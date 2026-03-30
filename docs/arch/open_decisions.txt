@@ -1,0 +1,67 @@
+Modern C - Current Open Questions
+
+Purpose
+
+This file is no longer a first-pass questionnaire.
+The core language semantics now live in:
+- docs/arch/language_spec.txt
+- docs/arch/runtime_spec.txt
+- docs/arch/canonical_programs.txt
+
+The major language-design decisions are now settled for v0.2:
+- integer semantics and reduced UB
+- pointer aliasing and provenance rules
+- array, slice, buffer, and string model
+- explicit `(value, Error)` error handling
+- allocator shape and ownership rules
+- `defer` behavior
+- tagged unions and C interop boundary
+- minimal concurrency and atomic model
+- no hidden language runtime
+
+What remains open is smaller and mostly about packaging, conventions, and what v0.2 should standardize early.
+
+1. Standard Library Packaging and Naming
+
+The minimum library surface is mostly chosen, but the final packaging is still loose.
+
+Open questions:
+- How should the initial standard library be divided across modules such as `io`, `fs`, `mem`, `strings`, `utf8`, and concurrency primitives?
+- Which helper names should be treated as canonical in v0.2 versus illustrative?
+- Which APIs belong in the standard library versus a platform layer beneath it?
+
+Why this is still open:
+- The semantic surface is close to stable, but naming and packaging should not drift across examples, docs, and implementations.
+
+2. Error-Handling Ergonomics Follow-Up
+
+The semantic decision is settled: explicit returns, no hidden propagation. The remaining question is whether a very small convenience pattern is justified later.
+
+Open questions:
+- After more real programs are written, is explicit `(value, Error)` handling still acceptable without a standard propagation helper?
+- If a helper is ever added, can it remain purely explicit and avoid becoming a second hidden control-flow system?
+
+Why this is still open:
+- This should be decided from pressure in real code, not speculation. It is not a reason to reopen the basic error model now.
+
+Non-open items
+
+The following are not current open questions for v0.2 unless real program pressure reopens them:
+- signed overflow behavior
+- strict aliasing policy
+- UTF-8 and string ownership model
+- `Buffer<T>` versus `Slice<T>` roles
+- volatile versus atomic separation
+- thread, mutex, condvar, and atomic baseline
+- C interop spelling and explicit ABI annotations
+- `distinct` scalar types
+- test discovery convention and ordinary `func() Error` test shape
+- `mem.default_allocator() *Allocator` as the hosted default allocator accessor
+- explicit allocator parameters for allocating library APIs in v0.2
+- no broad hosted convenience wrappers that silently choose the default allocator in v0.2
+- exclusion of exceptions, GC, hidden init, and compile-time execution
+
+Change rule
+
+This file should list only unresolved decisions.
+Once a question is accepted into language_spec, runtime_spec, or the canonical programs, remove it from here rather than keeping historical discussion.

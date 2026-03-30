@@ -1,0 +1,683 @@
+Modern C - Compiler Design Ideas
+
+Purpose
+
+This document is a first-pass note on compiler architecture for Modern C.
+It is not a backend implementation plan and not yet a normative toolchain spec.
+Its purpose is to identify a compiler shape that fits the language philosophy:
+- simple enough to understand
+- explicit enough to preserve the language's semantic commitments
+- practical enough to ship on real targets without spending years on backend work first
+
+Core bias
+
+The compiler should follow the same bias as the language:
+- visible phases
+- small internal models
+- explicit lowering steps
+- no hidden semantic magic
+- fast ordinary builds
+
+If forced to choose, prefer:
+- semantic clarity over maximum optimizer cleverness
+- compiler simplicity over framework complexity
+- a language-owned IR over backend-owned semantics
+- ordinary artifacts over opaque pipelines
+
+1. High-Level Recommendation
+
+The pragmatic starting point is:
+- a small handwritten or simple parser frontend
+- a language-owned typed middle IR
+- an LLVM backend for code generation, object emission, and target coverage
+
+This gives Modern C:
+- fast development speed for the implementation
+- many targets without writing code generators immediately
+- a clear place to define wraparound arithmetic, aliasing rules, volatile access, atomics, and layout before machine lowering
+
+Recommendation:
+- Use LLVM as a backend.
+- Do not let LLVM become the compiler architecture.
+- Preserve the option to replace LLVM later with a native backend.
+
+2. What To Borrow From Thompson and Plan 9
+
+The useful part to borrow is the attitude, not necessarily the exact implementation strategy.
+
+Still-good ideas:
+- Keep the compiler small enough that one person can understand the whole path.
+- Keep the number of major phases low and obvious.
+- Treat compilation speed as a real design goal.
+- Keep object files, symbols, imports, and linking ordinary and visible.
+- Avoid making optimization the organizing principle of the entire compiler.
+- Prefer simple data structures and readable passes over abstract compiler frameworks.
+
+These values still fit Modern C very well.
+
+3. What Not To Copy Literally
+
+Some older Plan 9 era implementation ideas do not transfer directly.
+
+Less reusable today:
+- writing custom machine backends for many targets from day one
+- relying on a very thin optimization story if competitive code quality matters
+- assuming target ABIs, debug formats, and object pipelines remain simple
+- tying too much of the compiler structure directly to a single target family
+
+Modern targets bring more ABI, debug-info, sanitizer, and platform complexity than that era had to absorb.
+That makes a reusable backend more attractive now than it was then.
+
+4. Proposed Compiler Shape
+
+The initial compiler should have a small number of explicit stages:
+
+1. Lexing
+2. Parsing
+3. Name resolution and import checking
+4. Type checking and layout computation
+5. Constant evaluation for the intentionally narrow compile-time subset
+6. Lowering to a typed MIR
+7. Simple middle-end cleanup and validation passes
+8. Lowering to LLVM IR
+9. LLVM code generation and object emission
+
+This is enough to keep the pipeline understandable while still separating language semantics from backend mechanics.
+
+5. Frontend Design
+
+Frontend guidance:
+- Keep the grammar regular and easy to parse.
+- Prefer a straightforward AST over an overly compressed syntax tree.
+- Keep source locations on all meaningful nodes for diagnostics.
+- Resolve imports and names before type checking rather than mixing all logic together.
+
+The frontend should not try to be clever.
+Its job is to produce a semantically precise program representation, not to begin optimization early.
+
+6. Semantic Phase
+
+The semantic phase should own the language contract.
+
+It should decide and record:
+- types of all expressions
+- sizes, alignments, and field offsets
+- distinct-type identity
+- C ABI layout when requested
+- fallible versus infallible operations
+- whether operations are ordinary, volatile, or atomic
+- whether a parameter has `@noalias`
+
+This is also the right place to enforce language rules such as:
+- no implicit numeric conversions
+- explicit array-to-slice conversion only
+- tagged-union exhaustiveness
+- explicit error-result usage rules
+- restrictions on compile-time evaluation
+
+7. A Language-Owned MIR
+
+The key architectural choice is to introduce a small typed MIR between the frontend and LLVM.
+
+The MIR should be:
+- typed
+- explicit about control flow
+- explicit about loads, stores, calls, and conversions
+- simple enough to dump and read directly
+- close enough to the language to preserve its semantics faithfully
+
+The MIR should probably use basic blocks and a mostly SSA-style value model.
+It does not need to be fancy.
+It needs to be boring and exact.
+
+Important properties for Modern C MIR:
+- integer operations distinguish wraparound behavior explicitly
+- division-by-zero and invalid shift checks lower to explicit faulting operations or trap edges
+- volatile load and store are distinct from atomic operations
+- atomic operations carry explicit memory order
+- pointer-to-integer and integer-to-pointer conversions are explicit operations
+- aliasing facts come only from the language semantics and explicit annotations
+- array, slice, and buffer conversions are explicit
+- C ABI calls and normal language calls can be distinguished if needed
+
+Why MIR matters:
+- it prevents LLVM defaults from silently redefining the language
+- it gives a clean target for debugging and testing the compiler
+- it preserves the option of adding a second backend later
+
+8. LLVM Strategy
+
+LLVM is a good fit here if used narrowly.
+
+LLVM should provide:
+- target support
+- instruction selection
+- register allocation
+- machine code generation
+- object emission
+- backend optimization passes
+
+LLVM should not define:
+- the language's aliasing rules
+- the language's memory model
+- the language's error behavior
+- the meaning of volatile versus atomic operations
+- the language's layout promises beyond what the frontend and MIR already decided
+
+Practical rule:
+- Modern C semantics must be fully determined before LLVM lowering.
+
+9. Middle-End Scope
+
+The compiler should have a small middle-end of its own before handing code to LLVM.
+
+Good early passes:
+- constant folding
+- dead branch elimination after constant evaluation
+- simple local copy propagation
+- dead temporary elimination
+- control-flow simplification
+- validation passes that check MIR invariants
+
+Avoid early overreach:
+- no giant optimizer framework up front
+- no speculative alias-analysis machinery beyond what the language exposes
+- no heroic whole-program optimization requirement for the first compiler
+
+The first compiler should aim to be correct, fast enough, and understandable.
+
+10. Fast Build Mode Versus Optimized Build Mode
+
+A Thompson-compatible toolchain should treat build speed as a design feature.
+
+Recommendation:
+- Make a fast default build mode that does minimal middle-end work and light LLVM optimization.
+- Make a separate optimized build mode for release builds.
+- Keep checked builds as an explicit mode where runtime faults and extra validation are easier to enable.
+
+This fits the language's explicit philosophy better than one giant always-on optimization path.
+
+11. Artifacts Worth Exposing
+
+The compiler should expose its internal products in ordinary developer-facing forms.
+
+Useful outputs:
+- token dump
+- AST dump
+- typed AST or semantic tree dump
+- MIR dump
+- LLVM IR dump
+- object emission without forced linking
+
+This keeps the toolchain inspectable and makes language debugging much easier.
+
+12. Diagnostics Philosophy
+
+Diagnostics should be direct and concrete.
+
+Recommendations:
+- prefer one precise primary error over many cascading guesses
+- point to both sides of a mismatch when relevant
+- show resolved types in type errors
+- show import or symbol paths in module errors
+- make layout and ABI diagnostics explicit rather than mysterious
+
+This is especially important for a language that wants to be simpler than C while staying low level.
+
+13. Backend Independence Goal
+
+Even if LLVM is the first backend, the compiler should not be structurally trapped inside it.
+
+To preserve that freedom:
+- keep MIR independent of LLVM IR concepts where practical
+- keep type and layout logic entirely outside the backend
+- keep calling-convention decisions explicit at lowering boundaries
+- avoid letting backend quirks leak into the surface language
+
+Possible future backends:
+- a simple native backend for one architecture
+- an interpreter or MIR executor for testing
+- a verifier-focused backend for semantic validation
+
+None of these need to exist now.
+The point is to keep them possible.
+
+14. Suggested Initial Toolchain Scope
+
+A sensible first compiler could aim for:
+- one hosted target first
+- object generation and linking through ordinary platform tools
+- LLVM backend initially
+- clear debug and checked build modes
+- no incremental compilation machinery at the start
+- no LTO requirement
+- no integrated package manager tied into the compiler itself
+
+That keeps the first implementation small enough to finish.
+
+15. Bottom-Line Architecture
+
+If Modern C wants Thompson-like simplicity in a modern environment, the right compromise is:
+- simple frontend
+- strict semantic phase
+- small typed MIR
+- small in-house middle-end
+- LLVM for backend work
+
+That preserves the values worth keeping from older compiler designs:
+- clarity
+- speed
+- explicit artifacts
+- visible toolchain boundaries
+
+while avoiding the expensive parts that are no longer a good trade:
+- immediate custom backend work
+- backend-driven language semantics
+- excessive architecture-specific compiler structure
+
+Working recommendation
+
+Build the first compiler around a language-owned MIR and an LLVM backend.
+Take Thompson's simplicity as a design constraint on the compiler structure, not as a requirement to recreate the Plan 9 implementation strategy literally.
+
+16. Implementation Language Choices
+
+The compiler architecture described above does not force one implementation language, but implementation language still matters a lot in practice.
+
+The real question is not "what is theoretically possible?"
+The real question is "which choice gives the cleanest path to a finished first compiler without distorting the architecture?"
+
+Practical candidates:
+- C++
+- Rust
+- Go
+- Zig
+
+16A. C++
+
+Strengths:
+- best direct fit with LLVM's native API surface
+- easiest path if the first backend is LLVM-heavy
+- mature tooling for compiler and systems projects
+- no FFI boundary needed for most LLVM interaction
+
+Costs:
+- language complexity can leak into the compiler implementation if discipline is weak
+- easier to build abstraction-heavy or ownership-confused internals by accident
+- build-system and dependency complexity can grow quickly if not constrained
+
+Best use case:
+- most pragmatic choice if the goal is to get an LLVM-backed compiler running quickly without fighting bindings
+
+16B. Rust
+
+Strengths:
+- good fit for implementing a compiler frontend, semantic phase, and MIR cleanly
+- strong help from the language around ownership bugs in compiler internals
+- good ecosystem for CLI tools and structured libraries
+
+Costs:
+- LLVM integration is less direct than in C++
+- binding choice becomes part of the architecture risk
+- some implementation friction appears exactly at the backend boundary
+
+Best use case:
+- strong option if the team values compiler-internal safety enough to accept more backend friction
+
+16C. Go
+
+Go is an option, but it is not the first recommendation for this particular plan.
+
+Strengths:
+- very simple implementation language
+- fast builds and straightforward tooling
+- good fit for command-line tools, drivers, and build orchestration
+- easy to keep the codebase readable if the design stays disciplined
+
+Costs:
+- much weaker fit for an LLVM-first compiler because LLVM integration is awkward compared with C++ and Rust
+- less natural for very low-level backend-adjacent work
+- likely to push you toward either cgo-heavy boundaries or a cleaner but more limited non-LLVM strategy
+
+Best use case:
+- plausible if you want a very simple frontend or driver and are willing to accept backend indirection, or if you later choose a different backend strategy
+
+Bottom line on Go:
+- yes, it is an option
+- no, it is probably not the best first choice if the plan is "language-owned MIR plus LLVM backend" 
+
+16D. Zig
+
+Strengths:
+- systems-language feel with simpler surface area than C++
+- good control over memory and explicitness in compiler internals
+- plausible fit for a small compiler codebase
+
+Costs:
+- less conventional choice for an LLVM-heavy compiler toolchain team
+- ecosystem and long-term tooling story may be less boring than C++ or Rust depending on goals
+
+Best use case:
+- interesting option if implementation-language experimentation is part of the project, less compelling if the main goal is the shortest path to a stable first compiler
+
+16E. Recommended Choice
+
+If the project keeps the current plan:
+- language-owned MIR
+- LLVM backend first
+- finish a real compiler before exploring backend purity
+
+Then the practical ranking is:
+
+1. C++
+2. Rust
+3. Go
+4. Zig
+
+Why C++ first:
+- it minimizes friction exactly where this architecture is most likely to hurt: the LLVM boundary
+
+Why Rust second:
+- it may produce a cleaner long-term compiler implementation, but it makes the backend boundary harder sooner
+
+Why Go is not first:
+- the frontend and driver would likely be pleasant
+- the LLVM boundary would likely be the tax you keep paying
+
+A different answer would make sense only if you changed one of the major premises, for example:
+- no LLVM backend
+- backend deferred for a long time
+- C backend first
+- compiler-as-tooling simplicity valued above backend integration quality
+
+Decision:
+- build the first compiler in C++
+
+Reason:
+- this keeps the architecture described above while minimizing friction at the LLVM boundary, which is the highest-risk integration point in the current plan
+
+17. Potential Repository Structure For C++
+
+This section now assumes the first compiler is implemented in C++.
+Its purpose is to keep the source tree aligned with the architectural boundaries above without overengineering the project.
+
+Guiding rule:
+- organize directories by compiler responsibility, not by speculative abstraction layers
+
+Recommended C++-oriented top-level structure:
+
+```text
+compiler/
+	CMakeLists.txt or equivalent
+	tools/
+		mc/
+	include/
+		mc/
+			source/
+			diag/
+			lexer/
+			parser/
+			ast/
+			resolve/
+			types/
+			layout/
+			sema/
+			consteval/
+			mir/
+			passes/
+			lower_llvm/
+			backend/
+			driver/
+			target/
+			support/
+	src/
+		source/
+		diag/
+		lexer/
+		parser/
+		ast/
+		resolve/
+		types/
+		layout/
+		sema/
+		consteval/
+		mir/
+		passes/
+		lower_llvm/
+		backend/
+		driver/
+		target/
+		support/
+	runtime/
+		hosted/
+		freestanding/
+	std/
+		core/
+		mem/
+		strings/
+		utf8/
+		io/
+		fs/
+		sync/
+		os/
+		hal/
+	tests/
+		parse/
+		sema/
+		mir/
+		codegen/
+		runtime/
+		std/
+	docs/
+```
+
+Directory intent:
+
+- `tools/mc`
+	- command-line entrypoint for the compiler driver
+	- argument parsing, mode selection, and wiring to the internal driver
+	- should stay thin; most logic belongs in reusable library code under `src/`
+
+- `include/mc/...`
+	- public internal headers shared across compiler subsystems
+	- keep headers small and aligned to subsystem boundaries rather than building one giant catch-all include tree
+
+- `src/...`
+	- subsystem implementations
+	- should mirror `include/mc/...` closely enough that the codebase is easy to navigate
+
+- `src/source`
+	- source files, spans, file tables, and line-mapping utilities
+
+- `src/diag`
+	- diagnostics formatting and reporting
+	- should stay independent enough that every phase can report through it cleanly
+
+- `src/lexer`
+	- tokenization only
+
+- `src/parser`
+	- syntax parsing only
+	- should build AST nodes without performing semantic work
+
+- `src/ast`
+	- syntax tree node definitions and AST helpers
+
+- `src/resolve`
+	- import resolution and name binding
+	- symbol-table machinery can live here unless it becomes large enough to split out later
+
+- `src/types`
+	- type representations and type-comparison logic
+
+- `src/layout`
+	- size, alignment, field offset, and ABI layout computation
+
+- `src/sema`
+	- semantic analysis that turns parsed syntax into a fully typed checked program
+
+- `src/consteval`
+	- narrow constant evaluation for compile-time constants only
+
+- `src/mir`
+	- MIR definitions, builders, printers, and validators
+
+- `src/passes`
+	- small MIR cleanup or simplification passes owned by the compiler
+
+- `src/lower_llvm`
+	- lowering from MIR to LLVM IR
+	- keep LLVM-specific details here rather than leaking them into `mir` or `sema`
+
+- `src/backend`
+	- shared backend interface and codegen orchestration
+	- if a second backend is added later, it should fit here cleanly
+
+- `src/driver`
+	- compilation pipeline orchestration for one module or build invocation
+
+- `src/target`
+	- target triples, ABI descriptors, calling conventions, and platform facts needed by lowering
+
+- `src/support`
+	- boring reusable utilities that do not belong to semantic subsystems
+	- this directory should stay small to avoid becoming a junk drawer
+
+- `runtime/hosted`
+	- minimal startup shims and hosted support glue
+
+- `runtime/freestanding`
+	- freestanding entry or target-support stubs where needed
+
+- `std/...`
+	- standard library sources, structured according to the emerging library architecture
+	- keep standard-library code separate from compiler internals and startup code
+
+- `tests/parse`
+	- syntax and recovery tests
+
+- `tests/sema`
+	- type-checking, layout, imports, and diagnostics tests
+
+- `tests/mir`
+	- MIR construction, validation, and pass tests
+
+- `tests/codegen`
+	- LLVM lowering and object-generation tests
+
+- `tests/runtime`
+	- startup and runtime-boundary tests
+
+- `tests/std`
+	- standard-library behavior tests
+
+Practical notes:
+- keep `sema`, `mir`, and `lower_llvm` as clearly separate directories so language semantics do not blur into backend lowering
+- keep `runtime` outside `std` so startup support does not quietly become a normal library subsystem
+- keep `target` separate from `backend` so target facts do not become LLVM-specific by accident
+- keep the command-line driver thin; most real work should live in library code that can be tested directly
+- in C++, prefer straightforward value types, `std::vector`, `std::string`, and RAII where they clarify ownership; do not build a framework of custom containers before the compiler is real
+- keep cross-subsystem interfaces explicit in headers instead of relying on large transitive include chains
+
+Possible simplification for a very early compiler:
+
+```text
+compiler/
+	tools/
+	include/mc/
+	src/
+		source/
+		diag/
+		lexer/
+		parser/
+		ast/
+		sema/
+		mir/
+		lower_llvm/
+		driver/
+	tests/
+```
+
+That smaller structure is enough for an initial implementation.
+The larger structure above is mainly a way to keep future growth orderly without over-engineering the first version.
+
+18. First Milestone Plan For A C++ Compiler
+
+The first compiler should be built in small milestones that each leave behind a usable artifact.
+Do not jump directly from parser prototypes to full code generation.
+
+Milestone 0: Skeleton And Driver
+- create the C++ project skeleton and build files
+- wire a minimal `mc` binary
+- support reading source files and printing a token dump or AST dump
+- establish the diagnostics subsystem and source-location model
+
+Success condition:
+- `mc check foo.mc` can read a file, lex it, parse it, and print useful diagnostics on malformed input
+
+Milestone 1: Parser And AST Stability
+- implement the core grammar
+- produce a stable AST
+- add parser tests and AST dump tests
+- keep imports, exports, declarations, statements, and expressions round-trippable enough for debugging
+
+Success condition:
+- a representative subset of the language spec parses correctly and bad syntax produces precise errors
+
+Milestone 2: Resolution, Types, And Check Mode
+- implement name resolution and import checking
+- implement the core type system
+- compute layout information needed by the language
+- enforce explicit conversions, tagged-union exhaustiveness, and the current allocation rules
+- make `mc check` the first serious semantic tool
+
+Success condition:
+- a nontrivial subset of the canonical programs type-checks correctly
+- compile-fail tests for type errors and import errors are in place
+
+Milestone 3: MIR Bring-Up
+- lower checked programs into a typed MIR
+- add MIR validation
+- add MIR dumps for developer inspection
+- implement a few simple MIR cleanup passes
+
+Success condition:
+- `mc check --dump-mir` works on semantically valid programs
+- MIR captures wraparound arithmetic, explicit loads or stores, calls, and basic control flow
+
+Milestone 4: LLVM Lowering On One Hosted Target
+- lower MIR to LLVM IR
+- emit object files for one hosted target first
+- link using ordinary platform tooling
+- support the hosted startup path and canonical `main(args: Slice<cstr>) i32` convention
+
+Success condition:
+- small hosted programs compile, link, and run on one target
+- at least the hello-world and simple allocation examples work end to end
+
+Milestone 5: Runtime And Standard Library Bring-Up
+- bring up the minimum hosted runtime shim
+- implement enough of `mem`, `io`, `strings`, and `fs` for the canonical examples
+- validate `mem.default_allocator()` and `Buffer<T>` ownership paths
+
+Success condition:
+- several canonical programs run end to end under the real toolchain
+
+Milestone 6: Test And Spec Tightening
+- add compile-pass, compile-fail, run-output, MIR, runtime, and stdlib tests
+- compare canonical programs against actual compiler behavior
+- tighten wording in the language and build specs where the implementation revealed ambiguity
+
+Success condition:
+- the compiler and docs stabilize together rather than drifting apart
+
+What should stay out of the early milestones:
+- multiple backends
+- incremental compilation
+- package management
+- LTO
+- heroic optimization work
+- broad IDE protocol work
+
+The first real goal is not a perfect compiler.
+The first real goal is a small honest compiler that can parse, check, lower, and run real programs on one hosted target without violating the language design.

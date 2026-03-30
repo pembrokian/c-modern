@@ -1,0 +1,201 @@
+Modern C - Test Examples
+
+Purpose
+
+This document gives concrete example test files that match the current testing direction:
+- ordinary source files
+- `test_*` functions
+- `func() Error` result shape
+- no test-specific language syntax
+
+1. Unit Test Example
+
+File:
+
+```text
+tests/parse_config_test.mc
+```
+
+Sketch:
+
+```text
+import strings
+
+func test_parse_port() Error {
+    cfg, err = parse_config("port=8080\nmode=dev")
+    if err != nil {
+        return err
+    }
+
+    if cfg.port != 8080 {
+        return Error.test_failure("expected port 8080")
+    }
+
+    if !strings.equal(cfg.mode, "dev") {
+        return Error.test_failure("expected mode dev")
+    }
+
+    return nil
+}
+
+func test_missing_equals_fails() Error {
+    _, err = parse_config("port 8080")
+    if err == nil {
+        return Error.test_failure("expected parse failure")
+    }
+    return nil
+}
+```
+
+What this demonstrates:
+- direct use of ordinary library code
+- explicit success and failure checks
+- no assertion macros required
+
+2. Integration Test Example
+
+File:
+
+```text
+tests/grep_integration_test.mc
+```
+
+Sketch:
+
+```text
+import os
+import strings
+
+func test_grep_finds_match() Error {
+    result, err = os.run({
+        program: "build/checked/grep",
+        args: ["needle", "tests/data/corpus.txt"],
+    })
+    if err != nil {
+        return err
+    }
+
+    if result.exit_code != 0 {
+        return Error.test_failure("expected exit code 0")
+    }
+
+    if !strings.has_prefix(result.stdout, "needle") {
+        return Error.test_failure("expected matching output")
+    }
+
+    return nil
+}
+```
+
+What this demonstrates:
+- integration tests are still just ordinary tests
+- subprocess behavior is handled through normal library or platform APIs
+
+3. Test Data Layout Example
+
+Possible tree:
+
+```text
+tests/
+  parse_config_test.mc
+  grep_integration_test.mc
+  data/
+    corpus.txt
+    sample.conf
+```
+
+What this demonstrates:
+- test inputs stay as ordinary version-controlled files
+- no fixture registry or hidden resource mechanism is required
+
+4. Compiler Compile-Fail Example
+
+File:
+
+```text
+compiler/tests/compile_fail/distinct_mismatch.mc
+```
+
+Sketch:
+
+```text
+// error: cannot convert UserId to FileId
+
+distinct UserId = i32
+distinct FileId = i32
+
+func takes_file(id: FileId) {}
+
+func main(args: Slice<cstr>) i32 {
+    user = UserId(7)
+    takes_file(user)
+    return 0
+}
+```
+
+What this demonstrates:
+- compile-fail tests can live as ordinary source files with expectation comments
+- expectation matching should be stable-substring or diagnostic-id based
+
+5. Compiler Run-Output Example
+
+File:
+
+```text
+compiler/tests/run_output/hello_world.mc
+```
+
+Sketch:
+
+```text
+import io
+
+func main(args: Slice<cstr>) i32 {
+    err = io.write_line("hello")
+    if err != nil {
+        return 1
+    }
+    return 0
+}
+```
+
+Possible expectation:
+
+```text
+stdout: hello\n
+exit: 0
+```
+
+What this demonstrates:
+- runtime and codegen behavior can be validated through normal executable behavior
+
+6. Compiler MIR Test Example
+
+File:
+
+```text
+compiler/tests/mir/wrap_add.mc
+```
+
+Sketch:
+
+```text
+func add(a: i32, b: i32) i32 {
+    return a + b
+}
+```
+
+Possible expectation:
+
+```text
+contains: add_i32_wrap
+contains: return
+```
+
+What this demonstrates:
+- semantic lowering can be tested directly without relying only on final machine code
+
+Bottom line
+
+These examples are intentionally plain.
+If the testing model starts requiring much more machinery than this for ordinary code, the design should be reconsidered.

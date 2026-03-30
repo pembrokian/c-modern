@@ -1,0 +1,649 @@
+Modern C - Canonical Programs for Design Pressure Testing
+
+Purpose
+
+These programs are not only examples. They are acceptance tests for the language design.
+If the language makes these programs awkward, ambiguous, or error-prone, the spec is not finished.
+
+Selection criteria:
+- Common systems tasks
+- Pressure on allocation and cleanup
+- Pressure on slices and strings
+- Pressure on tagged unions and error handling
+- Pressure on interop and low-level memory semantics
+
+1. Hello, stdout
+
+Purpose:
+- Establish minimal module structure
+- Exercise import syntax, string literals, and explicit I/O
+
+Sketch:
+
+export { main }
+
+import io
+
+func main() i32 {
+    err = io.write_line("hello, world")
+    if err != nil {
+        return 1
+    }
+    return 0
+}
+
+What this validates:
+- String literal semantics
+- Explicit error handling for common I/O
+- No hidden runtime initialization
+- Language-level entrypoint neutrality; `main` is only a build convention
+- Standard I/O lives in the standard library surface rather than only in the platform layer
+
+2. Read Entire File Into Memory
+
+Purpose:
+- Exercise allocator APIs, slices, defer, and failure handling
+
+Sketch:
+
+export { read_file }
+
+import fs
+import mem
+
+func read_file(path: str, alloc: *Allocator) (Buffer<ui8>, Error) {
+    size, err = fs.file_size(path)
+    if err != nil {
+        return Buffer<ui8>{ ptr: nil, len: 0, cap: 0, alloc: alloc }, err
+    }
+
+    buf, err = alloc.alloc(alloc.ctx, size, 1)
+    if err != nil {
+        return Buffer<ui8>{ ptr: nil, len: 0, cap: 0, alloc: alloc }, err
+    }
+
+    read_len, err = fs.read_all(path, Slice<ui8>{ ptr: buf, len: size })
+    if err != nil {
+        alloc.free(alloc.ctx, buf, size, 1)
+        return Buffer<ui8>{ ptr: nil, len: 0, cap: 0, alloc: alloc }, err
+    }
+
+    return Buffer<ui8>{ ptr: buf, len: read_len, cap: size, alloc: alloc }, nil
+}
+
+What this validates:
+- Explicit allocator identity
+- Error paths without exceptions
+- Return of owned memory through an explicit owning type
+- Zero-value-plus-Error as the standard fallible return convention
+
+3. Scoped Temporary Buffer
+
+Purpose:
+- Exercise defer behavior inside nested scopes and loops
+
+Sketch:
+
+func hash_lines(lines: Slice<str>, alloc: *Allocator) (ui64, Error) {
+    sum: ui64 = 0
+
+    for line in lines {
+        tmp, err = alloc.alloc(alloc.ctx, line.len, 1)
+        if err != nil {
+            return 0, err
+        }
+        defer alloc.free(alloc.ctx, tmp, line.len, 1)
+
+        copy_bytes(tmp, line)
+        sum = sum + hash_bytes(Slice<ui8>{ ptr: tmp, len: line.len })
+    }
+
+    return sum, nil
+}
+
+What this validates:
+- Per-iteration defer scope
+- Immediate evaluation of deferred arguments
+- Lack of hidden lifetime extension
+- Concrete allocator interface shape via function-table dispatch
+- Temporary-versus-returned storage handled through explicit owning and borrowed types rather than a new storage category
+
+4. Line-Oriented Config Parser
+
+Purpose:
+- Exercise borrowed strings, UTF-8 assumptions, and the standard `(value, Error)` failure convention
+
+Sketch:
+
+func parse_config(input: str) (Config, Error) {
+    cfg = Config{}
+
+    for line_no, line in strings.lines(input) {
+        if strings.is_blank(line) {
+            continue
+        }
+
+        key, value, ok = strings.split_once(line, "=")
+        if !ok {
+            return Config{}, Error.parse_missing_equals(line_no)
+        }
+
+        switch key {
+            case "port":
+                cfg.port = parse_u16(value)
+            case "mode":
+                cfg.mode = value
+            default:
+                return Config{}, Error.parse_unknown_key(line_no)
+        }
+    }
+
+    return cfg, nil
+}
+
+What this validates:
+- str as valid UTF-8 only
+- Standard `(value, Error)` failure shape
+- Borrowed substrings into larger storage
+- UTF-8-preserving string operations or explicit failure
+- Early standard string surface includes `lines`, `split_once`, and UTF-8 validation primitives
+
+5. Arena-Backed AST Build
+
+Purpose:
+- Exercise custom allocators, allocator pairing, and lifetime discipline in a realistic compiler-like workload
+
+Sketch:
+
+struct Parser {
+    arena: *Arena
+    tokens: Slice<Token>
+    pos: usize
+}
+
+func parse_expr(p: *Parser) (*Expr, Error) {
+    node, err = arena_new(p.arena, Expr)
+    if err != nil {
+        return nil, err
+    }
+
+    node.kind = ExprKind.Int
+    node.value = expect_int(p)
+    return node, nil
+}
+
+What this validates:
+- Custom allocator API shape
+- Pointer stability inside arena allocation
+- Clear separation between allocation policy and language semantics
+- Typed allocation helpers as part of the thin standard allocator helper surface
+
+6. Recursive Expression Evaluator
+
+Purpose:
+- Exercise tagged unions, exhaustive switch, and ordinary `(value, Error)` multi-return propagation
+
+Sketch:
+
+enum Expr {
+    Int(value: i64)
+    Add(left: *Expr, right: *Expr)
+    Div(left: *Expr, right: *Expr)
+}
+
+func eval(expr: *Expr) (i64, Error) {
+    switch expr.* {
+        case Expr.Int(value):
+            return value, nil
+        case Expr.Add(left, right):
+            a, err = eval(left)
+            if err != nil {
+                return 0, err
+            }
+
+            b, err = eval(right)
+            if err != nil {
+                return 0, err
+            }
+
+            return a + b, nil
+        case Expr.Div(left, right):
+            a, err = eval(left)
+            if err != nil {
+                return 0, err
+            }
+
+            b, err = eval(right)
+            if err != nil {
+                return 0, err
+            }
+
+            if b == 0 {
+                return 0, Error.divide_by_zero()
+            }
+            return a / b, nil
+    }
+}
+
+What this validates:
+- Exhaustive switch semantics
+- Tagged-union case destructuring syntax
+- Real cost of explicit error propagation
+- Known verbosity cost of explicit multi-return handling in recursive code
+
+7. C ABI Boundary Example
+
+Purpose:
+- Exercise explicit C interop without header parsing
+
+Sketch:
+
+@abi(c)
+struct CStat {
+    size: ui64
+    mode: ui32
+}
+
+extern(c) func c_stat(path: cstr, out: *CStat) i32
+
+func file_size(path: cstr) (ui64, Error) {
+    st = CStat{}
+    rc = c_stat(path, &st)
+    if rc != 0 {
+        return 0, Error.from_errno()
+    }
+    return st.size, nil
+}
+
+What this validates:
+- Explicit ABI annotation
+- Distinct C string interop type
+- No dependency on C header parsing
+- Frozen C interop spelling set: `extern(c)`, `@abi(c)`, and `cstr`
+
+8. MMIO Register Access
+
+Purpose:
+- Exercise volatile or MMIO semantics and pointer safety at the hardware boundary
+
+Sketch:
+
+const UART0_BASE: uintptr = 0x4000_1000
+
+func uart_tx_ready() bool {
+    status_ptr = mmio_ptr<ui32>(UART0_BASE + 0x18)
+    status = volatile_load(status_ptr)
+    return (status & 0x1) != 0
+}
+
+func uart_write_byte(b: ui8) {
+    data_ptr = mmio_ptr<ui32>(UART0_BASE)
+    while !uart_tx_ready() {
+    }
+    volatile_store(data_ptr, ui32(b))
+}
+
+What this validates:
+- The need for explicit volatile or MMIO operations
+- Integer-pointer casts at hardware boundaries
+- The single-threaded ordering guarantee for observable memory operations
+- Volatile operations ordered relative to surrounding memory accesses
+- Library-based MMIO surface with `mmio_ptr`, `volatile_load`, and `volatile_store`
+
+9. Bounded Ring Buffer
+
+Purpose:
+- Exercise wraparound arithmetic, slices, and explicit invariants without hidden synchronization
+
+Sketch:
+
+struct RingBuffer {
+    buf: Slice<ui8>
+    head: usize
+    tail: usize
+    len: usize
+}
+
+func push(rb: *RingBuffer, b: ui8) bool {
+    if rb.len == rb.buf.len {
+        return false
+    }
+
+    rb.buf.ptr[rb.tail] = b
+    rb.tail = (rb.tail + 1) % rb.buf.len
+    rb.len = rb.len + 1
+    return true
+}
+
+What this validates:
+- Defined integer behavior
+- Bounds reasoning with slices
+- No reliance on UB for common data-structure code
+- `%` on `usize` frozen as mathematical remainder after truncating division
+- Slice indexing and slicing rules specified sharply for low-level containers
+
+10. Minimal Buildable Tool: grep-lite
+
+Purpose:
+- Combine modules, file I/O, string processing, allocation, and explicit errors into a realistic utility
+
+Sketch:
+- Read argv as explicit slices or cstr values at the program boundary.
+- Open a file.
+- Stream lines through a search function.
+- Print matches to stdout.
+- Return process exit codes explicitly.
+
+What this validates:
+- Whether the language can express an everyday tool without ceremony
+- Whether standard library boundaries feel coherent
+- Whether explicit error returns stay acceptable outside toy examples
+
+11. Shared Counter with Mutex
+
+Purpose:
+- Exercise thread creation, join, mutex semantics, and happens-before through lock or unlock
+
+Sketch:
+
+struct Counter {
+    mu: Mutex
+    value: i64
+}
+
+struct WorkerArgs {
+    counter: *Counter
+    iterations: usize
+}
+
+func worker(args: *WorkerArgs) {
+    i: usize = 0
+    while i < args.iterations {
+        mutex_lock(&args.counter.mu)
+        args.counter.value = args.counter.value + 1
+        mutex_unlock(&args.counter.mu)
+        i = i + 1
+    }
+}
+
+func run_counter_test() (i64, Error) {
+    counter = Counter{ mu: mutex_init(), value: 0 }
+    args1 = WorkerArgs{ counter: &counter, iterations: 100000 }
+    args2 = WorkerArgs{ counter: &counter, iterations: 100000 }
+
+    t1, err = thread_spawn(worker, &args1)
+    if err != nil {
+        return 0, err
+    }
+
+    t2, err = thread_spawn(worker, &args2)
+    if err != nil {
+        thread_join(t1)
+        return 0, err
+    }
+
+    thread_join(t1)
+    thread_join(t2)
+    return counter.value, nil
+}
+
+What this validates:
+- Thread spawn and join as library primitives
+- Mutex lock and unlock as synchronization edges
+- Data-race-free shared state without language-level concurrency syntax
+- Thread entrypoints as ordinary functions
+- Explicit mutex initialization through constructor functions
+
+12. Producer-Consumer with Condition Variable
+
+Purpose:
+- Exercise blocking coordination, condvar semantics, and the relationship between wait and mutex reacquisition
+
+Sketch:
+
+struct Queue {
+    mu: Mutex
+    cv: Condvar
+    buf: Buffer<ui8>
+    len: usize
+    closed: bool
+}
+
+func queue_pop(q: *Queue) (ui8, bool) {
+    mutex_lock(&q.mu)
+    defer mutex_unlock(&q.mu)
+
+    while q.len == 0 && !q.closed {
+        condvar_wait(&q.cv, &q.mu)
+    }
+
+    if q.len == 0 && q.closed {
+        return 0, false
+    }
+
+    b = q.buf.ptr[0]
+    shift_left(q.buf.ptr, q.len)
+    q.len = q.len - 1
+    return b, true
+}
+
+func queue_push(q: *Queue, b: ui8) bool {
+    mutex_lock(&q.mu)
+    defer mutex_unlock(&q.mu)
+
+    if q.closed || q.len == q.buf.len {
+        return false
+    }
+
+    q.buf.ptr[q.len] = b
+    q.len = q.len + 1
+    condvar_signal(&q.cv)
+    return true
+}
+
+What this validates:
+- Condition-variable wait semantics
+- Blocking coordination without channels in the language
+- The rule that wait resumes only after the mutex is reacquired
+- Condition variables as standard-library primitives rather than language features
+- Bounded queues remain userland in v0.2; the primitive layer must still make them straightforward to implement
+
+13. Atomic Flag Publication
+
+Purpose:
+- Exercise atomics, memory orders, and atomic publication without overcommitting to a high-level concurrency framework
+
+Sketch:
+
+struct PublishedData {
+    value: i32
+}
+
+var ready: Atomic<ui32>
+var shared: PublishedData
+
+func producer() {
+    shared.value = 42
+    atomic_store(&ready, 1, release)
+}
+
+func consumer() i32 {
+    while atomic_load(&ready, acquire) == 0 {
+    }
+    return shared.value
+}
+
+What this validates:
+- The need for atomic load and store with explicit memory order
+- Release-acquire publication as a portable communication pattern
+- Clear separation between volatile MMIO semantics and thread synchronization
+- Restricted `Atomic<T>` as the standard atomic surface
+- Weaker memory orders exposed alongside a `seq_cst` default
+- Atomic semantics defined independently of any lock-free guarantee
+
+14. Distinct Type Safety
+
+Purpose:
+- Exercise zero-cost logical type separation without implicit conversion
+
+Sketch:
+
+distinct FileId = i32
+distinct UserId = i32
+
+func lookup_file(id: FileId) (FileInfo, Error)
+func lookup_user(id: UserId) (UserInfo, Error)
+
+func load_owner(file_id: FileId) (UserInfo, Error) {
+    file, err = lookup_file(file_id)
+    if err != nil {
+        return UserInfo{}, err
+    }
+
+    owner_id = UserId(file.owner_raw)
+    return lookup_user(owner_id)
+}
+
+What this validates:
+- `distinct` types as zero-cost semantic barriers
+- Explicit conversion only at real boundary crossings
+- Prevention of accidental interchange between logically different IDs
+- `distinct` limited to scalar base types in v0.2
+
+15. Fixed Array, Slice, and Buffer Conversion
+
+Purpose:
+- Exercise the finalized container model and explicit view formation
+
+Sketch:
+
+func checksum_block(block: [16]ui8) ui32 {
+    bytes = slice_from_array(&block)
+    return checksum(bytes)
+}
+
+func copy_prefix(src: Slice<ui8>, alloc: *Allocator) (Buffer<ui8>, Error) {
+    out, err = buffer_new<ui8>(alloc, 16)
+    if err != nil {
+        return Buffer<ui8>{ ptr: nil, len: 0, cap: 0, alloc: alloc }, err
+    }
+
+    n = min(src.len, 16)
+    copy_bytes(slice_from_buffer(&out)[0:n], src[0:n])
+    out.len = n
+    return out, nil
+}
+
+What this validates:
+- `[N]T` as fixed owned storage
+- Explicit conversion from array to slice and from buffer to slice
+- Clear separation between non-owning views and owning dynamic storage
+- Frozen helper spellings: `slice_from_array` and `slice_from_buffer`
+
+16. Hosted Default Allocator Use
+
+Purpose:
+- Exercise the explicit hosted allocator convention without turning allocation into ambient runtime state
+
+Sketch:
+
+import mem
+import io
+
+func main(args: Slice<cstr>) i32 {
+    alloc = mem.default_allocator()
+    buf, err = mem.buffer_new<ui8>(alloc, 4096)
+    if err != nil {
+        return 1
+    }
+    defer mem.buffer_free(&buf)
+
+    view = slice_from_buffer(&buf)
+    fill_bytes(view, 0)
+
+    err = io.write_line("allocator ready")
+    if err != nil {
+        return 1
+    }
+
+    return 0
+}
+
+What this validates:
+- Hosted code has one explicit conventional heap entrypoint
+- The default allocator remains a library call, not hidden state
+- `buffer_free` is the conventional release path for `Buffer<T>`
+- Owned storage still moves through `Buffer<T>` rather than raw heap pointers in ordinary code
+
+17. Arena Allocator Through The Common Protocol
+
+Purpose:
+- Exercise arena allocation as a library policy layered on top of the common `Allocator` protocol
+
+Sketch:
+
+struct Parser {
+    alloc: *Allocator
+    tokens: Slice<Token>
+    pos: usize
+}
+
+func parse_expr(p: *Parser) (*Expr, Error) {
+    node, err = mem.alloc_value<Expr>(p.alloc)
+    if err != nil {
+        return nil, err
+    }
+
+    node.kind = ExprKind.Int
+    node.value = expect_int(p)
+    return node, nil
+}
+
+func build_ast(tokens: Slice<Token>) (*Expr, Error) {
+    arena = arena_init(mem.default_allocator(), 64 * 1024)
+    defer arena_deinit(&arena)
+
+    parser = Parser{ alloc: arena_allocator(&arena), tokens: tokens, pos: 0 }
+    return parse_expr(&parser)
+}
+
+What this validates:
+- Arena or bump allocation stays a library concern, not a language feature
+- Custom allocators can participate through the same `Allocator` protocol
+- Reusable code can allocate through an abstract allocator without knowing the concrete storage policy
+- The allocation convention supports compiler-style workloads without inventing new syntax
+
+Acceptance criteria for the language
+
+The language should be considered healthy only if these programs can be written with:
+- No hidden allocation
+- No hidden control flow
+- No ambiguous ownership transfer
+- No dependence on optimizer folklore
+- No dependence on unspecified thread behavior
+- No accidental mixing of logically distinct scalar identifiers
+- A standard library small enough to understand, but large enough to avoid rewriting primitives constantly
+
+Failure signals
+
+Revisit the spec if several of these programs require:
+- Repeated allocator boilerplate that obscures logic
+- Excessive error noise with no standard conventions
+- Unclear lifetime rules for slices or strings
+- FFI patterns that require unsafe casts everywhere
+- Concurrency patterns that require dropping into platform-specific APIs for basic correctness
+- More compile-time machinery to stay ergonomic
+
+Current design pressures revealed by these programs
+
+- The language needs a distinct owning buffer type; borrowed slices are not enough.
+- The allocator interface shape must be stable early because real examples depend on it.
+- The language benefits from one explicit hosted allocator accessor rather than a hidden default allocation culture.
+- Broad standard-library convenience wrappers around the hosted allocator would likely duplicate APIs without clarifying ownership.
+- Explicit multi-return error handling is semantically clean but ergonomically costly in recursive code.
+- UTF-8-preserving string operations are part of the semantic contract, not just library style.
+- Volatile and MMIO ordering guarantees must be specified, not implied.
+- The concurrency model needs just enough standard-library surface to make DRF-SC usable in ordinary programs.
+- Volatile and atomics must remain clearly separated, or systems programmers will misuse one for the other.
+- Distinct types strengthen the no-implicit-conversion rule without dragging in a heavier type system.
+- Arrays, slices, and buffers need explicit conversion points or ownership becomes ambiguous again.

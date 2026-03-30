@@ -1,0 +1,383 @@
+Modern C - Positions on Open Decisions
+
+Purpose
+
+This document turns the open questions in docs/arch/open_decisions.txt into recommended design positions. The goal is not maximal power. The goal is a language that stays recognizably C-like while removing the worst semantic traps.
+
+Guiding bias
+
+When forced to choose, prefer:
+- Predictability over optimizer freedom
+- Explicit rules over inherited C folklore
+- Library mechanisms over language mechanisms
+- A smaller spec over a more clever one
+
+Core recommendation
+
+Modern C should define a small, strict, boring semantic core. The language should not try to preserve every optimization latitude that legacy C compilers exploit. That trade is worth making if the result is a simpler and more teachable systems language.
+
+Implementation rule:
+- The compiler must not assume overflow cannot occur.
+- The compiler must not invent non-aliasing facts that the program did not state explicitly.
+- Optimization is allowed only when it preserves the program's explicit value and memory semantics.
+
+1. Undefined Behavior and Integer Semantics
+
+Position:
+- Keep UB small and explicit.
+- Signed and unsigned integer arithmetic both use two's-complement modular wrap by default.
+- Division by zero is a checked runtime fault.
+- Shift counts outside the bit width are a checked runtime fault.
+- Invalid pointer dereference, use-after-free, and out-of-bounds access remain UB unless a checked build mode is enabled.
+
+Rationale:
+- Signed overflow UB is one of C's worst design inheritances. It buys optimizer freedom at a large predictability cost.
+- Defined wrap makes arithmetic portable and removes a large class of surprising miscompilations.
+- Traps for division-by-zero and invalid shifts are easy to explain and cheap to implement.
+
+Spec direction:
+- State plainly that integers are fixed-width two's-complement.
+- State plainly that the compiler may not treat potential arithmetic overflow as impossible.
+- Reserve checked arithmetic helpers for the standard library rather than adding special operators in v0.2.
+
+2. Pointer Aliasing Rules
+
+Position:
+- Do not adopt C-style strict aliasing UB.
+- Different pointer types may alias the same storage.
+- The compiler may only assume non-aliasing when the programmer uses an explicit annotation.
+- In v0.2, @noalias is a per-parameter qualifier, not a property of a pointer type or an entire function.
+- Byte-wise inspection through ui8 pointers or byte slices is always allowed.
+
+Rationale:
+- Strict aliasing is easy for compilers and hostile to humans.
+- A language meant to be simpler than C should not depend on one of C's least understood optimization contracts.
+
+Cost:
+- Some optimizations become less automatic.
+- That is acceptable for a language optimizing for transparency.
+
+3. Memory Model
+
+Position:
+- v0.2 defines a minimal concurrency model.
+- The language itself adds no concurrency syntax and no scheduler runtime.
+- In single-threaded code, the compiler must preserve program order for memory operations that are observable through pointer reads, pointer writes, or explicit volatile or MMIO operations.
+- v0.2 should include an explicit volatile memory access facility for device registers and low-level runtime code.
+- Volatile or MMIO operations must not be reordered relative to one another.
+- Volatile or MMIO operations must not be reordered across surrounding ordinary memory operations.
+- Volatile is not a synchronization primitive.
+- The language should use a DRF-SC model: data-race-free programs behave as if sequentially consistent, and conflicting unsynchronized non-atomic accesses are invalid.
+- Thread creation and join, mutex lock and unlock, and condition-variable wait and wake must establish the expected happens-before edges.
+- Atomics, threads, mutexes, and condition variables belong in the standard library or platform library, not in language syntax.
+- Thread entrypoints should be ordinary language functions, with the thread library adapting them to platform thread ABIs.
+- Mutexes and condition variables should require explicit constructor functions rather than relying on zero-initialization.
+- The standard library should expose a restricted Atomic<T> facility only for bool, fixed-width integers, usize, isize, uintptr, and pointer values.
+- Atomic operations should be indivisible and totally ordered per atomic object.
+- Atomic objects should require natural alignment, and misaligned atomic access should be invalid.
+- The language should not promise lock-free atomics on all targets.
+- The standard library should expose relaxed, acquire, release, acq_rel, and seq_cst memory orders, with seq_cst as the default and preferred order for ordinary code.
+- acquire should be valid for load and successful read-modify-write operations.
+- release should be valid for store and successful read-modify-write operations.
+- acq_rel should be valid only for read-modify-write operations.
+- compare_exchange failure order should be limited to relaxed, acquire, or seq_cst, and should not exceed the success order.
+
+Rationale:
+- Systems code still needs predictable ordering for observable memory effects even before threads enter the picture.
+- The smallest honest concurrency story is language-defined memory semantics plus a small standard-library primitive set.
+- Higher-level constructs such as channels, async runtimes, futures, and actor systems should remain userland concerns.
+
+4. Struct Layout Guarantees
+
+Position:
+- Field order is preserved exactly as written.
+- Padding and alignment are implementation-defined but stable for a target ABI.
+- Default struct layout is not promised to match C exactly.
+- C layout must be requested explicitly with an ABI attribute such as @abi(c).
+- @packed is allowed, but only as an explicit layout escape hatch.
+
+Rationale:
+- Preserving field order is necessary for predictability.
+- Requiring explicit C layout avoids accidental ABI dependence.
+
+4A. Distinct Types
+
+Position:
+- The language should support zero-cost distinct types over existing scalar representations.
+- Distinct types should preserve representation and ABI while forbidding implicit interchange with their base type.
+- In v0.2, distinct types should be limited to scalar base types.
+
+Rationale:
+- Distinct types reinforce the language's no-implicit-conversion rule without adding runtime cost.
+- They solve real systems problems such as mixing file descriptors, IDs, indices, counters, and sizes.
+
+5. Strings and Slices
+
+Position:
+- The container model should distinguish fixed arrays, slices, and buffers visibly.
+- `[N]T` should represent fixed-size owned storage.
+- Slice<T> is always a non-owning view.
+- Ownership belongs to the allocation or object that produced the slice.
+- Slices do not extend lifetimes.
+- Using a slice after the underlying storage becomes invalid is invalid behavior.
+- The standard library should define an explicit owning Buffer<T> type distinct from Slice<T>.
+- Buffer<T> owns storage, tracks capacity, and retains the allocator needed for release.
+- The standard library should adopt `slice_from_array` and `slice_from_buffer` as the conventional explicit view-formation helpers.
+- type str = Slice<const ui8>
+- str always represents valid UTF-8.
+- Raw bytes use Slice<ui8> or Slice<const ui8>, not str.
+- String literals produce str values backed by static read-only storage.
+- String literals are not implicitly null-terminated for language semantics.
+- Null-terminated strings for C interop require an explicit distinct form, such as a c-string literal syntax or a library conversion function.
+- String operations that return str must preserve UTF-8 validity or fail explicitly.
+
+Rationale:
+- If arrays, slices, and buffers are not visibly distinct, ownership and lifetime rules become muddy immediately.
+- If str is both bytes and text, the language recreates C's char* confusion.
+- If str is owning, ownership rules leak into every API.
+- Borrowed immutable UTF-8 is the cleanest default.
+
+Consequence:
+- Mutable text buffers are just byte slices plus validation rules in libraries.
+- The initial standard text surface should stay small and non-allocating by default.
+- `strings.lines`, `strings.split_once`, `strings.trim_space`, prefix or suffix checks, equality, and `utf8` validation and decode or encode primitives are sufficient for the first pass.
+- The language should solve temporary-versus-returned storage with disciplined owning and borrowed types, not with a new storage category.
+
+5A. Basic I/O Placement
+
+Position:
+- `stdin`, `stdout`, and `stderr` should belong to the standard library I/O surface.
+- Lower-level file descriptor and platform handle details may live in the platform layer below that surface.
+
+Rationale:
+- Tool-building should not require dropping into platform APIs for ordinary process I/O.
+- This keeps the language aligned with the Thompson and Pike bias toward simple tools.
+
+6. Error Handling Discipline
+
+Position:
+- Errors are ordinary values.
+- The language does not reserve a magical error interface or exception path.
+- The standard library should define a conventional Error type.
+- Multiple return values should be the primary success-or-error transport mechanism.
+- The conventional fallible function shape is `(value, Error)` with the error in the final return position.
+- Success is represented by nil in the Error position.
+- On failure, non-error return values should be the zero value of their type.
+- Domain-specific failure details should normally be carried inside Error rather than through ad hoc enum-plus-None conventions.
+- Ignoring non-void return values is not allowed silently.
+- A caller must either bind the result or discard it explicitly with _.
+- There is no implicit propagation operator in v0.2.
+
+Rationale:
+- Explicit discard is the minimum discipline needed to avoid silent failure.
+- A standard library convention is enough; the core language does not need a second control-flow system.
+
+Recommended rule:
+- If a function returns an Error, the compiler should warn by default and may error under a strict mode if the result is unused.
+
+Future note:
+- The language may eventually standardize a small propagation helper or pattern, but v0.2 should first validate whether explicit returns are acceptable in real programs.
+
+Known cost:
+- Explicit multi-return error handling in deep or recursive code is expected to be verbose.
+- That cost should be acknowledged as a deliberate trade, not treated as a reason to add hidden propagation.
+
+7. Allocation API Shape
+
+Position:
+- Allocation is a library feature, not a language primitive.
+- The standard library should define an Allocator function-table shape with an explicit context pointer.
+- The standard library should define typed allocation helpers and Buffer<T> constructors on top of that allocator interface.
+- The standard library should standardize `mem.default_allocator() *Allocator` as the conventional hosted heap entrypoint.
+- The standard library should provide:
+  heap_alloc(size: usize, align: usize) (*ui8, Error)
+  heap_free(ptr: *ui8)
+- Library code that may allocate repeatedly should accept an explicit Allocator value or pointer.
+- `buffer_free<T>(buf: *Buffer<T>)` should be the conventional release function for `Buffer<T>`.
+- Simple hosted programs may obtain an allocator explicitly through `mem.default_allocator()`.
+- Allocation failure returns an error, not nil, by default.
+- Memory must be released through the same allocator family that produced it.
+- Unqualified heap_free applies only to memory returned by heap_alloc.
+- Custom allocators must expose matching alloc and free operations through their allocator interface.
+- v0.2 should not standardize a second family of broad hosted convenience wrappers that silently choose the default allocator for general library APIs.
+
+Rationale:
+- Returning nil recreates C's most common unchecked failure mode.
+- Making allocator choice explicit where it matters preserves systems-level control without burdening every beginner program.
+- Explicit allocator pairing prevents mismatched allocation and free bugs from reappearing under a cleaner syntax.
+- One explicit hosted allocator accessor is enough convenience; duplicating APIs into explicit and default-allocator forms would enlarge the standard library without clarifying ownership.
+
+Alignment rule:
+- Alignment must be explicit in the allocator API.
+- Typed allocation helpers may infer natural alignment.
+
+Helper rule:
+- Typed allocation helpers should stay thin and mechanical.
+- `alloc_value<T>`, `alloc_array<T>`, `buffer_new<T>`, and `buffer_free<T>` are sufficient as a first-pass helper surface.
+
+8. defer Semantics
+
+Position:
+- defer runs on normal scope exit caused by fallthrough, break, continue, or return.
+- Since the language has no exceptions or panic system in v0.2, there is no extra unwinding model to define.
+- defer does not run on process abort, trap, or forced termination.
+- Deferred call arguments are evaluated immediately when the defer statement is reached.
+- Deferred actions execute in LIFO order.
+- Each loop iteration is treated as its own defer scope.
+
+Rationale:
+- Immediate argument evaluation avoids closure-capture surprises.
+- Per-iteration defer scope prevents accidental unbounded cleanup stacks inside loops.
+
+Example effect:
+- defer free(x) inside a loop frees that iteration's x at the end of the iteration, not at the end of the whole function.
+
+9. Tagged Unions and ABI
+
+Position:
+- Tagged unions are a core language type.
+- Exhaustive switch over tagged unions is required.
+- Tagged-union destructuring should use switch cases of the form `case VariantName(bound, values):`.
+- Their physical layout is implementation-defined by default.
+- The tag is a semantic part of the value but not necessarily a user-addressable field.
+- Default tagged unions are not promised to be C ABI compatible.
+- For C interop, programmers should use an explicit @abi(c) struct-plus-union representation.
+
+Rationale:
+- A safe tagged union and a C union solve different problems.
+- Pretending they are the same creates ABI confusion immediately.
+
+10. Module and Build Semantics
+
+Position:
+- One source file equals one module in v0.2.
+- Modules compile independently.
+- Imports are acyclic.
+- There are no hidden static constructors or module init routines.
+- Top-level values must be compile-time constants.
+- The language should not reserve a special entry function.
+- Executable entrypoints should be selected by the build tool or platform convention.
+- The standard build tool is canonical, but it should emit normal object files and link artifacts so other build systems can drive it.
+- Multi-file modules are a possible future extension, not part of v0.2.
+
+Rationale:
+- Multi-file module systems and import cycles are exactly where simple languages start accumulating special cases.
+- No hidden initialization preserves the "what you write is what runs" principle.
+
+11. Const Semantics
+
+Position:
+- Const must be explicit in the type, not inferred from declaration position.
+- const on aggregates is deep for the aggregate reachable through that value.
+- Pointer constness must be written at the pointer layer.
+- The language should distinguish clearly between:
+  *const T       read-only pointee
+  const *T       immutable pointer value
+  const *const T immutable pointer and read-only pointee
+- Bare forms that recreate C's ambiguity should be rejected.
+
+Rationale:
+- C's const rules are notorious because the syntax hides what is actually immutable.
+- If Modern C wants const, it needs to be mechanically readable.
+
+12. Compile-Time Boundary
+
+Position:
+- v0.2 supports constants only.
+- There is no if comptime in v0.2.
+- There is no user-programmable compile-time execution model in v0.2.
+- No heap allocation, I/O, reflection, compile-time mutation of global compiler state, or arbitrary function execution during compilation.
+
+Rationale:
+- This is the fork where languages drift into a second execution model.
+- Constants alone are enough for v0.2.
+- Compile-time branching can be added later if real programs prove that the added complexity is justified.
+
+13. Pointer Model
+
+Position:
+- Pointer arithmetic is allowed only within a single live allocation, array, or one-past the end.
+- Pointer comparison is only defined for pointers into the same allocation or against nil.
+- Null is spelled nil.
+- General integer-to-pointer and pointer-to-integer casts are unsafe operations intended for FFI, MMIO, and low-level runtime code.
+- A pointer cast to uintptr and back preserves usability only if the numeric value is unchanged and the original allocation remains live.
+
+Rationale:
+- Pointer provenance matters whether the spec admits it or not.
+- Stating a small provenance rule is better than leaving optimizers and programmers to guess.
+
+13A. Indexing Precision
+
+Position:
+- `%` on unsigned integers should be specified as mathematical remainder after truncating division.
+- Slice indexing and slicing bounds should be specified sharply.
+- Out-of-bounds indexing should remain invalid behavior in release mode and may trap in checked builds.
+
+Rationale:
+- Low-level containers depend on indexing and remainder semantics being boring and exact.
+- This is specification work, not a place for implementation latitude.
+
+14. Interoperability with C
+
+Position:
+- C interop is a first-class goal, but not via textual header inclusion in v0.2.
+- Bindings should be declared explicitly in Modern C source or generated by an external binding tool.
+- The spelling for external C declarations should be `extern(c)`.
+- The spelling for C layout should be `@abi(c)`.
+- Exact ABI compatibility is guaranteed only for a defined interoperable subset:
+  primitive integers and floats
+  pointers
+  function signatures using interoperable types
+  structs marked @abi(c)
+- Null-terminated strings are an interop type, not the language's default string type.
+- The standard library should define `cstr` as the conventional null-terminated read-only C string type.
+
+Rationale:
+- Parsing C headers drags the entire C preprocessor model back into the language.
+- Explicit bindings preserve clarity and keep the core compiler small.
+
+14A. Volatile and MMIO API Shape
+
+Position:
+- Volatile and MMIO access should be exposed through library functions, not through a type qualifier or dedicated syntax.
+- The conventional surface should be `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>`.
+- Volatile access should remain separate from atomic synchronization.
+
+Rationale:
+- A library surface makes the device boundary explicit and avoids conflating MMIO with the type system.
+
+15. Explicit Non-Goals to Freeze Now
+
+Position:
+- No exceptions
+- No garbage collection
+- No inheritance or class hierarchy
+- No implicit numeric conversions
+- No implicit pointer conversions
+- No hidden allocation
+- No preprocessor macros in v0.2
+- No hidden module initialization
+
+Rationale:
+- These exclusions define the language as much as the included features do.
+
+16. Recommended Priority Order
+
+If only five decisions are folded into the next draft, make them these:
+1. Integer arithmetic is defined two's-complement wrap.
+2. There is no strict-aliasing UB.
+3. str is borrowed immutable valid UTF-8, not owning bytes.
+4. Allocation failure returns an explicit error.
+5. Unused non-void results must be explicitly discarded.
+
+17. Bottom Line
+
+The design should stay conservative.
+
+That means:
+- Define fewer things, but define them clearly.
+- Reject hidden optimizer contracts.
+- Keep ownership, allocation, and failure visible at call sites.
+- Treat C interop as an explicit boundary, not a reason to re-import C's historical accidents.
+
+If the language follows these positions, it stays close to C in feel while being materially easier to reason about.

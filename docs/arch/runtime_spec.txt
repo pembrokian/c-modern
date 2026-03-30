@@ -1,0 +1,280 @@
+Modern C - Runtime Model
+
+Purpose
+
+This document defines the runtime stance for Modern C. The language aims to have no mandatory language runtime in the usual managed-language sense, while still being precise about the minimal code and support needed for a program to start and run.
+
+Core position
+
+Modern C should have:
+- No mandatory language runtime system
+- A minimal, transparent startup shim
+- A standard library that is separate from the runtime model
+
+Modern C should not have:
+- Garbage collection
+- A scheduler or green-thread runtime
+- Exception or panic unwinding runtime
+- Hidden initialization systems
+- Mandatory runtime reflection metadata
+
+1. Runtime Layers
+
+For clarity, separate execution support into three layers:
+
+1. OS or platform runtime
+2. Minimal startup shim
+3. Standard library
+
+OS or platform runtime:
+- Kernel entry, system call ABI, loader behavior, and optional libc are external to the language.
+
+Minimal startup shim:
+- A thin bridge between the platform entrypoint and the user program.
+- This is part of the toolchain or target support, not a rich language runtime.
+
+Standard library:
+- Normal library code providing I/O, allocation, strings, slices, concurrency primitives, and platform abstractions.
+- The standard library is not itself a hidden runtime system.
+
+2. What the Language Must Not Require
+
+Modern C must not require runtime services that introduce hidden control flow or hidden allocation.
+
+Specifically excluded:
+- Garbage collector state or collector threads
+- Automatic scheduler or task runtime
+- Exception tables and hidden stack unwinding for ordinary error handling
+- Hidden constructor registration or startup hooks
+- Mandatory reflection registries carried into binaries
+
+Design rule:
+- Nothing runs unless the programmer can point to it, or unless it is the minimal documented startup shim.
+
+3. What Must Exist Anyway
+
+Even a strict systems language still needs minimal execution support.
+
+3A. Program entry
+
+Some platform-specific entrypoint must exist to begin execution.
+
+Conceptual flow:
+
+_start -> main(args)
+
+This startup path may be provided by:
+- The standard toolchain in hosted builds
+- User or target support code in freestanding builds
+
+3B. Compiler support hooks
+
+The compiler may lower certain operations to support functions or target intrinsics.
+These are not a general-purpose runtime.
+
+Typical examples:
+- memcpy
+- memset
+- memmove
+- integer division helpers on constrained targets
+- optional checked-operation helpers in checked builds
+
+Rule:
+- These hooks are implementation support, not user-visible language services.
+
+4. Hosted and Freestanding Execution
+
+Modern C should explicitly support both execution modes.
+
+Hosted mode:
+- The standard toolchain provides a minimal startup shim.
+- Program arguments and environment access are available through the standard library.
+- A normal process entry convention exists for ordinary tools and applications.
+
+Freestanding mode:
+- No assumption is made about process startup, arguments, environment, file I/O, or a default allocator.
+- The program may define or replace its own entry sequence.
+
+Recommendation:
+- Hosted builds should be easy.
+- Freestanding builds should remain fully possible.
+
+5. Startup Shim Model
+
+The standard toolchain may provide a minimal startup shim in hosted environments.
+This shim should do only the minimum necessary to enter user code.
+
+Conceptual behavior:
+
+func _start() {
+    args = platform_args()
+    code = main(args)
+    platform_exit(code)
+}
+
+Rules:
+- The shim must be replaceable.
+- The shim must not allocate implicitly on behalf of the language.
+- The shim must not register hidden callbacks or perform hidden module initialization.
+- The shim should only establish process arguments, call the program entrypoint, and return an exit code.
+- In hosted mode, the default shim should present program arguments to user code as `Slice<cstr>`.
+- The default shim should construct that slice without changing argument bytes and without requiring heap allocation.
+
+6. Program Entry Convention
+
+Modern C should preserve the existing decision that `main` is not a language keyword.
+
+Hosted convention:
+- `main` is a conventional entry function selected by the toolchain or build mode.
+- The canonical hosted signature for ordinary executable programs is:
+
+func main(args: Slice<cstr>) i32
+
+- `args` is a borrowed slice of read-only null-terminated argument strings.
+- This keeps the boundary explicit and C-compatible without forcing raw `argc` or `argv` handling into every hosted program.
+- Environment access should come from the standard library or platform layer rather than through `main` parameters.
+
+Freestanding convention:
+- Programs may provide an alternative entrypoint and bypass the hosted shim entirely.
+
+This keeps entry behavior visible and target-specific without making it magical.
+
+7. Allocation and the Runtime Boundary
+
+Allocation remains a library feature, not a runtime requirement.
+
+Rule:
+- The language does not require a default allocator to exist.
+
+Hosted recommendation:
+- The standard library provides the conventional explicit default allocator accessor:
+
+mem.default_allocator()
+
+- This accessor returns `*Allocator`.
+- It is explicit library access, not hidden ambient runtime state.
+- It is the conventional hosted heap entrypoint, not a requirement on freestanding targets.
+
+Freestanding recommendation:
+- Programs may supply their own allocator or none at all.
+
+Constraint:
+- No allocator should be made available through hidden ambient runtime state.
+
+Hosted library rule:
+- v0.2 should not standardize broad hosted convenience wrappers that silently allocate through the default allocator for general library APIs.
+- Libraries that allocate owned results should normally accept `alloc: *Allocator` explicitly.
+
+8. Standard Library vs Runtime
+
+It is important to keep these separate.
+
+The standard library may provide:
+- I/O
+- allocation
+- strings and slices
+- platform abstractions
+- concurrency primitives
+
+But these are library facilities.
+Using them is not the same as depending on a mandatory runtime system.
+
+9. Replaceability
+
+The runtime stance is only credible if the minimal execution layer is replaceable.
+
+Hosted toolchains should allow:
+- replacing the default startup shim
+- omitting the hosted layer for freestanding targets
+- linking without the full standard library when appropriate
+
+10. Runtime Model Summary
+
+Modern C should specify:
+- The language defines no mandatory runtime system.
+- Hosted and freestanding execution are both first-class.
+- The toolchain may provide a minimal hosted startup shim.
+- That shim is replaceable and has no hidden behavior.
+- The standard library is a library, not a runtime engine.
+
+Bottom line
+
+Modern C should feel like a language with:
+- C-level control over startup and execution
+- explicit library use
+- no hidden runtime behavior
+
+If this boundary is maintained, the language stays true to its current philosophy rather than drifting toward a scheduler-, GC-, or exception-driven model.
+
+11. Possible Library Structure
+
+This section is intentionally architectural rather than normative.
+Its purpose is to make the layering visible early so the standard library does not accidentally collapse into a hidden runtime or a grab-bag of unrelated modules.
+
+Guiding rule:
+- Keep startup support, portable standard-library code, and platform bindings as separate layers.
+
+Possible top-level structure:
+
+- `core`
+    - language-adjacent types and operations with no hosted-environment assumptions
+    - examples: basic memory operations, slices, buffers, UTF-8 primitives, maybe foundational traits of `Error` and `Allocator` representations if those stay universally available
+
+- `mem`
+    - allocation interfaces and storage helpers
+    - examples: `Allocator`, `heap_alloc`, `heap_free`, `alloc_value`, `alloc_array`, `buffer_new`, `default_allocator` if hosted builds standardize one
+
+- `strings`
+    - non-allocating text helpers over `str` and byte slices
+    - examples: `lines`, `split_once`, `trim_space`, `has_prefix`, `has_suffix`, `equal`
+
+- `utf8`
+    - explicit UTF-8 validation and encode-decode helpers kept separate from broader string convenience APIs
+
+- `io`
+    - stream-oriented portable I/O surface
+    - examples: readers, writers, `stdin`, `stdout`, `stderr`, write helpers
+
+- `fs`
+    - file and path operations above raw platform handles
+
+- `sync` or `threading`
+    - concurrency primitives only
+    - examples: `Thread`, `Mutex`, `Condvar`, `Atomic<T>`, memory orders, thread spawn or join
+
+- `time`
+    - clocks, durations, and sleep primitives if standardized in v0.2 or shortly after
+
+- `os` or platform-specific modules
+    - raw operating-system bindings and handle-level escape hatches
+    - examples: process APIs, environment access, descriptors or handles, platform errors, sockets if not kept elsewhere
+
+- `hal` or `device`
+    - freestanding or hardware-facing helpers
+    - examples: `mmio_ptr`, `volatile_load`, `volatile_store`, target support shims
+
+- `runtime` or `startup`
+    - minimal hosted startup glue supplied by the toolchain
+    - examples: `_start`, argument handoff, exit handoff
+    - this layer should stay tiny and replaceable, and should not become a general-purpose library namespace
+
+Illustrative layering:
+
+1. `runtime` or `startup` sits closest to process entry and exit.
+2. `os` and `hal` expose target-specific reality.
+3. Portable standard-library modules such as `mem`, `io`, `fs`, `strings`, `utf8`, and `sync` are built above those target layers where needed.
+4. User programs depend on the portable surface by default and drop to `os` or `hal` only when they need explicit platform control.
+
+Architectural constraints:
+- `core` should remain usable in freestanding builds.
+- Hosted I/O and filesystem code should not be required for freestanding targets.
+- `runtime` or `startup` should not own allocators, schedulers, reflection metadata, or hidden initialization registries.
+- Platform bindings should be explicit imports, not ambient capabilities.
+- The standard library should prefer small focused modules over a single monolithic namespace.
+
+Practical implication:
+- A normal hosted tool might import `io`, `fs`, `strings`, and `mem`.
+- A kernel or firmware target might import `core`, `mem`, and `hal`, while replacing `startup` entirely.
+
+This structure is a direction, not yet a frozen package spec.
+It is enough to keep the architecture intentional while the exact module boundaries and names are still being refined.

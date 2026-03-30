@@ -1,0 +1,323 @@
+Modern C - Test Design Notes
+
+Purpose
+
+This document sketches a testing model for Modern C.
+It is not yet a final normative spec, but it is intended to make test design intentional early instead of letting test behavior emerge accidentally from the build tool.
+
+The test system should fit the same overall philosophy as the language and toolchain:
+- no hidden runtime model
+- no second programming language for tests
+- no mandatory macro system
+- no large fixture framework required for ordinary code
+- explicit build and execution behavior
+
+Core position
+
+Tests in Modern C should be ordinary Modern C code.
+The build tool may provide a small amount of discovery and runner generation, but the semantics of a test should remain visible and unsurprising.
+
+In practical terms:
+- test files are normal source files
+- test functions are normal functions
+- tests use ordinary control flow and ordinary error values
+- `mc test` is a conventional tool entrypoint, not a special language mode
+
+1. Design Bias
+
+If forced to choose, prefer:
+- ordinary functions over test-specific syntax
+- explicit return or failure behavior over implicit assertion machinery
+- checked test builds over fast but less informative defaults
+- serial execution by default over hidden parallelism
+- simple text output over a rich but opaque reporting protocol
+
+2. What The Test System Should Cover
+
+Modern C likely needs more than one kind of test.
+
+Useful categories:
+- project unit tests
+- project integration tests
+- compile-pass tests for the compiler
+- compile-fail tests for the compiler
+- run-output tests for runtime, ABI, or code generation behavior
+- standard-library tests
+
+These should share a common philosophy even if they are implemented with slightly different runners.
+
+3. Ordinary Project Tests
+
+The simplest model is:
+- test source files live under `tests/`
+- test file names end in `_test.mc`
+- the build tool discovers test functions inside those files
+
+Recommended function shape for v0.2:
+
+```text
+func test_parse_port() Error
+```
+
+Rules:
+- a function whose name starts with `test_` and whose signature is `func() Error` is a test function
+- returning `nil` means pass
+- returning non-`nil` `Error` means fail
+- trapping, aborting, or crashing counts as failure
+
+Why this shape fits:
+- it reuses the existing `Error` convention
+- it avoids adding a dedicated assertion result type
+- it keeps tests readable to anyone who understands ordinary language code
+
+4. Discovery Model
+
+Recommended default discovery for ordinary projects:
+- `mc test` reads `build.toml`
+- for each enabled target, it looks under the target's configured test roots
+- by default, that root is `tests/`
+- within those roots, files ending in `_test.mc` are test sources
+- within those files, functions named `test_*` with signature `func() Error` are runnable tests
+
+This is enough to avoid manual test lists without turning discovery into a large policy engine.
+
+Recommended `build.toml` shape for tests:
+
+```toml
+[targets.grep.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000
+```
+
+Suggested meanings:
+- `enabled`: whether the target participates in `mc test`
+- `roots`: directories searched for test files
+- `mode`: build mode used for the test executable
+- `timeout_ms`: per-test-executable timeout unless overridden by command-line flags
+
+5. Test Execution Model
+
+The first test runner should stay simple.
+
+Recommended v0.2 behavior:
+- `mc test` builds one test executable per target
+- the tool generates a small runner `main` for that test executable
+- the generated runner calls discovered test functions serially in a deterministic order
+- deterministic order should be lexical by file path, then lexical by function name
+
+Why serial by default:
+- it matches the language's explicitness bias
+- it avoids accidental race-dependent tests
+- it keeps output and failure behavior straightforward
+
+Possible future extension:
+- optional parallel test execution by command-line flag
+- not the default, and not required in v0.2
+
+6. Result Model
+
+Recommended result rules:
+- return `nil`: pass
+- return non-`nil` `Error`: fail
+- process trap or crash: fail
+- timeout: fail
+- nonzero runner exit code: fail overall target
+
+Suggested runner output shape:
+
+```text
+PASS test_parse_port
+FAIL test_missing_equals: parse_missing_equals at line 7
+PASS test_trim_space
+
+3 tests, 2 passed, 1 failed
+```
+
+The output should stay plain and readable.
+Machine-readable output can be added later as a separate flag if needed.
+
+7. Assertion Style
+
+The core design should not depend on assertion macros.
+
+Preferred style:
+
+```text
+func test_parse_port() Error {
+    cfg, err = parse_config("port=8080")
+    if err != nil {
+        return err
+    }
+
+    if cfg.port != 8080 {
+        return Error.test_failure("expected port 8080")
+    }
+
+    return nil
+}
+```
+
+This keeps tests close to normal code.
+
+Optional helper surface:
+- a small `testing` library module may later provide convenience helpers
+- such helpers should remain ordinary library functions, not compiler magic
+- the design should not require a giant `testing.T` object model for basic tests
+
+Good minimal helper candidates:
+- failure construction helpers
+- temporary-directory helpers
+- output capture helpers
+- deterministic test-data location helpers
+
+8. Checked Mode As The Default
+
+Recommended default:
+- `mc test` should build tests in `checked` mode unless the user overrides it
+
+Why:
+- tests are exactly where extra runtime checks are most valuable
+- this helps catch indexing mistakes, invalid shifts, or other faulting behavior earlier
+- it fits the language's explicit distinction between ordinary debug or release and checked execution
+
+9. Integration Tests
+
+Some tests need to exercise complete executables rather than internal functions.
+
+Recommended model:
+- integration tests are ordinary test functions that run built executables as subprocesses
+- they inspect exit code, stdout, stderr, and files as needed
+- the build tool does not need a separate integration-test language
+
+Possible repository layout:
+
+```text
+tests/
+  parse_test.mc
+  grep_integration_test.mc
+  data/
+    sample.conf
+    corpus.txt
+```
+
+This keeps test inputs ordinary and version-controlled.
+
+10. Compiler Test Design
+
+The compiler itself needs a richer test matrix than ordinary projects do.
+
+Recommended compiler-side categories:
+
+Compile-pass tests:
+- source files that must parse, resolve, type-check, and codegen successfully
+
+Compile-fail tests:
+- source files that must fail with expected diagnostics
+- expected diagnostics should be checked by substring or structured expectation files, not by brittle full-output matching only
+
+Run-output tests:
+- programs compiled and executed with expected stdout, stderr, and exit code
+- useful for runtime behavior, ABI behavior, startup behavior, and codegen validation
+
+MIR or lowering tests:
+- small programs checked against expected MIR or expected lowering properties
+- useful to keep semantic lowering stable without testing only through machine code
+
+Standard-library tests:
+- ordinary tests for `mem`, `strings`, `fs`, `io`, `sync`, and other library modules
+
+11. Compile-Fail Test Format
+
+A simple approach is best.
+
+Recommended pattern:
+- each compile-fail test is a `.mc` file under a dedicated compiler test directory
+- expectations are stored either in leading comments or in adjacent expectation files
+
+Illustrative source-comment shape:
+
+```text
+// error: cannot convert UserId to FileId
+// error: expected str, got Slice<ui8>
+```
+
+Rules:
+- matching should prefer stable diagnostic identifiers or stable substrings over exact byte-for-byte output
+- tests should not become fragile because wording changes slightly
+
+12. Test Isolation
+
+The simplest runner model is one process per test target.
+
+Tradeoff:
+- simpler implementation
+- faster startup
+- but one crash aborts the remaining tests in that target
+
+Recommended v0.2 stance:
+- default to one process per test target
+- if a test crashes, mark the target failed and stop that executable
+- optional per-test subprocess isolation can be explored later if it proves necessary
+
+This is the right first cut for a simple system.
+
+13. Timeouts and Determinism
+
+Tests should be deterministic by default.
+
+Recommendations:
+- serial execution by default
+- explicit timeout support at the runner level
+- no dependence on wall-clock ordering when avoidable
+- no hidden randomization of test order in v0.2
+
+If randomized order is ever added later, it should be opt-in and seed-reported.
+
+14. Fixtures and Test Data
+
+Avoid an elaborate fixture framework.
+
+Preferred approach:
+- keep test data in ordinary files under `tests/data/`
+- write small setup helpers as ordinary library functions
+- let tests create and clean up temporary directories explicitly or through small helper functions
+
+This preserves the "ordinary code" model.
+
+15. Relationship To The Standard Library
+
+The test system should not force a large testing framework into the language core.
+
+Likely split:
+- test discovery and runner generation belong to the build tool
+- any helper APIs belong to a normal `testing` library module
+- process spawning, temp files, and environment manipulation belong to standard or platform libraries, not test-specific language semantics
+
+16. Non-Goals
+
+The v0.2 testing model should avoid:
+- test-specific language syntax
+- macro-based assertion dependence
+- hidden fixture lifecycle hooks
+- hidden parallel execution
+- implicit network access
+- a giant reflection-driven test framework
+- a mandatory object-oriented test API
+
+17. Bottom-Line Recommendation
+
+The best first testing model for Modern C is:
+- tests are ordinary functions
+- test files are ordinary source files under `tests/`
+- `mc test` discovers `test_*` functions with signature `func() Error`
+- tests run in `checked` mode by default
+- the runner is generated by the build tool and executes tests serially in deterministic order
+- more advanced behavior stays layered on top rather than entering the language core
+
+This keeps testing aligned with the rest of the project:
+- explicit
+- inspectable
+- small
+- practical

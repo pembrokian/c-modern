@@ -1,0 +1,573 @@
+Modern C (Working Name) - High-Level Specification (v0.2)
+
+1. Design Goals
+
+Modern C is a conservative evolution of C, not a replacement for systems programming in general.
+
+It aims to:
+- Preserve the spirit of C: simple, predictable, close to the machine
+- Improve safety where the cost is low and visible
+- Eliminate historical ambiguities that make optimization and reasoning diverge
+- Keep compilation, linking, and execution models explicit
+
+It does not aim to provide:
+- A hidden runtime
+- Garbage collection
+- Exceptions or implicit propagation
+- A large meta-programming system
+- A complex ownership or trait system
+
+2. Core Principles
+
+The language is governed by these rules:
+1. What you write is what runs.
+2. No hidden control flow or hidden allocation.
+3. Explicit contracts beat inherited folklore.
+4. Zero-cost abstractions only.
+5. One runtime phase; compile time remains minimal.
+6. The compiler may optimize only within the program's explicit semantic rules.
+
+Implementation constraints:
+- The compiler must not assume arithmetic overflow cannot occur.
+- The compiler must not invent non-aliasing facts not stated by the program.
+- The compiler must preserve explicit value and memory semantics.
+
+3. Program Structure
+
+Modules:
+- One source file equals one module in v0.2.
+- Modules compile independently.
+- Imports are explicit and acyclic.
+- There are no hidden static constructors or module initialization hooks.
+- Top-level values must be compile-time constants.
+
+Execution note:
+- The language does not reserve a special entry function.
+- Hosted and freestanding startup behavior, including conventional entrypoint selection, are defined by the runtime model document.
+
+Example:
+
+export { foo, bar }
+
+import io
+import math
+
+Future direction:
+- Multi-file modules are a possible future extension, but are not part of v0.2.
+
+4. Types
+
+Primitive types:
+- bool
+- ui8, ui16, ui32, ui64
+- i8, i16, i32, i64
+- usize, isize
+- uintptr
+- f32, f64
+- utf
+
+All integer types are fixed-width two's-complement.
+There are no implicit numeric conversions.
+
+Distinct types:
+
+Modern C supports representation-preserving distinct types.
+
+distinct UserId = i32
+
+Rules:
+- A distinct type has the same representation and calling convention as its base type.
+- A distinct type is not implicitly interchangeable with its base type or with other distinct types of the same base representation.
+- Conversions between a distinct type and its base type must be explicit.
+- Distinct types are zero-cost and exist to prevent accidental mixing of logically different values.
+- In v0.2, distinct types are limited to scalar base types.
+
+Structs:
+
+struct Point {
+    x: f32
+    y: f32
+}
+
+Layout rules:
+- Field order is preserved exactly as written.
+- Padding and alignment are implementation-defined but stable for a target ABI.
+- Default layout is not promised to match C.
+- C layout must be requested explicitly with @abi(c).
+- @packed is allowed only as an explicit layout escape hatch.
+
+Fixed arrays:
+
+Fixed-size arrays are written as:
+
+[N]T
+
+Rules:
+- `[N]T` is a value type with `N` elements of `T`.
+- Fixed arrays are distinct from slices and from owning buffers.
+- Fixed arrays do not implicitly decay to pointers.
+- A slice view over an array requires an explicit conversion.
+
+Slices:
+
+struct Slice<T> {
+    ptr: *T
+    len: usize
+}
+
+Slice<T> is a non-owning view.
+Slices do not extend the lifetime of underlying storage.
+Using a slice after its storage becomes invalid is invalid behavior.
+
+Array and buffer views:
+- Slices may be formed explicitly from fixed arrays, buffers, or pointer-plus-length pairs.
+- Slice formation never transfers ownership.
+- The standard library should provide `slice_from_array` and `slice_from_buffer` as the conventional view-formation helpers.
+
+Owned buffers:
+
+The standard library defines an owning contiguous buffer type distinct from Slice<T>.
+
+struct Buffer<T> {
+    ptr: *T
+    len: usize
+    cap: usize
+    alloc: *Allocator
+}
+
+Buffer<T> owns its storage and is responsible for releasing it through its allocator.
+Buffer<T> may be converted explicitly to Slice<T> or Slice<const T> views.
+
+Container model summary:
+- `[N]T` is fixed-size owned storage.
+- `Slice<T>` is a non-owning view.
+- `Buffer<T>` is a dynamically sized owning contiguous container.
+
+Storage-lifetime guidance:
+- v0.2 does not add a separate language-level temporary-storage category.
+- Functions that return storage whose lifetime outlives the callee should return `Buffer<T>` or another owning type.
+- Functions that return views should return `Slice<T>`.
+- Libraries should not return borrowed views into temporary internal storage.
+
+Strings:
+
+type str = Slice<const ui8>
+
+String rules:
+- str is immutable borrowed text.
+- str always contains valid UTF-8.
+- Raw bytes use Slice<ui8> or Slice<const ui8>, not str.
+- String literals produce str backed by static read-only storage.
+- String literals are not implicitly null-terminated for language semantics.
+- Null-terminated strings exist only as an explicit interop form.
+- String operations that return str must preserve UTF-8 validity or return an explicit failure.
+
+Const:
+- Const is part of the type.
+- Const on aggregates is deep for the reachable value through that binding.
+- Pointer constness must be written at the pointer layer.
+- Ambiguous C-style const forms should be rejected.
+
+5. Arithmetic and Undefined Behavior
+
+Arithmetic rules:
+- Signed and unsigned integer arithmetic use modular wrap.
+- Division by zero is a checked runtime fault.
+- Shift counts outside the bit width are a checked runtime fault.
+- `%` on unsigned integers is the mathematical remainder after truncating division.
+
+Undefined behavior is intentionally small.
+
+Undefined:
+- Use-after-free
+- Out-of-bounds access
+- Invalid pointer dereference
+- Use of slices after underlying storage becomes invalid
+
+Defined:
+- Integer overflow wraps
+- Field order in structs
+- Stable target-specific ABI layout choices
+
+Checked builds may trap additional invalid operations, but checked behavior does not redefine the release semantics.
+
+Indexing rules:
+- `slice[i]` requires `0 <= i < slice.len`.
+- `slice[a:b]` requires `0 <= a <= b <= slice.len`.
+- Out-of-bounds indexing is invalid behavior in release mode and may trap in checked builds.
+- Indexing does not perform hidden bounds recovery, clamping, or allocation.
+
+6. Pointers and Aliasing
+
+Pointer model:
+- Pointer arithmetic is valid only within a single live allocation, array, or one-past the end.
+- Pointer comparison is defined only for pointers into the same allocation or against nil.
+- nil is the null pointer value.
+- Pointer provenance matters: converting a pointer to an integer and back preserves usability only if the numeric value is unchanged and the source allocation remains live.
+- Integer-pointer casts are unsafe operations intended for FFI, MMIO, and runtime code.
+
+Aliasing:
+- Modern C does not adopt C-style strict-aliasing UB.
+- Different pointer types may alias the same storage.
+- Byte-wise inspection through ui8 pointers or byte slices is always allowed.
+- Non-aliasing assumptions must be explicit.
+- In v0.2, @noalias is a per-parameter qualifier.
+
+7. Memory and Allocation
+
+The language performs no implicit allocation.
+Allocation is a standard-library feature, not a language primitive.
+
+Allocator interface shape:
+
+struct Allocator {
+    ctx: *ui8
+    alloc: func(ctx: *ui8, size: usize, align: usize) (*ui8, Error)
+    free: func(ctx: *ui8, ptr: *ui8, size: usize, align: usize)
+}
+
+Standard heap shape:
+
+heap_alloc(size: usize, align: usize) (*ui8, Error)
+heap_free(ptr: *ui8)
+
+Hosted default allocator shape:
+
+mem.default_allocator() *Allocator
+
+Rules:
+- Allocation failure returns an explicit error, not nil.
+- Memory must be freed through the same allocator family that produced it.
+- heap_free applies only to memory returned by heap_alloc.
+- Custom allocators must provide matching alloc and free operations.
+- Alignment is explicit in the allocator API.
+- `mem.default_allocator()` is the conventional hosted heap entrypoint.
+- `mem.default_allocator()` is explicit library access, not ambient runtime state.
+- Freestanding builds are not required to provide `mem.default_allocator()`.
+- Typed helper APIs may infer natural alignment.
+- Typed allocation helpers and Buffer<T> constructors should be defined on top of Allocator.
+- v0.2 does not standardize hosted convenience wrappers that silently choose the default allocator for general library APIs.
+
+Illustrative typed allocation helper surface:
+
+alloc_value<T>(alloc: *Allocator) (*T, Error)
+alloc_array<T>(alloc: *Allocator, len: usize) (Buffer<T>, Error)
+buffer_new<T>(alloc: *Allocator, cap: usize) (Buffer<T>, Error)
+buffer_free<T>(buf: *Buffer<T>)
+
+Rules for typed helpers:
+- Typed helpers are zero-cost wrappers over the allocator interface.
+- Typed helpers must not hide allocator identity.
+- Typed helpers must not imply resizing, reference counting, or hidden ownership transfer.
+- `buffer_free` is the conventional release function for `Buffer<T>`.
+- Functions that allocate owned contiguous storage should normally return `Buffer<T>` rather than raw pointer-plus-length pairs.
+- Library APIs that allocate owned results should accept `alloc: *Allocator` explicitly when allocator choice is part of the contract.
+
+Defer:
+
+defer heap_free(ptr)
+
+Rules:
+- defer runs on normal scope exit caused by fallthrough, break, continue, or return.
+- Deferred call arguments are evaluated immediately.
+- Deferred calls execute in LIFO order.
+- defer does not run on abort, trap, or forced termination.
+- Each loop iteration is its own defer scope.
+
+8. Memory Ordering, Volatile Access, and Concurrency
+
+Modern C defines a minimal concurrency model.
+Concurrency is expressed through standard-library primitives built on top of language-defined memory semantics.
+
+Single-threaded rules:
+- The compiler must preserve program order for memory operations observable through pointer reads, pointer writes, or explicit volatile or MMIO operations.
+- The standard library should include an explicit volatile memory access facility for device registers and low-level runtime code.
+- Volatile operations must not be reordered relative to other volatile operations.
+- Volatile operations must not be reordered across surrounding ordinary memory operations.
+- Volatile is not a thread-synchronization mechanism.
+
+Concurrent execution rules:
+- The language uses a DRF-SC model: data-race-free programs behave as if their operations were sequentially consistent.
+- Conflicting non-atomic accesses from multiple threads without synchronization are invalid behavior.
+- Atomic operations and synchronization primitives are the only portable way to communicate between threads.
+- Thread creation and thread join establish happens-before edges.
+- Mutex lock and unlock operations establish happens-before edges.
+- Condition-variable wait resumes only after reacquiring the associated mutex.
+
+Concurrency surface decisions:
+- Thread entrypoints are ordinary language functions; there is no distinct thread-function calling convention in the language.
+- The standard library thread API is responsible for adapting ordinary functions to any platform-specific thread ABI.
+- Mutexes and condition variables are initialized through explicit constructor functions such as mutex_init() and condvar_init().
+- Zero-initialization is not guaranteed to produce a valid mutex or condition variable.
+
+Atomic model:
+- The standard library provides a restricted Atomic<T> facility only for bool, fixed-width integers, usize, isize, uintptr, and pointer types.
+- Atomic operations are indivisible and totally ordered per atomic object.
+- Atomic objects must be naturally aligned for their underlying type.
+- Misaligned atomic access is invalid behavior.
+- The language does not guarantee that atomic operations are lock-free on every target.
+- The minimum atomic operations are load, store, exchange, compare_exchange, and fetch_add.
+- The minimum memory orders are relaxed, acquire, release, acq_rel, and seq_cst.
+- acquire is valid for load and successful read-modify-write operations.
+- release is valid for store and successful read-modify-write operations.
+- acq_rel is valid only for read-modify-write operations.
+- For compare_exchange, the failure order must be relaxed, acquire, or seq_cst, and must not be stronger than the success order.
+- seq_cst is the default if an operation does not spell out a weaker order.
+- seq_cst is the preferred default for ordinary code; weaker orders are available in v0.2 for expert use and standard publication patterns.
+
+Library boundary:
+- Threads, mutexes, condition variables, and atomics belong in the standard library or platform library, not in core language syntax.
+- Higher-level concurrency constructs such as channels, futures, async or await, work-stealing schedulers, and actor runtimes are userland library concerns.
+- The language does not require green threads, coroutines, or a task runtime.
+- Bounded queues remain userland containers in v0.2.
+
+Illustrative standard-library concurrency surface:
+
+The exact library packaging may vary, but the minimum concurrency surface should look roughly like this:
+
+struct Thread
+struct Mutex
+struct Condvar
+
+enum MemoryOrder {
+    Relaxed
+    Acquire
+    Release
+    AcqRel
+    SeqCst
+}
+
+struct Atomic<T>
+
+thread_spawn<T>(entry: func(ctx: *T), ctx: *T) (Thread, Error)
+thread_join(thread: Thread) Error
+
+mutex_init() Mutex
+mutex_lock(mu: *Mutex)
+mutex_unlock(mu: *Mutex)
+
+condvar_init() Condvar
+condvar_wait(cv: *Condvar, mu: *Mutex)
+condvar_signal(cv: *Condvar)
+condvar_broadcast(cv: *Condvar)
+
+atomic_load(ptr: *Atomic<T>, order: MemoryOrder) T
+atomic_store(ptr: *Atomic<T>, value: T, order: MemoryOrder)
+atomic_exchange(ptr: *Atomic<T>, value: T, order: MemoryOrder) T
+atomic_compare_exchange(ptr: *Atomic<T>, expected: *T, desired: T, success: MemoryOrder, failure: MemoryOrder) bool
+atomic_fetch_add(ptr: *Atomic<T>, value: T, order: MemoryOrder) T
+
+Notes:
+- These signatures are illustrative rather than normative ABI commitments.
+- seq_cst is the default memory order when an API offers an overload or convenience form without an explicit order parameter.
+- Platform bindings may lower the typed thread entrypoint form to platform-specific thread ABIs internally.
+
+9. Functions and Returns
+
+Functions are declared explicitly:
+
+func add(a: i32, b: i32) i32 {
+    return a + b
+}
+
+Rules:
+- No implicit return
+- No default arguments
+- Multiple return values are allowed
+
+Example:
+
+func read() (Data, Error)
+
+10. Error Handling
+
+Errors are ordinary values.
+The language provides no exceptions and no implicit propagation operator in v0.2.
+
+Recommended standard library conventions:
+- Error is the conventional fallible-operation type.
+- Fallible functions return their primary value followed by Error.
+- Success is represented by nil in the Error position.
+- The error result appears last in the return list.
+- Domain-specific failure details may be carried inside Error rather than through ad hoc success-sentinel enums.
+- On failure, non-error return values should be the zero value of their type.
+
+Usage rule:
+- Ignoring a non-void result is not allowed silently.
+- Callers must bind the result or discard it explicitly with _.
+- Compilers should warn by default when Error-typed return values are unused, and may elevate this to an error in strict mode.
+
+Known cost:
+- Explicit error handling is intentionally verbose in deeply nested or recursive code.
+- This cost is accepted in v0.2 and should be addressed first through library conventions, not hidden control-flow features.
+
+Example:
+
+data, err = read()
+if err != nil {
+    return err
+}
+
+11. Control Flow
+
+If:
+
+if cond {
+    ...
+} else {
+    ...
+}
+
+Switch:
+
+switch x {
+    case A:
+        ...
+    case B:
+        ...
+}
+
+Rules:
+- No implicit fallthrough
+- Exhaustive switching is required for tagged unions
+- `for` loops are part of the core language.
+- `for value in slice` and `for index, value in slice` are core iteration forms for slices.
+- Tagged-union case destructuring uses the switch syntax `case VariantName(bound, values):`.
+
+12. Tagged Unions
+
+Tagged unions are a core language type.
+
+Example:
+
+enum Token {
+    Int(value: i64)
+    Plus
+    Minus
+}
+
+Rules:
+- Exhaustive switch over tagged unions is required.
+- The tag is part of the semantic value.
+- Physical layout is implementation-defined by default.
+- Tagged unions are not promised to be C ABI compatible.
+- C interop should use an explicit @abi(c) struct-plus-union representation when layout compatibility matters.
+
+13. Attributes
+
+Attributes are lightweight annotations.
+Expected examples include:
+- @inline
+- @pure
+- @deprecated
+- @packed
+- @abi(c)
+- @noalias
+
+Rule:
+- Attributes may affect optimization, diagnostics, or ABI selection.
+- Attributes must not silently introduce hidden control flow or allocation semantics.
+
+14. Compile-Time Features
+
+Compile-time support in v0.2 is intentionally narrow.
+
+Supported:
+- Constants
+
+Not included:
+- if comptime
+- Reflection
+- Arbitrary compile-time execution
+- Templates
+- Compile-time allocation or I/O
+
+15. Interoperability with C
+
+C interop is a first-class goal, but it is an explicit boundary.
+
+Rules:
+- v0.2 does not parse C headers as part of the language.
+- Bindings are written explicitly in Modern C or generated by an external tool.
+- ABI compatibility is guaranteed only for a defined interoperable subset.
+- External C declarations use the spelling `extern(c)`.
+- ABI-sensitive layout is requested with `@abi(c)`.
+
+Interop subset:
+- Primitive integers and floats
+- Pointers
+- Function signatures using interoperable types
+- Structs marked @abi(c)
+- Explicit null-terminated string forms
+
+Convention:
+- The standard library defines `cstr` as the conventional null-terminated read-only C string type.
+
+Illustrative C interop surface:
+
+extern(c) func c_stat(path: cstr, out: *CStat) i32
+
+16. Volatile and MMIO API Shape
+
+Volatile and MMIO access are library APIs, not type qualifiers and not language syntax.
+
+The standard or platform library should expose a surface like:
+
+mmio_ptr<T>(addr: uintptr) *T
+volatile_load<T>(ptr: *T) T
+volatile_store<T>(ptr: *T, value: T)
+
+Rules:
+- `mmio_ptr` is an explicit escape hatch for forming pointers to device memory.
+- `volatile_load` and `volatile_store` are the standard operations for observable device access.
+- Volatile access remains distinct from atomic synchronization.
+
+17. Standard Library
+
+The standard library should remain small.
+
+Basic I/O placement:
+- `stdin`, `stdout`, and `stderr` belong in the standard library I/O surface, not only in the platform layer.
+- Platform libraries may expose lower-level OS-specific handles beneath the standard I/O layer.
+
+First-pass string and UTF-8 surface:
+- The initial standard string surface should stay small, explicit, and non-allocating by default.
+- The first-pass standard utilities should include `strings.lines`, `strings.split_once`, `strings.trim_space`, `strings.has_prefix`, `strings.has_suffix`, `strings.equal`, `utf8.valid`, `utf8.decode`, and `utf8.encode`.
+- Richer text-processing facilities belong in later libraries, not in the core standard surface.
+
+Minimum areas:
+- Allocation and allocator interfaces
+- Thread, atomic, mutex, and condition-variable primitives
+- Buffer<T> and slice conversion utilities
+- Slices and string utilities
+- Basic I/O
+- File APIs
+- Platform abstractions
+- Volatile or MMIO access helpers
+
+The standard library must not imply a hidden runtime.
+
+18. Explicit Non-Goals
+
+v0.2 explicitly excludes:
+- Exceptions
+- Garbage collection
+- Inheritance or class hierarchies
+- Implicit numeric conversions
+- Implicit pointer conversions
+- Hidden allocation
+- Preprocessor macros
+- Hidden module initialization
+- A general compile-time execution model
+
+19. Summary
+
+Modern C is C-like in feel, but it rejects several of C's historical optimizer contracts.
+
+The result is a language that aims to be:
+- Smaller than C++
+- Less magical than Rust
+- More explicit than Go
+- Easier to reason about than legacy C
+
+If this design changes, it should change only in response to pressure from real programs, not from speculative feature demand.

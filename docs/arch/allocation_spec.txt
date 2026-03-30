@@ -1,0 +1,254 @@
+Modern C - Allocation Convention Notes
+
+Purpose
+
+This document explores the allocation convention for Modern C.
+The core semantics are already mostly decided: allocation is a library feature, not a language primitive, and allocation failure is explicit.
+
+What remains is to make the day-to-day convention coherent so APIs, examples, standard library modules, and runtime behavior all line up.
+
+Core recommendation
+
+Modern C should adopt a two-layer allocation model:
+- a low-level `Allocator` interface for explicit storage policy
+- a small conventional hosted default allocator accessor for ordinary programs
+
+This gives:
+- explicit control where allocation policy matters
+- easy hosted programs without hidden ambient runtime state
+- a clear way to write libraries that remain usable in freestanding builds
+
+1. Non-Negotiable Principles
+
+Allocation convention should preserve these rules:
+- no implicit allocation in the language
+- no hidden global current allocator
+- no allocation failure signaled by `nil` alone
+- no allocator-family mismatch hidden behind convenience APIs
+- no GC, reference counting, or ownership transfer implied by helper names
+
+These are already consistent with the current design and should stay fixed.
+
+2. Low-Level Interface
+
+The existing low-level shape is sound and should remain the base layer:
+
+```text
+struct Allocator {
+    ctx: *ui8
+    alloc: func(ctx: *ui8, size: usize, align: usize) (*ui8, Error)
+    free: func(ctx: *ui8, ptr: *ui8, size: usize, align: usize)
+}
+```
+
+Why this is a good base:
+- explicit context pointer
+- explicit size and alignment
+- easy to implement for heap, arena, pool, region, bump, or target-specific allocators
+- no hidden vtable object model beyond a simple function table
+
+This should remain the one real allocator protocol in v0.2.
+
+3. Default Allocator Convention
+
+The most useful remaining decision is the hosted default allocator.
+
+Recommended convention:
+
+```text
+mem.default_allocator() *Allocator
+```
+
+Recommendation details:
+- `default_allocator` belongs in `mem`
+- it returns `*Allocator`, not a copied value
+- it is available in hosted environments
+- it is not required in freestanding environments
+- it is an explicit accessor, not ambient state
+
+Why this is the right cut:
+- simple programs need a conventional heap entrypoint
+- the call site stays explicit
+- libraries are not forced to depend on hidden runtime state
+- freestanding targets stay honest
+
+Example:
+
+```text
+func main(args: Slice<cstr>) i32 {
+    alloc = mem.default_allocator()
+    buf, err = mem.buffer_new<ui8>(alloc, 4096)
+    if err != nil {
+        return 1
+    }
+    defer mem.buffer_free(&buf)
+    return 0
+}
+```
+
+4. API Convention For Allocating Functions
+
+Not every function should mention an allocator.
+The question is when allocator choice is part of the contract.
+
+Recommended rule:
+- if a function may allocate and the caller may reasonably care which allocator is used, it should accept `alloc: *Allocator`
+- if a function is a thin hosted convenience wrapper, it may use `mem.default_allocator()` internally, but that should be visible from the API family and documentation
+
+Recommended parameter placement:
+- put `alloc: *Allocator` last in ordinary library APIs
+
+Why last:
+- it reads as a policy or resource parameter rather than part of the logical payload
+- it matches current examples such as `read_file(path, alloc)`
+- it keeps common data arguments grouped together
+
+Examples:
+
+```text
+read_file(path: str, alloc: *Allocator) (Buffer<ui8>, Error)
+parse_and_store(input: str, alloc: *Allocator) (*Node, Error)
+buffer_new<T>(alloc: *Allocator, cap: usize) (Buffer<T>, Error)
+```
+
+5. Standard Helper Surface
+
+The standard helper surface should stay small and mechanical.
+
+Recommended first-pass helpers:
+
+```text
+mem.heap_alloc(size: usize, align: usize) (*ui8, Error)
+mem.heap_free(ptr: *ui8)
+
+mem.alloc_value<T>(alloc: *Allocator) (*T, Error)
+mem.alloc_array<T>(alloc: *Allocator, len: usize) (Buffer<T>, Error)
+mem.buffer_new<T>(alloc: *Allocator, cap: usize) (Buffer<T>, Error)
+mem.buffer_free<T>(buf: *Buffer<T>)
+```
+
+Why add `buffer_free`:
+- it avoids forcing every caller to reconstruct size and alignment details
+- it centralizes release of owned `Buffer<T>` values
+- it makes `Buffer<T>` feel like a real owning container instead of a raw struct every caller must dismantle manually
+
+Possible supporting rule:
+- `buffer_free` should zero the buffer after release so double-free mistakes are easier to surface in checked builds
+
+6. Convenience Wrappers Versus Explicit Allocators
+
+There are two tempting extremes:
+- require an allocator parameter everywhere
+- hide allocation behind hosted convenience APIs everywhere
+
+Both are wrong.
+
+Recommended split:
+- core and reusable library code should accept explicit allocators when allocating owned results
+- application code may write its own convenience wrappers locally when useful
+
+Decision for v0.2:
+- the standard library should not provide broad hosted convenience wrappers such as `read_file_default` for general allocation-bearing APIs
+- the standard library should standardize one explicit hosted accessor, `mem.default_allocator()`, and otherwise keep allocator choice visible in APIs that allocate owned results
+
+Why this is the better cut:
+- it avoids duplicating every allocating API into explicit and default-allocator variants
+- it keeps allocation policy visible at the call site
+- it preserves a small standard library surface
+- local applications can always build thin wrappers of their own if they want less repetition
+
+Example of an application-local wrapper:
+
+```text
+func read_file_app(path: str) (Buffer<ui8>, Error) {
+    return fs.read_file(path, mem.default_allocator())
+}
+```
+
+This keeps the convenience local rather than baking a second API family into the standard library.
+
+7. Buffer Ownership Convention
+
+Owned dynamic contiguous memory should normally move through `Buffer<T>`.
+
+Recommended ownership rule:
+- functions returning newly allocated contiguous storage should return `Buffer<T>` unless there is a strong reason to return a different owning type
+- borrowed data should return `Slice<T>` or `Slice<const T>`
+- APIs should not return borrowed views into temporary internal allocations
+
+Release rule:
+- if a type owns heap or allocator-managed storage, it should provide a conventional release function in the owning module
+
+Examples:
+- `mem.buffer_free`
+- later, possibly `strings.builder_free` or `fs.dir_entries_free` if those owning types exist
+
+8. Arena and Region Style Allocation
+
+Modern C should not add arena syntax or region syntax in the language.
+
+Recommended convention:
+- arenas, bump allocators, pools, and regions are library types that implement the `Allocator` protocol or expose allocation functions compatible with it
+
+Why:
+- keeps the language core small
+- preserves explicit policy choice
+- avoids introducing lifetime magic into the type system
+
+This is the Thompson-like cut: libraries, not language features.
+
+9. Failure Convention
+
+Allocation failure should remain explicit everywhere.
+
+Recommended rule:
+- allocation functions return `(value, Error)` or `(*ui8, Error)`
+- failure does not surface as a valid pointer plus out-of-band flag
+- callers must handle or explicitly discard the error like any other fallible result
+
+This should remain boring and uniform.
+
+10. Hosted Versus Freestanding Convention
+
+Hosted builds:
+- `mem.default_allocator()` exists
+- hosted convenience wrappers may exist sparingly
+- heap-backed allocation is available by convention
+
+Freestanding builds:
+- no default allocator is assumed
+- code should accept explicit allocators or use target-specific allocation strategies
+- library code that requires allocation should say so in its API
+
+This keeps freestanding support real instead of nominal.
+
+11. Recommended Naming Discipline
+
+To keep allocation visible, naming should be boring and regular.
+
+Recommended patterns:
+- `alloc_*` for typed allocation helpers
+- `buffer_*` for owning buffer operations
+- `default_allocator` for the hosted accessor
+- avoid vague names like `new`, `create`, or `make` when allocation is a major semantic effect unless the module style already makes allocation obvious
+
+Examples:
+- good: `alloc_value`, `alloc_array`, `buffer_new`, `buffer_free`
+- weaker: `new_buffer`, `create_list`, `make_bytes`
+
+The goal is not dogma.
+The goal is that allocation does not become easy to miss in APIs.
+
+12. Bottom-Line Recommendation
+
+The cleanest allocation convention for Modern C is:
+- keep one real `Allocator` protocol
+- standardize `mem.default_allocator() *Allocator` for hosted code
+- pass `alloc: *Allocator` explicitly in library APIs that allocate owned storage
+- keep allocator parameters last in ordinary APIs
+- use `Buffer<T>` as the normal owning contiguous return type
+- add a small helper surface including `buffer_free`
+- keep hosted convenience wrappers thin and clearly named
+- keep arenas and regions in libraries, not the language
+
+If this convention is adopted, the remaining allocator question in the design becomes small: mostly naming and how much hosted convenience the standard library should offer, not the ownership model itself.
