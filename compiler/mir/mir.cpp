@@ -667,6 +667,33 @@ const VariantDecl* FindMirVariantDecl(const TypeDecl& type_decl, std::string_vie
     return nullptr;
 }
 
+std::string_view PrimaryTargetName(const Instruction& instruction) {
+    if (!instruction.target_name.empty()) {
+        return instruction.target_name;
+    }
+    return instruction.target;
+}
+
+std::string_view DisplayTarget(const Instruction& instruction) {
+    if (!instruction.target_display.empty()) {
+        return instruction.target_display;
+    }
+    if (!instruction.target.empty()) {
+        return instruction.target;
+    }
+    return instruction.target_name;
+}
+
+std::string CanonicalVariantDisplayName(const sema::Type& selector_type, std::string_view variant_name) {
+    if (variant_name.find('.') != std::string_view::npos) {
+        return std::string(variant_name);
+    }
+    if (selector_type.kind == sema::Type::Kind::kNamed && !selector_type.name.empty()) {
+        return selector_type.name + "." + std::string(variant_name);
+    }
+    return std::string(variant_name);
+}
+
 class FunctionLowerer {
   public:
     FunctionLowerer(const Decl& decl,
@@ -721,9 +748,19 @@ class FunctionLowerer {
 
     struct DeferredCall {
         std::string target;
+        Instruction::TargetKind target_kind = Instruction::TargetKind::kNone;
+        std::string target_name;
+        std::string target_display;
         sema::Type type;
         std::string callee_local;
         std::vector<std::string> arg_locals;
+    };
+
+    struct TargetMetadata {
+        std::string target;
+        Instruction::TargetKind kind = Instruction::TargetKind::kNone;
+        std::string name;
+        std::string display;
     };
 
     struct DeferScope {
@@ -777,18 +814,42 @@ class FunctionLowerer {
         return {};
     }
 
+    TargetMetadata TargetMetadataForExpr(const Expr& expr) const {
+        const std::string canonical_name = CalleeName(expr);
+        if (!canonical_name.empty()) {
+            return {
+                .target = canonical_name,
+                .kind = InferSymbolRefKind(canonical_name),
+                .name = canonical_name,
+                .display = canonical_name,
+            };
+        }
+        const std::string display = RenderExprInline(expr);
+        return {
+            .target = display,
+            .kind = Instruction::TargetKind::kNone,
+            .name = {},
+            .display = display,
+        };
+    }
+
+    std::string StableExprMetadataText(const Expr& expr) const {
+        const TargetMetadata metadata = TargetMetadataForExpr(expr);
+        return !metadata.name.empty() ? metadata.name : metadata.display;
+    }
+
     std::string RenderOrderMetadata(const Expr& expr, std::size_t order_index) const {
         if (expr.args.size() <= order_index) {
             return {};
         }
-        return "order=" + RenderExprInline(*expr.args[order_index]);
+        return "order=" + StableExprMetadataText(*expr.args[order_index]);
     }
 
     std::string RenderCompareExchangeOrderMetadata(const Expr& expr) const {
         if (expr.args.size() <= 4) {
             return {};
         }
-        return "success=" + RenderExprInline(*expr.args[3]) + ",failure=" + RenderExprInline(*expr.args[4]);
+        return "success=" + StableExprMetadataText(*expr.args[3]) + ",failure=" + StableExprMetadataText(*expr.args[4]);
     }
 
     bool TryEmitSpecialCall(const Expr& expr,
@@ -809,10 +870,14 @@ class FunctionLowerer {
         const bool produces_value = kind == SpecialCallKind::kVolatileLoad || kind == SpecialCallKind::kAtomicLoad ||
                                     kind == SpecialCallKind::kAtomicExchange || kind == SpecialCallKind::kAtomicCompareExchange ||
                                     kind == SpecialCallKind::kAtomicFetchAdd;
+        const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
 
         Instruction instruction {
             .type = result_type,
-            .target = callee_name,
+            .target = target_metadata.target,
+            .target_kind = target_metadata.kind,
+            .target_name = target_metadata.name,
+            .target_display = target_metadata.display,
         };
         if (wants_result || produces_value) {
             instruction.result = NewValue();
@@ -885,11 +950,15 @@ class FunctionLowerer {
         for (const auto& arg : args) {
             operands.push_back(arg.value);
         }
+        const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
 
         Emit({
             .kind = Instruction::Kind::kCall,
             .type = call_type,
-            .target = CalleeName(*expr.left).empty() ? RenderExprInline(*expr.left) : CalleeName(*expr.left),
+            .target = target_metadata.target,
+            .target_kind = target_metadata.kind,
+            .target_name = target_metadata.name,
+            .target_display = target_metadata.display,
             .operands = std::move(operands),
         });
     }
@@ -905,6 +974,7 @@ class FunctionLowerer {
                 .target = expr.text,
                 .target_kind = InferSymbolRefKind(expr.text),
                 .target_name = expr.text,
+                .target_display = expr.text,
             });
             return {value, type};
         }
@@ -919,6 +989,7 @@ class FunctionLowerer {
                 .target = qualified_name,
                 .target_kind = InferSymbolRefKind(qualified_name),
                 .target_name = qualified_name,
+                .target_display = qualified_name,
             });
             return {value, type};
         }
@@ -936,8 +1007,12 @@ class FunctionLowerer {
             args.push_back(LowerExpr(*arg));
         }
         const auto callee = LowerCalleeExpr(*expr.left);
+        const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
         DeferredCall call {
-            .target = CalleeName(*expr.left).empty() ? RenderExprInline(*expr.left) : CalleeName(*expr.left),
+            .target = target_metadata.target,
+            .target_kind = target_metadata.kind,
+            .target_name = target_metadata.name,
+            .target_display = target_metadata.display,
             .type = sema::VoidType(),
             .callee_local = NewHiddenLocal("defer_callee"),
         };
@@ -960,6 +1035,9 @@ class FunctionLowerer {
             .kind = Instruction::Kind::kCall,
             .type = call.type,
             .target = call.target,
+            .target_kind = call.target_kind,
+            .target_name = call.target_name,
+            .target_display = call.target_display,
             .operands = std::move(operands),
         });
     }
@@ -1077,6 +1155,10 @@ class FunctionLowerer {
                 .result = value,
                 .type = sema::NamedType("usize"),
                 .target = "len",
+                .target_kind = Instruction::TargetKind::kField,
+                .target_name = "len",
+                .target_display = "len",
+                .target_base_type = base.type,
                 .operands = {base.value},
             });
             return ValueInfo {value, sema::NamedType("usize")};
@@ -1148,6 +1230,7 @@ class FunctionLowerer {
             .result = value,
             .type = target_type,
             .target = sema::FormatType(target_type),
+            .target_display = sema::FormatType(target_type),
             .operands = {operand.value},
         });
         return {value, target_type};
@@ -1155,11 +1238,15 @@ class FunctionLowerer {
 
     ValueInfo EmitVariantMatchValue(const ValueInfo& selector, const std::string& variant_name) {
         const std::string value = NewValue();
+        const std::string canonical_variant_name = CanonicalVariantDisplayName(selector.type, variant_name);
         Emit({
             .kind = Instruction::Kind::kVariantMatch,
             .result = value,
             .type = sema::BoolType(),
-            .target = variant_name,
+            .target = canonical_variant_name,
+            .target_name = VariantLeafName(variant_name),
+            .target_display = canonical_variant_name,
+            .target_base_type = selector.type,
             .operands = {selector.value},
         });
         return {value, sema::BoolType()};
@@ -1174,12 +1261,17 @@ class FunctionLowerer {
         const sema::Type payload_type = KnownTypeOrError(InferVariantPayloadType(selector_type, variant_name, payload_index),
                                                          span,
                                                          "variant payload type for " + variant_name);
+        const std::string canonical_variant_name = CanonicalVariantDisplayName(selector_type, variant_name);
         Emit({
             .kind = Instruction::Kind::kVariantExtract,
             .result = value,
             .type = payload_type,
             .op = std::to_string(payload_index),
-            .target = variant_name,
+            .target = canonical_variant_name,
+            .target_name = VariantLeafName(variant_name),
+            .target_display = canonical_variant_name,
+            .target_base_type = selector_type,
+            .target_index = static_cast<std::int64_t>(payload_index),
             .operands = {selector.value},
         });
         return {value, payload_type};
@@ -1261,6 +1353,7 @@ class FunctionLowerer {
                     .target = expr.text,
                     .target_kind = InferSymbolRefKind(expr.text),
                     .target_name = expr.text,
+                    .target_display = expr.text,
                 });
                 return {value, type};
             }
@@ -1288,6 +1381,7 @@ class FunctionLowerer {
                     .target = qualified_name,
                     .target_kind = InferSymbolRefKind(qualified_name),
                     .target_name = qualified_name,
+                    .target_display = qualified_name,
                 });
                 return {value, type};
             }
@@ -1346,11 +1440,15 @@ class FunctionLowerer {
                     operands.push_back(arg.value);
                 }
                 const std::string value = NewValue();
+                const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
                 Emit({
                     .kind = Instruction::Kind::kCall,
                     .result = value,
                     .type = type,
-                    .target = CalleeName(*expr.left).empty() ? RenderExprInline(*expr.left) : CalleeName(*expr.left),
+                    .target = target_metadata.target,
+                    .target_kind = target_metadata.kind,
+                    .target_name = target_metadata.name,
+                    .target_display = target_metadata.display,
                     .operands = std::move(operands),
                 });
                 return {value, type};
@@ -1360,11 +1458,17 @@ class FunctionLowerer {
                 const auto base = LowerExpr(*expr.left);
                 const std::string value = NewValue();
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "field expression type");
+                const std::string target_display = RenderExprInline(expr);
                 Emit({
                     .kind = Instruction::Kind::kField,
                     .result = value,
                     .type = type,
-                    .target = expr.text.empty() ? RenderExprInline(expr) : expr.text,
+                    .target = expr.text.empty() ? target_display : expr.text,
+                    .target_kind = expr.kind == Expr::Kind::kField ? Instruction::TargetKind::kField
+                                                                    : Instruction::TargetKind::kDerefField,
+                    .target_name = expr.text,
+                    .target_display = target_display,
+                    .target_base_type = base.type,
                     .operands = {base.value},
                 });
                 return {value, type};
@@ -1375,10 +1479,15 @@ class FunctionLowerer {
                 EmitIndexBoundsCheck(base, index);
                 const std::string value = NewValue();
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "index expression type");
+                const std::string target_display = RenderExprInline(expr);
                 Emit({
                     .kind = Instruction::Kind::kIndex,
                     .result = value,
                     .type = type,
+                    .target_kind = Instruction::TargetKind::kIndex,
+                    .target_display = target_display,
+                    .target_base_type = base.type,
+                    .target_aux_types = {index.type},
                     .operands = {base.value, index.value},
                 });
                 return {value, type};
@@ -1388,13 +1497,16 @@ class FunctionLowerer {
                 std::optional<ValueInfo> lower;
                 std::optional<ValueInfo> upper;
                 std::vector<std::string> operands = {base.value};
+                std::vector<sema::Type> target_aux_types;
                 if (expr.right != nullptr) {
                     lower = LowerExpr(*expr.right);
                     operands.push_back(lower->value);
+                    target_aux_types.push_back(lower->type);
                 }
                 if (expr.extra != nullptr) {
                     upper = LowerExpr(*expr.extra);
                     operands.push_back(upper->value);
+                    target_aux_types.push_back(upper->type);
                 }
                 EmitSliceBoundsCheck(base, lower, upper);
                 const std::string value = NewValue();
@@ -1403,6 +1515,9 @@ class FunctionLowerer {
                     .kind = Instruction::Kind::kSlice,
                     .result = value,
                     .type = type,
+                    .target_display = RenderExprInline(expr),
+                    .target_base_type = base.type,
+                    .target_aux_types = std::move(target_aux_types),
                     .operands = std::move(operands),
                 });
                 return {value, type};
@@ -1489,6 +1604,7 @@ class FunctionLowerer {
                           : target.kind == Expr::Kind::kIndex ? Instruction::TargetKind::kIndex
                                                               : Instruction::TargetKind::kOther,
             .target_name = (target.kind == Expr::Kind::kField || target.kind == Expr::Kind::kDerefField) ? target.text : std::string(),
+            .target_display = RenderExprInline(target),
             .target_base_type = target.left != nullptr
                                     ? KnownTypeOrError(ExprTypeOrUnknown(*target.left), target.left->span, "assignment target base type")
                                     : sema::UnknownType(),
@@ -1963,6 +2079,10 @@ class FunctionLowerer {
             .result = len_value,
             .type = sema::NamedType("usize"),
             .target = "len",
+            .target_kind = Instruction::TargetKind::kField,
+            .target_name = "len",
+            .target_display = stmt.exprs.front() != nullptr ? RenderExprInline(*stmt.exprs.front()) + ".len" : std::string("len"),
+            .target_base_type = iterable_type,
             .operands = {stored_iterable.value},
         });
         const auto condition = EmitBinaryValue("<", current_index, {len_value, sema::NamedType("usize")}, sema::BoolType());
@@ -1986,6 +2106,12 @@ class FunctionLowerer {
             .kind = Instruction::Kind::kIndex,
             .result = item_value,
             .type = element_type,
+            .target_kind = Instruction::TargetKind::kIndex,
+            .target_display = stmt.exprs.front() != nullptr && !stmt.loop_name.empty()
+                                  ? RenderExprInline(*stmt.exprs.front()) + "[" + stmt.loop_name + "]"
+                                  : std::string(),
+            .target_base_type = iterable_type,
+            .target_aux_types = {sema::NamedType("usize")},
             .operands = {body_iterable.value, body_index.value},
         });
         if (stmt.kind == Stmt::Kind::kForEachIndex) {
@@ -2368,7 +2494,7 @@ bool ValidateModule(const Module& module,
                         if (instruction.operands.size() != 1) {
                             report("store_target must use exactly one operand in function " + function.name);
                         }
-                        if (instruction.target.empty()) {
+                        if (instruction.target.empty() && instruction.target_name.empty() && instruction.target_display.empty()) {
                             report("store_target must name a target in function " + function.name);
                         }
                         if (operand_types.size() == 1 && !sema::IsUnknown(instruction.type) && !IsAssignableType(instruction.type, operand_types.front())) {
@@ -2802,13 +2928,23 @@ bool ValidateModule(const Module& module,
                             report("call must include a callee operand in function " + function.name);
                             break;
                         }
-                        if (IsDedicatedCallSurface(instruction.target)) {
+                        const std::string_view call_target_name = PrimaryTargetName(instruction);
+                        if (!call_target_name.empty() && IsDedicatedCallSurface(call_target_name)) {
                             report("call must use a dedicated volatile/atomic opcode when one exists in function " + function.name);
+                        }
+                        if (instruction.target_kind == Instruction::TargetKind::kFunction && instruction.target_name.empty()) {
+                            report("call must record target_name metadata for direct function calls in function " + function.name);
                         }
                         const sema::Type& callee_type = operand_types.front();
                         if (!sema::IsUnknown(callee_type) && callee_type.kind != sema::Type::Kind::kProcedure) {
                             report("call callee must have procedure type in function " + function.name);
                             break;
+                        }
+                        if (instruction.target_kind == Instruction::TargetKind::kFunction && !instruction.target_name.empty()) {
+                            if (const Function* direct_callee = FindMirFunction(module, instruction.target_name); direct_callee != nullptr &&
+                                !sema::IsUnknown(callee_type) && callee_type != FunctionProcedureType(*direct_callee)) {
+                                report("call target metadata type mismatch in function " + function.name + " for " + direct_callee->name);
+                            }
                         }
                         if (callee_type.kind == sema::Type::Kind::kProcedure) {
                             const std::size_t param_count = ProcedureParamCount(callee_type);
@@ -2832,7 +2968,7 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kVolatileLoad: {
-                        if (ClassifySpecialCall(instruction.target) != SpecialCallKind::kVolatileLoad) {
+                        if (ClassifySpecialCall(PrimaryTargetName(instruction)) != SpecialCallKind::kVolatileLoad) {
                             report("volatile_load must use volatile_load call metadata in function " + function.name);
                         }
                         if (instruction.result.empty()) {
@@ -2855,7 +2991,7 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kVolatileStore: {
-                        if (ClassifySpecialCall(instruction.target) != SpecialCallKind::kVolatileStore) {
+                        if (ClassifySpecialCall(PrimaryTargetName(instruction)) != SpecialCallKind::kVolatileStore) {
                             report("volatile_store must use volatile_store call metadata in function " + function.name);
                         }
                         if (!instruction.result.empty()) {
@@ -2892,7 +3028,7 @@ bool ValidateModule(const Module& module,
                                                               : is_exchange       ? SpecialCallKind::kAtomicExchange
                                                               : is_compare_exchange ? SpecialCallKind::kAtomicCompareExchange
                                                                                     : SpecialCallKind::kAtomicFetchAdd;
-                        if (ClassifySpecialCall(instruction.target) != expected_special_kind) {
+                        if (ClassifySpecialCall(PrimaryTargetName(instruction)) != expected_special_kind) {
                             report(std::string(ToString(instruction.kind)) + " must use matching atomic call metadata in function " + function.name);
                         }
                         const std::size_t expected_operands = is_load ? 2 : (is_store || is_exchange || is_fetch_add ? 3 : 5);
@@ -2983,12 +3119,22 @@ bool ValidateModule(const Module& module,
                             report("field must use exactly one base operand in function " + function.name);
                             break;
                         }
-                        if (instruction.target.empty()) {
+                        const std::string_view field_name = PrimaryTargetName(instruction);
+                        if (field_name.empty()) {
                             report("field must name a member target in function " + function.name);
                             break;
                         }
-                        const sema::Type& base_type = operand_types.front();
-                        if (instruction.target == "len") {
+                        if (instruction.target_kind != Instruction::TargetKind::kNone && instruction.target_kind != Instruction::TargetKind::kField &&
+                            instruction.target_kind != Instruction::TargetKind::kDerefField) {
+                            report("field must use field or deref_field target metadata in function " + function.name);
+                        }
+                        const sema::Type& operand_base_type = operand_types.front();
+                        const sema::Type base_type = !sema::IsUnknown(instruction.target_base_type) ? instruction.target_base_type : operand_base_type;
+                        if (!sema::IsUnknown(instruction.target_base_type) && !sema::IsUnknown(operand_base_type) &&
+                            instruction.target_base_type != operand_base_type) {
+                            report("field target base metadata mismatch in function " + function.name);
+                        }
+                        if (field_name == "len") {
                             const bool len_ok = (base_type.kind == sema::Type::Kind::kNamed &&
                                                  (base_type.name == "Slice" || base_type.name == "Buffer" || base_type.name == "str" ||
                                                   base_type.name == "string")) ||
@@ -3004,16 +3150,16 @@ bool ValidateModule(const Module& module,
                             if (type_decl != nullptr) {
                                 bool found_field = false;
                                 for (const auto& field : type_decl->fields) {
-                                    if (field.first == instruction.target) {
+                                    if (field.first == field_name) {
                                         found_field = true;
                                         if (instruction.type != field.second) {
-                                            report("field result type mismatch in function " + function.name + " for " + instruction.target);
+                                            report("field result type mismatch in function " + function.name + " for " + std::string(field_name));
                                         }
                                         break;
                                     }
                                 }
                                 if (!found_field) {
-                                    report("field references unknown member in function " + function.name + ": " + instruction.target);
+                                    report("field references unknown member in function " + function.name + ": " + std::string(field_name));
                                 }
                             } else if (IsBuiltinNamedNonAggregate(base_type)) {
                                 report("field requires named aggregate base in function " + function.name);
@@ -3031,8 +3177,23 @@ bool ValidateModule(const Module& module,
                             report("index must use base and index operands in function " + function.name);
                             break;
                         }
-                        const sema::Type& base_type = operand_types.front();
-                        const sema::Type& index_type = operand_types[1];
+                        const sema::Type& operand_base_type = operand_types.front();
+                        const sema::Type base_type = !sema::IsUnknown(instruction.target_base_type) ? instruction.target_base_type : operand_base_type;
+                        if (!sema::IsUnknown(instruction.target_base_type) && !sema::IsUnknown(operand_base_type) &&
+                            instruction.target_base_type != operand_base_type) {
+                            report("index target base metadata mismatch in function " + function.name);
+                        }
+                        sema::Type index_type = operand_types[1];
+                        if (!instruction.target_aux_types.empty()) {
+                            if (instruction.target_aux_types.size() != 1) {
+                                report("index target metadata must carry exactly one index type in function " + function.name);
+                            } else {
+                                if (!sema::IsUnknown(index_type) && instruction.target_aux_types.front() != index_type) {
+                                    report("index target metadata type mismatch in function " + function.name);
+                                }
+                                index_type = instruction.target_aux_types.front();
+                            }
+                        }
                         sema::Type expected_type = sema::UnknownType();
                         if (base_type.kind == sema::Type::Kind::kArray && !base_type.subtypes.empty()) {
                             expected_type = base_type.subtypes.front();
@@ -3061,7 +3222,12 @@ bool ValidateModule(const Module& module,
                             report("slice must use one to three operands in function " + function.name);
                             break;
                         }
-                        const sema::Type& base_type = operand_types.front();
+                        const sema::Type& operand_base_type = operand_types.front();
+                        const sema::Type base_type = !sema::IsUnknown(instruction.target_base_type) ? instruction.target_base_type : operand_base_type;
+                        if (!sema::IsUnknown(instruction.target_base_type) && !sema::IsUnknown(operand_base_type) &&
+                            instruction.target_base_type != operand_base_type) {
+                            report("slice target base metadata mismatch in function " + function.name);
+                        }
                         sema::Type expected_type = sema::UnknownType();
                         if (base_type.kind == sema::Type::Kind::kArray && !base_type.subtypes.empty()) {
                             expected_type = sema::NamedType("Slice");
@@ -3084,8 +3250,17 @@ bool ValidateModule(const Module& module,
                             report("slice result type mismatch in function " + function.name + ": expected " + sema::FormatType(expected_type) +
                                    ", got " + sema::FormatType(instruction.type));
                         }
+                        if (!instruction.target_aux_types.empty() && instruction.target_aux_types.size() != operand_types.size() - 1) {
+                            report("slice target metadata must track each bound type in function " + function.name);
+                        }
                         for (std::size_t index = 1; index < operand_types.size(); ++index) {
-                            const sema::Type& bound_type = operand_types[index];
+                            sema::Type bound_type = operand_types[index];
+                            if (index - 1 < instruction.target_aux_types.size()) {
+                                if (!sema::IsUnknown(bound_type) && instruction.target_aux_types[index - 1] != bound_type) {
+                                    report("slice target metadata type mismatch in function " + function.name);
+                                }
+                                bound_type = instruction.target_aux_types[index - 1];
+                            }
                             if (!sema::IsUnknown(bound_type) && bound_type != sema::NamedType("usize") &&
                                 bound_type.kind != sema::Type::Kind::kIntLiteral) {
                                 report("slice bounds must be usize-compatible in function " + function.name);
@@ -3145,30 +3320,40 @@ bool ValidateModule(const Module& module,
                             }
                         }
                         break;
-                    case Instruction::Kind::kVariantMatch:
+                    case Instruction::Kind::kVariantMatch: {
                         if (instruction.result.empty()) {
                             report("variant_match must produce a result in function " + function.name);
                         }
                         if (instruction.operands.size() != 1) {
                             report("variant_match must use exactly one selector operand in function " + function.name);
                         }
-                        if (instruction.target.empty()) {
+                        const std::string_view variant_name = PrimaryTargetName(instruction);
+                        if (variant_name.empty()) {
                             report("variant_match must name a target variant in function " + function.name);
                         }
                         if (instruction.type != sema::BoolType()) {
                             report("variant_match must produce bool in function " + function.name);
                         }
-                        if (operand_types.size() == 1 && operand_types.front().kind == sema::Type::Kind::kNamed) {
-                            const TypeDecl* type_decl = FindMirTypeDecl(module, operand_types.front().name);
+                        const sema::Type selector_type = !sema::IsUnknown(instruction.target_base_type) ? instruction.target_base_type
+                                                                                                        : (operand_types.empty()
+                                                                                                               ? sema::UnknownType()
+                                                                                                               : operand_types.front());
+                        if (operand_types.size() == 1 && !sema::IsUnknown(instruction.target_base_type) &&
+                            !sema::IsUnknown(operand_types.front()) && instruction.target_base_type != operand_types.front()) {
+                            report("variant_match selector metadata mismatch in function " + function.name);
+                        }
+                        if (selector_type.kind == sema::Type::Kind::kNamed) {
+                            const TypeDecl* type_decl = FindMirTypeDecl(module, selector_type.name);
                             if (type_decl == nullptr) {
-                                report("variant_match selector type is unknown in function " + function.name + ": " + operand_types.front().name);
+                                report("variant_match selector type is unknown in function " + function.name + ": " + selector_type.name);
                             } else if (type_decl->kind != TypeDecl::Kind::kEnum) {
                                 report("variant_match requires enum selector type in function " + function.name);
-                            } else if (FindMirVariantDecl(*type_decl, instruction.target) == nullptr) {
-                                report("variant_match references unknown variant in function " + function.name + ": " + instruction.target);
+                            } else if (FindMirVariantDecl(*type_decl, variant_name) == nullptr) {
+                                report("variant_match references unknown variant in function " + function.name + ": " + std::string(variant_name));
                             }
                         }
                         break;
+                    }
                     case Instruction::Kind::kVariantExtract: {
                         if (instruction.result.empty()) {
                             report("variant_extract must produce a result in function " + function.name);
@@ -3176,46 +3361,59 @@ bool ValidateModule(const Module& module,
                         if (instruction.operands.size() != 1) {
                             report("variant_extract must use exactly one selector operand in function " + function.name);
                         }
-                        if (instruction.target.empty()) {
+                        const std::string_view variant_name = PrimaryTargetName(instruction);
+                        if (variant_name.empty()) {
                             report("variant_extract must name a target variant in function " + function.name);
                         }
-                        if (instruction.op.empty()) {
+                        if (instruction.op.empty() && instruction.target_index < 0) {
                             report("variant_extract must record a payload index in function " + function.name);
                         }
-                        bool payload_index_ok = false;
-                        std::size_t payload_index = 0;
+                        bool payload_index_ok = instruction.target_index >= 0;
+                        std::size_t payload_index = instruction.target_index >= 0 ? static_cast<std::size_t>(instruction.target_index) : 0;
                         if (!instruction.op.empty()) {
                             try {
-                                payload_index = static_cast<std::size_t>(std::stoul(instruction.op));
+                                const std::size_t encoded_payload_index = static_cast<std::size_t>(std::stoul(instruction.op));
+                                if (payload_index_ok && encoded_payload_index != payload_index) {
+                                    report("variant_extract payload metadata mismatch in function " + function.name);
+                                }
+                                payload_index = encoded_payload_index;
                                 payload_index_ok = true;
                             } catch (const std::exception&) {
                                 report("variant_extract payload index must be numeric in function " + function.name);
                             }
                         }
-                        if (operand_types.size() == 1 && operand_types.front().kind == sema::Type::Kind::kNamed) {
-                            const TypeDecl* type_decl = FindMirTypeDecl(module, operand_types.front().name);
+                        const sema::Type selector_type = !sema::IsUnknown(instruction.target_base_type) ? instruction.target_base_type
+                                                                                                        : (operand_types.empty()
+                                                                                                               ? sema::UnknownType()
+                                                                                                               : operand_types.front());
+                        if (operand_types.size() == 1 && !sema::IsUnknown(instruction.target_base_type) &&
+                            !sema::IsUnknown(operand_types.front()) && instruction.target_base_type != operand_types.front()) {
+                            report("variant_extract selector metadata mismatch in function " + function.name);
+                        }
+                        if (selector_type.kind == sema::Type::Kind::kNamed) {
+                            const TypeDecl* type_decl = FindMirTypeDecl(module, selector_type.name);
                             if (type_decl == nullptr) {
-                                report("variant_extract selector type is unknown in function " + function.name + ": " + operand_types.front().name);
+                                report("variant_extract selector type is unknown in function " + function.name + ": " + selector_type.name);
                                 break;
                             }
                             if (type_decl->kind != TypeDecl::Kind::kEnum) {
                                 report("variant_extract requires enum selector type in function " + function.name);
                                 break;
                             }
-                            const VariantDecl* variant_decl = FindMirVariantDecl(*type_decl, instruction.target);
+                            const VariantDecl* variant_decl = FindMirVariantDecl(*type_decl, variant_name);
                             if (variant_decl == nullptr) {
-                                report("variant_extract references unknown variant in function " + function.name + ": " + instruction.target);
+                                report("variant_extract references unknown variant in function " + function.name + ": " + std::string(variant_name));
                                 break;
                             }
                             if (!payload_index_ok) {
                                 break;
                             }
                             if (payload_index >= variant_decl->payload_fields.size()) {
-                                report("variant_extract payload index out of range in function " + function.name + " for " + instruction.target);
+                                report("variant_extract payload index out of range in function " + function.name + " for " + std::string(variant_name));
                                 break;
                             }
                             if (instruction.type != variant_decl->payload_fields[payload_index].second) {
-                                report("variant_extract result type mismatch in function " + function.name + " for " + instruction.target + ": expected " +
+                                report("variant_extract result type mismatch in function " + function.name + " for " + std::string(variant_name) + ": expected " +
                                        sema::FormatType(variant_decl->payload_fields[payload_index].second) + ", got " +
                                        sema::FormatType(instruction.type));
                             }
@@ -3233,14 +3431,15 @@ bool ValidateModule(const Module& module,
                             report("const must record literal payload text in function " + function.name);
                         }
                         break;
-                    case Instruction::Kind::kSymbolRef:
+                    case Instruction::Kind::kSymbolRef: {
                         if (instruction.result.empty()) {
                             report("symbol_ref must produce a result in function " + function.name);
                         }
                         if (!instruction.operands.empty()) {
                             report("symbol_ref must not take operands in function " + function.name);
                         }
-                        if (instruction.target.empty()) {
+                        const std::string_view symbol_name = PrimaryTargetName(instruction);
+                        if (symbol_name.empty()) {
                             report("symbol_ref must name a target symbol in function " + function.name);
                         }
                         if (instruction.target_kind == Instruction::TargetKind::kNone) {
@@ -3251,21 +3450,22 @@ bool ValidateModule(const Module& module,
                             report("symbol_ref must record target_name metadata for known symbols in function " + function.name);
                         }
                         if (instruction.target_kind == Instruction::TargetKind::kFunction) {
-                            const Function* callee = FindMirFunction(module, instruction.target_name.empty() ? instruction.target : instruction.target_name);
+                            const Function* callee = FindMirFunction(module, symbol_name);
                             if (callee != nullptr && instruction.type != FunctionProcedureType(*callee)) {
                                 report("symbol_ref function type mismatch in function " + function.name + " for " + callee->name + ": expected " +
                                        sema::FormatType(FunctionProcedureType(*callee)) + ", got " + sema::FormatType(instruction.type));
                             }
                         }
                         if (instruction.target_kind == Instruction::TargetKind::kGlobal) {
-                            const GlobalDecl* global = FindMirGlobalDecl(module, instruction.target_name.empty() ? instruction.target : instruction.target_name);
+                            const GlobalDecl* global = FindMirGlobalDecl(module, symbol_name);
                             if (global != nullptr && instruction.type != global->type) {
                                 report("symbol_ref global type mismatch in function " + function.name + " for " +
-                                       (instruction.target_name.empty() ? instruction.target : instruction.target_name) + ": expected " +
+                                       std::string(symbol_name) + ": expected " +
                                        sema::FormatType(global->type) + ", got " + sema::FormatType(instruction.type));
                             }
                         }
                         break;
+                    }
                 }
 
                 if (!instruction.result.empty()) {
@@ -3428,8 +3628,14 @@ std::string DumpModule(const Module& module) {
                 if (!instruction.target_name.empty()) {
                     line << " target_name=" << instruction.target_name;
                 }
+                if (!instruction.target_display.empty() && instruction.target_display != instruction.target) {
+                    line << " target_display=" << instruction.target_display;
+                }
                 if (!sema::IsUnknown(instruction.target_base_type)) {
                     line << " target_base=" << sema::FormatType(instruction.target_base_type);
+                }
+                if (instruction.target_index >= 0) {
+                    line << " target_index=" << instruction.target_index;
                 }
                 if (!instruction.operands.empty()) {
                     line << " operands=[";

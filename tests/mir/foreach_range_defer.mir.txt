@@ -24,13 +24,13 @@ Module
     Block label=foreach_cond1
       load_local %v4:usize target=$index2
       load_local %v5:Slice<i32> target=$iterable1
-      field %v6:usize target=len operands=[%v5]
+      field %v6:usize target=len target_kind=field target_name=len target_display=values.len target_base=Slice<i32> operands=[%v5]
       binary %v7:bool op=< operands=[%v4, %v6]
       terminator cond value=%v7 true=foreach_body2 false=foreach_exit4
     Block label=foreach_body2
       load_local %v8:Slice<i32> target=$iterable1
       load_local %v9:usize target=$index2
-      index %v10:i32 operands=[%v8, %v9]
+      index %v10:i32 target_kind=index target_display=values[index] target_base=Slice<i32> operands=[%v8, %v9] target_types=[usize]
       store_local target=index operands=[%v9]
       store_local target=value operands=[%v10]
       load_local %v11:i32 target=total
@@ -68,5 +68,5 @@ Module
     Block label=range_exit8
       load_local %v27:i32 target=total
       load_local %v28:proc()->void target=$defer_callee0
-      call target=cleanup operands=[%v28]
+      call target=cleanup target_kind=function target_name=cleanup operands=[%v28]
       terminator return values=[%v27]

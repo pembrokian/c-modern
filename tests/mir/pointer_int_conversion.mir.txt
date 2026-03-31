@@ -13,7 +13,7 @@ Module
       load_local %v0:i32 target=value
       unary %v1:*i32 op=& operands=[%v0]
       symbol_ref %v2:proc(*i32)->uintptr target=expose target_kind=function target_name=expose
-      call %v3:uintptr target=expose operands=[%v2, %v1]
+      call %v3:uintptr target=expose target_kind=function target_name=expose operands=[%v2, %v1]
       store_local target=raw operands=[%v3]
       load_local %v4:uintptr target=raw
       int_to_pointer %v5:*i32 target=*i32 operands=[%v4]

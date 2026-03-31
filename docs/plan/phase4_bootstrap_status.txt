@@ -18,6 +18,7 @@ What is in place:
 - concrete integer `+`, `-`, and `*` operations now record explicit wraparound semantics in MIR binary metadata instead of leaving overflow behavior implicit
 - library-shaped volatile and atomic operations now lower through dedicated MIR instructions for `volatile_load`, `volatile_store`, `atomic_load`, `atomic_store`, `atomic_exchange`, `atomic_compare_exchange`, and `atomic_fetch_add` instead of falling back to generic call shaping
 - ordinary AST expression result types are now recorded by sema and consumed by MIR lowering for literals, unary/binary expressions, calls, field/index/slice expressions, and aggregate initializers instead of being re-derived locally in MIR
+- MIR instructions now carry structured target metadata for direct calls, field/index/slice accesses, store targets, and variant operations, and the validator uses that metadata directly instead of re-deriving identities from rendered display text where the structured facts are available
 - MIR unit coverage now includes focused validator failures for non-bool conditions, bad unary legality, incompatible comparison operands, malformed bounds checks, missing fault checks on division/shift binaries, missing or invalid wraparound arithmetic metadata, bad volatile or atomic instruction shapes, misencoded generic conversions, duplicate aggregate fields, invalid field/index/slice bases and slice bounds, bad call argument types, aggregate field mismatches, variant payload mismatches, bad symbol-ref types, and structured store-target mismatches
 - MIR fixtures now cover semantic-boundary intrinsic lowering for volatile and atomic operations in addition to the earlier bounds-check and conversion-focused fixtures
 - representative supported MIR lowering tests now assert that variant switches, foreach/range loops, and typed symbol-reference paths do not emit `unknown`, and a dump audit across current accepted sample inputs finds no emitted `unknown` MIR types
@@ -76,10 +77,10 @@ Theme: MIR validation closure
 - completed: focused negative MIR unit tests were added for each strengthened legality rule so validator regressions fail at the narrowest direct contract
 
 Theme: Structured identity and metadata quality
-- reduce dependence on rendered expression strings for MIR lookup, naming, and validation paths by threading more structured semantic identity through lowering
-- replace fragile string-based recovery where practical with explicit symbol, field, variant, and target metadata that survives dumping and validation deterministically
-- audit existing MIR dump fields to ensure they carry enough structure for validator checks without forcing the validator to reverse-engineer meaning from display text
-- keep dumps deterministic while expanding structured metadata so fixture churn stays intentional and reviewable
+- completed: lowering now threads structured direct-call, field/index/slice, store-target, and variant metadata into MIR instructions instead of relying on rendered expression text as the only recoverable identity
+- completed: validator lookups now prefer explicit symbol, field, variant, and target metadata, falling back to display text only for older or intentionally unstructured instruction shapes
+- completed: MIR dumps now emit the additional structured target metadata needed for validator reasoning, including canonical target names, base types, bound/index types, payload indices, and human-readable display strings where they add debugging value
+- completed: fixture goldens were refreshed against the richer deterministic dump format so metadata expansion remains reviewable and stable under snapshot testing
 
 Theme: Fixture and representative-program coverage
 - add MIR golden fixtures for representative canonical small programs, not only narrow unit-style lowering cases

@@ -18,5 +18,5 @@ Module
       store_local target=$defer_callee0 operands=[%v3]
       const %v4:int_literal op=10
       load_local %v5:proc()->void target=$defer_callee0
-      call target=hit operands=[%v5]
+      call target=hit target_kind=function target_name=hit operands=[%v5]
       terminator return values=[%v4]

@@ -18,7 +18,7 @@ Module
       symbol_ref %v4:proc()->void target=tick target_kind=function target_name=tick
       store_local target=$defer_callee0 operands=[%v4]
       load_local %v5:proc()->void target=$defer_callee0
-      call target=tick operands=[%v5]
+      call target=tick target_kind=function target_name=tick operands=[%v5]
       terminator branch target=range_step3
     Block label=range_step3
       load_local %v6:int_literal target=idx

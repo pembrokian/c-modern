@@ -19,5 +19,5 @@ Module
       const %v4:int_literal op=0
       load_local %v5:proc(i32)->void target=$defer_callee0
       load_local %v6:i32 target=$defer_arg1
-      call target=hit operands=[%v5, %v6]
+      call target=hit target_kind=function target_name=hit operands=[%v5, %v6]
       terminator return values=[%v4]

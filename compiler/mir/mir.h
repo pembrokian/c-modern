@@ -1,6 +1,7 @@
 #ifndef C_MODERN_COMPILER_MIR_MIR_H_
 #define C_MODERN_COMPILER_MIR_MIR_H_
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -105,8 +106,10 @@ struct Instruction {
     std::string target;
     TargetKind target_kind = TargetKind::kNone;
     std::string target_name;
+    std::string target_display;
     sema::Type target_base_type;
     std::vector<sema::Type> target_aux_types;
+    std::int64_t target_index = -1;
     std::vector<std::string> operands;
     std::vector<std::string> field_names;
     ArithmeticSemantics arithmetic_semantics = ArithmeticSemantics::kNone;

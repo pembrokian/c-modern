@@ -8,13 +8,13 @@ Module
     Local name=v type=i32 readonly
     Block label=entry0
       load_local %v0:Result target=value
-      variant_match %v1:bool target=Result.Ok operands=[%v0]
+      variant_match %v1:bool target=Result.Ok target_name=Ok target_base=Result operands=[%v0]
       terminator cond value=%v1 true=switch_case3 false=switch_default2
     Block label=switch_default2
       const %v4:int_literal op=2
       terminator return values=[%v4]
     Block label=switch_case3
-      variant_extract %v2:i32 op=0 target=Result.Ok operands=[%v0]
+      variant_extract %v2:i32 op=0 target=Result.Ok target_name=Ok target_base=Result target_index=0 operands=[%v0]
       store_local target=v operands=[%v2]
       load_local %v3:i32 target=v
       terminator return values=[%v3]

@@ -19,7 +19,7 @@ Module
       terminator branch target=if_merge2
     Block label=if_merge2
       load_local %v4:proc()->void target=$defer_callee0
-      call target=inner operands=[%v4]
+      call target=inner target_kind=function target_name=inner operands=[%v4]
       load_local %v5:i32 target=total
       const %v6:int_literal op=1
       binary %v7:i32 op=+ arithmetic=wrap operands=[%v5, %v6]

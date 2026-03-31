@@ -7,7 +7,7 @@ Module
       load_local %v1:usize target=idx
       const %v2:usize op=4
       bounds_check op=index operands=[%v1, %v2]
-      index %v3:i32 operands=[%v0, %v1]
+      index %v3:i32 target_kind=index target_display=values[idx] target_base=[4]i32 operands=[%v0, %v1] target_types=[usize]
       terminator return values=[%v3]
   Function name=window returns=[Slice<i32>]
     Local name=values type=[4]i32 param readonly
@@ -19,5 +19,5 @@ Module
       load_local %v2:usize target=end
       const %v3:usize op=4
       bounds_check op=slice operands=[%v1, %v2, %v3]
-      slice %v4:Slice<i32> operands=[%v0, %v1, %v2]
+      slice %v4:Slice<i32> target_display=values[start:end] target_base=[4]i32 operands=[%v0, %v1, %v2] target_types=[usize, usize]
       terminator return values=[%v4]

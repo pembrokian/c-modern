@@ -125,6 +125,11 @@ void TestVariantSwitchLoweringSucceeds() {
     if (dump.find("variant_extract %v") == std::string::npos || dump.find(":i32 op=0 target=Result.Ok") == std::string::npos) {
         Fail("variant switch lowering should emit typed variant_extract instructions");
     }
+    if (dump.find("variant_match %v1:bool target=Result.Ok target_name=Ok target_base=Result") == std::string::npos ||
+        dump.find("variant_extract %v2:i32 op=0 target=Result.Ok target_name=Ok target_base=Result target_index=0") ==
+            std::string::npos) {
+        Fail("variant switch lowering should preserve structured variant metadata in MIR dumps");
+    }
     if (dump.find("unknown") != std::string::npos) {
         Fail("supported variant switch lowering should not emit unknown MIR types");
     }
@@ -156,6 +161,13 @@ void TestForEachAndDeferLoweringSucceed() {
     }
     if (dump.find("target=cleanup") == std::string::npos) {
         Fail("defer lowering should emit deferred cleanup call");
+    }
+    if (dump.find("field %v6:usize target=len target_kind=field target_name=len") == std::string::npos ||
+        dump.find("target_display=values.len target_base=Slice<i32>") == std::string::npos ||
+        dump.find("index %v10:i32 target_kind=index target_display=values[index] target_base=Slice<i32>") == std::string::npos ||
+        dump.find("target_types=[usize]") == std::string::npos ||
+        dump.find("call target=cleanup target_kind=function target_name=cleanup") == std::string::npos) {
+        Fail("foreach lowering should preserve structured field, index, and direct-call metadata");
     }
     if (dump.find("Local name=value type=i32") == std::string::npos) {
         Fail("foreach lowering should preserve indexed element types");
@@ -1866,6 +1878,58 @@ void TestValidatorRejectsKnownFunctionSymbolRefMissingTargetName() {
     }
 }
 
+void TestValidatorRejectsDirectCallMissingTargetName() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+
+    mc::mir::Function callee;
+    callee.name = "callee";
+    callee.blocks.push_back({
+        .label = "entry",
+        .instructions = {},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(callee));
+
+    mc::mir::Function function;
+    function.name = "broken_direct_call_target_name";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::ProcedureType({}, {}),
+                .target = "callee",
+                .target_kind = mc::mir::Instruction::TargetKind::kFunction,
+                .target_name = "callee",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kCall,
+                .type = mc::sema::VoidType(),
+                .target = "callee",
+                .target_kind = mc::mir::Instruction::TargetKind::kFunction,
+                .operands = {"%v0"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject direct call instructions without target_name metadata");
+    }
+    if (diagnostics.Render().find("call must record target_name metadata") == std::string::npos) {
+        Fail("validator should explain missing direct-call target metadata");
+    }
+}
+
 void TestValidatorRejectsUnterminatedUnreachableBlock() {
     mc::support::DiagnosticSink diagnostics;
     mc::mir::Module module;
@@ -1997,6 +2061,7 @@ int main() {
     TestValidatorRejectsAtomicCompareExchangeMissingOrderMetadata();
     TestValidatorRejectsStoreTargetIndexMissingAuxType();
     TestValidatorRejectsKnownFunctionSymbolRefMissingTargetName();
+    TestValidatorRejectsDirectCallMissingTargetName();
     TestValidatorRejectsUnterminatedUnreachableBlock();
     TestValidatorRejectsBranchTerminatorWithValues();
     return 0;
