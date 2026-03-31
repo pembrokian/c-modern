@@ -1,5 +1,6 @@
 BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
-  Function source=main backend=@main returns=[i32]
+  Function source=main backend=@main returns=[i32 [repr=i32, size=4, align=4]]
     Block source=entry0 backend=bb0_0.entry0
-      %t0_0_0 = const int_literal 0
-      ret i32 %t0_0_0
+      %t0_0_0 = const int_literal [repr=i64, size=8, align=8] 0
+      ret i32 [repr=i32, size=4, align=4] %t0_0_0
+

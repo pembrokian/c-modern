@@ -36,6 +36,13 @@ std::string ReadTextFile(const std::filesystem::path& path) {
     return buffer.str();
 }
 
+std::string NormalizeFixtureText(std::string text) {
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) {
+        text.pop_back();
+    }
+    return text;
+}
+
 std::string LowerToBackendDump(const std::string& source_text,
                                const std::filesystem::path& source_path) {
     mc::support::DiagnosticSink diagnostics;
@@ -75,9 +82,9 @@ void RunFixture(const std::filesystem::path& fixture_dir,
     const auto expected_path = fixture_dir / fixture.expected_output_name;
 
     const auto source_text = ReadTextFile(source_path);
-    const auto expected_text = ReadTextFile(expected_path);
-    const auto actual_dump = LowerToBackendDump(source_text, source_path);
-    const auto second_dump = LowerToBackendDump(source_text, source_path);
+    const auto expected_text = NormalizeFixtureText(ReadTextFile(expected_path));
+    const auto actual_dump = NormalizeFixtureText(LowerToBackendDump(source_text, source_path));
+    const auto second_dump = NormalizeFixtureText(LowerToBackendDump(source_text, source_path));
 
     if (actual_dump != second_dump) {
         Fail("backend fixture should lower deterministically across repeated runs: " + source_path.generic_string());
@@ -102,7 +109,11 @@ int main(int argc, char** argv) {
     const std::filesystem::path fixture_dir = source_root / "tests/codegen";
     const std::vector<FixtureCase> fixtures = {
         {"branch_direct_call.mc", "branch_direct_call.backend.txt"},
+        {"checked_division.mc", "checked_division.backend.txt"},
+        {"checked_shift.mc", "checked_shift.backend.txt"},
         {"direct_call_add.mc", "direct_call_add.backend.txt"},
+        {"explicit_conversion.mc", "explicit_conversion.backend.txt"},
+        {"pointer_int_conversion.mc", "pointer_int_conversion.backend.txt"},
         {"smoke_return_zero.mc", "smoke_return_zero.backend.txt"},
         {"branch_if_return.mc", "branch_if_return.backend.txt"},
         {"store_local_compare_branch.mc", "store_local_compare_branch.backend.txt"},

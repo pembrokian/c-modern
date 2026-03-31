@@ -1,0 +1,19 @@
+BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
+  Function source=divide backend=@divide returns=[i32 [repr=i32, size=4, align=4]]
+    Local source=value backend=%local.value type=i32 [repr=i32, size=4, align=4] param readonly
+    Local source=denom backend=%local.denom type=i32 [repr=i32, size=4, align=4] param readonly
+    Block source=entry0 backend=bb0_0.entry0
+      %t0_0_0 = load i32 [repr=i32, size=4, align=4] %local.value
+      %t0_0_1 = load i32 [repr=i32, size=4, align=4] %local.denom
+      check.div / lhs=%t0_0_0 rhs=%t0_0_1 type=i32 [repr=i32, size=4, align=4]
+      %t0_0_3 = binary / i32 [repr=i32, size=4, align=4] %t0_0_0, %t0_0_1
+      ret i32 [repr=i32, size=4, align=4] %t0_0_3
+  Function source=remainder backend=@remainder returns=[i32 [repr=i32, size=4, align=4]]
+    Local source=value backend=%local.value type=i32 [repr=i32, size=4, align=4] param readonly
+    Local source=denom backend=%local.denom type=i32 [repr=i32, size=4, align=4] param readonly
+    Block source=entry0 backend=bb1_0.entry0
+      %t1_0_0 = load i32 [repr=i32, size=4, align=4] %local.value
+      %t1_0_1 = load i32 [repr=i32, size=4, align=4] %local.denom
+      check.div % lhs=%t1_0_0 rhs=%t1_0_1 type=i32 [repr=i32, size=4, align=4]
+      %t1_0_3 = binary % i32 [repr=i32, size=4, align=4] %t1_0_0, %t1_0_1
+      ret i32 [repr=i32, size=4, align=4] %t1_0_3

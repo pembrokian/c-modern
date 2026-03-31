@@ -1,0 +1,7 @@
+BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
+  Function source=promote backend=@promote returns=[UserId [repr=i32, size=4, align=4]]
+    Local source=raw backend=%local.raw type=i32 [repr=i32, size=4, align=4] param readonly
+    Block source=entry0 backend=bb0_0.entry0
+      %t0_0_0 = load i32 [repr=i32, size=4, align=4] %local.raw
+      %t0_0_1 = convert_distinct UserId [repr=i32, size=4, align=4] %t0_0_0
+      ret UserId [repr=i32, size=4, align=4] %t0_0_1

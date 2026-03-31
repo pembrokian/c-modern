@@ -1,6 +1,7 @@
 #ifndef C_MODERN_COMPILER_CODEGEN_LLVM_BACKEND_H_
 #define C_MODERN_COMPILER_CODEGEN_LLVM_BACKEND_H_
 
+#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -11,6 +12,13 @@
 #include "compiler/support/diagnostics.h"
 
 namespace mc::codegen_llvm {
+
+struct BackendTypeInfo {
+    std::string source_name;
+    std::string backend_name;
+    std::size_t size = 0;
+    std::size_t alignment = 0;
+};
 
 struct TargetConfig {
     std::string triple;
@@ -27,6 +35,7 @@ struct BackendLocal {
     std::string source_name;
     std::string backend_name;
     sema::Type type;
+    BackendTypeInfo lowered_type;
     bool is_parameter = false;
     bool is_mutable = true;
 };
@@ -42,6 +51,7 @@ struct BackendFunction {
     std::string source_name;
     std::string backend_name;
     std::vector<sema::Type> return_types;
+    std::vector<BackendTypeInfo> backend_return_types;
     std::vector<BackendLocal> locals;
     std::vector<BackendBlock> blocks;
 };

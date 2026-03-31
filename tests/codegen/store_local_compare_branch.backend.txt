@@ -1,18 +1,18 @@
 BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
-  Function source=choose backend=@choose returns=[i32]
-    Local source=value backend=%local.value type=i32 param readonly
-    Local source=result backend=%local.result type=i32
+  Function source=choose backend=@choose returns=[i32 [repr=i32, size=4, align=4]]
+    Local source=value backend=%local.value type=i32 [repr=i32, size=4, align=4] param readonly
+    Local source=result backend=%local.result type=i32 [repr=i32, size=4, align=4]
     Block source=entry0 backend=bb0_0.entry0
-      %t0_0_0 = const int_literal 0
-      store i32 %t0_0_0 -> %local.result
-      %t0_0_2 = load i32 %local.value
-      %t0_0_3 = const int_literal 1
-      %t0_0_4 = binary == bool %t0_0_2, %t0_0_3
+      %t0_0_0 = const int_literal [repr=i64, size=8, align=8] 0
+      store i32 %t0_0_0 -> %local.result as i32 [repr=i32, size=4, align=4]
+      %t0_0_2 = load i32 [repr=i32, size=4, align=4] %local.value
+      %t0_0_3 = const int_literal [repr=i64, size=8, align=8] 1
+      %t0_0_4 = binary == bool [repr=i1, size=1, align=1] %t0_0_2, %t0_0_3
       condbr %t0_0_4 true=bb0_1.if_then1 false=bb0_2.if_merge2
     Block source=if_then1 backend=bb0_1.if_then1
-      %t0_1_0 = const int_literal 2
-      store i32 %t0_1_0 -> %local.result
+      %t0_1_0 = const int_literal [repr=i64, size=8, align=8] 2
+      store i32 %t0_1_0 -> %local.result as i32 [repr=i32, size=4, align=4]
       br bb0_2.if_merge2
     Block source=if_merge2 backend=bb0_2.if_merge2
-      %t0_2_0 = load i32 %local.result
-      ret i32 %t0_2_0
+      %t0_2_0 = load i32 [repr=i32, size=4, align=4] %local.result
+      ret i32 [repr=i32, size=4, align=4] %t0_2_0

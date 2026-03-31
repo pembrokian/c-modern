@@ -1,16 +1,17 @@
 BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
-  Function source=add backend=@add returns=[i32]
-    Local source=left backend=%local.left type=i32 param readonly
-    Local source=right backend=%local.right type=i32 param readonly
+  Function source=add backend=@add returns=[i32 [repr=i32, size=4, align=4]]
+    Local source=left backend=%local.left type=i32 [repr=i32, size=4, align=4] param readonly
+    Local source=right backend=%local.right type=i32 [repr=i32, size=4, align=4] param readonly
     Block source=entry0 backend=bb0_0.entry0
-      %t0_0_0 = load i32 %local.left
-      %t0_0_1 = load i32 %local.right
-      %t0_0_2 = binary wrap + i32 %t0_0_0, %t0_0_1
-      ret i32 %t0_0_2
-  Function source=main backend=@main returns=[i32]
+      %t0_0_0 = load i32 [repr=i32, size=4, align=4] %local.left
+      %t0_0_1 = load i32 [repr=i32, size=4, align=4] %local.right
+      %t0_0_2 = binary wrap + i32 [repr=i32, size=4, align=4] %t0_0_0, %t0_0_1
+      ret i32 [repr=i32, size=4, align=4] %t0_0_2
+  Function source=main backend=@main returns=[i32 [repr=i32, size=4, align=4]]
     Block source=entry0 backend=bb1_0.entry0
-      %t1_0_0 = const int_literal 1
-      %t1_0_1 = const int_literal 2
-      %t1_0_2 = symbol_ref proc(i32, i32)->i32 @add
-      %t1_0_3 = call i32 @add(%t1_0_2, %t1_0_0, %t1_0_1)
-      ret i32 %t1_0_3
+      %t1_0_0 = const int_literal [repr=i64, size=8, align=8] 1
+      %t1_0_1 = const int_literal [repr=i64, size=8, align=8] 2
+      %t1_0_2 = symbol_ref proc(i32, i32)->i32 [repr=ptr, size=8, align=8] @add
+      %t1_0_3 = call i32 [repr=i32, size=4, align=4] @add(%t1_0_2, %t1_0_0, %t1_0_1)
+      ret i32 [repr=i32, size=4, align=4] %t1_0_3
+

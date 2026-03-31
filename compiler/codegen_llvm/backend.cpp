@@ -1,5 +1,6 @@
 #include "compiler/codegen_llvm/backend.h"
 
+#include <optional>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
@@ -14,10 +15,12 @@ constexpr std::string_view kInspectSurface = "backend_ir_text";
 
 struct FunctionLoweringState {
     std::size_t function_index = 0;
+    const mir::Module* module = nullptr;
     const mir::Function* function = nullptr;
     std::unordered_map<std::string, BackendLocal> locals;
     std::unordered_map<std::string, std::string> blocks;
     std::unordered_map<std::string, std::string> values;
+    std::unordered_map<std::string, BackendTypeInfo> value_types;
 };
 
 std::string_view ToString(mir::Instruction::Kind kind) {
@@ -163,6 +166,157 @@ bool IsBootstrapTarget(const TargetConfig& target) {
            target.object_format == kBootstrapObjectFormat;
 }
 
+const mir::TypeDecl* FindTypeDecl(const mir::Module& module,
+                                  std::string_view name) {
+    for (const auto& type_decl : module.type_decls) {
+        if (type_decl.name == name) {
+            return &type_decl;
+        }
+    }
+    return nullptr;
+}
+
+std::optional<std::size_t> ParseArrayLength(std::string_view text) {
+    if (text.empty()) {
+        return std::nullopt;
+    }
+
+    std::size_t value = 0;
+    for (const char ch : text) {
+        if (ch < '0' || ch > '9') {
+            return std::nullopt;
+        }
+        value = (value * 10) + static_cast<std::size_t>(ch - '0');
+    }
+    return value;
+}
+
+std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
+                                             const sema::Type& type) {
+    BackendTypeInfo info {
+        .source_name = sema::FormatType(type),
+    };
+
+    const auto use_backend_type = [&](std::string backend_name,
+                                      std::size_t size,
+                                      std::size_t alignment) -> std::optional<BackendTypeInfo> {
+        info.backend_name = std::move(backend_name);
+        info.size = size;
+        info.alignment = alignment;
+        return info;
+    };
+
+    switch (type.kind) {
+        case sema::Type::Kind::kBool:
+            return use_backend_type("i1", 1, 1);
+        case sema::Type::Kind::kIntLiteral:
+            return use_backend_type("i64", 8, 8);
+        case sema::Type::Kind::kFloatLiteral:
+            return use_backend_type("double", 8, 8);
+        case sema::Type::Kind::kNamed:
+            if (type.name == "bool") {
+                return use_backend_type("i1", 1, 1);
+            }
+            if (type.name == "i8" || type.name == "u8") {
+                return use_backend_type("i8", 1, 1);
+            }
+            if (type.name == "i16" || type.name == "u16") {
+                return use_backend_type("i16", 2, 2);
+            }
+            if (type.name == "i32" || type.name == "u32") {
+                return use_backend_type("i32", 4, 4);
+            }
+            if (type.name == "i64" || type.name == "u64" || type.name == "isize" || type.name == "usize" ||
+                type.name == "uintptr") {
+                return use_backend_type("i64", 8, 8);
+            }
+            if (type.name == "f32") {
+                return use_backend_type("float", 4, 4);
+            }
+            if (type.name == "f64") {
+                return use_backend_type("double", 8, 8);
+            }
+            if (type.name == "str" || type.name == "string" || type.name == "cstr") {
+                return use_backend_type("{ptr, i64}", 16, 8);
+            }
+            if (type.name == "Slice") {
+                return use_backend_type("{ptr, i64}", 16, 8);
+            }
+            if (type.name == "Buffer") {
+                return use_backend_type("{ptr, i64, i64, ptr}", 32, 8);
+            }
+            if (const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name)) {
+                if (type_decl->kind == mir::TypeDecl::Kind::kAlias || type_decl->kind == mir::TypeDecl::Kind::kDistinct) {
+                    auto lowered = LowerTypeInfo(module, type_decl->aliased_type);
+                    if (!lowered.has_value()) {
+                        return std::nullopt;
+                    }
+                    lowered->source_name = info.source_name;
+                    return lowered;
+                }
+            }
+            return std::nullopt;
+        case sema::Type::Kind::kPointer:
+            return use_backend_type("ptr", 8, 8);
+        case sema::Type::Kind::kConst: {
+            if (type.subtypes.empty()) {
+                return std::nullopt;
+            }
+            auto lowered = LowerTypeInfo(module, type.subtypes.front());
+            if (!lowered.has_value()) {
+                return std::nullopt;
+            }
+            lowered->source_name = info.source_name;
+            return lowered;
+        }
+        case sema::Type::Kind::kArray: {
+            if (type.subtypes.empty()) {
+                return std::nullopt;
+            }
+            auto element = LowerTypeInfo(module, type.subtypes.front());
+            const auto length = ParseArrayLength(type.metadata);
+            if (!element.has_value() || !length.has_value()) {
+                return std::nullopt;
+            }
+            return use_backend_type("[" + std::to_string(*length) + " x " + element->backend_name + "]",
+                                    element->size * *length,
+                                    element->alignment);
+        }
+        case sema::Type::Kind::kProcedure:
+            return use_backend_type("ptr", 8, 8);
+        case sema::Type::Kind::kString:
+            return use_backend_type("{ptr, i64}", 16, 8);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::string FormatTypeInfo(const BackendTypeInfo& type_info) {
+    std::ostringstream stream;
+    stream << type_info.source_name << " [repr=" << type_info.backend_name << ", size=" << type_info.size
+           << ", align=" << type_info.alignment << ']';
+    return stream.str();
+}
+
+bool LowerInstructionType(const mir::Module& module,
+                         const sema::Type& type,
+                         const std::filesystem::path& source_path,
+                         support::DiagnosticSink& diagnostics,
+                         const std::string& context,
+                         BackendTypeInfo& type_info) {
+    auto lowered = LowerTypeInfo(module, type);
+    if (lowered.has_value()) {
+        type_info = std::move(*lowered);
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap backend cannot map MIR type '" + sema::FormatType(type) +
+                           "' to a Darwin arm64 representation in " + context,
+                       diagnostics);
+    return false;
+}
+
 std::string BackendFunctionName(const std::string& source_name) {
     return "@" + source_name;
 }
@@ -184,14 +338,14 @@ std::string BackendTempName(std::size_t function_index,
            std::to_string(instruction_index);
 }
 
-std::string FormatReturnTypes(const std::vector<sema::Type>& return_types) {
+std::string FormatReturnTypes(const std::vector<BackendTypeInfo>& return_types) {
     std::ostringstream stream;
     stream << '[';
     for (std::size_t index = 0; index < return_types.size(); ++index) {
         if (index > 0) {
             stream << ", ";
         }
-        stream << sema::FormatType(return_types[index]);
+        stream << FormatTypeInfo(return_types[index]);
     }
     stream << ']';
     return stream.str();
@@ -207,6 +361,12 @@ const std::string* FindValue(const FunctionLoweringState& state,
                              const std::string& value_name) {
     const auto it = state.values.find(value_name);
     return it == state.values.end() ? nullptr : &it->second;
+}
+
+const BackendTypeInfo* FindValueType(const FunctionLoweringState& state,
+                                     const std::string& value_name) {
+    const auto it = state.value_types.find(value_name);
+    return it == state.value_types.end() ? nullptr : &it->second;
 }
 
 const std::string* FindBlock(const FunctionLoweringState& state,
@@ -247,6 +407,31 @@ bool ResolveValue(const FunctionLoweringState& state,
     ReportBackendError(source_path,
                        "LLVM bootstrap backend references unknown MIR value '" + value_name + "' in function '" +
                            function.name + "' block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+bool ResolveTypedValue(const FunctionLoweringState& state,
+                       const std::string& value_name,
+                       const mir::Function& function,
+                       const mir::BasicBlock& block,
+                       const std::filesystem::path& source_path,
+                       support::DiagnosticSink& diagnostics,
+                       std::string& resolved,
+                       BackendTypeInfo& type_info) {
+    if (!ResolveValue(state, value_name, function, block, source_path, diagnostics, resolved)) {
+        return false;
+    }
+
+    const BackendTypeInfo* lowered_type = FindValueType(state, value_name);
+    if (lowered_type != nullptr) {
+        type_info = *lowered_type;
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap backend has no lowered type info for MIR value '" + value_name +
+                           "' in function '" + function.name + "' block '" + block.label + "'",
                        diagnostics);
     return false;
 }
@@ -311,8 +496,10 @@ bool LowerInstruction(const mir::Instruction& instruction,
     const mir::Function& function = *state.function;
     const mir::BasicBlock& block = function.blocks[block_index];
 
-    const auto record_value = [&](const std::string& backend_name) {
+    const auto record_value = [&](const std::string& backend_name,
+                                  const BackendTypeInfo& type_info) {
         state.values[instruction.result] = backend_name;
+        state.value_types[instruction.result] = type_info;
     };
 
     switch (instruction.kind) {
@@ -320,10 +507,19 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "const in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name);
-            backend_block.instructions.push_back(backend_name + " = const " + sema::FormatType(instruction.type) +
-                                                 " " + instruction.op);
+            record_value(backend_name, type_info);
+            backend_block.instructions.push_back(backend_name + " = const " + FormatTypeInfo(type_info) + " " +
+                                                 instruction.op);
             return true;
         }
 
@@ -336,8 +532,8 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name);
-            backend_block.instructions.push_back(backend_name + " = load " + sema::FormatType(instruction.type) +
+            record_value(backend_name, local->lowered_type);
+            backend_block.instructions.push_back(backend_name + " = load " + FormatTypeInfo(local->lowered_type) +
                                                  " " + local->backend_name);
             return true;
         }
@@ -359,7 +555,7 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             backend_block.instructions.push_back("store " + sema::FormatType(local->type) + " " + operand + " -> " +
-                                                 local->backend_name);
+                                                 local->backend_name + " as " + FormatTypeInfo(local->lowered_type));
             return true;
         }
 
@@ -378,10 +574,19 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
                 return false;
             }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "unary in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name);
+            record_value(backend_name, type_info);
             backend_block.instructions.push_back(backend_name + " = unary " + instruction.op + " " +
-                                                 sema::FormatType(instruction.type) + " " + operand);
+                                                 FormatTypeInfo(type_info) + " " + operand);
             return true;
         }
 
@@ -405,15 +610,24 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 }
                 operands.push_back(std::move(operand));
             }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "binary in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name);
+            record_value(backend_name, type_info);
 
             std::ostringstream line;
             line << backend_name << " = binary ";
             if (instruction.arithmetic_semantics != mir::Instruction::ArithmeticSemantics::kNone) {
                 line << ToString(instruction.arithmetic_semantics) << ' ';
             }
-            line << instruction.op << ' ' << sema::FormatType(instruction.type) << ' ' << operands[0] << ", "
+            line << instruction.op << ' ' << FormatTypeInfo(type_info) << ' ' << operands[0] << ", "
                  << operands[1];
             backend_block.instructions.push_back(line.str());
             return true;
@@ -422,7 +636,7 @@ bool LowerInstruction(const mir::Instruction& instruction,
         case mir::Instruction::Kind::kSymbolRef: {
             if (instruction.target_kind != mir::Instruction::TargetKind::kFunction || instruction.target_name.empty()) {
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only admits function symbol_ref values in Stage 3; function '" +
+                                   "LLVM bootstrap backend only admits function symbol_ref values in the current bootstrap slice; function '" +
                                        function.name + "' block '" + block.label + "' uses target_kind='" +
                                        std::string(ToString(instruction.target_kind)) + "'",
                                    diagnostics);
@@ -431,17 +645,26 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "symbol_ref in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name);
-            backend_block.instructions.push_back(backend_name + " = symbol_ref " + sema::FormatType(instruction.type) +
-                                                 " " + BackendFunctionName(instruction.target_name));
+            record_value(backend_name, type_info);
+            backend_block.instructions.push_back(backend_name + " = symbol_ref " + FormatTypeInfo(type_info) + " " +
+                                                 BackendFunctionName(instruction.target_name));
             return true;
         }
 
         case mir::Instruction::Kind::kCall: {
             if (instruction.target_kind != mir::Instruction::TargetKind::kFunction || instruction.target_name.empty()) {
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only admits direct function calls in Stage 3; function '" +
+                                   "LLVM bootstrap backend only admits direct function calls in the current bootstrap slice; function '" +
                                        function.name + "' block '" + block.label + "' is not a direct call",
                                    diagnostics);
                 return false;
@@ -461,24 +684,176 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 line << "call void " << BackendFunctionName(instruction.target_name) << '(' << JoinOperands(operands)
                      << ')';
             } else {
+                BackendTypeInfo type_info;
+                if (!LowerInstructionType(*state.module,
+                                          instruction.type,
+                                          source_path,
+                                          diagnostics,
+                                          "call result in function '" + function.name + "' block '" + block.label + "'",
+                                          type_info)) {
+                    return false;
+                }
                 const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-                record_value(backend_name);
-                line << backend_name << " = call " << sema::FormatType(instruction.type) << ' '
+                record_value(backend_name, type_info);
+                line << backend_name << " = call " << FormatTypeInfo(type_info) << ' '
                      << BackendFunctionName(instruction.target_name) << '(' << JoinOperands(operands) << ')';
             }
             backend_block.instructions.push_back(line.str());
             return true;
         }
 
+        case mir::Instruction::Kind::kBoundsCheck: {
+            std::vector<std::string> operands;
+            operands.reserve(instruction.operands.size());
+            for (const auto& operand_name : instruction.operands) {
+                std::string operand;
+                if (!ResolveValue(state, operand_name, function, block, source_path, diagnostics, operand)) {
+                    return false;
+                }
+                operands.push_back(std::move(operand));
+            }
+            backend_block.instructions.push_back("check.bounds " + instruction.op + " " + JoinOperands(operands));
+            return true;
+        }
+
+        case mir::Instruction::Kind::kDivCheck: {
+            if (instruction.operands.size() != 2) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires div_check to use two operands in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            std::string lhs;
+            std::string rhs;
+            BackendTypeInfo lhs_type;
+            BackendTypeInfo rhs_type;
+            if (!ResolveTypedValue(state, instruction.operands[0], function, block, source_path, diagnostics, lhs, lhs_type) ||
+                !ResolveTypedValue(state, instruction.operands[1], function, block, source_path, diagnostics, rhs, rhs_type)) {
+                return false;
+            }
+            backend_block.instructions.push_back("check.div " + instruction.op + " lhs=" + lhs + " rhs=" + rhs +
+                                                 " type=" + FormatTypeInfo(lhs_type));
+            return true;
+        }
+
+        case mir::Instruction::Kind::kShiftCheck: {
+            if (instruction.operands.size() != 2) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires shift_check to use two operands in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            std::string value;
+            std::string count;
+            BackendTypeInfo value_type;
+            BackendTypeInfo count_type;
+            if (!ResolveTypedValue(state, instruction.operands[0], function, block, source_path, diagnostics, value, value_type) ||
+                !ResolveTypedValue(state, instruction.operands[1], function, block, source_path, diagnostics, count, count_type)) {
+                return false;
+            }
+            backend_block.instructions.push_back("check.shift " + instruction.op + " value=" + value + " count=" + count +
+                                                 " type=" + FormatTypeInfo(value_type));
+            return true;
+        }
+
+        case mir::Instruction::Kind::kConvertDistinct: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            if (instruction.operands.size() != 1) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires convert_distinct to use exactly one operand in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            std::string operand;
+            if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
+                return false;
+            }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "convert_distinct in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
+            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
+            record_value(backend_name, type_info);
+            backend_block.instructions.push_back(backend_name + " = convert_distinct " + FormatTypeInfo(type_info) +
+                                                 " " + operand);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kPointerToInt: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            if (instruction.operands.size() != 1) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires pointer_to_int to use exactly one operand in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            std::string operand;
+            if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
+                return false;
+            }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "pointer_to_int in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
+            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
+            record_value(backend_name, type_info);
+            backend_block.instructions.push_back(backend_name + " = ptrtoint " + FormatTypeInfo(type_info) + " " +
+                                                 operand);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kIntToPointer: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            if (instruction.operands.size() != 1) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires int_to_pointer to use exactly one operand in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            std::string operand;
+            if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
+                return false;
+            }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "int_to_pointer in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
+            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
+            record_value(backend_name, type_info);
+            backend_block.instructions.push_back(backend_name + " = inttoptr " + FormatTypeInfo(type_info) + " " +
+                                                 operand);
+            return true;
+        }
+
         case mir::Instruction::Kind::kStoreTarget:
-        case mir::Instruction::Kind::kBoundsCheck:
-        case mir::Instruction::Kind::kDivCheck:
-        case mir::Instruction::Kind::kShiftCheck:
         case mir::Instruction::Kind::kConvert:
         case mir::Instruction::Kind::kConvertNumeric:
-        case mir::Instruction::Kind::kConvertDistinct:
-        case mir::Instruction::Kind::kPointerToInt:
-        case mir::Instruction::Kind::kIntToPointer:
         case mir::Instruction::Kind::kArrayToSlice:
         case mir::Instruction::Kind::kBufferToSlice:
         case mir::Instruction::Kind::kVolatileLoad:
@@ -528,7 +903,7 @@ bool LowerTerminator(const mir::BasicBlock& block,
 
             if (block.terminator.values.size() != 1 || function.return_types.size() != 1) {
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only supports single-value returns in Stage 3; function '" +
+                                   "LLVM bootstrap backend only supports single-value returns in the current bootstrap slice; function '" +
                                        function.name + "' block '" + block.label + "'",
                                    diagnostics);
                 return false;
@@ -545,7 +920,19 @@ bool LowerTerminator(const mir::BasicBlock& block,
                 return false;
             }
 
-            backend_block.terminator = "ret " + sema::FormatType(function.return_types.front()) + " " + value;
+            const auto* return_type = function.return_types.empty() ? nullptr : &function.return_types.front();
+            BackendTypeInfo lowered_return_type;
+            if (return_type != nullptr &&
+                !LowerInstructionType(*state.module,
+                                      *return_type,
+                                      source_path,
+                                      diagnostics,
+                                      "return in function '" + function.name + "' block '" + block.label + "'",
+                                      lowered_return_type)) {
+                return false;
+            }
+
+            backend_block.terminator = "ret " + FormatTypeInfo(lowered_return_type) + " " + value;
             return true;
         }
 
@@ -598,14 +985,15 @@ bool LowerTerminator(const mir::BasicBlock& block,
     return false;
 }
 
-bool LowerFunction(const mir::Function& function,
+bool LowerFunction(const mir::Module& module,
+                   const mir::Function& function,
                    std::size_t function_index,
                    const std::filesystem::path& source_path,
                    support::DiagnosticSink& diagnostics,
                    BackendModule& backend_module) {
     if (function.is_extern) {
         ReportBackendError(source_path,
-                           "LLVM bootstrap backend does not lower extern functions in Stage 3; function '" +
+                           "LLVM bootstrap backend does not lower extern functions in the current bootstrap slice; function '" +
                                function.name + "'",
                            diagnostics);
         return false;
@@ -615,18 +1003,43 @@ bool LowerFunction(const mir::Function& function,
     backend_function.source_name = function.name;
     backend_function.backend_name = BackendFunctionName(function.name);
     backend_function.return_types = function.return_types;
+    backend_function.backend_return_types.reserve(function.return_types.size());
     backend_function.locals.reserve(function.locals.size());
     backend_function.blocks.reserve(function.blocks.size());
 
+    for (const auto& return_type : function.return_types) {
+        BackendTypeInfo lowered_return_type;
+        if (!LowerInstructionType(module,
+                                  return_type,
+                                  source_path,
+                                  diagnostics,
+                                  "function return types for '" + function.name + "'",
+                                  lowered_return_type)) {
+            return false;
+        }
+        backend_function.backend_return_types.push_back(std::move(lowered_return_type));
+    }
+
     FunctionLoweringState state;
     state.function_index = function_index;
+    state.module = &module;
     state.function = &function;
 
     for (const auto& local : function.locals) {
+        BackendTypeInfo lowered_type;
+        if (!LowerInstructionType(module,
+                                  local.type,
+                                  source_path,
+                                  diagnostics,
+                                  "local '" + local.name + "' in function '" + function.name + "'",
+                                  lowered_type)) {
+            return false;
+        }
         BackendLocal backend_local {
             .source_name = local.name,
             .backend_name = BackendLocalName(local.name),
             .type = local.type,
+            .lowered_type = lowered_type,
             .is_parameter = local.is_parameter,
             .is_mutable = local.is_mutable,
         };
@@ -701,7 +1114,7 @@ LowerResult LowerModule(const mir::Module& module,
             names << module.globals.front().names[index];
         }
         ReportBackendError(source_path,
-                           "LLVM bootstrap backend does not lower globals in the current Stage 3 slice; first global names=[" +
+                               "LLVM bootstrap backend does not lower globals in the current bootstrap slice; first global names=[" +
                                names.str() + "]",
                            diagnostics);
         return {};
@@ -713,7 +1126,8 @@ LowerResult LowerModule(const mir::Module& module,
     backend_module->functions.reserve(module.functions.size());
 
     for (std::size_t function_index = 0; function_index < module.functions.size(); ++function_index) {
-        if (!LowerFunction(module.functions[function_index],
+        if (!LowerFunction(module,
+                   module.functions[function_index],
                            function_index,
                            source_path,
                            diagnostics,
@@ -737,15 +1151,15 @@ std::string DumpModule(const BackendModule& module) {
     for (const auto& function : module.functions) {
         std::ostringstream header;
         header << "Function source=" << function.source_name << " backend=" << function.backend_name;
-        if (!function.return_types.empty()) {
-            header << " returns=" << FormatReturnTypes(function.return_types);
+        if (!function.backend_return_types.empty()) {
+            header << " returns=" << FormatReturnTypes(function.backend_return_types);
         }
         WriteLine(stream, 1, header.str());
 
         for (const auto& local : function.locals) {
             std::ostringstream local_line;
             local_line << "Local source=" << local.source_name << " backend=" << local.backend_name
-                       << " type=" << sema::FormatType(local.type);
+                       << " type=" << FormatTypeInfo(local.lowered_type);
             if (local.is_parameter) {
                 local_line << " param";
             }
