@@ -1,0 +1,92 @@
+Module
+  TypeDecl kind=enum name=MemoryOrder
+    Variant name=Relaxed
+    Variant name=Acquire
+    Variant name=Release
+  TypeDecl kind=struct name=Atomic
+    typeParams=[T]
+  Function name=volatile_load returns=[i32]
+    Local name=ptr type=*i32 param readonly
+    Block label=entry0
+      const %v0:int_literal op=0
+      terminator return values=[%v0]
+  Function name=volatile_store
+    Local name=ptr type=*i32 param readonly
+    Local name=value type=i32 param readonly
+    Block label=entry0
+      terminator return
+  Function name=atomic_load returns=[i32]
+    Local name=ptr type=*Atomic<i32> param readonly
+    Local name=order type=MemoryOrder param readonly
+    Block label=entry0
+      const %v0:int_literal op=0
+      terminator return values=[%v0]
+  Function name=atomic_store
+    Local name=ptr type=*Atomic<i32> param readonly
+    Local name=value type=i32 param readonly
+    Local name=order type=MemoryOrder param readonly
+    Block label=entry0
+      terminator return
+  Function name=atomic_exchange returns=[i32]
+    Local name=ptr type=*Atomic<i32> param readonly
+    Local name=value type=i32 param readonly
+    Local name=order type=MemoryOrder param readonly
+    Block label=entry0
+      load_local %v0:i32 target=value
+      terminator return values=[%v0]
+  Function name=atomic_compare_exchange returns=[bool]
+    Local name=ptr type=*Atomic<i32> param readonly
+    Local name=expected type=*i32 param readonly
+    Local name=desired type=i32 param readonly
+    Local name=success type=MemoryOrder param readonly
+    Local name=failure type=MemoryOrder param readonly
+    Block label=entry0
+      const %v0:bool op=true
+      terminator return values=[%v0]
+  Function name=atomic_fetch_add returns=[i32]
+    Local name=ptr type=*Atomic<i32> param readonly
+    Local name=value type=i32 param readonly
+    Local name=order type=MemoryOrder param readonly
+    Block label=entry0
+      load_local %v0:i32 target=value
+      terminator return values=[%v0]
+  Function name=demo returns=[bool]
+    Local name=ptr type=*i32 param readonly
+    Local name=atom type=*Atomic<i32> param readonly
+    Local name=expected type=*i32 param readonly
+    Local name=value type=i32
+    Local name=loaded type=i32
+    Local name=swapped type=i32
+    Local name=added type=i32
+    Block label=entry0
+      load_local %v0:*i32 target=ptr
+      volatile_load %v1:i32 target=volatile_load operands=[%v0]
+      store_local target=value operands=[%v1]
+      load_local %v2:*i32 target=ptr
+      load_local %v3:i32 target=value
+      volatile_store target=volatile_store operands=[%v2, %v3]
+      load_local %v4:*Atomic<i32> target=atom
+      symbol_ref %v5:MemoryOrder target=MemoryOrder.Acquire target_kind=other target_name=MemoryOrder.Acquire
+      atomic_load %v6:i32 op=order=MemoryOrder.Acquire target=atomic_load operands=[%v4, %v5]
+      store_local target=loaded operands=[%v6]
+      load_local %v7:*Atomic<i32> target=atom
+      load_local %v8:i32 target=loaded
+      symbol_ref %v9:MemoryOrder target=MemoryOrder.Release target_kind=other target_name=MemoryOrder.Release
+      atomic_store op=order=MemoryOrder.Release target=atomic_store operands=[%v7, %v8, %v9]
+      load_local %v10:*Atomic<i32> target=atom
+      load_local %v11:i32 target=loaded
+      symbol_ref %v12:MemoryOrder target=MemoryOrder.Acquire target_kind=other target_name=MemoryOrder.Acquire
+      atomic_exchange %v13:i32 op=order=MemoryOrder.Acquire target=atomic_exchange operands=[%v10, %v11, %v12]
+      store_local target=swapped operands=[%v13]
+      load_local %v14:*Atomic<i32> target=atom
+      load_local %v15:i32 target=swapped
+      symbol_ref %v16:MemoryOrder target=MemoryOrder.Release target_kind=other target_name=MemoryOrder.Release
+      atomic_fetch_add %v17:i32 op=order=MemoryOrder.Release target=atomic_fetch_add operands=[%v14, %v15, %v16]
+      store_local target=added operands=[%v17]
+      load_local %v18:*Atomic<i32> target=atom
+      load_local %v19:*i32 target=expected
+      load_local %v20:i32 target=added
+      symbol_ref %v21:MemoryOrder target=MemoryOrder.Acquire target_kind=other target_name=MemoryOrder.Acquire
+      symbol_ref %v22:MemoryOrder target=MemoryOrder.Relaxed target_kind=other target_name=MemoryOrder.Relaxed
+      atomic_compare_exchange %v23:bool op=success=MemoryOrder.Acquire,failure=MemoryOrder.Relaxed target=atomic_compare_exchange operands=[%v18, %v19, %v20, %v21, %v22]
+      terminator return values=[%v23]

@@ -80,6 +80,13 @@ bool IsNumericType(const Type& type) {
     return IsIntegerTypeName(type.name) || IsFloatTypeName(type.name);
 }
 
+bool IsIntegerLikeType(const Type& type) {
+    if (type.kind == Type::Kind::kIntLiteral) {
+        return true;
+    }
+    return type.kind == Type::Kind::kNamed && IsIntegerTypeName(type.name);
+}
+
 bool IsBoolType(const Type& type) {
     return type.kind == Type::Kind::kBool || (type.kind == Type::Kind::kNamed && type.name == "bool");
 }
@@ -1002,6 +1009,15 @@ class Checker {
                         Report(expr.span, "comparison requires compatible operand types");
                     }
                     return record(BoolType());
+                }
+                if (expr.text == "<<" || expr.text == ">>") {
+                    if (!IsUnknown(left) && !IsIntegerLikeType(left)) {
+                        Report(expr.left->span, "shift operator requires integer left operand");
+                    }
+                    if (!IsUnknown(right) && !IsIntegerLikeType(right)) {
+                        Report(expr.right->span, "shift operator requires integer right operand");
+                    }
+                    return record(left);
                 }
                 if (!IsNumericType(left) || !IsNumericType(right)) {
                     if (!IsUnknown(left) && !IsUnknown(right)) {

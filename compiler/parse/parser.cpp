@@ -1009,7 +1009,11 @@ class Parser {
     }
 
     std::unique_ptr<Expr> ParseRelationalExpr() {
-        return ParseBinaryChain(&Parser::ParseAdditiveExpr, {TokenKind::kLt, TokenKind::kLtEq, TokenKind::kGt, TokenKind::kGtEq});
+        return ParseBinaryChain(&Parser::ParseShiftExpr, {TokenKind::kLt, TokenKind::kLtEq, TokenKind::kGt, TokenKind::kGtEq});
+    }
+
+    std::unique_ptr<Expr> ParseShiftExpr() {
+        return ParseBinaryChain(&Parser::ParseAdditiveExpr, {TokenKind::kLtLt, TokenKind::kGtGt});
     }
 
     std::unique_ptr<Expr> ParseAdditiveExpr() {

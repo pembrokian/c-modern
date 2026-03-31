@@ -395,11 +395,17 @@ class Lexer {
                 }
                 return emit(TokenKind::kBang, 1);
             case '<':
+                if (PeekNext() == '<') {
+                    return emit(TokenKind::kLtLt, 2);
+                }
                 if (PeekNext() == '=') {
                     return emit(TokenKind::kLtEq, 2);
                 }
                 return emit(TokenKind::kLt, 1);
             case '>':
+                if (PeekNext() == '>') {
+                    return emit(TokenKind::kGtGt, 2);
+                }
                 if (PeekNext() == '=') {
                     return emit(TokenKind::kGtEq, 2);
                 }
@@ -540,10 +546,14 @@ std::string_view ToString(TokenKind kind) {
             return "<";
         case TokenKind::kLtEq:
             return "<=";
+        case TokenKind::kLtLt:
+            return "<<";
         case TokenKind::kGt:
             return ">";
         case TokenKind::kGtEq:
             return ">=";
+        case TokenKind::kGtGt:
+            return ">>";
         case TokenKind::kPlus:
             return "+";
         case TokenKind::kMinus:

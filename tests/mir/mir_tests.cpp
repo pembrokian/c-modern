@@ -534,6 +534,92 @@ void TestStatementCallUsesVoidFallbackForUnresolvedCallee() {
     }
 }
 
+void TestDivisionAndShiftLoweringEmitExplicitChecks() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "func math(value: i32, denom: i32, count: i32) i32 {\n"
+        "    left: i32 = value / denom\n"
+        "    rem: i32 = value % denom\n"
+        "    wide: i32 = value << count\n"
+        "    narrow: i32 = value >> count\n"
+        "    return left + rem + wide + narrow\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("division and shift lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("div_check op=/") == std::string::npos || dump.find("div_check op=%") == std::string::npos) {
+        Fail("division and remainder lowering should emit explicit div_check instructions");
+    }
+    if (dump.find("shift_check op=<<") == std::string::npos || dump.find("shift_check op=>>") == std::string::npos) {
+        Fail("shift lowering should emit explicit shift_check instructions");
+    }
+}
+
+void TestVolatileAndAtomicCallsLowerExplicitly() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "enum MemoryOrder { Relaxed, Acquire, Release }\n"
+        "struct Atomic<T> {}\n"
+        "\n"
+        "func volatile_load(ptr: *i32) i32 {\n"
+        "    return 0\n"
+        "}\n"
+        "\n"
+        "func volatile_store(ptr: *i32, value: i32) {\n"
+        "}\n"
+        "\n"
+        "func atomic_load(ptr: *Atomic<i32>, order: MemoryOrder) i32 {\n"
+        "    return 0\n"
+        "}\n"
+        "\n"
+        "func atomic_store(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) {\n"
+        "}\n"
+        "\n"
+        "func atomic_exchange(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) i32 {\n"
+        "    return value\n"
+        "}\n"
+        "\n"
+        "func atomic_compare_exchange(ptr: *Atomic<i32>, expected: *i32, desired: i32, success: MemoryOrder, failure: MemoryOrder) bool {\n"
+        "    return true\n"
+        "}\n"
+        "\n"
+        "func atomic_fetch_add(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) i32 {\n"
+        "    return value\n"
+        "}\n"
+        "\n"
+        "func demo(ptr: *i32, atom: *Atomic<i32>, expected: *i32) bool {\n"
+        "    value: i32 = volatile_load(ptr)\n"
+        "    volatile_store(ptr, value)\n"
+        "    loaded: i32 = atomic_load(atom, MemoryOrder.Acquire)\n"
+        "    atomic_store(atom, loaded, MemoryOrder.Release)\n"
+        "    swapped: i32 = atomic_exchange(atom, loaded, MemoryOrder.Acquire)\n"
+        "    added: i32 = atomic_fetch_add(atom, swapped, MemoryOrder.Release)\n"
+        "    return atomic_compare_exchange(atom, expected, added, MemoryOrder.Acquire, MemoryOrder.Relaxed)\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("volatile and atomic lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("volatile_load %v") == std::string::npos || dump.find("volatile_store target=volatile_store") == std::string::npos) {
+        Fail("volatile operations should lower to dedicated MIR instructions");
+    }
+    if (dump.find("atomic_load %v") == std::string::npos || dump.find("atomic_store op=order=") == std::string::npos ||
+        dump.find("atomic_exchange %v") == std::string::npos || dump.find("atomic_compare_exchange %v") == std::string::npos ||
+        dump.find("atomic_fetch_add %v") == std::string::npos) {
+        Fail("atomic operations should lower to dedicated MIR instructions");
+    }
+    if (dump.find("call target=volatile_load") != std::string::npos || dump.find("call target=atomic_load") != std::string::npos) {
+        Fail("dedicated volatile and atomic operations must not lower as generic calls");
+    }
+}
+
 void TestValidatorRejectsBadBranchTarget() {
     mc::support::DiagnosticSink diagnostics;
     mc::mir::Module module;
@@ -1257,6 +1343,137 @@ void TestValidatorRejectsBadBoundsCheckOperands() {
     }
 }
 
+void TestValidatorRejectsDivisionWithoutDivCheck() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_div";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("i32"),
+                .op = "4",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("i32"),
+                .op = "2",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBinary,
+                .result = "%v2",
+                .type = mc::sema::NamedType("i32"),
+                .op = "/",
+                .operands = {"%v0", "%v1"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject division without explicit div_check");
+    }
+    if (diagnostics.Render().find("must be preceded by matching div_check") == std::string::npos) {
+        Fail("validator should explain missing div_check");
+    }
+}
+
+void TestValidatorRejectsGenericVolatileCall() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_volatile_call";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::ProcedureType({mc::sema::PointerType(mc::sema::NamedType("i32"))}, {mc::sema::NamedType("i32")}),
+                .target = "volatile_load",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v1",
+                .type = mc::sema::PointerType(mc::sema::NamedType("i32")),
+                .target = "ptr",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kCall,
+                .result = "%v2",
+                .type = mc::sema::NamedType("i32"),
+                .target = "volatile_load",
+                .operands = {"%v0", "%v1"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject generic calls for dedicated volatile operations");
+    }
+    if (diagnostics.Render().find("dedicated volatile/atomic opcode") == std::string::npos) {
+        Fail("validator should explain generic volatile call misuse");
+    }
+}
+
+void TestValidatorRejectsAtomicLoadBadOrderType() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_atomic_order";
+    mc::sema::Type atomic_i32 = mc::sema::NamedType("Atomic");
+    atomic_i32.subtypes.push_back(mc::sema::NamedType("i32"));
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::PointerType(atomic_i32),
+                .target = "atom",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::BoolType(),
+                .op = "true",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kAtomicLoad,
+                .result = "%v2",
+                .type = mc::sema::NamedType("i32"),
+                .target = "atomic_load",
+                .operands = {"%v0", "%v1"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject atomic_load with non-MemoryOrder operand");
+    }
+    if (diagnostics.Render().find("MemoryOrder operand") == std::string::npos) {
+        Fail("validator should explain invalid atomic order operands");
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -1279,6 +1496,8 @@ int main() {
     TestLoopIterationDefersRunBeforeStep();
     TestDeferArgumentsAreEvaluatedImmediately();
     TestStatementCallUsesVoidFallbackForUnresolvedCallee();
+    TestDivisionAndShiftLoweringEmitExplicitChecks();
+    TestVolatileAndAtomicCallsLowerExplicitly();
     TestValidatorRejectsBadBranchTarget();
     TestValidatorRejectsNonBoolCondition();
     TestValidatorRejectsCallArgumentTypeMismatch();
@@ -1296,5 +1515,8 @@ int main() {
     TestValidatorRejectsBadSliceBaseType();
     TestValidatorRejectsBadSliceBoundType();
     TestValidatorRejectsBadBoundsCheckOperands();
+    TestValidatorRejectsDivisionWithoutDivCheck();
+    TestValidatorRejectsGenericVolatileCall();
+    TestValidatorRejectsAtomicLoadBadOrderType();
     return 0;
 }

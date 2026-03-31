@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
         {"foreach_range_defer.mc", "foreach_range_defer.mir.txt", true},
         {"explicit_conversion.mc", "explicit_conversion.mir.txt", true},
         {"pointer_int_conversion.mc", "pointer_int_conversion.mir.txt", true},
+        {"semantic_boundary_intrinsics.mc", "semantic_boundary_intrinsics.mir.txt", true},
         {"loop_iteration_defer.mc", "loop_iteration_defer.mir.txt", true},
         {"scoped_defer.mc", "scoped_defer.mir.txt", true},
         {"switch_variant.mc", "switch_variant.mir.txt", true},
