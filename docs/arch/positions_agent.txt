@@ -153,6 +153,21 @@ Rationale:
 - Tool-building should not require dropping into platform APIs for ordinary process I/O.
 - This keeps the language aligned with the Thompson and Pike bias toward simple tools.
 
+5B. Standard Library Packaging
+
+Position:
+- The standard library should use a small fixed set of focused module names in v0.2.
+- The canonical portable modules should be `mem`, `utf8`, `strings`, `io`, `fs`, `sync`, `time`, and `testing`.
+- The canonical platform or target-facing modules should be `os` and `hal`.
+- Startup support should remain a separate non-ordinary layer, not a normal import module.
+- v0.2 should not define an omnibus `core` module, a hidden prelude, or a vague `platform` mega-module.
+
+Rationale:
+- Small focused modules preserve architectural boundaries better than one central junk drawer.
+- `sync` is clearer and smaller than a second naming family such as `threading`.
+- `os` and `hal` make the platform boundary explicit instead of smearing it across `io`, `fs`, and `mem`.
+- A non-magical standard library should be visible in source through explicit imports.
+
 6. Error Handling Discipline
 
 Position:
@@ -254,7 +269,10 @@ Position:
 - Modules compile independently.
 - Imports are acyclic.
 - There are no hidden static constructors or module init routines.
-- Top-level values must be compile-time constants.
+- Top-level `const` initializers must be compile-time constants.
+- Top-level `var` declarations are allowed for static storage.
+- Top-level `var` initializers, when present, must be compile-time constants.
+- Top-level `var` declarations without an initializer are zero-initialized.
 - The language should not reserve a special entry function.
 - Executable entrypoints should be selected by the build tool or platform convention.
 - The standard build tool is canonical, but it should emit normal object files and link artifacts so other build systems can drive it.

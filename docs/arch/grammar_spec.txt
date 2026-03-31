@@ -1,0 +1,437 @@
+Modern C - Concrete Grammar (v0.2)
+
+Purpose
+
+This document freezes the first-pass concrete syntax for Modern C.
+It exists to give lexer and parser bring-up a stable target without forcing the high-level language document to carry every grammar detail inline.
+
+Authority and scope:
+- `language_spec.txt` remains the semantic authority.
+- this document is the concrete syntax authority for v0.2 parser bring-up.
+- `lexer_spec.txt` freezes the token inventory derived from this grammar.
+- `ast_spec.txt` freezes the parser output inventory derived from this grammar.
+- if a semantic rule and a grammar production appear to disagree, the semantic rule wins and the grammar should be corrected.
+- this document standardizes only the syntax needed for the first compiler bring-up.
+- features not spelled out here should be treated as out of scope for v0.2 parser work rather than guessed.
+
+Notation
+
+This file uses a simple EBNF-like notation:
+- `A = B C` means sequence
+- `A = B | C` means choice
+- `{ X }` means zero or more repetitions
+- `[ X ]` means optional
+- quoted text such as `"func"` means a literal token
+- names in angle brackets such as `<identifier>` describe lexical token classes
+
+1. Lexical Structure
+
+Whitespace:
+- spaces, tabs, and carriage returns separate tokens
+- newlines are preserved as separators where this grammar explicitly requires them
+- outside those separator positions, newlines behave like ordinary whitespace
+
+Line breaks:
+
+```text
+<newline>      = <line_break> { <line_break> }
+<line_break>   = "\n" | "\r\n"
+```
+
+Comments:
+- line comments begin with `//` and continue to the end of the line
+- line comments are whitespace, but the terminating line break still counts as `<newline>`
+- this grammar does not standardize block comments for v0.2
+
+Identifiers:
+
+```text
+<identifier> = letter { letter | digit | "_" }
+letter       = "A".."Z" | "a".."z" | "_"
+digit        = "0".."9"
+```
+
+Keywords:
+- `import`
+- `export`
+- `func`
+- `struct`
+- `enum`
+- `distinct`
+- `type`
+- `extern`
+- `if`
+- `else`
+- `switch`
+- `case`
+- `default`
+- `for`
+- `while`
+- `in`
+- `return`
+- `break`
+- `continue`
+- `defer`
+- `var`
+- `const`
+- `nil`
+- `true`
+- `false`
+
+Reserved words:
+- `const` is reserved for future or implementation use even though current examples mostly use typed or inferred bindings
+
+Literals standardized for v0.2 bring-up:
+- integer literals
+- floating-point literals
+- string literals
+- `true`
+- `false`
+- `nil`
+
+Literal forms:
+
+```text
+<int_lit>    = <dec_int> | <hex_int>
+<dec_int>    = digit { [ "_" ] digit }
+<hex_int>    = "0x" <hex_digit> { [ "_" ] <hex_digit> }
+<hex_digit>  = digit | "a".."f" | "A".."F"
+
+<float_lit>  = digit { [ "_" ] digit } "." digit { [ "_" ] digit } [ <exp_part> ]
+             | digit { [ "_" ] digit } <exp_part>
+<exp_part>   = ("e" | "E") [ "+" | "-" ] digit { digit }
+
+<string_lit> = '"' { <string_char> | <escape_seq> } '"'
+<string_char> = any UTF-8 source character except '"', "\\", "\n", or "\r"
+<escape_seq> = "\\\"" | "\\\\" | "\\n" | "\\r" | "\\t" | "\\0"
+```
+
+String literal rules:
+- string literals produce `str`
+- string literals are UTF-8 text in source form
+- numeric separators `_` are allowed between digits in integer and floating-point literals, but not at the start or end of a digit sequence
+- v0.2 standardizes only the escape sequences listed above
+- unicode, hex, and octal string escapes are out of scope for the first parser bring-up unless the spec is expanded explicitly
+
+Tokens and punctuation used by the grammar:
+
+```text
+{ } ( ) [ ] , : . .* .. = == != < <= > >= + - * / % && || ! & @
+->
+```
+
+Notes:
+- `.*` is a single postfix dereference token sequence in the grammar even if the lexer emits `.` and `*` separately
+- `->` is reserved and not part of the v0.2 source grammar
+
+2. Source File Structure
+
+```text
+source_file     = [ export_block source_sep ]
+                  { import_decl source_sep }
+                  [ top_level_decl { source_sep top_level_decl } [ source_sep ] ]
+
+source_sep      = <newline>
+
+export_block    = "export" "{" [ export_name_list ] "}"
+export_name_list = <identifier> { "," <identifier> }
+
+import_decl     = "import" module_name
+module_name     = <identifier>
+```
+
+Rules:
+- one source file is one module in v0.2
+- imports are explicit and acyclic
+- exports are declared through the top-level export block, not by per-declaration `export` modifiers in source syntax
+- this grammar standardizes single-segment module names for v0.2
+
+3. Attributes and Modifiers
+
+```text
+attribute_list  = { attribute }
+attribute       = "@" <identifier> [ "(" [ attribute_arg_list ] ")" ]
+attribute_arg_list = attribute_arg { "," attribute_arg }
+attribute_arg   = <identifier> | literal
+
+extern_modifier = "extern" "(" <identifier> ")"
+```
+
+Rules:
+- attributes may appear before top-level declarations
+- parameter attributes are allowed before a parameter name to support cases such as `@noalias`
+- `extern(c)` is the standardized foreign-declaration modifier for v0.2
+
+4. Top-Level Declarations
+
+```text
+top_level_decl  = func_decl
+                | extern_func_decl
+                | struct_decl
+                | enum_decl
+                | distinct_decl
+                | type_alias_decl
+                | var_decl
+                | const_binding_decl
+
+func_decl       = attribute_list "func" <identifier> signature block
+extern_func_decl = attribute_list extern_modifier "func" <identifier> signature
+
+struct_decl     = attribute_list "struct" <identifier> [ type_params ] struct_body
+enum_decl       = attribute_list "enum" <identifier> [ type_params ] enum_body
+distinct_decl   = "distinct" <identifier> "=" type_expr
+type_alias_decl = "type" <identifier> [ type_params ] "=" type_expr
+
+var_decl        = "var" storage_binding_decl
+const_binding_decl = "const" initialized_binding_decl
+```
+
+Rules:
+- top-level `const` declarations require an initializer
+- top-level `var` declarations may omit an initializer
+- semantic analysis enforces that top-level initializers are compile-time constants
+
+5. Signatures, Parameters, and Return Types
+
+```text
+signature       = "(" [ parameter_list ] ")" [ return_type ]
+parameter_list  = parameter { "," parameter }
+parameter       = attribute_list <identifier> ":" type_expr
+
+return_type     = type_expr | "(" type_expr { "," type_expr } ")"
+```
+
+Examples covered by this grammar:
+- `func add(a: i32, b: i32) i32`
+- `func read() (Data, Error)`
+- `extern(c) func c_stat(path: cstr, out: *CStat) i32`
+
+6. Types
+
+```text
+type_expr       = prefix_type
+
+prefix_type     = "const" prefix_type
+                | "*" prefix_type
+                | array_type
+                | named_type
+                | "(" type_expr ")"
+
+array_type      = "[" expr "]" type_expr
+
+named_type      = <identifier> [ type_args ]
+type_args       = "<" type_expr { "," type_expr } ">"
+type_params     = "<" <identifier> { "," <identifier> } ">"
+```
+
+Rules:
+- `const` binds at the type layer where it appears
+- pointer types are written prefix-style as `*T`
+- fixed arrays are written `[N]T`
+- generic nominal types such as `Slice<T>`, `Buffer<T>`, and `Atomic<T>` use angle-bracket arguments
+
+7. Aggregate Bodies
+
+```text
+struct_body     = "{" [ field_decl { member_sep field_decl } [ member_sep ] ] "}"
+field_decl      = <identifier> ":" type_expr
+
+enum_body       = "{" [ enum_variant { member_sep enum_variant } [ member_sep ] ] "}"
+enum_variant    = <identifier> [ "(" [ variant_field_list ] ")" ]
+variant_field_list = variant_field { "," variant_field }
+variant_field   = [ <identifier> ":" ] type_expr
+
+member_sep      = "," | <newline>
+```
+
+Examples covered by this grammar:
+- `struct Point { x: f32 y: f32 }`
+- `enum Expr { Int(value: i64) Add(left: *Expr, right: *Expr) Div(left: *Expr, right: *Expr) }`
+
+8. Blocks and Statements
+
+```text
+block           = "{" [ statement { statement_sep statement } [ statement_sep ] ] "}"
+
+statement       = block
+                | binding_stmt
+                | assign_stmt
+                | expr_stmt
+                | if_stmt
+                | switch_stmt
+                | for_stmt
+                | while_stmt
+                | return_stmt
+                | break_stmt
+                | continue_stmt
+                | defer_stmt
+
+binding_stmt    = initialized_binding_decl
+                | storage_binding_decl
+                | var_stmt
+                | const_stmt
+
+initialized_binding_decl = binding_lhs [ ":" type_expr ] "=" expr_list
+storage_binding_decl = binding_lhs ":" type_expr
+binding_lhs     = <identifier> { "," <identifier> }
+
+var_stmt        = "var" ( initialized_binding_decl | storage_binding_decl )
+const_stmt      = "const" initialized_binding_decl
+
+assign_stmt     = assignment_target_list "=" expr_list
+assignment_target_list = assignment_target { "," assignment_target }
+assignment_target = postfix_expr
+
+expr_stmt       = expr
+
+if_stmt         = "if" expr block [ "else" ( block | if_stmt ) ]
+
+switch_stmt     = "switch" expr "{" [ switch_case_group { statement_sep switch_case_group } [ statement_sep ] ] "}"
+switch_case_group = switch_case | default_case
+switch_case     = "case" case_pattern ":" [ case_body ]
+default_case    = "default" ":" [ case_body ]
+case_body       = statement { statement_sep statement }
+
+for_stmt        = "for" for_header block
+for_header      = expr
+                | <identifier> "in" expr
+                | <identifier> "," <identifier> "in" expr
+                | <identifier> "in" range_expr
+
+while_stmt      = "while" expr block
+
+return_stmt     = "return" [ expr_list ]
+break_stmt      = "break"
+continue_stmt   = "continue"
+defer_stmt      = "defer" expr
+
+expr_list       = expr { "," expr }
+statement_sep   = <newline>
+```
+
+Rules:
+- local initialized bindings may be typed or inferred
+- local storage declarations without an initializer require an explicit type
+- `const` bindings are allowed at top level and inside blocks
+- multi-result binding and assignment are both part of the core v0.2 syntax
+- `for value in slice` and `for index, value in slice` are the standardized iterator forms
+- `for name in a..b` is the standardized range-iteration form used by the current canonical programs
+- `while` is the standardized condition-loop spelling used by the current canonical programs
+- `for expr { ... }` remains available as the general condition-style loop form
+- `defer` takes an expression, typically a call expression
+- block statements and aggregate members are separated by line breaks or explicit commas where allowed; there is no hidden semicolon insertion pass
+- switch case bodies are separated by line breaks; a new `case` or `default` starts a new case group
+
+9. Expressions
+
+Expressions use the following precedence, from lowest to highest:
+
+```text
+expr            = range_expr
+
+range_expr      = logical_or_expr [ ".." logical_or_expr ]
+
+logical_or_expr = logical_and_expr { "||" logical_and_expr }
+logical_and_expr = equality_expr { "&&" equality_expr }
+equality_expr   = relational_expr { ("==" | "!=") relational_expr }
+relational_expr = additive_expr { ("<" | "<=" | ">" | ">=") additive_expr }
+additive_expr   = multiplicative_expr { ("+" | "-") multiplicative_expr }
+multiplicative_expr = unary_expr { ("*" | "/" | "%") unary_expr }
+
+unary_expr      = postfix_expr
+                | ("!" | "-" | "&" | "*") unary_expr
+
+postfix_expr    = primary_expr { postfix_op }
+postfix_op      = field_access
+                | deref_access
+                | index_access
+                | slice_access
+                | call_suffix
+                | aggregate_init_suffix
+
+field_access    = "." <identifier>
+deref_access    = ".*"
+index_access    = "[" expr "]"
+slice_access    = "[" [ expr ] ":" [ expr ] "]"
+call_suffix     = "(" [ expr_list ] ")"
+aggregate_init_suffix = "{" [ field_init_list ] "}"
+field_init_list = field_init { "," field_init }
+field_init      = [ <identifier> ":" ] expr
+```
+
+Rules:
+- postfix operations associate left to right
+- unary operators associate right to left
+- `..` binds more weakly than logical and arithmetic operators and is intended primarily for range iteration syntax
+- aggregate initialization is a postfix form on a type-like primary expression, which permits examples such as `Config{}` and `Buffer<ui8>{ ptr: nil, len: 0, cap: 0, alloc: alloc }`
+- `expr.*` is the standardized explicit dereference syntax used in current examples
+- indexing and slicing are distinct postfix forms
+
+10. Primary Expressions
+
+```text
+primary_expr    = literal
+                | <identifier>
+                | qualified_name
+                | conversion_expr
+                | parenthesized_expr
+
+qualified_name  = <identifier> "." <identifier>
+conversion_expr = named_type "(" expr_list ")"
+parenthesized_expr = "(" expr ")"
+
+literal         = <int_lit>
+                | <float_lit>
+                | <string_lit>
+                | "true"
+                | "false"
+                | "nil"
+```
+
+Rules:
+- explicit conversions use call-like syntax such as `EventMask(1)`
+- qualified names cover ordinary module-member references such as `io.write_line`
+- the parser may initially treat `named_type("..." )` and ordinary call syntax similarly and leave final disambiguation to semantic analysis
+
+11. Switch Case Patterns
+
+```text
+case_pattern    = expr
+                | qualified_name [ "(" [ pattern_binding_list ] ")" ]
+
+pattern_binding_list = <identifier> { "," <identifier> }
+```
+
+Rules:
+- ordinary value switch cases use `case expr:`
+- tagged-union destructuring uses `case VariantName(bound, values):`
+- qualified variant names such as `Expr.Int(value)` are allowed by the grammar because current examples use them
+
+12. Explicitly Out Of Scope For This Grammar
+
+The following are intentionally not standardized here and should not be guessed during bring-up:
+- multi-file modules
+- implicit semicolon insertion
+- hidden exports or per-declaration `export` modifiers in source files
+- compile-time execution syntax
+- async or await syntax
+- trait, interface, or method syntax
+- C header import syntax
+- macro syntax
+- block comment syntax
+- a distinct literal form for `utf`
+- additional assignment operators such as `+=` or `*=`
+- richer range syntax beyond `a..b`
+
+13. Parser Bring-Up Notes
+
+Guidance for the first implementation:
+- keep the parser concrete and syntax-only; do not encode semantic rules such as type validity, exhaustiveness, or layout constraints into parse decisions
+- preserve source spans on every declaration, statement, expression, and type node
+- parse ambiguous call-like forms conservatively and let semantic analysis decide whether a node is a conversion, constructor-like aggregate use, or ordinary call
+- accept only the syntax frozen here; do not extend the parser just because a C-family spelling feels familiar
+
+Bottom line
+
+This grammar is the concrete parser contract for v0.2 bring-up.
+If the implementation needs more syntax than this document provides, the correct response is to update the spec first rather than letting the parser invent the language.

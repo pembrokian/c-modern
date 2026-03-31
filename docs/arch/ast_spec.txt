@@ -1,0 +1,193 @@
+Modern C - AST Node Inventory (v0.2)
+
+Purpose
+
+This document freezes the first-pass AST surface for parser and early semantic bring-up.
+It is intentionally structural rather than semantic: the goal is to define what the parser must produce, not to encode type rules in the tree.
+
+Authority and scope:
+- `grammar_spec.txt` is the syntax authority.
+- this document freezes the AST node inventory and minimum fields required for v0.2 bring-up.
+- semantic analysis may attach later facts, but it should not require the parser to invent hidden nodes.
+
+Global rules:
+- every node carries a source span
+- lists preserve source order exactly
+- the AST should distinguish syntax categories directly instead of collapsing them into untyped generic nodes
+- no parser-generated implicit semicolon, auto-import, or hidden initialization nodes are allowed
+
+1. Source File And Module Nodes
+
+Core nodes:
+- `SourceFile`
+  - fields: `exportBlock?`, `imports[]`, `decls[]`
+- `ExportBlock`
+  - fields: `names[]`
+- `ImportDecl`
+  - fields: `moduleName`
+
+2. Declaration Nodes
+
+Top-level declarations:
+- `FuncDecl`
+  - fields: `attributes[]`, `name`, `typeParams[]`, `params[]`, `returnTypes[]`, `body`
+- `ExternFuncDecl`
+  - fields: `attributes[]`, `externAbi`, `name`, `typeParams[]`, `params[]`, `returnTypes[]`
+- `StructDecl`
+  - fields: `attributes[]`, `name`, `typeParams[]`, `fields[]`
+- `EnumDecl`
+  - fields: `attributes[]`, `name`, `typeParams[]`, `variants[]`
+- `DistinctDecl`
+  - fields: `name`, `baseType`
+- `TypeAliasDecl`
+  - fields: `name`, `typeParams[]`, `aliasedType`
+- `ConstDecl`
+  - fields: `pattern`, `typeAnn?`, `values[]`
+- `VarDecl`
+  - fields: `pattern`, `typeAnn?`, `values[]`, `hasInitializer`
+
+Auxiliary declaration nodes:
+- `FieldDecl`
+  - fields: `name`, `type`
+- `EnumVariantDecl`
+  - fields: `name`, `payloadFields[]`
+- `ParamDecl`
+  - fields: `attributes[]`, `name`, `type`
+- `Attribute`
+  - fields: `name`, `args[]`
+
+3. Type Nodes
+
+Type nodes:
+- `NamedType`
+  - fields: `name`, `typeArgs[]`
+- `PointerType`
+  - fields: `pointee`
+- `ConstType`
+  - fields: `inner`
+- `ArrayType`
+  - fields: `lengthExpr`, `elementType`
+- `ParenType`
+  - fields: `inner`
+
+Notes:
+- `Slice<T>`, `Buffer<T>`, `Atomic<T>`, and similar forms remain `NamedType` plus type arguments in the AST
+- semantic analysis resolves built-in and library-defined type meaning later
+
+4. Statement Nodes
+
+Statement nodes:
+- `BlockStmt`
+  - fields: `statements[]`
+- `BindingStmt`
+  - fields: `pattern`, `typeAnn?`, `values[]`
+- `VarStmt`
+  - fields: `pattern`, `typeAnn?`, `values[]`, `hasInitializer`
+- `ConstStmt`
+  - fields: `pattern`, `typeAnn?`, `values[]`
+- `AssignStmt`
+  - fields: `targets[]`, `values[]`
+- `ExprStmt`
+  - fields: `expr`
+- `IfStmt`
+  - fields: `cond`, `thenBlock`, `elseBranch?`
+- `SwitchStmt`
+  - fields: `scrutinee`, `cases[]`, `defaultCase?`
+- `WhileStmt`
+  - fields: `cond`, `body`
+- `ForConditionStmt`
+  - fields: `cond`, `body`
+- `ForEachStmt`
+  - fields: `valueName`, `iterable`, `body`
+- `ForEachIndexStmt`
+  - fields: `indexName`, `valueName`, `iterable`, `body`
+- `ForRangeStmt`
+  - fields: `name`, `rangeExpr`, `body`
+- `ReturnStmt`
+  - fields: `values[]`
+- `BreakStmt`
+  - no payload fields
+- `ContinueStmt`
+  - no payload fields
+- `DeferStmt`
+  - fields: `expr`
+
+Supporting nodes:
+- `NamePattern`
+  - fields: `names[]`
+- `SwitchCase`
+  - fields: `pattern`, `statements[]`
+- `DefaultCase`
+  - fields: `statements[]`
+
+5. Expression Nodes
+
+Expression nodes:
+- `NameExpr`
+  - fields: `name`
+- `QualifiedNameExpr`
+  - fields: `base`, `member`
+- `LiteralExpr`
+  - fields: `kind`, `rawText`
+- `UnaryExpr`
+  - fields: `op`, `operand`
+- `BinaryExpr`
+  - fields: `op`, `left`, `right`
+- `RangeExpr`
+  - fields: `start`, `end`
+- `CallExpr`
+  - fields: `callee`, `args[]`
+- `FieldExpr`
+  - fields: `base`, `name`
+- `DerefFieldExpr`
+  - fields: `base`
+- `IndexExpr`
+  - fields: `base`, `index`
+- `SliceExpr`
+  - fields: `base`, `start?`, `end?`
+- `AggregateInitExpr`
+  - fields: `base`, `inits[]`
+- `ParenExpr`
+  - fields: `inner`
+
+Supporting nodes:
+- `FieldInit`
+  - fields: `name?`, `value`
+
+Notes:
+- explicit conversions should initially parse as `CallExpr`; semantic analysis can later classify type-directed calls such as `EventMask(1)` as conversions
+- aggregate initialization remains explicit syntax in the AST instead of being lowered into assignment lists during parsing
+
+6. Pattern Nodes
+
+Switch-pattern nodes:
+- `ExprCasePattern`
+  - fields: `expr`
+- `VariantCasePattern`
+  - fields: `variantName`, `bindings[]`
+
+Notes:
+- qualified variant names such as `Expr.Int` should be preserved as written
+- exhaustive or non-exhaustive status is semantic information, not parser information
+
+7. Minimum Operator Enumeration
+
+The AST should preserve the source operator spelling for at least these operators:
+- unary: `!`, `-`, `&`, `*`
+- binary: `||`, `&&`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `+`, `-`, `*`, `/`, `%`
+- range: `..`
+
+8. Non-Goals For The AST
+
+Do not add parser-time nodes for:
+- inferred types
+- constant values
+- resolved symbol bindings
+- desugared iterator protocols
+- implicit temporary variables
+- backend-oriented lowering constructs
+
+Bottom line
+
+The AST should be a faithful structural record of the source accepted by `grammar_spec.txt`.
+If semantic analysis needs more shape than this inventory provides, add that shape explicitly instead of smuggling it through generic parse nodes.

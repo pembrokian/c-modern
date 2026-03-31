@@ -29,17 +29,19 @@ If forced to choose, prefer:
 The pragmatic starting point is:
 - a small handwritten or simple parser frontend
 - a language-owned typed middle IR
-- an LLVM backend for code generation, object emission, and target coverage
+- a first backend chosen only after MIR is concrete enough to evaluate backend cost honestly
 
 This gives Modern C:
 - fast development speed for the implementation
-- many targets without writing code generators immediately
 - a clear place to define wraparound arithmetic, aliasing rules, volatile access, atomics, and layout before machine lowering
+- freedom to choose LLVM, a one-target native backend, or another narrow first backend based on real implementation pressure rather than early assumption
 
 Recommendation:
-- Use LLVM as a backend.
+- Build the compiler around a language-owned MIR first.
+- Treat backend choice as a Phase 5 decision, not as a Phase 0 semantic dependency.
+- Keep LLVM as the leading candidate for the first backend.
 - Do not let LLVM become the compiler architecture.
-- Preserve the option to replace LLVM later with a native backend.
+- Preserve the option to choose or replace the first backend after MIR validation.
 
 2. What To Borrow From Thompson and Plan 9
 
@@ -79,8 +81,8 @@ The initial compiler should have a small number of explicit stages:
 5. Constant evaluation for the intentionally narrow compile-time subset
 6. Lowering to a typed MIR
 7. Simple middle-end cleanup and validation passes
-8. Lowering to LLVM IR
-9. LLVM code generation and object emission
+8. Lowering to a first backend IR or machine-level form
+9. Backend code generation and object emission
 
 This is enough to keep the pipeline understandable while still separating language semantics from backend mechanics.
 
@@ -117,7 +119,7 @@ This is also the right place to enforce language rules such as:
 
 7. A Language-Owned MIR
 
-The key architectural choice is to introduce a small typed MIR between the frontend and LLVM.
+The key architectural choice is to introduce a small typed MIR between the frontend and any backend.
 
 The MIR should be:
 - typed
@@ -145,7 +147,25 @@ Why MIR matters:
 - it gives a clean target for debugging and testing the compiler
 - it preserves the option of adding a second backend later
 
-8. LLVM Strategy
+8. Backend Strategy
+
+The project should not freeze the first backend before MIR is real.
+
+Decision rule:
+- finish enough MIR work to understand what backend lowering actually requires
+- then choose the backend that best fits the first-version goals
+
+Current leading candidate:
+- LLVM remains the leading candidate because it reduces code-generation scope on the first hosted target
+
+Current alternatives worth keeping open:
+- a one-target native backend if MIR proves simple enough
+- a temporary C backend only if semantic leakage risk is accepted explicitly
+
+Practical rule:
+- Modern C semantics must be fully determined before any backend lowering.
+
+9. LLVM Strategy
 
 LLVM is a good fit here if used narrowly.
 
@@ -167,7 +187,10 @@ LLVM should not define:
 Practical rule:
 - Modern C semantics must be fully determined before LLVM lowering.
 
-9. Middle-End Scope
+LLVM-specific recommendation:
+- choose LLVM when the priority is the shortest path to a usable hosted native compiler without owning code generation machinery early.
+
+10. Middle-End Scope
 
 The compiler should have a small middle-end of its own before handing code to LLVM.
 
@@ -186,18 +209,18 @@ Avoid early overreach:
 
 The first compiler should aim to be correct, fast enough, and understandable.
 
-10. Fast Build Mode Versus Optimized Build Mode
+11. Fast Build Mode Versus Optimized Build Mode
 
 A Thompson-compatible toolchain should treat build speed as a design feature.
 
 Recommendation:
-- Make a fast default build mode that does minimal middle-end work and light LLVM optimization.
+- Make a fast default build mode that does minimal middle-end work and light backend optimization.
 - Make a separate optimized build mode for release builds.
 - Keep checked builds as an explicit mode where runtime faults and extra validation are easier to enable.
 
 This fits the language's explicit philosophy better than one giant always-on optimization path.
 
-11. Artifacts Worth Exposing
+12. Artifacts Worth Exposing
 
 The compiler should expose its internal products in ordinary developer-facing forms.
 
@@ -206,12 +229,12 @@ Useful outputs:
 - AST dump
 - typed AST or semantic tree dump
 - MIR dump
-- LLVM IR dump
+- backend IR dump when the chosen backend has one
 - object emission without forced linking
 
 This keeps the toolchain inspectable and makes language debugging much easier.
 
-12. Diagnostics Philosophy
+13. Diagnostics Philosophy
 
 Diagnostics should be direct and concrete.
 
@@ -224,7 +247,7 @@ Recommendations:
 
 This is especially important for a language that wants to be simpler than C while staying low level.
 
-13. Backend Independence Goal
+14. Backend Independence Goal
 
 Even if LLVM is the first backend, the compiler should not be structurally trapped inside it.
 
@@ -242,12 +265,12 @@ Possible future backends:
 None of these need to exist now.
 The point is to keep them possible.
 
-14. Suggested Initial Toolchain Scope
+15. Suggested Initial Toolchain Scope
 
 A sensible first compiler could aim for:
 - one hosted target first
 - object generation and linking through ordinary platform tools
-- LLVM backend initially
+- first backend chosen after MIR validation, with LLVM as the current leading candidate
 - clear debug and checked build modes
 - no incremental compilation machinery at the start
 - no LTO requirement
@@ -255,14 +278,14 @@ A sensible first compiler could aim for:
 
 That keeps the first implementation small enough to finish.
 
-15. Bottom-Line Architecture
+16. Bottom-Line Architecture
 
 If Modern C wants Thompson-like simplicity in a modern environment, the right compromise is:
 - simple frontend
 - strict semantic phase
 - small typed MIR
 - small in-house middle-end
-- LLVM for backend work
+- a backend chosen after MIR proves what is actually needed
 
 That preserves the values worth keeping from older compiler designs:
 - clarity
@@ -277,7 +300,9 @@ while avoiding the expensive parts that are no longer a good trade:
 
 Working recommendation
 
-Build the first compiler around a language-owned MIR and an LLVM backend.
+Build the first compiler around a language-owned MIR.
+Choose the first backend at the Phase 4 to Phase 5 boundary.
+LLVM remains the leading candidate, but not a frozen premise.
 Take Thompson's simplicity as a design constraint on the compiler structure, not as a requirement to recreate the Plan 9 implementation strategy literally.
 
 16. Implementation Language Choices

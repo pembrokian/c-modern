@@ -2,8 +2,8 @@ Modern C - Build System Notes
 
 Purpose
 
-This document sketches what the build or make system for Modern C should look like.
-It is not yet a final package-manager or workspace spec.
+This document freezes the initial v0.2 build model for Modern C.
+It is intentionally narrow: the goal is to define the canonical build surface for first implementation, not to solve every future workspace or package-management problem.
 Its purpose is to define a build model that matches the language philosophy:
 - simple
 - explicit
@@ -46,7 +46,7 @@ If forced to choose, prefer:
 The language already assumes:
 - one source file equals one module in v0.2
 - imports are explicit and acyclic
-- top-level values are compile-time constants
+- top-level initialization is static and requires no hidden initialization hooks
 - there are no hidden init hooks
 
 The build tool should lean on those facts.
@@ -60,9 +60,9 @@ Basic model:
 
 3. Canonical Command Shape
 
-The canonical tool should probably expose a small command surface.
+The canonical tool exposes a small command surface.
 
-Suggested shape:
+Canonical shape:
 
 ```text
 mc build
@@ -93,7 +93,7 @@ Recommendation:
 - keep the syntax data-oriented rather than imperative
 - avoid embedding a general scripting language in the build file
 
-Canonical choice for current discussion:
+Canonical choice for v0.2:
 - use `build.toml` at the repository root
 
 Why TOML is a reasonable fit:
@@ -204,7 +204,7 @@ If those ever exist, they should be layered outside the core build model.
 
 Because the module system is explicit and acyclic, the build tool can stay simple.
 
-Recommended behavior:
+Canonical behavior:
 - each module compiles independently to an object file plus a small interface artifact
 - the interface artifact records exported names and enough type information for downstream checking
 - importing a module should not require reparsing the entire upstream source tree every time
@@ -217,7 +217,7 @@ This gives a simple and fast separate-compilation story without requiring a gian
 
 The compiler should likely emit a small machine-readable interface file per compiled module.
 
-Recommended artifact model:
+Canonical artifact model:
 - each compiled module emits one object file and one interface artifact
 - the interface artifact is for compiler consumption, not for hand authoring
 - the canonical extension is `.mci` for "Modern C Interface"
@@ -279,7 +279,7 @@ The important point is the compiler contract first and the stable text encoding 
 
 The build tool should emit ordinary outputs into a visible build directory.
 
-Suggested shape:
+Canonical shape:
 
 ```text
 build/

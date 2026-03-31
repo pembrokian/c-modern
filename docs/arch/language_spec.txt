@@ -39,11 +39,15 @@ Modules:
 - Modules compile independently.
 - Imports are explicit and acyclic.
 - There are no hidden static constructors or module initialization hooks.
-- Top-level values must be compile-time constants.
+- Top-level `const` initializers must be compile-time constants.
+- Top-level `var` declarations are allowed for static storage.
+- Top-level `var` initializers, when present, must be compile-time constants.
+- Top-level `var` declarations without an initializer are zero-initialized.
 
 Execution note:
 - The language does not reserve a special entry function.
 - Hosted and freestanding startup behavior, including conventional entrypoint selection, are defined by the runtime model document.
+- Concrete source syntax for lexer and parser bring-up is defined in `docs/arch/grammar_spec.txt`.
 
 Example:
 
@@ -432,7 +436,14 @@ Rules:
 - Exhaustive switching is required for tagged unions
 - `for` loops are part of the core language.
 - `for value in slice` and `for index, value in slice` are core iteration forms for slices.
+- `for index in a..b` is the core counted-iteration form.
+- `while condition { ... }` is the core condition-loop spelling.
 - Tagged-union case destructuring uses the switch syntax `case VariantName(bound, values):`.
+
+Binding rules:
+- local initialized bindings may use inferred type or explicit type annotation
+- local storage declarations without an initializer require an explicit type annotation
+- `const` requires an initializer
 
 12. Tagged Unions
 
@@ -526,6 +537,13 @@ Rules:
 
 The standard library should remain small.
 
+Canonical v0.2 module set:
+- Portable modules: `mem`, `utf8`, `strings`, `io`, `fs`, `net`, and `sync`, plus `time` when standardized.
+- Platform or target-facing modules: `os` and `hal`.
+- The `testing` module is a shipped toolchain companion for test code, not part of the minimal non-test portable surface.
+- Startup support is not a normal import module.
+- v0.2 does not define an omnibus `core` module or a hidden prelude.
+
 Basic I/O placement:
 - `stdin`, `stdout`, and `stderr` belong in the standard library I/O surface, not only in the platform layer.
 - Platform libraries may expose lower-level OS-specific handles beneath the standard I/O layer.
@@ -542,8 +560,22 @@ Minimum areas:
 - Slices and string utilities
 - Basic I/O
 - File APIs
+- Networking APIs
 - Platform abstractions
 - Volatile or MMIO access helpers
+
+Canonical packaging:
+- `mem` owns allocation interfaces, owning buffers, and slice-view helpers.
+- `utf8` owns UTF-8 validation and encode or decode primitives.
+- `strings` owns non-allocating text helpers over `str`.
+- `io` owns portable stream-oriented I/O and standard streams.
+- `fs` owns file and path operations above raw platform handles.
+- `net` owns portable networking above raw platform sockets.
+- `sync` owns threads, mutexes, condition variables, atomics, and memory-order types.
+- `time` owns clocks, durations, and sleep when standardized.
+- `testing` is an ordinary helper module shipped with the toolchain for test code, not language magic.
+- `os` owns process, environment, and other platform-facing APIs.
+- `hal` owns MMIO, volatile access, and hardware-facing escape hatches.
 
 The standard library must not imply a hidden runtime.
 

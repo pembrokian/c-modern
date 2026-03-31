@@ -1,0 +1,145 @@
+Modern C - Lexer Token Inventory (v0.2)
+
+Purpose
+
+This document freezes the token inventory and lexer-side decisions for the first Modern C compiler.
+It is derived from `grammar_spec.txt` and exists so lexer, parser, and AST work do not drift on token naming or trivia handling.
+
+Authority and scope:
+- `grammar_spec.txt` remains the concrete syntax authority.
+- this document freezes the token classes and longest-match rules needed for v0.2 bring-up.
+- if the parser needs a token not listed here, update the grammar first and then this file.
+
+1. Trivia
+
+Trivia is not part of the semantic token stream, but the lexer must preserve enough information for source spans and newline-sensitive separators.
+
+Trivia classes:
+- spaces
+- tabs
+- carriage returns
+- line comments beginning with `//`
+
+Significant separator token:
+- `NEWLINE`
+
+Rules:
+- the lexer should emit `NEWLINE` for one or more physical line breaks after stripping any trailing `//` comment text on that line
+- consecutive line breaks may be coalesced into a single `NEWLINE` token
+- other trivia may be discarded after span accounting unless a later formatter or source-preserving tool requires retention
+
+2. Identifiers And Keywords
+
+Identifier token:
+- `IDENT`
+
+Keywords:
+- `IMPORT`
+- `EXPORT`
+- `FUNC`
+- `STRUCT`
+- `ENUM`
+- `DISTINCT`
+- `TYPE`
+- `EXTERN`
+- `IF`
+- `ELSE`
+- `SWITCH`
+- `CASE`
+- `DEFAULT`
+- `FOR`
+- `WHILE`
+- `IN`
+- `RETURN`
+- `BREAK`
+- `CONTINUE`
+- `DEFER`
+- `VAR`
+- `CONST`
+- `NIL`
+- `TRUE`
+- `FALSE`
+
+Keyword rule:
+- keywords win over `IDENT` when the source spelling matches exactly
+
+3. Literal Tokens
+
+Literal tokens:
+- `INT_LIT`
+- `FLOAT_LIT`
+- `STRING_LIT`
+
+Literal rules:
+- integer literals include decimal and hexadecimal spellings with `_` separators between digits
+- floating-point literals include decimal fraction or exponent spellings with `_` separators between digits
+- string literals support only the v0.2 escape set frozen in `grammar_spec.txt`
+- malformed literals should still produce a token when practical so diagnostics can point at the literal span directly
+
+4. Delimiters
+
+Delimiter tokens:
+- `L_BRACE` for `{`
+- `R_BRACE` for `}`
+- `L_PAREN` for `(`
+- `R_PAREN` for `)`
+- `L_BRACKET` for `[`
+- `R_BRACKET` for `]`
+
+5. Punctuation And Operators
+
+Punctuation tokens:
+- `COMMA` for `,`
+- `COLON` for `:`
+- `DOT` for `.`
+- `AT` for `@`
+
+Operator tokens:
+- `DOT_DEREF` for `.*`
+- `RANGE` for `..`
+- `ASSIGN` for `=`
+- `EQ_EQ` for `==`
+- `BANG_EQ` for `!=`
+- `LT` for `<`
+- `LT_EQ` for `<=`
+- `GT` for `>`
+- `GT_EQ` for `>=`
+- `PLUS` for `+`
+- `MINUS` for `-`
+- `STAR` for `*`
+- `SLASH` for `/`
+- `PERCENT` for `%`
+- `AMP` for `&`
+- `BANG` for `!`
+- `AMP_AMP` for `&&`
+- `PIPE_PIPE` for `||`
+
+Reserved but unsupported token:
+- `ARROW` for `->`
+
+6. Longest-Match Rules
+
+The lexer must prefer the longest valid token at each position.
+
+Important cases:
+- emit `DOT_DEREF` instead of `DOT` then `STAR` for `.*` when contiguous
+- emit `RANGE` instead of two `DOT` tokens for `..`
+- emit `EQ_EQ`, `BANG_EQ`, `LT_EQ`, `GT_EQ`, `AMP_AMP`, and `PIPE_PIPE` as single tokens when contiguous
+- emit `ARROW` for `->` even though the parser rejects it in v0.2
+
+7. Token Stream Constraints For The Parser
+
+Parser-facing rules:
+- the parser should receive `NEWLINE` tokens because they separate top-level declarations, block statements, and aggregate members in the v0.2 grammar
+- angle brackets stay lexed as `LT` and `GT`; generic nesting is resolved by the parser, not by a type-aware lexer
+- explicit conversion syntax does not need a distinct token kind from ordinary call syntax
+
+8. End Of File
+
+The lexer should emit:
+- `EOF`
+
+Bottom line
+
+The first compiler should have a boring, explicit token inventory.
+If the parser needs token-level tricks beyond these rules, the syntax contract is probably under-specified and should be updated in the docs first.

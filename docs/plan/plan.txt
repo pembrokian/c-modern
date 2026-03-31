@@ -1,0 +1,483 @@
+Modern C - First Version Bring-Up Plan
+
+Purpose
+
+This plan describes a practical process for bringing up the first usable version of the language and toolchain.
+It assumes the current design direction already captured in the architecture docs:
+- language semantics are mostly frozen for v0.2
+- the first compiler is written in C++
+- the compiler uses a language-owned typed MIR
+- the first backend is chosen after MIR validation, with LLVM as the current leading candidate
+- the first release targets one hosted platform first
+- the build tool is `mc`
+
+The goal is not to finish everything at once.
+The goal is to reach a small, correct, inspectable implementation that can compile real programs, run tests, and validate the design under pressure.
+
+Guiding Rules
+
+1. Keep the first version narrow.
+2. Bring up one hosted target before chasing portability.
+3. Prefer correctness and inspectability over optimization.
+4. Validate every major semantic promise with executable tests.
+5. Do not expand the language surface during bring-up unless real implementation pressure forces it.
+
+Phase 0 - Freeze The Initial Contract
+
+Objective:
+Lock the minimum language and toolchain contract needed for first implementation.
+
+Work:
+- treat `language_spec.txt` as the authoritative semantic contract
+- treat `runtime_spec.txt` as the authoritative startup and hosted/freestanding contract
+- treat `canonical_programs.txt` as the pressure-test suite for usability
+- treat `build_spec.txt`, `test_spec.txt`, and `stdlib_spec.txt` as the initial toolchain surface
+- resolve only implementation-blocking ambiguities; defer non-blocking improvements
+- define a short list of features explicitly out of scope for first bring-up
+
+Exit criteria:
+- no major unresolved semantic questions block parser, type checker, MIR, or codegen work
+- canonical programs are accepted as the first implementation target set
+- open questions are reduced to non-blocking follow-up items only
+
+Phase 1 - Establish The Repository Skeleton
+
+Objective:
+Create a repository layout that matches the intended compiler phases and toolchain outputs.
+
+Work:
+- create clear directories for frontend, semantic analysis, MIR, LLVM lowering, driver, tests, and docs
+- separate compiler code from standard library source, test fixtures, and example programs
+- define where `.mci` artifacts, object files, and temporary build products live
+- set up a minimal host build using ordinary platform tooling
+- add a small number of developer commands for build, test, format, and dump workflows
+
+Exit criteria:
+- a new contributor can build the compiler and run the test suite with one documented command path
+- repository structure matches the compiler stages instead of mixing concerns
+
+Phase 1 - Concrete Repository Layout
+
+Suggested top-level layout:
+
+- `compiler/` - implementation of the compiler and driver
+- `stdlib/` - standard library module sources
+- `runtime/` - hosted startup shims and low-level runtime boundary code
+- `tests/` - compiler, language, stdlib, and tool tests
+- `examples/` - canonical and real-program bring-up examples
+- `tools/` - developer helper scripts that are not part of the language surface
+- `docs/` - specs, plans, and implementation notes
+- `build/` - generated outputs only, not checked-in source
+
+Suggested compiler subtree:
+
+- `compiler/driver/` - command-line entry, mode selection, and pipeline orchestration
+- `compiler/lex/` - lexer and token definitions
+- `compiler/parse/` - parser and AST construction
+- `compiler/ast/` - AST node definitions and source-span utilities
+- `compiler/resolve/` - imports, scopes, and name resolution
+- `compiler/sema/` - type checking, constant evaluation, and layout
+- `compiler/mir/` - MIR types, builders, validators, and dumps
+- `compiler/codegen_llvm/` - MIR to LLVM lowering
+- `compiler/support/` - diagnostics, arena utilities, interning, file services
+- `compiler/mci/` - interface artifact read/write support
+
+Suggested test subtree:
+
+- `tests/parser/` - parse-pass and parse-fail fixtures
+- `tests/sema/` - semantic pass/fail fixtures
+- `tests/mir/` - MIR golden and validator tests
+- `tests/codegen/` - end-to-end executable tests on the first hosted target
+- `tests/stdlib/` - library behavior tests
+- `tests/tool/` - `mc` command behavior and rebuild tests
+- `tests/cases/` - shared small source fixtures if centralization helps
+
+Suggested example subtree:
+
+- `examples/canonical/` - the pressure-test programs derived from `canonical_programs.txt`
+- `examples/small/` - tiny smoke-test programs
+- `examples/real/` - small utilities used for pressure testing later
+
+Proposed directory tree:
+
+```text
+compiler/
+	driver/
+	lex/
+	parse/
+	ast/
+	resolve/
+	sema/
+	mir/
+	codegen_llvm/
+	mci/
+	support/
+stdlib/
+	mem/
+	io/
+	strings/
+	utf8/
+	fs/
+	sync/
+	time/
+	os/
+	hal/
+	testing/
+runtime/
+	hosted/
+	freestanding/
+tests/
+	parser/
+	sema/
+	mir/
+	codegen/
+	stdlib/
+	tool/
+	cases/
+examples/
+	canonical/
+	small/
+	real/
+tools/
+docs/
+	arch/
+	plan/
+build/
+```
+
+Directory notes:
+
+- `compiler/support/` should hold diagnostics, source files, string interning, and general utilities used across phases
+- `runtime/hosted/` should contain only startup and ABI-boundary code, not standard library logic
+- `stdlib/testing/` remains a shipped toolchain companion, even if it is not part of the minimal portable core surface
+- `tests/cases/` should contain tiny reusable source snippets only when duplication across test classes becomes noisy
+- `build/` should remain disposable and should not become an input location for checked-in sources
+
+Bootstrap task list for Phase 1:
+
+1. Create the directory skeleton and check in placeholder files only where the build system requires them.
+2. Add a host build that produces one compiler executable with no backend functionality yet.
+3. Add a tiny diagnostic subsystem early so later phases do not invent ad hoc error plumbing.
+4. Add test execution wiring before large compiler subsystems land.
+5. Add dump-file conventions for AST, MIR, and interface artifacts so tests can stabilize around them.
+6. Document one bootstrap command path for build and test on the first host platform.
+
+Phase 1 dependency notes:
+
+- diagnostics and file handling should land before parser work gets deep
+- test wiring should land before semantic and MIR work so regressions have a place to go
+- interface artifact plumbing can start as stubs early, but real `.mci` semantics depend on semantic analysis
+- LLVM integration should stay out of the initial repository bootstrap until MIR boundaries are clear
+
+Phase 2 - Frontend Bring-Up
+
+Objective:
+Build a parser and AST pipeline that can read complete source files and produce stable diagnostics.
+
+Work:
+- implement lexer and parser for the v0.2 surface syntax
+- define AST structures that preserve source locations on all meaningful nodes
+- implement module parsing, import parsing, and export parsing
+- add AST dump output for debugging and test baselines
+- build parser tests for declarations, expressions, types, attributes, imports, and malformed input
+
+Scope control:
+- do not start code generation here
+- do not mix semantic decisions into the parser unless syntax requires it
+
+Exit criteria:
+- all canonical syntax forms parse successfully
+- malformed inputs produce direct, stable diagnostics
+- AST dumps are deterministic enough for snapshot-style tests
+
+Phase 3 - Semantic Checking And Layout
+
+Objective:
+Make the compiler understand the language contract before any backend work matters.
+
+Work:
+- implement name resolution and acyclic import checking
+- implement type checking for primitives, pointers, arrays, slices, buffers, structs, distinct types, and procedures
+- implement constant evaluation for the intentionally small compile-time subset
+- compute size, alignment, and field offsets
+- enforce explicit conversion rules, no implicit numeric conversions, and distinct-type separation
+- implement ABI-related rules for normal layout, `@abi(c)`, and `@packed`
+- implement semantic checking for `defer`, explicit error returns, and `@noalias`
+- define the internal semantic representation used as input to MIR lowering
+
+Exit criteria:
+- the compiler can fully check small multi-module programs without generating code
+- type/layout results match the spec and canonical examples
+- semantic test coverage exists for every feature claimed in v0.2
+
+Phase 4 - Typed MIR And Validation
+
+Objective:
+Introduce the language-owned IR that preserves Modern C semantics independent of LLVM.
+
+Work:
+- define a small typed MIR with explicit control flow, loads, stores, calls, conversions, and aggregates
+- make wraparound integer behavior explicit in MIR operations
+- represent bounds checks, divide-by-zero faults, invalid shifts, volatile ops, and atomic ops explicitly
+- represent pointer-int casts, array-slice conversions, and buffer-slice conversions explicitly
+- add MIR dump tooling and MIR validation passes
+- create MIR golden tests from carefully chosen semantic fixtures
+
+Why this phase matters:
+- this is the boundary that prevents backend defaults from redefining the language
+- this is also the best place to debug semantic lowering mistakes early
+
+Exit criteria:
+- checked semantic programs lower to MIR deterministically
+- MIR validators catch malformed control flow or illegal typed operations
+- canonical small programs can be represented without ad hoc backend-specific hacks
+
+Phase 5 - Initial Backend Bring-Up On One Hosted Target
+
+Objective:
+Produce working executables for one host platform using the selected first backend.
+
+Work:
+- choose the first backend based on Phase 4 evidence rather than early assumption
+- lower MIR to the selected backend form without changing language semantics
+- support ordinary procedures, globals, aggregates, calls, branches, and returns
+- support the hosted entry path defined in `runtime_spec.txt`
+- implement codegen for arrays, slices, buffers, pointers, and struct layout rules
+- implement checked traps for the first checked build mode where specified
+- emit object files and link through ordinary platform tools
+- add backend IR dumps when applicable and simple codegen integration tests
+
+Recommended target:
+- bring up one hosted target first, likely the developer's primary host platform
+
+Current leading backend candidate:
+- LLVM remains the leading candidate because it reduces early code-generation scope, but this is a backend-phase decision rather than a frozen bring-up premise
+
+Exit criteria:
+- the compiler can build and run a basic executable on one hosted platform
+- hello-world, string, array/slice, and simple allocation examples work end to end
+- generated code respects the defined semantics for integer wrap and explicit memory operations
+
+Phase 6 - Minimal Standard Library And Runtime Boundary
+
+Objective:
+Ship only the library surface required to make real hosted programs possible.
+
+Work:
+- implement the first cut of `mem`, `io`, `strings`, `utf8`, `fs`, `sync`, `time`, `os`, and `hal` only to the extent needed for current examples and tests
+- implement `Allocator`, `mem.default_allocator()`, `Buffer<T>` support helpers, and slice conversion helpers
+- implement the hosted startup shim outside the core language
+- keep `testing` as a toolchain companion library rather than a hidden language feature
+- avoid adding convenience wrappers that hide allocation or execution behavior
+
+Scope control:
+- do not try to make the stdlib broad before the core compiler is stable
+- prefer a thin, correct library over a large incomplete one
+
+Exit criteria:
+- canonical examples that depend on the standard modules compile and run
+- library boundaries match the packaging docs rather than evolving ad hoc in code
+
+Phase 7 - Build Tool And Test Harness
+
+Objective:
+Make the implementation usable as a toolchain rather than only as a compiler binary.
+
+Work:
+- implement `mc check`, `mc build`, `mc run`, and `mc test`
+- support root module selection, target selection, build mode selection, and hosted mode
+- emit and consume `.mci` interface files for separate compilation
+- implement the ordinary test discovery model from `test_spec.txt`
+- support compile-pass, compile-fail, run-output, and MIR-oriented test classes for compiler validation
+- keep the first build graph simple and explicit
+
+Exit criteria:
+- developers can compile modules separately and rebuild dependents only when interface hashes change
+- the test command runs both language tests and compiler regression tests through one consistent entry point
+
+Phase 8 - Semantic Pressure Testing
+
+Objective:
+Use real programs to validate that the design is actually sufficient.
+
+Work:
+- compile every program in `canonical_programs.txt`
+- add small real utilities beyond the canonical examples: text filters, file walkers, hashing tools, simple threaded examples, arena-using tools
+- compare implementation friction against the promises in the spec
+- identify places where the spec is clear but the implementation is wrong
+- identify places where the implementation is correct but the spec is missing an important rule
+
+Decision rule:
+- fix implementation bugs first
+- only reopen the language when repeated real-program pressure shows a missing primitive or a bad abstraction boundary
+
+Exit criteria:
+- the toolchain can build a meaningful set of small real programs
+- remaining friction is documented as either implementation work or explicit post-v0.2 design follow-up
+
+Phase 9 - Stabilization And First Public Cut
+
+Objective:
+Turn the first working implementation into a disciplined initial release.
+
+Work:
+- tighten diagnostics and error messages
+- improve determinism of outputs, dumps, and interface artifacts
+- audit checked versus release behavior for consistency with the spec
+- write installation and usage documentation for the compiler and `mc`
+- define the exact supported host target set for the release
+- publish a short known-limitations list rather than pretending the first cut is complete
+
+Exit criteria:
+- the compiler, build tool, stdlib subset, and tests are documented and reproducible
+- the first release can build the canonical programs and a small set of real utilities on the supported host target
+
+Suggested Milestones
+
+Milestone A:
+Parser, AST dumps, and parser tests complete.
+
+Milestone B:
+Semantic checker and layout engine complete for the core type system.
+
+Milestone C:
+Typed MIR complete with validation and MIR tests.
+
+Milestone D:
+One hosted backend target can build and run non-trivial programs.
+
+Milestone E:
+`mc build` and `mc test` work with separate compilation and `.mci` artifacts.
+
+Milestone F:
+Canonical programs and a small real-program suite pass.
+
+Milestone Schedule And Dependencies
+
+This is a rough execution order rather than a calendar estimate.
+The intent is to show what must exist before the next layer can be brought up with low rework.
+
+Stage 1:
+- Milestone A after Phase 1 repository bootstrap is in place
+- dependency: repository layout, diagnostics skeleton, test runner wiring
+- output: parser can read files, dump ASTs, and fail cleanly
+
+Stage 2:
+- Milestone B after Milestone A
+- dependency: stable AST, import handling, symbol tables, layout engine foundations
+- output: type checking and layout are authoritative before backend work begins
+
+Stage 3:
+- Milestone C after Milestone B
+- dependency: semantic representation is stable enough to lower without semantic gaps
+- output: MIR becomes the internal contract for all later backend and testing work
+
+Stage 4:
+- Milestone D after Milestone C
+- dependency: MIR validators, LLVM lowering path, hosted startup path, basic link flow
+- output: first end-to-end executable generation on one host target
+
+Stage 5:
+- Milestone E starts in parallel with late Milestone D work but cannot finish before D
+- dependency: working semantic exports, `.mci` format, driver commands, target graph handling
+- output: separate compilation and normal developer workflows through `mc`
+
+Stage 6:
+- Milestone F after D and E are both operational
+- dependency: usable stdlib subset, stable tool workflow, reliable executable tests
+- output: canonical programs and real small tools validate the design under load
+
+Cross-cutting rules:
+
+- standard library work should track the needs of Milestones D through F, not run far ahead of the compiler
+- checked-mode behavior should be added early enough to influence MIR and codegen design, not bolted on after release-mode works
+- documentation updates should happen at each milestone boundary so implementation drift is visible immediately
+
+Recommended implementation order inside the milestones:
+
+1. repository bootstrap and diagnostics
+2. lexer and parser
+3. AST dumps and parser tests
+4. name resolution and type checking
+5. layout, constants, and ABI rules
+6. MIR definition and MIR validation
+7. LLVM lowering for the basic hosted path
+8. minimal stdlib and runtime startup pieces
+9. `mc` build and test workflow
+10. canonical-program and real-program pressure testing
+
+Stage 1 Through 3 Implementation Backlog
+
+This backlog is intentionally front-loaded toward infrastructure that reduces rework in later phases.
+
+Stage 1 backlog - repository bootstrap, diagnostics, parser foundation:
+
+1. Create the top-level repository tree and empty subsystem directories.
+2. Add a host build that produces a single `mc` executable stub.
+3. Define a diagnostics API with source spans, severity, and stable formatting.
+4. Define source-file loading and file-table utilities.
+5. Define token kinds and lexer interfaces.
+6. Implement the lexer for keywords, identifiers, literals, punctuation, and attributes.
+7. Add lexer tests for valid tokens, malformed literals, and source span coverage.
+8. Define AST node types for modules, imports, exports, declarations, statements, expressions, and types.
+9. Implement a parser for module structure and top-level declarations.
+10. Add parse-fail tests that verify direct diagnostics instead of cascades.
+11. Add deterministic AST dump output and snapshot tests.
+12. Wire `mc check` to lex, parse, and print diagnostics without semantic analysis yet.
+
+Stage 2 backlog - resolution, type checking, and layout:
+
+1. Define symbol tables and scope rules for modules, procedures, blocks, and types.
+2. Implement explicit import loading and acyclic import checks.
+3. Implement name resolution for local bindings, module exports, and imported symbols.
+4. Define the compiler's canonical internal type objects.
+5. Implement primitive, pointer, array, slice, buffer, procedure, struct, and distinct-type checking.
+6. Implement explicit conversion checking and rejection of implicit numeric conversions.
+7. Implement constant evaluation for top-level constants and required compile-time expressions.
+8. Implement struct layout, alignment, padding, `@abi(c)`, and `@packed` checks.
+9. Implement semantic rules for `defer`, explicit error returns, and `@noalias`.
+10. Add semantic pass/fail fixtures covering each adopted v0.2 rule.
+11. Extend `mc check` so it completes parsing, resolution, and semantic checking.
+
+Stage 3 backlog - MIR definition and validation:
+
+1. Define MIR module, function, block, instruction, type, and constant forms.
+2. Define explicit MIR operations for arithmetic, control flow, loads, stores, calls, conversions, and aggregates.
+3. Define explicit MIR representation for faults, volatile operations, and atomic operations.
+4. Define the lowering contract from semantic nodes to MIR.
+5. Implement MIR builders for expressions, statements, procedures, and globals.
+6. Implement MIR validation passes for type consistency, block termination, operand shape, and control-flow sanity.
+7. Implement MIR dump output in a deterministic textual form.
+8. Add MIR golden tests for representative programs covering arrays, slices, buffers, distinct types, and checked faults.
+9. Add MIR negative tests where malformed MIR is rejected by validators.
+10. Wire `mc check` or an internal debug mode to emit MIR dumps for selected test cases.
+
+Backlog sequencing rules:
+
+- do not start LLVM lowering until MIR validation is already useful on non-trivial cases
+- do not delay diagnostics cleanup until after semantic work; bad early diagnostics slow every later phase
+- keep the `mc` driver thin during Stages 1 through 3; avoid turning it into the place where semantic policy accumulates
+- add tests in the same change set as each new subsystem when practical
+
+Immediate Next Steps
+
+1. Freeze the exact first-target feature subset from the existing spec.
+2. Create the compiler repository skeleton and test layout.
+3. Implement lexer, parser, and deterministic AST dumps.
+4. Build semantic tests before code generation gets deep.
+5. Define MIR early so LLVM lowering does not become the language definition by accident.
+
+Non-Goals For The First Version
+
+- multiple backends
+- broad target matrix
+- incremental compilation
+- package registry or remote dependency fetching
+- self-hosting
+- aggressive optimization work beyond what is needed for respectable release builds
+- large stdlib breadth before the core semantics are proven in real programs
+
+Bottom Line
+
+The first version should be brought up as a narrow, hosted, C++ implementation that proves the semantics, the MIR boundary, the minimal stdlib, and the basic `mc` workflow.
+If that core is correct and usable, later portability, performance, debugger integration, and self-hosting become tractable follow-on work instead of guesswork.

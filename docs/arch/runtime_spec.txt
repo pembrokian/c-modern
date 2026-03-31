@@ -208,21 +208,17 @@ If this boundary is maintained, the language stays true to its current philosoph
 
 11. Possible Library Structure
 
-This section is intentionally architectural rather than normative.
-Its purpose is to make the layering visible early so the standard library does not accidentally collapse into a hidden runtime or a grab-bag of unrelated modules.
+This section now reflects the canonical first-pass library packaging.
+Its purpose is to keep the layering visible so the standard library does not accidentally collapse into a hidden runtime or a grab-bag of unrelated modules.
 
 Guiding rule:
 - Keep startup support, portable standard-library code, and platform bindings as separate layers.
 
-Possible top-level structure:
-
-- `core`
-    - language-adjacent types and operations with no hosted-environment assumptions
-    - examples: basic memory operations, slices, buffers, UTF-8 primitives, maybe foundational traits of `Error` and `Allocator` representations if those stay universally available
+Canonical top-level structure:
 
 - `mem`
     - allocation interfaces and storage helpers
-    - examples: `Allocator`, `heap_alloc`, `heap_free`, `alloc_value`, `alloc_array`, `buffer_new`, `default_allocator` if hosted builds standardize one
+    - examples: `Allocator`, `heap_alloc`, `heap_free`, `alloc_value`, `alloc_array`, `buffer_new`, `buffer_free`, `default_allocator`
 
 - `strings`
     - non-allocating text helpers over `str` and byte slices
@@ -238,7 +234,7 @@ Possible top-level structure:
 - `fs`
     - file and path operations above raw platform handles
 
-- `sync` or `threading`
+- `sync`
     - concurrency primitives only
     - examples: `Thread`, `Mutex`, `Condvar`, `Atomic<T>`, memory orders, thread spawn or join
 
@@ -250,31 +246,37 @@ Possible top-level structure:
     - examples: process APIs, environment access, descriptors or handles, platform errors, sockets if not kept elsewhere
 
 - `hal` or `device`
+- `hal`
     - freestanding or hardware-facing helpers
     - examples: `mmio_ptr`, `volatile_load`, `volatile_store`, target support shims
 
-- `runtime` or `startup`
+- `testing`
+    - ordinary helper functions for tests shipped with the toolchain distribution
+    - examples: failure helpers, temp-directory helpers, output capture helpers
+    - not part of the minimal freestanding-oriented portable surface
+
+- `startup`
     - minimal hosted startup glue supplied by the toolchain
     - examples: `_start`, argument handoff, exit handoff
     - this layer should stay tiny and replaceable, and should not become a general-purpose library namespace
 
 Illustrative layering:
 
-1. `runtime` or `startup` sits closest to process entry and exit.
+1. `startup` sits closest to process entry and exit.
 2. `os` and `hal` expose target-specific reality.
-3. Portable standard-library modules such as `mem`, `io`, `fs`, `strings`, `utf8`, and `sync` are built above those target layers where needed.
-4. User programs depend on the portable surface by default and drop to `os` or `hal` only when they need explicit platform control.
+3. Portable standard-library modules such as `mem`, `io`, `fs`, `strings`, `utf8`, `sync`, and `time` are built above those target layers where needed.
+4. The `testing` module is shipped with the toolchain as an ordinary companion library for test code.
+5. User programs depend on the portable surface by default and drop to `os` or `hal` only when they need explicit platform control.
 
 Architectural constraints:
-- `core` should remain usable in freestanding builds.
 - Hosted I/O and filesystem code should not be required for freestanding targets.
-- `runtime` or `startup` should not own allocators, schedulers, reflection metadata, or hidden initialization registries.
+- `startup` should not own allocators, schedulers, reflection metadata, or hidden initialization registries.
 - Platform bindings should be explicit imports, not ambient capabilities.
 - The standard library should prefer small focused modules over a single monolithic namespace.
+- v0.2 should not define an omnibus `core` module.
 
 Practical implication:
 - A normal hosted tool might import `io`, `fs`, `strings`, and `mem`.
-- A kernel or firmware target might import `core`, `mem`, and `hal`, while replacing `startup` entirely.
+- A kernel or firmware target might import `mem` and `hal`, while replacing `startup` entirely.
 
-This structure is a direction, not yet a frozen package spec.
-It is enough to keep the architecture intentional while the exact module boundaries and names are still being refined.
+This structure is now the canonical first-pass package direction for v0.2.

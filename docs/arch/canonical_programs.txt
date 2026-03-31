@@ -24,7 +24,7 @@ export { main }
 
 import io
 
-func main() i32 {
+func main(args: Slice<cstr>) i32 {
     err = io.write_line("hello, world")
     if err != nil {
         return 1
@@ -84,6 +84,8 @@ Purpose:
 
 Sketch:
 
+import mem
+
 func hash_lines(lines: Slice<str>, alloc: *Allocator) (ui64, Error) {
     sum: ui64 = 0
 
@@ -94,7 +96,7 @@ func hash_lines(lines: Slice<str>, alloc: *Allocator) (ui64, Error) {
         }
         defer alloc.free(alloc.ctx, tmp, line.len, 1)
 
-        copy_bytes(tmp, line)
+        mem.copy_bytes(tmp, line)
         sum = sum + hash_bytes(Slice<ui8>{ ptr: tmp, len: line.len })
     }
 
@@ -114,6 +116,8 @@ Purpose:
 - Exercise borrowed strings, UTF-8 assumptions, and the standard `(value, Error)` failure convention
 
 Sketch:
+
+import strings
 
 func parse_config(input: str) (Config, Error) {
     cfg = Config{}
@@ -261,26 +265,274 @@ What this validates:
 - No dependency on C header parsing
 - Frozen C interop spelling set: `extern(c)`, `@abi(c)`, and `cstr`
 
-8. MMIO Register Access
+8. Single-Threaded Evented Echo Server
+
+Purpose:
+- exercise a portable readiness-based poller surface
+- prove that scalable I/O does not require language-level async syntax or a scheduler runtime
+- keep pressure on explicit handles, event buffers, and error returns
+
+Sketch:
+
+```text
+import io
+import mem
+import net
+
+func run_echo(listener: File) Error {
+    poller, err = io.poller_new()
+    if err != nil {
+        return err
+    }
+    defer io.poller_close(poller)
+
+    err = io.poller_add(poller, listener, EVENT_READABLE)
+    if err != nil {
+        return err
+    }
+
+    events: [128]Event
+
+    while true {
+        n, err = io.poller_wait(poller, mem.slice_from_array(events), -1)
+        if err != nil {
+            return err
+        }
+
+        for i in 0..n {
+            ev = events[i]
+
+            if ev.file == listener && ev.readable {
+                conn, err = net.accept(listener)
+                if err != nil {
+                    return err
+                }
+
+                err = io.poller_add(poller, conn, EVENT_READABLE)
+                if err != nil {
+                    _ = io.close(conn)
+                    return err
+                }
+                continue
+            }
+
+            if ev.error {
+                _ = io.poller_remove(poller, ev.file)
+                _ = io.close(ev.file)
+                continue
+            }
+
+            if ev.readable {
+                buf: [4096]ui8
+                bytes = mem.slice_from_array(buf)
+                nread, err = io.read(ev.file, bytes)
+                if err != nil || nread == 0 {
+                    _ = io.poller_remove(poller, ev.file)
+                    _ = io.close(ev.file)
+                    continue
+                }
+
+                _, err = io.write(ev.file, Slice<const ui8>{ ptr: bytes.ptr, len: nread })
+                if err != nil {
+                    _ = io.poller_remove(poller, ev.file)
+                    _ = io.close(ev.file)
+                    continue
+                }
+            }
+        }
+    }
+}
+```
+
+What this validates:
+- evented I/O can remain an ordinary library abstraction
+- the caller owns the event buffer and there is no hidden per-iteration allocation
+- scalable I/O and concurrency are separate concerns
+- a single thread can manage many connections without forcing an async language model
+- backend choices such as `epoll`, `kqueue`, `io_uring`, or IOCP remain below the portable API boundary
+
+9. Partial-Write Response State Machine
+
+Purpose:
+- exercise writable readiness and partial-write handling
+- force the poller surface to support changing interests after a connection state transition
+- pressure-test whether one portable `File` handle type composes cleanly across `net` and `io`
+
+Sketch:
+
+```text
+import io
+
+struct Conn {
+    file: File
+    response: str
+    written: usize
+}
+
+func queue_response(poller: *Poller, conn: *Conn, response: str) Error {
+    conn.response = response
+    conn.written = 0
+    return io.poller_set(poller, conn.file, EVENT_WRITABLE)
+}
+
+func flush_response(poller: *Poller, conn: *Conn) Error {
+    remaining = conn.response[conn.written:conn.response.len]
+    nwritten, err = io.write(conn.file, remaining)
+    if err != nil {
+        return err
+    }
+
+    conn.written = conn.written + nwritten
+    if conn.written == conn.response.len {
+        conn.response = ""
+        conn.written = 0
+        return io.poller_set(poller, conn.file, EVENT_READABLE)
+    }
+
+    return nil
+}
+```
+
+What this validates:
+- writable readiness is a real requirement, not an optional extra
+- partial writes need explicit caller-managed state rather than hidden buffering in the runtime
+- the poller API needs an interest-update operation such as `poller_set`
+- one portable `File` handle type keeps the shared I/O surface smaller and clearer than separate `Socket` and `File` handle families would
+
+10. Evented TCP Client Request-Response
+
+Purpose:
+- exercise `net.connect_tcp` from portable client code
+- prove that client-side state transitions use the same `io.poller_set` mechanism as server-side writable flushing
+- pressure-test the fallible `io.close` rule in a normal network client flow
+
+Sketch:
+
+```text
+import io
+import mem
+import net
+
+struct Client {
+    file: File
+    request: str
+    sent: usize
+    done: bool
+}
+
+func close_ignored(file: File) {
+    _ = io.close(file)
+}
+
+func fetch_once(remote: IpEndpoint, request: str) Error {
+    conn, err = net.connect_tcp(remote)
+    if err != nil {
+        return err
+    }
+    defer close_ignored(conn)
+
+    poller, err = io.poller_new()
+    if err != nil {
+        return err
+    }
+    defer io.poller_close(poller)
+
+    client = Client{
+        file: conn,
+        request: request,
+        sent: 0,
+        done: false,
+    }
+
+    err = io.poller_add(poller, conn, EVENT_WRITABLE)
+    if err != nil {
+        return err
+    }
+
+    events: [16]Event
+    buf: [4096]ui8
+
+    while !client.done {
+        n, err = io.poller_wait(poller, mem.slice_from_array(events), -1)
+        if err != nil {
+            return err
+        }
+
+        for i in 0..n {
+            ev = events[i]
+
+            if ev.error {
+                return Error.connection_failed()
+            }
+
+            if ev.writable && client.sent < client.request.len {
+                remaining = client.request[client.sent:client.request.len]
+                nwritten, err = io.write(client.file, remaining)
+                if err != nil {
+                    return err
+                }
+
+                client.sent = client.sent + nwritten
+                if client.sent == client.request.len {
+                    err = io.poller_set(poller, client.file, EVENT_READABLE)
+                    if err != nil {
+                        return err
+                    }
+                }
+            }
+
+            if ev.readable {
+                bytes = mem.slice_from_array(buf)
+                nread, err = io.read(client.file, bytes)
+                if err != nil {
+                    return err
+                }
+
+                if nread == 0 {
+                    client.done = true
+                    break
+                }
+
+                _, err = io.write(io.stdout, Slice<const ui8>{ ptr: bytes.ptr, len: nread })
+                if err != nil {
+                    return err
+                }
+            }
+        }
+    }
+
+    return nil
+}
+```
+
+What this validates:
+- portable client networking should work without `os` imports
+- `connect_tcp` composes directly with `io.poller_add`, `io.poller_set`, `io.read`, and `io.write`
+- the same readiness model handles both request flushing and response reading
+- explicit discard on `defer _ = io.close(conn)` keeps close-time errors visible in the language model without forcing every caller to branch on shutdown paths
+
+11. MMIO Register Access
 
 Purpose:
 - Exercise volatile or MMIO semantics and pointer safety at the hardware boundary
 
 Sketch:
 
+import hal
+
 const UART0_BASE: uintptr = 0x4000_1000
 
 func uart_tx_ready() bool {
-    status_ptr = mmio_ptr<ui32>(UART0_BASE + 0x18)
-    status = volatile_load(status_ptr)
+    status_ptr = hal.mmio_ptr<ui32>(UART0_BASE + 0x18)
+    status = hal.volatile_load(status_ptr)
     return (status & 0x1) != 0
 }
 
 func uart_write_byte(b: ui8) {
-    data_ptr = mmio_ptr<ui32>(UART0_BASE)
+    data_ptr = hal.mmio_ptr<ui32>(UART0_BASE)
     while !uart_tx_ready() {
     }
-    volatile_store(data_ptr, ui32(b))
+    hal.volatile_store(data_ptr, ui32(b))
 }
 
 What this validates:
@@ -288,9 +540,9 @@ What this validates:
 - Integer-pointer casts at hardware boundaries
 - The single-threaded ordering guarantee for observable memory operations
 - Volatile operations ordered relative to surrounding memory accesses
-- Library-based MMIO surface with `mmio_ptr`, `volatile_load`, and `volatile_store`
+- Library-based MMIO surface with `hal.mmio_ptr`, `hal.volatile_load`, and `hal.volatile_store`
 
-9. Bounded Ring Buffer
+12. Bounded Ring Buffer
 
 Purpose:
 - Exercise wraparound arithmetic, slices, and explicit invariants without hidden synchronization
@@ -346,6 +598,8 @@ Purpose:
 
 Sketch:
 
+import sync
+
 struct Counter {
     mu: Mutex
     value: i64
@@ -359,31 +613,31 @@ struct WorkerArgs {
 func worker(args: *WorkerArgs) {
     i: usize = 0
     while i < args.iterations {
-        mutex_lock(&args.counter.mu)
+        sync.mutex_lock(&args.counter.mu)
         args.counter.value = args.counter.value + 1
-        mutex_unlock(&args.counter.mu)
+        sync.mutex_unlock(&args.counter.mu)
         i = i + 1
     }
 }
 
 func run_counter_test() (i64, Error) {
-    counter = Counter{ mu: mutex_init(), value: 0 }
+    counter = Counter{ mu: sync.mutex_init(), value: 0 }
     args1 = WorkerArgs{ counter: &counter, iterations: 100000 }
     args2 = WorkerArgs{ counter: &counter, iterations: 100000 }
 
-    t1, err = thread_spawn(worker, &args1)
+    t1, err = sync.thread_spawn(worker, &args1)
     if err != nil {
         return 0, err
     }
 
-    t2, err = thread_spawn(worker, &args2)
+    t2, err = sync.thread_spawn(worker, &args2)
     if err != nil {
-        thread_join(t1)
+        sync.thread_join(t1)
         return 0, err
     }
 
-    thread_join(t1)
-    thread_join(t2)
+    sync.thread_join(t1)
+    sync.thread_join(t2)
     return counter.value, nil
 }
 
@@ -401,6 +655,8 @@ Purpose:
 
 Sketch:
 
+import sync
+
 struct Queue {
     mu: Mutex
     cv: Condvar
@@ -410,11 +666,11 @@ struct Queue {
 }
 
 func queue_pop(q: *Queue) (ui8, bool) {
-    mutex_lock(&q.mu)
-    defer mutex_unlock(&q.mu)
+    sync.mutex_lock(&q.mu)
+    defer sync.mutex_unlock(&q.mu)
 
     while q.len == 0 && !q.closed {
-        condvar_wait(&q.cv, &q.mu)
+        sync.condvar_wait(&q.cv, &q.mu)
     }
 
     if q.len == 0 && q.closed {
@@ -428,8 +684,8 @@ func queue_pop(q: *Queue) (ui8, bool) {
 }
 
 func queue_push(q: *Queue, b: ui8) bool {
-    mutex_lock(&q.mu)
-    defer mutex_unlock(&q.mu)
+    sync.mutex_lock(&q.mu)
+    defer sync.mutex_unlock(&q.mu)
 
     if q.closed || q.len == q.buf.len {
         return false
@@ -437,7 +693,7 @@ func queue_push(q: *Queue, b: ui8) bool {
 
     q.buf.ptr[q.len] = b
     q.len = q.len + 1
-    condvar_signal(&q.cv)
+    sync.condvar_signal(&q.cv)
     return true
 }
 
@@ -455,6 +711,8 @@ Purpose:
 
 Sketch:
 
+import sync
+
 struct PublishedData {
     value: i32
 }
@@ -464,11 +722,11 @@ var shared: PublishedData
 
 func producer() {
     shared.value = 42
-    atomic_store(&ready, 1, release)
+    sync.atomic_store(&ready, 1, release)
 }
 
 func consumer() i32 {
-    while atomic_load(&ready, acquire) == 0 {
+    while sync.atomic_load(&ready, acquire) == 0 {
     }
     return shared.value
 }
@@ -517,19 +775,21 @@ Purpose:
 
 Sketch:
 
+import mem
+
 func checksum_block(block: [16]ui8) ui32 {
-    bytes = slice_from_array(&block)
+    bytes = mem.slice_from_array(&block)
     return checksum(bytes)
 }
 
 func copy_prefix(src: Slice<ui8>, alloc: *Allocator) (Buffer<ui8>, Error) {
-    out, err = buffer_new<ui8>(alloc, 16)
+    out, err = mem.buffer_new<ui8>(alloc, 16)
     if err != nil {
         return Buffer<ui8>{ ptr: nil, len: 0, cap: 0, alloc: alloc }, err
     }
 
     n = min(src.len, 16)
-    copy_bytes(slice_from_buffer(&out)[0:n], src[0:n])
+    mem.copy_bytes(mem.slice_from_buffer(&out)[0:n], src[0:n])
     out.len = n
     return out, nil
 }
@@ -538,7 +798,7 @@ What this validates:
 - `[N]T` as fixed owned storage
 - Explicit conversion from array to slice and from buffer to slice
 - Clear separation between non-owning views and owning dynamic storage
-- Frozen helper spellings: `slice_from_array` and `slice_from_buffer`
+- Frozen helper spellings: `mem.slice_from_array` and `mem.slice_from_buffer`
 
 16. Hosted Default Allocator Use
 
@@ -558,8 +818,8 @@ func main(args: Slice<cstr>) i32 {
     }
     defer mem.buffer_free(&buf)
 
-    view = slice_from_buffer(&buf)
-    fill_bytes(view, 0)
+    view = mem.slice_from_buffer(&buf)
+    mem.fill_bytes(view, 0)
 
     err = io.write_line("allocator ready")
     if err != nil {
@@ -582,6 +842,8 @@ Purpose:
 
 Sketch:
 
+import mem
+
 struct Parser {
     alloc: *Allocator
     tokens: Slice<Token>
@@ -600,10 +862,10 @@ func parse_expr(p: *Parser) (*Expr, Error) {
 }
 
 func build_ast(tokens: Slice<Token>) (*Expr, Error) {
-    arena = arena_init(mem.default_allocator(), 64 * 1024)
-    defer arena_deinit(&arena)
+    arena = mem.arena_init(mem.default_allocator(), 64 * 1024)
+    defer mem.arena_deinit(&arena)
 
-    parser = Parser{ alloc: arena_allocator(&arena), tokens: tokens, pos: 0 }
+    parser = Parser{ alloc: mem.arena_allocator(&arena), tokens: tokens, pos: 0 }
     return parse_expr(&parser)
 }
 

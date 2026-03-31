@@ -1,0 +1,133 @@
+Modern C - Backend Strategy Decision Memo
+
+Purpose
+
+This document makes the backend choice explicit rather than treating it as an unexamined premise.
+Modern C already freezes the semantic core around a language-owned MIR.
+The remaining question is which backend gives the best first implementation path after MIR is real.
+
+Decision frame
+
+The right question is not:
+- which backend is most powerful in theory?
+
+The right question is:
+- which backend best serves the first-version goals already adopted elsewhere in the docs?
+
+Relevant project goals:
+- one hosted target first
+- correctness and inspectability over optimization
+- a language-owned MIR that defines semantics before backend lowering
+- a small, finishable first compiler
+
+1. What Must Be True Regardless Of Backend
+
+These requirements do not depend on LLVM, a C backend, or a native backend:
+- language semantics must be fully determined before backend lowering
+- MIR is the contract between the semantic pipeline and machine-level lowering
+- wraparound arithmetic, volatile versus atomic operations, explicit conversions, and ABI layout rules must not be delegated to backend defaults
+- backend choice must not redefine the language
+
+If a backend choice makes those rules hard to preserve, it is the wrong backend for v0.2.
+
+2. Option A - LLVM First
+
+What it buys:
+- mature target support
+- instruction selection, register allocation, and object emission without writing a machine backend immediately
+- a realistic path to a usable hosted compiler on the first target
+- room for decent release builds without building a custom optimizer stack first
+
+What it costs:
+- substantial implementation and build complexity
+- strong pull toward C++ as the implementation language
+- more distance between the compiler's internal simplicity goals and the operational reality of the backend stack
+- risk that debugging backend issues feels larger and less inspectable than the frontend or MIR pipeline
+
+Best fit:
+- when the priority is the fastest path to native code on a hosted target without owning code generation machinery early
+
+Main risk:
+- treating LLVM as architecture rather than as a replaceable backend component
+
+3. Option B - C Backend First
+
+What it buys:
+- a much smaller implementation step from MIR to runnable programs
+- easy leverage of existing hosted C toolchains for compilation and linking
+- simpler bootstrap story than a full native backend
+
+What it costs:
+- semantic risk at exactly the boundary Modern C is trying to clarify
+- danger of re-importing C optimizer assumptions through generated C
+- lower confidence that backend behavior matches Modern C rather than "whatever the host C compiler decided"
+- awkwardness around representing volatile, atomics, checked faults, and aliasing-sensitive behavior precisely
+
+Best fit:
+- when the priority is a fast prototype or bootstrap compiler and semantic risk is explicitly accepted and tightly contained
+
+Main risk:
+- the generated C quietly becomes a second language definition
+
+4. Option C - One-Target Native Backend First
+
+What it buys:
+- maximum control over semantics
+- the cleanest relationship between MIR and final machine behavior
+- no dependency on LLVM or on C backend semantics
+- strongest alignment with the "one hosted target first" rule
+
+What it costs:
+- real backend engineering immediately
+- object format, relocation, ABI, calling convention, and instruction selection work arrives sooner
+- higher schedule risk for the first public compiler
+
+Best fit:
+- when semantic control and implementation minimalism matter more than time-to-first-native-code
+
+Main risk:
+- the backend becomes the dominant project before the frontend and MIR are proven
+
+5. Recommended Decision Rule
+
+The backend should not be frozen before MIR exists.
+
+Recommended sequence:
+1. freeze semantics
+2. build lexer, parser, sema, and MIR
+3. validate MIR on canonical programs
+4. choose the first backend based on what the MIR actually requires
+
+Why this sequence is better:
+- it separates language design confidence from backend preference
+- it prevents premature lock-in to LLVM just because it is the most familiar industrial answer
+- it gives the team real evidence about whether the backend problem is large enough to justify LLVM's complexity
+
+6. Working Recommendation For v0.2
+
+At the current project scope:
+- LLVM should remain the leading candidate for the first backend
+- LLVM should not be treated as a frozen Phase 0 premise
+- the actual backend decision should be taken at the Phase 4 to Phase 5 boundary
+
+Why this is the current recommendation:
+- the first release still wants a real hosted compiler, not only a semantic validator
+- a one-target native backend may turn out to be simpler than expected, but that should be validated after MIR is concrete, not assumed now
+- a C backend is possible, but it creates semantic leakage risk precisely where Modern C is intentionally different from C
+
+7. Practical Consequences For The Plan
+
+The plan should say:
+- the compiler uses a language-owned typed MIR
+- the first backend is chosen after MIR validation
+- LLVM is the leading candidate, not an unchangeable premise
+
+Phase 5 should therefore be phrased in backend-neutral terms, with LLVM called out as the current likely path rather than the only acceptable implementation.
+
+Bottom line
+
+Modern C does not need LLVM to exist.
+It needs a backend that preserves MIR-defined semantics while keeping the first compiler finishable.
+
+LLVM may still be the right first backend.
+It just should be chosen deliberately at the backend boundary rather than assumed long before that boundary is real.

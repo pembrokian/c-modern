@@ -2,8 +2,8 @@ Modern C - Test Design Notes
 
 Purpose
 
-This document sketches a testing model for Modern C.
-It is not yet a final normative spec, but it is intended to make test design intentional early instead of letting test behavior emerge accidentally from the build tool.
+This document freezes the initial v0.2 testing model for Modern C.
+Its goal is to make test behavior intentional early instead of letting it emerge accidentally from the build tool.
 
 The test system should fit the same overall philosophy as the language and toolchain:
 - no hidden runtime model
@@ -53,7 +53,7 @@ The simplest model is:
 - test file names end in `_test.mc`
 - the build tool discovers test functions inside those files
 
-Recommended function shape for v0.2:
+Canonical function shape for v0.2:
 
 ```text
 func test_parse_port() Error
@@ -72,7 +72,7 @@ Why this shape fits:
 
 4. Discovery Model
 
-Recommended default discovery for ordinary projects:
+Canonical default discovery for ordinary projects:
 - `mc test` reads `build.toml`
 - for each enabled target, it looks under the target's configured test roots
 - by default, that root is `tests/`
@@ -81,7 +81,7 @@ Recommended default discovery for ordinary projects:
 
 This is enough to avoid manual test lists without turning discovery into a large policy engine.
 
-Recommended `build.toml` shape for tests:
+Canonical `build.toml` shape for tests:
 
 ```toml
 [targets.grep.tests]
@@ -91,7 +91,7 @@ mode = "checked"
 timeout_ms = 5000
 ```
 
-Suggested meanings:
+Field meanings:
 - `enabled`: whether the target participates in `mc test`
 - `roots`: directories searched for test files
 - `mode`: build mode used for the test executable
@@ -101,7 +101,7 @@ Suggested meanings:
 
 The first test runner should stay simple.
 
-Recommended v0.2 behavior:
+Canonical v0.2 behavior:
 - `mc test` builds one test executable per target
 - the tool generates a small runner `main` for that test executable
 - the generated runner calls discovered test functions serially in a deterministic order
@@ -118,14 +118,14 @@ Possible future extension:
 
 6. Result Model
 
-Recommended result rules:
+Canonical result rules:
 - return `nil`: pass
 - return non-`nil` `Error`: fail
 - process trap or crash: fail
 - timeout: fail
 - nonzero runner exit code: fail overall target
 
-Suggested runner output shape:
+Canonical runner output shape:
 
 ```text
 PASS test_parse_port
@@ -166,6 +166,10 @@ Optional helper surface:
 - such helpers should remain ordinary library functions, not compiler magic
 - the design should not require a giant `testing.T` object model for basic tests
 
+Distribution decision:
+- `testing` should ship with the standard toolchain distribution for v0.2
+- it is an ordinary companion library for test code, not a language feature and not part of the minimal freestanding-oriented standard surface
+
 Good minimal helper candidates:
 - failure construction helpers
 - temporary-directory helpers
@@ -174,7 +178,7 @@ Good minimal helper candidates:
 
 8. Checked Mode As The Default
 
-Recommended default:
+Canonical default:
 - `mc test` should build tests in `checked` mode unless the user overrides it
 
 Why:
@@ -186,7 +190,7 @@ Why:
 
 Some tests need to exercise complete executables rather than internal functions.
 
-Recommended model:
+Canonical model:
 - integration tests are ordinary test functions that run built executables as subprocesses
 - they inspect exit code, stdout, stderr, and files as needed
 - the build tool does not need a separate integration-test language
@@ -208,7 +212,7 @@ This keeps test inputs ordinary and version-controlled.
 
 The compiler itself needs a richer test matrix than ordinary projects do.
 
-Recommended compiler-side categories:
+Canonical compiler-side categories:
 
 Compile-pass tests:
 - source files that must parse, resolve, type-check, and codegen successfully
@@ -232,7 +236,7 @@ Standard-library tests:
 
 A simple approach is best.
 
-Recommended pattern:
+Canonical pattern:
 - each compile-fail test is a `.mc` file under a dedicated compiler test directory
 - expectations are stored either in leading comments or in adjacent expectation files
 
@@ -256,7 +260,7 @@ Tradeoff:
 - faster startup
 - but one crash aborts the remaining tests in that target
 
-Recommended v0.2 stance:
+Canonical v0.2 stance:
 - default to one process per test target
 - if a test crashes, mark the target failed and stop that executable
 - optional per-test subprocess isolation can be explored later if it proves necessary

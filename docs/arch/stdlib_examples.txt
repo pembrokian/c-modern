@@ -1,0 +1,122 @@
+Modern C - Standard Library Boundary Examples
+
+Purpose
+
+This document gives short examples showing what belongs in `io`, `fs`, and `os`.
+The goal is to keep the boundary concrete so APIs do not drift across modules for accidental convenience.
+
+1. `io`: Portable Stream I/O
+
+Use `io` for ordinary stream-oriented operations that should feel portable and unsurprising.
+
+Examples:
+- writing to standard output
+- reading from standard input
+- writing formatted or line-oriented output
+- working with reader or writer style abstractions
+
+Sketch:
+
+```text
+import io
+
+func main(args: Slice<cstr>) i32 {
+    err = io.write_line("hello")
+    if err != nil {
+        return 1
+    }
+    return 0
+}
+```
+
+What does not belong in `io`:
+- process spawning
+- environment variables
+- raw file descriptors or handles as the main user-facing surface
+
+2. `fs`: Files And Paths
+
+Use `fs` for filesystem operations above raw platform handles.
+
+Examples:
+- file size queries
+- opening or reading files
+- directory iteration when standardized
+- path-level file operations
+
+Sketch:
+
+```text
+import fs
+import mem
+
+func read_config(path: str, alloc: *Allocator) (Buffer<ui8>, Error) {
+    return fs.read_file(path, alloc)
+}
+```
+
+What does not belong in `fs`:
+- process environment access
+- subprocess execution
+- standard streams
+
+3. `os`: Process And Platform Boundary
+
+Use `os` when the code is explicitly interacting with operating-system process facilities or other platform-facing behavior.
+
+Examples:
+- environment variables
+- subprocess execution
+- process IDs
+- raw handles or descriptors when needed
+- platform error bridging
+
+Sketch:
+
+```text
+import os
+
+func show_home() Error {
+    home, ok = os.getenv("HOME")
+    if !ok {
+        return Error.not_found("HOME")
+    }
+    return nil
+}
+```
+
+Subprocess sketch:
+
+```text
+import os
+
+func run_child() (i32, Error) {
+    result, err = os.run({
+        program: "grep",
+        args: ["needle", "file.txt"],
+    })
+    if err != nil {
+        return 0, err
+    }
+    return result.exit_code, nil
+}
+```
+
+What does not belong in `os` by default:
+- ordinary line-oriented output helpers
+- ordinary file-reading convenience for most application code
+
+4. Boundary Rule Of Thumb
+
+Use this test:
+- if the code is about bytes flowing through a stream, prefer `io`
+- if the code is about files and paths, prefer `fs`
+- if the code is about processes, environment, or platform-specific handles, prefer `os`
+
+5. Why This Split Matters
+
+If `os` absorbs `io` and `fs`, ordinary programs become more platform-shaped than they need to be.
+If `io` or `fs` absorb `os`, the portable surface turns into a disguised platform layer.
+
+The point of the split is not taxonomy for its own sake.
+The point is to keep everyday tools simple while still making platform boundaries explicit.

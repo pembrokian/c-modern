@@ -1,0 +1,294 @@
+Modern C - Standard Library Packaging Notes
+
+Purpose
+
+This document freezes the first-pass standard library packaging and canonical module names for Modern C.
+The language and runtime documents already define the semantic surface; this document defines how that surface is grouped so examples, implementations, and tooling stop drifting.
+
+Core position
+
+The standard library should be small, explicit, and split into focused modules.
+It should not begin with an omnibus `core` module, a hidden prelude, or a platform-blurred namespace.
+
+Guiding rules:
+- prefer small focused modules over a single catch-all namespace
+- keep portable modules separate from platform-facing modules
+- keep startup support out of the normal import surface
+- do not require implicit imports beyond the language's built-in primitive and predeclared types
+
+1. Canonical v0.2 Module Set
+
+Portable standard modules:
+- `mem`
+- `utf8`
+- `strings`
+- `io`
+- `fs`
+- `net`
+- `sync`
+- `time`
+
+Platform or target-adjacent modules:
+- `os`
+- `hal`
+
+Not a normal library module:
+- `startup`
+
+Toolchain companion module:
+- `testing`
+
+2. Module Responsibilities
+
+`mem`
+- allocation interfaces and owning storage helpers
+- examples: `Allocator`, `Buffer<T>`, `heap_alloc`, `heap_free`, `default_allocator`, `alloc_value`, `alloc_array`, `buffer_new`, `buffer_free`, `slice_from_array`, `slice_from_buffer`, `copy_bytes`, `fill_bytes`
+
+`utf8`
+- UTF-8 validation and encode or decode primitives only
+- examples: `valid`, `decode`, `encode`
+
+`strings`
+- text operations over `str` and string-like views
+- examples: `lines`, `split_once`, `trim_space`, `has_prefix`, `has_suffix`, `equal`, `is_blank`
+- rule: `strings` should stay non-allocating by default in v0.2
+
+`io`
+- stream-oriented portable I/O
+- examples: readers, writers, `stdin`, `stdout`, `stderr`, `read`, `write`, `write_line`, `close`
+- evented I/O belongs here when it is exposed as a portable readiness surface rather than as a raw platform backend
+- examples: `Poller`, `Event`, `EventMask`, `poller_new`, `poller_add`, `poller_set`, `poller_remove`, `poller_wait`, `poller_close`
+
+`fs`
+- file and path operations above raw platform handles
+- examples: `file_size`, `read_all`, open operations, directory iteration if standardized later
+
+`net`
+- portable networking above raw platform sockets
+- examples: `IpAddr`, `IpEndpoint`, `tcp_listen`, `accept`, `connect_tcp`
+- rule: `net` exposes ordinary networking operations without leaking raw socket APIs, ioctl-like setup surfaces, or backend-specific queue concepts into portable code
+
+`sync`
+- concurrency primitives only
+- examples: `Thread`, `Mutex`, `Condvar`, `Atomic<T>`, `MemoryOrder`, `thread_spawn`, `thread_join`, `mutex_lock`, `condvar_wait`, atomic operations
+
+`time`
+- clocks, durations, and sleep operations when standardized
+- keep it small and separate from `os`
+
+`testing`
+- ordinary helper functions for test code shipped with the standard toolchain distribution
+- examples: failure helpers, temporary-directory helpers, output capture helpers
+- rule: `testing` is a normal library module, not compiler magic
+- distribution rule: `testing` ships with the toolchain, but it is not part of the minimal portable standard surface required for non-test code or freestanding targets
+
+`os`
+- operating-system facing APIs and process-level facilities
+- examples: environment access, subprocess execution, process IDs, raw descriptors or handles, platform error bridging
+- rule: `os` is explicit and platform-facing; ordinary code should prefer `io` and `fs` when possible
+- rule: raw event backends such as `epoll`, `kqueue`, `io_uring`, or IOCP do not belong in the portable `io` surface and should remain in `os` or behind the implementation boundary
+
+`hal`
+- hardware-facing or freestanding helpers
+- examples: `mmio_ptr`, `volatile_load`, `volatile_store`, target-specific escape hatches
+- rule: `hal` is where hardware reality lives, not `mem` or `sync`
+
+`startup`
+- hosted startup shim and related entry glue
+- not part of the ordinary application import surface
+- replaceable by design
+
+3. Explicit Non-Modules
+
+The first-pass standard library should not define:
+- an omnibus `core` module
+- a vague `platform` mega-module
+- a `threading` alias beside `sync`
+- a second text module overlapping `strings` and `utf8`
+- a large `util` or `common` namespace
+
+Rationale:
+- those names tend to become junk drawers and blur architectural boundaries quickly
+
+4. Canonical Naming Choices
+
+Use these names in examples and docs:
+- `mem`, not `memory`
+- `strings`, not `text`
+- `utf8`, not `unicode`
+- `net`, not `network`
+- `sync`, not `threading`
+- `os`, not `platform`
+- `hal`, not `device`
+- `testing`, not `test`
+
+These choices are intentionally short and unsurprising.
+
+5. Boundary Rules
+
+Portable layer:
+- `mem`, `utf8`, `strings`, `io`, `fs`, `net`, `sync`, and `time` form the normal portable standard surface
+
+Platform layer:
+- `os` and `hal` sit below or beside the portable layer
+- user code imports them explicitly when it needs platform-specific control
+
+Startup layer:
+- `startup` remains outside ordinary library use
+- the build tool and runtime model decide when it is linked
+
+Toolchain companion layer:
+- `testing` ships with the toolchain for test code
+- it is ordinary library code, but it is not part of the minimal freestanding-oriented standard surface
+
+6. Import Discipline
+
+Recommended rule:
+- no hidden prelude beyond language built-ins
+- importing a module brings its exported names into scope according to the language's import rules
+- docs and examples should import the modules they use explicitly
+
+This keeps the library shape visible in real programs.
+
+7. Immediate Consequences For Existing APIs
+
+These spellings should now be treated as canonical:
+- `mem.default_allocator()`
+- `mem.buffer_new<T>`
+- `mem.buffer_free<T>`
+- `mem.slice_from_array`
+- `mem.slice_from_buffer`
+- `strings.lines`
+- `strings.split_once`
+- `utf8.valid`
+- `io.close`
+- `io.poller_set`
+- `io.write_line`
+- `net.connect_tcp`
+- `sync.thread_spawn`
+- `hal.mmio_ptr`
+
+8. Bottom-Line Recommendation
+
+The canonical v0.2 packaging should be:
+- portable modules: `mem`, `utf8`, `strings`, `io`, `fs`, `net`, `sync`, `time`
+- platform modules: `os`, `hal`
+- toolchain companion module: `testing`
+- non-import startup layer: `startup`
+
+This is small enough to hold in your head, explicit enough to preserve architectural boundaries, and concrete enough that the docs can now stop speaking about library packaging only in approximate terms.
+
+9. Evented I/O Placement
+
+If v0.2 or an early follow-up standardizes scalable non-blocking I/O, the portable surface should be a small readiness-based poller API.
+
+Recommended placement:
+- the portable abstraction belongs in `io`
+- raw descriptor or handle operations remain in `os`
+- kernel-specific mechanisms such as `epoll`, `kqueue`, `io_uring`, and IOCP remain implementation details or explicit `os` escape hatches
+
+Rationale:
+- readiness polling is part of the portable I/O story, not the concurrency story
+- it allows single-threaded I/O multiplexing without introducing a scheduler, futures, or language-level async syntax
+- exposing `io_uring` directly would leak Linux-specific queue semantics into the portable surface and distort the standard library boundary
+
+Recommended minimal surface:
+
+```text
+distinct File = i32
+
+func close(file: File) Error
+
+distinct EventMask = ui32
+
+const EVENT_READABLE: EventMask = EventMask(1)
+const EVENT_WRITABLE: EventMask = EventMask(2)
+
+struct Event {
+	file: File
+	readable: bool
+	writable: bool
+	error: bool
+}
+
+struct Poller
+
+func poller_new() (*Poller, Error)
+func poller_add(p: *Poller, file: File, interests: EventMask) Error
+func poller_set(p: *Poller, file: File, interests: EventMask) Error
+func poller_remove(p: *Poller, file: File) Error
+func poller_wait(p: *Poller, events: Slice<Event>, timeout_ms: i32) (usize, Error)
+func poller_close(p: *Poller)
+```
+
+Allocation rule:
+- `poller_wait` writes into caller-provided event storage
+- the standard surface should not require per-wait hidden allocation
+
+Close rule:
+- `io.close` remains fallible in the portable surface
+- close-time failures are observable for some file-backed streams and should not be erased just because socket close is often operationally best-effort
+- code that intentionally ignores close failure must discard it explicitly with `_ = io.close(file)`
+
+Boundary rule:
+- `Poller` is not a thread, task, or scheduler abstraction
+- `Poller` belongs in `io`, not `sync`
+- `sync` remains the home of threads, mutexes, condition variables, and atomics for real concurrency or parallelism
+
+Handle rule:
+- v0.2 should keep one portable `File` handle type for ordinary byte-stream I/O, readiness polling, and socket-like streams returned by `net`
+- `fs` and `net` should distinguish capabilities through constructors and operations rather than through separate `File`, `Socket`, and `Listener` handle types in the first portable surface
+- splitting handles too early would force duplicate `read`, `write`, `close`, and poller APIs or require a trait or capability system that the language does not have
+
+Portability rule:
+- Linux implementations may use `epoll` or `io_uring`
+- BSD and macOS implementations may use `kqueue`
+- Windows implementations may use IOCP or another suitable event backend
+- portable user code should not depend on which backend is chosen
+
+Non-goal rule:
+- standardizing a poller does not imply language-level async or a mandatory runtime event loop
+- programs remain free to use blocking I/O, explicit threads from `sync`, or platform-specific `os` facilities when needed
+
+10. Networking Surface
+
+If the standard library includes portable networking, it should sit beside `fs` rather than under `os`.
+
+Recommended placement:
+- path-based storage and directory operations remain in `fs`
+- stream-oriented byte I/O and polling remain in `io`
+- socket creation, listen, accept, and connect operations belong in `net`
+- raw socket options and platform-specific escape hatches remain in `os`
+
+Rationale:
+- most networking code wants portable TCP operations without dropping into platform bindings
+- keeping `net` separate from `io` avoids turning `io` into a catch-all module for unrelated concerns
+- keeping `net` above `os` preserves the same layering used elsewhere in the standard library
+
+Recommended minimal surface:
+
+```text
+enum IpAddr {
+	V4(octets: [4]ui8)
+	V6(bytes: [16]ui8)
+}
+
+struct IpEndpoint {
+	addr: IpAddr
+	port: ui16
+}
+
+func tcp_listen(local: IpEndpoint, backlog: i32) (File, Error)
+func accept(listener: File) (File, Error)
+func connect_tcp(remote: IpEndpoint) (File, Error)
+```
+
+Address rule:
+- `IpAddr` is an explicit tagged union over IPv4 and IPv6 byte representations rather than an opaque handle or a text string
+- `IpEndpoint` is the minimal portable address-plus-port value used by `tcp_listen` and `connect_tcp`
+- name resolution stays out of this minimal surface and can be added later without weakening the binary address model
+
+Boundary rule:
+- `accept` and `connect_tcp` return `File` so the result composes directly with `io.read`, `io.write`, `io.close`, and `io.poller_*`
+- portable code should not need to import `os` for ordinary TCP client or server flows
+- advanced socket tuning stays in `os` until a narrow portable need proves itself

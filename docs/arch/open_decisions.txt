@@ -21,19 +21,7 @@ The major language-design decisions are now settled for v0.2:
 
 What remains open is smaller and mostly about packaging, conventions, and what v0.2 should standardize early.
 
-1. Standard Library Packaging and Naming
-
-The minimum library surface is mostly chosen, but the final packaging is still loose.
-
-Open questions:
-- How should the initial standard library be divided across modules such as `io`, `fs`, `mem`, `strings`, `utf8`, and concurrency primitives?
-- Which helper names should be treated as canonical in v0.2 versus illustrative?
-- Which APIs belong in the standard library versus a platform layer beneath it?
-
-Why this is still open:
-- The semantic surface is close to stable, but naming and packaging should not drift across examples, docs, and implementations.
-
-2. Error-Handling Ergonomics Follow-Up
+1. Error-Handling Ergonomics Follow-Up
 
 The semantic decision is settled: explicit returns, no hidden propagation. The remaining question is whether a very small convenience pattern is justified later.
 
@@ -59,6 +47,13 @@ The following are not current open questions for v0.2 unless real program pressu
 - `mem.default_allocator() *Allocator` as the hosted default allocator accessor
 - explicit allocator parameters for allocating library APIs in v0.2
 - no broad hosted convenience wrappers that silently choose the default allocator in v0.2
+- canonical stdlib packaging: `mem`, `utf8`, `strings`, `io`, `fs`, `net`, `sync`, `time`, `os`, and `hal`, plus toolchain companion `testing`
+- portable evented I/O surface in `io`, with raw backends such as `epoll`, `kqueue`, `io_uring`, and IOCP kept under `os` or implementation boundaries
+- portable networking surface in `net`, above `os`
+- one portable `File` handle type for ordinary stream I/O and readiness polling in v0.2, rather than split `File`, `Socket`, and `Listener` handle families
+- concrete binary `IpAddr` and `IpEndpoint` portable networking values, rather than text-only or opaque address handles
+- fallible `io.close(file) Error` in the portable surface, with explicit discard when callers intentionally ignore shutdown errors
+- no omnibus `core` module or hidden prelude in v0.2
 - exclusion of exceptions, GC, hidden init, and compile-time execution
 
 Change rule
