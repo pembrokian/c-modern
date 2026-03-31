@@ -1091,12 +1091,12 @@ class FunctionLowerer {
     }
 
     void EmitDeferredCall(const DeferredCall& call) {
-        std::vector<ValueInfo> args;
-        args.reserve(call.arg_locals.size());
-        for (const auto& arg_local : call.arg_locals) {
-            args.push_back(LoadLocalValue(arg_local));
-        }
         if (call.special_kind != SpecialCallKind::kNone) {
+            std::vector<ValueInfo> args;
+            args.reserve(call.arg_locals.size());
+            for (const auto& arg_local : call.arg_locals) {
+                args.push_back(LoadLocalValue(arg_local));
+            }
             const TargetMetadata target_metadata {
                 .target = call.target,
                 .kind = call.target_kind,
@@ -1109,8 +1109,8 @@ class FunctionLowerer {
 
         const auto callee = LoadLocalValue(call.callee_local);
         std::vector<std::string> operands = {callee.value};
-        for (const auto& arg : args) {
-            operands.push_back(arg.value);
+        for (const auto& arg_local : call.arg_locals) {
+            operands.push_back(LoadLocalValue(arg_local).value);
         }
         Emit({
             .kind = Instruction::Kind::kCall,

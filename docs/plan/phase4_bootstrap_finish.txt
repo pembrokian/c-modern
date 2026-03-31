@@ -1,0 +1,30 @@
+Bootstrap Phase 4 Completion
+
+This repository does not implement the full language-wide Phase 4 defined in plan.txt.
+It now implements a narrower, explicit bootstrap Phase 4 for the currently supported checked-semantic surface.
+
+Plan alignment for this milestone:
+- this note is grounded in the original plan.txt Phase 4 objective: introduce a language-owned typed MIR that preserves Modern C semantics independent of LLVM
+- this note is grounded in the original plan.txt Phase 4 exit criteria: deterministic MIR lowering from checked programs, validator coverage for malformed control flow and illegal typed operations, and canonical small-program representation without backend-specific hacks
+- this repository milestone claims only the supported bootstrap subset that now satisfies those criteria with direct test evidence
+
+Completed in this milestone:
+- checked semantic programs for the supported bootstrap subset lower deterministically to typed MIR and are snapshot-tested under `tests/mir/`
+- the MIR fixture harness now re-lowers each successful fixture to confirm deterministic dumps across repeated runs
+- supported semantic-boundary operations lower through dedicated MIR forms instead of generic backend-shaped call hacks, including bounds/divide/shift checks, wrap-aware integer arithmetic, explicit conversion families, `mmio_ptr`, and the current volatile/atomic subset
+- MIR validation rejects malformed control flow and illegal typed operations across the supported emitted MIR surface, with focused unit coverage for both handcrafted invalid modules and mutations of valid lowered MIR
+- representative canonical small programs are present as concrete sources under `examples/canonical/` and mirrored by MIR fixtures for `eval`, `memory_poll`, and `window_stats`
+
+Explicitly not claimed complete here:
+- full Phase 4 completion for the entire plan.txt language surface
+- exhaustive MIR lowering coverage for unsupported or not-yet-semanticized constructs
+- exhaustive MIR validator legality across every possible future instruction form or semantic boundary
+- backend bring-up, backend optimization policy, or any Phase 5 completion claim
+
+Meaning of “Phase 4 finished” in the current repository:
+- the bootstrap compiler has a real typed MIR boundary between sema and future backend work
+- the supported bootstrap subset lowers to deterministic MIR without relying on ad hoc backend-shaped representations for the semantic-boundary operations it currently supports
+- the validator is strong enough to catch malformed control flow and representative illegal typed operations on the emitted MIR surface used by the current bootstrap compiler
+- canonical small programs are represented through MIR fixtures rather than only narrow synthetic tests
+
+The original plan.txt Phase 4 remains the full target. This file records the narrower repository milestone that closes the bootstrap MIR validation gap without overstating full language or backend readiness.

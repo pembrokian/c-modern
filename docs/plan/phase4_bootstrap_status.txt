@@ -1,6 +1,6 @@
 Bootstrap Phase 4 Status
 
-This repository has active bootstrap MIR work, but it should not yet claim that Phase 4 from plan.txt is finished.
+This repository now records a narrower bootstrap Phase 4 completion note in `docs/plan/phase4_bootstrap_finish.txt`, but it should not claim that the full Phase 4 from plan.txt is finished.
 
 What is in place:
 - typed MIR module, function, block, instruction, and terminator structures exist
@@ -10,12 +10,13 @@ What is in place:
 - MIR validation now also enforces structural legality for emitted value/effect instructions, dedicated conversion-family metadata, dedicated volatile/atomic opcode metadata, stricter symbol/store target metadata, and block/terminator shape invariants even for unreachable dead blocks
 - MIR validation also checks symbol-ref type consistency where matching MIR-local declarations exist without rejecting import-backed symbol refs that are semantically known but not materialized as local MIR declarations
 - bootstrap MIR lowering covers core control flow, locals, calls, aggregates, range loops, foreach loops, defer unwinding, expression switch cases, and variant switch patterns
-- recent bootstrap tightening carries semantic types through indexed slice elements, known global/function symbol refs, deferred and statement-only sink callees inferred from call sites, variant payload extraction, synthetic range/foreach loop state, and ordinary local/expression lowering instead of leaving those MIR values as `unknown`
+- recent bootstrap tightening carries semantic types through indexed slice elements, known global/function symbol refs, sema-typed deferred and statement-only sink callees, variant payload extraction, synthetic range/foreach loop state, and ordinary local/expression lowering instead of leaving those MIR values as `unknown`
 - MIR dumps now preserve enum variant payload metadata and structured symbol/store-target metadata so validator checks do not need to recover those facts from plain rendered strings alone
 - bootstrap MIR now splits explicit conversions into dedicated MIR forms for distinct/base conversions, numeric conversions, array-to-slice conversions, and buffer-to-slice conversions instead of routing those supported cases through one generic conversion instruction
-- direct index and slice expressions now lower through an explicit `bounds_check` MIR instruction before the value-producing `index` or `slice` operation, so checked-bounds semantics are no longer implicit backend policy for those supported paths
+- direct, foreach-synthesized, and indexed-store bounds-sensitive paths now lower through an explicit `bounds_check` MIR instruction before the value-producing `index` or `slice` operation or accompanying indexed store effect, so checked-bounds semantics are no longer implicit backend policy for those supported paths
 - integer division, remainder, and shift expressions now lower through explicit `div_check` and `shift_check` MIR instructions before the corresponding value-producing binary operation, so those checked runtime faults are no longer implicit backend policy on supported paths
 - concrete integer `+`, `-`, and `*` operations now record explicit wraparound semantics in MIR binary metadata instead of leaving overflow behavior implicit
+- the library-shaped `mmio_ptr` boundary now lowers through the dedicated `int_to_pointer` MIR instruction instead of generic call shaping, matching the existing explicit pointer/integer conversion family
 - library-shaped volatile and atomic operations now lower through dedicated MIR instructions for `volatile_load`, `volatile_store`, `atomic_load`, `atomic_store`, `atomic_exchange`, `atomic_compare_exchange`, and `atomic_fetch_add` instead of falling back to generic call shaping
 - ordinary AST expression result types are now recorded by sema and consumed by MIR lowering for literals, unary/binary expressions, calls, field/index/slice expressions, and aggregate initializers instead of being re-derived locally in MIR
 - MIR instructions now carry structured target metadata for direct calls, field/index/slice accesses, store targets, and variant operations, and the validator uses that metadata directly instead of re-deriving identities from rendered display text where the structured facts are available
@@ -28,19 +29,17 @@ What is in place:
 What still blocks a Phase 4 completion claim:
 - MIR is materially tighter across the currently supported surface, but unsupported or not-yet-semanticized paths can still hit lowering diagnostics and recovery behavior rather than a fully explicit typed MIR form
 - the validator now covers a broader typed subset including explicit conversion-family selection, core unary/comparison legality, field/index/slice base-and-bound checks, and aggregate field-shape checks, but it still does not comprehensively reject illegal typed operations across the full MIR surface
-- explicit MIR forms now cover distinct/base, numeric, pointer-int, array-to-slice, and buffer-to-slice conversions, checked divide/shift faults, and the current library-shaped volatile/atomic operation subset; other semantic-boundary operations are still pending
+- explicit MIR forms now cover distinct/base, numeric, pointer-int, array-to-slice, and buffer-to-slice conversions, library-shaped `mmio_ptr` pointer formation, checked divide/shift faults, and the current library-shaped volatile/atomic operation subset; other semantic-boundary operations are still pending
 
 Current structural debt worth tracking explicitly:
-- MIR lowering still has a small amount of call-site fallback and recovery logic for unresolved or unsupported cases; supported lowering paths should continue moving toward direct sema-owned typed inputs with fewer bootstrap escape hatches
 - some MIR lookup and naming paths still rely on rendered expression strings instead of structured semantic identities; this is acceptable for bootstrap dumps but fragile as a long-term lookup mechanism
 - local typing no longer intentionally carries `unknown` through supported lowering paths, but the remaining recovery behavior is still bootstrap-oriented rather than a final long-term contract
-- binding-or-assignment handling in MIR remains intentionally incomplete and still rejects mixed existing/new patterns rather than consuming a fully resolved semantic classification
 
 Practical bootstrap interpretation:
-- Phase 4 bootstrap is underway and already useful for debugging semantic lowering mistakes
+- the repository has closed the narrower bootstrap Phase 4 milestone recorded in `docs/plan/phase4_bootstrap_finish.txt`
 - the current MIR layer is strong enough to support continued bootstrap bring-up
 - the current tree is green under the canonical local build and test flow
-- the repository should continue describing this as active Phase 4 work rather than a completed Phase 4 milestone
+- the repository should continue distinguishing the narrower bootstrap milestone from full Phase 4 completion in `plan.txt`
 
 Concrete next steps toward a narrower bootstrap completion note:
 1. extend the remaining explicit low-level semantic-boundary coverage beyond the current bounds/divide/shift checks, conversion split, and first volatile/atomic instruction set, especially any additional slice/view formation paths and future low-level memory operations the frontend begins to express
@@ -53,9 +52,9 @@ Concrete next steps toward a narrower bootstrap completion note:
 Detailed close-out task map:
 
 Theme: Explicit semantic-boundary instruction coverage
-- audit existing lowering for any remaining slice/view or pointer-adjacent operations that still encode language semantics indirectly rather than through explicit MIR forms
-- confirm that all currently supported explicit conversions and checked fault paths use dedicated MIR instructions instead of falling back to generic `binary`, `call`, or `convert` shaping
-- extend the current explicit volatile/atomic subset if additional standard-library boundary operations become supported
+- completed: audited the remaining supported slice/view and pointer-adjacent lowering paths and removed the lingering implicit cases in foreach-generated indexing and indexed store targets by emitting explicit `bounds_check` instructions there as well
+- completed: confirmed the currently supported explicit conversions and checked fault paths use dedicated MIR instructions by closing the deferred special-call fallback path and extending validator coverage to reject generic call shaping for dedicated semantic-boundary surfaces
+- completed: extended the low-level library boundary surface with `mmio_ptr`, which now lowers through dedicated `int_to_pointer` MIR instead of generic call shaping
 
 Theme: Arithmetic and operation semantics
 - completed: concrete integer `+`, `-`, and `*` MIR binaries now use explicit `arithmetic=wrap` metadata
@@ -64,11 +63,11 @@ Theme: Arithmetic and operation semantics
 - completed: validator coverage rejects integer arithmetic missing wrap metadata and rejects invalid wrap metadata on non-wrap operations or non-integer results
 
 Theme: Lowering completeness and semantic ownership
-- remove the remaining bootstrap recovery and fallback paths in MIR lowering for supported language constructs so supported cases either lower deterministically or fail crisply
-- keep pushing type and semantic facts to come from sema rather than being re-inferred opportunistically inside MIR lowering
-- finish any still-incomplete binding/assignment classification work needed so MIR consumes resolved semantic intent rather than partial AST-shape heuristics
-- audit unsupported constructs and convert any currently vague bootstrap diagnostics into specific "not yet supported" or semantic-lowering failure points
-- review call, store-target, aggregate, and control-flow lowering for any remaining places where bootstrap convenience logic still hides missing semantic structure
+- completed: supported MIR lowering paths no longer rely on call-site fallback shaping, so supported constructs now either lower deterministically from sema-owned facts or fail crisply at a specific semantic-lowering boundary
+- completed: MIR now consumes sema-owned type and semantic facts for supported expression, call, symbol-reference, and loop-element typing paths instead of re-inferring those facts opportunistically during lowering
+- completed: binding-or-assignment lowering now consumes sema-provided per-name resolution facts, so mixed existing/new patterns lower according to resolved semantic intent rather than AST-shape heuristics
+- completed: unsupported lowering paths now report narrower bootstrap diagnostics such as explicit "not yet supported in MIR" and semantic-information requirements instead of vague recovery-oriented failures
+- completed: call, store-target, aggregate, and control-flow lowering were audited to remove bootstrap convenience logic that had been masking missing semantic structure on the currently supported surface
 
 Theme: MIR validation closure
 - completed: the validator now checks the remaining emitted instruction forms more explicitly, including structural result/effect shape for const, symbol_ref, field/index/slice, aggregate, variant, and explicit conversion instructions in addition to the earlier typed subset
@@ -91,8 +90,8 @@ Theme: Fixture and representative-program coverage
 - completed: MIR fixture coverage now includes deterministic lowering-failure diagnostics for useful unsupported bootstrap boundaries instead of only success-path goldens
 
 Theme: Phase close-out validation and milestone criteria
-- re-check the Phase 4 note against the original `plan.txt` objective and exit criteria rather than repository-local momentum before declaring closure
-- verify that checked semantic programs for the supported bootstrap surface lower to deterministic MIR without ad hoc backend-shaped hacks
-- verify that validators catch malformed control flow and illegal typed operations across the supported emitted MIR surface
-- verify that canonical small programs are representable through MIR fixtures rather than only by targeted synthetic tests
-- once those conditions are met, write a repository-specific `phase4_bootstrap_finish.txt` that clearly states the narrower bootstrap milestone without overstating full plan completion
+- completed: re-checked the bootstrap milestone note against the original `plan.txt` Phase 4 objective and exit criteria instead of repository-local momentum, and recorded that alignment explicitly in `docs/plan/phase4_bootstrap_finish.txt`
+- completed: the MIR fixture harness now re-lowers every successful fixture and rejects generic call-shaped lowering for the dedicated semantic-boundary targets, so the supported bootstrap surface is explicitly audited for deterministic MIR without backend-shaped hacks
+- completed: MIR unit coverage now includes mutation-based checks that start from valid lowered MIR and confirm the validator rejects malformed control flow and illegal typed operations on the supported emitted surface in addition to the existing handcrafted negative modules
+- completed: representative canonical small programs now exist as concrete sources under `examples/canonical/` and are kept in sync with the corresponding MIR fixtures so canonical-program representation is no longer evidenced only by targeted synthetic tests
+- completed: the repository-specific `docs/plan/phase4_bootstrap_finish.txt` milestone note now records the narrower bootstrap Phase 4 completion without overstating full Phase 4 or later-phase readiness

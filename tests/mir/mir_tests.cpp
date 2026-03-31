@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "compiler/lex/lexer.h"
 #include "compiler/mir/mir.h"
@@ -26,6 +27,18 @@ mc::mir::LowerResult Lower(const std::string& source, mc::support::DiagnosticSin
         Fail("source should pass semantic checking before MIR lowering:\n" + diagnostics.Render());
     }
     return mc::mir::LowerSourceFile(*parsed.source_file, *checked.module, "<mir-test>", diagnostics);
+}
+
+mc::mir::Module LowerAndValidateModule(const std::string& source) {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(source, diagnostics);
+    if (!lowered.ok) {
+        Fail("lowering should succeed:\n" + diagnostics.Render());
+    }
+    if (!mc::mir::ValidateModule(*lowered.module, "<mir-test>", diagnostics)) {
+        Fail("lowered module should validate:\n" + diagnostics.Render());
+    }
+    return *lowered.module;
 }
 
 void TestLoweringProducesDeterministicDump() {
@@ -165,9 +178,9 @@ void TestForEachAndDeferLoweringSucceed() {
     if (dump.find("bounds_check op=index") == std::string::npos) {
         Fail("foreach lowering should emit explicit bounds checks before indexed element loads");
     }
-    if (dump.find("field %v6:usize target=len target_kind=field target_name=len") == std::string::npos ||
-        dump.find("target_display=values.len target_base=Slice<i32>") == std::string::npos ||
-        dump.find("index %v10:i32 target_kind=index target_display=values[index] target_base=Slice<i32>") == std::string::npos ||
+    if (dump.find("target_display=values.len target_base=Slice<i32>") == std::string::npos ||
+        dump.find("bounds_check op=index") == std::string::npos ||
+        dump.find("target_kind=index target_display=values[index] target_base=Slice<i32>") == std::string::npos ||
         dump.find("target_types=[usize]") == std::string::npos ||
         dump.find("call target=cleanup target_kind=function target_name=cleanup") == std::string::npos) {
         Fail("foreach lowering should preserve structured field, index, and direct-call metadata");
@@ -789,6 +802,68 @@ void TestMmioPtrCallLowersToIntToPointer() {
     }
     if (dump.find("call target=mmio_ptr") != std::string::npos) {
         Fail("mmio_ptr calls must not lower as generic calls");
+    }
+}
+
+void TestValidatorRejectsMalformedControlFlowOnLoweredSurface() {
+    auto module = LowerAndValidateModule(
+        "func choose(flag: bool) i32 {\n"
+        "    if flag {\n"
+        "        return 1\n"
+        "    }\n"
+        "    return 0\n"
+        "}\n");
+
+    if (module.functions.empty() || module.functions.front().blocks.empty()) {
+        Fail("expected lowered function and blocks for control-flow mutation test");
+    }
+
+    module.functions.front().blocks.front().terminator.true_target = "missing_phase4_block";
+
+    mc::support::DiagnosticSink diagnostics;
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject malformed control flow on lowered MIR surface");
+    }
+    if (diagnostics.Render().find("conditional branch true target missing MIR block") == std::string::npos) {
+        Fail("validator should explain malformed control flow on lowered MIR surface");
+    }
+}
+
+void TestValidatorRejectsIllegalTypedOperationOnLoweredSurface() {
+    auto module = LowerAndValidateModule(
+        "func add(left: i32, right: i32) i32 {\n"
+        "    return left + right\n"
+        "}\n");
+
+    bool mutated = false;
+    for (auto& function : module.functions) {
+        for (auto& block : function.blocks) {
+            for (auto& instruction : block.instructions) {
+                if (instruction.kind == mc::mir::Instruction::Kind::kBinary && instruction.op == "+") {
+                    instruction.arithmetic_semantics = mc::mir::Instruction::ArithmeticSemantics::kNone;
+                    mutated = true;
+                    break;
+                }
+            }
+            if (mutated) {
+                break;
+            }
+        }
+        if (mutated) {
+            break;
+        }
+    }
+
+    if (!mutated) {
+        Fail("expected to find integer binary instruction on lowered MIR surface");
+    }
+
+    mc::support::DiagnosticSink diagnostics;
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject illegal typed operations on lowered MIR surface");
+    }
+    if (diagnostics.Render().find("must record wrap semantics") == std::string::npos) {
+        Fail("validator should explain illegal typed operations on lowered MIR surface");
     }
 }
 
@@ -2163,6 +2238,8 @@ int main() {
     TestVolatileAndAtomicCallsLowerExplicitly();
     TestDeferredBoundaryCallsLowerExplicitly();
     TestMmioPtrCallLowersToIntToPointer();
+    TestValidatorRejectsMalformedControlFlowOnLoweredSurface();
+    TestValidatorRejectsIllegalTypedOperationOnLoweredSurface();
     TestValidatorRejectsBadBranchTarget();
     TestValidatorRejectsNonBoolCondition();
     TestValidatorRejectsCallArgumentTypeMismatch();

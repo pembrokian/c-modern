@@ -41,28 +41,30 @@ Module
     Block label=foreach_body2
       load_local %v14:Slice<i32> target=$iterable0
       load_local %v15:usize target=$index1
-      index %v16:i32 target_kind=index target_display=window[index] target_base=Slice<i32> operands=[%v14, %v15] target_types=[usize]
+      field %v16:usize target=len target_kind=field target_name=len target_base=Slice<i32> operands=[%v14]
+      bounds_check op=index operands=[%v15, %v16]
+      index %v17:i32 target_kind=index target_display=window[index] target_base=Slice<i32> operands=[%v14, %v15] target_types=[usize]
       store_local target=index operands=[%v15]
-      store_local target=value operands=[%v16]
-      load_local %v17:i32 target=total
-      load_local %v18:i32 target=value
-      binary %v19:i32 op=+ arithmetic=wrap operands=[%v17, %v18]
-      store_local target=total operands=[%v19]
+      store_local target=value operands=[%v17]
+      load_local %v18:i32 target=total
+      load_local %v19:i32 target=value
+      binary %v20:i32 op=+ arithmetic=wrap operands=[%v18, %v19]
+      store_local target=total operands=[%v20]
       terminator branch target=foreach_step3
     Block label=foreach_step3
-      load_local %v20:usize target=$index1
-      const %v21:usize op=1
-      binary %v22:usize op=+ arithmetic=wrap operands=[%v20, %v21]
-      store_local target=$index1 operands=[%v22]
+      load_local %v21:usize target=$index1
+      const %v22:usize op=1
+      binary %v23:usize op=+ arithmetic=wrap operands=[%v21, %v22]
+      store_local target=$index1 operands=[%v23]
       terminator branch target=foreach_cond1
     Block label=foreach_exit4
-      load_local %v23:i32 target=total
-      load_local %v24:Slice<i32> target=window
-      const %v25:int_literal op=0
-      field %v26:usize target=len target_kind=field target_name=len target_base=Slice<i32> operands=[%v24]
-      bounds_check op=index operands=[%v25, %v26]
-      index %v27:i32 target_kind=index target_display=window[0] target_base=Slice<i32> operands=[%v24, %v25] target_types=[int_literal]
-      load_local %v28:Slice<i32> target=window
-      field %v29:usize target=len operands=[%v28]
-      aggregate_init %v30:WindowStats target=WindowStats operands=[%v23, %v27, %v29] fields=[total, first, count]
-      terminator return values=[%v30]
+      load_local %v24:i32 target=total
+      load_local %v25:Slice<i32> target=window
+      const %v26:int_literal op=0
+      field %v27:usize target=len target_kind=field target_name=len target_base=Slice<i32> operands=[%v25]
+      bounds_check op=index operands=[%v26, %v27]
+      index %v28:i32 target_kind=index target_display=window[0] target_base=Slice<i32> operands=[%v25, %v26] target_types=[int_literal]
+      load_local %v29:Slice<i32> target=window
+      field %v30:usize target=len operands=[%v29]
+      aggregate_init %v31:WindowStats target=WindowStats operands=[%v24, %v28, %v30] fields=[total, first, count]
+      terminator return values=[%v31]
