@@ -59,6 +59,11 @@ struct Instruction {
         kOther,
     };
 
+    enum class ArithmeticSemantics {
+        kNone,
+        kWrap,
+    };
+
     enum class Kind {
         kConst,
         kLoadLocal,
@@ -104,6 +109,7 @@ struct Instruction {
     std::vector<sema::Type> target_aux_types;
     std::vector<std::string> operands;
     std::vector<std::string> field_names;
+    ArithmeticSemantics arithmetic_semantics = ArithmeticSemantics::kNone;
 };
 
 struct Terminator {

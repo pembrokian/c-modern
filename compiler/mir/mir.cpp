@@ -128,6 +128,17 @@ std::string_view ToString(Instruction::TargetKind kind) {
     return "none";
 }
 
+std::string_view ToString(Instruction::ArithmeticSemantics semantics) {
+    switch (semantics) {
+        case Instruction::ArithmeticSemantics::kNone:
+            return "none";
+        case Instruction::ArithmeticSemantics::kWrap:
+            return "wrap";
+    }
+
+    return "none";
+}
+
 std::string VariantTypeName(std::string_view variant_name) {
     const std::size_t separator = variant_name.find('.');
     if (separator == std::string_view::npos) {
@@ -274,6 +285,10 @@ bool IsFloatType(const sema::Type& type) {
 
 bool IsNumericType(const sema::Type& type) {
     return type.kind == sema::Type::Kind::kIntLiteral || type.kind == sema::Type::Kind::kFloatLiteral || IsIntegerType(type) || IsFloatType(type);
+}
+
+bool IsWraparoundBinaryOp(std::string_view op) {
+    return op == "+" || op == "-" || op == "*";
 }
 
 bool IsIntegerLikeType(const sema::Type& type) {
@@ -504,6 +519,20 @@ ExplicitConversionKind ClassifyMirConversion(const Module& module, const sema::T
     }
 
     return ExplicitConversionKind::kGeneric;
+}
+
+Instruction::ArithmeticSemantics ClassifyBinaryArithmeticSemantics(const Module& module,
+                                                                   std::string_view op,
+                                                                   const sema::Type& result_type) {
+    if (!IsWraparoundBinaryOp(op)) {
+        return Instruction::ArithmeticSemantics::kNone;
+    }
+
+    const sema::Type stripped_result = StripMirAliasOrDistinct(module, result_type);
+    if (IsIntegerType(stripped_result)) {
+        return Instruction::ArithmeticSemantics::kWrap;
+    }
+    return Instruction::ArithmeticSemantics::kNone;
 }
 
 std::size_t ProcedureParamCount(const sema::Type& type) {
@@ -998,6 +1027,7 @@ class FunctionLowerer {
             .type = type,
             .op = op,
             .operands = {left.value, right.value},
+            .arithmetic_semantics = ClassifyBinaryArithmeticSemantics(module_, op, type),
         });
         return {value, type};
     }
@@ -1287,6 +1317,7 @@ class FunctionLowerer {
                     .type = type,
                     .op = expr.text,
                     .operands = {left.value, right.value},
+                    .arithmetic_semantics = ClassifyBinaryArithmeticSemantics(module_, expr.text, type),
                 });
                 return {value, type};
             }
@@ -2355,9 +2386,20 @@ bool ValidateModule(const Module& module,
                             }
                         }
                         break;
-                    case Instruction::Kind::kBinary:
+                    case Instruction::Kind::kBinary: {
                         if (instruction.operands.size() != 2) {
                             report("binary must use exactly two operands in function " + function.name);
+                        }
+                        const sema::Type binary_result_type = StripMirAliasOrDistinct(module, instruction.type);
+                        const bool requires_wrap_semantics = IsWraparoundBinaryOp(instruction.op) && !sema::IsUnknown(binary_result_type) &&
+                                                            IsIntegerType(binary_result_type);
+                        if (requires_wrap_semantics &&
+                            instruction.arithmetic_semantics != Instruction::ArithmeticSemantics::kWrap) {
+                            report("integer arithmetic binary must record wrap semantics in function " + function.name);
+                        }
+                        if (instruction.arithmetic_semantics == Instruction::ArithmeticSemantics::kWrap &&
+                            (!IsWraparoundBinaryOp(instruction.op) || !sema::IsUnknown(binary_result_type) && !IsIntegerType(binary_result_type))) {
+                            report("wrap semantics are only valid on integer +, -, or * binaries in function " + function.name);
                         }
                         if ((instruction.op == "==" || instruction.op == "!=" || instruction.op == "<" || instruction.op == "<=" || instruction.op == ">" ||
                              instruction.op == ">=" || instruction.op == "&&" || instruction.op == "||") &&
@@ -2409,6 +2451,7 @@ bool ValidateModule(const Module& module,
                             }
                         }
                         break;
+                    }
                     case Instruction::Kind::kConvert:
                         if (instruction.operands.size() != 1) {
                             report("convert must use exactly one operand in function " + function.name);
@@ -3053,6 +3096,9 @@ std::string DumpModule(const Module& module) {
                 }
                 if (!instruction.op.empty()) {
                     line << " op=" << instruction.op;
+                }
+                if (instruction.arithmetic_semantics != Instruction::ArithmeticSemantics::kNone) {
+                    line << " arithmetic=" << ToString(instruction.arithmetic_semantics);
                 }
                 if (!instruction.target.empty()) {
                     line << " target=" << instruction.target;

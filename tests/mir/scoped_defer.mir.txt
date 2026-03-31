@@ -19,7 +19,7 @@ Module
       call target=inner operands=[%v4]
       load_local %v5:i32 target=total
       const %v6:int_literal op=1
-      binary %v7:i32 op=+ operands=[%v5, %v6]
+      binary %v7:i32 op=+ arithmetic=wrap operands=[%v5, %v6]
       store_local target=total operands=[%v7]
       load_local %v8:i32 target=total
       terminator return values=[%v8]

@@ -14,9 +14,10 @@ What is in place:
 - bootstrap MIR now splits explicit conversions into dedicated MIR forms for distinct/base conversions, numeric conversions, array-to-slice conversions, and buffer-to-slice conversions instead of routing those supported cases through one generic conversion instruction
 - direct index and slice expressions now lower through an explicit `bounds_check` MIR instruction before the value-producing `index` or `slice` operation, so checked-bounds semantics are no longer implicit backend policy for those supported paths
 - integer division, remainder, and shift expressions now lower through explicit `div_check` and `shift_check` MIR instructions before the corresponding value-producing binary operation, so those checked runtime faults are no longer implicit backend policy on supported paths
+- concrete integer `+`, `-`, and `*` operations now record explicit wraparound semantics in MIR binary metadata instead of leaving overflow behavior implicit
 - library-shaped volatile and atomic operations now lower through dedicated MIR instructions for `volatile_load`, `volatile_store`, `atomic_load`, `atomic_store`, `atomic_exchange`, `atomic_compare_exchange`, and `atomic_fetch_add` instead of falling back to generic call shaping
 - ordinary AST expression result types are now recorded by sema and consumed by MIR lowering for literals, unary/binary expressions, calls, field/index/slice expressions, and aggregate initializers instead of being re-derived locally in MIR
-- MIR unit coverage now includes focused validator failures for non-bool conditions, bad unary legality, incompatible comparison operands, malformed bounds checks, missing fault checks on division/shift binaries, bad volatile or atomic instruction shapes, misencoded generic conversions, duplicate aggregate fields, invalid field/index/slice bases and slice bounds, bad call argument types, aggregate field mismatches, variant payload mismatches, bad symbol-ref types, and structured store-target mismatches
+- MIR unit coverage now includes focused validator failures for non-bool conditions, bad unary legality, incompatible comparison operands, malformed bounds checks, missing fault checks on division/shift binaries, missing or invalid wraparound arithmetic metadata, bad volatile or atomic instruction shapes, misencoded generic conversions, duplicate aggregate fields, invalid field/index/slice bases and slice bounds, bad call argument types, aggregate field mismatches, variant payload mismatches, bad symbol-ref types, and structured store-target mismatches
 - MIR fixtures now cover semantic-boundary intrinsic lowering for volatile and atomic operations in addition to the earlier bounds-check and conversion-focused fixtures
 - representative supported MIR lowering tests now assert that variant switches, foreach/range loops, and typed symbol-reference paths do not emit `unknown`, and a dump audit across current accepted sample inputs finds no emitted `unknown` MIR types
 
@@ -24,7 +25,6 @@ What still blocks a Phase 4 completion claim:
 - MIR is materially tighter across the currently supported surface, but unsupported or not-yet-semanticized paths can still hit lowering diagnostics and recovery behavior rather than a fully explicit typed MIR form
 - the validator now covers a broader typed subset including explicit conversion-family selection, core unary/comparison legality, field/index/slice base-and-bound checks, and aggregate field-shape checks, but it still does not comprehensively reject illegal typed operations across the full MIR surface
 - explicit MIR forms now cover distinct/base, numeric, pointer-int, array-to-slice, and buffer-to-slice conversions, checked divide/shift faults, and the current library-shaped volatile/atomic operation subset; other semantic-boundary operations are still pending
-- integer wraparound behavior is not yet modeled explicitly in MIR operations
 - canonical small programs are not yet demonstrated as MIR-representable through dedicated Phase 4 fixtures or canonical-program coverage
 
 Current structural debt worth tracking explicitly:
@@ -55,10 +55,10 @@ Theme: Explicit semantic-boundary instruction coverage
 - extend the current explicit volatile/atomic subset if additional standard-library boundary operations become supported
 
 Theme: Arithmetic and operation semantics
-- make integer wraparound behavior explicit in MIR arithmetic operations instead of leaving overflow meaning implicit
-- decide whether that wraparound modeling should be expressed as explicit op metadata, distinct instruction families, or another deterministic MIR encoding that validators can enforce
-- extend lowering so the supported arithmetic surface consistently emits the chosen wraparound-aware MIR form
-- add validator checks that reject arithmetic instructions whose encoded semantics do not match Modern C's wraparound contract
+- completed: concrete integer `+`, `-`, and `*` MIR binaries now use explicit `arithmetic=wrap` metadata
+- completed: wraparound modeling is encoded as deterministic MIR instruction metadata that the validator can enforce directly
+- completed: lowering emits the wrap-aware MIR form across the currently supported concrete integer arithmetic surface
+- completed: validator coverage rejects integer arithmetic missing wrap metadata and rejects invalid wrap metadata on non-wrap operations or non-integer results
 
 Theme: Lowering completeness and semantic ownership
 - remove the remaining bootstrap recovery and fallback paths in MIR lowering for supported language constructs so supported cases either lower deterministically or fail crisply

@@ -559,6 +559,36 @@ void TestDivisionAndShiftLoweringEmitExplicitChecks() {
     }
 }
 
+void TestIntegerArithmeticLowersWithExplicitWrapSemantics() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "func ints(left: i32, right: i32) i32 {\n"
+        "    sum: i32 = left + right\n"
+        "    diff: i32 = sum - right\n"
+        "    prod: i32 = diff * right\n"
+        "    return prod\n"
+        "}\n"
+        "\n"
+        "func floats(left: f32, right: f32) f32 {\n"
+        "    return left + right\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("integer arithmetic lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find(":i32 op=+ arithmetic=wrap") == std::string::npos ||
+        dump.find(":i32 op=- arithmetic=wrap") == std::string::npos ||
+        dump.find(":i32 op=* arithmetic=wrap") == std::string::npos) {
+        Fail("integer arithmetic lowering should emit explicit wrap semantics");
+    }
+    if (dump.find(":f32 op=+ arithmetic=wrap") != std::string::npos) {
+        Fail("floating-point arithmetic should not be marked as wraparound");
+    }
+}
+
 void TestVolatileAndAtomicCallsLowerExplicitly() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
@@ -1386,6 +1416,93 @@ void TestValidatorRejectsDivisionWithoutDivCheck() {
     }
 }
 
+void TestValidatorRejectsIntegerArithmeticWithoutWrapSemantics() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_wrap";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("i32"),
+                .op = "1",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("i32"),
+                .op = "2",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBinary,
+                .result = "%v2",
+                .type = mc::sema::NamedType("i32"),
+                .op = "+",
+                .operands = {"%v0", "%v1"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject integer arithmetic without explicit wrap semantics");
+    }
+    if (diagnostics.Render().find("must record wrap semantics") == std::string::npos) {
+        Fail("validator should explain missing wrap semantics");
+    }
+}
+
+void TestValidatorRejectsWrapSemanticsOnFloatArithmetic() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_float_wrap";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("f32"),
+                .op = "1.0",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("f32"),
+                .op = "2.0",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBinary,
+                .result = "%v2",
+                .type = mc::sema::NamedType("f32"),
+                .op = "+",
+                .operands = {"%v0", "%v1"},
+                .arithmetic_semantics = mc::mir::Instruction::ArithmeticSemantics::kWrap,
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject wrap semantics on floating-point arithmetic");
+    }
+    if (diagnostics.Render().find("wrap semantics are only valid") == std::string::npos) {
+        Fail("validator should explain invalid wrap semantics");
+    }
+}
+
 void TestValidatorRejectsGenericVolatileCall() {
     mc::support::DiagnosticSink diagnostics;
     mc::mir::Module module;
@@ -1497,6 +1614,7 @@ int main() {
     TestDeferArgumentsAreEvaluatedImmediately();
     TestStatementCallUsesVoidFallbackForUnresolvedCallee();
     TestDivisionAndShiftLoweringEmitExplicitChecks();
+    TestIntegerArithmeticLowersWithExplicitWrapSemantics();
     TestVolatileAndAtomicCallsLowerExplicitly();
     TestValidatorRejectsBadBranchTarget();
     TestValidatorRejectsNonBoolCondition();
@@ -1516,6 +1634,8 @@ int main() {
     TestValidatorRejectsBadSliceBoundType();
     TestValidatorRejectsBadBoundsCheckOperands();
     TestValidatorRejectsDivisionWithoutDivCheck();
+    TestValidatorRejectsIntegerArithmeticWithoutWrapSemantics();
+    TestValidatorRejectsWrapSemanticsOnFloatArithmetic();
     TestValidatorRejectsGenericVolatileCall();
     TestValidatorRejectsAtomicLoadBadOrderType();
     return 0;

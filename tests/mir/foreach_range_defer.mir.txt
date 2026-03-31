@@ -32,13 +32,13 @@ Module
       store_local target=value operands=[%v10]
       load_local %v11:i32 target=total
       load_local %v12:i32 target=value
-      binary %v13:i32 op=+ operands=[%v11, %v12]
+      binary %v13:i32 op=+ arithmetic=wrap operands=[%v11, %v12]
       store_local target=total operands=[%v13]
       terminator branch target=foreach_step3
     Block label=foreach_step3
       load_local %v14:usize target=$index2
       const %v15:usize op=1
-      binary %v16:usize op=+ operands=[%v14, %v15]
+      binary %v16:usize op=+ arithmetic=wrap operands=[%v14, %v15]
       store_local target=$index2 operands=[%v16]
       terminator branch target=foreach_cond1
     Block label=foreach_exit4
@@ -53,7 +53,7 @@ Module
     Block label=range_body6
       load_local %v21:i32 target=total
       load_local %v22:int_literal target=idx
-      binary %v23:i32 op=+ operands=[%v21, %v22]
+      binary %v23:i32 op=+ arithmetic=wrap operands=[%v21, %v22]
       store_local target=total operands=[%v23]
       terminator branch target=range_step7
     Block label=range_step7
