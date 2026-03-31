@@ -1,0 +1,131 @@
+Bootstrap Phase 5 Backend Slice Freeze
+
+Purpose
+
+This document closes Stage 0 of `phase5_bootstrap_execution_plan.txt`.
+It fixes the first backend choice, first hosted target, initial MIR lowering slice, and the narrower repository-specific meaning of Phase 5 bootstrap completion.
+It is intentionally narrower than the full backend surface described in `plan.txt`.
+
+Frozen backend choice
+
+- first backend: LLVM
+- backend subtree: `compiler/codegen_llvm/`
+- first hosted target: the current development host on macOS arm64
+- bootstrap target triple: `arm64-apple-darwin25.4.0`
+- target-family shorthand allowed in docs and diagnostics: `arm64-apple-darwin`
+- ordinary host toolchain assumption: object emission and linking go through the normal host LLVM/Clang toolchain rather than a custom linker path
+
+Repository interpretation of the target assumption
+
+- Phase 5 bootstrap is not multi-target work.
+- The first executable path is only required to run on the repository's current hosted Darwin arm64 development platform.
+- If later work normalizes the exact Darwin version suffix in the LLVM triple, that is an implementation detail and does not reopen Stage 0 as long as the target family remains hosted `arm64-apple-darwin`.
+- Freestanding startup, non-Darwin targets, cross-compilation, and backend selection switches remain out of scope for this bootstrap milestone.
+
+Frozen executable slice
+
+The initial runnable backend slice is intentionally smaller than the full current MIR surface.
+It exists to prove a real sema -> MIR -> backend -> object -> executable path before the repository spends effort on wider lowering coverage.
+
+Entry and module assumptions:
+
+- one checked root module lowers to one hosted executable
+- the executable entry follows the existing hosted convention from `runtime_spec.txt` and `build_spec.txt`: `func main(args: Slice<cstr>) i32`
+- the default hosted startup shim remains a thin external boundary; Phase 5 does not move startup semantics into the compiler
+- early executable smoke tests may ignore `args`, but the backend path must preserve a stable representation for the incoming `Slice<cstr>` entry parameter
+- only direct calls are in scope for the first runnable slice; no indirect calls or function-pointer dispatch are part of bootstrap bring-up
+
+Value and control-flow assumptions:
+
+- locals and parameters are limited to the scalar and control-flow forms needed by the first smoke cases: `bool`, integer scalars, and target-representable pointers only where the hosted entry boundary requires them
+- the first runnable slice covers constants, local loads and stores, integer unary and binary operations, comparisons, direct calls, branches, conditional branches, and returns
+- mutable memory through address-computed l-values is not part of the first runnable slice
+- user-defined aggregates are not required for the first runnable slice
+- the only aggregate representation admitted before later expansion is the hosted entry `Slice<cstr>` value handed to `main`; Stage 0 does not require field extraction, indexing, or slicing operations on that value in the first executable tests
+- globals are not required for the first hello-style path; if a later Phase 5 test adds globals, Stage 3 or Stage 4 must expand the frozen matrix explicitly rather than treating global lowering as implied
+
+Initial MIR lowering matrix
+
+The following MIR surface is in scope for initial backend lowering.
+Everything not listed here must fail directly and reviewably as unsupported backend input.
+
+In scope for the first runnable slice:
+
+- `Instruction::Kind::kConst`
+- `Instruction::Kind::kLoadLocal`
+- `Instruction::Kind::kStoreLocal`
+- `Instruction::Kind::kSymbolRef` when materializing a direct function symbol or another explicitly admitted bootstrap symbol
+- `Instruction::Kind::kUnary` for the integer and boolean operators required by the first smoke tests
+- `Instruction::Kind::kBinary` for integer arithmetic and comparisons required by the first smoke tests
+- `Instruction::Kind::kCall` when the callee is a direct function symbol and the call shape stays within the admitted scalar entry/call surface
+- `Terminator::Kind::kReturn`
+- `Terminator::Kind::kBranch`
+- `Terminator::Kind::kCondBranch`
+
+Conditionally deferred until later Phase 5 expansion:
+
+- `GlobalDecl` lowering for scalar globals with deterministic constant initialization
+- aggregate lowering beyond the hosted `main(args: Slice<cstr>) i32` boundary
+- representation-sensitive argument and return passing that goes beyond the first scalar smoke cases
+
+Explicitly out of scope for the initial runnable slice and required to fail crisply:
+
+- `Instruction::Kind::kStoreTarget`
+- `Instruction::Kind::kBoundsCheck`
+- `Instruction::Kind::kDivCheck`
+- `Instruction::Kind::kShiftCheck`
+- `Instruction::Kind::kConvert`
+- `Instruction::Kind::kConvertNumeric`
+- `Instruction::Kind::kConvertDistinct`
+- `Instruction::Kind::kPointerToInt`
+- `Instruction::Kind::kIntToPointer`
+- `Instruction::Kind::kArrayToSlice`
+- `Instruction::Kind::kBufferToSlice`
+- `Instruction::Kind::kVolatileLoad`
+- `Instruction::Kind::kVolatileStore`
+- `Instruction::Kind::kAtomicLoad`
+- `Instruction::Kind::kAtomicStore`
+- `Instruction::Kind::kAtomicExchange`
+- `Instruction::Kind::kAtomicCompareExchange`
+- `Instruction::Kind::kAtomicFetchAdd`
+- `Instruction::Kind::kField`
+- `Instruction::Kind::kIndex`
+- `Instruction::Kind::kSlice`
+- `Instruction::Kind::kAggregateInit`
+- `Instruction::Kind::kVariantMatch`
+- `Instruction::Kind::kVariantExtract`
+- extern ABI surfaces beyond the minimal hosted runtime/link boundary needed to start and exit a process
+- any MIR form that would require backend-owned reconstruction of sema facts instead of consuming MIR types and metadata directly
+
+Checked-semantics freeze for bootstrap
+
+- Phase 5 bootstrap does not begin by claiming executable support for `bounds_check`, `div_check`, or `shift_check`.
+- Those instructions already have MIR meaning, so backend work must either lower them explicitly in a later Phase 5 expansion or reject them with narrow backend diagnostics.
+- The repository must not treat target-default traps, undefined behavior, or implicit LLVM lowering as an acceptable substitute for explicit checked-operation support.
+- If checked operations are added to the supported executable slice later in Phase 5, the milestone evidence must include executable tests that prove the claimed behavior on the hosted Darwin arm64 target.
+
+What Stage 1 and later are allowed to build
+
+- Stage 1 may add LLVM backend scaffolding, target configuration plumbing, and backend diagnostics only for the frozen target above.
+- Stage 2 may choose LLVM IR text as the first inspectability surface if that remains the lowest-friction deterministic backend dump format on this host.
+- Stage 3 may implement only the in-scope matrix above before any broader lowering work begins.
+- Stage 4 may expand the admitted slice, but only by making the new scope explicit in docs and proving it with targeted executable tests.
+
+Bootstrap-complete meaning for this repository
+
+The narrower repository-specific Phase 5 bootstrap milestone is complete only when all of the following are true:
+
+- the first backend and hosted target remain explicit as LLVM on hosted `arm64-apple-darwin`
+- one checked source module with the canonical hosted `main(args: Slice<cstr>) i32` entry lowers through a real backend library under `compiler/codegen_llvm/`
+- the backend can emit an object file and link a hosted executable through ordinary host tooling on the first target
+- `tests/codegen/` contains end-to-end executable coverage for the admitted bootstrap slice, starting with hello-style entry and then the direct-call, integer, branch, and return surface actually claimed by the implementation
+- any MIR form still outside the admitted slice fails with narrow backend diagnostics rather than vague driver or linker failures
+- any later-added checked or representation-sensitive behavior is only claimed after executable tests prove it on the same hosted target
+- milestone wording stays narrower than the full `plan.txt` Phase 5 and does not imply multi-target, separate-compilation, optimizer, or full workflow completion
+
+Immediate consequences for implementation order
+
+- Stage 1 starts with LLVM backend scaffolding for hosted Darwin arm64 only
+- the first executable smoke path should be a hello-style `main` that does not require aggregate field extraction, checked faults, globals, or low-level memory operations
+- direct calls, integer arithmetic, and branch-heavy tests come next
+- checked faults, globals, aggregates, pointer-int conversions, slices, variants, volatile operations, and atomics stay out of scope until the earlier executable path is already stable

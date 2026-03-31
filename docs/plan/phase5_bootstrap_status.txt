@@ -1,0 +1,102 @@
+Bootstrap Phase 5 Status
+
+This repository has started Stage 0 of the narrower bootstrap Phase 5 plan by freezing the first backend and first executable slice, and it should still not claim that the full Phase 5 from plan.txt is finished.
+
+The ordered implementation sequence for this status note now lives in `docs/plan/phase5_bootstrap_execution_plan.txt`.
+The Stage 0 freeze note for that sequence now lives in `docs/plan/phase5_bootstrap_backend_slice.txt`.
+
+What is in place before Phase 5 begins:
+- typed MIR exists as a real compiler boundary after bootstrap semantic checking and before any backend work
+- `mc check` can parse, semantically check, lower to MIR, validate MIR, and emit deterministic MIR dumps for the currently supported bootstrap subset
+- deterministic semantic and MIR fixture coverage exists under `tests/sema/` and `tests/mir/`, giving Phase 5 a stable frontend contract to lower from
+- the tree already separates future backend and executable-test areas through placeholder directories in `compiler/codegen_llvm/` and `tests/codegen/`
+- the current driver remains intentionally thin and does not yet emit object code, invoke a linker, or produce executables
+- the current build stays green under the canonical local workflow, so Phase 5 can start from a known-good pre-backend baseline
+
+What Stage 0 has now fixed explicitly:
+- the first backend choice is LLVM
+- the first hosted bootstrap target is the current Darwin arm64 development host, recorded in repository terms as hosted `arm64-apple-darwin`
+- the initial runnable backend slice is intentionally smaller than the full MIR surface and starts with direct-call scalar control flow rather than globals, checked faults, aggregate-heavy lowering, low-level memory operations, or atomics
+- unsupported MIR outside that initial slice is now expected to fail with narrow backend diagnostics instead of being treated as implied future support
+- the repository-specific meaning of Phase 5 bootstrap completion is now written down separately from the full `plan.txt` milestone
+
+What a narrower bootstrap Phase 5 will need to satisfy:
+- lower the supported typed MIR subset to backend IR without letting backend defaults redefine Modern C language semantics
+- support enough code generation for ordinary procedures, globals, aggregates, calls, branches, and returns to produce runnable hosted executables
+- carry the sema-owned layout and MIR-owned checked-operation semantics through code generation for the supported bootstrap subset
+- provide a thin bootstrap path for object emission and linking without prematurely claiming the broader Phase 7 tool workflow
+- add executable-focused tests under `tests/codegen/` that prove the supported bootstrap subset runs end to end on the first hosted target
+
+What still blocks a Phase 5 completion claim:
+- no backend has been wired into the build as an actual code generation stage yet
+- `compiler/codegen_llvm/` is still only a placeholder, so no MIR-to-backend lowering contract exists in code yet
+- no object emission, assembly emission, or linker invocation path exists in the driver or test harness
+- no hosted runtime entry path is integrated for executable bring-up on a real target
+- no codegen integration tests exist yet for executable behavior, runtime faults, layout-sensitive data, or host linking
+
+Current structural debt worth tracking explicitly:
+- the current driver surface is inspection-oriented around `mc check`; Phase 5 should extend it only as far as backend bring-up requires and should avoid collapsing Phase 7 workflow concerns into early backend work
+- the repository currently has a MIR boundary but no backend-specific dump or validation layer, so Phase 5 will need to decide where backend-facing inspectability lives without weakening MIR as the semantic contract
+- runtime startup and platform-linking concerns remain outside the current bootstrap compiler path, so executable bring-up must define a narrow ownership boundary between compiler output and hosted runtime support
+
+Practical bootstrap interpretation:
+- the repository is entering Phase 5 from a green Phase 4 bootstrap baseline rather than from a parser-only or sema-only bring-up state
+- the immediate goal is not a full toolchain or build-system surface; it is a narrow, inspectable backend path that can turn the already-supported MIR subset into working executables on one hosted target
+- Phase 5 should continue to distinguish a narrower repository bootstrap milestone from the broader Phase 5 target in plan.txt
+
+Concrete next steps toward a narrower bootstrap completion note:
+1. add build wiring for a real backend library under `compiler/codegen_llvm/` against the already-frozen LLVM and hosted Darwin arm64 target
+2. implement the initial MIR-to-backend lowering contract defined in `phase5_bootstrap_backend_slice.txt`
+3. add the thinnest viable executable-emission path that can lower one checked module, emit an object, and link it with the hosted runtime boundary
+4. stand up `tests/codegen/` with a small end-to-end executable suite before expanding backend surface area
+5. only after those steps, consider writing a repository-specific `phase5_bootstrap_finish.txt` analogous to the earlier bootstrap milestone notes
+
+Detailed close-out task map:
+
+Theme: Backend scope and milestone framing
+- completed: restate the narrower bootstrap Phase 5 objective in repository terms so future work tracks the original plan.txt Phase 5 goal without overstating readiness
+- completed: choose the first backend implementation path and first hosted target triple or platform combination for bootstrap executable bring-up
+- completed: define the initial MIR instructions and semantic-boundary operations that count as the admitted bootstrap backend slice, with unsupported forms required to fail crisply
+- pending: document which tool workflow pieces are intentionally deferred to Phase 7 so Phase 5 stays focused on backend bring-up rather than general build orchestration
+
+Theme: Backend scaffolding and ownership boundaries
+- pending: add a real backend library under `compiler/codegen_llvm/` and wire it into CMake without bypassing the existing sema -> MIR boundary
+- pending: define the backend entry points, module/function lowering API, symbol materialization rules, and target-machine configuration for the chosen hosted target
+- pending: add backend-facing dump or debug output where it helps inspect lowering decisions without making backend IR the language definition
+- pending: keep driver responsibilities limited to pipeline orchestration so backend policy does not accumulate inside `compiler/driver/`
+
+Theme: MIR-to-backend instruction lowering
+- pending: lower the supported bootstrap MIR control-flow forms, including blocks, branches, conditional branches, switches if needed, and returns
+- pending: lower the admitted initial bootstrap value and effect instructions for locals, constants, `store_local`, direct calls, and direct symbol references before widening the slice further
+- pending: add checked MIR operations such as bounds checks, divide checks, and shift checks only after the initial executable path is stable and only with explicit executable proof on the first hosted target
+- pending: add pointer/integer boundaries, aggregate-heavy lowering, and the current volatile/atomic subset only after the narrower initial slice is already working end to end
+
+Theme: Type, layout, and data representation
+- pending: map MIR scalar, pointer, aggregate, array, slice, and buffer representations onto the chosen backend type system for the supported bootstrap subset
+- pending: preserve sema-computed struct layout, alignment, padding, and field-offset facts through global and stack allocation lowering
+- pending: define how distinct semantic types lower when they share representation with base types so backend representation does not erase sema-owned meaning in the wrong layer
+- pending: add layout-sensitive tests that prove backend data placement matches the current bootstrap semantic contract on the first hosted target
+
+Theme: Calls, globals, and hosted entry bring-up
+- pending: lower direct procedure calls, parameter passing, return values, and global definitions for the supported bootstrap calling surface
+- pending: define the minimal hosted entry path needed to turn a checked Modern C root module into a runnable program on the first target
+- pending: integrate the narrow runtime startup shim and any required support objects without turning runtime glue into ad hoc compiler semantics
+- pending: prove that simple executable cases such as hello-world-style entry, aggregate passing where supported, and global initialization work end to end
+
+Theme: Object emission, linking, and bootstrap driver surface
+- pending: add the minimum driver or internal tool path needed to emit backend output and produce an object file from one checked source module
+- pending: add a narrow link step through ordinary host platform tools so Phase 5 can produce executables without claiming a full `mc build` workflow
+- pending: define where build artifacts, temporary backend dumps, and produced executables live inside `build/` so output paths remain deterministic and disposable
+- pending: keep command-line surface growth minimal and explicitly bootstrap-scoped until separate compilation and broader tool workflow work begins later
+
+Theme: Checked behavior and runtime fault realization
+- pending: decide how the first hosted target realizes checked runtime faults emitted by MIR, including the supported divide, shift, and bounds failure cases
+- pending: ensure backend lowering preserves wraparound integer behavior where MIR already records it explicitly instead of inheriting accidental backend defaults
+- pending: validate that the supported volatile and atomic MIR instructions lower to correct backend operations for the chosen target subset
+- pending: add executable tests that distinguish correct checked behavior from silent miscompilation or target-default behavior
+
+Theme: Executable test coverage and milestone evidence
+- pending: populate `tests/codegen/` with narrow end-to-end executable cases that exercise the first supported backend surface before scaling up to broader examples
+- pending: add tests for ordinary procedures, globals, branches, returns, aggregates, arrays or slices where already supported, and the minimal hosted entry path
+- pending: add negative or diagnostic-oriented coverage where backend bring-up should fail crisply because a MIR form or target behavior is not yet supported
+- pending: define the evidence required for a future `phase5_bootstrap_finish.txt`, including green build-and-run coverage for the chosen hosted target and clear alignment with the original plan.txt Phase 5 exit criteria

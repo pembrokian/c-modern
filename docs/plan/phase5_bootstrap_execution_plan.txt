@@ -1,0 +1,226 @@
+Bootstrap Phase 5 Execution Plan
+
+Purpose
+
+This document turns the high-level Phase 5 bootstrap status into an ordered implementation plan.
+It is intentionally narrower than the full Phase 5 in `plan.txt`.
+The goal is to reach one inspectable hosted backend path that can turn the already-supported MIR subset into working executables on one target without collapsing later-phase workflow concerns into backend bring-up.
+
+Planning assumptions
+
+- the repository starts from a green bootstrap Phase 4 baseline with sema -> MIR already in place
+- the first backend choice is made at the Phase 4 to Phase 5 boundary rather than assumed as architecture from the start
+- LLVM remains the leading candidate backend unless concrete bring-up evidence forces a different choice
+- the first target remains one hosted platform only
+- the driver should stay thin; full `mc build` and broader tool workflow remain Phase 7 work
+
+Phase 5 bootstrap objective
+
+Implement the minimum backend path needed for one checked Modern C module to lower from typed MIR to backend output, emit an object, link a hosted executable, and run a narrow executable test suite on the first supported target.
+
+Explicit non-goals for this bootstrap plan
+
+- separate compilation or `.mci` consumption
+- multi-target support
+- optimization work beyond what is needed for correct executable bring-up
+- broad runtime or standard library expansion
+- full coverage of every MIR form not already needed by the chosen executable test slice
+- full `mc build` or `mc test` workflow design
+
+Execution order
+
+Stage 0 - Freeze the bootstrap backend slice
+
+Objective:
+Define the exact supported backend target and the minimum MIR surface that Phase 5 will lower.
+
+Stage 0 status:
+Completed and frozen in `docs/plan/phase5_bootstrap_backend_slice.txt`.
+
+Tasks:
+1. Confirm the first backend choice and hosted target.
+2. Record the exact target assumption in repository terms.
+3. Define the initial supported executable slice: root entry, direct calls, locals, integer arithmetic, branches, returns, globals, aggregates only if needed by the first tests, and the checked operations already explicit in MIR.
+4. List the MIR instructions that are explicitly in scope for initial lowering and list the forms that must fail crisply as unsupported.
+5. Define what Phase 5 bootstrap-complete means in repository terms, separate from the full `plan.txt` Phase 5.
+
+Outputs:
+- backend choice recorded in docs
+- initial supported MIR-lowering matrix
+- bootstrap success criteria for executable bring-up
+
+Stage 0 close-out note:
+- the frozen backend choice is LLVM
+- the frozen first hosted target is Darwin arm64 on the current development host, recorded as `arm64-apple-darwin`
+- the initial runnable slice is limited to direct-call scalar control flow and intentionally excludes checked faults, globals, aggregates beyond the hosted entry boundary, pointer-int conversions, slices, variants, volatile operations, and atomics until later explicit expansion
+- Phase 5 bootstrap-complete remains a narrower repository milestone and is not the same as full `plan.txt` Phase 5 completion
+
+Validation gate:
+- no codegen work begins until the in-scope MIR surface is written down clearly enough that tests can be chosen against it
+
+Stage 1 - Backend scaffolding and build wiring
+
+Objective:
+Create a real backend subsystem and wire it into the build without weakening the existing sema -> MIR boundary.
+
+Tasks:
+1. Add real source files under `compiler/codegen_llvm/`.
+2. Add a backend library target in CMake and link it into the `mc` executable.
+3. Define the backend entry API from MIR module to backend result.
+4. Define how target configuration is supplied to the backend for the first hosted target.
+5. Add narrow backend diagnostics so unsupported lowering fails directly and reviewably.
+
+Outputs:
+- compilable backend library
+- stable backend entry points
+- build graph that includes backend code without yet claiming end-to-end executable support
+
+Validation gate:
+- the tree builds with backend scaffolding present
+- existing parser, sema, MIR, and tool tests still pass unchanged
+
+Stage 2 - Backend inspectability and backend contract closure
+
+Objective:
+Make backend lowering inspectable before executable behavior depends on it.
+
+Tasks:
+1. Decide whether the first inspectability surface is backend IR text, emitted assembly, or both.
+2. Add deterministic backend dump support for the chosen inspectability surface.
+3. Define naming rules for functions, globals, temporaries, and backend artifacts so dumps remain reviewable.
+4. Keep dump generation optional and build-dir scoped, matching the existing AST and MIR dump path conventions.
+5. Document where backend dumps belong relative to MIR dumps so the semantic boundary stays clear.
+
+Outputs:
+- deterministic backend dump path and format for the first target
+- developer-visible proof that MIR is lowering through a real backend path
+
+Validation gate:
+- one or more focused smoke cases can lower to backend output deterministically without yet requiring a linked executable
+
+Stage 3 - Minimum MIR-to-backend lowering
+
+Objective:
+Lower the first supported executable slice from MIR to backend IR.
+
+Tasks:
+1. Lower module structure, functions, basic blocks, and terminators.
+2. Lower locals, constants, symbol refs, direct calls, loads, stores, and returns.
+3. Lower integer unary and binary operations already represented explicitly in MIR.
+4. Lower comparisons and branch conditions needed by the first control-flow tests.
+5. Lower stack allocation and local aggregate storage only as required by the chosen test slice.
+6. Lower direct global definitions needed by the initial executable cases.
+7. Fail crisply on MIR instructions not yet in scope instead of inventing fallback behavior.
+
+Outputs:
+- backend lowering for the minimum runnable subset
+- crisp unsupported-lowering diagnostics for out-of-scope MIR
+
+Validation gate:
+- deterministic backend dumps exist for the initial runnable slice
+- unsupported MIR forms fail with narrow backend diagnostics rather than vague driver failures
+
+Stage 4 - Representation correctness and checked semantics
+
+Objective:
+Preserve the semantics already made explicit in sema and MIR through code generation.
+
+Tasks:
+1. Map scalar and pointer MIR types to backend types for the initial target.
+2. Preserve sema-owned struct layout, alignment, padding, and field offsets for any aggregates used by the runnable slice.
+3. Ensure explicit wraparound integer behavior survives lowering where MIR marks it.
+4. Realize `bounds_check`, `div_check`, and `shift_check` in a target-correct way for the supported subset.
+5. Lower the currently supported pointer-int and low-level memory boundary operations only if they are part of the chosen executable slice; otherwise keep them explicitly out of scope.
+6. Decide how distinct semantic types share representation without moving language meaning into backend heuristics.
+
+Outputs:
+- first target representation rules for the supported slice
+- explicit checked-behavior lowering strategy
+
+Validation gate:
+- representation-sensitive smoke cases pass
+- checked-fault behavior is either executable-tested or explicitly blocked as not yet in the first runnable slice
+
+Stage 5 - Object emission, linking, and hosted entry
+
+Objective:
+Produce a real hosted executable from one checked module.
+
+Tasks:
+1. Add the minimum backend output path needed to emit an object file.
+2. Add the thinnest viable link step through ordinary host tooling.
+3. Define the minimal hosted entry path from Modern C root procedure to target executable start.
+4. Integrate only the required runtime startup shim or support object boundary.
+5. Keep artifact locations deterministic under `build/`.
+6. Extend the driver only as far as needed to perform the backend, object, and link pipeline.
+
+Outputs:
+- one checked source can produce one linked hosted executable
+- deterministic build artifact locations for backend outputs
+
+Validation gate:
+- an end-to-end hello-style executable builds and runs on the chosen hosted target
+- the driver still remains bootstrap-thin rather than growing into a Phase 7 build tool
+
+Stage 6 - Executable test suite and milestone close-out evidence
+
+Objective:
+Prove the supported bootstrap backend slice through executable tests and close-out criteria.
+
+Tasks:
+1. Populate `tests/codegen/` with a small but representative executable suite.
+2. Add end-to-end tests for entry, direct calls, integer operations, branches, returns, globals, and any aggregates included in scope.
+3. Add layout-sensitive tests if aggregate or global layout is part of the supported slice.
+4. Add checked-behavior tests for any explicit runtime faults claimed by the backend implementation.
+5. Add targeted negative coverage for unsupported backend forms where codegen should fail crisply.
+6. Document the exact evidence required for a later `phase5_bootstrap_finish.txt`.
+
+Outputs:
+- bootstrap codegen test suite under `tests/codegen/`
+- milestone evidence set for a narrower repository-specific Phase 5 completion note
+
+Validation gate:
+- the canonical local build remains green
+- codegen tests pass on the chosen first hosted target
+- milestone wording can point to concrete executable evidence rather than intended future work
+
+Recommended first vertical slice
+
+The first implementation slice should be intentionally narrow:
+1. one hosted target on the current development platform
+2. one root-module executable path
+3. one entry function convention
+4. direct calls only
+5. integer locals, constants, arithmetic, comparisons, branches, and returns
+6. minimal globals only if needed by the first smoke tests
+7. no separate compilation, no optimizer work, no broad runtime surface
+
+This slice is useful because it proves the end-to-end backend path before the repository spends time on aggregates, low-level memory operations, or wider runtime boundaries.
+
+Task dependency rules
+
+- do not expand driver command surface before object emission and linking actually exist
+- do not broaden MIR lowering coverage before one narrow executable slice runs end to end
+- do not claim aggregate or layout support in codegen until executable tests prove the backend respects sema-owned layout facts
+- do not lower checked MIR instructions through implicit target behavior when MIR already carries explicit semantic intent
+- do not turn runtime startup glue into hidden compiler semantics; keep the ownership boundary explicit
+
+Suggested immediate implementation order inside the stages
+
+1. choose LLVM plus first hosted target explicitly
+2. add `compiler/codegen_llvm/` library and CMake wiring
+3. define backend API and minimal dump support
+4. lower functions, blocks, returns, and integer arithmetic for one smoke case
+5. emit one object file and link one executable
+6. add `tests/codegen/hello_*` or equivalent smoke coverage
+7. extend to direct calls, branches, locals, and globals
+8. extend to checked operations and representation-sensitive cases only after the first executable path is stable
+
+Completion rule for the narrower bootstrap milestone
+
+The repository should only consider writing `phase5_bootstrap_finish.txt` after all of the following are true:
+- the first backend and hosted target are explicit and documented
+- one checked MIR-backed source module lowers through a real backend library to an object file and linked executable
+- executable tests exist for the supported bootstrap backend slice under `tests/codegen/`
+- the supported codegen path preserves the MIR-defined semantics it claims to support
+- the milestone wording remains narrower than the full `plan.txt` Phase 5
