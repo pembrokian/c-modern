@@ -105,6 +105,7 @@ int main(int argc, char** argv) {
         {"import_root_ok_main.mc", "import_root_ok_main.sema.txt", {"tests/sema/import_roots"}, true},
         {"layout_ok.mc", "layout_ok.sema.txt", {}, true},
         {"unknown_name_bad.mc", "unknown_name_bad.errors.txt", {}, false},
+        {"unknown_callee_bad.mc", "unknown_callee_bad.errors.txt", {}, false},
         {"missing_import_bad.mc", "missing_import_bad.errors.txt", {}, false},
         {"import_cycle_a.mc", "import_cycle_a.errors.txt", {}, false},
         {"return_type_bad.mc", "return_type_bad.errors.txt", {}, false},

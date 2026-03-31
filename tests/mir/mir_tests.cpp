@@ -133,6 +133,9 @@ void TestVariantSwitchLoweringSucceeds() {
 void TestForEachAndDeferLoweringSucceed() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
+        "func cleanup() {\n"
+        "}\n"
+        "\n"
         "func visit(values: Slice<i32>) i32 {\n"
         "    total: i32 = 0\n"
         "    defer cleanup()\n"
@@ -217,6 +220,33 @@ void TestKnownSymbolRefsAreTyped() {
     }
     if (dump.find("unknown") != std::string::npos) {
         Fail("supported symbol reference lowering should not emit unknown MIR types");
+    }
+}
+
+void TestMixedBindingOrAssignmentUsesSemanticClassification() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "func demo() i32 {\n"
+        "    left: i32 = 1\n"
+        "    left, right = 2, left\n"
+        "    return right\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("mixed binding-or-assignment lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("Local name=right type=i32") == std::string::npos) {
+        Fail("mixed binding-or-assignment lowering should create new locals for sema-classified bindings");
+    }
+    const auto load_pos = dump.find("load_local ");
+    const auto left_store_pos = dump.find("store_local target=left", load_pos == std::string::npos ? 0 : load_pos);
+    const auto right_store_pos = dump.find("store_local target=right", left_store_pos == std::string::npos ? 0 : left_store_pos);
+    if (load_pos == std::string::npos || left_store_pos == std::string::npos || right_store_pos == std::string::npos ||
+        !(load_pos < left_store_pos && left_store_pos < right_store_pos)) {
+        Fail("mixed binding-or-assignment lowering should evaluate right-hand sides before mutating targets");
     }
 }
 
@@ -368,6 +398,9 @@ void TestIntToPointerConversionLowersExplicitly() {
 void TestScopedDeferRunsBeforeFollowingStatement() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
+        "func inner() {\n"
+        "}\n"
+        "\n"
         "func nested(flag: bool) i32 {\n"
         "    total: i32 = 0\n"
         "    {\n"
@@ -399,6 +432,9 @@ void TestScopedDeferRunsBeforeFollowingStatement() {
 void TestLoopExitUnwindsScopedDefers() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
+        "func tick() {\n"
+        "}\n"
+        "\n"
         "func spin(limit: i32) i32 {\n"
         "    total: i32 = 0\n"
         "    while total < limit {\n"
@@ -430,6 +466,9 @@ void TestLoopExitUnwindsScopedDefers() {
 void TestSwitchArmUnwindsScopedDefers() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
+        "func hit() {\n"
+        "}\n"
+        "\n"
         "func choose(flag: i32) i32 {\n"
         "    switch flag {\n"
         "    case 0:\n"
@@ -457,6 +496,9 @@ void TestSwitchArmUnwindsScopedDefers() {
 void TestLoopIterationDefersRunBeforeStep() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
+        "func tick() {\n"
+        "}\n"
+        "\n"
         "func iterate() i32 {\n"
         "    for idx in 0..2 {\n"
         "        defer tick()\n"
@@ -481,6 +523,9 @@ void TestLoopIterationDefersRunBeforeStep() {
 void TestDeferArgumentsAreEvaluatedImmediately() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
+        "func hit(value: i32) {\n"
+        "}\n"
+        "\n"
         "func demo() i32 {\n"
         "    value: i32 = 1\n"
         "    defer hit(value)\n"
@@ -508,29 +553,32 @@ void TestDeferArgumentsAreEvaluatedImmediately() {
         Fail("defer argument snapshot should happen before later mutations and be reused on unwind");
     }
     if (dump.find("Local name=$defer_callee0 type=proc(i32)->void readonly") == std::string::npos) {
-        Fail("defer lowering should infer unresolved sink-call procedure types from the call site");
+        Fail("defer lowering should preserve sema-known callee procedure types in hidden locals");
     }
 }
 
-void TestStatementCallUsesVoidFallbackForUnresolvedCallee() {
+void TestUnresolvedCalleeFailsSemanticChecking() {
     mc::support::DiagnosticSink diagnostics;
-    const auto lowered = Lower(
+    const auto lexed = mc::lex::Lex(
         "func demo() i32 {\n"
         "    hit(1)\n"
         "    return 0\n"
         "}\n",
+        "<mir-test>",
         diagnostics);
 
-    if (!lowered.ok) {
-        Fail("statement call lowering should succeed:\n" + diagnostics.Render());
+    const auto parsed = mc::parse::Parse(lexed, "<mir-test>", diagnostics);
+    if (!parsed.ok) {
+        Fail("source should parse before semantic checking:\n" + diagnostics.Render());
     }
 
-    const auto dump = mc::mir::DumpModule(*lowered.module);
-    if (dump.find("symbol_ref %v") == std::string::npos || dump.find("->void target=hit") == std::string::npos) {
-        Fail("unresolved sink-call symbol references should carry a void-return procedure shape");
+    const auto checked = mc::sema::CheckSourceFile(*parsed.source_file, "<mir-test>", diagnostics);
+    if (checked.ok) {
+        Fail("semantic checking should reject unresolved callees");
     }
-    if (dump.find("call target=hit operands=[") == std::string::npos) {
-        Fail("statement calls should lower to side-effect calls without a materialized result value");
+
+    if (diagnostics.Render().find("unknown name: hit") == std::string::npos) {
+        Fail("semantic checking should report the unresolved callee name");
     }
 }
 
@@ -1600,6 +1648,7 @@ int main() {
     TestForEachAndDeferLoweringSucceed();
     TestForRangeUsesSemaRangeElementType();
     TestKnownSymbolRefsAreTyped();
+    TestMixedBindingOrAssignmentUsesSemanticClassification();
     TestExplicitConversionLowersToConvert();
     TestNumericConversionLowersToConvertNumeric();
     TestArrayToSliceConversionLowersExplicitly();
@@ -1612,7 +1661,7 @@ int main() {
     TestSwitchArmUnwindsScopedDefers();
     TestLoopIterationDefersRunBeforeStep();
     TestDeferArgumentsAreEvaluatedImmediately();
-    TestStatementCallUsesVoidFallbackForUnresolvedCallee();
+    TestUnresolvedCalleeFailsSemanticChecking();
     TestDivisionAndShiftLoweringEmitExplicitChecks();
     TestIntegerArithmeticLowersWithExplicitWrapSemantics();
     TestVolatileAndAtomicCallsLowerExplicitly();

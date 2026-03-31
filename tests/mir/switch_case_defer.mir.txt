@@ -1,4 +1,7 @@
 Module
+  Function name=hit
+    Block label=entry0
+      terminator return
   Function name=choose returns=[i32]
     Local name=flag type=i32 param readonly
     Local name=$defer_callee0 type=proc()->void readonly
@@ -13,7 +16,7 @@ Module
       const %v6:int_literal op=20
       terminator return values=[%v6]
     Block label=switch_case3
-      symbol_ref %v3:proc()->void target=hit target_kind=other target_name=hit
+      symbol_ref %v3:proc()->void target=hit target_kind=function target_name=hit
       store_local target=$defer_callee0 operands=[%v3]
       const %v4:int_literal op=10
       load_local %v5:proc()->void target=$defer_callee0

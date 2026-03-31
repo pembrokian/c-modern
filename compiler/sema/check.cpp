@@ -47,6 +47,20 @@ bool IsBuiltinNamedType(std::string_view name) {
            name == "cstr" || name == "void" || name == "Slice" || name == "Buffer" || name == "Result";
 }
 
+std::size_t ProcedureParamCount(const Type& type) {
+    if (type.kind != Type::Kind::kProcedure || type.metadata.empty()) {
+        return 0;
+    }
+    return static_cast<std::size_t>(std::stoul(type.metadata));
+}
+
+std::string CombineQualifiedName(const Expr& expr) {
+    if (expr.kind == Expr::Kind::kQualifiedName) {
+        return expr.text + "." + expr.secondary_text;
+    }
+    return expr.text;
+}
+
 std::size_t AlignTo(std::size_t value, std::size_t alignment) {
     if (alignment == 0) {
         return value;
@@ -118,17 +132,24 @@ bool IsAssignable(const Type& expected, const Type& actual);
 bool IsExplicitlyConvertible(const Type& expected, const Type& actual, const Module& module);
 
 Type StripAliasOrDistinct(Type type, const Module& module) {
-    if (type.kind != Type::Kind::kNamed) {
-        return type;
+    std::unordered_set<std::string> visited;
+    while (type.kind == Type::Kind::kNamed) {
+        if (!visited.insert(type.name).second) {
+            break;
+        }
+
+        const TypeDeclSummary* type_decl = FindTypeDecl(module, type.name);
+        if (type_decl == nullptr) {
+            break;
+        }
+        if (type_decl->kind != Decl::Kind::kDistinct && type_decl->kind != Decl::Kind::kTypeAlias) {
+            break;
+        }
+
+        type = type_decl->aliased_type;
     }
-    const TypeDeclSummary* type_decl = FindTypeDecl(module, type.name);
-    if (type_decl == nullptr) {
-        return type;
-    }
-    if (type_decl->kind != Decl::Kind::kDistinct && type_decl->kind != Decl::Kind::kTypeAlias) {
-        return type;
-    }
-    return type_decl->aliased_type;
+
+    return type;
 }
 
 Type InferExplicitConversionTarget(Type target, const Type& actual, const Module& module) {
@@ -175,8 +196,18 @@ bool IsExplicitlyConvertible(const Type& expected, const Type& actual, const Mod
 
     const Type stripped_expected = StripAliasOrDistinct(expected, module);
     const Type stripped_actual = StripAliasOrDistinct(actual, module);
-    if ((stripped_expected != expected || stripped_actual != actual) && IsExplicitlyConvertible(stripped_expected, stripped_actual, module)) {
+    if (IsAssignable(stripped_expected, stripped_actual)) {
         return true;
+    }
+
+    if (stripped_expected.kind == Type::Kind::kNamed && stripped_expected.name == "Slice" && !stripped_expected.subtypes.empty()) {
+        if (stripped_actual.kind == Type::Kind::kArray && !stripped_actual.subtypes.empty()) {
+            return IsAssignable(stripped_expected.subtypes.front(), stripped_actual.subtypes.front());
+        }
+        if (stripped_actual.kind == Type::Kind::kNamed && (stripped_actual.name == "Slice" || stripped_actual.name == "Buffer") &&
+            !stripped_actual.subtypes.empty()) {
+            return IsAssignable(stripped_expected.subtypes.front(), stripped_actual.subtypes.front());
+        }
     }
 
     if ((IsPointerLikeType(stripped_expected) && IsUintPtrType(stripped_actual)) ||
@@ -287,6 +318,11 @@ void WriteLine(std::ostringstream& stream, int indent, const std::string& text) 
 bool SameSpan(const mc::support::SourceSpan& left, const mc::support::SourceSpan& right) {
     return left.begin.line == right.begin.line && left.begin.column == right.begin.column && left.end.line == right.end.line &&
            left.end.column == right.end.column;
+}
+
+std::string SpanKey(const mc::support::SourceSpan& span) {
+        return std::to_string(span.begin.line) + ":" + std::to_string(span.begin.column) + "-" + std::to_string(span.end.line) + ":" +
+                     std::to_string(span.end.column);
 }
 
 class Checker {
@@ -682,7 +718,7 @@ class Checker {
 
         LayoutInfo layout;
         layout.valid = true;
-        layout.alignment = type_decl->is_packed ? 1 : 1;
+        layout.alignment = type_decl->is_packed ? 1 : 0;
         std::size_t size = 0;
         for (const auto& field : type_decl->fields) {
             const LayoutInfo field_layout = ComputeTypeLayout(field.second, span, active_types);
@@ -725,7 +761,7 @@ class Checker {
 
             ValidateTypeExpr(decl.type_ann.get(), {}, decl.span);
             for (const auto& value : decl.values) {
-                (void)AnalyzeExpr(*value, false);
+                (void)AnalyzeExpr(*value);
             }
         }
     }
@@ -794,16 +830,31 @@ class Checker {
     }
 
     void RecordExprType(const Expr& expr, const Type& type) {
-        for (auto& fact : module_->expr_types) {
-            if (SameSpan(fact.span, expr.span)) {
-                fact.type = type;
-                return;
-            }
+        const std::string key = SpanKey(expr.span);
+        const auto found = module_->expr_type_indices.find(key);
+        if (found != module_->expr_type_indices.end()) {
+            module_->expr_types[found->second].type = type;
+            return;
         }
         module_->expr_types.push_back({
             .span = expr.span,
             .type = type,
         });
+        module_->expr_type_indices[key] = module_->expr_types.size() - 1;
+    }
+
+    void RecordBindingOrAssignFact(const Stmt& stmt, std::vector<BindingOrAssignResolution> resolutions) {
+        const std::string key = SpanKey(stmt.span);
+        const auto found = module_->binding_or_assign_indices.find(key);
+        if (found != module_->binding_or_assign_indices.end()) {
+            module_->binding_or_assign_facts[found->second].resolutions = std::move(resolutions);
+            return;
+        }
+        module_->binding_or_assign_facts.push_back({
+            .span = stmt.span,
+            .resolutions = std::move(resolutions),
+        });
+        module_->binding_or_assign_indices[key] = module_->binding_or_assign_facts.size() - 1;
     }
 
     const TypeDeclSummary* LookupStructType(const Type& type) const {
@@ -844,17 +895,16 @@ class Checker {
             return UnknownType();
         }
 
-        const FunctionSignature* signature = nullptr;
         Type conversion_target = UnknownType();
         if (expr.type_target != nullptr) {
             ValidateTypeExpr(expr.type_target.get(), current_function_ != nullptr ? current_function_->type_params : std::vector<std::string> {}, expr.type_target->span);
             conversion_target = TypeFromAst(expr.type_target.get());
-        } else if (expr.left != nullptr && expr.left->kind == Expr::Kind::kName) {
-            signature = FindFunctionSignature(*module_, expr.left->text);
         }
 
+        std::vector<Type> arg_types;
+        arg_types.reserve(expr.args.size());
         for (const auto& arg : expr.args) {
-            (void)AnalyzeExpr(*arg, false);
+            arg_types.push_back(AnalyzeExpr(*arg));
         }
 
         if (!IsUnknown(conversion_target)) {
@@ -863,7 +913,7 @@ class Checker {
                                       std::to_string(expr.args.size()));
                 return conversion_target;
             }
-            const Type actual = AnalyzeExpr(*expr.args.front(), false);
+            const Type actual = arg_types.front();
             conversion_target = InferExplicitConversionTarget(conversion_target, actual, *module_);
             if (!IsExplicitlyConvertible(conversion_target, actual, *module_)) {
                 Report(expr.args.front()->span,
@@ -872,7 +922,12 @@ class Checker {
             return conversion_target;
         }
 
-        if (signature == nullptr) {
+        if (expr.left == nullptr) {
+            return UnknownType();
+        }
+
+        const Type callee_type = AnalyzeExpr(*expr.left);
+        if (IsUnknown(callee_type)) {
             if (expr.left != nullptr && expr.left->kind == Expr::Kind::kName &&
                 IsKnownTypeName(expr.left->text, current_function_ != nullptr ? current_function_->type_params : std::vector<std::string> {})) {
                 Report(expr.span, "explicit conversions require parenthesized type-expression syntax");
@@ -880,31 +935,61 @@ class Checker {
             return UnknownType();
         }
 
-        if (signature->param_types.size() != expr.args.size()) {
-            Report(expr.span, "call to " + signature->name + " expects " + std::to_string(signature->param_types.size()) +
-                                  " arguments but got " + std::to_string(expr.args.size()));
-            return signature->return_types.empty() ? VoidType() : signature->return_types.front();
+        const Type stripped_callee = StripAliasOrDistinct(callee_type, *module_);
+        if (stripped_callee.kind != Type::Kind::kProcedure) {
+            Report(expr.left->span, "call target must have procedure type");
+            return UnknownType();
+        }
+
+        const std::size_t param_count = ProcedureParamCount(stripped_callee);
+        const std::string callee_name = CombineQualifiedName(*expr.left);
+        const bool has_named_callee = expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName;
+
+        if (param_count != expr.args.size()) {
+            const std::string message_prefix = has_named_callee ? "call to " + callee_name : "call target";
+            Report(expr.span,
+                   message_prefix + " expects " + std::to_string(param_count) + " arguments but got " + std::to_string(expr.args.size()));
+            if (param_count >= stripped_callee.subtypes.size()) {
+                return VoidType();
+            }
+            const std::vector<Type> returns(stripped_callee.subtypes.begin() + static_cast<std::ptrdiff_t>(param_count),
+                                            stripped_callee.subtypes.end());
+            if (returns.empty()) {
+                return VoidType();
+            }
+            if (returns.size() == 1) {
+                return returns.front();
+            }
+            return TupleType(returns);
         }
 
         for (std::size_t index = 0; index < expr.args.size(); ++index) {
-            const Type actual = AnalyzeExpr(*expr.args[index], false);
-            if (!IsAssignable(signature->param_types[index], actual)) {
+            const Type& actual = arg_types[index];
+            const Type& expected = stripped_callee.subtypes[index];
+            if (!IsAssignable(expected, actual)) {
+                const std::string callee_label = has_named_callee ? callee_name : "call target";
                 Report(expr.args[index]->span,
-                       "argument type mismatch for parameter " + std::to_string(index + 1) + " of " + signature->name +
-                           ": expected " + FormatType(signature->param_types[index]) + ", got " + FormatType(actual));
+                       "argument type mismatch for parameter " + std::to_string(index + 1) + " of " + callee_label +
+                           ": expected " + FormatType(expected) + ", got " + FormatType(actual));
             }
         }
 
-        if (signature->return_types.empty()) {
+        if (param_count >= stripped_callee.subtypes.size()) {
             return VoidType();
         }
-        if (signature->return_types.size() == 1) {
-            return signature->return_types.front();
+
+        const std::vector<Type> returns(stripped_callee.subtypes.begin() + static_cast<std::ptrdiff_t>(param_count),
+                                        stripped_callee.subtypes.end());
+        if (returns.empty()) {
+            return VoidType();
         }
-        return TupleType(signature->return_types);
+        if (returns.size() == 1) {
+            return returns.front();
+        }
+        return TupleType(returns);
     }
 
-    Type AnalyzeExpr(const Expr& expr, bool allow_unresolved_name) {
+    Type AnalyzeExpr(const Expr& expr) {
         const auto record = [&](const Type& type) {
             RecordExprType(expr, type);
             return type;
@@ -922,9 +1007,7 @@ class Checker {
                 if (const auto* global = FindGlobalSummary(*module_, expr.text); global != nullptr) {
                     return record(global->type);
                 }
-                if (!allow_unresolved_name) {
-                    Report(expr.span, "unknown name: " + expr.text);
-                }
+                Report(expr.span, "unknown name: " + expr.text);
                 return record(UnknownType());
             }
             case Expr::Kind::kQualifiedName:
@@ -957,11 +1040,19 @@ class Checker {
                 if (const auto* function = FindFunctionSignature(*module_, expr.text + "." + expr.secondary_text); function != nullptr) {
                     return record(ProcedureType(function->param_types, function->return_types));
                 }
+                if (const auto* type_decl = FindTypeDecl(*module_, expr.text);
+                    type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
+                    for (const auto& variant : type_decl->variants) {
+                        if (variant.name == expr.secondary_text) {
+                            return record(NamedType(expr.text));
+                        }
+                    }
+                }
                 return record(UnknownType());
             case Expr::Kind::kLiteral:
                 return record(InferLiteralType(expr));
             case Expr::Kind::kUnary: {
-                const Type operand = AnalyzeExpr(*expr.left, false);
+                const Type operand = AnalyzeExpr(*expr.left);
                 if (expr.text == "!" && !IsUnknown(operand) && !IsBoolType(operand)) {
                     Report(expr.span, "logical not requires bool operand");
                 }
@@ -985,8 +1076,8 @@ class Checker {
             }
             case Expr::Kind::kBinary:
             case Expr::Kind::kRange: {
-                const Type left = AnalyzeExpr(*expr.left, false);
-                const Type right = AnalyzeExpr(*expr.right, false);
+                const Type left = AnalyzeExpr(*expr.left);
+                const Type right = AnalyzeExpr(*expr.right);
                 if (expr.kind == Expr::Kind::kRange) {
                     const Type element = MergeNumericTypes(left, right);
                     if (IsUnknown(element)) {
@@ -1035,7 +1126,7 @@ class Checker {
                 return record(AnalyzeCall(expr));
             case Expr::Kind::kField:
             case Expr::Kind::kDerefField: {
-                const Type base = AnalyzeExpr(*expr.left, false);
+                const Type base = AnalyzeExpr(*expr.left);
                 if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer") && expr.text == "len") {
                     return record(NamedType("usize"));
                 }
@@ -1055,8 +1146,8 @@ class Checker {
                 return record(UnknownType());
             }
             case Expr::Kind::kIndex: {
-                const Type base = AnalyzeExpr(*expr.left, false);
-                (void)AnalyzeExpr(*expr.right, false);
+                const Type base = AnalyzeExpr(*expr.left);
+                (void)AnalyzeExpr(*expr.right);
                 if (base.kind == Type::Kind::kArray && !base.subtypes.empty()) {
                     return record(base.subtypes.front());
                 }
@@ -1067,12 +1158,12 @@ class Checker {
             }
             case Expr::Kind::kSlice:
             {
-                const Type base = AnalyzeExpr(*expr.left, false);
+                const Type base = AnalyzeExpr(*expr.left);
                 if (expr.right != nullptr) {
-                    (void)AnalyzeExpr(*expr.right, false);
+                    (void)AnalyzeExpr(*expr.right);
                 }
                 if (expr.extra != nullptr) {
-                    (void)AnalyzeExpr(*expr.extra, false);
+                    (void)AnalyzeExpr(*expr.extra);
                 }
                 if (base.kind == Type::Kind::kArray && !base.subtypes.empty()) {
                     Type slice = NamedType("Slice");
@@ -1105,7 +1196,7 @@ class Checker {
                     }
                     for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
                         const auto& field_init = expr.field_inits[index];
-                        const Type value_type = AnalyzeExpr(*field_init.value, false);
+                        const Type value_type = AnalyzeExpr(*field_init.value);
                         if (field_init.has_name) {
                             const auto found = fields.find(field_init.name);
                             if (found == fields.end()) {
@@ -1131,13 +1222,13 @@ class Checker {
                     }
                 } else {
                     for (const auto& field_init : expr.field_inits) {
-                        (void)AnalyzeExpr(*field_init.value, false);
+                        (void)AnalyzeExpr(*field_init.value);
                     }
                 }
                 return record(aggregate_type);
             }
             case Expr::Kind::kParen:
-                return record(AnalyzeExpr(*expr.left, false));
+                return record(AnalyzeExpr(*expr.left));
         }
 
         return record(UnknownType());
@@ -1161,7 +1252,7 @@ class Checker {
             return;
         }
 
-        (void)AnalyzeExpr(expr, false);
+        (void)AnalyzeExpr(expr);
     }
 
     void CheckStmtList(const std::vector<std::unique_ptr<Stmt>>& statements, bool create_scope) {
@@ -1194,12 +1285,12 @@ class Checker {
                 return;
             case Stmt::Kind::kExpr:
                 if (!stmt.exprs.empty()) {
-                    (void)AnalyzeExpr(*stmt.exprs.front(), false);
+                    (void)AnalyzeExpr(*stmt.exprs.front());
                 }
                 return;
             case Stmt::Kind::kIf:
                 if (!stmt.exprs.empty()) {
-                    const Type condition = AnalyzeExpr(*stmt.exprs.front(), false);
+                    const Type condition = AnalyzeExpr(*stmt.exprs.front());
                     if (!IsUnknown(condition) && !IsBoolType(condition)) {
                         Report(stmt.exprs.front()->span, "if condition must have type bool");
                     }
@@ -1243,7 +1334,7 @@ class Checker {
                     Report(stmt.span, "defer requires a call expression in the bootstrap semantic checker");
                     return;
                 }
-                (void)AnalyzeExpr(*stmt.exprs.front(), false);
+                (void)AnalyzeExpr(*stmt.exprs.front());
                 return;
         }
     }
@@ -1251,44 +1342,60 @@ class Checker {
     void CheckBindingLike(const Stmt& stmt, bool is_mutable) {
         ValidateTypeExpr(stmt.type_ann.get(), current_function_ != nullptr ? current_function_->type_params : std::vector<std::string> {}, stmt.span);
         const Type declared_type = TypeFromAst(stmt.type_ann.get());
+        if (stmt.has_initializer && stmt.pattern.names.size() != stmt.exprs.size()) {
+            Report(stmt.span, "binding requires one initializer per bound name");
+            return;
+        }
+
+        std::vector<Type> value_types;
+        value_types.reserve(stmt.pattern.names.size());
         for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
             Type value_type = declared_type;
             if (index < stmt.exprs.size()) {
-                value_type = AnalyzeExpr(*stmt.exprs[index], false);
+                value_type = AnalyzeExpr(*stmt.exprs[index]);
                 if (!IsUnknown(declared_type) && !IsAssignable(declared_type, value_type)) {
                     Report(stmt.exprs[index]->span, "binding type mismatch for " + stmt.pattern.names[index] + ": expected " +
                                                    FormatType(declared_type) + ", got " + FormatType(value_type));
                 }
             }
-            BindValue(stmt.pattern.names[index], IsUnknown(declared_type) ? value_type : declared_type, is_mutable, stmt.span);
+            value_types.push_back(value_type);
+        }
+
+        for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+            BindValue(stmt.pattern.names[index], IsUnknown(declared_type) ? value_types[index] : declared_type, is_mutable, stmt.span);
         }
     }
 
     void CheckBindingOrAssign(const Stmt& stmt) {
-        bool any_existing = false;
-        bool any_missing = false;
-        for (const auto& name : stmt.pattern.names) {
-            if (LookupValue(name).has_value()) {
-                any_existing = true;
-            } else {
-                any_missing = true;
-            }
-        }
-        if (any_existing && any_missing) {
-            Report(stmt.span, "cannot mix existing assignments and new bindings in one binding-or-assignment statement");
+        if (stmt.pattern.names.size() != stmt.exprs.size()) {
+            Report(stmt.span, "binding-or-assignment requires one value per name");
             return;
         }
-        if (any_existing) {
-            for (std::size_t index = 0; index < stmt.pattern.names.size() && index < stmt.exprs.size(); ++index) {
+
+        std::vector<Type> value_types;
+        value_types.reserve(stmt.exprs.size());
+        for (const auto& expr : stmt.exprs) {
+            value_types.push_back(AnalyzeExpr(*expr));
+        }
+
+        std::vector<BindingOrAssignResolution> resolutions;
+        resolutions.reserve(stmt.pattern.names.size());
+        for (const auto& name : stmt.pattern.names) {
+            resolutions.push_back(LookupValue(name).has_value() ? BindingOrAssignResolution::kAssign : BindingOrAssignResolution::kBind);
+        }
+        RecordBindingOrAssignFact(stmt, resolutions);
+
+        for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+            if (resolutions[index] == BindingOrAssignResolution::kAssign) {
                 Expr target;
                 target.kind = Expr::Kind::kName;
                 target.text = stmt.pattern.names[index];
                 target.span = stmt.span;
-                CheckAssignableTarget(target, AnalyzeExpr(*stmt.exprs[index], false));
+                CheckAssignableTarget(target, value_types[index]);
+                continue;
             }
-            return;
+            BindValue(stmt.pattern.names[index], value_types[index], true, stmt.span);
         }
-        CheckBindingLike(stmt, true);
     }
 
     void CheckAssign(const Stmt& stmt) {
@@ -1297,17 +1404,17 @@ class Checker {
             return;
         }
         for (std::size_t index = 0; index < stmt.assign_targets.size(); ++index) {
-            const Type value_type = AnalyzeExpr(*stmt.assign_values[index], false);
+            const Type value_type = AnalyzeExpr(*stmt.assign_values[index]);
             CheckAssignableTarget(*stmt.assign_targets[index], value_type);
         }
     }
 
     void CheckSwitch(const Stmt& stmt) {
-        const Type selector = stmt.exprs.empty() ? UnknownType() : AnalyzeExpr(*stmt.exprs.front(), false);
+        const Type selector = stmt.exprs.empty() ? UnknownType() : AnalyzeExpr(*stmt.exprs.front());
         for (const auto& switch_case : stmt.switch_cases) {
             PushScope();
             if (switch_case.pattern.kind == mc::ast::CasePattern::Kind::kExpr && switch_case.pattern.expr != nullptr) {
-                const Type pattern_type = AnalyzeExpr(*switch_case.pattern.expr, false);
+                const Type pattern_type = AnalyzeExpr(*switch_case.pattern.expr);
                 if (!IsUnknown(selector) && !IsUnknown(pattern_type) && !IsAssignable(selector, pattern_type) && !IsAssignable(pattern_type, selector)) {
                     Report(switch_case.pattern.span, "switch case pattern type does not match selector type");
                 }
@@ -1337,7 +1444,7 @@ class Checker {
 
     void CheckConditionLoop(const Stmt& stmt) {
         if (!stmt.exprs.empty()) {
-            const Type condition = AnalyzeExpr(*stmt.exprs.front(), false);
+            const Type condition = AnalyzeExpr(*stmt.exprs.front());
             if (!IsUnknown(condition) && !IsBoolType(condition)) {
                 Report(stmt.exprs.front()->span, "loop condition must have type bool");
             }
@@ -1353,7 +1460,7 @@ class Checker {
         if (stmt.exprs.empty()) {
             return;
         }
-        const Type iterable = AnalyzeExpr(*stmt.exprs.front(), false);
+        const Type iterable = AnalyzeExpr(*stmt.exprs.front());
         Type element_type = UnknownType();
         if (iterable.kind == Type::Kind::kArray && !iterable.subtypes.empty()) {
             element_type = iterable.subtypes.front();
@@ -1381,7 +1488,7 @@ class Checker {
         if (stmt.exprs.empty()) {
             return;
         }
-        const Type range_type = AnalyzeExpr(*stmt.exprs.front(), false);
+        const Type range_type = AnalyzeExpr(*stmt.exprs.front());
         Type element_type = UnknownType();
         if (range_type.kind == Type::Kind::kRange && !range_type.subtypes.empty()) {
             element_type = range_type.subtypes.front();
@@ -1405,7 +1512,7 @@ class Checker {
             return;
         }
         for (std::size_t index = 0; index < stmt.exprs.size(); ++index) {
-            const Type actual = AnalyzeExpr(*stmt.exprs[index], false);
+            const Type actual = AnalyzeExpr(*stmt.exprs[index]);
             if (!IsAssignable(current_function_->return_types[index], actual)) {
                 Report(stmt.exprs[index]->span,
                        "return type mismatch: expected " + FormatType(current_function_->return_types[index]) + ", got " +
@@ -1641,10 +1748,17 @@ const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view na
 }
 
 const Type* FindExprType(const Module& module, const ast::Expr& expr) {
-    for (const auto& fact : module.expr_types) {
-        if (SameSpan(fact.span, expr.span)) {
-            return &fact.type;
-        }
+    const auto found = module.expr_type_indices.find(SpanKey(expr.span));
+    if (found != module.expr_type_indices.end() && found->second < module.expr_types.size()) {
+        return &module.expr_types[found->second].type;
+    }
+    return nullptr;
+}
+
+const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const ast::Stmt& stmt) {
+    const auto found = module.binding_or_assign_indices.find(SpanKey(stmt.span));
+    if (found != module.binding_or_assign_indices.end() && found->second < module.binding_or_assign_facts.size()) {
+        return &module.binding_or_assign_facts[found->second];
     }
     return nullptr;
 }

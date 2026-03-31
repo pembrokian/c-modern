@@ -1,3 +1,6 @@
+func inner() {
+}
+
 func nested(flag: bool) i32 {
     total: i32 = 0
     {

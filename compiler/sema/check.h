@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "compiler/ast/ast.h"
@@ -58,12 +59,25 @@ struct ExprTypeFact {
     Type type;
 };
 
+enum class BindingOrAssignResolution {
+    kBind,
+    kAssign,
+};
+
+struct BindingOrAssignFact {
+    support::SourceSpan span {};
+    std::vector<BindingOrAssignResolution> resolutions;
+};
+
 struct Module {
     std::vector<std::string> imports;
     std::vector<TypeDeclSummary> type_decls;
     std::vector<GlobalSummary> globals;
     std::vector<FunctionSignature> functions;
     std::vector<ExprTypeFact> expr_types;
+    std::vector<BindingOrAssignFact> binding_or_assign_facts;
+    std::unordered_map<std::string, std::size_t> expr_type_indices;
+    std::unordered_map<std::string, std::size_t> binding_or_assign_indices;
 };
 
 struct CheckResult {
@@ -92,6 +106,7 @@ const FunctionSignature* FindFunctionSignature(const Module& module, std::string
 const TypeDeclSummary* FindTypeDecl(const Module& module, std::string_view name);
 const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view name);
 const Type* FindExprType(const Module& module, const ast::Expr& expr);
+const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const ast::Stmt& stmt);
 std::string DumpModule(const Module& module);
 
 }  // namespace mc::sema

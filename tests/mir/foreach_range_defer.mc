@@ -1,3 +1,6 @@
+func cleanup() {
+}
+
 func walk(values: Slice<i32>) i32 {
     total: i32 = 0
     defer cleanup()

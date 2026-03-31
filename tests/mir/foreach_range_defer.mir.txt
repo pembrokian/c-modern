@@ -1,4 +1,7 @@
 Module
+  Function name=cleanup
+    Block label=entry0
+      terminator return
   Function name=walk returns=[i32]
     Local name=values type=Slice<i32> param readonly
     Local name=total type=i32
@@ -11,7 +14,7 @@ Module
     Block label=entry0
       const %v0:int_literal op=0
       store_local target=total operands=[%v0]
-      symbol_ref %v1:proc()->void target=cleanup target_kind=other target_name=cleanup
+      symbol_ref %v1:proc()->void target=cleanup target_kind=function target_name=cleanup
       store_local target=$defer_callee0 operands=[%v1]
       load_local %v2:Slice<i32> target=values
       store_local target=$iterable1 operands=[%v2]

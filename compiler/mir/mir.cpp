@@ -139,6 +139,39 @@ std::string_view ToString(Instruction::ArithmeticSemantics semantics) {
     return "none";
 }
 
+std::string_view ToString(Expr::Kind kind) {
+    switch (kind) {
+        case Expr::Kind::kName:
+            return "name";
+        case Expr::Kind::kQualifiedName:
+            return "qualified-name";
+        case Expr::Kind::kLiteral:
+            return "literal";
+        case Expr::Kind::kUnary:
+            return "unary";
+        case Expr::Kind::kBinary:
+            return "binary";
+        case Expr::Kind::kRange:
+            return "range";
+        case Expr::Kind::kCall:
+            return "call";
+        case Expr::Kind::kField:
+            return "field";
+        case Expr::Kind::kDerefField:
+            return "deref-field";
+        case Expr::Kind::kIndex:
+            return "index";
+        case Expr::Kind::kSlice:
+            return "slice";
+        case Expr::Kind::kAggregateInit:
+            return "aggregate-init";
+        case Expr::Kind::kParen:
+            return "paren";
+    }
+
+    return "expr";
+}
+
 std::string VariantTypeName(std::string_view variant_name) {
     const std::size_t separator = variant_name.find('.');
     if (separator == std::string_view::npos) {
@@ -711,24 +744,9 @@ class FunctionLowerer {
         return {type};
     }
 
-    sema::Type InferCalleeTypeFromCallSite(const Expr& call_expr, const sema::Type& result_type) const {
-        std::vector<sema::Type> param_types;
-        param_types.reserve(call_expr.args.size());
-        for (const auto& arg : call_expr.args) {
-            param_types.push_back(ExprTypeOrUnknown(*arg));
-        }
-        return sema::ProcedureType(std::move(param_types), ExpandReturnTypes(result_type));
-    }
-
     sema::Type ExprTypeOrUnknown(const Expr& expr) const {
         if (const sema::Type* type = sema::FindExprType(sema_module_, expr); type != nullptr) {
             return *type;
-        }
-        if (expr.kind == Expr::Kind::kName) {
-            return InferSymbolRefType(expr.text);
-        }
-        if (expr.kind == Expr::Kind::kQualifiedName) {
-            return InferSymbolRefType(CombineQualifiedName(expr));
         }
         return sema::UnknownType();
     }
@@ -841,12 +859,11 @@ class FunctionLowerer {
             args.push_back(LowerExpr(*arg));
         }
 
-        const sema::Type call_type = ExprTypeOrUnknown(expr);
-        const sema::Type fallback_result_type = sema::IsUnknown(call_type) ? sema::VoidType() : call_type;
-        if (TryEmitSpecialCall(expr, args, fallback_result_type, false, nullptr)) {
+        const sema::Type call_type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "statement call result type");
+        if (TryEmitSpecialCall(expr, args, call_type, false, nullptr)) {
             return;
         }
-        const auto callee = LowerCalleeExpr(*expr.left, InferCalleeTypeFromCallSite(expr, fallback_result_type));
+        const auto callee = LowerCalleeExpr(*expr.left);
 
         std::vector<std::string> operands = {callee.value};
         for (const auto& arg : args) {
@@ -855,19 +872,16 @@ class FunctionLowerer {
 
         Emit({
             .kind = Instruction::Kind::kCall,
-            .type = fallback_result_type,
-            .target = RenderExprInline(*expr.left),
+            .type = call_type,
+            .target = CalleeName(*expr.left).empty() ? RenderExprInline(*expr.left) : CalleeName(*expr.left),
             .operands = std::move(operands),
         });
     }
 
-    ValueInfo LowerCalleeExpr(const Expr& expr, const sema::Type& fallback_type) {
+    ValueInfo LowerCalleeExpr(const Expr& expr) {
         if (expr.kind == Expr::Kind::kName) {
             const std::string value = NewValue();
-            sema::Type type = ExprTypeOrUnknown(expr);
-            if (sema::IsUnknown(type)) {
-                type = fallback_type;
-            }
+            const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "callee type for " + expr.text);
             Emit({
                 .kind = Instruction::Kind::kSymbolRef,
                 .result = value,
@@ -881,10 +895,7 @@ class FunctionLowerer {
         if (expr.kind == Expr::Kind::kQualifiedName) {
             const std::string qualified_name = CombineQualifiedName(expr);
             const std::string value = NewValue();
-            sema::Type type = ExprTypeOrUnknown(expr);
-            if (sema::IsUnknown(type)) {
-                type = fallback_type;
-            }
+            const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "callee type for " + qualified_name);
             Emit({
                 .kind = Instruction::Kind::kSymbolRef,
                 .result = value,
@@ -908,9 +919,9 @@ class FunctionLowerer {
         for (const auto& arg : expr.args) {
             args.push_back(LowerExpr(*arg));
         }
-        const auto callee = LowerCalleeExpr(*expr.left, InferCalleeTypeFromCallSite(expr, sema::VoidType()));
+        const auto callee = LowerCalleeExpr(*expr.left);
         DeferredCall call {
-            .target = RenderExprInline(*expr.left),
+            .target = CalleeName(*expr.left).empty() ? RenderExprInline(*expr.left) : CalleeName(*expr.left),
             .type = sema::VoidType(),
             .callee_local = NewHiddenLocal("defer_callee"),
         };
@@ -955,7 +966,7 @@ class FunctionLowerer {
         if (!sema::IsUnknown(type)) {
             return type;
         }
-        Report(span, "bootstrap MIR requires sema-known " + context);
+        Report(span, "MIR lowering requires semantic type information for " + context);
         return sema::VoidType();
     }
 
@@ -1158,28 +1169,6 @@ class FunctionLowerer {
         return {value, payload_type};
     }
 
-    sema::Type InferSymbolRefType(std::string_view name) const {
-        if (const auto* global = sema::FindGlobalSummary(sema_module_, name); global != nullptr) {
-            return global->type;
-        }
-        if (const auto* function = sema::FindFunctionSignature(sema_module_, name); function != nullptr) {
-            return sema::ProcedureType(function->param_types, function->return_types);
-        }
-        const std::string qualified_type = VariantTypeName(name);
-        const std::string leaf_name = VariantLeafName(name);
-        if (!qualified_type.empty() && qualified_type != std::string(name)) {
-            if (const auto* type_decl = sema::FindTypeDecl(sema_module_, qualified_type);
-                type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
-                for (const auto& variant : type_decl->variants) {
-                    if (variant.name == leaf_name) {
-                        return sema::NamedType(qualified_type);
-                    }
-                }
-            }
-        }
-        return sema::UnknownType();
-    }
-
     Instruction::TargetKind InferSymbolRefKind(std::string_view name) const {
         if (sema::FindGlobalSummary(sema_module_, name) != nullptr) {
             return Instruction::TargetKind::kGlobal;
@@ -1248,7 +1237,7 @@ class FunctionLowerer {
                     return LoadLocalValue(expr.text);
                 }
                 const std::string value = NewValue();
-                const sema::Type type = KnownTypeOrError(InferSymbolRefType(expr.text), expr.span, "symbol reference type for " + expr.text);
+                const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "symbol reference type for " + expr.text);
                 Emit({
                     .kind = Instruction::Kind::kSymbolRef,
                     .result = value,
@@ -1275,7 +1264,7 @@ class FunctionLowerer {
                 }
                 const std::string value = NewValue();
                 const std::string qualified_name = CombineQualifiedName(expr);
-                const sema::Type type = KnownTypeOrError(InferSymbolRefType(qualified_name), expr.span, "symbol reference type for " + qualified_name);
+                const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "symbol reference type for " + qualified_name);
                 Emit({
                     .kind = Instruction::Kind::kSymbolRef,
                     .result = value,
@@ -1335,7 +1324,7 @@ class FunctionLowerer {
                 if (TryEmitSpecialCall(expr, args, type, true, &special_result)) {
                     return special_result;
                 }
-                const auto callee = LowerCalleeExpr(*expr.left, InferCalleeTypeFromCallSite(expr, type));
+                const auto callee = LowerCalleeExpr(*expr.left);
                 std::vector<std::string> operands = {callee.value};
                 for (const auto& arg : args) {
                     operands.push_back(arg.value);
@@ -1345,7 +1334,7 @@ class FunctionLowerer {
                     .kind = Instruction::Kind::kCall,
                     .result = value,
                     .type = type,
-                    .target = RenderExprInline(*expr.left),
+                    .target = CalleeName(*expr.left).empty() ? RenderExprInline(*expr.left) : CalleeName(*expr.left),
                     .operands = std::move(operands),
                 });
                 return {value, type};
@@ -1425,8 +1414,75 @@ class FunctionLowerer {
                 return LowerExpr(*expr.left);
         }
 
-        Report(expr.span, "bootstrap MIR encountered unsupported expression form");
+        Report(expr.span, "not yet supported in MIR: " + std::string(ToString(expr.kind)) + " expression");
         return EmitLiteralValue("0", sema::VoidType());
+    }
+
+    void BindLocal(const std::string& name,
+                   const std::string& value,
+                   const sema::Type& type,
+                   bool is_mutable,
+                   const mc::support::SourceSpan& span) {
+        if (local_types_.contains(name)) {
+            Report(span, "MIR lowering cannot rebind existing local: " + name);
+            return;
+        }
+        const sema::Type local_type = EnsureLocal(name, type, is_mutable);
+        Emit({
+            .kind = Instruction::Kind::kStoreLocal,
+            .type = local_type,
+            .target = name,
+            .operands = {value},
+        });
+    }
+
+    void AssignNamedTarget(const std::string& name, const ValueInfo& value, const mc::support::SourceSpan& span) {
+        const auto found_local = local_types_.find(name);
+        if (found_local != local_types_.end()) {
+            Emit({
+                .kind = Instruction::Kind::kStoreLocal,
+                .type = found_local->second,
+                .target = name,
+                .operands = {value.value},
+            });
+            return;
+        }
+
+        if (const auto* global = sema::FindGlobalSummary(sema_module_, name); global != nullptr) {
+            Emit({
+                .kind = Instruction::Kind::kStoreTarget,
+                .type = global->type,
+                .target = name,
+                .target_kind = Instruction::TargetKind::kGlobal,
+                .target_name = name,
+                .operands = {value.value},
+            });
+            return;
+        }
+
+        Report(span, "MIR lowering expected semantically resolved assignment target: " + name);
+    }
+
+    void EmitStoreTarget(const Expr& target, const ValueInfo& value) {
+        Emit({
+            .kind = Instruction::Kind::kStoreTarget,
+            .type = KnownTypeOrError(ExprTypeOrUnknown(target), target.span, "assignment target type"),
+            .target = RenderExprInline(target),
+            .target_kind = target.kind == Expr::Kind::kField ? Instruction::TargetKind::kField
+                          : target.kind == Expr::Kind::kDerefField ? Instruction::TargetKind::kDerefField
+                          : target.kind == Expr::Kind::kIndex ? Instruction::TargetKind::kIndex
+                                                              : Instruction::TargetKind::kOther,
+            .target_name = (target.kind == Expr::Kind::kField || target.kind == Expr::Kind::kDerefField) ? target.text : std::string(),
+            .target_base_type = target.left != nullptr
+                                    ? KnownTypeOrError(ExprTypeOrUnknown(*target.left), target.left->span, "assignment target base type")
+                                    : sema::UnknownType(),
+            .target_aux_types = target.kind == Expr::Kind::kIndex && target.right != nullptr
+                                    ? std::vector<sema::Type> {KnownTypeOrError(ExprTypeOrUnknown(*target.right),
+                                                                                target.right->span,
+                                                                                "assignment index type")}
+                                    : std::vector<sema::Type> {},
+            .operands = {value.value},
+        });
     }
 
     void StoreLocal(const std::string& name, const std::string& value, const sema::Type& type, bool is_mutable) {
@@ -1439,10 +1495,14 @@ class FunctionLowerer {
         });
     }
 
-    void LowerBindingLike(const Stmt& stmt, bool is_mutable, bool allow_existing) {
+    void LowerBindingLike(const Stmt& stmt, bool is_mutable) {
         const sema::Type declared_type = sema::TypeFromAst(stmt.type_ann.get());
         if (!stmt.has_initializer) {
             for (const auto& name : stmt.pattern.names) {
+                if (local_types_.contains(name)) {
+                    Report(stmt.span, "MIR lowering cannot rebind existing local: " + name);
+                    return;
+                }
                 EnsureLocal(name, declared_type, is_mutable);
             }
             return;
@@ -1453,13 +1513,18 @@ class FunctionLowerer {
             return;
         }
 
+        std::vector<ValueInfo> values;
+        values.reserve(stmt.exprs.size());
+        for (const auto& expr : stmt.exprs) {
+            values.push_back(LowerExpr(*expr));
+        }
+
         for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
-            const auto value = LowerExpr(*stmt.exprs[index]);
-            if (!allow_existing && local_types_.contains(stmt.pattern.names[index])) {
-                Report(stmt.span, "bootstrap MIR binding would shadow an existing local");
-                return;
-            }
-            StoreLocal(stmt.pattern.names[index], value.value, sema::IsUnknown(declared_type) ? value.type : declared_type, is_mutable);
+            BindLocal(stmt.pattern.names[index],
+                      values[index].value,
+                      sema::IsUnknown(declared_type) ? values[index].type : declared_type,
+                      is_mutable,
+                      stmt.span);
         }
     }
 
@@ -1469,28 +1534,20 @@ class FunctionLowerer {
             return;
         }
 
+        std::vector<ValueInfo> values;
+        values.reserve(stmt.assign_values.size());
+        for (const auto& expr : stmt.assign_values) {
+            values.push_back(LowerExpr(*expr));
+        }
+
         for (std::size_t index = 0; index < stmt.assign_targets.size(); ++index) {
-            const auto value = LowerExpr(*stmt.assign_values[index]);
             const Expr& target = *stmt.assign_targets[index];
             if (target.kind == Expr::Kind::kName) {
-                StoreLocal(target.text, value.value, value.type, true);
+                AssignNamedTarget(target.text, values[index], target.span);
                 continue;
             }
 
-            Emit({
-                .kind = Instruction::Kind::kStoreTarget,
-                .type = value.type,
-                .target = RenderExprInline(target),
-                .target_kind = target.kind == Expr::Kind::kField ? Instruction::TargetKind::kField
-                              : target.kind == Expr::Kind::kDerefField ? Instruction::TargetKind::kDerefField
-                              : target.kind == Expr::Kind::kIndex ? Instruction::TargetKind::kIndex
-                                                                  : Instruction::TargetKind::kOther,
-                .target_name = (target.kind == Expr::Kind::kField || target.kind == Expr::Kind::kDerefField) ? target.text : std::string(),
-                .target_base_type = target.left != nullptr ? ExprTypeOrUnknown(*target.left) : sema::UnknownType(),
-                .target_aux_types = target.kind == Expr::Kind::kIndex && target.right != nullptr ? std::vector<sema::Type> {ExprTypeOrUnknown(*target.right)}
-                                                                                                  : std::vector<sema::Type> {},
-                .operands = {value.value},
-            });
+            EmitStoreTarget(target, values[index]);
         }
     }
 
@@ -1545,26 +1602,35 @@ class FunctionLowerer {
                 return;
             case Stmt::Kind::kBinding:
             case Stmt::Kind::kVar:
-                LowerBindingLike(stmt, true, false);
+                LowerBindingLike(stmt, true);
                 return;
             case Stmt::Kind::kConst:
-                LowerBindingLike(stmt, false, false);
+                LowerBindingLike(stmt, false);
                 return;
             case Stmt::Kind::kBindingOrAssign: {
-                bool any_existing = false;
-                bool any_missing = false;
-                for (const auto& name : stmt.pattern.names) {
-                    if (local_types_.contains(name)) {
-                        any_existing = true;
-                    } else {
-                        any_missing = true;
-                    }
-                }
-                if (any_existing && any_missing) {
-                    Report(stmt.span, "bootstrap MIR cannot resolve mixed binding-or-assignment patterns without semantic analysis");
+                const auto* fact = sema::FindBindingOrAssignFact(sema_module_, stmt);
+                if (fact == nullptr) {
+                    Report(stmt.span, "MIR lowering requires semantic classification for binding-or-assignment statement");
                     return;
                 }
-                LowerBindingLike(stmt, true, any_existing);
+                if (fact->resolutions.size() != stmt.pattern.names.size() || stmt.exprs.size() != stmt.pattern.names.size()) {
+                    Report(stmt.span, "MIR lowering requires one semantic resolution and one initializer per binding-or-assignment name");
+                    return;
+                }
+
+                std::vector<ValueInfo> values;
+                values.reserve(stmt.exprs.size());
+                for (const auto& expr : stmt.exprs) {
+                    values.push_back(LowerExpr(*expr));
+                }
+
+                for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+                    if (fact->resolutions[index] == sema::BindingOrAssignResolution::kAssign) {
+                        AssignNamedTarget(stmt.pattern.names[index], values[index], stmt.span);
+                        continue;
+                    }
+                    BindLocal(stmt.pattern.names[index], values[index].value, values[index].type, true, stmt.span);
+                }
                 return;
             }
             case Stmt::Kind::kAssign:
@@ -1775,13 +1841,13 @@ class FunctionLowerer {
 
     void LowerForRange(const Stmt& stmt) {
         if (stmt.exprs.empty() || stmt.exprs.front()->kind != Expr::Kind::kRange || stmt.exprs.front()->left == nullptr || stmt.exprs.front()->right == nullptr) {
-            Report(stmt.span, "bootstrap MIR for-range requires an explicit range expression");
+            Report(stmt.span, "not yet supported in MIR: for-range without explicit lower and upper bounds");
             return;
         }
 
         const sema::Type loop_type = RangeElementType(ExprTypeOrUnknown(*stmt.exprs.front()));
         if (sema::IsUnknown(loop_type)) {
-            Report(stmt.span, "bootstrap MIR for-range requires a sema-known range element type");
+            Report(stmt.span, "MIR lowering requires semantic range element type for for-range loop");
             return;
         }
 
@@ -1843,7 +1909,7 @@ class FunctionLowerer {
         const auto iterable = LowerExpr(*stmt.exprs.front());
         const sema::Type element_type = IterableElementType(iterable_type);
         if (sema::IsUnknown(element_type)) {
-            Report(stmt.span, "bootstrap MIR foreach requires a sema-known iterable element type");
+            Report(stmt.span, "MIR lowering requires semantic iterable element type for foreach loop");
             return;
         }
         const std::string iterable_name = NewHiddenLocal("iterable");
@@ -1927,7 +1993,7 @@ class FunctionLowerer {
         }
         const Expr& expr = *stmt.exprs.front();
         if (expr.kind != Expr::Kind::kCall || expr.left == nullptr) {
-            Report(stmt.span, "bootstrap MIR only lowers defer call expressions");
+            Report(stmt.span, "not yet supported in MIR: defer of " + std::string(ToString(expr.kind)) + " expression");
             return;
         }
         if (defer_scopes_.empty()) {

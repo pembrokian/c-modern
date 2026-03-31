@@ -1,3 +1,6 @@
+func hit() {
+}
+
 func choose(flag: i32) i32 {
     switch flag {
     case 0:
