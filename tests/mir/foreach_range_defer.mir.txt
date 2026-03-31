@@ -1,0 +1,69 @@
+Module
+  Function name=walk returns=[i32]
+    Local name=values type=Slice<i32> param readonly
+    Local name=total type=i32
+    Local name=$defer_callee0 type=unknown readonly
+    Local name=$iterable1 type=Slice<i32>
+    Local name=$index2 type=usize
+    Local name=index type=usize
+    Local name=value type=unknown
+    Local name=idx type=int_literal
+    Block label=entry0
+      const %v0:int_literal op=0
+      store_local target=total operands=[%v0]
+      symbol_ref %v1:unknown target=cleanup
+      store_local target=$defer_callee0 operands=[%v1]
+      load_local %v2:Slice<i32> target=values
+      store_local target=$iterable1 operands=[%v2]
+      const %v3:usize op=0
+      store_local target=$index2 operands=[%v3]
+      terminator branch target=foreach_cond1
+    Block label=foreach_cond1
+      load_local %v4:usize target=$index2
+      load_local %v5:Slice<i32> target=$iterable1
+      field %v6:usize target=len operands=[%v5]
+      binary %v7:bool op=< operands=[%v4, %v6]
+      terminator cond value=%v7 true=foreach_body2 false=foreach_exit4
+    Block label=foreach_body2
+      load_local %v8:Slice<i32> target=$iterable1
+      load_local %v9:usize target=$index2
+      index %v10:unknown operands=[%v8, %v9]
+      store_local target=index operands=[%v9]
+      store_local target=value operands=[%v10]
+      load_local %v11:i32 target=total
+      load_local %v12:unknown target=value
+      binary %v13:i32 op=+ operands=[%v11, %v12]
+      store_local target=total operands=[%v13]
+      terminator branch target=foreach_step3
+    Block label=foreach_step3
+      load_local %v14:usize target=$index2
+      const %v15:usize op=1
+      binary %v16:usize op=+ operands=[%v14, %v15]
+      store_local target=$index2 operands=[%v16]
+      terminator branch target=foreach_cond1
+    Block label=foreach_exit4
+      const %v17:int_literal op=0
+      const %v18:int_literal op=3
+      store_local target=idx operands=[%v17]
+      terminator branch target=range_cond5
+    Block label=range_cond5
+      load_local %v19:int_literal target=idx
+      binary %v20:bool op=< operands=[%v19, %v18]
+      terminator cond value=%v20 true=range_body6 false=range_exit8
+    Block label=range_body6
+      load_local %v21:i32 target=total
+      load_local %v22:int_literal target=idx
+      binary %v23:i32 op=+ operands=[%v21, %v22]
+      store_local target=total operands=[%v23]
+      terminator branch target=range_step7
+    Block label=range_step7
+      load_local %v24:int_literal target=idx
+      const %v25:int_literal op=1
+      binary %v26:int_literal op=+ operands=[%v24, %v25]
+      store_local target=idx operands=[%v26]
+      terminator branch target=range_cond5
+    Block label=range_exit8
+      load_local %v27:i32 target=total
+      load_local %v28:unknown target=$defer_callee0
+      call target=cleanup operands=[%v28]
+      terminator return values=[%v27]

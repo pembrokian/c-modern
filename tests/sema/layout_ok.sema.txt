@@ -1,0 +1,17 @@
+SemanticModule
+  TypeDecl name=PackedPair kind=struct
+    attributes=[packed]
+    Field name=small type=u8
+    Field name=large type=i32
+    Layout size=5 align=1 offsets=[0, 1]
+  TypeDecl name=Header kind=struct
+    attributes=[abi(c)]
+    Field name=tag type=u8
+    Field name=value type=i32
+    Field name=tail type=u16
+    Layout size=12 align=4 offsets=[0, 4, 8]
+  TypeDecl name=Envelope kind=struct
+    Field name=header type=Header
+    Field name=payload type=[4]u8
+    Layout size=16 align=4 offsets=[0, 12]
+  Function name=main params=[] returns=[i32]

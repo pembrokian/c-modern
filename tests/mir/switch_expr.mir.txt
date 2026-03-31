@@ -1,0 +1,23 @@
+Module
+  Function name=choose returns=[i32]
+    Local name=value type=i32 param readonly
+    Block label=entry0
+      load_local %v0:i32 target=value
+      const %v1:int_literal op=0
+      binary %v2:bool op=== operands=[%v0, %v1]
+      terminator cond value=%v2 true=switch_case4 false=switch_test3
+    Block label=switch_merge1
+      terminator none
+    Block label=switch_default2
+      const %v7:int_literal op=30
+      terminator return values=[%v7]
+    Block label=switch_test3
+      const %v4:int_literal op=1
+      binary %v5:bool op=== operands=[%v0, %v4]
+      terminator cond value=%v5 true=switch_case5 false=switch_default2
+    Block label=switch_case4
+      const %v3:int_literal op=10
+      terminator return values=[%v3]
+    Block label=switch_case5
+      const %v6:int_literal op=20
+      terminator return values=[%v6]

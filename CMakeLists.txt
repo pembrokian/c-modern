@@ -25,20 +25,35 @@ add_library(mc_frontend_stub STATIC
 target_include_directories(mc_frontend_stub PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_frontend_stub PUBLIC mc_support)
 
+add_library(mc_sema_bootstrap STATIC
+    compiler/sema/check.cpp
+    compiler/sema/type.cpp
+)
+
+target_include_directories(mc_sema_bootstrap PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_sema_bootstrap PUBLIC mc_frontend_stub mc_support)
+
+add_library(mc_mir STATIC
+    compiler/mir/mir.cpp
+)
+
+target_include_directories(mc_mir PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_mir PUBLIC mc_sema_bootstrap mc_frontend_stub mc_support)
+
 add_executable(mc
     compiler/driver/driver.cpp
     compiler/driver/main.cpp
 )
 
 target_include_directories(mc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc PRIVATE mc_frontend_stub mc_support)
+target_link_libraries(mc PRIVATE mc_frontend_stub mc_mir mc_support)
 
 add_executable(mc_bootstrap_tests
     tests/tool/bootstrap_tests.cpp
 )
 
 target_include_directories(mc_bootstrap_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc_bootstrap_tests PRIVATE mc_frontend_stub mc_support)
+target_link_libraries(mc_bootstrap_tests PRIVATE mc_frontend_stub mc_mir mc_support)
 
 add_executable(mc_parser_fixture_tests
     tests/parser/parser_fixture_tests.cpp
@@ -47,8 +62,34 @@ add_executable(mc_parser_fixture_tests
 target_include_directories(mc_parser_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_parser_fixture_tests PRIVATE mc_frontend_stub mc_support)
 
+add_executable(mc_mir_tests
+    tests/mir/mir_tests.cpp
+)
+
+target_include_directories(mc_mir_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_mir_tests PRIVATE mc_mir mc_frontend_stub mc_support)
+
+add_executable(mc_mir_fixture_tests
+    tests/mir/mir_fixture_tests.cpp
+)
+
+target_include_directories(mc_mir_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_mir_fixture_tests PRIVATE mc_mir mc_frontend_stub mc_support)
+
+add_executable(mc_sema_fixture_tests
+    tests/sema/sema_fixture_tests.cpp
+)
+
+target_include_directories(mc_sema_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_sema_fixture_tests PRIVATE mc_sema_bootstrap mc_frontend_stub mc_support)
+
 add_test(NAME mc_bootstrap_unit COMMAND mc_bootstrap_tests)
 add_test(NAME mc_parser_fixture_unit COMMAND mc_parser_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME mc_sema_fixture_unit COMMAND mc_sema_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME mc_mir_unit COMMAND mc_mir_tests)
+add_test(NAME mc_mir_fixture_unit COMMAND mc_mir_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_help_smoke COMMAND mc --help)
 add_test(NAME mc_check_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc)
+add_test(NAME mc_check_import_root_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_root_ok_main.mc --import-root ${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_roots)
+add_test(NAME mc_check_dump_mir_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --dump-mir --build-dir ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_dump_paths_smoke COMMAND mc dump-paths ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --build-dir ${CMAKE_CURRENT_BINARY_DIR})

@@ -1,0 +1,28 @@
+Module
+  Function name=iterate returns=[i32]
+    Local name=idx type=int_literal
+    Local name=$defer_callee0 type=unknown readonly
+    Block label=entry0
+      const %v0:int_literal op=0
+      const %v1:int_literal op=2
+      store_local target=idx operands=[%v0]
+      terminator branch target=range_cond1
+    Block label=range_cond1
+      load_local %v2:int_literal target=idx
+      binary %v3:bool op=< operands=[%v2, %v1]
+      terminator cond value=%v3 true=range_body2 false=range_exit4
+    Block label=range_body2
+      symbol_ref %v4:unknown target=tick
+      store_local target=$defer_callee0 operands=[%v4]
+      load_local %v5:unknown target=$defer_callee0
+      call target=tick operands=[%v5]
+      terminator branch target=range_step3
+    Block label=range_step3
+      load_local %v6:int_literal target=idx
+      const %v7:int_literal op=1
+      binary %v8:int_literal op=+ operands=[%v6, %v7]
+      store_local target=idx operands=[%v8]
+      terminator branch target=range_cond1
+    Block label=range_exit4
+      const %v9:int_literal op=0
+      terminator return values=[%v9]

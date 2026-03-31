@@ -1,0 +1,6 @@
+SemanticModule
+  TypeDecl name=Pair kind=struct
+    Field name=left type=i32
+    Field name=right type=i32
+    Layout size=8 align=4 offsets=[0, 4]
+  Function name=add params=[i32, i32] returns=[i32]

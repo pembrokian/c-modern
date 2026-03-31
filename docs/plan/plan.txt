@@ -210,6 +210,9 @@ Exit criteria:
 - type/layout results match the spec and canonical examples
 - semantic test coverage exists for every feature claimed in v0.2
 
+Bootstrap repository note:
+- the current repository also tracks a narrower single-file Phase 3 completion milestone in `docs/plan/phase3_bootstrap_finish.txt`; this formalizes the implemented bootstrap sema boundary without claiming the full original Phase 3 is finished
+
 Phase 4 - Typed MIR And Validation
 
 Objective:

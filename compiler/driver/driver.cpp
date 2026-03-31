@@ -6,10 +6,13 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "compiler/ast/ast.h"
 #include "compiler/lex/lexer.h"
+#include "compiler/mir/mir.h"
 #include "compiler/parse/parser.h"
+#include "compiler/sema/check.h"
 #include "compiler/support/diagnostics.h"
 #include "compiler/support/dump_paths.h"
 #include "compiler/support/source_manager.h"
@@ -21,15 +24,17 @@ constexpr std::string_view kUsage =
     "Modern C bootstrap driver\n"
     "\n"
     "Usage:\n"
-    "  mc check <source> [--build-dir <dir>] [--emit-dump-paths] [--dump-ast]\n"
+    "  mc check <source> [--build-dir <dir>] [--import-root <dir>] [--emit-dump-paths] [--dump-ast] [--dump-mir]\n"
     "  mc dump-paths <source> [--build-dir <dir>]\n"
     "  mc --help\n";
 
 struct CommandOptions {
     std::filesystem::path source_path;
     std::filesystem::path build_dir = "build/debug";
+    std::vector<std::filesystem::path> import_roots;
     bool emit_dump_paths = false;
     bool dump_ast = false;
+    bool dump_mir = false;
 };
 
 void PrintUsage(std::ostream& stream) {
@@ -60,6 +65,11 @@ std::optional<CommandOptions> ParseCommandOptions(int argc,
             continue;
         }
 
+        if (argument == "--dump-mir") {
+            options.dump_mir = true;
+            continue;
+        }
+
         if (argument == "--build-dir") {
             if (index + 1 >= argc) {
                 errors << "missing value for --build-dir\n";
@@ -67,6 +77,16 @@ std::optional<CommandOptions> ParseCommandOptions(int argc,
             }
 
             options.build_dir = argv[++index];
+            continue;
+        }
+
+        if (argument == "--import-root") {
+            if (index + 1 >= argc) {
+                errors << "missing value for --import-root\n";
+                return std::nullopt;
+            }
+
+            options.import_roots.push_back(argv[++index]);
             continue;
         }
 
@@ -100,8 +120,32 @@ int RunCheck(const CommandOptions& options) {
         return 1;
     }
 
+    mc::sema::CheckOptions sema_options;
+    sema_options.import_roots.reserve(options.import_roots.size());
+    for (const auto& import_root : options.import_roots) {
+        sema_options.import_roots.push_back(std::filesystem::absolute(import_root).lexically_normal());
+    }
+
+    const auto sema_result = mc::sema::CheckProgram(*parse_result.source_file, source_file->path, sema_options, diagnostics);
+    if (!sema_result.ok) {
+        std::cerr << diagnostics.Render() << '\n';
+        return 1;
+    }
+
+    const auto mir_result = mc::mir::LowerSourceFile(*parse_result.source_file, *sema_result.module, source_file->path, diagnostics);
+    if (!mir_result.ok) {
+        std::cerr << diagnostics.Render() << '\n';
+        return 1;
+    }
+
+    if (!mc::mir::ValidateModule(*mir_result.module, source_file->path, diagnostics)) {
+        std::cerr << diagnostics.Render() << '\n';
+        return 1;
+    }
+
+    const auto targets = support::ComputeDumpTargets(source_file->path, options.build_dir);
+
     if (options.dump_ast) {
-        const auto targets = support::ComputeDumpTargets(source_file->path, options.build_dir);
         std::filesystem::create_directories(targets.ast.parent_path());
         std::ofstream output(targets.ast, std::ios::binary);
         output << mc::ast::DumpSourceFile(*parse_result.source_file);
@@ -117,10 +161,26 @@ int RunCheck(const CommandOptions& options) {
         }
     }
 
-    std::cout << "checked " << source_file->path.generic_string() << " (frontend phase 2)" << '\n';
+    if (options.dump_mir) {
+        std::filesystem::create_directories(targets.mir.parent_path());
+        std::ofstream output(targets.mir, std::ios::binary);
+        output << mc::mir::DumpModule(*mir_result.module);
+        if (!output) {
+            diagnostics.Report({
+                .file_path = targets.mir,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "unable to write MIR dump",
+            });
+            std::cerr << diagnostics.Render() << '\n';
+            return 1;
+        }
+    }
+
+    std::cout << "checked " << source_file->path.generic_string() << " (bootstrap phase 3 sema, phase 4 MIR)" << '\n';
 
     if (options.emit_dump_paths) {
-        PrintDumpTargets(support::ComputeDumpTargets(source_file->path, options.build_dir), std::cout);
+        PrintDumpTargets(targets, std::cout);
     }
 
     return 0;

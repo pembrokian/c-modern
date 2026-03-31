@@ -1,0 +1,28 @@
+Bootstrap Phase 3 Completion
+
+This repository does not implement the full language-wide Phase 3 defined in plan.txt.
+It now implements a narrower, explicit bootstrap Phase 3 for the supported single-file subset.
+
+Completed in this milestone:
+- semantic checking runs before MIR lowering in `mc check`
+- a semantic module is produced and passed into MIR lowering as the semantic boundary
+- bootstrap program checking resolves imports, supports configured import roots, enforces export-block visibility, and rejects import cycles
+- single-file top-level symbol collection exists for functions, globals, and type declarations
+- local scope checking exists for bindings, assignments, returns, break/continue, and defer-call validity
+- bootstrap expression checking exists for literals, arithmetic/comparison, calls, aggregate init, indexing, range loops, and selected field lookups
+- first-cut struct layout computation exists for deterministic size, alignment, and field-offset reporting, including `@packed` and `@abi(c)` handling in bootstrap sema
+- semantic fixtures exist under `tests/sema/`
+
+Explicitly not claimed complete here:
+- separate-compilation interface consumption
+- full layout computation, ABI layout rules, and packed/c ABI enforcement across the whole language surface
+- full distinct-type semantics, explicit conversion rules across the whole surface, and constant evaluation completeness
+- semantic rules for `@noalias` and explicit error returns
+- full canonical-program coverage
+
+Meaning of “Phase 3 finished” in the current repository:
+- the bootstrap compiler no longer skips semantic checking
+- MIR lowering consumes semantic output instead of reconstructing signatures ad hoc
+- the supported bootstrap language subset has deterministic semantic tests
+
+The original plan.txt Phase 3 remains the full target. This file records the narrower repository milestone that closes the bootstrap gap before deeper sema work continues.
