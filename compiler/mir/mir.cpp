@@ -513,6 +513,22 @@ bool IsDedicatedCallSurface(std::string_view callee_name) {
     return ClassifySpecialCall(callee_name) != SpecialCallKind::kNone;
 }
 
+bool HasAtomicOrderMetadata(std::string_view metadata) {
+    return metadata.starts_with("order=") && metadata.size() > std::string_view("order=").size();
+}
+
+bool HasCompareExchangeOrderMetadata(std::string_view metadata) {
+    if (!metadata.starts_with("success=")) {
+        return false;
+    }
+    const std::size_t separator = metadata.find(",failure=");
+    if (separator == std::string_view::npos) {
+        return false;
+    }
+    return separator > std::string_view("success=").size() &&
+           separator + std::string_view(",failure=").size() < metadata.size();
+}
+
 enum class ExplicitConversionKind {
     kGeneric,
     kNumeric,
@@ -1712,7 +1728,12 @@ class FunctionLowerer {
 
         const bool then_reaches_merge = function_.blocks[then_block].terminator.kind == Terminator::Kind::kBranch &&
                                         function_.blocks[then_block].terminator.true_target == function_.blocks[merge_block].label;
-        current_block_ = (then_reaches_merge || else_reaches_merge) ? std::optional<std::size_t>(merge_block) : std::nullopt;
+        if (then_reaches_merge || else_reaches_merge) {
+            current_block_ = merge_block;
+        } else {
+            function_.blocks.erase(function_.blocks.begin() + static_cast<std::ptrdiff_t>(merge_block));
+            current_block_ = std::nullopt;
+        }
     }
 
     void LowerSwitch(const Stmt& stmt) {
@@ -1801,7 +1822,12 @@ class FunctionLowerer {
             }
         }
 
-        current_block_ = reaches_merge ? std::optional<std::size_t>(merge_block) : std::nullopt;
+        if (reaches_merge) {
+            current_block_ = merge_block;
+        } else {
+            function_.blocks.erase(function_.blocks.begin() + static_cast<std::ptrdiff_t>(merge_block));
+            current_block_ = std::nullopt;
+        }
     }
 
     void LowerWhileLike(const Stmt& stmt) {
@@ -2192,6 +2218,49 @@ bool ValidateModule(const Module& module,
             blocks_by_label[block.label] = &block;
         }
 
+        for (const auto& block : function.blocks) {
+            switch (block.terminator.kind) {
+                case Terminator::Kind::kNone:
+                    report("unterminated MIR block in function " + function.name + ": " + block.label);
+                    break;
+                case Terminator::Kind::kReturn:
+                    if (!block.terminator.true_target.empty() || !block.terminator.false_target.empty()) {
+                        report("return terminator must not name branch targets in function " + function.name + ": " + block.label);
+                    }
+                    break;
+                case Terminator::Kind::kBranch:
+                    if (!block.terminator.values.empty()) {
+                        report("branch terminator must not carry values in function " + function.name + ": " + block.label);
+                    }
+                    if (block.terminator.true_target.empty()) {
+                        report("branch terminator must name a target in function " + function.name + ": " + block.label);
+                    } else if (!block_labels.contains(block.terminator.true_target)) {
+                        report("branch targets missing MIR block in function " + function.name + ": " + block.terminator.true_target);
+                    }
+                    if (!block.terminator.false_target.empty()) {
+                        report("branch terminator must not name a false target in function " + function.name + ": " + block.label);
+                    }
+                    break;
+                case Terminator::Kind::kCondBranch:
+                    if (block.terminator.values.size() != 1) {
+                        report("conditional branch must use exactly one condition value in function " + function.name + ": " + block.label);
+                    }
+                    if (block.terminator.true_target.empty()) {
+                        report("conditional branch must name a true target in function " + function.name + ": " + block.label);
+                    } else if (!block_labels.contains(block.terminator.true_target)) {
+                        report("conditional branch true target missing MIR block in function " + function.name + ": " +
+                               block.terminator.true_target);
+                    }
+                    if (block.terminator.false_target.empty()) {
+                        report("conditional branch must name a false target in function " + function.name + ": " + block.label);
+                    } else if (!block_labels.contains(block.terminator.false_target)) {
+                        report("conditional branch false target missing MIR block in function " + function.name + ": " +
+                               block.terminator.false_target);
+                    }
+                    break;
+            }
+        }
+
         std::unordered_set<std::string> reachable_blocks;
         std::vector<std::string> worklist;
         worklist.push_back(function.blocks.front().label);
@@ -2245,6 +2314,9 @@ bool ValidateModule(const Module& module,
 
                 switch (instruction.kind) {
                     case Instruction::Kind::kLoadLocal: {
+                        if (instruction.result.empty()) {
+                            report("load_local must produce a result in function " + function.name);
+                        }
                         if (!instruction.operands.empty()) {
                             report("load_local must not take operands in function " + function.name);
                         }
@@ -2264,6 +2336,9 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kStoreLocal: {
+                        if (!instruction.result.empty()) {
+                            report("store_local must not produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("store_local must use exactly one operand in function " + function.name);
                         }
@@ -2287,6 +2362,9 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kStoreTarget:
+                        if (!instruction.result.empty()) {
+                            report("store_target must not produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("store_target must use exactly one operand in function " + function.name);
                         }
@@ -2300,6 +2378,9 @@ bool ValidateModule(const Module& module,
                         switch (instruction.target_kind) {
                             case Instruction::TargetKind::kField:
                             case Instruction::TargetKind::kDerefField: {
+                                if (!instruction.target_aux_types.empty()) {
+                                    report("store_target field access must not carry index metadata in function " + function.name);
+                                }
                                 if (instruction.target_name.empty()) {
                                     report("store_target field access must name a field in function " + function.name);
                                     break;
@@ -2334,6 +2415,12 @@ bool ValidateModule(const Module& module,
                                 break;
                             }
                             case Instruction::TargetKind::kIndex: {
+                                if (!instruction.target_name.empty()) {
+                                    report("store_target index access must not name a field target in function " + function.name);
+                                }
+                                if (instruction.target_aux_types.size() != 1) {
+                                    report("store_target index access must carry exactly one index type in function " + function.name);
+                                }
                                 sema::Type element_type = sema::UnknownType();
                                 if (instruction.target_base_type.kind == sema::Type::Kind::kArray && !instruction.target_base_type.subtypes.empty()) {
                                     element_type = instruction.target_base_type.subtypes.front();
@@ -2356,14 +2443,25 @@ bool ValidateModule(const Module& module,
                                 }
                                 break;
                             }
+                            case Instruction::TargetKind::kGlobal:
+                                if (instruction.target_name.empty()) {
+                                    report("store_target global access must name the target symbol in function " + function.name);
+                                }
+                                if (!instruction.target_aux_types.empty() || !instruction.target_name.empty() &&
+                                                                           !sema::IsUnknown(instruction.target_base_type)) {
+                                    report("store_target global access must not carry structured base metadata in function " + function.name);
+                                }
+                                break;
                             case Instruction::TargetKind::kNone:
                             case Instruction::TargetKind::kFunction:
-                            case Instruction::TargetKind::kGlobal:
                             case Instruction::TargetKind::kOther:
                                 break;
                         }
                         break;
                     case Instruction::Kind::kUnary: {
+                        if (instruction.result.empty()) {
+                            report("unary must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("unary must use exactly one operand in function " + function.name);
                         }
@@ -2388,6 +2486,17 @@ bool ValidateModule(const Module& module,
                         if (instruction.op == "*" && operand_types.size() == 1 && deref_operand.kind == sema::Type::Kind::kPointer &&
                             !deref_operand.subtypes.empty() && instruction.type != deref_operand.subtypes.front()) {
                             report("pointer dereference result type mismatch in function " + function.name);
+                        }
+                        if (instruction.op == "-" && operand_types.size() == 1) {
+                            if (!sema::IsUnknown(operand_types.front()) && !IsNumericType(operand_types.front())) {
+                                report("numeric unary requires numeric operand in function " + function.name);
+                            }
+                            if (!sema::IsUnknown(instruction.type) && !IsNumericType(instruction.type)) {
+                                report("numeric unary must produce numeric type in function " + function.name);
+                            }
+                        }
+                        if (instruction.op != "!" && instruction.op != "&" && instruction.op != "*" && instruction.op != "-") {
+                            report("unary uses unsupported opcode in function " + function.name + ": " + instruction.op);
                         }
                         break;
                     }
@@ -2453,6 +2562,9 @@ bool ValidateModule(const Module& module,
                         }
                         break;
                     case Instruction::Kind::kBinary: {
+                        if (instruction.result.empty()) {
+                            report("binary must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 2) {
                             report("binary must use exactly two operands in function " + function.name);
                         }
@@ -2507,6 +2619,9 @@ bool ValidateModule(const Module& module,
                                     report("arithmetic binary requires numeric operands in function " + function.name);
                                 }
                             }
+                            if (operand_types.size() == 2 && !HasCompatibleNumericTypes(operand_types.front(), operand_types.back())) {
+                                report("arithmetic binary requires compatible operand types in function " + function.name);
+                            }
                             if (!sema::IsUnknown(instruction.type) && !IsNumericType(instruction.type)) {
                                 report("arithmetic binary must produce numeric type in function " + function.name);
                             }
@@ -2519,6 +2634,9 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kConvert:
+                        if (instruction.result.empty()) {
+                            report("convert must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("convert must use exactly one operand in function " + function.name);
                         }
@@ -2534,18 +2652,42 @@ bool ValidateModule(const Module& module,
                         }
                         break;
                     case Instruction::Kind::kConvertNumeric:
+                        if (instruction.result.empty()) {
+                            report("convert_numeric must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("convert_numeric must use exactly one operand in function " + function.name);
                             break;
+                        }
+                        if (instruction.target.empty()) {
+                            report("convert_numeric must name a target type in function " + function.name);
+                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                            report("convert_numeric target metadata must match result type in function " + function.name);
+                        }
+                        if (operand_types.size() == 1 &&
+                            ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kNumeric) {
+                            report("convert_numeric must encode a numeric conversion family in function " + function.name);
                         }
                         if (operand_types.size() == 1 && (!IsNumericType(operand_types.front()) || !IsNumericType(instruction.type))) {
                             report("convert_numeric requires numeric source and target types in function " + function.name);
                         }
                         break;
                     case Instruction::Kind::kConvertDistinct: {
+                        if (instruction.result.empty()) {
+                            report("convert_distinct must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("convert_distinct must use exactly one operand in function " + function.name);
                             break;
+                        }
+                        if (instruction.target.empty()) {
+                            report("convert_distinct must name a target type in function " + function.name);
+                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                            report("convert_distinct target metadata must match result type in function " + function.name);
+                        }
+                        if (operand_types.size() == 1 &&
+                            ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kDistinct) {
+                            report("convert_distinct must encode a distinct or alias conversion family in function " + function.name);
                         }
                         if (operand_types.empty()) {
                             break;
@@ -2558,9 +2700,21 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kPointerToInt:
+                        if (instruction.result.empty()) {
+                            report("pointer_to_int must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("pointer_to_int must use exactly one operand in function " + function.name);
                             break;
+                        }
+                        if (instruction.target.empty()) {
+                            report("pointer_to_int must name a target type in function " + function.name);
+                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                            report("pointer_to_int target metadata must match result type in function " + function.name);
+                        }
+                        if (operand_types.size() == 1 &&
+                            ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kPointerToInt) {
+                            report("pointer_to_int must encode a pointer-to-uintptr conversion family in function " + function.name);
                         }
                         if (operand_types.size() == 1 && (!IsPointerLikeType(StripMirAliasOrDistinct(module, operand_types.front())) ||
                                                          !IsUintPtrType(StripMirAliasOrDistinct(module, instruction.type)))) {
@@ -2568,9 +2722,21 @@ bool ValidateModule(const Module& module,
                         }
                         break;
                     case Instruction::Kind::kIntToPointer:
+                        if (instruction.result.empty()) {
+                            report("int_to_pointer must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("int_to_pointer must use exactly one operand in function " + function.name);
                             break;
+                        }
+                        if (instruction.target.empty()) {
+                            report("int_to_pointer must name a target type in function " + function.name);
+                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                            report("int_to_pointer target metadata must match result type in function " + function.name);
+                        }
+                        if (operand_types.size() == 1 &&
+                            ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kIntToPointer) {
+                            report("int_to_pointer must encode a uintptr-to-pointer conversion family in function " + function.name);
                         }
                         if (operand_types.size() == 1 && (!IsUintPtrType(StripMirAliasOrDistinct(module, operand_types.front())) ||
                                                          !IsPointerLikeType(StripMirAliasOrDistinct(module, instruction.type)))) {
@@ -2578,9 +2744,21 @@ bool ValidateModule(const Module& module,
                         }
                         break;
                     case Instruction::Kind::kArrayToSlice:
+                        if (instruction.result.empty()) {
+                            report("array_to_slice must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("array_to_slice must use exactly one operand in function " + function.name);
                             break;
+                        }
+                        if (instruction.target.empty()) {
+                            report("array_to_slice must name a target type in function " + function.name);
+                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                            report("array_to_slice target metadata must match result type in function " + function.name);
+                        }
+                        if (operand_types.size() == 1 &&
+                            ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kArrayToSlice) {
+                            report("array_to_slice must encode an array-to-slice conversion family in function " + function.name);
                         }
                         if (operand_types.size() == 1) {
                             if (operand_types.front().kind != sema::Type::Kind::kArray || instruction.type.kind != sema::Type::Kind::kNamed ||
@@ -2593,9 +2771,21 @@ bool ValidateModule(const Module& module,
                         }
                         break;
                     case Instruction::Kind::kBufferToSlice:
+                        if (instruction.result.empty()) {
+                            report("buffer_to_slice must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("buffer_to_slice must use exactly one operand in function " + function.name);
                             break;
+                        }
+                        if (instruction.target.empty()) {
+                            report("buffer_to_slice must name a target type in function " + function.name);
+                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                            report("buffer_to_slice target metadata must match result type in function " + function.name);
+                        }
+                        if (operand_types.size() == 1 &&
+                            ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kBufferToSlice) {
+                            report("buffer_to_slice must encode a buffer-to-slice conversion family in function " + function.name);
                         }
                         if (operand_types.size() == 1) {
                             if (operand_types.front().kind != sema::Type::Kind::kNamed || operand_types.front().name != "Buffer" ||
@@ -2642,6 +2832,9 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kVolatileLoad: {
+                        if (ClassifySpecialCall(instruction.target) != SpecialCallKind::kVolatileLoad) {
+                            report("volatile_load must use volatile_load call metadata in function " + function.name);
+                        }
                         if (instruction.result.empty()) {
                             report("volatile_load must produce a result in function " + function.name);
                         }
@@ -2662,6 +2855,9 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kVolatileStore: {
+                        if (ClassifySpecialCall(instruction.target) != SpecialCallKind::kVolatileStore) {
+                            report("volatile_store must use volatile_store call metadata in function " + function.name);
+                        }
                         if (!instruction.result.empty()) {
                             report("volatile_store must not produce a result in function " + function.name);
                         }
@@ -2691,10 +2887,24 @@ bool ValidateModule(const Module& module,
                         const bool is_exchange = instruction.kind == Instruction::Kind::kAtomicExchange;
                         const bool is_compare_exchange = instruction.kind == Instruction::Kind::kAtomicCompareExchange;
                         const bool is_fetch_add = instruction.kind == Instruction::Kind::kAtomicFetchAdd;
+                        const SpecialCallKind expected_special_kind = is_load     ? SpecialCallKind::kAtomicLoad
+                                                              : is_store          ? SpecialCallKind::kAtomicStore
+                                                              : is_exchange       ? SpecialCallKind::kAtomicExchange
+                                                              : is_compare_exchange ? SpecialCallKind::kAtomicCompareExchange
+                                                                                    : SpecialCallKind::kAtomicFetchAdd;
+                        if (ClassifySpecialCall(instruction.target) != expected_special_kind) {
+                            report(std::string(ToString(instruction.kind)) + " must use matching atomic call metadata in function " + function.name);
+                        }
                         const std::size_t expected_operands = is_load ? 2 : (is_store || is_exchange || is_fetch_add ? 3 : 5);
                         if (instruction.operands.size() != expected_operands) {
                             report(std::string(ToString(instruction.kind)) + " operand count mismatch in function " + function.name);
                             break;
+                        }
+                        if ((is_load || is_store || is_exchange || is_fetch_add) && !HasAtomicOrderMetadata(instruction.op)) {
+                            report(std::string(ToString(instruction.kind)) + " must record order metadata in function " + function.name);
+                        }
+                        if (is_compare_exchange && !HasCompareExchangeOrderMetadata(instruction.op)) {
+                            report("atomic_compare_exchange must record success/failure order metadata in function " + function.name);
                         }
                         if ((is_load || is_exchange || is_fetch_add) && instruction.result.empty()) {
                             report(std::string(ToString(instruction.kind)) + " must produce a result in function " + function.name);
@@ -2766,8 +2976,15 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kField: {
+                        if (instruction.result.empty()) {
+                            report("field must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("field must use exactly one base operand in function " + function.name);
+                            break;
+                        }
+                        if (instruction.target.empty()) {
+                            report("field must name a member target in function " + function.name);
                             break;
                         }
                         const sema::Type& base_type = operand_types.front();
@@ -2807,6 +3024,9 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kIndex: {
+                        if (instruction.result.empty()) {
+                            report("index must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 2) {
                             report("index must use base and index operands in function " + function.name);
                             break;
@@ -2834,6 +3054,9 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kSlice: {
+                        if (instruction.result.empty()) {
+                            report("slice must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.empty() || instruction.operands.size() > 3) {
                             report("slice must use one to three operands in function " + function.name);
                             break;
@@ -2871,6 +3094,9 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kAggregateInit:
+                        if (instruction.result.empty()) {
+                            report("aggregate_init must produce a result in function " + function.name);
+                        }
                         if (instruction.field_names.size() != instruction.operands.size()) {
                             report("aggregate_init field metadata mismatch in function " + function.name);
                         }
@@ -2920,6 +3146,9 @@ bool ValidateModule(const Module& module,
                         }
                         break;
                     case Instruction::Kind::kVariantMatch:
+                        if (instruction.result.empty()) {
+                            report("variant_match must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("variant_match must use exactly one selector operand in function " + function.name);
                         }
@@ -2933,12 +3162,17 @@ bool ValidateModule(const Module& module,
                             const TypeDecl* type_decl = FindMirTypeDecl(module, operand_types.front().name);
                             if (type_decl == nullptr) {
                                 report("variant_match selector type is unknown in function " + function.name + ": " + operand_types.front().name);
+                            } else if (type_decl->kind != TypeDecl::Kind::kEnum) {
+                                report("variant_match requires enum selector type in function " + function.name);
                             } else if (FindMirVariantDecl(*type_decl, instruction.target) == nullptr) {
                                 report("variant_match references unknown variant in function " + function.name + ": " + instruction.target);
                             }
                         }
                         break;
                     case Instruction::Kind::kVariantExtract: {
+                        if (instruction.result.empty()) {
+                            report("variant_extract must produce a result in function " + function.name);
+                        }
                         if (instruction.operands.size() != 1) {
                             report("variant_extract must use exactly one selector operand in function " + function.name);
                         }
@@ -2964,6 +3198,10 @@ bool ValidateModule(const Module& module,
                                 report("variant_extract selector type is unknown in function " + function.name + ": " + operand_types.front().name);
                                 break;
                             }
+                            if (type_decl->kind != TypeDecl::Kind::kEnum) {
+                                report("variant_extract requires enum selector type in function " + function.name);
+                                break;
+                            }
                             const VariantDecl* variant_decl = FindMirVariantDecl(*type_decl, instruction.target);
                             if (variant_decl == nullptr) {
                                 report("variant_extract references unknown variant in function " + function.name + ": " + instruction.target);
@@ -2985,8 +3223,33 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kConst:
+                        if (instruction.result.empty()) {
+                            report("const must produce a result in function " + function.name);
+                        }
+                        if (!instruction.operands.empty()) {
+                            report("const must not take operands in function " + function.name);
+                        }
+                        if (instruction.op.empty()) {
+                            report("const must record literal payload text in function " + function.name);
+                        }
                         break;
                     case Instruction::Kind::kSymbolRef:
+                        if (instruction.result.empty()) {
+                            report("symbol_ref must produce a result in function " + function.name);
+                        }
+                        if (!instruction.operands.empty()) {
+                            report("symbol_ref must not take operands in function " + function.name);
+                        }
+                        if (instruction.target.empty()) {
+                            report("symbol_ref must name a target symbol in function " + function.name);
+                        }
+                        if (instruction.target_kind == Instruction::TargetKind::kNone) {
+                            report("symbol_ref must record a target kind in function " + function.name);
+                        }
+                        if ((instruction.target_kind == Instruction::TargetKind::kFunction || instruction.target_kind == Instruction::TargetKind::kGlobal) &&
+                            instruction.target_name.empty()) {
+                            report("symbol_ref must record target_name metadata for known symbols in function " + function.name);
+                        }
                         if (instruction.target_kind == Instruction::TargetKind::kFunction) {
                             const Function* callee = FindMirFunction(module, instruction.target_name.empty() ? instruction.target : instruction.target_name);
                             if (callee != nullptr && instruction.type != FunctionProcedureType(*callee)) {
@@ -3015,7 +3278,6 @@ bool ValidateModule(const Module& module,
 
             switch (block.terminator.kind) {
                 case Terminator::Kind::kNone:
-                    report("unterminated MIR block in function " + function.name + ": " + block.label);
                     break;
                 case Terminator::Kind::kReturn:
                     if (block.terminator.values.size() != function.return_types.size()) {
@@ -3039,25 +3301,16 @@ bool ValidateModule(const Module& module,
                     }
                     break;
                 case Terminator::Kind::kBranch:
-                    if (!block_labels.contains(block.terminator.true_target)) {
-                        report("branch targets missing MIR block in function " + function.name + ": " + block.terminator.true_target);
-                    }
                     break;
                 case Terminator::Kind::kCondBranch:
-                    if (block.terminator.values.size() != 1 || !defined_values.contains(block.terminator.values.front())) {
+                    if (block.terminator.values.size() == 1 && !defined_values.contains(block.terminator.values.front())) {
                         report("conditional branch must use one defined MIR condition in function " + function.name);
-                    } else {
+                    } else if (block.terminator.values.size() == 1) {
                         const auto found_type = value_types.find(block.terminator.values.front());
                         const sema::Type condition_type = found_type == value_types.end() ? sema::UnknownType() : found_type->second;
                         if (!sema::IsUnknown(condition_type) && !IsBoolType(condition_type)) {
                             report("conditional branch condition must have bool type in function " + function.name);
                         }
-                    }
-                    if (!block_labels.contains(block.terminator.true_target)) {
-                        report("conditional branch true target missing MIR block in function " + function.name + ": " + block.terminator.true_target);
-                    }
-                    if (!block_labels.contains(block.terminator.false_target)) {
-                        report("conditional branch false target missing MIR block in function " + function.name + ": " + block.terminator.false_target);
                     }
                     break;
             }

@@ -6,8 +6,6 @@ Module
       const %v1:int_literal op=0
       binary %v2:bool op=== operands=[%v0, %v1]
       terminator cond value=%v2 true=switch_case4 false=switch_test3
-    Block label=switch_merge1
-      terminator none
     Block label=switch_default2
       const %v7:int_literal op=30
       terminator return values=[%v7]

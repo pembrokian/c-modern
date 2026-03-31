@@ -1639,6 +1639,311 @@ void TestValidatorRejectsAtomicLoadBadOrderType() {
     }
 }
 
+void TestValidatorRejectsShiftWithoutShiftCheck() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_shift";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("i32"),
+                .op = "4",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("i32"),
+                .op = "1",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBinary,
+                .result = "%v2",
+                .type = mc::sema::NamedType("i32"),
+                .op = "<<",
+                .operands = {"%v0", "%v1"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject shift without explicit shift_check");
+    }
+    if (diagnostics.Render().find("must be preceded by matching shift_check") == std::string::npos) {
+        Fail("validator should explain missing shift_check");
+    }
+}
+
+void TestValidatorRejectsConvertNumericBadTargetMetadata() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_convert_numeric_metadata";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("i32"),
+                .op = "1",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConvertNumeric,
+                .result = "%v1",
+                .type = mc::sema::NamedType("i64"),
+                .target = "i32",
+                .operands = {"%v0"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject convert_numeric target metadata mismatches");
+    }
+    if (diagnostics.Render().find("convert_numeric target metadata must match result type") == std::string::npos) {
+        Fail("validator should explain bad convert_numeric target metadata");
+    }
+}
+
+void TestValidatorRejectsAtomicCompareExchangeMissingOrderMetadata() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_atomic_cx_orders";
+    mc::sema::Type atomic_i32 = mc::sema::NamedType("Atomic");
+    atomic_i32.subtypes.push_back(mc::sema::NamedType("i32"));
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::PointerType(atomic_i32),
+                .target = "atom",
+                .target_kind = mc::mir::Instruction::TargetKind::kOther,
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v1",
+                .type = mc::sema::PointerType(mc::sema::NamedType("i32")),
+                .target = "expected_ptr",
+                .target_kind = mc::mir::Instruction::TargetKind::kOther,
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v2",
+                .type = mc::sema::NamedType("i32"),
+                .op = "7",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v3",
+                .type = mc::sema::NamedType("MemoryOrder"),
+                .op = "seq_cst",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v4",
+                .type = mc::sema::NamedType("MemoryOrder"),
+                .op = "seq_cst",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kAtomicCompareExchange,
+                .result = "%v5",
+                .type = mc::sema::BoolType(),
+                .target = "atomic_compare_exchange",
+                .operands = {"%v0", "%v1", "%v2", "%v3", "%v4"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject atomic_compare_exchange without order metadata");
+    }
+    if (diagnostics.Render().find("must record success/failure order metadata") == std::string::npos) {
+        Fail("validator should explain missing compare-exchange order metadata");
+    }
+}
+
+void TestValidatorRejectsStoreTargetIndexMissingAuxType() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_store_index_metadata";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("i32"),
+                .op = "1",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kStoreTarget,
+                .type = mc::sema::NamedType("i32"),
+                .target = "values[idx]",
+                .target_kind = mc::mir::Instruction::TargetKind::kIndex,
+                .target_base_type = mc::sema::ArrayType(mc::sema::NamedType("i32"), "4"),
+                .operands = {"%v0"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject store_target index operations without aux index metadata");
+    }
+    if (diagnostics.Render().find("must carry exactly one index type") == std::string::npos) {
+        Fail("validator should explain missing store_target index metadata");
+    }
+}
+
+void TestValidatorRejectsKnownFunctionSymbolRefMissingTargetName() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+
+    mc::mir::Function callee;
+    callee.name = "callee";
+    callee.blocks.push_back({
+        .label = "entry",
+        .instructions = {},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(callee));
+
+    mc::mir::Function function;
+    function.name = "broken_missing_symbol_target_name";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::ProcedureType({}, {}),
+                .target = "callee",
+                .target_kind = mc::mir::Instruction::TargetKind::kFunction,
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject known function symbol_ref instructions without target_name metadata");
+    }
+    if (diagnostics.Render().find("must record target_name metadata") == std::string::npos) {
+        Fail("validator should explain missing function symbol_ref target_name metadata");
+    }
+}
+
+void TestValidatorRejectsUnterminatedUnreachableBlock() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_dead_block";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kBranch,
+            .values = {},
+            .true_target = "exit",
+        },
+    });
+    function.blocks.push_back({
+        .label = "exit",
+        .instructions = {},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    function.blocks.push_back({
+        .label = "dead",
+        .instructions = {},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kNone,
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject unterminated unreachable blocks");
+    }
+    if (diagnostics.Render().find("unterminated MIR block") == std::string::npos) {
+        Fail("validator should explain unterminated unreachable blocks");
+    }
+}
+
+void TestValidatorRejectsBranchTerminatorWithValues() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_branch_values";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("i32"),
+                .op = "1",
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kBranch,
+            .values = {"%v0"},
+            .true_target = "exit",
+        },
+    });
+    function.blocks.push_back({
+        .label = "exit",
+        .instructions = {},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject branch terminators that carry values");
+    }
+    if (diagnostics.Render().find("branch terminator must not carry values") == std::string::npos) {
+        Fail("validator should explain invalid branch terminator payloads");
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -1687,5 +1992,12 @@ int main() {
     TestValidatorRejectsWrapSemanticsOnFloatArithmetic();
     TestValidatorRejectsGenericVolatileCall();
     TestValidatorRejectsAtomicLoadBadOrderType();
+    TestValidatorRejectsShiftWithoutShiftCheck();
+    TestValidatorRejectsConvertNumericBadTargetMetadata();
+    TestValidatorRejectsAtomicCompareExchangeMissingOrderMetadata();
+    TestValidatorRejectsStoreTargetIndexMissingAuxType();
+    TestValidatorRejectsKnownFunctionSymbolRefMissingTargetName();
+    TestValidatorRejectsUnterminatedUnreachableBlock();
+    TestValidatorRejectsBranchTerminatorWithValues();
     return 0;
 }

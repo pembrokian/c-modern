@@ -10,8 +10,6 @@ Module
       load_local %v0:Result target=value
       variant_match %v1:bool target=Result.Ok operands=[%v0]
       terminator cond value=%v1 true=switch_case3 false=switch_default2
-    Block label=switch_merge1
-      terminator none
     Block label=switch_default2
       const %v4:int_literal op=2
       terminator return values=[%v4]

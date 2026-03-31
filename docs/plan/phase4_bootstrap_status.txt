@@ -7,6 +7,7 @@ What is in place:
 - MIR lowering runs after bootstrap semantic checking in `mc check`
 - MIR dumps are deterministic and covered by fixture tests under `tests/mir/`
 - MIR validation checks duplicate functions, duplicate blocks, undefined operands, duplicate values, reachable block termination, branch target validity, and typed legality for locals, calls, unary/binary ops, explicit bounds checks, conversion op selection, field/index/slice base and bound rules, aggregate initializers, variant match/extract ops, return values, branch conditions, and structured field/index store targets
+- MIR validation now also enforces structural legality for emitted value/effect instructions, dedicated conversion-family metadata, dedicated volatile/atomic opcode metadata, stricter symbol/store target metadata, and block/terminator shape invariants even for unreachable dead blocks
 - MIR validation also checks symbol-ref type consistency where matching MIR-local declarations exist without rejecting import-backed symbol refs that are semantically known but not materialized as local MIR declarations
 - bootstrap MIR lowering covers core control flow, locals, calls, aggregates, range loops, foreach loops, defer unwinding, expression switch cases, and variant switch patterns
 - recent bootstrap tightening carries semantic types through indexed slice elements, known global/function symbol refs, deferred and statement-only sink callees inferred from call sites, variant payload extraction, synthetic range/foreach loop state, and ordinary local/expression lowering instead of leaving those MIR values as `unknown`
@@ -68,11 +69,11 @@ Theme: Lowering completeness and semantic ownership
 - review call, store-target, aggregate, and control-flow lowering for any remaining places where bootstrap convenience logic still hides missing semantic structure
 
 Theme: MIR validation closure
-- extend the validator instruction-by-instruction until all currently emitted MIR instructions have legality checks strong enough to catch malformed typed operations, not just the current typed subset
-- add validator coverage for every newly added fault, volatile, atomic, and wraparound-aware MIR form as soon as each form lands
-- tighten validation of structured metadata so target names, auxiliary types, mode tags, and payload metadata are all checked against MIR-local declarations and sema-known expectations
-- review terminator and block invariants again once the remaining explicit fault instructions exist, especially if any faulting operations imply control-flow or trapping behavior
-- keep adding focused negative unit tests whenever validator rules are strengthened so each legality contract has a direct regression test
+- completed: the validator now checks the remaining emitted instruction forms more explicitly, including structural result/effect shape for const, symbol_ref, field/index/slice, aggregate, variant, and explicit conversion instructions in addition to the earlier typed subset
+- completed: validator coverage now includes dedicated negative tests for explicit shift checks, conversion metadata, atomic compare-exchange order metadata, structured store-target metadata, and wrap/fault opcode invariants alongside the earlier volatile/atomic and div-check cases
+- completed: structured metadata validation is tighter for target names, target kinds, index auxiliary types, conversion target metadata, atomic order mode tags, and enum variant payload metadata while still permitting import-backed symbol refs that are semantically known but not materialized as local MIR declarations
+- completed: block and terminator validation now checks dead-block termination and terminator shape invariants directly, and lowering no longer leaves dead switch/if merge blocks behind when no control-flow path reaches them
+- completed: focused negative MIR unit tests were added for each strengthened legality rule so validator regressions fail at the narrowest direct contract
 
 Theme: Structured identity and metadata quality
 - reduce dependence on rendered expression strings for MIR lookup, naming, and validation paths by threading more structured semantic identity through lowering
