@@ -72,7 +72,8 @@ Literal tokens:
 
 Literal rules:
 - integer literals include decimal and hexadecimal spellings with `_` separators between digits
-- floating-point literals include decimal fraction or exponent spellings with `_` separators between digits
+- floating-point literals include decimal fraction spellings with `_` separators between digits in the significand
+- exponent digits never allow `_`; `1e10` is valid and `1e1_0` is not
 - string literals support only the v0.2 escape set frozen in `grammar_spec.txt`
 - malformed literals should still produce a token when practical so diagnostics can point at the literal span directly
 

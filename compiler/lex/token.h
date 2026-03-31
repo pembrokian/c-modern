@@ -1,40 +1,83 @@
 #ifndef C_MODERN_COMPILER_LEX_TOKEN_H_
 #define C_MODERN_COMPILER_LEX_TOKEN_H_
 
+#include <string>
 #include <string_view>
+
+#include "compiler/support/source_span.h"
 
 namespace mc::lex {
 
 enum class TokenKind {
+    kNewline,
     kIdentifier,
-    kKeyword,
-    kIntegerLiteral,
+    kImport,
+    kExport,
+    kFunc,
+    kStruct,
+    kEnum,
+    kDistinct,
+    kType,
+    kExtern,
+    kIf,
+    kElse,
+    kSwitch,
+    kCase,
+    kDefault,
+    kFor,
+    kWhile,
+    kIn,
+    kReturn,
+    kBreak,
+    kContinue,
+    kDefer,
+    kVar,
+    kConst,
+    kNil,
+    kTrue,
+    kFalse,
+    kIntLiteral,
+    kFloatLiteral,
     kStringLiteral,
-    kPunctuation,
-    kAttribute,
-    kEndOfFile,
+    kLBrace,
+    kRBrace,
+    kLParen,
+    kRParen,
+    kLBracket,
+    kRBracket,
+    kComma,
+    kColon,
+    kDot,
+    kAt,
+    kDotDeref,
+    kRange,
+    kAssign,
+    kEqEq,
+    kBangEq,
+    kLt,
+    kLtEq,
+    kGt,
+    kGtEq,
+    kPlus,
+    kMinus,
+    kStar,
+    kSlash,
+    kPercent,
+    kAmp,
+    kBang,
+    kAmpAmp,
+    kPipePipe,
+    kArrow,
+    kEof,
 };
 
-inline std::string_view ToString(TokenKind kind) {
-    switch (kind) {
-        case TokenKind::kIdentifier:
-            return "identifier";
-        case TokenKind::kKeyword:
-            return "keyword";
-        case TokenKind::kIntegerLiteral:
-            return "integer_literal";
-        case TokenKind::kStringLiteral:
-            return "string_literal";
-        case TokenKind::kPunctuation:
-            return "punctuation";
-        case TokenKind::kAttribute:
-            return "attribute";
-        case TokenKind::kEndOfFile:
-            return "eof";
-    }
+struct Token {
+    TokenKind kind = TokenKind::kEof;
+    std::string lexeme;
+    support::SourceSpan span {};
+};
 
-    return "unknown";
-}
+std::string_view ToString(TokenKind kind);
 
 }  // namespace mc::lex
 

@@ -101,6 +101,10 @@ Literal forms:
              | digit { [ "_" ] digit } <exp_part>
 <exp_part>   = ("e" | "E") [ "+" | "-" ] digit { digit }
 
+Notes:
+- `_` separators are allowed only inside the significand digit sequences shown above.
+- exponent digits in `<exp_part>` do not permit `_`; forms such as `1e1_0` are invalid.
+
 <string_lit> = '"' { <string_char> | <escape_seq> } '"'
 <string_char> = any UTF-8 source character except '"', "\\", "\n", or "\r"
 <escape_seq> = "\\\"" | "\\\\" | "\\n" | "\\r" | "\\t" | "\\0"

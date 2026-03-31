@@ -1,0 +1,16 @@
+SourceFile
+  FuncDecl name=build
+    body:
+      BlockStmt
+        statements:
+          BindingOrAssignStmt hasInitializer=true
+            NamePattern names=[cfg]
+            exprs:
+              AggregateInitExpr
+                left:
+                  NameExpr text=Config
+                inits:
+                  FieldInit name=path
+                    LiteralExpr text="out" extra=string_lit
+                  FieldInit name=mode
+                    LiteralExpr text="fast" extra=string_lit

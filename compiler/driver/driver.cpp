@@ -1,11 +1,13 @@
 #include "compiler/driver/driver.h"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <string>
 #include <string_view>
 
+#include "compiler/ast/ast.h"
 #include "compiler/lex/lexer.h"
 #include "compiler/parse/parser.h"
 #include "compiler/support/diagnostics.h"
@@ -19,7 +21,7 @@ constexpr std::string_view kUsage =
     "Modern C bootstrap driver\n"
     "\n"
     "Usage:\n"
-    "  mc check <source> [--build-dir <dir>] [--emit-dump-paths]\n"
+    "  mc check <source> [--build-dir <dir>] [--emit-dump-paths] [--dump-ast]\n"
     "  mc dump-paths <source> [--build-dir <dir>]\n"
     "  mc --help\n";
 
@@ -27,6 +29,7 @@ struct CommandOptions {
     std::filesystem::path source_path;
     std::filesystem::path build_dir = "build/debug";
     bool emit_dump_paths = false;
+    bool dump_ast = false;
 };
 
 void PrintUsage(std::ostream& stream) {
@@ -49,6 +52,11 @@ std::optional<CommandOptions> ParseCommandOptions(int argc,
         const std::string_view argument = argv[index];
         if (argument == "--emit-dump-paths") {
             options.emit_dump_paths = true;
+            continue;
+        }
+
+        if (argument == "--dump-ast") {
+            options.dump_ast = true;
             continue;
         }
 
@@ -85,20 +93,31 @@ int RunCheck(const CommandOptions& options) {
     }
 
     const support::SourceFile* source_file = source_manager.GetFile(*file_id);
-    const auto lex_result = mc::lex::LexForBootstrap(source_file->contents);
-    const auto parse_result = mc::parse::ParseForBootstrap(lex_result);
+    const auto lex_result = mc::lex::Lex(source_file->contents, source_file->path.generic_string(), diagnostics);
+    const auto parse_result = mc::parse::Parse(lex_result, source_file->path, diagnostics);
     if (!parse_result.ok) {
-        diagnostics.Report({
-            .file_path = source_file->path,
-            .span = support::kDefaultSourceSpan,
-            .severity = support::DiagnosticSeverity::kError,
-            .message = "bootstrap parser pipeline failed",
-        });
         std::cerr << diagnostics.Render() << '\n';
         return 1;
     }
 
-    std::cout << "checked " << source_file->path.generic_string() << " (bootstrap frontend stub)" << '\n';
+    if (options.dump_ast) {
+        const auto targets = support::ComputeDumpTargets(source_file->path, options.build_dir);
+        std::filesystem::create_directories(targets.ast.parent_path());
+        std::ofstream output(targets.ast, std::ios::binary);
+        output << mc::ast::DumpSourceFile(*parse_result.source_file);
+        if (!output) {
+            diagnostics.Report({
+                .file_path = targets.ast,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "unable to write AST dump",
+            });
+            std::cerr << diagnostics.Render() << '\n';
+            return 1;
+        }
+    }
+
+    std::cout << "checked " << source_file->path.generic_string() << " (frontend phase 2)" << '\n';
 
     if (options.emit_dump_paths) {
         PrintDumpTargets(support::ComputeDumpTargets(source_file->path, options.build_dir), std::cout);

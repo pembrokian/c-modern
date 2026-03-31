@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 
+#include "compiler/ast/ast.h"
 #include "compiler/lex/lexer.h"
 #include "compiler/parse/parser.h"
 #include "compiler/support/diagnostics.h"
@@ -22,10 +23,15 @@ void Expect(bool condition, const std::string& message) {
 std::filesystem::path MakeTempFile() {
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
     const auto path = std::filesystem::temp_directory_path() /
-                      ("c_modern_phase1_" + std::to_string(stamp) + ".mc");
+                      ("c_modern_phase2_" + std::to_string(stamp) + ".mc");
     std::ofstream output(path);
     output << "func main() {}\n";
     return path;
+}
+
+mc::parse::ParseResult ParseText(const std::string& source, mc::support::DiagnosticSink& diagnostics) {
+    const auto lexed = mc::lex::Lex(source, "<test>", diagnostics);
+    return mc::parse::Parse(lexed, "<test>", diagnostics);
 }
 
 void TestDiagnosticFormatting() {
@@ -67,13 +73,122 @@ void TestDumpPaths() {
            "mci path should be deterministic");
 }
 
-void TestBootstrapFrontendContracts() {
-    const auto lexed = mc::lex::LexForBootstrap("func main() {}\n");
-    const auto parsed = mc::parse::ParseForBootstrap(lexed);
-    Expect(lexed.complete, "bootstrap lexer should report completion");
-    Expect(!lexed.tokens.empty(), "bootstrap lexer should produce at least eof");
-    Expect(parsed.ok, "bootstrap parser should accept bootstrap lexer output");
-    Expect(parsed.stage == "phase1-bootstrap", "bootstrap parser should expose a stable stage label");
+void TestLexerTracksKeywordsAndSeparators() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lexed = mc::lex::Lex("export { main }\nimport io\nfunc main() {}\n", "<test>", diagnostics);
+    Expect(lexed.ok, "lexer should accept a basic module");
+    Expect(!diagnostics.HasErrors(), "lexer should not emit diagnostics for valid input");
+    Expect(lexed.tokens.size() >= 10, "lexer should emit a real token stream");
+    Expect(lexed.tokens[0].kind == mc::lex::TokenKind::kExport, "lexer should recognize export keyword");
+    Expect(lexed.tokens[4].kind == mc::lex::TokenKind::kNewline, "lexer should preserve newline separators");
+}
+
+void TestParserBuildsDeterministicAstDump() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "export { main }\n"
+        "import io\n"
+        "@trace\n"
+        "func main(args: Slice<cstr>) i32 {\n"
+        "    cfg = Config{ path: \"out\" }\n"
+        "    if args.len == 0 {\n"
+        "        return 1\n"
+        "    }\n"
+        "    return io.write(cfg.path)\n"
+        "}\n",
+        diagnostics);
+
+    Expect(parsed.ok, "parser should accept a representative Phase 2 module");
+    Expect(!diagnostics.HasErrors(), "valid module should not emit diagnostics");
+
+    const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
+    Expect(dump.find("SourceFile") != std::string::npos, "dump should start with SourceFile");
+    Expect(dump.find("ExportBlock names=[main]") != std::string::npos, "dump should include export block");
+    Expect(dump.find("ImportDecl moduleName=io") != std::string::npos, "dump should include imports");
+    Expect(dump.find("FuncDecl name=main") != std::string::npos, "dump should include function declaration");
+    Expect(dump.find("AggregateInitExpr") != std::string::npos, "dump should include aggregate initializer expression");
+    Expect(dump.find("FieldInit name=path") != std::string::npos, "dump should preserve named aggregate fields");
+    Expect(dump.find("IfStmt") != std::string::npos, "dump should include if statement");
+}
+
+void TestParserHandlesTypesAndLoopForms() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "struct Buffer<T> {\n"
+        "    ptr: *T\n"
+        "    len: usize\n"
+        "}\n"
+        "\n"
+        "func walk(values: Slice<i32>) i32 {\n"
+        "    total: i32\n"
+        "    for index, value in values {\n"
+        "        total = total + value\n"
+        "    }\n"
+        "    for idx in 0..10 {\n"
+        "        total = total + idx\n"
+        "    }\n"
+        "    while total < 100 {\n"
+        "        total = total + 1\n"
+        "    }\n"
+        "    return total\n"
+        "}\n",
+        diagnostics);
+
+    Expect(parsed.ok, "parser should accept generic types and loop forms");
+    const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
+    Expect(dump.find("StructDecl name=Buffer") != std::string::npos, "dump should include struct declaration");
+    Expect(dump.find("PointerType") != std::string::npos, "dump should include pointer types");
+    Expect(dump.find("ForEachIndexStmt") != std::string::npos, "dump should include index foreach loop");
+    Expect(dump.find("ForRangeStmt") != std::string::npos, "dump should include range loop");
+    Expect(dump.find("WhileStmt") != std::string::npos, "dump should include while loop");
+}
+
+void TestParserReportsMalformedInput() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "func broken(a: i32 {\n"
+        "    return a\n"
+        "}\n",
+        diagnostics);
+
+    Expect(!parsed.ok, "parser should reject malformed input");
+    Expect(diagnostics.HasErrors(), "parser should report malformed input");
+    Expect(diagnostics.Render().find("expected ')' after parameter list") != std::string::npos,
+           "parser should report a direct syntax diagnostic");
+}
+
+void TestParserHandlesMultiTargetAssignment() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "func swap() {\n"
+        "    left = 1\n"
+        "    pair = Pair{ right: 2 }\n"
+        "    left, pair.right = pair.right, left\n"
+        "}\n",
+        diagnostics);
+
+    Expect(parsed.ok, "parser should accept multi-target assignment");
+    const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
+    Expect(dump.find("AssignStmt") != std::string::npos, "dump should include assignment statement");
+    Expect(dump.find("targets:") != std::string::npos, "assignment dump should distinguish targets");
+    Expect(dump.find("values:") != std::string::npos, "assignment dump should distinguish values");
+}
+
+void TestParserPreservesBindingAssignmentAmbiguity() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "func demo() {\n"
+        "    left = right\n"
+        "    first, second = second, first\n"
+        "}\n",
+        diagnostics);
+
+    Expect(parsed.ok, "parser should accept bare identifier-list equals forms");
+    const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
+    Expect(dump.find("BindingOrAssignStmt") != std::string::npos,
+           "dump should preserve binding-versus-assignment ambiguity explicitly");
+    Expect(dump.find("NamePattern names=[first, second]") != std::string::npos,
+           "ambiguous node should preserve the identifier list");
 }
 
 }  // namespace
@@ -82,6 +197,11 @@ int main() {
     TestDiagnosticFormatting();
     TestSourceManagerLoad();
     TestDumpPaths();
-    TestBootstrapFrontendContracts();
+    TestLexerTracksKeywordsAndSeparators();
+    TestParserBuildsDeterministicAstDump();
+    TestParserHandlesTypesAndLoopForms();
+    TestParserReportsMalformedInput();
+    TestParserHandlesMultiTargetAssignment();
+    TestParserPreservesBindingAssignmentAmbiguity();
     return 0;
 }

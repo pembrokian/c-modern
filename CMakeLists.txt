@@ -17,6 +17,7 @@ add_library(mc_support STATIC
 target_include_directories(mc_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(mc_frontend_stub STATIC
+    compiler/ast/ast.cpp
     compiler/lex/lexer.cpp
     compiler/parse/parser.cpp
 )
@@ -39,7 +40,15 @@ add_executable(mc_bootstrap_tests
 target_include_directories(mc_bootstrap_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_bootstrap_tests PRIVATE mc_frontend_stub mc_support)
 
+add_executable(mc_parser_fixture_tests
+    tests/parser/parser_fixture_tests.cpp
+)
+
+target_include_directories(mc_parser_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_parser_fixture_tests PRIVATE mc_frontend_stub mc_support)
+
 add_test(NAME mc_bootstrap_unit COMMAND mc_bootstrap_tests)
+add_test(NAME mc_parser_fixture_unit COMMAND mc_parser_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_help_smoke COMMAND mc --help)
 add_test(NAME mc_check_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc)
 add_test(NAME mc_dump_paths_smoke COMMAND mc dump-paths ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --build-dir ${CMAKE_CURRENT_BINARY_DIR})

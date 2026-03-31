@@ -1,0 +1,14 @@
+SourceFile
+  FuncDecl name=demo
+    body:
+      BlockStmt
+        statements:
+          BindingOrAssignStmt hasInitializer=true
+            NamePattern names=[left]
+            exprs:
+              NameExpr text=right
+          BindingOrAssignStmt hasInitializer=true
+            NamePattern names=[first, second]
+            exprs:
+              NameExpr text=second
+              NameExpr text=first
