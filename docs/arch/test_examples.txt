@@ -127,7 +127,7 @@ distinct FileId = i32
 func takes_file(id: FileId) {}
 
 func main(args: Slice<cstr>) i32 {
-    user = UserId(7)
+    user = (UserId)(7)
     takes_file(user)
     return 0
 }

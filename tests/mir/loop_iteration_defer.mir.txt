@@ -1,7 +1,7 @@
 Module
   Function name=iterate returns=[i32]
     Local name=idx type=int_literal
-    Local name=$defer_callee0 type=unknown readonly
+    Local name=$defer_callee0 type=proc()->void readonly
     Block label=entry0
       const %v0:int_literal op=0
       const %v1:int_literal op=2
@@ -12,9 +12,9 @@ Module
       binary %v3:bool op=< operands=[%v2, %v1]
       terminator cond value=%v3 true=range_body2 false=range_exit4
     Block label=range_body2
-      symbol_ref %v4:unknown target=tick
+      symbol_ref %v4:proc()->void target=tick target_kind=other target_name=tick
       store_local target=$defer_callee0 operands=[%v4]
-      load_local %v5:unknown target=$defer_callee0
+      load_local %v5:proc()->void target=$defer_callee0
       call target=tick operands=[%v5]
       terminator branch target=range_step3
     Block label=range_step3

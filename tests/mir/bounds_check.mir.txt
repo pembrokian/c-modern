@@ -1,0 +1,23 @@
+Module
+  Function name=at returns=[i32]
+    Local name=values type=[4]i32 param readonly
+    Local name=idx type=usize param readonly
+    Block label=entry0
+      load_local %v0:[4]i32 target=values
+      load_local %v1:usize target=idx
+      const %v2:usize op=4
+      bounds_check op=index operands=[%v1, %v2]
+      index %v3:i32 operands=[%v0, %v1]
+      terminator return values=[%v3]
+  Function name=window returns=[Slice<i32>]
+    Local name=values type=[4]i32 param readonly
+    Local name=start type=usize param readonly
+    Local name=end type=usize param readonly
+    Block label=entry0
+      load_local %v0:[4]i32 target=values
+      load_local %v1:usize target=start
+      load_local %v2:usize target=end
+      const %v3:usize op=4
+      bounds_check op=slice operands=[%v1, %v2, %v3]
+      slice %v4:Slice<i32> operands=[%v0, %v1, %v2]
+      terminator return values=[%v4]

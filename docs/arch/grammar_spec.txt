@@ -393,9 +393,9 @@ literal         = <int_lit>
 ```
 
 Rules:
-- explicit conversions use call-like syntax such as `EventMask(1)`
+- explicit conversions use parenthesized type-expression syntax such as `(EventMask)(1)`
 - qualified names cover ordinary module-member references such as `io.write_line`
-- the parser may initially treat `named_type("..." )` and ordinary call syntax similarly and leave final disambiguation to semantic analysis
+- function calls and conversions are separate syntactic forms: `foo(x)` is an expression call, while `(<type-expr>)(x)` is an explicit conversion
 
 11. Switch Case Patterns
 

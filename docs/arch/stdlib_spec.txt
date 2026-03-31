@@ -201,8 +201,8 @@ func close(file: File) Error
 
 distinct EventMask = ui32
 
-const EVENT_READABLE: EventMask = EventMask(1)
-const EVENT_WRITABLE: EventMask = EventMask(2)
+const EVENT_READABLE: EventMask = (EventMask)(1)
+const EVENT_WRITABLE: EventMask = (EventMask)(2)
 
 struct Event {
 	file: File

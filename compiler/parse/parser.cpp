@@ -1046,7 +1046,110 @@ class Parser {
         return false;
     }
 
+    std::optional<std::size_t> SkipArrayLengthLookahead(std::size_t offset) const {
+        int bracket_depth = 1;
+        int paren_depth = 0;
+        while (true) {
+            const TokenKind kind = Peek(offset).kind;
+            if (kind == TokenKind::kEof) {
+                return std::nullopt;
+            }
+            if (kind == TokenKind::kLBracket) {
+                ++bracket_depth;
+            } else if (kind == TokenKind::kRBracket) {
+                --bracket_depth;
+                if (bracket_depth == 0 && paren_depth == 0) {
+                    return offset + 1;
+                }
+            } else if (kind == TokenKind::kLParen) {
+                ++paren_depth;
+            } else if (kind == TokenKind::kRParen && paren_depth > 0) {
+                --paren_depth;
+            }
+            ++offset;
+        }
+    }
+
+    std::optional<std::size_t> SkipTypeExprLookahead(std::size_t offset, bool allow_bare_identifier) const {
+        switch (Peek(offset).kind) {
+            case TokenKind::kConst:
+                return SkipTypeExprLookahead(offset + 1, true);
+            case TokenKind::kStar:
+                return SkipTypeExprLookahead(offset + 1, true);
+            case TokenKind::kLBracket: {
+                const auto after_length = SkipArrayLengthLookahead(offset + 1);
+                if (!after_length.has_value()) {
+                    return std::nullopt;
+                }
+                return SkipTypeExprLookahead(*after_length, true);
+            }
+            case TokenKind::kLParen: {
+                const auto inner = SkipTypeExprLookahead(offset + 1, true);
+                if (!inner.has_value() || Peek(*inner).kind != TokenKind::kRParen) {
+                    return std::nullopt;
+                }
+                return *inner + 1;
+            }
+            case TokenKind::kIdentifier: {
+                std::size_t next = offset + 1;
+                if (Peek(next).kind == TokenKind::kLt) {
+                    ++next;
+                    if (Peek(next).kind != TokenKind::kGt) {
+                        while (true) {
+                            const auto type_arg_end = SkipTypeExprLookahead(next, true);
+                            if (!type_arg_end.has_value()) {
+                                return std::nullopt;
+                            }
+                            next = *type_arg_end;
+                            if (Peek(next).kind == TokenKind::kComma) {
+                                ++next;
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+                    if (Peek(next).kind != TokenKind::kGt) {
+                        return std::nullopt;
+                    }
+                    return next + 1;
+                }
+                return allow_bare_identifier ? std::optional<std::size_t>(next) : std::nullopt;
+            }
+            default:
+                return std::nullopt;
+        }
+    }
+
+    bool LooksLikeTypeCallExpr() const {
+        if (!Check(TokenKind::kLParen)) {
+            return false;
+        }
+        const auto inner_type_end = SkipTypeExprLookahead(1, true);
+        return inner_type_end.has_value() && Peek(*inner_type_end).kind == TokenKind::kRParen && Peek(*inner_type_end + 1).kind == TokenKind::kLParen;
+    }
+
+    std::unique_ptr<Expr> ParseTypeCallExpr() {
+        auto expr = std::make_unique<Expr>();
+        expr->kind = Expr::Kind::kCall;
+        expr->span.begin = Current().span.begin;
+        Consume(TokenKind::kLParen, "expected '(' before conversion target type");
+        expr->type_target = ParseTypeExpr();
+        Consume(TokenKind::kRParen, "expected ')' after conversion target type");
+        Consume(TokenKind::kLParen, "expected '(' after conversion target type");
+        if (!Check(TokenKind::kRParen)) {
+            do {
+                expr->args.push_back(ParseExpr());
+            } while (Match(TokenKind::kComma));
+        }
+        Consume(TokenKind::kRParen, "expected ')' after call arguments");
+        expr->span.end = Previous().span.end;
+        return expr;
+    }
+
     std::unique_ptr<Expr> ParseUnaryExpr() {
+        if (LooksLikeTypeCallExpr()) {
+            return ParseTypeCallExpr();
+        }
         if (MatchesAny({TokenKind::kBang, TokenKind::kMinus, TokenKind::kAmp, TokenKind::kStar})) {
             const auto op = Previous();
             auto expr = std::make_unique<Expr>();

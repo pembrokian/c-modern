@@ -23,6 +23,7 @@ struct Type {
         kArray,
         kTuple,
         kRange,
+        kProcedure,
     };
 
     Kind kind = Kind::kUnknown;
@@ -47,6 +48,8 @@ Type ConstType(Type inner);
 Type ArrayType(Type inner, std::string length_text);
 Type TupleType(std::vector<Type> elements);
 Type RangeType(Type element);
+Type ProcedureType(std::vector<Type> params, std::vector<Type> returns);
+Type NamedOrBuiltinType(std::string_view name);
 
 Type TypeFromAst(const ast::TypeExpr* type_expr);
 std::string FormatType(const Type& type);

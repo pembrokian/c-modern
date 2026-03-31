@@ -1,0 +1,36 @@
+Modern C - Key Decisions
+
+Purpose
+
+This file records major settled language and compiler-boundary decisions that benefit from a short rationale in addition to the normative spec text.
+
+Use this file for:
+- decisions that materially affect parser, sema, MIR, runtime, or stdlib boundaries
+- concise rationale for why the repository chose one design over nearby alternatives
+
+Do not use this file for:
+- unresolved questions
+- exhaustive language reference text
+- implementation status tracking
+
+1. Explicit Conversion Syntax
+
+Decision:
+- Explicit conversions use parenthesized type-expression syntax: `(<type-expr>)(value)`.
+
+Examples:
+- `(UserId)(raw)`
+- `(i64)(count)`
+- `(Slice<i32>)(values)`
+- `(*u8)(addr)`
+
+Why:
+- keeps function calls and conversions in different syntactic categories
+- avoids scope-sensitive reinterpretation of `Foo(x)` between function and type meanings
+- gives the parser an explicit boundary instead of deferring ambiguity into semantic analysis
+- scales cleanly to raw pointer, generic, const, and other richer type-expression targets
+
+Consequence:
+- ordinary `foo(x)` remains expression-call syntax only
+- bare named forms like `UserId(x)` are not conversion syntax in v0.2
+- MIR lowering still classifies conversions semantically, but the frontend no longer depends on a bare-name conversion fallback

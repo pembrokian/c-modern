@@ -1,0 +1,11 @@
+Module
+  Function name=view returns=[usize]
+    Local name=values type=[4]i32 param readonly
+    Local name=slice type=Slice<i32>
+    Block label=entry0
+      load_local %v0:[4]i32 target=values
+      array_to_slice %v1:Slice<i32> target=Slice<i32> operands=[%v0]
+      store_local target=slice operands=[%v1]
+      load_local %v2:Slice<i32> target=slice
+      field %v3:usize target=len operands=[%v2]
+      terminator return values=[%v3]

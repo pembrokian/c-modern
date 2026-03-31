@@ -5,6 +5,39 @@
 namespace mc::sema {
 namespace {
 
+std::string RenderExprInline(const ast::Expr& expr);
+
+std::string RenderTypeInline(const ast::TypeExpr& type) {
+    switch (type.kind) {
+        case ast::TypeExpr::Kind::kNamed: {
+            if (type.type_args.empty()) {
+                return type.name;
+            }
+            std::ostringstream stream;
+            stream << type.name << '<';
+            for (std::size_t index = 0; index < type.type_args.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                stream << RenderTypeInline(*type.type_args[index]);
+            }
+            stream << '>';
+            return stream.str();
+        }
+        case ast::TypeExpr::Kind::kPointer:
+            return "*" + (type.inner != nullptr ? RenderTypeInline(*type.inner) : std::string("<?>"));
+        case ast::TypeExpr::Kind::kConst:
+            return "const " + (type.inner != nullptr ? RenderTypeInline(*type.inner) : std::string("<?>"));
+        case ast::TypeExpr::Kind::kArray:
+            return "[" + (type.length_expr != nullptr ? RenderExprInline(*type.length_expr) : std::string("?")) + "]" +
+                   (type.inner != nullptr ? RenderTypeInline(*type.inner) : std::string("<?>"));
+        case ast::TypeExpr::Kind::kParen:
+            return "(" + (type.inner != nullptr ? RenderTypeInline(*type.inner) : std::string("<?>")) + ")";
+    }
+
+    return "<?>";
+}
+
 std::string RenderExprInline(const ast::Expr& expr) {
     switch (expr.kind) {
         case ast::Expr::Kind::kName:
@@ -21,7 +54,9 @@ std::string RenderExprInline(const ast::Expr& expr) {
                    (expr.right != nullptr ? RenderExprInline(*expr.right) : std::string("<?>"));
         case ast::Expr::Kind::kCall: {
             std::ostringstream stream;
-            stream << (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) << '(';
+            stream << (expr.type_target != nullptr ? RenderTypeInline(*expr.type_target)
+                                                   : (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")))
+                   << '(';
             for (std::size_t index = 0; index < expr.args.size(); ++index) {
                 if (index > 0) {
                     stream << ", ";
@@ -138,6 +173,26 @@ Type RangeType(Type element) {
     return type;
 }
 
+Type ProcedureType(std::vector<Type> params, std::vector<Type> returns) {
+    Type type {
+        .kind = Type::Kind::kProcedure,
+        .metadata = std::to_string(params.size()),
+    };
+    type.subtypes = std::move(params);
+    type.subtypes.insert(type.subtypes.end(), std::make_move_iterator(returns.begin()), std::make_move_iterator(returns.end()));
+    return type;
+}
+
+Type NamedOrBuiltinType(std::string_view name) {
+    if (name == "bool") {
+        return BoolType();
+    }
+    if (name == "str" || name == "string" || name == "cstr") {
+        return StringType();
+    }
+    return NamedType(std::string(name));
+}
+
 Type TypeFromAst(const ast::TypeExpr* type_expr) {
     if (type_expr == nullptr) {
         return UnknownType();
@@ -145,13 +200,7 @@ Type TypeFromAst(const ast::TypeExpr* type_expr) {
 
     switch (type_expr->kind) {
         case ast::TypeExpr::Kind::kNamed: {
-            if (type_expr->name == "bool") {
-                return BoolType();
-            }
-            if (type_expr->name == "str" || type_expr->name == "string" || type_expr->name == "cstr") {
-                return StringType();
-            }
-            Type type = NamedType(type_expr->name);
+            Type type = NamedOrBuiltinType(type_expr->name);
             type.subtypes.reserve(type_expr->type_args.size());
             for (const auto& type_arg : type_expr->type_args) {
                 type.subtypes.push_back(TypeFromAst(type_arg.get()));
@@ -224,6 +273,37 @@ std::string FormatType(const Type& type) {
         }
         case Type::Kind::kRange:
             return "range<" + FormatType(type.subtypes.front()) + ">";
+        case Type::Kind::kProcedure: {
+            std::size_t param_count = 0;
+            if (!type.metadata.empty()) {
+                param_count = static_cast<std::size_t>(std::stoul(type.metadata));
+            }
+            std::ostringstream stream;
+            stream << "proc(";
+            for (std::size_t index = 0; index < param_count && index < type.subtypes.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                stream << FormatType(type.subtypes[index]);
+            }
+            stream << ")";
+            const std::size_t return_count = type.subtypes.size() >= param_count ? type.subtypes.size() - param_count : 0;
+            if (return_count == 0) {
+                stream << "->void";
+            } else if (return_count == 1) {
+                stream << "->" << FormatType(type.subtypes[param_count]);
+            } else {
+                stream << "->tuple<";
+                for (std::size_t index = 0; index < return_count; ++index) {
+                    if (index > 0) {
+                        stream << ", ";
+                    }
+                    stream << FormatType(type.subtypes[param_count + index]);
+                }
+                stream << '>';
+            }
+            return stream.str();
+        }
     }
 
     return "unknown";

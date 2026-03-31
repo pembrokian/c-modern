@@ -119,6 +119,7 @@ struct Expr : Node {
     Kind kind = Kind::kName;
     std::string text;
     std::string secondary_text;
+    std::unique_ptr<TypeExpr> type_target;
     std::vector<std::unique_ptr<Expr>> args;
     std::vector<FieldInit> field_inits;
     std::unique_ptr<Expr> left;

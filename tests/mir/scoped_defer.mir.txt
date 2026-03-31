@@ -2,11 +2,11 @@ Module
   Function name=nested returns=[i32]
     Local name=flag type=bool param readonly
     Local name=total type=i32
-    Local name=$defer_callee0 type=unknown readonly
+    Local name=$defer_callee0 type=proc()->void readonly
     Block label=entry0
       const %v0:int_literal op=0
       store_local target=total operands=[%v0]
-      symbol_ref %v1:unknown target=inner
+      symbol_ref %v1:proc()->void target=inner target_kind=other target_name=inner
       store_local target=$defer_callee0 operands=[%v1]
       load_local %v2:bool target=flag
       terminator cond value=%v2 true=if_then1 false=if_merge2
@@ -15,7 +15,7 @@ Module
       store_local target=total operands=[%v3]
       terminator branch target=if_merge2
     Block label=if_merge2
-      load_local %v4:unknown target=$defer_callee0
+      load_local %v4:proc()->void target=$defer_callee0
       call target=inner operands=[%v4]
       load_local %v5:i32 target=total
       const %v6:int_literal op=1

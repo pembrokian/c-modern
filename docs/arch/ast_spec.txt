@@ -155,7 +155,7 @@ Supporting nodes:
   - fields: `name?`, `value`
 
 Notes:
-- explicit conversions should initially parse as `CallExpr`; semantic analysis can later classify type-directed calls such as `EventMask(1)` as conversions
+- explicit conversions parse as `CallExpr` with a dedicated type target when written as parenthesized type-expression syntax such as `(EventMask)(1)`
 - aggregate initialization remains explicit syntax in the AST instead of being lowered into assignment lists during parsing
 
 6. Pattern Nodes

@@ -758,7 +758,7 @@ func load_owner(file_id: FileId) (UserInfo, Error) {
         return UserInfo{}, err
     }
 
-    owner_id = UserId(file.owner_raw)
+    owner_id = (UserId)(file.owner_raw)
     return lookup_user(owner_id)
 }
 

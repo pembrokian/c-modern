@@ -1,0 +1,22 @@
+Module
+  TypeDecl kind=enum name=Result
+    Variant name=Ok
+      PayloadField name=value type=i32
+    Variant name=Err
+  Function name=dispatch returns=[i32]
+    Local name=value type=Result param readonly
+    Local name=v type=i32 readonly
+    Block label=entry0
+      load_local %v0:Result target=value
+      variant_match %v1:bool target=Result.Ok operands=[%v0]
+      terminator cond value=%v1 true=switch_case3 false=switch_default2
+    Block label=switch_merge1
+      terminator none
+    Block label=switch_default2
+      const %v4:int_literal op=2
+      terminator return values=[%v4]
+    Block label=switch_case3
+      variant_extract %v2:i32 op=0 target=Result.Ok operands=[%v0]
+      store_local target=v operands=[%v2]
+      load_local %v3:i32 target=v
+      terminator return values=[%v3]

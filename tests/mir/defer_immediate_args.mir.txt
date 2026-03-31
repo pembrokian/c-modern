@@ -1,19 +1,19 @@
 Module
   Function name=demo returns=[i32]
     Local name=value type=i32
-    Local name=$defer_callee0 type=unknown readonly
+    Local name=$defer_callee0 type=proc(i32)->void readonly
     Local name=$defer_arg1 type=i32 readonly
     Block label=entry0
       const %v0:int_literal op=1
       store_local target=value operands=[%v0]
-      symbol_ref %v1:unknown target=hit
-      store_local target=$defer_callee0 operands=[%v1]
-      load_local %v2:i32 target=value
-      store_local target=$defer_arg1 operands=[%v2]
+      load_local %v1:i32 target=value
+      symbol_ref %v2:proc(i32)->void target=hit target_kind=other target_name=hit
+      store_local target=$defer_callee0 operands=[%v2]
+      store_local target=$defer_arg1 operands=[%v1]
       const %v3:int_literal op=2
       store_local target=value operands=[%v3]
       const %v4:int_literal op=0
-      load_local %v5:unknown target=$defer_callee0
+      load_local %v5:proc(i32)->void target=$defer_callee0
       load_local %v6:i32 target=$defer_arg1
       call target=hit operands=[%v5, %v6]
       terminator return values=[%v4]

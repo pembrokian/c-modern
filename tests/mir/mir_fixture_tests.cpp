@@ -104,13 +104,18 @@ int main(int argc, char** argv) {
     const std::filesystem::path source_root = argv[1];
     const std::filesystem::path fixture_dir = source_root / "tests/mir";
     const std::vector<FixtureCase> fixtures = {
+        {"array_to_slice_conversion.mc", "array_to_slice_conversion.mir.txt", true},
+        {"bounds_check.mc", "bounds_check.mir.txt", true},
+        {"buffer_to_slice_conversion.mc", "buffer_to_slice_conversion.mir.txt", true},
         {"defer_immediate_args.mc", "defer_immediate_args.mir.txt", true},
         {"switch_expr.mc", "switch_expr.mir.txt", true},
         {"switch_case_defer.mc", "switch_case_defer.mir.txt", true},
         {"foreach_range_defer.mc", "foreach_range_defer.mir.txt", true},
+        {"explicit_conversion.mc", "explicit_conversion.mir.txt", true},
+        {"pointer_int_conversion.mc", "pointer_int_conversion.mir.txt", true},
         {"loop_iteration_defer.mc", "loop_iteration_defer.mir.txt", true},
         {"scoped_defer.mc", "scoped_defer.mir.txt", true},
-        {"switch_variant_bad.mc", "switch_variant_bad.errors.txt", false},
+        {"switch_variant.mc", "switch_variant.mir.txt", true},
     };
 
     for (const auto& fixture : fixtures) {

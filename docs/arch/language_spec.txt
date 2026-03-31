@@ -112,6 +112,13 @@ Rules:
 - Fixed arrays do not implicitly decay to pointers.
 - A slice view over an array requires an explicit conversion.
 
+Explicit conversions:
+
+- Explicit conversions use a parenthesized type-expression target: `(<type-expr>)(value)`.
+- Examples: `(UserId)(raw)`, `(i64)(count)`, `(Slice<i32>)(values)`, `(*u8)(addr)`.
+- Ordinary call syntax remains expression-only. `foo(x)` is a function call surface, not a conversion surface.
+- Bare named forms such as `UserId(x)` or `i64(x)` are not conversion syntax in v0.2.
+
 Slices:
 
 struct Slice<T> {

@@ -2,16 +2,16 @@ Module
   Function name=walk returns=[i32]
     Local name=values type=Slice<i32> param readonly
     Local name=total type=i32
-    Local name=$defer_callee0 type=unknown readonly
+    Local name=$defer_callee0 type=proc()->void readonly
     Local name=$iterable1 type=Slice<i32>
     Local name=$index2 type=usize
     Local name=index type=usize
-    Local name=value type=unknown
+    Local name=value type=i32
     Local name=idx type=int_literal
     Block label=entry0
       const %v0:int_literal op=0
       store_local target=total operands=[%v0]
-      symbol_ref %v1:unknown target=cleanup
+      symbol_ref %v1:proc()->void target=cleanup target_kind=other target_name=cleanup
       store_local target=$defer_callee0 operands=[%v1]
       load_local %v2:Slice<i32> target=values
       store_local target=$iterable1 operands=[%v2]
@@ -27,11 +27,11 @@ Module
     Block label=foreach_body2
       load_local %v8:Slice<i32> target=$iterable1
       load_local %v9:usize target=$index2
-      index %v10:unknown operands=[%v8, %v9]
+      index %v10:i32 operands=[%v8, %v9]
       store_local target=index operands=[%v9]
       store_local target=value operands=[%v10]
       load_local %v11:i32 target=total
-      load_local %v12:unknown target=value
+      load_local %v12:i32 target=value
       binary %v13:i32 op=+ operands=[%v11, %v12]
       store_local target=total operands=[%v13]
       terminator branch target=foreach_step3
@@ -64,6 +64,6 @@ Module
       terminator branch target=range_cond5
     Block label=range_exit8
       load_local %v27:i32 target=total
-      load_local %v28:unknown target=$defer_callee0
+      load_local %v28:proc()->void target=$defer_callee0
       call target=cleanup operands=[%v28]
       terminator return values=[%v27]

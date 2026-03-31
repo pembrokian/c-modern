@@ -111,6 +111,7 @@ int main(int argc, char** argv) {
         {"break_outside_loop_bad.mc", "break_outside_loop_bad.errors.txt", {}, false},
         {"defer_non_call_bad.mc", "defer_non_call_bad.errors.txt", {}, false},
         {"call_arity_bad.mc", "call_arity_bad.errors.txt", {}, false},
+        {"bare_conversion_syntax_bad.mc", "bare_conversion_syntax_bad.errors.txt", {}, false},
         {"layout_cycle_bad.mc", "layout_cycle_bad.errors.txt", {}, false},
     };
 

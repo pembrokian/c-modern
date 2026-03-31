@@ -13,6 +13,11 @@
 
 namespace mc::mir {
 
+struct VariantDecl {
+    std::string name;
+    std::vector<std::pair<std::string, sema::Type>> payload_fields;
+};
+
 struct TypeDecl {
     enum class Kind {
         kStruct,
@@ -25,7 +30,7 @@ struct TypeDecl {
     std::string name;
     std::vector<std::string> type_params;
     std::vector<std::pair<std::string, sema::Type>> fields;
-    std::vector<std::string> variants;
+    std::vector<VariantDecl> variants;
     sema::Type aliased_type;
 };
 
@@ -44,19 +49,39 @@ struct Local {
 };
 
 struct Instruction {
+    enum class TargetKind {
+        kNone,
+        kFunction,
+        kGlobal,
+        kField,
+        kDerefField,
+        kIndex,
+        kOther,
+    };
+
     enum class Kind {
         kConst,
         kLoadLocal,
         kStoreLocal,
         kStoreTarget,
         kSymbolRef,
+        kBoundsCheck,
         kUnary,
         kBinary,
+        kConvert,
+        kConvertNumeric,
+        kConvertDistinct,
+        kPointerToInt,
+        kIntToPointer,
+        kArrayToSlice,
+        kBufferToSlice,
         kCall,
         kField,
         kIndex,
         kSlice,
         kAggregateInit,
+        kVariantMatch,
+        kVariantExtract,
     };
 
     Kind kind = Kind::kConst;
@@ -64,6 +89,10 @@ struct Instruction {
     sema::Type type;
     std::string op;
     std::string target;
+    TargetKind target_kind = TargetKind::kNone;
+    std::string target_name;
+    sema::Type target_base_type;
+    std::vector<sema::Type> target_aux_types;
     std::vector<std::string> operands;
     std::vector<std::string> field_names;
 };

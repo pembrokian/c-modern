@@ -1,0 +1,9 @@
+Module
+  TypeDecl kind=distinct name=UserId
+    AliasedType=i32
+  Function name=promote returns=[UserId]
+    Local name=raw type=i32 param readonly
+    Block label=entry0
+      load_local %v0:i32 target=raw
+      convert_distinct %v1:UserId target=UserId operands=[%v0]
+      terminator return values=[%v1]

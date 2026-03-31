@@ -29,13 +29,18 @@ struct LayoutInfo {
     std::vector<std::size_t> field_offsets;
 };
 
+struct VariantSummary {
+    std::string name;
+    std::vector<std::pair<std::string, Type>> payload_fields;
+};
+
 struct TypeDeclSummary {
     ast::Decl::Kind kind = ast::Decl::Kind::kStruct;
     std::string name;
     std::vector<std::string> type_params;
     std::vector<ast::Attribute> attributes;
     std::vector<std::pair<std::string, Type>> fields;
-    std::vector<std::string> variants;
+    std::vector<VariantSummary> variants;
     Type aliased_type;
     bool is_packed = false;
     bool is_abi_c = false;
@@ -48,11 +53,17 @@ struct GlobalSummary {
     Type type;
 };
 
+struct ExprTypeFact {
+    support::SourceSpan span {};
+    Type type;
+};
+
 struct Module {
     std::vector<std::string> imports;
     std::vector<TypeDeclSummary> type_decls;
     std::vector<GlobalSummary> globals;
     std::vector<FunctionSignature> functions;
+    std::vector<ExprTypeFact> expr_types;
 };
 
 struct CheckResult {
@@ -79,6 +90,8 @@ CheckResult CheckSourceFile(const ast::SourceFile& source_file,
 
 const FunctionSignature* FindFunctionSignature(const Module& module, std::string_view name);
 const TypeDeclSummary* FindTypeDecl(const Module& module, std::string_view name);
+const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view name);
+const Type* FindExprType(const Module& module, const ast::Expr& expr);
 std::string DumpModule(const Module& module);
 
 }  // namespace mc::sema
