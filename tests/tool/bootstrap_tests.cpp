@@ -69,6 +69,8 @@ void TestDumpPaths() {
            "ast dump path should be deterministic");
     Expect(targets.mir.generic_string() == "build/debug/dumps/mir/tests_cases_hello.mc.mir.txt",
            "mir dump path should be deterministic");
+    Expect(targets.backend.generic_string() == "build/debug/dumps/backend/tests_cases_hello.mc.backend.txt",
+        "backend dump path should be deterministic");
     Expect(targets.mci.generic_string() == "build/debug/mci/tests_cases_hello.mc.mci",
            "mci path should be deterministic");
 }

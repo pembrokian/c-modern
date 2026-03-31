@@ -1,0 +1,12 @@
+BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
+  Function source=choose backend=@choose returns=[i32]
+    Local source=flag backend=%local.flag type=bool param readonly
+    Block source=entry0 backend=bb0_0.entry0
+      %t0_0_0 = load bool %local.flag
+      condbr %t0_0_0 true=bb0_1.if_then1 false=bb0_2.if_merge2
+    Block source=if_then1 backend=bb0_1.if_then1
+      %t0_1_0 = const int_literal 1
+      ret i32 %t0_1_0
+    Block source=if_merge2 backend=bb0_2.if_merge2
+      %t0_2_0 = const int_literal 0
+      ret i32 %t0_2_0

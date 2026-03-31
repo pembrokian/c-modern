@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "compiler/ast/ast.h"
+#include "compiler/codegen_llvm/backend.h"
 #include "compiler/lex/lexer.h"
 #include "compiler/mir/mir.h"
 #include "compiler/parse/parser.h"
@@ -24,7 +25,7 @@ constexpr std::string_view kUsage =
     "Modern C bootstrap driver\n"
     "\n"
     "Usage:\n"
-    "  mc check <source> [--build-dir <dir>] [--import-root <dir>] [--emit-dump-paths] [--dump-ast] [--dump-mir]\n"
+    "  mc check <source> [--build-dir <dir>] [--import-root <dir>] [--emit-dump-paths] [--dump-ast] [--dump-mir] [--dump-backend]\n"
     "  mc dump-paths <source> [--build-dir <dir>]\n"
     "  mc --help\n";
 
@@ -35,6 +36,7 @@ struct CommandOptions {
     bool emit_dump_paths = false;
     bool dump_ast = false;
     bool dump_mir = false;
+    bool dump_backend = false;
 };
 
 void PrintUsage(std::ostream& stream) {
@@ -70,6 +72,11 @@ std::optional<CommandOptions> ParseCommandOptions(int argc,
             continue;
         }
 
+        if (argument == "--dump-backend") {
+            options.dump_backend = true;
+            continue;
+        }
+
         if (argument == "--build-dir") {
             if (index + 1 >= argc) {
                 errors << "missing value for --build-dir\n";
@@ -100,6 +107,7 @@ std::optional<CommandOptions> ParseCommandOptions(int argc,
 void PrintDumpTargets(const support::DumpTargets& targets, std::ostream& stream) {
     stream << "ast: " << targets.ast.generic_string() << '\n';
     stream << "mir: " << targets.mir.generic_string() << '\n';
+    stream << "backend: " << targets.backend.generic_string() << '\n';
     stream << "mci: " << targets.mci.generic_string() << '\n';
 }
 
@@ -171,6 +179,34 @@ int RunCheck(const CommandOptions& options) {
                 .span = support::kDefaultSourceSpan,
                 .severity = support::DiagnosticSeverity::kError,
                 .message = "unable to write MIR dump",
+            });
+            std::cerr << diagnostics.Render() << '\n';
+            return 1;
+        }
+    }
+
+    if (options.dump_backend) {
+        mc::codegen_llvm::LowerOptions backend_options {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+        };
+        const auto backend_result = mc::codegen_llvm::LowerModule(*mir_result.module,
+                                                                  source_file->path,
+                                                                  backend_options,
+                                                                  diagnostics);
+        if (!backend_result.ok) {
+            std::cerr << diagnostics.Render() << '\n';
+            return 1;
+        }
+
+        std::filesystem::create_directories(targets.backend.parent_path());
+        std::ofstream output(targets.backend, std::ios::binary);
+        output << mc::codegen_llvm::DumpModule(*backend_result.module);
+        if (!output) {
+            diagnostics.Report({
+                .file_path = targets.backend,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "unable to write backend dump",
             });
             std::cerr << diagnostics.Render() << '\n';
             return 1;

@@ -19,13 +19,13 @@ This file is a fast orientation map for agents working in this repository.
 2. `compiler/parse`
 3. `compiler/sema`
 4. `compiler/mir`
-5. `compiler/codegen_llvm` (reserved for later work)
+5. `compiler/codegen_llvm`
 
 ### Key Directories
 
 - `compiler/driver`
   - CLI entrypoint and pipeline orchestration
-  - `driver.cpp` is where `mc check` options are parsed and parse -> sema -> MIR is wired together
+  - `driver.cpp` is where `mc check` options are parsed and parse -> sema -> MIR -> optional backend dump wiring lives
 
 - `compiler/ast`
   - AST node definitions and AST dump support
@@ -43,6 +43,10 @@ This file is a fast orientation map for agents working in this repository.
 
 - `compiler/mir`
   - typed MIR data structures, lowering from sema, MIR validation, MIR dumps
+
+- `compiler/codegen_llvm`
+  - bootstrap LLVM backend scaffolding
+  - frozen hosted Darwin arm64 target configuration and backend preflight entrypoints
 
 - `compiler/support`
   - diagnostics, source-manager utilities, deterministic dump-path helpers
@@ -67,6 +71,10 @@ This file is a fast orientation map for agents working in this repository.
 
 - `tests/mir`
   - MIR unit tests and MIR fixture dumps
+
+- `tests/codegen`
+  - deterministic backend inspectability fixtures
+  - executable coverage will expand here later in Phase 5
 
 - `tests/tool`
   - smoke and support-layer tests for the driver/tooling path

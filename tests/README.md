@@ -10,6 +10,11 @@ The test tree mirrors the planned validation layers:
 - `tool/`
 - `cases/`
 
+Current codegen coverage is still bootstrap-narrow:
+
+- `codegen/` currently snapshots deterministic backend text dumps for inspectability before executable bring-up exists
+- executable tests under `codegen/` are a later Phase 5 step, after object emission and linking are implemented
+
 Phase 2 adds parser fixtures under `parser/` for both AST snapshots and parse-fail diagnostic substrings.
 
 Parse-fail convention:

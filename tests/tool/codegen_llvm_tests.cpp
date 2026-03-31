@@ -59,11 +59,129 @@ void TestLowerModuleAcceptsStageOneSlice() {
     };
 
     const auto result = mc::codegen_llvm::LowerModule(MakeMinimalSupportedModule(), "tests/cases/hello.mc", options, diagnostics);
-    Expect(result.ok, "supported Stage 1 MIR should pass backend preflight");
-    Expect(!diagnostics.HasErrors(), "supported Stage 1 MIR should not emit backend diagnostics");
-    Expect(result.module != nullptr, "successful lowering should materialize a backend module scaffold");
-    Expect(result.module->functions.size() == 1 && result.module->functions[0] == "main",
-           "backend module scaffold should preserve function names");
+    Expect(result.ok, "supported Stage 3 MIR should lower successfully");
+    Expect(!diagnostics.HasErrors(), "supported Stage 3 MIR should not emit backend diagnostics");
+    Expect(result.module != nullptr, "successful lowering should materialize a backend module");
+    Expect(result.module->functions.size() == 1, "backend module should preserve the function count");
+    Expect(result.module->functions[0].source_name == "main", "backend module should preserve function source names");
+    Expect(result.module->functions[0].backend_name == "@main", "backend module should assign deterministic backend names");
+}
+
+void TestLowerModuleLowersStoreBranchAndCompare() {
+    mc::mir::Instruction zero {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v0",
+        .type = mc::sema::IntLiteralType(),
+        .op = "0",
+    };
+
+    mc::mir::Instruction init_result {
+        .kind = mc::mir::Instruction::Kind::kStoreLocal,
+        .target = "result",
+        .operands = {"%v0"},
+    };
+
+    mc::mir::Instruction load_value {
+        .kind = mc::mir::Instruction::Kind::kLoadLocal,
+        .result = "%v1",
+        .type = mc::sema::NamedType("i32"),
+        .target = "value",
+    };
+
+    mc::mir::Instruction one {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v2",
+        .type = mc::sema::IntLiteralType(),
+        .op = "1",
+    };
+
+    mc::mir::Instruction compare {
+        .kind = mc::mir::Instruction::Kind::kBinary,
+        .result = "%v3",
+        .type = mc::sema::BoolType(),
+        .op = "==",
+        .operands = {"%v1", "%v2"},
+    };
+
+    mc::mir::BasicBlock entry {
+        .label = "entry0",
+        .instructions = {zero, init_result, load_value, one, compare},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kCondBranch,
+            .values = {"%v3"},
+            .true_target = "if_then1",
+            .false_target = "if_merge2",
+        },
+    };
+
+    mc::mir::Instruction two {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v4",
+        .type = mc::sema::IntLiteralType(),
+        .op = "2",
+    };
+
+    mc::mir::Instruction set_result {
+        .kind = mc::mir::Instruction::Kind::kStoreLocal,
+        .target = "result",
+        .operands = {"%v4"},
+    };
+
+    mc::mir::BasicBlock then_block {
+        .label = "if_then1",
+        .instructions = {two, set_result},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kBranch,
+            .true_target = "if_merge2",
+        },
+    };
+
+    mc::mir::Instruction load_result {
+        .kind = mc::mir::Instruction::Kind::kLoadLocal,
+        .result = "%v5",
+        .type = mc::sema::NamedType("i32"),
+        .target = "result",
+    };
+
+    mc::mir::BasicBlock merge_block {
+        .label = "if_merge2",
+        .instructions = {load_result},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v5"},
+        },
+    };
+
+    mc::mir::Function function {
+        .name = "choose",
+        .locals = {
+            {.name = "value", .type = mc::sema::NamedType("i32"), .is_parameter = true, .is_mutable = false},
+            {.name = "result", .type = mc::sema::NamedType("i32")},
+        },
+        .return_types = {mc::sema::NamedType("i32")},
+        .blocks = {entry, then_block, merge_block},
+    };
+
+    mc::mir::Module module {
+        .functions = {function},
+    };
+
+    mc::support::DiagnosticSink diagnostics;
+    mc::codegen_llvm::LowerOptions options {
+        .target = mc::codegen_llvm::BootstrapTargetConfig(),
+    };
+
+    const auto result = mc::codegen_llvm::LowerModule(module, "tests/cases/hello.mc", options, diagnostics);
+    Expect(result.ok, "store_local and branch MIR should lower successfully");
+    Expect(!diagnostics.HasErrors(), "supported control-flow MIR should not emit backend diagnostics");
+
+    const auto dump = mc::codegen_llvm::DumpModule(*result.module);
+    Expect(dump.find("store i32 %t0_0_0 -> %local.result") != std::string::npos,
+           "backend dump should lower store_local to an explicit store line");
+    Expect(dump.find("binary == bool %t0_0_2, %t0_0_3") != std::string::npos,
+           "backend dump should lower comparison-shaped binary instructions");
+    Expect(dump.find("br bb0_2.if_merge2") != std::string::npos,
+           "backend dump should lower plain branch terminators");
 }
 
 void TestLowerModuleRejectsUnsupportedTarget() {
@@ -108,6 +226,7 @@ void TestLowerModuleRejectsUnsupportedInstruction() {
 int main() {
     TestBootstrapTargetConfigIsStable();
     TestLowerModuleAcceptsStageOneSlice();
+    TestLowerModuleLowersStoreBranchAndCompare();
     TestLowerModuleRejectsUnsupportedTarget();
     TestLowerModuleRejectsUnsupportedInstruction();
     return 0;

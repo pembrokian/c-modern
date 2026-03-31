@@ -9,6 +9,7 @@ namespace mc::support {
 struct DumpTargets {
     std::filesystem::path ast;
     std::filesystem::path mir;
+    std::filesystem::path backend;
     std::filesystem::path mci;
 };
 

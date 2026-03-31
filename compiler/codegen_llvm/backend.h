@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "compiler/mir/mir.h"
+#include "compiler/sema/type.h"
 #include "compiler/support/diagnostics.h"
 
 namespace mc::codegen_llvm {
@@ -22,9 +23,33 @@ struct LowerOptions {
     TargetConfig target;
 };
 
+struct BackendLocal {
+    std::string source_name;
+    std::string backend_name;
+    sema::Type type;
+    bool is_parameter = false;
+    bool is_mutable = true;
+};
+
+struct BackendBlock {
+    std::string source_label;
+    std::string backend_label;
+    std::vector<std::string> instructions;
+    std::string terminator;
+};
+
+struct BackendFunction {
+    std::string source_name;
+    std::string backend_name;
+    std::vector<sema::Type> return_types;
+    std::vector<BackendLocal> locals;
+    std::vector<BackendBlock> blocks;
+};
+
 struct BackendModule {
     TargetConfig target;
-    std::vector<std::string> functions;
+    std::string inspect_surface;
+    std::vector<BackendFunction> functions;
 };
 
 struct LowerResult {
@@ -38,6 +63,8 @@ LowerResult LowerModule(const mir::Module& module,
                         const std::filesystem::path& source_path,
                         const LowerOptions& options,
                         support::DiagnosticSink& diagnostics);
+
+std::string DumpModule(const BackendModule& module);
 
 }  // namespace mc::codegen_llvm
 

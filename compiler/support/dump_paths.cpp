@@ -36,6 +36,7 @@ DumpTargets ComputeDumpTargets(const std::filesystem::path& source_path,
     return {
         .ast = build_dir / "dumps" / "ast" / (stem + ".ast.txt"),
         .mir = build_dir / "dumps" / "mir" / (stem + ".mir.txt"),
+        .backend = build_dir / "dumps" / "backend" / (stem + ".backend.txt"),
         .mci = build_dir / "mci" / (stem + ".mci"),
     };
 }
