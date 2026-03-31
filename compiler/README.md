@@ -9,6 +9,6 @@ The compiler tree is organized by phase boundary rather than by utility type.
 - `resolve/` is reserved for future import loading and name resolution infrastructure.
 - `sema/` holds the bootstrap semantic checker, type utilities, and first-cut layout logic.
 - `mir/` holds typed MIR definitions, lowering, validation, and dumps.
-- `codegen_llvm/` is reserved for MIR-to-LLVM lowering.
+- `codegen_llvm/` holds the bootstrap LLVM backend scaffolding and the MIR-to-LLVM lowering entrypoints.
 - `mci/` is reserved for Modern C interface artifact support.
 - `support/` holds shared diagnostics, file services, and small reusable utilities.

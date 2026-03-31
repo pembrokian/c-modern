@@ -63,6 +63,9 @@ Stage 1 - Backend scaffolding and build wiring
 Objective:
 Create a real backend subsystem and wire it into the build without weakening the existing sema -> MIR boundary.
 
+Stage 1 status:
+Completed with a real `compiler/codegen_llvm/` backend scaffold, a dedicated `mc_codegen_llvm` library target in CMake, fixed hosted Darwin arm64 target configuration in the backend API, and narrow backend diagnostics for unsupported Stage 1 MIR forms.
+
 Tasks:
 1. Add real source files under `compiler/codegen_llvm/`.
 2. Add a backend library target in CMake and link it into the `mc` executable.
@@ -74,6 +77,12 @@ Outputs:
 - compilable backend library
 - stable backend entry points
 - build graph that includes backend code without yet claiming end-to-end executable support
+
+Stage 1 close-out note:
+- the backend scaffold exposes a `BootstrapTargetConfig()` plus `LowerModule(...)` entrypoint under `compiler/codegen_llvm/`
+- the fixed Stage 1 target contract remains hosted `arm64-apple-darwin` with the frozen LLVM triple `arm64-apple-darwin25.4.0`
+- backend preflight rejects globals, extern lowering, non-direct calls, non-function symbol refs, and MIR instructions outside the frozen Stage 0 executable slice directly inside the backend library
+- the driver remains inspection-thin; linking `mc_codegen_llvm` into `mc` does not yet turn `mc check` into a codegen command
 
 Validation gate:
 - the tree builds with backend scaffolding present

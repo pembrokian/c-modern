@@ -40,13 +40,20 @@ add_library(mc_mir STATIC
 target_include_directories(mc_mir PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_mir PUBLIC mc_sema_bootstrap mc_frontend_stub mc_support)
 
+add_library(mc_codegen_llvm STATIC
+    compiler/codegen_llvm/backend.cpp
+)
+
+target_include_directories(mc_codegen_llvm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_codegen_llvm PUBLIC mc_mir mc_support)
+
 add_executable(mc
     compiler/driver/driver.cpp
     compiler/driver/main.cpp
 )
 
 target_include_directories(mc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc PRIVATE mc_frontend_stub mc_mir mc_support)
+target_link_libraries(mc PRIVATE mc_codegen_llvm mc_frontend_stub mc_mir mc_support)
 
 add_executable(mc_bootstrap_tests
     tests/tool/bootstrap_tests.cpp
@@ -54,6 +61,13 @@ add_executable(mc_bootstrap_tests
 
 target_include_directories(mc_bootstrap_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_bootstrap_tests PRIVATE mc_frontend_stub mc_mir mc_support)
+
+add_executable(mc_codegen_llvm_tests
+    tests/tool/codegen_llvm_tests.cpp
+)
+
+target_include_directories(mc_codegen_llvm_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_codegen_llvm_tests PRIVATE mc_codegen_llvm mc_mir mc_support)
 
 add_executable(mc_parser_fixture_tests
     tests/parser/parser_fixture_tests.cpp
@@ -84,6 +98,7 @@ target_include_directories(mc_sema_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_
 target_link_libraries(mc_sema_fixture_tests PRIVATE mc_sema_bootstrap mc_frontend_stub mc_support)
 
 add_test(NAME mc_bootstrap_unit COMMAND mc_bootstrap_tests)
+add_test(NAME mc_codegen_llvm_unit COMMAND mc_codegen_llvm_tests)
 add_test(NAME mc_parser_fixture_unit COMMAND mc_parser_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_sema_fixture_unit COMMAND mc_sema_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_mir_unit COMMAND mc_mir_tests)

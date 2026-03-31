@@ -10,6 +10,7 @@ What is in place:
 - a handwritten lexer and parser that handle modules, declarations, types, statements, and expression precedence for the current v0.2 bootstrap subset
 - bootstrap semantic checking for imports, visibility, local control-flow rules, and first-cut layout reporting
 - typed MIR lowering, validation, and deterministic MIR fixture coverage for the currently supported semantic subset
+- bootstrap LLVM backend scaffolding for the frozen hosted Darwin arm64 target, with narrow backend preflight diagnostics for out-of-scope MIR
 - a thin `mc` driver with `check`, `dump-paths`, `--dump-ast`, and `--dump-mir` for compiler inspection
 - parser, sema, MIR, and tool smoke tests wired through CTest and exposed through the same `make` command path used for local development
 
@@ -33,4 +34,5 @@ Notes:
 - `build/` is disposable and ignored by Git.
 - `make format` expects `clang-format` to be available on the host machine.
 - The current `mc check` command runs the bootstrap frontend, semantic checker, and MIR pipeline and can emit deterministic AST and MIR dumps through `--dump-ast` and `--dump-mir`.
+- The backend scaffold now builds as a separate library under `compiler/codegen_llvm/`, but executable emission and backend dumps remain later bootstrap work.
 - `make` is a thin convenience wrapper around the canonical CMake workflow above.

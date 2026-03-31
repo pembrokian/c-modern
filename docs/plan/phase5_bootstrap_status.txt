@@ -60,8 +60,9 @@ Theme: Backend scope and milestone framing
 - pending: document which tool workflow pieces are intentionally deferred to Phase 7 so Phase 5 stays focused on backend bring-up rather than general build orchestration
 
 Theme: Backend scaffolding and ownership boundaries
-- pending: add a real backend library under `compiler/codegen_llvm/` and wire it into CMake without bypassing the existing sema -> MIR boundary
-- pending: define the backend entry points, module/function lowering API, symbol materialization rules, and target-machine configuration for the chosen hosted target
+- completed: add a real backend library under `compiler/codegen_llvm/` and wire it into CMake without bypassing the existing sema -> MIR boundary
+- completed: define the backend entry points, module/function lowering API, and fixed hosted Darwin arm64 target configuration for the Stage 1 scaffold
+- completed: narrow backend diagnostics now reject globals, extern lowering, unsupported MIR instructions, non-direct calls, and non-function symbol refs directly inside the backend scaffold
 - pending: add backend-facing dump or debug output where it helps inspect lowering decisions without making backend IR the language definition
 - pending: keep driver responsibilities limited to pipeline orchestration so backend policy does not accumulate inside `compiler/driver/`
 
