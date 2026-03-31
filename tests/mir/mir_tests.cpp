@@ -162,6 +162,9 @@ void TestForEachAndDeferLoweringSucceed() {
     if (dump.find("target=cleanup") == std::string::npos) {
         Fail("defer lowering should emit deferred cleanup call");
     }
+    if (dump.find("bounds_check op=index") == std::string::npos) {
+        Fail("foreach lowering should emit explicit bounds checks before indexed element loads");
+    }
     if (dump.find("field %v6:usize target=len target_kind=field target_name=len") == std::string::npos ||
         dump.find("target_display=values.len target_base=Slice<i32>") == std::string::npos ||
         dump.find("index %v10:i32 target_kind=index target_display=values[index] target_base=Slice<i32>") == std::string::npos ||
@@ -360,6 +363,27 @@ void TestIndexAndSliceLoweringEmitBoundsChecks() {
     }
     if (dump.find("bounds_check op=slice") == std::string::npos) {
         Fail("slice lowering should emit explicit bounds_check instructions");
+    }
+}
+
+void TestIndexedStoreLoweringEmitsBoundsChecks() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "func write(values: Slice<i32>, idx: usize, value: i32) {\n"
+        "    values[idx] = value\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("indexed store lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("bounds_check op=index") == std::string::npos) {
+        Fail("indexed store lowering should emit explicit bounds_check instructions");
+    }
+    if (dump.find("store_target target=values[idx] target_kind=index") == std::string::npos) {
+        Fail("indexed store lowering should preserve structured index-store metadata");
     }
 }
 
@@ -707,6 +731,64 @@ void TestVolatileAndAtomicCallsLowerExplicitly() {
     }
     if (dump.find("call target=volatile_load") != std::string::npos || dump.find("call target=atomic_load") != std::string::npos) {
         Fail("dedicated volatile and atomic operations must not lower as generic calls");
+    }
+}
+
+void TestDeferredBoundaryCallsLowerExplicitly() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "enum MemoryOrder { Relaxed, Acquire, Release }\n"
+        "struct Atomic<T> {}\n"
+        "\n"
+        "func volatile_store(ptr: *i32, value: i32) {\n"
+        "}\n"
+        "\n"
+        "func atomic_store(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) {\n"
+        "}\n"
+        "\n"
+        "func flush(ptr: *i32, atom: *Atomic<i32>) {\n"
+        "    defer volatile_store(ptr, 1)\n"
+        "    defer atomic_store(atom, 2, MemoryOrder.Release)\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("deferred boundary-call lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("volatile_store target=volatile_store") == std::string::npos ||
+        dump.find("atomic_store op=order=MemoryOrder.Release target=atomic_store") == std::string::npos) {
+        Fail("deferred boundary calls should lower to dedicated MIR instructions");
+    }
+    if (dump.find("call target=volatile_store") != std::string::npos || dump.find("call target=atomic_store") != std::string::npos) {
+        Fail("deferred boundary calls must not fall back to generic call instructions");
+    }
+}
+
+void TestMmioPtrCallLowersToIntToPointer() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "func mmio_ptr(addr: uintptr) *i32 {\n"
+        "    return (*i32)(addr)\n"
+        "}\n"
+        "\n"
+        "func map(addr: uintptr) *i32 {\n"
+        "    return mmio_ptr(addr)\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("mmio_ptr lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("Function name=map") == std::string::npos || dump.find("int_to_pointer %v") == std::string::npos ||
+        dump.find(":*i32 target=*i32") == std::string::npos) {
+        Fail("mmio_ptr calls should lower through the dedicated int_to_pointer MIR instruction");
+    }
+    if (dump.find("call target=mmio_ptr") != std::string::npos) {
+        Fail("mmio_ptr calls must not lower as generic calls");
     }
 }
 
@@ -1601,8 +1683,52 @@ void TestValidatorRejectsGenericVolatileCall() {
     if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
         Fail("validator should reject generic calls for dedicated volatile operations");
     }
-    if (diagnostics.Render().find("dedicated volatile/atomic opcode") == std::string::npos) {
+    if (diagnostics.Render().find("dedicated semantic-boundary opcode") == std::string::npos) {
         Fail("validator should explain generic volatile call misuse");
+    }
+}
+
+void TestValidatorRejectsGenericMmioPtrCall() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_mmio_call";
+    function.return_types.push_back(mc::sema::PointerType(mc::sema::NamedType("i32")));
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::ProcedureType({mc::sema::NamedType("uintptr")}, {mc::sema::PointerType(mc::sema::NamedType("i32"))}),
+                .target = "mmio_ptr",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("uintptr"),
+                .op = "0",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kCall,
+                .result = "%v2",
+                .type = mc::sema::PointerType(mc::sema::NamedType("i32")),
+                .target = "mmio_ptr",
+                .operands = {"%v0", "%v1"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v2"},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject generic calls for dedicated mmio_ptr lowering");
+    }
+    if (diagnostics.Render().find("dedicated semantic-boundary opcode") == std::string::npos) {
+        Fail("validator should explain generic mmio_ptr call misuse");
     }
 }
 
@@ -2023,6 +2149,7 @@ int main() {
     TestArrayToSliceConversionLowersExplicitly();
     TestBufferToSliceConversionLowersExplicitly();
     TestIndexAndSliceLoweringEmitBoundsChecks();
+    TestIndexedStoreLoweringEmitsBoundsChecks();
     TestPointerToIntConversionLowersExplicitly();
     TestIntToPointerConversionLowersExplicitly();
     TestScopedDeferRunsBeforeFollowingStatement();
@@ -2034,6 +2161,8 @@ int main() {
     TestDivisionAndShiftLoweringEmitExplicitChecks();
     TestIntegerArithmeticLowersWithExplicitWrapSemantics();
     TestVolatileAndAtomicCallsLowerExplicitly();
+    TestDeferredBoundaryCallsLowerExplicitly();
+    TestMmioPtrCallLowersToIntToPointer();
     TestValidatorRejectsBadBranchTarget();
     TestValidatorRejectsNonBoolCondition();
     TestValidatorRejectsCallArgumentTypeMismatch();
@@ -2055,6 +2184,7 @@ int main() {
     TestValidatorRejectsIntegerArithmeticWithoutWrapSemantics();
     TestValidatorRejectsWrapSemanticsOnFloatArithmetic();
     TestValidatorRejectsGenericVolatileCall();
+    TestValidatorRejectsGenericMmioPtrCall();
     TestValidatorRejectsAtomicLoadBadOrderType();
     TestValidatorRejectsShiftWithoutShiftCheck();
     TestValidatorRejectsConvertNumericBadTargetMetadata();

@@ -475,6 +475,7 @@ std::optional<sema::Type> AtomicElementType(const Module& module, const sema::Ty
 
 enum class SpecialCallKind {
     kNone,
+    kMmioPtr,
     kVolatileLoad,
     kVolatileStore,
     kAtomicLoad,
@@ -485,6 +486,9 @@ enum class SpecialCallKind {
 };
 
 SpecialCallKind ClassifySpecialCall(std::string_view callee_name) {
+    if (callee_name == "mmio_ptr" || callee_name == "hal.mmio_ptr") {
+        return SpecialCallKind::kMmioPtr;
+    }
     if (callee_name == "volatile_load" || callee_name == "hal.volatile_load") {
         return SpecialCallKind::kVolatileLoad;
     }
@@ -751,7 +755,9 @@ class FunctionLowerer {
         Instruction::TargetKind target_kind = Instruction::TargetKind::kNone;
         std::string target_name;
         std::string target_display;
+        SpecialCallKind special_kind = SpecialCallKind::kNone;
         sema::Type type;
+        std::string op;
         std::string callee_local;
         std::vector<std::string> arg_locals;
     };
@@ -852,34 +858,72 @@ class FunctionLowerer {
         return "success=" + StableExprMetadataText(*expr.args[3]) + ",failure=" + StableExprMetadataText(*expr.args[4]);
     }
 
-    bool TryEmitSpecialCall(const Expr& expr,
-                           const std::vector<ValueInfo>& args,
-                           const sema::Type& result_type,
-                           bool wants_result,
-                           ValueInfo* result) {
-        if (expr.left == nullptr) {
-            return false;
+    bool SpecialCallProducesValue(SpecialCallKind kind) const {
+        return kind == SpecialCallKind::kMmioPtr || kind == SpecialCallKind::kVolatileLoad || kind == SpecialCallKind::kAtomicLoad ||
+               kind == SpecialCallKind::kAtomicExchange || kind == SpecialCallKind::kAtomicCompareExchange ||
+               kind == SpecialCallKind::kAtomicFetchAdd;
+    }
+
+    std::string SpecialCallMetadata(const Expr& expr, SpecialCallKind kind) const {
+        switch (kind) {
+            case SpecialCallKind::kAtomicLoad:
+                return RenderOrderMetadata(expr, 1);
+            case SpecialCallKind::kAtomicStore:
+            case SpecialCallKind::kAtomicExchange:
+            case SpecialCallKind::kAtomicFetchAdd:
+                return RenderOrderMetadata(expr, 2);
+            case SpecialCallKind::kAtomicCompareExchange:
+                return RenderCompareExchangeOrderMetadata(expr);
+            case SpecialCallKind::kNone:
+            case SpecialCallKind::kMmioPtr:
+            case SpecialCallKind::kVolatileLoad:
+            case SpecialCallKind::kVolatileStore:
+                return {};
         }
 
-        const std::string callee_name = CalleeName(*expr.left);
-        const SpecialCallKind kind = ClassifySpecialCall(callee_name);
+        return {};
+    }
+
+    bool EmitSpecialCallInstruction(const TargetMetadata& target_metadata,
+                                    SpecialCallKind kind,
+                                    const std::vector<ValueInfo>& args,
+                                    const sema::Type& result_type,
+                                    const std::string& metadata,
+                                    bool wants_result,
+                                    ValueInfo* result) {
         if (kind == SpecialCallKind::kNone) {
             return false;
         }
 
-        const bool produces_value = kind == SpecialCallKind::kVolatileLoad || kind == SpecialCallKind::kAtomicLoad ||
-                                    kind == SpecialCallKind::kAtomicExchange || kind == SpecialCallKind::kAtomicCompareExchange ||
-                                    kind == SpecialCallKind::kAtomicFetchAdd;
-        const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
+        if (kind == SpecialCallKind::kMmioPtr) {
+            const std::string value = NewValue();
+            std::vector<std::string> operands;
+            if (!args.empty()) {
+                operands.push_back(args.front().value);
+            }
+            Emit({
+                .kind = Instruction::Kind::kIntToPointer,
+                .result = value,
+                .type = result_type,
+                .target = sema::FormatType(result_type),
+                .target_display = sema::FormatType(result_type),
+                .operands = std::move(operands),
+            });
+            if (wants_result && result != nullptr) {
+                *result = {value, result_type};
+            }
+            return true;
+        }
 
         Instruction instruction {
             .type = result_type,
+            .op = metadata,
             .target = target_metadata.target,
             .target_kind = target_metadata.kind,
             .target_name = target_metadata.name,
             .target_display = target_metadata.display,
         };
-        if (wants_result || produces_value) {
+        if (wants_result || SpecialCallProducesValue(kind)) {
             instruction.result = NewValue();
         }
         for (const auto& arg : args) {
@@ -895,33 +939,49 @@ class FunctionLowerer {
                 break;
             case SpecialCallKind::kAtomicLoad:
                 instruction.kind = Instruction::Kind::kAtomicLoad;
-                instruction.op = RenderOrderMetadata(expr, 1);
                 break;
             case SpecialCallKind::kAtomicStore:
                 instruction.kind = Instruction::Kind::kAtomicStore;
-                instruction.op = RenderOrderMetadata(expr, 2);
                 break;
             case SpecialCallKind::kAtomicExchange:
                 instruction.kind = Instruction::Kind::kAtomicExchange;
-                instruction.op = RenderOrderMetadata(expr, 2);
                 break;
             case SpecialCallKind::kAtomicCompareExchange:
                 instruction.kind = Instruction::Kind::kAtomicCompareExchange;
-                instruction.op = RenderCompareExchangeOrderMetadata(expr);
                 break;
             case SpecialCallKind::kAtomicFetchAdd:
                 instruction.kind = Instruction::Kind::kAtomicFetchAdd;
-                instruction.op = RenderOrderMetadata(expr, 2);
                 break;
             case SpecialCallKind::kNone:
+            case SpecialCallKind::kMmioPtr:
                 return false;
         }
 
-        Emit(instruction);
+        Emit(std::move(instruction));
         if (wants_result && result != nullptr) {
-            *result = {instruction.result, result_type};
+            *result = {function_.blocks[*current_block_].instructions.back().result, result_type};
         }
         return true;
+    }
+
+    bool TryEmitSpecialCall(const Expr& expr,
+                           const std::vector<ValueInfo>& args,
+                           const sema::Type& result_type,
+                           bool wants_result,
+                           ValueInfo* result) {
+        if (expr.left == nullptr) {
+            return false;
+        }
+
+        const std::string callee_name = CalleeName(*expr.left);
+        const SpecialCallKind kind = ClassifySpecialCall(callee_name);
+        if (kind == SpecialCallKind::kNone) {
+            return false;
+        }
+
+        const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
+        return EmitSpecialCallInstruction(
+            target_metadata, kind, args, result_type, SpecialCallMetadata(expr, kind), wants_result, result);
     }
 
     void LowerCallStmt(const Expr& expr) {
@@ -1006,17 +1066,22 @@ class FunctionLowerer {
         for (const auto& arg : expr.args) {
             args.push_back(LowerExpr(*arg));
         }
-        const auto callee = LowerCalleeExpr(*expr.left);
+        const SpecialCallKind special_kind = ClassifySpecialCall(CalleeName(*expr.left));
+        const auto callee = special_kind == SpecialCallKind::kNone ? LowerCalleeExpr(*expr.left) : ValueInfo {};
         const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
         DeferredCall call {
             .target = target_metadata.target,
             .target_kind = target_metadata.kind,
             .target_name = target_metadata.name,
             .target_display = target_metadata.display,
-            .type = sema::VoidType(),
-            .callee_local = NewHiddenLocal("defer_callee"),
+            .special_kind = special_kind,
+            .type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "deferred call result type"),
+            .op = SpecialCallMetadata(expr, special_kind),
         };
-        SnapshotValueToLocal(call.callee_local, callee);
+        if (special_kind == SpecialCallKind::kNone) {
+            call.callee_local = NewHiddenLocal("defer_callee");
+            SnapshotValueToLocal(call.callee_local, callee);
+        }
         for (const auto& value : args) {
             const std::string arg_local = NewHiddenLocal("defer_arg");
             SnapshotValueToLocal(arg_local, value);
@@ -1026,10 +1091,26 @@ class FunctionLowerer {
     }
 
     void EmitDeferredCall(const DeferredCall& call) {
+        std::vector<ValueInfo> args;
+        args.reserve(call.arg_locals.size());
+        for (const auto& arg_local : call.arg_locals) {
+            args.push_back(LoadLocalValue(arg_local));
+        }
+        if (call.special_kind != SpecialCallKind::kNone) {
+            const TargetMetadata target_metadata {
+                .target = call.target,
+                .kind = call.target_kind,
+                .name = call.target_name,
+                .display = call.target_display,
+            };
+            static_cast<void>(EmitSpecialCallInstruction(target_metadata, call.special_kind, args, call.type, call.op, false, nullptr));
+            return;
+        }
+
         const auto callee = LoadLocalValue(call.callee_local);
         std::vector<std::string> operands = {callee.value};
-        for (const auto& arg_local : call.arg_locals) {
-            operands.push_back(LoadLocalValue(arg_local).value);
+        for (const auto& arg : args) {
+            operands.push_back(arg.value);
         }
         Emit({
             .kind = Instruction::Kind::kCall,
@@ -1595,6 +1676,11 @@ class FunctionLowerer {
     }
 
     void EmitStoreTarget(const Expr& target, const ValueInfo& value) {
+        if (target.kind == Expr::Kind::kIndex && target.left != nullptr && target.right != nullptr) {
+            const auto base = LowerExpr(*target.left);
+            const auto index = LowerExpr(*target.right);
+            EmitIndexBoundsCheck(base, index);
+        }
         Emit({
             .kind = Instruction::Kind::kStoreTarget,
             .type = KnownTypeOrError(ExprTypeOrUnknown(target), target.span, "assignment target type"),
@@ -2101,6 +2187,7 @@ class FunctionLowerer {
         current_block_ = body_block;
         const auto body_iterable = LoadLocalValue(iterable_name);
         const auto body_index = LoadLocalValue(index_name);
+        EmitIndexBoundsCheck(body_iterable, body_index);
         const std::string item_value = NewValue();
         Emit({
             .kind = Instruction::Kind::kIndex,
@@ -2930,7 +3017,7 @@ bool ValidateModule(const Module& module,
                         }
                         const std::string_view call_target_name = PrimaryTargetName(instruction);
                         if (!call_target_name.empty() && IsDedicatedCallSurface(call_target_name)) {
-                            report("call must use a dedicated volatile/atomic opcode when one exists in function " + function.name);
+                            report("call must use a dedicated semantic-boundary opcode when one exists in function " + function.name);
                         }
                         if (instruction.target_kind == Instruction::TargetKind::kFunction && instruction.target_name.empty()) {
                             report("call must record target_name metadata for direct function calls in function " + function.name);
