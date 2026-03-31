@@ -1,0 +1,62 @@
+Module
+  TypeDecl kind=enum name=MemoryOrder
+    Variant name=Relaxed
+    Variant name=Acquire
+    Variant name=Release
+  TypeDecl kind=struct name=Atomic
+    typeParams=[T]
+  Function name=volatile_load returns=[i32]
+    Local name=ptr type=*i32 param readonly
+    Block label=entry0
+      const %v0:int_literal op=0
+      terminator return values=[%v0]
+  Function name=volatile_store
+    Local name=ptr type=*i32 param readonly
+    Local name=value type=i32 param readonly
+    Block label=entry0
+      terminator return
+  Function name=atomic_load returns=[i32]
+    Local name=ptr type=*Atomic<i32> param readonly
+    Local name=order type=MemoryOrder param readonly
+    Block label=entry0
+      const %v0:int_literal op=0
+      terminator return values=[%v0]
+  Function name=atomic_fetch_add returns=[i32]
+    Local name=ptr type=*Atomic<i32> param readonly
+    Local name=value type=i32 param readonly
+    Local name=order type=MemoryOrder param readonly
+    Block label=entry0
+      load_local %v0:i32 target=value
+      terminator return values=[%v0]
+  Function name=wait_until_ready returns=[i32]
+    Local name=status type=*i32 param readonly
+    Local name=counter type=*Atomic<i32> param readonly
+    Local name=attempts type=i32
+    Block label=entry0
+      const %v0:int_literal op=0
+      store_local target=attempts operands=[%v0]
+      terminator branch target=loop_cond1
+    Block label=loop_cond1
+      load_local %v1:*i32 target=status
+      volatile_load %v2:i32 target=volatile_load target_kind=function target_name=volatile_load operands=[%v1]
+      const %v3:int_literal op=0
+      binary %v4:bool op=== operands=[%v2, %v3]
+      terminator cond value=%v4 true=loop_body2 false=loop_exit3
+    Block label=loop_body2
+      load_local %v5:*Atomic<i32> target=counter
+      const %v6:int_literal op=1
+      symbol_ref %v7:MemoryOrder target=MemoryOrder.Relaxed target_kind=other target_name=MemoryOrder.Relaxed
+      atomic_fetch_add %v8:i32 op=order=MemoryOrder.Relaxed target=atomic_fetch_add target_kind=function target_name=atomic_fetch_add operands=[%v5, %v6, %v7]
+      load_local %v9:i32 target=attempts
+      const %v10:int_literal op=1
+      binary %v11:i32 op=+ arithmetic=wrap operands=[%v9, %v10]
+      store_local target=attempts operands=[%v11]
+      terminator branch target=loop_cond1
+    Block label=loop_exit3
+      load_local %v12:*i32 target=status
+      load_local %v13:i32 target=attempts
+      volatile_store target=volatile_store target_kind=function target_name=volatile_store operands=[%v12, %v13]
+      load_local %v14:*Atomic<i32> target=counter
+      symbol_ref %v15:MemoryOrder target=MemoryOrder.Acquire target_kind=other target_name=MemoryOrder.Acquire
+      atomic_load %v16:i32 op=order=MemoryOrder.Acquire target=atomic_load target_kind=function target_name=atomic_load operands=[%v14, %v15]
+      terminator return values=[%v16]

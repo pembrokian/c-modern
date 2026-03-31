@@ -1,0 +1,65 @@
+Module
+  TypeDecl kind=enum name=Expr
+    Variant name=Int
+      PayloadField name=value type=i32
+    Variant name=Add
+      PayloadField name=left type=i32
+      PayloadField name=right type=i32
+    Variant name=Div
+      PayloadField name=left type=i32
+      PayloadField name=right type=i32
+  Function name=eval returns=[i32]
+    Local name=expr type=Expr param readonly
+    Local name=int_value type=i32 readonly
+    Local name=add_left type=i32 readonly
+    Local name=add_right type=i32 readonly
+    Local name=div_left type=i32 readonly
+    Local name=div_right type=i32 readonly
+    Block label=entry0
+      load_local %v0:Expr target=expr
+      variant_match %v1:bool target=Expr.Int target_name=Int target_base=Expr operands=[%v0]
+      terminator cond value=%v1 true=switch_case5 false=switch_test3
+    Block label=switch_default2
+      const %v20:int_literal op=0
+      terminator return values=[%v20]
+    Block label=switch_test3
+      variant_match %v4:bool target=Expr.Add target_name=Add target_base=Expr operands=[%v0]
+      terminator cond value=%v4 true=switch_case6 false=switch_test4
+    Block label=switch_test4
+      variant_match %v10:bool target=Expr.Div target_name=Div target_base=Expr operands=[%v0]
+      terminator cond value=%v10 true=switch_case7 false=switch_default2
+    Block label=switch_case5
+      variant_extract %v2:i32 op=0 target=Expr.Int target_name=Int target_base=Expr target_index=0 operands=[%v0]
+      store_local target=int_value operands=[%v2]
+      load_local %v3:i32 target=int_value
+      terminator return values=[%v3]
+    Block label=switch_case6
+      variant_extract %v5:i32 op=0 target=Expr.Add target_name=Add target_base=Expr target_index=0 operands=[%v0]
+      store_local target=add_left operands=[%v5]
+      variant_extract %v6:i32 op=1 target=Expr.Add target_name=Add target_base=Expr target_index=1 operands=[%v0]
+      store_local target=add_right operands=[%v6]
+      load_local %v7:i32 target=add_left
+      load_local %v8:i32 target=add_right
+      binary %v9:i32 op=+ arithmetic=wrap operands=[%v7, %v8]
+      terminator return values=[%v9]
+    Block label=switch_case7
+      variant_extract %v11:i32 op=0 target=Expr.Div target_name=Div target_base=Expr target_index=0 operands=[%v0]
+      store_local target=div_left operands=[%v11]
+      variant_extract %v12:i32 op=1 target=Expr.Div target_name=Div target_base=Expr target_index=1 operands=[%v0]
+      store_local target=div_right operands=[%v12]
+      load_local %v13:i32 target=div_right
+      const %v14:int_literal op=0
+      binary %v15:bool op=== operands=[%v13, %v14]
+      terminator cond value=%v15 true=if_then8 false=if_merge9
+    Block label=if_then8
+      const %v16:int_literal op=0
+      terminator return values=[%v16]
+    Block label=if_merge9
+      load_local %v17:i32 target=div_left
+      load_local %v18:i32 target=div_right
+      div_check op=/ operands=[%v17, %v18]
+      binary %v19:i32 op=/ operands=[%v17, %v18]
+      terminator return values=[%v19]
+    Block label=dead10
+      const %v21:int_literal op=0
+      terminator return values=[%v21]

@@ -22,12 +22,13 @@ What is in place:
 - MIR unit coverage now includes focused validator failures for non-bool conditions, bad unary legality, incompatible comparison operands, malformed bounds checks, missing fault checks on division/shift binaries, missing or invalid wraparound arithmetic metadata, bad volatile or atomic instruction shapes, misencoded generic conversions, duplicate aggregate fields, invalid field/index/slice bases and slice bounds, bad call argument types, aggregate field mismatches, variant payload mismatches, bad symbol-ref types, and structured store-target mismatches
 - MIR fixtures now cover semantic-boundary intrinsic lowering for volatile and atomic operations in addition to the earlier bounds-check and conversion-focused fixtures
 - representative supported MIR lowering tests now assert that variant switches, foreach/range loops, and typed symbol-reference paths do not emit `unknown`, and a dump audit across current accepted sample inputs finds no emitted `unknown` MIR types
+- MIR fixtures now include representative canonical-style programs covering explicit conversions, checked faults, aggregates, slices, loops, variants, and low-level memory operations instead of only narrow unit-style cases
+- MIR fixture coverage now includes lowering-failure diagnostics for unsupported bootstrap boundaries such as non-iterable foreach loops and variant payload bindings that would shadow existing locals
 
 What still blocks a Phase 4 completion claim:
 - MIR is materially tighter across the currently supported surface, but unsupported or not-yet-semanticized paths can still hit lowering diagnostics and recovery behavior rather than a fully explicit typed MIR form
 - the validator now covers a broader typed subset including explicit conversion-family selection, core unary/comparison legality, field/index/slice base-and-bound checks, and aggregate field-shape checks, but it still does not comprehensively reject illegal typed operations across the full MIR surface
 - explicit MIR forms now cover distinct/base, numeric, pointer-int, array-to-slice, and buffer-to-slice conversions, checked divide/shift faults, and the current library-shaped volatile/atomic operation subset; other semantic-boundary operations are still pending
-- canonical small programs are not yet demonstrated as MIR-representable through dedicated Phase 4 fixtures or canonical-program coverage
 
 Current structural debt worth tracking explicitly:
 - MIR lowering still has a small amount of call-site fallback and recovery logic for unresolved or unsupported cases; supported lowering paths should continue moving toward direct sema-owned typed inputs with fewer bootstrap escape hatches
@@ -83,11 +84,11 @@ Theme: Structured identity and metadata quality
 - completed: fixture goldens were refreshed against the richer deterministic dump format so metadata expansion remains reviewable and stable under snapshot testing
 
 Theme: Fixture and representative-program coverage
-- add MIR golden fixtures for representative canonical small programs, not only narrow unit-style lowering cases
-- choose canonical examples that exercise the semantic boundaries Phase 4 is supposed to own: explicit conversions, checked faults, aggregates, slices, loops, variants, and low-level memory operations
-- ensure new fixtures cover both value-producing operations and effect-only semantic instructions such as explicit fault checks
-- continue the current "no emitted unknown type on supported paths" audit as the supported surface grows
-- expand negative coverage where useful so unsupported or malformed inputs fail deterministically at the right layer
+- completed: MIR golden fixtures now include representative canonical-style small programs, not only narrow unit-style lowering cases
+- completed: the representative fixtures exercise the current Phase 4 semantic boundaries across explicit conversions, checked faults, aggregates, slices, loops, variants, and low-level memory operations
+- completed: the new representative fixtures cover both value-producing MIR instructions and effect-only semantic instructions such as explicit fault checks and volatile stores
+- completed: the fixture harness now extends the existing "no emitted unknown type on supported paths" audit across every successful MIR fixture
+- completed: MIR fixture coverage now includes deterministic lowering-failure diagnostics for useful unsupported bootstrap boundaries instead of only success-path goldens
 
 Theme: Phase close-out validation and milestone criteria
 - re-check the Phase 4 note against the original `plan.txt` objective and exit criteria rather than repository-local momentum before declaring closure

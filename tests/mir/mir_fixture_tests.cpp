@@ -65,6 +65,9 @@ void RunFixture(const std::filesystem::path& fixture_dir, const FixtureCase& fix
         }
 
         const auto actual_dump = mc::mir::DumpModule(*lowered.module);
+        if (actual_dump.find("unknown") != std::string::npos) {
+            Fail("supported fixture should not emit unknown MIR types: " + source_path.generic_string() + "\n" + actual_dump);
+        }
         if (actual_dump != expected_text) {
             std::cerr << "fixture mismatch for " << source_path.generic_string() << "\n";
             std::cerr << "expected:\n" << expected_text << "\n";
@@ -107,16 +110,21 @@ int main(int argc, char** argv) {
         {"array_to_slice_conversion.mc", "array_to_slice_conversion.mir.txt", true},
         {"bounds_check.mc", "bounds_check.mir.txt", true},
         {"buffer_to_slice_conversion.mc", "buffer_to_slice_conversion.mir.txt", true},
+        {"canonical_eval.mc", "canonical_eval.mir.txt", true},
+        {"canonical_memory_poll.mc", "canonical_memory_poll.mir.txt", true},
+        {"canonical_window_stats.mc", "canonical_window_stats.mir.txt", true},
         {"defer_immediate_args.mc", "defer_immediate_args.mir.txt", true},
         {"switch_expr.mc", "switch_expr.mir.txt", true},
         {"switch_case_defer.mc", "switch_case_defer.mir.txt", true},
         {"foreach_range_defer.mc", "foreach_range_defer.mir.txt", true},
+        {"foreach_non_iterable_fail.mc", "foreach_non_iterable_fail.errors.txt", false},
         {"explicit_conversion.mc", "explicit_conversion.mir.txt", true},
         {"pointer_int_conversion.mc", "pointer_int_conversion.mir.txt", true},
         {"semantic_boundary_intrinsics.mc", "semantic_boundary_intrinsics.mir.txt", true},
         {"loop_iteration_defer.mc", "loop_iteration_defer.mir.txt", true},
         {"scoped_defer.mc", "scoped_defer.mir.txt", true},
         {"switch_variant.mc", "switch_variant.mir.txt", true},
+        {"variant_binding_shadow_fail.mc", "variant_binding_shadow_fail.errors.txt", false},
     };
 
     for (const auto& fixture : fixtures) {

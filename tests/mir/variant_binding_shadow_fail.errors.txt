@@ -1,0 +1,1 @@
+bootstrap MIR variant binding would shadow an existing local
