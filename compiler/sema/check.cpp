@@ -348,19 +348,23 @@ Type MergeNumericTypes(const Type& left, const Type& right) {
 }
 
 bool IsAssignable(const Type& expected, const Type& actual) {
-    if (IsUnknown(expected) || IsUnknown(actual)) {
+    const Type canonical_expected = CanonicalizeBuiltinType(expected);
+    const Type canonical_actual = CanonicalizeBuiltinType(actual);
+    if (IsUnknown(canonical_expected) || IsUnknown(canonical_actual)) {
         return true;
     }
-    if (expected == actual) {
+    if (canonical_expected == canonical_actual) {
         return true;
     }
-    if (expected.kind == Type::Kind::kNamed && actual.kind == Type::Kind::kIntLiteral && IsIntegerTypeName(expected.name)) {
+    if (canonical_expected.kind == Type::Kind::kNamed && canonical_actual.kind == Type::Kind::kIntLiteral &&
+        IsIntegerTypeName(canonical_expected.name)) {
         return true;
     }
-    if (expected.kind == Type::Kind::kNamed && actual.kind == Type::Kind::kFloatLiteral && IsFloatTypeName(expected.name)) {
+    if (canonical_expected.kind == Type::Kind::kNamed && canonical_actual.kind == Type::Kind::kFloatLiteral &&
+        IsFloatTypeName(canonical_expected.name)) {
         return true;
     }
-    if (IsPointerLikeType(expected) && actual.kind == Type::Kind::kNil) {
+    if (IsPointerLikeType(canonical_expected) && canonical_actual.kind == Type::Kind::kNil) {
         return true;
     }
     return false;
@@ -1386,16 +1390,18 @@ class Checker {
             case Expr::Kind::kAggregateInit: {
                 Type aggregate_type = UnknownType();
                 if (expr.left != nullptr && (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {
-                    aggregate_type = NamedType(CombineQualifiedName(*expr.left));
+                    aggregate_type = NamedOrBuiltinType(CombineQualifiedName(*expr.left));
                     for (const auto& type_arg : expr.left->type_args) {
                         ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
                         aggregate_type.subtypes.push_back(TypeFromAst(type_arg.get()));
                     }
                 }
                 const TypeDeclSummary* type_decl = LookupStructType(aggregate_type);
-                if (type_decl != nullptr) {
+                const auto builtin_fields = BuiltinAggregateFields(aggregate_type);
+                if (type_decl != nullptr || !builtin_fields.empty()) {
                     std::unordered_map<std::string, Type> fields;
-                    for (const auto& field : type_decl->fields) {
+                    const auto& field_source = type_decl != nullptr ? type_decl->fields : builtin_fields;
+                    for (const auto& field : field_source) {
                         fields[field.first] = field.second;
                     }
                     for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
@@ -1404,7 +1410,8 @@ class Checker {
                         if (field_init.has_name) {
                             const auto found = fields.find(field_init.name);
                             if (found == fields.end()) {
-                                Report(field_init.span, "type " + type_decl->name + " has no field named " + field_init.name);
+                                Report(field_init.span,
+                                       "type " + FormatType(aggregate_type) + " has no field named " + field_init.name);
                                 continue;
                             }
                             if (!IsAssignable(found->second, value_type)) {
@@ -1414,14 +1421,14 @@ class Checker {
                             }
                             continue;
                         }
-                        if (index >= type_decl->fields.size()) {
-                            Report(field_init.span, "too many aggregate initializer values for type " + type_decl->name);
+                        if (index >= field_source.size()) {
+                            Report(field_init.span, "too many aggregate initializer values for type " + FormatType(aggregate_type));
                             continue;
                         }
-                        if (!IsAssignable(type_decl->fields[index].second, value_type)) {
+                        if (!IsAssignable(field_source[index].second, value_type)) {
                             Report(field_init.span,
-                                   "aggregate field type mismatch for " + type_decl->fields[index].first + ": expected " +
-                                       FormatType(type_decl->fields[index].second) + ", got " + FormatType(value_type));
+                                   "aggregate field type mismatch for " + field_source[index].first + ": expected " +
+                                       FormatType(field_source[index].second) + ", got " + FormatType(value_type));
                         }
                     }
                 } else {

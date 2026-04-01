@@ -29,34 +29,6 @@ struct FunctionLoweringState {
     std::unordered_map<std::string, BackendTypeInfo> value_types;
 };
 
-std::vector<std::pair<std::string, sema::Type>> BuiltinAggregateFields(const sema::Type& type) {
-    std::vector<std::pair<std::string, sema::Type>> fields;
-    if (type.kind == sema::Type::Kind::kString ||
-        (type.kind == sema::Type::Kind::kNamed && (type.name == "str" || type.name == "string" || type.name == "cstr"))) {
-        fields.push_back({"ptr", sema::PointerType(sema::NamedType("u8"))});
-        fields.push_back({"len", sema::NamedType("usize")});
-        return fields;
-    }
-    if (type.kind != sema::Type::Kind::kNamed) {
-        return fields;
-    }
-    if (type.name == "Slice") {
-        const sema::Type element_type = type.subtypes.empty() ? sema::UnknownType() : type.subtypes.front();
-        fields.push_back({"ptr", sema::PointerType(element_type)});
-        fields.push_back({"len", sema::NamedType("usize")});
-        return fields;
-    }
-    if (type.name == "Buffer") {
-        const sema::Type element_type = type.subtypes.empty() ? sema::UnknownType() : type.subtypes.front();
-        fields.push_back({"ptr", sema::PointerType(element_type)});
-        fields.push_back({"len", sema::NamedType("usize")});
-        fields.push_back({"cap", sema::NamedType("usize")});
-        fields.push_back({"alloc", sema::PointerType(sema::NamedType("Allocator"))});
-        return fields;
-    }
-    return fields;
-}
-
 std::string_view ToString(mir::Instruction::Kind kind) {
     switch (kind) {
         case mir::Instruction::Kind::kConst:
@@ -313,6 +285,8 @@ std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
     switch (type.kind) {
         case sema::Type::Kind::kBool:
             return use_backend_type("i1", 1, 1);
+        case sema::Type::Kind::kString:
+            return use_backend_type("{ptr, i64}", 16, 8);
         case sema::Type::Kind::kIntLiteral:
             return use_backend_type("i64", 8, 8);
         case sema::Type::Kind::kFloatLiteral:
@@ -391,8 +365,6 @@ std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
         }
         case sema::Type::Kind::kProcedure:
             return use_backend_type("ptr", 8, 8);
-        case sema::Type::Kind::kString:
-            return use_backend_type("{ptr, i64}", 16, 8);
         default:
             return std::nullopt;
     }
@@ -471,6 +443,18 @@ std::string JoinOperands(const std::vector<std::string>& operands) {
         stream << operands[index];
     }
     return stream.str();
+}
+
+std::optional<std::string> BaseStoreTargetName(const mir::Instruction& instruction) {
+    if (instruction.target_display.empty() || instruction.target_name.empty()) {
+        return std::nullopt;
+    }
+    const std::string suffix = "." + instruction.target_name;
+    if (instruction.target_display.size() <= suffix.size() ||
+        instruction.target_display.rfind(suffix) != instruction.target_display.size() - suffix.size()) {
+        return std::nullopt;
+    }
+    return instruction.target_display.substr(0, instruction.target_display.size() - suffix.size());
 }
 
 const BackendLocal* FindLocal(const FunctionLoweringState& state,
@@ -1125,20 +1109,25 @@ bool LowerInstruction(const mir::Instruction& instruction,
         }
 
         case mir::Instruction::Kind::kStoreTarget: {
-            std::string operand;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "store_target",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      operand)) {
+            std::vector<std::string> operands;
+            if (!ResolveOperands(state,
+                                 instruction,
+                                 function,
+                                 block,
+                                 source_path,
+                                 diagnostics,
+                                 operands)) {
                 return false;
             }
+            std::ostringstream rendered;
+            for (std::size_t index = 0; index < operands.size(); ++index) {
+                if (index > 0) {
+                    rendered << ", ";
+                }
+                rendered << operands[index];
+            }
             backend_block.instructions.push_back("store_target " + instruction.target_display + " kind=" +
-                                                 std::string(ToString(instruction.target_kind)) + " value=" + operand);
+                                                 std::string(ToString(instruction.target_kind)) + " operands=[" + rendered.str() + "]");
             return true;
         }
 
@@ -1621,30 +1610,16 @@ std::size_t IntegerBitWidth(const BackendTypeInfo& type_info) {
 std::optional<std::size_t> FindFieldIndex(const mir::Module& module,
                                           const sema::Type& base_type,
                                           std::string_view field_name) {
-    const sema::Type lowered_base = base_type.kind == sema::Type::Kind::kNamed ? base_type : base_type;
+    const auto builtin_fields = sema::BuiltinAggregateFields(base_type);
+    if (!builtin_fields.empty()) {
+        for (std::size_t index = 0; index < builtin_fields.size(); ++index) {
+            if (builtin_fields[index].first == field_name) {
+                return index;
+            }
+        }
+    }
+    const sema::Type lowered_base = sema::CanonicalizeBuiltinType(base_type);
     if (lowered_base.kind == sema::Type::Kind::kNamed) {
-        if (lowered_base.name == "Slice" || lowered_base.name == "str" || lowered_base.name == "string" || lowered_base.name == "cstr") {
-            if (field_name == "ptr") {
-                return 0;
-            }
-            if (field_name == "len") {
-                return 1;
-            }
-        }
-        if (lowered_base.name == "Buffer") {
-            if (field_name == "ptr") {
-                return 0;
-            }
-            if (field_name == "len") {
-                return 1;
-            }
-            if (field_name == "cap") {
-                return 2;
-            }
-            if (field_name == "alloc") {
-                return 3;
-            }
-        }
         if (const auto* type_decl = FindTypeDecl(module, lowered_base.name)) {
             for (std::size_t index = 0; index < type_decl->fields.size(); ++index) {
                 if (type_decl->fields[index].first == field_name) {
@@ -1659,30 +1634,15 @@ std::optional<std::size_t> FindFieldIndex(const mir::Module& module,
 std::optional<sema::Type> FindFieldType(const mir::Module& module,
                                         const sema::Type& base_type,
                                         std::string_view field_name) {
-    if (base_type.kind == sema::Type::Kind::kNamed) {
-        if (base_type.name == "Slice" || base_type.name == "Buffer") {
-            if (field_name == "ptr") {
-                if (base_type.subtypes.empty()) {
-                    return sema::PointerType(sema::UnknownType());
-                }
-                return sema::PointerType(base_type.subtypes.front());
-            }
-            if (field_name == "len" || field_name == "cap") {
-                return sema::NamedType("usize");
-            }
-            if (field_name == "alloc") {
-                return sema::PointerType(sema::NamedType("Allocator"));
-            }
+    const auto builtin_fields = sema::BuiltinAggregateFields(base_type);
+    for (const auto& field : builtin_fields) {
+        if (field.first == field_name) {
+            return field.second;
         }
-        if (base_type.name == "str" || base_type.name == "string" || base_type.name == "cstr") {
-            if (field_name == "ptr") {
-                return sema::PointerType(sema::ConstType(sema::NamedType("u8")));
-            }
-            if (field_name == "len") {
-                return sema::NamedType("usize");
-            }
-        }
-        if (const auto* type_decl = FindTypeDecl(module, base_type.name)) {
+    }
+    const sema::Type canonical_base = sema::CanonicalizeBuiltinType(base_type);
+    if (canonical_base.kind == sema::Type::Kind::kNamed) {
+        if (const auto* type_decl = FindTypeDecl(module, canonical_base.name)) {
             for (const auto& field : type_decl->fields) {
                 if (field.first == field_name) {
                     return field.second;
@@ -1839,7 +1799,7 @@ std::optional<sema::Type> ResolveExecutableFieldBaseType(const mir::Module& modu
 
     if (base_value.type.source_name == "str" || base_value.type.source_name == "string" ||
         base_value.type.source_name == "cstr") {
-        return sema::NamedType(base_value.type.source_name);
+        return sema::StringType();
     }
     if (base_value.type.source_name == "Slice" || base_value.type.source_name.rfind("Slice<", 0) == 0) {
         return sema::NamedType("Slice");
@@ -2515,12 +2475,9 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
 
     std::vector<BackendTypeInfo> field_types;
     field_types.reserve(instruction.operands.size());
-    if (instruction.type.kind == sema::Type::Kind::kNamed) {
+    const auto builtin_fields = sema::BuiltinAggregateFields(instruction.type);
+    if (instruction.type.kind == sema::Type::Kind::kNamed || !builtin_fields.empty()) {
         const mir::TypeDecl* type_decl = FindTypeDecl(*state.module, instruction.type.name);
-        std::vector<std::pair<std::string, sema::Type>> builtin_fields;
-        if (type_decl == nullptr) {
-            builtin_fields = BuiltinAggregateFields(instruction.type);
-        }
         const auto field_count = type_decl != nullptr ? type_decl->fields.size() : builtin_fields.size();
         if ((type_decl != nullptr && type_decl->kind != mir::TypeDecl::Kind::kStruct) || field_count != instruction.operands.size()) {
             ReportBackendError(source_path,
@@ -3177,37 +3134,152 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                       output_lines);
 
         case mir::Instruction::Kind::kStoreTarget: {
-            if (instruction.target_kind != mir::Instruction::TargetKind::kGlobal || instruction.target.empty()) {
+            if (instruction.target_kind == mir::Instruction::TargetKind::kGlobal && !instruction.target.empty()) {
+                ExecutableValue operand;
+                if (!ResolveSingleExecutableOperand(state,
+                                                    instruction,
+                                                    "store_target",
+                                                    block,
+                                                    source_path,
+                                                    diagnostics,
+                                                    operand)) {
+                    return false;
+                }
+
+                const auto global_it = state.globals.find(instruction.target);
+                if (global_it == state.globals.end()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission references unknown global store target '" + instruction.target +
+                                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+
+                output_lines.push_back("store " + global_it->second.lowered_type.backend_name + " " + operand.text + ", ptr " +
+                                       global_it->second.backend_name + ", align " +
+                                       std::to_string(global_it->second.lowered_type.alignment));
+                return true;
+            }
+
+            if (instruction.target_kind == mir::Instruction::TargetKind::kField && instruction.operands.size() == 2) {
+                ExecutableValue stored_value;
+                ExecutableValue base;
+                if (!ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, stored_value) ||
+                    !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, base)) {
+                    return false;
+                }
+
+                const auto base_type = ResolveExecutableFieldBaseType(*state.module, instruction.target_base_type, base);
+                const auto field_index = base_type.has_value()
+                                             ? FindFieldIndex(*state.module, *base_type, instruction.target_name)
+                                             : std::nullopt;
+                if (!field_index.has_value()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission could not resolve store_target field '" + instruction.target_name +
+                                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+
+                const std::optional<std::string> base_name = BaseStoreTargetName(instruction);
+                if (!base_name.has_value()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission requires a direct field store target in function '" +
+                                           state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+
+                const std::string updated_value = LLVMTempName(function_index, block_index, instruction_index) + ".field";
+                output_lines.push_back(updated_value + " = insertvalue " + base.type.backend_name + " " + base.text + ", " +
+                                       stored_value.type.backend_name + " " + stored_value.text + ", " +
+                                       std::to_string(*field_index));
+
+                const auto local_it = state.local_slots.find(*base_name);
+                if (local_it != state.local_slots.end()) {
+                    output_lines.push_back("store " + base.type.backend_name + " " + updated_value + ", ptr " + local_it->second + ", align " +
+                                           std::to_string(base.type.alignment));
+                    return true;
+                }
+
+                const auto global_it = state.globals.find(*base_name);
+                if (global_it != state.globals.end()) {
+                    output_lines.push_back("store " + global_it->second.lowered_type.backend_name + " " + updated_value + ", ptr " +
+                                           global_it->second.backend_name + ", align " +
+                                           std::to_string(global_it->second.lowered_type.alignment));
+                    return true;
+                }
+
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap executable emission currently supports only global store_target effects in function '" +
+                                   "LLVM bootstrap executable emission currently supports only direct local/global field store_target effects in function '" +
                                        state.function->name + "' block '" + block.label + "'",
                                    diagnostics);
                 return false;
             }
 
-            ExecutableValue operand;
-            if (!ResolveSingleExecutableOperand(state,
-                                                instruction,
-                                                "store_target",
-                                                block,
-                                                source_path,
-                                                diagnostics,
-                                                operand)) {
+            if (instruction.target_kind != mir::Instruction::TargetKind::kIndex || instruction.operands.size() != 3) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission currently supports only global, direct field, and indexed store_target effects in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
                 return false;
             }
 
-            const auto global_it = state.globals.find(instruction.target);
-            if (global_it == state.globals.end()) {
+            ExecutableValue stored_value;
+            ExecutableValue base;
+            ExecutableValue index;
+            if (!ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, stored_value) ||
+                !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, base) ||
+                !ResolveExecutableValue(state, instruction.operands[2], block, source_path, diagnostics, index)) {
+                return false;
+            }
+
+            BackendTypeInfo stored_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("store_target", state, block),
+                                      stored_type)) {
+                return false;
+            }
+
+            std::string index_i64;
+            if (!ExtendIntegerToI64(index,
+                                    function_index,
+                                    block_index,
+                                    instruction_index,
+                                    "store_index",
+                                    output_lines,
+                                    index_i64)) {
+                return false;
+            }
+
+            const std::string ptr_temp = LLVMTempName(function_index, block_index, instruction_index) + ".ptr";
+            if (!base.type.backend_name.empty() && base.type.backend_name.front() == '[') {
+                const std::string array_slot = EmitAggregateStackSlot(base,
+                                                                      function_index,
+                                                                      block_index,
+                                                                      instruction_index,
+                                                                      "store_array",
+                                                                      output_lines);
+                output_lines.push_back(ptr_temp + " = getelementptr inbounds " + base.type.backend_name + ", ptr " + array_slot + ", i64 0, i64 " +
+                                       index_i64);
+            } else if (base.type.backend_name == "{ptr, i64}") {
+                const std::string data_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".data";
+                output_lines.push_back(data_ptr + " = extractvalue {ptr, i64} " + base.text + ", 0");
+                output_lines.push_back(ptr_temp + " = getelementptr inbounds " + stored_type.backend_name + ", ptr " + data_ptr + ", i64 " +
+                                       index_i64);
+            } else {
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap executable emission references unknown global store target '" + instruction.target +
+                                   "LLVM bootstrap executable emission does not support store_target index base type '" + base.type.source_name +
                                        "' in function '" + state.function->name + "' block '" + block.label + "'",
                                    diagnostics);
                 return false;
             }
 
-            output_lines.push_back("store " + global_it->second.lowered_type.backend_name + " " + operand.text + ", ptr " +
-                                   global_it->second.backend_name + ", align " +
-                                   std::to_string(global_it->second.lowered_type.alignment));
+            output_lines.push_back("store " + stored_type.backend_name + " " + stored_value.text + ", ptr " + ptr_temp + ", align " +
+                                   std::to_string(stored_type.alignment));
             return true;
         }
 

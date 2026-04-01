@@ -578,6 +578,13 @@ int main(int argc, char** argv) {
                           "hello, stdlib\n");
 
     RunBuiltOutputFixture(mc_path,
+                          source_root / "tests/stdlib/write_stdout.mc",
+                          work_root / "phase6_write_stdout_build",
+                          {},
+                          0,
+                          "phase6 write");
+
+    RunBuiltOutputFixture(mc_path,
                           source_root / "tests/stdlib/echo_arg.mc",
                           work_root / "phase6_echo_arg_build",
                           {"borrowed-arg"},
@@ -616,6 +623,13 @@ int main(int argc, char** argv) {
 
     const std::filesystem::path phase6_file_input = work_root / "phase6_file_input.txt";
     WriteFile(phase6_file_input, "phase6\n");
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/file_size.mc",
+                    work_root / "phase6_file_size_build",
+                    0,
+                    {phase6_file_input.generic_string()});
+
     RunBuiltFixture(mc_path,
                     source_root / "tests/stdlib/file_read_len.mc",
                     work_root / "phase6_file_read_len_build",
@@ -623,8 +637,20 @@ int main(int argc, char** argv) {
                     {phase6_file_input.generic_string()});
 
     RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/file_read_default_len.mc",
+                    work_root / "phase6_file_read_default_len_build",
+                    0,
+                    {phase6_file_input.generic_string()});
+
+    RunBuiltFixture(mc_path,
                     source_root / "tests/stdlib/slice_from_buffer_len.mc",
                     work_root / "phase6_slice_from_buffer_len_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/typed_buffer_roundtrip.mc",
+                    work_root / "phase6_typed_buffer_roundtrip_build",
                     0,
                     {});
 

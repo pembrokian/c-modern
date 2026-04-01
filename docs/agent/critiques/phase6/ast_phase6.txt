@@ -1,0 +1,188 @@
+================================================================
+ARCHITECTURAL & QUALITY REVIEW — compiler/ast/ast.cpp (+ ast.h)
+Phase 6 Deep Review
+================================================================
+
+FILES REVIEWED
+  compiler/ast/ast.h      (node definitions)
+  compiler/ast/ast.cpp    (dump implementation)
+
+------------------------------------------------------------------------
+1. DESIGN & ARCHITECTURE
+------------------------------------------------------------------------
+
+FINDING: Monolithic flat-struct node design
+  ast.h defines Expr, Stmt, and Decl as kitchen-sink structs that carry
+  every possible field for every node kind simultaneously. For example,
+  Expr holds: text, secondary_text, type_args, type_target, args,
+  field_inits, left, right, extra — all present regardless of which
+  Expr::Kind is actually represented.
+
+  This is a deliberate bootstrap trade-off (simpler allocation, no
+  downcasting), but it has real costs:
+
+    - Wrong-field bugs are silent. Nothing stops code from writing to
+      expr.right when it should write to expr.left, or from reading
+      expr.secondary_text on a kBinary node.
+    - Object size is large. An Expr carries ~8 unique_ptrs plus two
+      std::strings plus multiple vectors: roughly 150–200 bytes per
+      node on 64-bit. Every kName leaf (the most common expr kind)
+      carries this overhead even though it only uses text.
+    - Self-documenting: the reader cannot infer which fields are
+      meaningful for a given Kind without reading all call sites.
+
+  Issue: The `secondary_text` field is semantically overloaded.
+    - For kLiteral: stores the token kind name string (e.g. "int_literal")
+    - For kQualifiedName: stores the right-hand member name
+  This is encoded nowhere in the type definition and is only discoverable
+  by reading parser.cpp.
+
+FINDING: DumpXxx functions are purely debug/diagnostic output
+  The ast.cpp file is exclusively a diagnostic implementation; it has
+  no production responsibility. This is correct and the responsibility
+  boundary is well-drawn.
+
+FINDING: No variant/sum-type discipline
+  Without a discriminated union (std::variant, or a tagged union class
+  hierarchy), every client that switches on Kind must handle all cases
+  or silently fall through. C++ compiler warnings partially mitigate
+  this, but the AST is not self-enforcing.
+
+------------------------------------------------------------------------
+2. CORRECTNESS & SOUNDNESS
+------------------------------------------------------------------------
+
+ISSUE (low severity): Stack overflow on deeply nested ASTs
+  DumpExpr, DumpStmt, and DumpType are all mutually recursive with no
+  depth limit. A source file with 10,000+ consecutive binary operators
+  (e.g. `a + a + a + ... + a`) produces an AST of depth 10,000. The
+  dump routines would stack-overflow before printing anything.
+
+  In practice, compilers stack-overflow during parsing well before
+  dump, but it is a latent issue in test harnesses and fuzzer inputs.
+
+  Recommendation: Add an iteration limit or convert to an iterative
+  DFS using an explicit std::vector stack for dump routines.
+
+ISSUE (very low severity): Unconditional dereference of FieldInit.value
+  In DumpFieldInit:
+
+    DumpExpr(*init.value, stream, indent + 1);
+
+  init.value is a unique_ptr. The parser always assigns it, so in
+  practice this is safe. However, unlike other pointer dereferences in
+  this file (which are all guarded: `if (ptr != nullptr)`), this one
+  is not. If any future codepath produces a FieldInit without an
+  assigned value, the crash has no diagnostic.
+
+  Recommendation: Guard this as `if (init.value != nullptr)`.
+
+------------------------------------------------------------------------
+3. SIMPLICITY & ELEGANCE
+------------------------------------------------------------------------
+
+FINDING: Well-structured dump implementation
+  The DumpXxx pattern is consistent, readable, and easy to follow.
+  Each function handles exactly its node type with no cross-cutting
+  concerns. The use of `using Indent = int;` is a good clarity move.
+
+FINDING: Consistent null-pointer guards
+  All unique_ptr fields are null-checked before dereference except
+  the one noted above. The pattern `if (ptr != nullptr)` before every
+  structured child walk is correct and mechanical.
+
+FINDING: Potential simplification in DumpDecl
+  DumpDecl is 75 lines but entirely mechanical. No simplification is
+  needed; it reflects the flat-struct design.
+
+------------------------------------------------------------------------
+4. SAFETY & ROBUSTNESS
+------------------------------------------------------------------------
+
+FINDING: No memory safety issues in ast.cpp itself
+  The file only reads AST nodes via const references. All heap
+  allocation is managed by unique_ptr in ast.h. No raw pointer
+  ownership.
+
+FINDING: No concurrency safety issues
+  DumpSourceFile is a pure function over a const AST. Thread-safe
+  as written.
+
+FINDING: No I/O safety issues
+  The function returns a std::string (not written to file). Writers in
+  driver.cpp do the file I/O and handle errors there.
+
+------------------------------------------------------------------------
+5. PERFORMANCE & SCALABILITY
+------------------------------------------------------------------------
+
+FINDING: ostringstream append-heavy output
+  Every character of the dump is appended to an ostringstream via
+  operator<<. For typical programs this is fast enough. For programs
+  with many thousands of declarations or expressions, a single large
+  ostringstream allocation beats many small ones.
+
+  For a debug/diagnostic path this is entirely acceptable.
+
+FINDING: Recursive traversal depth
+  See correctness section. The recursive depth is bounded by source
+  expression nesting depth, which is typically shallow in real programs
+  but could be pathological in adversarial or machine-generated input.
+
+------------------------------------------------------------------------
+6. SYSTEM-LEVEL CONCERNS
+------------------------------------------------------------------------
+
+FINDING: ast.h includes no other compiler headers
+  The AST layer is correctly isolated from sema, mir, and backend. No
+  circular dependency risk. The only non-standard header is
+  compiler/support/source_span.h. This is correct layering.
+
+FINDING: Flat-struct design imposes costs on later compiler phases
+  Every sema, MIR-lowering, and backend pass that walks the AST must
+  null-check every optional field and interpret node kinds manually.
+  This is an amplified maintenance cost if the language grows. For a
+  bootstrap with a known exit phase, the trade-off is defensible.
+
+------------------------------------------------------------------------
+7. DOCUMENTATION & REASONING
+------------------------------------------------------------------------
+
+FINDING: Zero comments in ast.h and ast.cpp
+  No field is documented with its intended invariants. The overloaded
+  uses of secondary_text, extra, and the distinction between
+  kBinding/kBindingOrAssign/kVar are not explained.
+
+  Recommended minimum documentation:
+    a) Comment the intended fields per Kind in Expr, Stmt, and Decl.
+    b) Note the secondary_text overloading:
+       "For kLiteral: token kind string. For kQualifiedName: member name."
+    c) Document the DeferredCall / BindingOrAssign resolution mechanism.
+
+------------------------------------------------------------------------
+PRIORITIZED RECOMMENDATIONS
+------------------------------------------------------------------------
+
+CRITICAL / CORRECTNESS
+  (none — no correctness bugs in ast.cpp itself)
+
+ARCHITECTURAL / DESIGN
+  1. [Medium] Document the semantic overloading of secondary_text,
+     extra, left, right, and pattern per-Kind across Expr/Stmt/Decl.
+     Reduces future developer confusion and wrong-field bugs.
+
+  2. [Low] Consider moving toward a more discriminated representation
+     for Expr at least, once the bootstrap is past Phase 5. The flat
+     struct works now but creates compounding costs in all downstream
+     phases.
+
+CORRECTNESS / SAFETY
+  3. [Low] Guard DumpFieldInit's init.value dereference.
+
+  4. [Low] Add a max-depth guard in DumpExpr / DumpStmt to prevent
+     stack overflow on adversarial/fuzzer inputs.
+
+SIMPLIFICATION
+  5. [Informational] secondary_text is a poor name for its dual role.
+     A rename to token_kind_text + member_name, or a union variant,
+     would reduce cognitive load in parser.cpp and sema/check.cpp.

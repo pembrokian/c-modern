@@ -5,6 +5,10 @@
 namespace mc::sema {
 namespace {
 
+bool IsStringBuiltinName(std::string_view name) {
+    return name == "str" || name == "string" || name == "cstr";
+}
+
 std::string RenderExprInline(const ast::Expr& expr);
 
 std::string RenderTypeInline(const ast::TypeExpr& type) {
@@ -111,7 +115,10 @@ std::string RenderExprInline(const ast::Expr& expr) {
 }  // namespace
 
 bool operator==(const Type& left, const Type& right) {
-    return left.kind == right.kind && left.name == right.name && left.metadata == right.metadata && left.subtypes == right.subtypes;
+    const Type canonical_left = CanonicalizeBuiltinType(left);
+    const Type canonical_right = CanonicalizeBuiltinType(right);
+    return canonical_left.kind == canonical_right.kind && canonical_left.name == canonical_right.name &&
+           canonical_left.metadata == canonical_right.metadata && canonical_left.subtypes == canonical_right.subtypes;
 }
 
 bool operator!=(const Type& left, const Type& right) {
@@ -200,10 +207,55 @@ Type NamedOrBuiltinType(std::string_view name) {
     if (name == "bool") {
         return BoolType();
     }
-    if (name == "str" || name == "string" || name == "cstr") {
+    if (IsStringBuiltinName(name)) {
         return StringType();
     }
     return NamedType(std::string(name));
+}
+
+Type CanonicalizeBuiltinType(Type type) {
+    for (auto& subtype : type.subtypes) {
+        subtype = CanonicalizeBuiltinType(std::move(subtype));
+    }
+
+    if (type.kind != Type::Kind::kNamed) {
+        return type;
+    }
+    if (type.name == "bool" && type.subtypes.empty()) {
+        return BoolType();
+    }
+    if (IsStringBuiltinName(type.name) && type.subtypes.empty()) {
+        return StringType();
+    }
+    return type;
+}
+
+std::vector<std::pair<std::string, Type>> BuiltinAggregateFields(const Type& raw_type) {
+    const Type type = CanonicalizeBuiltinType(raw_type);
+    std::vector<std::pair<std::string, Type>> fields;
+    if (type.kind == Type::Kind::kString) {
+        fields.push_back({"ptr", PointerType(NamedType("u8"))});
+        fields.push_back({"len", NamedType("usize")});
+        return fields;
+    }
+    if (type.kind != Type::Kind::kNamed) {
+        return fields;
+    }
+    if (type.name == "Slice") {
+        const Type element_type = type.subtypes.empty() ? UnknownType() : type.subtypes.front();
+        fields.push_back({"ptr", PointerType(element_type)});
+        fields.push_back({"len", NamedType("usize")});
+        return fields;
+    }
+    if (type.name == "Buffer") {
+        const Type element_type = type.subtypes.empty() ? UnknownType() : type.subtypes.front();
+        fields.push_back({"ptr", PointerType(element_type)});
+        fields.push_back({"len", NamedType("usize")});
+        fields.push_back({"cap", NamedType("usize")});
+        fields.push_back({"alloc", PointerType(NamedType("Allocator"))});
+        return fields;
+    }
+    return fields;
 }
 
 Type TypeFromAst(const ast::TypeExpr* type_expr) {
@@ -235,7 +287,8 @@ Type TypeFromAst(const ast::TypeExpr* type_expr) {
 }
 
 std::string FormatType(const Type& type) {
-    switch (type.kind) {
+    const Type canonical = CanonicalizeBuiltinType(type);
+    switch (canonical.kind) {
         case Type::Kind::kUnknown:
             return "unknown";
         case Type::Kind::kVoid:
@@ -251,67 +304,67 @@ std::string FormatType(const Type& type) {
         case Type::Kind::kFloatLiteral:
             return "float_literal";
         case Type::Kind::kNamed: {
-            if (type.subtypes.empty()) {
-                return type.name;
+            if (canonical.subtypes.empty()) {
+                return canonical.name;
             }
 
             std::ostringstream stream;
-            stream << type.name << '<';
-            for (std::size_t index = 0; index < type.subtypes.size(); ++index) {
+            stream << canonical.name << '<';
+            for (std::size_t index = 0; index < canonical.subtypes.size(); ++index) {
                 if (index > 0) {
                     stream << ", ";
                 }
-                stream << FormatType(type.subtypes[index]);
+                stream << FormatType(canonical.subtypes[index]);
             }
             stream << '>';
             return stream.str();
         }
         case Type::Kind::kPointer:
-            return "*" + FormatType(type.subtypes.front());
+            return "*" + FormatType(canonical.subtypes.front());
         case Type::Kind::kConst:
-            return "const " + FormatType(type.subtypes.front());
+            return "const " + FormatType(canonical.subtypes.front());
         case Type::Kind::kArray:
-            return "[" + type.metadata + "]" + FormatType(type.subtypes.front());
+            return "[" + canonical.metadata + "]" + FormatType(canonical.subtypes.front());
         case Type::Kind::kTuple: {
             std::ostringstream stream;
             stream << "tuple<";
-            for (std::size_t index = 0; index < type.subtypes.size(); ++index) {
+            for (std::size_t index = 0; index < canonical.subtypes.size(); ++index) {
                 if (index > 0) {
                     stream << ", ";
                 }
-                stream << FormatType(type.subtypes[index]);
+                stream << FormatType(canonical.subtypes[index]);
             }
             stream << '>';
             return stream.str();
         }
         case Type::Kind::kRange:
-            return "range<" + FormatType(type.subtypes.front()) + ">";
+            return "range<" + FormatType(canonical.subtypes.front()) + ">";
         case Type::Kind::kProcedure: {
             std::size_t param_count = 0;
-            if (!type.metadata.empty()) {
-                param_count = static_cast<std::size_t>(std::stoul(type.metadata));
+            if (!canonical.metadata.empty()) {
+                param_count = static_cast<std::size_t>(std::stoul(canonical.metadata));
             }
             std::ostringstream stream;
             stream << "proc(";
-            for (std::size_t index = 0; index < param_count && index < type.subtypes.size(); ++index) {
+            for (std::size_t index = 0; index < param_count && index < canonical.subtypes.size(); ++index) {
                 if (index > 0) {
                     stream << ", ";
                 }
-                stream << FormatType(type.subtypes[index]);
+                stream << FormatType(canonical.subtypes[index]);
             }
             stream << ")";
-            const std::size_t return_count = type.subtypes.size() >= param_count ? type.subtypes.size() - param_count : 0;
+            const std::size_t return_count = canonical.subtypes.size() >= param_count ? canonical.subtypes.size() - param_count : 0;
             if (return_count == 0) {
                 stream << "->void";
             } else if (return_count == 1) {
-                stream << "->" << FormatType(type.subtypes[param_count]);
+                stream << "->" << FormatType(canonical.subtypes[param_count]);
             } else {
                 stream << "->tuple<";
                 for (std::size_t index = 0; index < return_count; ++index) {
                     if (index > 0) {
                         stream << ", ";
                     }
-                    stream << FormatType(type.subtypes[param_count + index]);
+                    stream << FormatType(canonical.subtypes[param_count + index]);
                 }
                 stream << '>';
             }

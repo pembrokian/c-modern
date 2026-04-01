@@ -34,3 +34,20 @@ Consequence:
 - ordinary `foo(x)` remains expression-call syntax only
 - bare named forms like `UserId(x)` are not conversion syntax in v0.2
 - MIR lowering still classifies conversions semantically, but the frontend no longer depends on a bare-name conversion fallback
+
+2. Builtin Aggregate Ownership
+
+Decision:
+- Builtin aggregate shapes are owned by the semantic type layer, not redefined independently in MIR or LLVM lowering.
+- The canonical builtin aggregates are `string`, `Slice<T>`, and `Buffer<T>`.
+- Surface spellings like `str`, `string`, and `cstr` normalize through sema type canonicalization before later phases consume them.
+
+Why:
+- keeps builtin field/layout rules in one place instead of duplicating `ptr`/`len`/`cap`/`alloc` knowledge across sema, MIR, and backend code
+- prevents drift where one layer treats string-like spellings as equivalent and another treats them as distinct
+- makes aggregate init, field access, and executable lowering consume the same contract
+
+Consequence:
+- MIR validation and LLVM lowering must consult semantic builtin aggregate metadata instead of carrying private tables
+- new builtin aggregate behavior should be added in sema type helpers first, then consumed downstream
+- executable support for aggregate field/index effects depends on this normalized sema-owned metadata rather than source spelling

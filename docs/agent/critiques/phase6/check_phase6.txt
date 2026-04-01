@@ -1,0 +1,365 @@
+================================================================
+ARCHITECTURAL & QUALITY REVIEW — compiler/sema/check.cpp
+Phase 6 Deep Review
+================================================================
+
+FILE REVIEWED
+  compiler/sema/check.cpp   (~1950 lines)
+
+------------------------------------------------------------------------
+1. DESIGN & ARCHITECTURE
+------------------------------------------------------------------------
+
+FINDING: Monolithic Checker class — correct but wide responsibility
+  The Checker class (~1300 lines) handles name resolution, type
+  inference, layout computation, import seeding, global validation,
+  function body checking, and diagnostic emission — all in one class.
+
+  This is understandable for a bootstrap, but there are cases where
+  the entanglement creates subtle ordering dependencies:
+
+    - SeedImportedSymbols() must run before CollectTopLevelDecls()
+    - CollectTopLevelDecls() must run before ValidateFunctions()
+    - function_map_ and type_map_ are populated at the end of
+      CollectTopLevelDecls(), not in the constructor — callers of
+      FindFunctionSignature / FindTypeDecl before that point would get
+      null results with no diagnostic
+
+  These phase dependencies are implicit. If Run() ordering is ever
+  changed (by mistake or refactor), failures are silent.
+
+  Recommendation: At minimum, document the required call order in
+  comments on Run(). Long-term, each phase can be a named method
+  called explicitly and its preconditions enforced.
+
+FINDING: Dual-mode operation via nullable imported_modules_ pointer
+  CheckProgram (called with imports) and CheckSourceFile (called
+  without) both create a Checker, but CheckSourceFile passes nullptr
+  as imported_modules_. This means FindImportedModule() returns nullptr
+  silently, and SeedImportedSymbols() becomes a no-op.
+
+  The dual mode is well-implemented, but the distinction is invisible
+  to a reader of the Checker class. The pointer-as-boolean design is
+  subtle.
+
+  Recommendation: Use an explicit enum or overload to distinguish
+  the two modes. The nullptr-as-absent pattern is correct C++ but
+  reduces readability.
+
+FINDING: SpanKey as map key is fragile
+  RecordExprType and RecordBindingOrAssignFact key their maps by:
+
+    std::to_string(span.begin.line) + ":" + std::to_string(span.begin.column)
+    + "-" + std::to_string(span.end.line) + ":" + std::to_string(span.end.column)
+
+  This has several concerns:
+
+    1. Key collisions: two expressions at the same source position
+       (impossible in normal source, but possible in synthetic ASTs
+       or macro-expanded code in a future language version) would
+       silently overwrite each other's type information.
+
+    2. String allocation: every RecordExprType call allocates a
+       std::string key. For a source file with N expressions, this
+       creates N heap allocations. For large files with thousands
+       of expressions, this is measurable.
+
+    3. Already solved: the AST nodes have unique_ptr identity. Keying
+       by node address (reinterpret_cast<uintptr_t>(node)) would be
+       O(1) with no collision risk. The span-key approach was presumably
+       chosen to allow post-lowering lookup by span, but this should
+       be documented.
+
+  Recommendation: Document why span-based keys are used instead of
+  pointer keys. If post-lowering span-based querying is actually needed,
+  comment that invariant.
+
+FINDING: O(n) linear scans for symbol lookup
+  FindTypeDecl, FindFunctionSignature, FindGlobalSummary all iterate
+  over the module's type_decls, functions, and globals vectors linearly.
+  The Checker does populate function_map_ and type_map_ after
+  CollectTopLevelDecls(), but:
+
+    a) These cache maps are not used by all lookup paths:
+       FindTypeDecl(module, name) is the free function, not the cache.
+       The cache only exists in the Checker's internal method pointers.
+
+    b) The free functions FindTypeDecl / FindFunctionSignature /
+       FindGlobalSummary (at file bottom) are used by MIR lowering and
+       other callers, and they all do O(n) scans.
+
+  For large modules with hundreds of types or functions, every type
+  check or call resolution is O(n), making the full checker O(n²).
+  This is acceptable at bootstrap scale but will become limiting.
+
+FINDING: Import rewriting creates deep module copies
+  CheckProgramInternal calls RewriteImportedModuleSurfaceTypes which
+  shallow-copies the entire imported module and rewrites every type
+  name in every function signature, struct field, and global. For
+  modules with many types and functions, this is expensive and allocates
+  substantially.
+
+  Combined with the fact that SeedImportedSymbols() also calls
+  RewriteImportedTypeDecl again for each type, some type entries are
+  rewritten twice.
+
+FINDING: Duplication in AnalyzeExpr
+  The kQualifiedName case duplicates Slice/Buffer field access logic
+  with the kField/kDerefField cases. The identical code block:
+
+    if (base.name == "Slice" || base.name == "Buffer") {
+      if (expr.text == "ptr") return PointerType(base.subtypes.front());
+      if (expr.text == "len") return NamedType("usize");
+      ...
+    }
+
+  appears three times: once for kQualifiedName locals, once for kField,
+  and partially for kQualifiedName globals. This triplication requires
+  three synchronized edits whenever Slice/Buffer fields change.
+
+  Recommendation: Extract a helper:
+    Type AnalyzeBuiltinFieldAccess(const Type& base, std::string_view field)
+
+------------------------------------------------------------------------
+2. CORRECTNESS & SOUNDNESS
+------------------------------------------------------------------------
+
+BUG (medium severity): Unguarded std::stoul in ProcedureParamCount
+  ProcedureParamCount calls:
+
+    return static_cast<std::size_t>(std::stoul(type.metadata));
+
+  std::stoul throws std::invalid_argument if metadata is not a valid
+  number, and std::out_of_range if it overflows. Neither exception is
+  caught. In production, metadata is always a small integer written by
+  ProcedureType(). But if MIR lowering ever creates a procedure type
+  with corrupted metadata (e.g. in a error-recovery path), this
+  becomes an uncaught exception that terminates the compiler process
+  rather than emitting a diagnostic.
+
+  Recommendation:
+    try { return std::stoull(type.metadata); }
+    catch (...) { return 0; }
+  or use a safe integer parse (strtoull with error checking).
+
+ISSUE (low severity): Cascade from cached CheckProgramInternal
+  If a file has errors and its result is cached in exported_cache,
+  a second caller importing it would re-use the cached (partially
+  valid) module. The ok flag comes from `!diagnostics.HasErrors()`
+  which is global across all files. First-file errors propagate as
+  failures in second-file lookups even if the second import is unrelated
+  to the first error.
+
+  In practice, compilation stops on first-file errors, but in a
+  scenario with multiple entry files or parallel compilation, this is
+  a silent data correctness issue.
+
+ISSUE (low severity): QualifiedName lookup order shadowing
+  In AnalyzeExpr for kQualifiedName, the lookup order is:
+    1. Local value of expr.text
+    2. Global symbol of expr.text
+    3. Imported module of expr.text
+    4. Qualified function name (module.function)
+    5. Enum variant (type.variant)
+
+  If a local variable is named the same as an imported module (e.g.,
+  `io := io.open(...)` where `io` is both a local and a module name),
+  the local shadows the module and the module access `io.write` fails
+  with "type X has no field named write", not "name io shadows module
+  io". The error message is misleading.
+
+  Recommendation: Detect the specific case where a local name shadows
+  a module name and emit a more precise diagnostic.
+
+ISSUE (low severity): Missing return analysis
+  CheckReturn verifies return value count and types. But there is no
+  analysis that all control-flow paths through a function body end
+  with a return. A function with an `if` branch that returns and an
+  else branch that falls through will silently compile. The MIR
+  lowerer catches this later ("missing explicit return"), but sema
+  could catch it earlier with better diagnostics.
+
+ISSUE (informational): No enforcement of const binding immutability
+  BindValue stores `is_mutable = false` for const bindings. But
+  CheckAssignableTarget only checks is_mutable for kName expressions.
+  For a compound target like `point.x = 1` where `point` is a const
+  binding, AnalyzeExpr(point) is called (which doesn't touch
+  CheckAssignableTarget) and the assignment to `.x` is silently
+  permitted at the sema level. The MIR validator may not catch this
+  either.
+
+  Recommendation: When checking kField/kDerefField/kIndex assignment
+  targets, trace back to the root identifier and verify its mutability.
+
+------------------------------------------------------------------------
+3. SIMPLICITY & ELEGANCE
+------------------------------------------------------------------------
+
+FINDING: AnalyzeExpr is a 400-line function
+  The single AnalyzeExpr function handles all expression kinds. While
+  each case is fairly short, the aggregate is hard to navigate. The
+  kQualifiedName case alone is ~100 lines.
+
+  Breaking this into AnalyzeBinaryExpr, AnalyzeCallExpr,
+  AnalyzeFieldAccess, AnalyzeIndexExpr, etc. would make each path
+  individually testable and easier to reason about.
+
+FINDING: MergeNumericTypes has 7 cases
+  The function can be simplified by normalizing:
+    If either side is Unknown -> return Unknown
+    If both sides equal -> return either
+    If one side is Named (integer/float) and the other is the
+    corresponding literal kind -> return the Named side
+    If left is FloatLiteral, right is IntLiteral -> return FloatLiteral
+    Otherwise -> Unknown
+
+  The current 7-case linear chain is correct but not systematic.
+  Introducing a "promotion priority" ordering would make the logic
+  table-driven and extensible.
+
+FINDING: SameSpan is defined but only used in SpanKey
+  SameSpan is a helper that compares two SourceSpans. It's used
+  nowhere in check.cpp (SpanKey is used instead). This is dead code.
+  SpanKey itself should either document why span-equality suffices, or
+  SameSpan should be removed.
+
+------------------------------------------------------------------------
+4. SAFETY & ROBUSTNESS
+------------------------------------------------------------------------
+
+FINDING: stoul exception — see Correctness section above.
+
+FINDING: function_map_ holds raw pointers into module_->functions
+  function_map_[name] = &function; stores a raw pointer into the
+  functions vector. If module_->functions is subsequently appended to
+  (which doesn't happen after CollectTopLevelDecls), the pointer would
+  be invalidated. This is currently safe because no functions are
+  added after the map is built, but the implicit contract is fragile.
+
+  Recommendation: Store indices instead of pointers, or use a
+  std::unordered_map that holds copies of signatures.
+
+FINDING: type_map_ has the same issue for type_decls.
+
+FINDING: Cycle detection in ComputeTypeLayout
+  active_types is an insertion-checked set. On a cycle, the function
+  reports an error and returns {}. After the early return,
+  `active_types.erase(type_decl->name)` is not called, which means
+  active_types contains a stale entry. Since each call to
+  ComputeTypeLayouts() clears active_types between type_decls, this
+  doesn't corrupt subsequent types — but it's a subtle invariant.
+
+  The correct fix is:
+    if (!active_types.insert(type_decl->name).second) {
+      Report(...);
+      return {};
+    }
+    // ... compute layout ...
+    active_types.erase(type_decl->name);  // always reached
+
+------------------------------------------------------------------------
+5. PERFORMANCE & SCALABILITY
+------------------------------------------------------------------------
+
+FINDING: O(n²) symbol lookup
+  (see Design section — FindTypeDecl, FindFunctionSignature,
+  FindGlobalSummary are all O(n) linear scans)
+
+FINDING: SpanKey allocates one std::string per expression
+  A source file with 10,000 expressions allocates 10,000 string keys
+  just for the expr_type_indices map. A compact representation (e.g.,
+  encoding line/col as a packed uint64_t) would reduce this to zero
+  allocations per lookup.
+
+FINDING: RewriteImportedModuleSurfaceTypes is called once per import
+  per importer. For N files each importing M modules, this is O(N*M)
+  copies of the surface module. In a stdlib-heavy project (many small
+  files importing many modules), this could dominate compile time.
+
+  Recommendation: Cache the rewritten surface module indexed by
+  (import_path, module_name) pair.
+
+------------------------------------------------------------------------
+6. SYSTEM-LEVEL CONCERNS
+------------------------------------------------------------------------
+
+FINDING: Duplicate import path resolution
+  check.cpp and driver.cpp each contain their own ResolveImportPath
+  function with the same logic. If the resolution algorithm diverges,
+  imports will resolve differently in `check` vs `build` mode.
+
+  Recommendation: Move ResolveImportPath into compiler/support/ or
+  into the CheckOptions struct as a strategy callback, ensuring one
+  authoritative implementation.
+
+FINDING: check.cpp directly parses and re-reads files
+  ParseFile in check.cpp (used during import checking) reads source
+  text with std::ifstream directly. The driver has a SourceManager
+  that should be the canonical owner of loaded source files, but sema
+  bypasses it entirely. This means source file contents are loaded
+  twice for imported modules (once in sema, once in the driver's
+  CollectBuildUnits).
+
+FINDING: UTF-8 and encoding
+  check.cpp reads source files and passes them to the lexer as raw
+  bytes. There is no encoding check. A source file with a UTF-16 BOM
+  or Windows line endings (\r\n) could produce confused line/column
+  numbers in diagnostics.
+
+------------------------------------------------------------------------
+7. DOCUMENTATION & REASONING
+------------------------------------------------------------------------
+
+FINDING: No explanatory comments
+  The Checker class has zero doc comments. The run order requirement
+  for SeedImportedSymbols -> CollectTopLevelDecls -> ValidateFunctions
+  is invisible to a reader. The purpose of the two-level "value_symbols_
+  for top-level names" + "global_symbols_ for type info" split is not
+  documented.
+
+FINDING: span-key rationale not documented
+  The reason SpanKey (string from source positions) is used instead of
+  node-pointer keying is not documented. This is a significant
+  architectural decision that future maintainers will question.
+
+------------------------------------------------------------------------
+PRIORITIZED RECOMMENDATIONS
+------------------------------------------------------------------------
+
+CRITICAL / CORRECTNESS
+  1. [High] Fix unguarded std::stoul in ProcedureParamCount. Wrap in
+     try/catch or use a safe integer parse helper. This is a process-
+     terminating exception in a misuse case that should be a diagnostic.
+
+  2. [Medium] Verify that const-binding immutability is enforced for
+     compound assignment targets (field/index access). Currently, const
+     structs can have their fields reassigned via kField targets.
+
+ARCHITECTURAL / DESIGN
+  3. [Medium] Extract the repeated Slice/Buffer field-access logic in
+     AnalyzeExpr into a dedicated helper function. Three copies must
+     stay in sync.
+
+  4. [Medium] Document the Checker's phase ordering requirement and
+     the purpose of function_map_ / type_map_ caches.
+
+  5. [Medium] Consolidate ResolveImportPath between check.cpp and
+     driver.cpp to a single authoritative implementation in support/.
+
+CORRECTNESS / SAFETY
+  6. [Low] Fix active_types not being erased after early return in
+     ComputeTypeLayout (cycle detection).
+
+  7. [Low] Document the SpanKey architecture decision. Consider using
+     node-pointer keys if post-lowering span-based lookup is not needed.
+
+PERFORMANCE
+  8. [Low] Replace SpanKey string allocation with a packed uint64_t
+     encoding of (begin_line << 20 | begin_col) for the common case.
+
+  9. [Low] Move RewriteImportedModuleSurfaceTypes result into an
+     import-level cache to avoid redundant rewrites.
+
+SIMPLICITY
+  10. [Informational] Break AnalyzeExpr into per-expression-kind helpers
+      to make each path independently navigable and testable.

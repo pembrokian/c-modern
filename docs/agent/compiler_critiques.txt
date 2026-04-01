@@ -1,0 +1,24 @@
+You are now acting as a senior compiler systems engineer with decades of experience building real-world compilers and language runtimes, including both monolithic and microkernel-level systems.
+
+Your task is to perform a deep architectural and quality review of the following source file(s): asp.cpp, check.cpp, parser.cpp, mir.cpp, driver.cpp, backend.cpp, 
+
+Your review should go beyond surface-level code critique. Focus on overall design, correctness, simplicity, maintainability, and robustness, with attention to principles of compiler construction and system-level programming.
+
+For each file, provide:
+    1.  Design & Architecture – Assess whether the structure and interactions in the file reflect sound compiler design. Consider modularity, separation of concerns, and clarity of abstraction. Are there hidden dependencies, coupling issues, or violations of single responsibility principles?
+    2.  Correctness & Soundness – Identify potential semantic bugs, undefined behavior, or edge cases that could cause incorrect compilation results. Evaluate assumptions in the code and whether they hold in real-world compiler workloads.
+    3.  Simplicity & Elegance – Highlight complexity or over-engineering. Suggest simplifications that preserve correctness and robustness. Evaluate naming, flow, and clarity of logic for maintainability by future developers.
+    4.  Safety & Robustness – Examine memory safety, concurrency safety, and error handling. Identify risky pointer usage, unsafe casts, or unhandled exceptions. Recommend more robust patterns if appropriate.
+    5.  Performance & Scalability – Analyze potential bottlenecks, unnecessary copies, expensive operations, or recursive patterns that could blow the stack or hurt compile-time. Consider worst-case behavior and scalability to large codebases.
+    6.  System-Level Concerns – Check for implications on runtime systems, interaction with other compiler components, and consistency with common compiler design principles. Consider maintainability in the context of long-lived compiler projects.
+    7.  Documentation & Reasoning – Assess whether code is self-explanatory, well-commented, and if the rationale behind design decisions is clear.
+
+After reviewing each file, produce a prioritized summary of recommendations, including:
+    •   Critical correctness or safety issues
+    •   Architectural or design improvements
+    •   Simplification and maintainability suggestions
+    •   Optional performance optimizations
+
+Important: Justify each point clearly. Where possible, suggest concrete alternative implementations or patterns that would improve correctness, simplicity, robustness, and maintainability. Think like a compiler expert who cares about both theory and practical system-level constraints.
+
+for each of the files provided, output your review as a separate file called [file_name]_[phase].txt in docs/agent/critiques/

@@ -1,0 +1,354 @@
+================================================================
+ARCHITECTURAL & QUALITY REVIEW — compiler/driver/driver.cpp
+Phase 6 Deep Review
+================================================================
+
+FILE REVIEWED
+  compiler/driver/driver.cpp   (~760 lines)
+
+------------------------------------------------------------------------
+1. DESIGN & ARCHITECTURE
+------------------------------------------------------------------------
+
+FINDING: CompileToMir carries a boolean that bifurcates its behavior
+  CompileToMir accepts an `include_imports_for_build` boolean that
+  fundamentally changes what the function does:
+
+    false → compile entry file only, produce MIR for that file
+    true  → compile entry file AND recursively collect all imported
+             modules, merge them, produce a combined MIR unit
+
+  A single function that performs two conceptually different operations
+  based on a boolean is a design smell. The caller cannot easily read
+  the intent:
+
+    CompileToMir(opts, path, diagnostics, true)   // does a lot more
+
+  Recommendation: Split into CompileOneUnit and CompileMergedBuild,
+  making the two code paths explicit at the call site in RunCheck
+  and RunBuild respectively.
+
+FINDING: Entry file is compiled twice when building a full binary
+  In RunBuild, `CompileToMir(include_imports_for_build=true)` is called.
+  Inside that path, `CollectBuildUnits` walks the import graph and
+  compiles all transitive imports. But the entry file itself is
+  compiled once at the top of CompileToMir (building the "root" unit)
+  and is then likely encountered again in CollectBuildUnits when
+  imports reference it.
+
+  The `built_indices` deduplication table in CollectBuildUnits uses
+  the canonical file path as the key and prevents re-compilation of
+  imports. However, EntrySourcePath is not inserted into built_indices
+  before CollectBuildUnits is called — it is compiled unconditionally
+  at the start of CompileToMir. This means the entry file's full
+  pipeline (lex → parse → sema → MIR) runs twice.
+
+  Recommendation: Seed built_indices with the entry path before
+  calling CollectBuildUnits to prevent the double compilation.
+
+FINDING: NamespaceImportedBuildUnit is an O(n·m) post-processing pass
+  After collecting all build units, MergeBuildUnits calls
+  NamespaceImportedBuildUnit on every non-entry module. This function
+  walks every instruction in every block of every function, rewriting
+  all name references to be module-qualified.
+
+  The cost is O(I) per module where I is the total instruction count
+  in that module. For N modules merged together, the total cost is
+  O(N · I_max). For large builds with many imported modules, this
+  could be significant.
+
+  This post-processing step exists because MIR lowering emits
+  unqualified names, and qualification happens only at merge time.
+  An alternative is for MIR lowering to emit qualified names from
+  the start (using the module namespace as a prefix), which would
+  eliminate the post-processing pass entirely.
+
+FINDING: Module namespace derived from file stem() — silent collision risk
+  In MergeBuildUnits and NamespaceImportedBuildUnit, the module
+  namespace is derived from `path.stem()` — the filename without
+  extension. Two files with the same stem in different directories
+  (e.g., `utils/io.mc` and `platform/io.mc`) would produce the
+  same namespace "io", causing imports to collide silently.
+
+  In the current test suite, all module files have unique stems,
+  so this is latent rather than active. However, any real project
+  with a standard naming convention (multiple `types.mc`, `utils.mc`,
+  `config.mc` files in different directories) would hit this.
+
+  Recommendation: Use the path relative to the repo root as the
+  module namespace, or use the explicit module declaration name
+  (if the language supports one).
+
+FINDING: ResolveImportPath is duplicated between check.cpp and driver.cpp
+  Both check.cpp and driver.cpp contain functionally identical
+  ResolveImportPath functions. They perform the same logic:
+    1. Try the import name relative to the source file directory.
+    2. Try the import name relative to the stdlib directory.
+
+  This is a DRY violation. If the search order changes (e.g., adding
+  a third lookup path), it must be updated in both files.
+
+  Recommendation: Move ResolveImportPath to compiler/support/ and
+  use it from both callers. The function only depends on filesystem
+  operations and the import name — no sema state.
+
+FINDING: DiscoverRepositoryRoot uses heuristic directory probing
+  DiscoverRepositoryRoot walks upward from the binary's location
+  looking for a directory that contains both `stdlib/` and `runtime/`.
+  This probing is reasonable for a bootstrap compiler run from the
+  repo tree, but it fails for:
+
+    - Installed builds where stdlib is in a system directory
+    - CI builds where the repo root is not the parent of the binary
+    - Invocations from symlinks
+
+  Recommendation: Accept an optional `--repo-root` flag or use a
+  compile-time constant (CMake-defined macro) for the repo path in
+  CMake builds.
+
+FINDING: include_imports_for_build path also compiles the root entry file inline
+  Before calling CollectBuildUnits, the entry source is compiled to
+  MIR as the "root" build unit. CollectBuildUnits then traverses
+  its imports. The root unit's MIR is stored independently and merged
+  last. This ordering is intentional (root unit goes into position 0
+  in the merged result), but it means that if the entry file has an
+  import that transitively imports itself (a cycle), the cycle
+  detection in CollectBuildUnits would not catch it (since the entry
+  file is not in the visited set yet).
+
+  In practice, import cycles are caught by sema (via check.cpp's
+  VisitState mechanism), before MIR lowering. So this is harmless
+  in well-formed inputs. But it is an invisible assumption.
+
+------------------------------------------------------------------------
+2. CORRECTNESS & SOUNDNESS
+------------------------------------------------------------------------
+
+FINDING: CollectBuildUnits correctly handles import cycles
+  The VisitState::kVisiting / kDone pattern correctly detects cycles.
+  When a cycle is detected, the function records a diagnostic and
+  returns false, and the caller (CollectBuildUnits recursion) unwinds
+  cleanly. Since built_indices uses canonical paths, cycles are
+  detected even across relative/absolute path combinations that
+  refer to the same file.
+
+FINDING: MergeBuildUnits applies NamespaceImportedBuildUnit only to non-root modules
+  The root module (entry source) retains its unqualified names.
+  Imported modules get their names prefixed. This is correct because
+  the root module calls imported symbols via qualified names (as
+  assigned by sema), and imported modules have their own internal
+  references qualify themselves.
+
+FINDING: WriteTextArtifact creates parent directories
+  If the requested artifact path is under a directory that does not
+  exist (e.g., `--dump-mir build/debug/dumps/foo/main.mir`), the
+  function calls `create_directories` first. This is correct and
+  prevents the ofstream from silently failing.
+
+FINDING: ParseCommandOptions does not reject unknown flags
+  Any argument starting with `--` that is not recognized is silently
+  ignored. Unknown flags produce no warning. A user who misspells
+  `--dump-mir` as `--dump_mir` would get no output and no error.
+
+  Recommendation: Emit a warning for unrecognized `--` options, or
+  collect unrecognized options and reject them at the end of parsing.
+
+FINDING: kBootstrapTriple is a compile-time constant with no CLI override
+  The build target triple is compiled into the binary. There is no
+  `--target` flag. This means the bootstrap compiler can only produce
+  code for the triple it was compiled for. Cross-compilation is not
+  possible from the CLI.
+
+  This is appropriate for a bootstrap compiler (you always build on
+  the target machine), but it should be explicitly documented.
+
+FINDING: BuildExecutable invokes external tools via system() or fork/exec
+  The BuildExecutable function (if using system()) is vulnerable to
+  shell injection if any of the arguments contain shell metacharacters.
+  In a bootstrap, the arguments are compiler-generated paths and
+  not user-controlled at runtime, so this is low risk in practice.
+  Still, `posix_spawn` or `execvp` with explicitly-separated arguments
+  is safer than constructing a command string.
+
+------------------------------------------------------------------------
+3. SIMPLICITY & ELEGANCE
+------------------------------------------------------------------------
+
+FINDING: RunCheck and RunBuild share a large preamble
+  Both RunCheck and RunBuild:
+    - Parse command options
+    - Call CompileToMir (with different flags)
+    - Check for diagnostics
+    - Write artifacts
+
+  The shared structure could be extracted into a "compile pipeline"
+  function, with RunCheck and RunBuild differing only in the mode
+  passed to it. This would reduce the combined 200-line size of both.
+
+FINDING: CompileToMir -> CollectBuildUnits -> MergeBuildUnits flow is clear
+  The three-phase "compile root → collect imports → merge" is
+  straightforward to trace from RunBuild. The naming is clear and
+  the phases are sequential. This is the cleanest part of the driver.
+
+FINDING: WriteTextArtifact is clean and reusable
+  Accepts a path and content string. Creates directories, writes file,
+  returns success. No surprising behavior. Good.
+
+FINDING: DiagnosticSink scoping
+  Each RunCheck/RunBuild call creates a local DiagnosticSink. The sink
+  accumulates errors across all pipeline stages. On any error, the
+  sink is rendered and returned as a failure. This is a clean
+  error-accumulation model. No global error state.
+
+------------------------------------------------------------------------
+4. SAFETY & ROBUSTNESS
+------------------------------------------------------------------------
+
+FINDING: sys/wait.h ties the driver to Unix
+  The use of sys/wait.h (for waitpid after fork/exec in BuildExecutable)
+  limits the driver to POSIX platforms. Windows would require a
+  completely different implementation of the linker invocation.
+
+  For a bootstrap targeting macOS arm64 only, this is acceptable.
+  It should be documented.
+
+FINDING: Relative kHostedRuntimeSupportPath in backend
+  The runtime C support file path is relative:
+    "runtime/hosted/mc_hosted_runtime.c"
+
+  This path is resolved relative to the current working directory,
+  not relative to the compiler binary or the discovered repo root.
+  If the driver is invoked from outside the repo root, the build
+  would fail with a file-not-found error. The error message from the
+  assembler will be opaque.
+
+  Recommendation: Resolve kHostedRuntimeSupportPath relative to
+  the value returned by DiscoverRepositoryRoot instead of relying
+  on the CWD.
+
+FINDING: VisitState map uses std::string keys (canonical paths)
+  By canonicalizing paths with `canonical(p)` before using them as
+  map keys, the cycle detection and deduplication are robust against
+  symlinks and relative paths resolving to the same file.
+
+FINDING: All build units held in memory simultaneously
+  CollectBuildUnits appends every compiled module to a vector in
+  memory. For a large project with many modules, all MIR for all
+  modules is live at once before MergeBuildUnits runs. This is
+  appropriate for the bootstrap scale but would not scale to large
+  codebases.
+
+  A streaming merge (produce MIR for one module, stream into merged
+  result, release the module-local MIR) would reduce peak memory.
+
+------------------------------------------------------------------------
+5. PERFORMANCE & SCALABILITY
+------------------------------------------------------------------------
+
+FINDING: Double compilation of the entry source file
+  (See Design section — entry file compiled in CompileToMir and
+  again implicitly via CollectBuildUnits if not guarded by built_indices)
+
+FINDING: NamespaceImportedBuildUnit walks all instructions
+  O(N · I) where N = module count, I = instructions per module.
+  For 20 modules of 500 instructions each, this is 10,000 instruction
+  walks just for namespacing. This is fine at bootstrap scale but
+  could be improved by emitting qualified names at lowering time.
+
+FINDING: All of sema, AST, and MIR are in memory simultaneously per module
+  For each module, the pipeline proceeds: lex → parse (AST) → sema
+  → MIR. The AST and sema artifacts are typically not released before
+  MIR emission is complete. For very large source files, this could
+  hold 2–3x the information in memory simultaneously. This is a
+  bootstrap-acceptable trade-off.
+
+------------------------------------------------------------------------
+6. SYSTEM-LEVEL CONCERNS
+------------------------------------------------------------------------
+
+FINDING: No cross-compilation support from CLI
+  kBootstrapTriple is hardcoded. No --target flag, no per-build
+  triple configuration. This is by design for the bootstrap but
+  should be documented.
+
+FINDING: BinaryPath discovery is fragile for installed builds
+  DiscoverRepositoryRoot uses the binary's parent directory path
+  and walks up to find a stdlib/ directory. This ties the compiler
+  to a specific layout relative to the binary. An installed compiler
+  (where the binary is in /usr/local/bin and stdlib is in
+  /usr/local/lib/mc/) would not work.
+
+FINDING: Import search paths are not configurable
+  There is no `-I` flag for custom include paths. The import search
+  is: (1) relative to source file, (2) stdlib. Any third-party
+  library or out-of-tree import will fail to resolve. A `--import-path`
+  flag would be needed for non-trivial use cases.
+
+FINDING: Driver does not log what it is doing unless --verbose
+  Without a verbose flag, the driver silently succeeds. For debugging
+  build issues (wrong import resolved, wrong output path), there's
+  no way to inspect the search path decisions without adding trace
+  statements.
+
+  Recommendation: Add a `--verbose` flag that prints: discovered repo
+  root, resolved import paths, merge order, artifact output paths.
+
+------------------------------------------------------------------------
+7. DOCUMENTATION & REASONING
+------------------------------------------------------------------------
+
+FINDING: The distinction between RunCheck and RunBuild is not documented
+  It is not obvious from reading RunCheck/RunBuild why one produces
+  only semantic artifacts and the other produces a binary. A top-level
+  comment per function explaining its entry-point contract would help.
+
+FINDING: include_imports_for_build flag intent is unexplained
+  The boolean parameter has no comment explaining why it exists as
+  a parameter (rather than two functions), what happens when true
+  vs. false, and why CollectBuildUnits is not called from the root
+  level of RunCheck.
+
+FINDING: CollectBuildUnits recursion is clear but the deduplication
+  mechanism (built_indices) is not explained. The interaction between
+  built_indices (indexed by canonical path) and VisitState (also by
+  canonical path) could be confusing.
+
+------------------------------------------------------------------------
+PRIORITIZED RECOMMENDATIONS
+------------------------------------------------------------------------
+
+CORRECTNESS / SAFETY
+  1. [High] Fix double compilation of the entry source file. Seed
+     built_indices with the entry path before calling CollectBuildUnits.
+
+  2. [Medium] Replace or audit the BuildExecutable system() call for
+     shell injection safety. Use posix_spawn with an explicit argv
+     array instead of a shell-expanded command string.
+
+  3. [Low] Diagnose unknown CLI flags rather than silently ignoring them.
+
+ARCHITECTURAL / DESIGN
+  4. [High] Split CompileToMir into CompileOneUnit and CompileMergedBuild.
+     Remove the include_imports_for_build boolean parameter.
+
+  5. [Medium] Move ResolveImportPath to compiler/support/ and use it
+     from both check.cpp and driver.cpp. Eliminates the DRY violation.
+
+  6. [Medium] Resolve kHostedRuntimeSupportPath relative to the
+     discovered repo root rather than the CWD.
+
+  7. [Medium] Add a --verbose / --import-path flag for build debugging
+     and third-party import support.
+
+CORRECTNESS
+  8. [Medium] Fix module namespace collision: use path-relative-to-repo
+     as the module namespace instead of file stem(). Two files named
+     utils.mc in different directories currently collide.
+
+  9. [Low] Accept DiscoverRepositoryRoot failure gracefully with a
+     clear error message rather than producing downstream file-not-
+     found failures during the link step.
+
+PERFORMANCE
+  10. [Low] Consider emitting module-qualified names from MIR lowering
+      to eliminate the NamespaceImportedBuildUnit post-processing pass.

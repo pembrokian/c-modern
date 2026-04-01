@@ -393,41 +393,14 @@ bool IsUintPtrType(const sema::Type& type) {
 }
 
 bool IsBuiltinNamedNonAggregate(const sema::Type& type) {
-    if (type.kind == sema::Type::Kind::kBool || type.kind == sema::Type::Kind::kString) {
+    const sema::Type canonical = sema::CanonicalizeBuiltinType(type);
+    if (canonical.kind == sema::Type::Kind::kBool || canonical.kind == sema::Type::Kind::kString) {
         return true;
     }
-    if (type.kind != sema::Type::Kind::kNamed) {
+    if (canonical.kind != sema::Type::Kind::kNamed) {
         return false;
     }
-    return IsIntegerType(type) || IsFloatType(type) || type.name == "bool" || type.name == "string" || type.name == "str" || type.name == "cstr";
-}
-
-std::vector<std::pair<std::string, sema::Type>> BuiltinAggregateFields(const sema::Type& type) {
-    std::vector<std::pair<std::string, sema::Type>> fields;
-    if (type.kind == sema::Type::Kind::kString ||
-        (type.kind == sema::Type::Kind::kNamed && (type.name == "str" || type.name == "string" || type.name == "cstr"))) {
-        fields.push_back({"ptr", sema::PointerType(sema::NamedType("u8"))});
-        fields.push_back({"len", sema::NamedType("usize")});
-        return fields;
-    }
-    if (type.kind != sema::Type::Kind::kNamed) {
-        return fields;
-    }
-    if (type.name == "Slice") {
-        const sema::Type element_type = type.subtypes.empty() ? sema::UnknownType() : type.subtypes.front();
-        fields.push_back({"ptr", sema::PointerType(element_type)});
-        fields.push_back({"len", sema::NamedType("usize")});
-        return fields;
-    }
-    if (type.name == "Buffer") {
-        const sema::Type element_type = type.subtypes.empty() ? sema::UnknownType() : type.subtypes.front();
-        fields.push_back({"ptr", sema::PointerType(element_type)});
-        fields.push_back({"len", sema::NamedType("usize")});
-        fields.push_back({"cap", sema::NamedType("usize")});
-        fields.push_back({"alloc", sema::PointerType(sema::NamedType("Allocator"))});
-        return fields;
-    }
-    return fields;
+    return IsIntegerType(canonical) || IsFloatType(canonical) || canonical.name == "bool";
 }
 
 bool IsUsizeCompatibleType(const sema::Type& type) {
@@ -1832,10 +1805,15 @@ class FunctionLowerer {
     }
 
     void EmitStoreTarget(const Expr& target, const ValueInfo& value) {
+        std::vector<std::string> target_operands = {value.value};
         if (target.kind == Expr::Kind::kIndex && target.left != nullptr && target.right != nullptr) {
             const auto base = LowerExpr(*target.left);
             const auto index = LowerExpr(*target.right);
             EmitIndexBoundsCheck(base, index);
+            target_operands.push_back(base.value);
+            target_operands.push_back(index.value);
+        } else if ((target.kind == Expr::Kind::kField || target.kind == Expr::Kind::kDerefField) && target.left != nullptr) {
+            target_operands.push_back(LowerExpr(*target.left).value);
         }
         Emit({
             .kind = Instruction::Kind::kStoreTarget,
@@ -1855,7 +1833,7 @@ class FunctionLowerer {
                                                                                 target.right->span,
                                                                                 "assignment index type")}
                                     : std::vector<sema::Type> {},
-            .operands = {value.value},
+            .operands = std::move(target_operands),
         });
     }
 
@@ -2748,19 +2726,19 @@ bool ValidateModule(const Module& module,
                         if (!instruction.result.empty()) {
                             report("store_target must not produce a result in function " + function.name);
                         }
-                        if (instruction.operands.size() != 1) {
-                            report("store_target must use exactly one operand in function " + function.name);
-                        }
                         if (instruction.target.empty() && instruction.target_name.empty() && instruction.target_display.empty()) {
                             report("store_target must name a target in function " + function.name);
                         }
-                        if (operand_types.size() == 1 && !sema::IsUnknown(instruction.type) && !IsAssignableType(instruction.type, operand_types.front())) {
+                        if (!operand_types.empty() && !sema::IsUnknown(instruction.type) && !IsAssignableType(instruction.type, operand_types.front())) {
                             report("store_target declared type mismatch in function " + function.name + ": expected " +
                                    sema::FormatType(instruction.type) + ", got " + sema::FormatType(operand_types.front()));
                         }
                         switch (instruction.target_kind) {
                             case Instruction::TargetKind::kField:
                             case Instruction::TargetKind::kDerefField: {
+                                if (instruction.operands.size() != 2) {
+                                    report("store_target field access must use value and base operands in function " + function.name);
+                                }
                                 if (!instruction.target_aux_types.empty()) {
                                     report("store_target field access must not carry index metadata in function " + function.name);
                                 }
@@ -2768,23 +2746,32 @@ bool ValidateModule(const Module& module,
                                     report("store_target field access must name a field in function " + function.name);
                                     break;
                                 }
+                                if (operand_types.size() >= 2 && !sema::IsUnknown(instruction.target_base_type) &&
+                                    instruction.target_base_type != operand_types[1]) {
+                                    report("store_target field base metadata mismatch in function " + function.name);
+                                }
                                 if (instruction.target_base_type.kind != sema::Type::Kind::kNamed) {
-                                    if (!sema::IsUnknown(instruction.target_base_type)) {
+                                    const auto builtin_fields = sema::BuiltinAggregateFields(instruction.target_base_type);
+                                    if (!sema::IsUnknown(instruction.target_base_type) && builtin_fields.empty()) {
                                         report("store_target field access requires named aggregate base in function " + function.name);
                                     }
-                                    break;
+                                    if (builtin_fields.empty()) {
+                                        break;
+                                    }
                                 }
                                 const TypeDecl* type_decl = FindMirTypeDecl(module, instruction.target_base_type.name);
-                                if (type_decl == nullptr) {
+                                const auto builtin_fields = sema::BuiltinAggregateFields(instruction.target_base_type);
+                                if (type_decl == nullptr && builtin_fields.empty()) {
                                     report("store_target field base type is unknown in function " + function.name + ": " +
                                            instruction.target_base_type.name);
                                     break;
                                 }
                                 bool found_field = false;
-                                for (const auto& field : type_decl->fields) {
+                                const auto& fields = type_decl != nullptr ? type_decl->fields : builtin_fields;
+                                for (const auto& field : fields) {
                                     if (field.first == instruction.target_name) {
                                         found_field = true;
-                                        if (operand_types.size() == 1 && !IsAssignableType(field.second, operand_types.front())) {
+                                        if (!operand_types.empty() && !IsAssignableType(field.second, operand_types.front())) {
                                             report("store_target field type mismatch in function " + function.name + " for " +
                                                    instruction.target_name + ": expected " + sema::FormatType(field.second) + ", got " +
                                                    sema::FormatType(operand_types.front()));
@@ -2798,11 +2785,18 @@ bool ValidateModule(const Module& module,
                                 break;
                             }
                             case Instruction::TargetKind::kIndex: {
+                                if (instruction.operands.size() != 3) {
+                                    report("store_target index access must use value, base, and index operands in function " + function.name);
+                                }
                                 if (!instruction.target_name.empty()) {
                                     report("store_target index access must not name a field target in function " + function.name);
                                 }
                                 if (instruction.target_aux_types.size() != 1) {
                                     report("store_target index access must carry exactly one index type in function " + function.name);
+                                }
+                                if (operand_types.size() >= 2 && !sema::IsUnknown(instruction.target_base_type) &&
+                                    instruction.target_base_type != operand_types[1]) {
+                                    report("store_target index base metadata mismatch in function " + function.name);
                                 }
                                 sema::Type element_type = sema::UnknownType();
                                 if (instruction.target_base_type.kind == sema::Type::Kind::kArray && !instruction.target_base_type.subtypes.empty()) {
@@ -2820,13 +2814,20 @@ bool ValidateModule(const Module& module,
                                     instruction.target_aux_types.front().kind != sema::Type::Kind::kIntLiteral) {
                                     report("store_target index operand must be usize-compatible in function " + function.name);
                                 }
-                                if (operand_types.size() == 1 && !sema::IsUnknown(element_type) && !IsAssignableType(element_type, operand_types.front())) {
+                                if (operand_types.size() >= 3 && !instruction.target_aux_types.empty() &&
+                                    instruction.target_aux_types.front() != operand_types[2]) {
+                                    report("store_target index metadata type mismatch in function " + function.name);
+                                }
+                                if (!operand_types.empty() && !sema::IsUnknown(element_type) && !IsAssignableType(element_type, operand_types.front())) {
                                     report("store_target indexed element type mismatch in function " + function.name + ": expected " +
                                            sema::FormatType(element_type) + ", got " + sema::FormatType(operand_types.front()));
                                 }
                                 break;
                             }
                             case Instruction::TargetKind::kGlobal:
+                                if (instruction.operands.size() != 1) {
+                                    report("store_target global access must use exactly one value operand in function " + function.name);
+                                }
                                 if (instruction.target_name.empty()) {
                                     report("store_target global access must name the target symbol in function " + function.name);
                                 }
@@ -3582,14 +3583,14 @@ bool ValidateModule(const Module& module,
                         if (instruction.field_names.size() != instruction.operands.size()) {
                             report("aggregate_init field metadata mismatch in function " + function.name);
                         }
-                        if (instruction.type.kind != sema::Type::Kind::kNamed) {
+                        const auto builtin_fields = sema::BuiltinAggregateFields(instruction.type);
+                        if (instruction.type.kind != sema::Type::Kind::kNamed && builtin_fields.empty()) {
                             if (!sema::IsUnknown(instruction.type)) {
                                 report("aggregate_init must produce a named aggregate type in function " + function.name);
                             }
                             break;
                         }
                         const TypeDecl* type_decl = FindMirTypeDecl(module, instruction.type.name);
-                        const auto builtin_fields = BuiltinAggregateFields(instruction.type);
                         if (type_decl == nullptr && builtin_fields.empty()) {
                             report("aggregate_init references unknown type in function " + function.name + ": " + instruction.type.name);
                         } else {

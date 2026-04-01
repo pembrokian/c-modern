@@ -1,0 +1,326 @@
+================================================================
+ARCHITECTURAL & QUALITY REVIEW — compiler/parse/parser.cpp
+Phase 6 Deep Review
+================================================================
+
+FILE REVIEWED
+  compiler/parse/parser.cpp   (~1520 lines)
+
+------------------------------------------------------------------------
+1. DESIGN & ARCHITECTURE
+------------------------------------------------------------------------
+
+FINDING: Clean recursive-descent structure
+  The Parser class is a single, well-contained recursive-descent parser.
+  It has a clear public interface (Run()), a straightforward token-
+  stream cursor model, and no external dependencies beyond the lexer
+  and AST types. This is textbook recursive descent and appropriate
+  for the language size.
+
+FINDING: allow_aggregate_init_ as mutable state pseudo-parameter
+  To suppress aggregate-init syntax in positions where `{` would be
+  ambiguous (e.g., `if condition {` would conflict with `if
+  SomeStruct{...} {`), ParseExpr() takes a bool parameter that is
+  saved and restored into the member:
+
+    allow_aggregate_init_ = allow_aggregate_init;
+    auto expr = ParseRangeExpr();
+    allow_aggregate_init_ = previous;
+
+  This save/restore pattern is functionally correct but architecturally
+  indicates a design that encodes parser state as an implicit thread
+  local variable rather than passing it through the call stack.
+
+  Problems:
+    - The class member serves as a pseudo-parameter, creating implicit
+      coupling between ParseExpr and every expression sub-parser that
+      calls ParsePostfixExpr.
+    - If any expression sub-parser ever calls ParseExpr() recursively
+      (e.g., as part of a complex lookahead), the save/restore must
+      be re-entered — currently this works because no sub-parser calls
+      ParseExpr directly.
+    - Reentrancy would violate the invariant silently.
+
+  Recommendation: Thread allow_aggregate_init as an explicit parameter
+  through the expression parse chain, or give ParsePostfixExpr its own
+  parameter. The current approach relies on an invisible invariant.
+
+FINDING: Lookahead disambiguation for `<` operator
+  LooksLikePostfixTypeArgs() and SkipTypeExprLookahead() implement a
+  recursive lookahead to disambiguate `func<T>(args)` from `a < b`.
+  This is inherently non-trivial in a C-family grammar and the
+  implementation correctly handles nested generic types.
+
+  The recursion in SkipTypeExprLookahead (itself recursive via its
+  array/paren cases) has no nesting depth limit. Deeply nested type
+  expressions in a call position (e.g., `f<[100]Slice<[100]T>>(...)`)
+  could stack-overflow the lookahead.
+
+  Recommendation: Add a max recursion depth guard, or restructure as
+  an iterative stack scanner.
+
+FINDING: ParseForStmt determines loop kind after parsing
+  ParseForStmt parses the iterable expression first, then post-hoc
+  reclassifies the stmt kind:
+
+    stmt->kind = iterable->kind == Expr::Kind::kRange
+               ? Stmt::Kind::kForRange
+               : Stmt::Kind::kForEach;
+
+  This means the AST structure of the for-loop depends on whether the
+  expression parser decided it was a range. The coupling between
+  expression classification and statement kind is implicit. If a range
+  expression were ever restructured to have a different kind identifier,
+  this condition would silently break.
+
+  Recommendation: Classify the for-kind by syntactic position (keyword
+  `..`) rather than by the resulting expression kind. Or document the
+  invariant that `..` always produces kRange.
+
+FINDING: ParseSwitchCase and ParseDefaultCase are near-identical
+  Both functions:
+    1. Consume a colon
+    2. Optionally parse one inline statement
+    3. Loop parsing statements until case/default/}/AtEnd
+
+  The only difference is the presence of pattern parsing in SwitchCase.
+  The shared body (8 lines) is duplicated.
+
+  Recommendation: Extract a shared ParseCaseBody helper.
+
+------------------------------------------------------------------------
+2. CORRECTNESS & SOUNDNESS
+------------------------------------------------------------------------
+
+FINDING: ParseRangeExpr post-hoc reclassification
+  ParseBinaryChain produces kBinary nodes. ParseRangeExpr then checks
+  if the result is `kBinary("..") -> kRange`. This works correctly
+  because `..` has lower precedence than all binary operators and
+  ParseBinaryChain is called on a single-operator level per call.
+
+  However, if `..` could ever participate in arithmetic chains
+  (e.g., `1 + 2 .. 10`) the parser would build a kBinary("+") node
+  whose left is kRange, not the expected kRange(1+2, 10). The
+  precedence ordering currently prevents this case, but the re-kind
+  is fragile if precedence levels are ever reordered.
+
+FINDING: ParsePostfixExpr QualifiedName vs. FieldExpr transition
+  When the base expression is a bare kName and `.` is encountered,
+  the parser upgrades it to kQualifiedName. On a second `.`, it
+  creates a kField with the QualifiedName as the base.
+
+  Example: `a.b.c` parses as kField(kQualifiedName(a, b), c).
+
+  This is the intended representation, but the parser has no way to
+  produce `QualifiedName(a, b.c)` — i.e., a qualified name with a
+  dotted member path. If the sema later needs to resolve `a.b.c` as
+  `module_a::b::c`, it must peel off the outer kField. This is sema's
+  responsibility and the current structure is consistent with how
+  sema handles it, but it should be documented.
+
+FINDING: ParseAssignOrExprStmt multi-name assignment
+  LooksLikeBareNameListAssignment scans:
+    `identifier (,identifier)* =`
+
+  Once confirmed, the function re-consumes all the identifiers. But
+  the first identifier was already parsed as `first` (a kName expr)
+  before the lookahead. The code does:
+
+    stmt->pattern.names.push_back(first->text);
+    while (Match(kComma)) { ... push more ... }
+    Consume(kAssign, ...)
+
+  The second Match(kComma) starts from the comma after the first name.
+  This is correct — the token stream is at the comma position after
+  the first identifier is already consumed. The logic is correct but
+  non-obvious.
+
+FINDING: Error node injection in ParsePrimaryExpr
+  On error, ParsePrimaryExpr produces a synthetic kLiteral node with
+  text "<error>". This prevents null-pointer crashes in downstream
+  phases. However:
+
+    - The "<error>" string will appear in MIR dumps and backend
+      output if error recovery allows compilation to proceed.
+    - Any code that tries to look up "<error>" as a name will fail
+      with "unknown name: <error>" rather than a clean "prior error
+      suppressed this diagnostic."
+
+  Recommendation: Introduce an Expr::Kind::kError discriminant so
+  downstream phases can detect and suppress cascading diagnostics
+  from error-recovery nodes. This is a standard practice in production
+  compilers (Clang uses a "dependent" type for cascading errors).
+
+FINDING: No recovery from mid-expression errors
+  SynchronizeStatement skips to the next newline or `}`. There is no
+  intra-expression recovery. A parse error inside a complex expression
+  (e.g., missing `:` in a field init) causes the parser to produce
+  a spurious "<error>" expr, then SynchronizeStatement fires and skips
+  to end-of-statement. This may work but can generate many spurious
+  diagnostics.
+
+------------------------------------------------------------------------
+3. SIMPLICITY & ELEGANCE
+------------------------------------------------------------------------
+
+FINDING: ParseBinaryChain elegantly eliminates boilerplate
+  All binary expression levels use a single ParseBinaryChain template
+  that takes a member function pointer for the next-higher precedence
+  level. This is clean and avoids 7 nearly-identical functions.
+
+FINDING: Consistent span tracking
+  Every parse function tracks span.begin at the opening token and
+  span.end at the last consumed token. The pattern is:
+    node->span.begin = Previous().span.begin  (after Match)
+    node->span.end = ...last child...->span.end
+
+  This is consistent throughout and spans are always propagated from
+  children.
+
+FINDING: Consume return value is inconsistently used
+  Consume() returns `nullptr` on mismatch. Most call sites ignore the
+  return value (using the consumed token only for side effects).
+  Some call sites use the return value for span tracking:
+
+    const auto* close = Consume(kRBrace, ...);
+    block->span.end = close != nullptr ? close->span.end : Previous().span.end;
+
+  This pattern is correct but would be cleaner as a non-nullable
+  function that always returns some token (the error token or a
+  synthetic one). The nullable return adds complexity to every span-
+  tracking call site.
+
+------------------------------------------------------------------------
+4. SAFETY & ROBUSTNESS
+------------------------------------------------------------------------
+
+FINDING: ParsePrimaryExpr advances the cursor to prevent infinite loops
+  On error, ParsePrimaryExpr calls Advance() (if !AtEnd()):
+
+    if (!AtEnd()) { Advance(); }
+
+  Without this, a parse error on an unexpected token would cause
+  ParseStatement -> ParseAssignOrExprStmt -> ParseExpr ->
+  ParsePrimaryExpr to loop forever without consuming any tokens.
+  This defensive advance is correct and prevents hangs.
+
+FINDING: Peek(offset) is bounds-checked via tokens_.size()
+  Peek clamps to the last token (EOF):
+
+    const auto target = index_ + offset;
+    return tokens_[target < tokens_.size() ? target : tokens_.size() - 1];
+
+  This means lookahead past end-of-file always returns the EOF token.
+  This allows lookahead scanners to terminate naturally on EOF rather
+  than oob-accessing the token vector. Correct.
+
+FINDING: No recursion depth limit on ParseTypeExpr
+  ParseTypeExpr is recursive for pointer/const/array/paren types.
+  A pathological type `****...*i32` (10,000 stars) would recurse 10,000
+  levels deep. Production compilers solve this via iterative type
+  parsing loops for leading type-expr prefixes.
+
+  Recommendation: Convert the leading prefix cases (kStar, kConst,
+  kArray) to an iterative loop before recursing for the base type.
+
+FINDING: No limit on ParseUnaryExpr recursion
+  ParseUnaryExpr recurses for nested unary operators: `!!!x` recurses
+  3 deep. This is safe for typical programs but stack-overflows for
+  deeply prefixed expressions.
+
+------------------------------------------------------------------------
+5. PERFORMANCE & SCALABILITY
+------------------------------------------------------------------------
+
+FINDING: Token vector is const& — no copies
+  Tokens are stored as a const reference to an external vector. No
+  copies during parsing. All lookahead is O(1) index arithmetic. Good.
+
+FINDING: std::string construction in ParseBinaryChain
+  For each binary operator encountered:
+
+    node->text = std::string(mc::lex::ToString(op.kind));
+
+  mc::lex::ToString returns std::string_view. The conversion to
+  std::string allocates for each binary node. For source files with
+  many arithmetic expressions, this adds up to many small string
+  allocations for short operator strings ("+", "-", etc.).
+
+  Recommendation: Intern operator strings or store the TokenKind enum
+  instead of a string in Expr. This would eliminate all operator
+  string allocations.
+
+FINDING: ParseCallTypeArgs and ParseTypeParams are separate code paths
+  Both parse `< T, U, ... >` but in different contexts. They could
+  share an inner loop. Minor but repeated code.
+
+------------------------------------------------------------------------
+6. SYSTEM-LEVEL CONCERNS
+------------------------------------------------------------------------
+
+FINDING: Parser correctly isolated from sema
+  The parser has no sema includes. It produces pure syntax. No type
+  resolution, name lookup, or semantic decisions occur during parsing.
+  This is the correct phase boundary.
+
+FINDING: Error nodes may leak into MIR
+  Since error-recovery injects synthetic kLiteral("<error>") nodes,
+  and the checker continues past certain errors, it's possible for
+  error-origin expressions to reach MIR lowering. The MIR lowerer
+  would emit "not yet supported in MIR: kLiteral expression"
+  diagnostics or similar, but the connection to the original parse
+  error is lost. A dedicated kError expr kind (see above) would
+  preserve this context.
+
+------------------------------------------------------------------------
+7. DOCUMENTATION & REASONING
+------------------------------------------------------------------------
+
+FINDING: Zero comments on non-obvious design decisions
+  The allow_aggregate_init_ save-restore mechanism has no comment
+  explaining why it's necessary or what it prevents.
+
+  The QualifiedName-to-FieldExpr transition rule in ParsePostfixExpr
+  has no comment explaining the invariant: "first .member on a bare
+  name produces QualifiedName; subsequent produce FieldExpr."
+
+  The reason ForRange/ForEach/ForEachIndex are distinguished at the
+  parser level (vs. sema) is not motivated.
+
+------------------------------------------------------------------------
+PRIORITIZED RECOMMENDATIONS
+------------------------------------------------------------------------
+
+CRITICAL / CORRECTNESS
+  (none — no correctness bugs found in the parser itself)
+
+ARCHITECTURAL / DESIGN
+  1. [Medium] Replace allow_aggregate_init_ member with an explicit
+     parameter threaded through the expression parse chain, or at
+     least document the save/restore invariant and reentrancy constraint.
+
+  2. [Medium] Introduce Expr::Kind::kError (or equivalent) for error-
+     recovery expressions, to allow downstream phases to identify and
+     suppress cascading diagnostics.
+
+  3. [Low] Extract ParseCaseBody from the duplicate body in
+     ParseSwitchCase and ParseDefaultCase.
+
+CORRECTNESS / SAFETY
+  4. [Low] Add a max-depth guard to SkipTypeExprLookahead,
+     ParseTypeExpr, and ParseUnaryExpr to prevent stack overflow on
+     adversarial inputs.
+
+SIMPLIFICATION
+  5. [Low] Document the QualifiedName-to-FieldExpr transition rule in
+     ParsePostfixExpr with a comment explaining the invariant and
+     why it's correct for `a.b.c` patterns.
+
+  6. [Low] Document the ParseForStmt range-kind inference:
+     "for-each is distinguished from for-range by checking whether
+     the iterable expression parsed as kRange".
+
+PERFORMANCE
+  7. [Informational] Consider storing TokenKind in Expr.text (or a
+     separate member) for operator binary nodes rather than allocating
+     a std::string for each two-character operator.

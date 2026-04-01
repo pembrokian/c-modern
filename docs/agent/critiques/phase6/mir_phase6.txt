@@ -1,0 +1,376 @@
+================================================================
+ARCHITECTURAL & QUALITY REVIEW — compiler/mir/mir.cpp
+Phase 6 Deep Review
+================================================================
+
+FILE REVIEWED
+  compiler/mir/mir.cpp   (~4000+ lines)
+
+------------------------------------------------------------------------
+1. DESIGN & ARCHITECTURE
+------------------------------------------------------------------------
+
+FINDING: FunctionLowerer is well-structured with clear responsibility
+  The FunctionLowerer class lowers one function from AST/sema into
+  MIR basic blocks. It correctly owns all per-function state:
+  block indices, value counters, loop target stack, defer scope stack,
+  and hidden local counters. This is a clean design that scales well.
+
+FINDING: ValidateModule is a 1200+ line monolithic function
+  ValidateModule validates block structure, terminator consistency,
+  use-def chains, reachability, and per-instruction type constraints
+  — all in one function. While the validation logic is correct and
+  comprehensive, the monolithic structure has real costs:
+
+    - It is impossible to run only "control-flow validation" or only
+      "type validation" independently.
+    - The function is too large to hold in mental context. Finding
+      the validation rule for a specific instruction kind requires
+      scanning 1200 lines.
+    - Test failures in the validator produce the same error path
+      regardless of which invariant was violated.
+
+  Recommendation: Break ValidateModule into:
+    - ValidateControlFlow(module) — terminators, block labels,
+      reachability BFS
+    - ValidateUseDef(module) — defined_values, operand references
+    - ValidateInstructionTypes(module) — per-instruction type rules
+
+  Each sub-validator can be called from ValidateModule, preserving
+  the external interface.
+
+FINDING: SpecialCallKind is a parallel dispatch system
+  ClassifySpecialCall maps callee name strings to SpecialCallKind
+  enumerators. This is a second name-dispatch system that duplicates
+  what sema's function resolution already knows — whether a function
+  is a builtin stdlib intrinsic.
+
+  Current pattern:
+    - Sema resolves the call normally (sees `buffer_new` as a function)
+    - MIR lowering re-checks the callee name against a hardcoded table
+    - If matched, a dedicated instruction kind is emitted
+
+  Problems:
+    - Adding a new intrinsic requires updating ClassifySpecialCall,
+      EmitSpecialCallInstruction, SpecialCallMetadata, and potentially
+      ValidateModule — in four separate locations.
+    - The lookup must handle both unqualified ("buffer_new") and
+      module-qualified ("mem.buffer_new") forms, creating a 2x
+      enumeration of each name.
+    - If sema ever renames a stdlib function, ClassifySpecialCall
+      silently stops recognizing it and falls through to kCall,
+      producing wrong IR without an error.
+
+  Recommendation: Mark intrinsics in sema (e.g., via an attribute or
+  enum in FunctionSignature) rather than string-matching in MIR.
+  MIR lowering would then check sema metadata, not callee names.
+
+FINDING: Metadata strings are implicit contracts between producer and consumer
+  Several instruction kinds store semantic information as formatted
+  strings in the `op` or `metadata` field:
+    - Atomic ordering: "order=acquire"
+    - Compare-exchange: "success=acq_rel,failure=acquire"
+    - Procedure param count: "3" in type.metadata
+
+  These strings are generated during lowering and parsed/validated
+  during validation and backend lowering. There is no type-safe
+  contract: a string format change in lowering silently breaks
+  validation.
+
+  Recommendation: For the atomic ordering case, use a dedicated
+  enum in the Instruction struct (AtomicOrdering). For procedure
+  param count, use an integer field rather than encoding it in the
+  metadata string. This eliminates the stoul call (see check.cpp
+  findings) and makes the contract type-safe.
+
+FINDING: Block erase by index in LowerSwitchStmt is brittle
+  After lowering all switch cases, if no arm reaches the merge block,
+  the merge block is deleted:
+
+    function_.blocks.erase(function_.blocks.begin() +
+        static_cast<std::ptrdiff_t>(merge_block));
+
+  This erase-by-index is correct because:
+    a) merge_block was the last block created before switch case bodies
+    b) CreateBlock only appends, so the merge_block index only changes
+       if blocks are erased between creation and deletion
+    c) No blocks are erased between CreateBlock("switch_merge") and
+       this erase
+
+  But this relies on an invariant that is nowhere documented. Any
+  refactoring that adds a CreateBlock call between switch_merge
+  creation and deletion would invalidate merge_block's index.
+
+  Recommendation: Use labels (strings) as stable identifiers and
+  delete by label instead of by index, or document the invariant.
+
+FINDING: Hidden local naming uses a counter that restarts per function
+  NewHiddenLocal("iterable") produces "$iterable0", "$iterable1", etc.
+  Since the counter restarts for each function, two functions each
+  containing a for-each loop would both produce "$iterable0". This is
+  correct (locals are function-scoped) but could be confusing when
+  reading MIR dumps that interleave multiple functions.
+
+------------------------------------------------------------------------
+2. CORRECTNESS & SOUNDNESS
+------------------------------------------------------------------------
+
+BUG (medium severity): Unguarded std::stoul in ProcedureParamCount
+  Same as check.cpp: ProcedureParamCount calls std::stoul(type.metadata)
+  without exception handling. In the MIR lowerer, this is called
+  on callee types derived from sema. Normally safe, but fragile.
+
+  Recommendation: Identical fix as in check.cpp — use a safe integer
+  parse helper shared between check.cpp and mir.cpp.
+
+FINDING: Use-def validation does not enforce dominance
+  defined_values accumulates value identifiers as they are encountered
+  in program order across all reachable blocks. This means a value
+  defined in block B (not a dominator) is considered "defined" and
+  can be used in block A that comes later in the block list, even if
+  B does not dominate A.
+
+  Example: A conditional branch creates two arms. A value defined in
+  the true-arm is then used in the false-arm. The current validator
+  does not catch this because defined_values is global.
+
+  This is explicitly a known gap for the bootstrap (MIR is not full
+  SSA with dominance checking). It should be documented as a known
+  limitation, not left as an invisible gap.
+
+FINDING: ForEach generates a hidden iterable local with correct semantics
+  `StoreLocal(iterable_name, iterable.value, ...)` captures the
+  iterable once before the loop. Modifications to the original source
+  of the iterable inside the loop body do not affect the iteration
+  length. This is the correct MC semantics for foreach.
+
+  However, for a large aggregate type (e.g., a large array on the
+  stack), this generates a full copy-by-value store to a local
+
+  inside a loop prologue. The copy is semantically correct but
+  potentially expensive for large aggregates. A reference/pointer
+  approach (storing a pointer to the original) would be more efficient
+  where the iterable does not change during the loop.
+
+FINDING: LowerSwitchStmt handles empty switch case list
+  If stmt.switch_cases is empty, the code falls through to:
+
+    if (stmt.switch_cases.empty()) {
+        entry.terminator.kind = Terminator::Kind::kBranch;
+        entry.terminator.true_target = ...default_block or merge_block label...;
+    }
+
+  This emits an unconditional branch to the default block (if present)
+  or merge block (if not). The behavior is correct but an empty
+  switch with no default is a semantic oddity — the code compiles
+  silently, and the switch body is unreachable dead code. Sema does
+  not warn about this.
+
+FINDING: LowerReturn calls EmitDeferredScopesToDepth(0) before return
+  This correctly unwinds all defer scopes (depth 0 = unwind all).
+  The defer calls are emitted as regular instructions before the
+  terminator. This is semantically correct for LIFO defer ordering,
+  provided EmitDeferredScopesToDepth iterates defer_scopes_ in
+  reverse order (which it should — this is the natural order for
+  a stack of scopes popped innermost-first).
+
+FINDING: LoopTarget.unwind_scope_depth stores defer_scopes_.size() at loop entry
+  Break/continue must only unwind defers pushed inside the current
+  loop body, not outer defers. The stashed unwind_scope_depth does
+  this correctly by recording the defer stack depth when the loop
+  was entered.
+
+------------------------------------------------------------------------
+3. SIMPLICITY & ELEGANCE
+------------------------------------------------------------------------
+
+FINDING: EnsureCurrentBlock as a defensive pattern
+  Many LowerXxx functions begin with EnsureCurrentBlock(). This creates
+  a new "dead" block if current_block_ is nullopt (i.e., after a
+  return/break/continue). Instructions emitted into this dead block
+  are unreachable. The reachability analysis in ValidateModule will
+  show them as dead.
+
+  The function is a defensive measure against lowering code after
+  unconditional control flow. While correct, it means unreachable code
+  after `return` is silently lowered into dead blocks rather than
+  being diagnosed. Adding a warning when instructions are emitted
+  into a dead block would surface unreachable-code issues earlier.
+
+FINDING: RenderExprInline is used for display metadata only
+  RenderExprInline produces human-readable strings for target_display
+  fields in instructions. These are diagnostic metadata, not
+  semantically significant. The function is called frequently during
+  lowering for every indexed/sliced/field expression.
+
+  Consider caching or lazily computing display strings only when
+  a dump is requested. For production builds that never dump MIR,
+  this is wasted allocation.
+
+FINDING: CaptureDeferredCall builds a struct snapshot of the call arguments
+  For `defer f(a, b)`, CaptureDeferredCall captures the current local
+  values of a and b at the point of the defer statement. This is the
+  correct semantics (defer captures the current value, not a future
+  value). The pattern is clean.
+
+FINDING: DeferScope is a simple struct with a vector of DeferredCall
+  Each DeferredCall stores a complete snapshot of call metadata
+  (target, args, etc.). This is correct for bootstrap use. For a
+  richer language with closures or complex argument capturing, this
+  approach would need revisiting.
+
+------------------------------------------------------------------------
+4. SAFETY & ROBUSTNESS
+------------------------------------------------------------------------
+
+FINDING: Block vector invalidation by erase in LowerSwitchStmt
+  (covered in Design section)
+
+FINDING: function_map contains raw pointers that could dangle
+  Not applicable in mir.cpp — the module is built up during lowering
+  and the FunctionLowerer only holds references to the module, not
+  cached pointers into it.
+
+FINDING: KnownTypeOrError helper propagates unknown types gracefully
+  When ExprTypeOrUnknown fails (no recorded type), KnownTypeOrError
+  emits a diagnostic and returns UnknownType(). Downstream instructions
+  use UnknownType() as their type. The validator will then either skip
+  type checks (via IsUnknown guards) or emit a "type mismatch" error.
+  This is a reasonable error-recovery strategy — no crashes, but
+  possibly cascading diagnostics.
+
+FINDING: SpanKey / Report take spans by value
+  The Report function in FunctionLowerer takes spans by value and the
+  span is sometimes a default-constructed span. For instructions
+  without a meaningful source location (e.g., synthesized instructions
+  for loop machinery), this emits diagnostics with zero-zero positions.
+  This is correct behavior but produces confusing diagnostic output.
+
+------------------------------------------------------------------------
+5. PERFORMANCE & SCALABILITY
+------------------------------------------------------------------------
+
+FINDING: ValidateModule does three passes over the function's blocks
+  Pass 1: Collect block labels and build blocks_by_label map
+  Pass 2: BFS reachability from first block
+  Pass 3: Instruction-level validation per reachable block
+
+  The total complexity is O(B + I) where B is the block count and I
+  is the instruction count. This is linear and appropriate.
+
+FINDING: ClassifySpecialCall is O(k) where k is 11 (number of intrinsics)
+  For every call instruction, ClassifySpecialCall is called and does
+  up to 11 string comparisons. This is O(1) per call but could be
+  a hash lookup for scalability.
+
+FINDING: local_types_ map grows linearly with locals per function
+  For functions with many locals (e.g., large state machines), the
+  local_types_ unordered_map could have thousands of entries. Each
+  BindLocal, StoreLocal, LoadLocalValue call does a map lookup.
+  This is correct and O(1) per access but has constant overhead.
+
+FINDING: ForEach generates many instructions per loop iteration
+  The foreach loop emits: store iterable, store index=0,
+  load index, load iterable, field(.len), binary(<),
+  plus body, plus step. For tight loops over small slices, this
+  overhead may be significant in generated code. This is a backend
+  optimization opportunity, not a correctness issue.
+
+------------------------------------------------------------------------
+6. SYSTEM-LEVEL CONCERNS
+------------------------------------------------------------------------
+
+FINDING: ParseArrayLength duplicated across check.cpp, mir.cpp, backend.cpp
+  All three files contain an identical decimal-only integer parser:
+
+    for each char in text: if not digit, return nullopt; accumulate.
+
+  This is three copies of the same 12-line function. If array length
+  constraints need to change (e.g., supporting hex lengths), all
+  three must be updated.
+
+  Recommendation: Move ParseArrayLength to compiler/support/ as a
+  shared utility.
+
+FINDING: LowerForEach uses a hidden "$iterable" local
+  The hidden local name has a `$` prefix, which distinguishes it from
+  user-written locals. However, there is no enforcement that user code
+  cannot write a binding named `$iterable0` (the parser would not
+  reject `$` in identifiers if the lexer allows it). This is an
+  implicit naming convention with no enforcement.
+
+  Recommendation: Document the `$` prefix convention for hidden locals
+  and, if possible, make the lexer reject user identifiers beginning
+  with `$`.
+
+FINDING: MIR does not encode source attribution on BasicBlocks
+  BasicBlocks have a label string but no source span. When a MIR
+  validation error says "unterminated block in function foo: bb0_3.loop_cond",
+  there is no source location associated with the block. Tracking the
+  source span of the statement that generated the block would improve
+  error messages dramatically.
+
+------------------------------------------------------------------------
+7. DOCUMENTATION & REASONING
+------------------------------------------------------------------------
+
+FINDING: ValidateModule has no explanatory comments
+  The validator is the most complex single function in the codebase.
+  Its known limitations (no dominance checking, best-effort type
+  validation) are not documented. A reader encountering a validation
+  false-negative has no guidance on whether it's expected or a bug.
+
+FINDING: The semantics of "dead blocks" from EnsureCurrentBlock
+  are not documented. A reader would not know whether instructions
+  after a return are intentionally lowered into dead blocks or if
+  it's an oversight.
+
+FINDING: The `$` prefix convention for hidden locals is not documented
+  anywhere in the file.
+
+------------------------------------------------------------------------
+PRIORITIZED RECOMMENDATIONS
+------------------------------------------------------------------------
+
+CRITICAL / CORRECTNESS
+  1. [High] Fix unguarded std::stoul in ProcedureParamCount (see
+     check.cpp recommendation — consolidate into a shared safe parse
+     helper in compiler/support/).
+
+  2. [Medium] Document the known limitation that ValidateModule does
+     not enforce value dominance at use points. This is a known gap
+     in bootstrap validation, not a bug, but it must be explicitly
+     noted to avoid confusion.
+
+ARCHITECTURAL / DESIGN
+  3. [Medium] Break ValidateModule into ValidateControlFlow,
+     ValidateUseDef, and ValidateInstructionTypes sub-functions.
+     Each should be separately callable for targeted testing.
+
+  4. [Medium] Replace SpecialCallKind string dispatch with a sema
+     attribute or function annotation. Eliminates the dual-name
+     (qualified/unqualified) enumeration and removes the invisible
+     breakage risk when stdlib names change.
+
+  5. [Medium] Replace atomic ordering and procedure param count
+     encoding in metadata strings with typed fields in Instruction
+     and Type structs respectively.
+
+CORRECTNESS / SAFETY
+  6. [Low] Document or enforce the LowerSwitchStmt block-erase-by-
+     index invariant. Consider deleting by label lookup instead.
+
+  7. [Low] Emit a compiler warning when instructions are generated
+     into a dead block (after return/break/continue). Currently
+     unreachable code is silently lowered.
+
+PERFORMANCE
+  8. [Low] Move ParseArrayLength to compiler/support/ as a shared
+     utility to eliminate the three-way duplication.
+
+  9. [Low] Consider caching RenderExprInline results (lazy evaluation)
+     so display metadata is not computed unless a dump is requested.
+
+DOCUMENTATION
+  10. [Low] Document the `$`-prefix hidden local convention and the
+      EnsureCurrentBlock dead-block semantics in comments.

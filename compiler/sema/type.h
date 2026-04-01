@@ -2,6 +2,8 @@
 #define C_MODERN_COMPILER_SEMA_TYPE_H_
 
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "compiler/ast/ast.h"
@@ -50,6 +52,8 @@ Type TupleType(std::vector<Type> elements);
 Type RangeType(Type element);
 Type ProcedureType(std::vector<Type> params, std::vector<Type> returns);
 Type NamedOrBuiltinType(std::string_view name);
+Type CanonicalizeBuiltinType(Type type);
+std::vector<std::pair<std::string, Type>> BuiltinAggregateFields(const Type& type);
 
 Type TypeFromAst(const ast::TypeExpr* type_expr);
 std::string FormatType(const Type& type);

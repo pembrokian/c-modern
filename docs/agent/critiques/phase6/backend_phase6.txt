@@ -1,0 +1,368 @@
+================================================================
+ARCHITECTURAL & QUALITY REVIEW — compiler/codegen_llvm/backend.cpp
+Phase 6 Deep Review
+================================================================
+
+FILE REVIEWED
+  compiler/codegen_llvm/backend.cpp   (~600+ lines, excluding LowerXxx per-instruction methods)
+
+------------------------------------------------------------------------
+1. DESIGN & ARCHITECTURE
+------------------------------------------------------------------------
+
+FINDING: Textual LLVM IR generation — correct bootstrap strategy
+  The backend emits LLVM IR as a formatted text string, not via the
+  LLVM C++ API. This is a deliberate bootstrap strategy that eliminates
+  the LLVM library dependency during early development. The trade-off:
+
+  Advantages:
+    - No LLVM build/link dependency at compile time.
+    - Emitted IR is directly human-readable for debugging.
+    - The full IR file can be inspected as an artifact.
+
+  Disadvantages:
+    - Any malformed IR (e.g., wrong type encoding, missing getelementptr
+      index types) produces an opaque assembler error from `clang -c`,
+      not a structured compiler error with source location.
+    - The backend must correctly format every LLVM IR construct
+      (types, instructions, attributes) manually. Bugs in the formatter
+      produce IR that is syntactically valid but semantically wrong
+      (or vice versa), both hard to diagnose.
+    - Escaping requirements for strings, identifiers, and IR tokens
+      must be handled manually.
+
+  This strategy is appropriate for the bootstrap phase and matches
+  what similar bootstrap compilers do. The risk is that the textual
+  IR generator accumulates correctness technical debt that is hard
+  to recover from as the feature set grows.
+
+FINDING: FunctionLoweringState is a clean per-function state container
+  The backend's FunctionLoweringState struct holds all per-function
+  lowering state: local name map, block label map, temp counter, etc.
+  There is no global mutable state between function lowerings. This
+  is correct and means functions can theoretically be lowered
+  independently (no cross-function data flow in the backend).
+
+FINDING: kBootstrapTriple is a module-level constant with no CLI override
+  kBootstrapTriple = "arm64-apple-darwin25.4.0" appears at the top
+  of backend.cpp. The triple is baked into every emitted IR file's
+  `target triple` directive. There is no mechanism to override this
+  from the CLI (no --target flag). This is intentional for the
+  bootstrap but limits portability.
+
+FINDING: LowerTypeInfo and LowerStructTypeInfo are mutually recursive
+  LowerTypeInfo calls LowerStructTypeInfo for struct types.
+  LowerStructTypeInfo calls LowerTypeInfo for each field's type.
+  If a cyclic type definition slips through sema (sema should prevent
+  this, but the backend has no independent cycle guard), the result
+  is infinite mutual recursion — a stack overflow or hang.
+
+  Recommendation: Add a `visiting` set to LowerTypeInfo to break
+  cycles, returning a placeholder type (e.g., `opaque` or `{ }`) on
+  a detected cycle and emitting a backend error.
+
+FINDING: Resolution helpers form a clean naming convention
+  ResolveValue, ResolveTypedValue, ResolveLocal, ResolveBlock are
+  small helpers that translate MIR value/local/block names to LLVM IR
+  identifiers (with `%` or `@` prefixes). The naming convention is
+  consistent and the functions are individually simple.
+
+  BackendFunctionName / BackendGlobalName / BackendLocalName /
+  BackendBlockName / BackendTempName are similarly clean.
+
+------------------------------------------------------------------------
+2. CORRECTNESS &SOUNDNESS
+------------------------------------------------------------------------
+
+BUG (high severity): LowerStructTypeInfo ignores is_packed
+  In check.cpp, ComputeTypeLayout for a packed struct forces
+  field_alignment = 1, so fields are stored without padding.
+  LowerStructTypeInfo in backend.cpp does NOT check type_decl->is_packed:
+
+    // Current behavior:
+    for (auto& field : type_decl->fields) {
+        auto lowered = LowerTypeInfo(field.type);
+        ...
+        // Computes natural alignment — ignores packing
+    }
+
+  A packed struct's LLVM type should be declared as:
+    %PackedFoo = type <{ i8, i32, i16 }>   ; note the < > for packed
+
+  Without the `<{...}>` packed syntax, LLVM will apply natural
+  alignment padding to the struct fields, producing a different memory
+  layout than what sema computed. Fields accessed by byte offset
+  (computed in sema) will be at different offsets in emitted IR.
+
+  This is the highest-priority correctness bug in the backend.
+
+  Recommendation: Check type_decl->is_packed. If true, emit the
+  struct type as `type <{ field_types... }>` using LLVM's packed
+  struct syntax.
+
+FINDING: LowerTypeInfo returns std::nullopt for unrecognized types
+  Type lowering is a partial function — not all sema types are handled.
+  When LowerTypeInfo returns nullopt, callers use ReportBackendError
+  and continue. However, if the caller returns the `nullopt` to its
+  own caller without checking, cascading nullopt propagation can
+  produce partially-constructed IR.
+
+  It is worth auditing all LowerTypeInfo callers to ensure they
+  short-circuit cleanly on nullopt rather than silently skipping
+  the failed type and continuing to emit IR that references an
+  absent type definition.
+
+FINDING: ParseBackendArrayLength parses LLVM's "[N x T]" syntax
+  This function is the inverse of the array type emitter — it parses
+  LLVM-side type strings to extract the length. This is used for
+  introspection: when the backend needs to know the length of an
+  array type it previously emitted.
+
+  Parsing your own output format is fragile. If the array type
+  emitter ever changes its format (e.g., adds whitespace differently),
+  ParseBackendArrayLength silently returns nullopt for what was
+  previously a valid type.
+
+  Recommendation: Carry array length as a structured value through
+  the backend's TypeInfo representation rather than parsing it back
+  out of the emitted string.
+
+FINDING: LLVM IR identifiers can contain characters that require quoting
+  LLVM IR requires that identifiers containing special characters
+  (spaces, hyphens, etc.) be quoted: `"my func"`. The BackendFunctionName
+  helper prepends `@` but does not quote identifiers. Module-qualified
+  names (e.g., from NamespaceImportedBuildUnit) use "." as a separator.
+  In LLVM IR, "@foo.bar" is a legal identifier (LLVM allows alphanumeric +
+  period + underscore + dollar in unquoted names), so dots are safe.
+  However, if any non-ASCII character ends up in a name, the emitted
+  IR would be malformed.
+
+  Recommendation: Sanitize or quote identifiers in BackendFunctionName
+  and similar helpers. At minimum, assert that input names match
+  `[A-Za-z0-9_$.]+`.
+
+FINDING: ParseArrayLength is triplicated
+  ParseArrayLength is identical in check.cpp, mir.cpp, and backend.cpp.
+  The same implementation with the same logic (decimal digit accumulation)
+  appears three times. This is a DRY violation.
+
+  Recommendation: Move to compiler/support/ and import as a shared
+  utility.
+
+------------------------------------------------------------------------
+3. SIMPLICITY & ELEGANCE
+------------------------------------------------------------------------
+
+FINDING: Per-instruction lowering methods are mechanically uniform
+  Each LowerXxx function (LowerCall, LowerBinaryOp, LowerBranch, etc.)
+  follows the same pattern:
+    1. Resolve operands
+    2. Emit LLVM instruction string
+    3. Record result value if any
+
+  This uniformity is clean and easy to extend. Adding a new
+  instruction kind means adding one LowerXxx method that follows
+  the same pattern.
+
+FINDING: FormatReturnTypes / FormatArgTypes helpers
+  These helpers build comma-separated type lists — for diagnostic
+  output, not for LLVM IR emission. Clear and limited in scope.
+
+FINDING: GetOrCreateTypeDecl and the type registry
+  The backend maintains a registry of LLVM type alias declarations
+  (`%TypeName = type { ... }`). GetOrCreateTypeDecl ensures each
+  struct/enum type is declared exactly once, even if referenced from
+  many functions. This is correct and clean.
+
+FINDING: BackendTempName increments a per-function counter
+  Every unnamed intermediate value in LLVM IR needs a unique name.
+  BackendTempName() returns `%t0`, `%t1`, etc., resetting per function.
+  This is consistent with how clang/LLVM number temporaries. Good.
+
+------------------------------------------------------------------------
+4. SAFETY & ROBUSTNESS
+------------------------------------------------------------------------
+
+FINDING: sys/wait.h ties the linker invocation to Unix
+  The backend likely uses fork/exec or system() to invoke the
+  assembler/linker. sys/wait.h is POSIX-only. This is acceptable
+  for a macOS arm64 bootstrap but not portable to Windows.
+
+FINDING: kHostedRuntimeSupportPath is a relative path
+  kHostedRuntimeSupportPath = "runtime/hosted/mc_hosted_runtime.c"
+  is resolved relative to the CWD at link time, not relative to the
+  compiler binary or the discovered repo root. When the compiler is
+  invoked from any directory other than the repository root, linking
+  a hosted binary will fail with a file-not-found error from the
+  assembler, with no explanation pointing back to this path.
+
+  Recommendation: Resolve this path relative to the RepositoryRoot
+  returned by DiscoverRepositoryRoot, or accept it as a CLI parameter.
+
+FINDING: LowerTypeInfo recursion depth is unbounded
+  For a type like `Array[Array[Array[i32]]]`, LowerTypeInfo recurses
+  three levels deep. There is no guard against adversarially nested
+  types or a pathological cycle (even though sema should prevent
+  cycles). Adding a depth limit (e.g., 64 levels) with a backend
+  error on overflow would be defensive.
+
+FINDING: Error reporting via ReportBackendError continues after failure
+  When ReportBackendError is called, lowering continues unless the
+  caller explicitly returns. In some cases, the lowered IR for the
+  failed portion is omitted, but the surrounding IR (function body,
+  other instructions) continues to be emitted. The resulting IR file
+  may reference undefined values or types.
+
+  It would be cleaner to set an "in error" flag on
+  FunctionLoweringState or the backend and skip further emission after
+  the first error in a function.
+
+------------------------------------------------------------------------
+5. PERFORMANCE & SCALABILITY
+------------------------------------------------------------------------
+
+FINDING: FindTypeDecl is an O(n) linear scan called per named type
+  For every named type reference encountered during IR lowering,
+  FindTypeDecl (or an equivalent lookup) scans the type_decls list.
+  This makes the backend O(n²) in the number of type declarations
+  for large modules with many types.
+
+  Recommendation: Build a name-to-TypeDecl map once at the start of
+  backend lowering, the same way check.cpp builds type_map_.
+
+FINDING: All IR is accumulated in a single std::ostringstream
+  The backend writes the entire LLVM IR for a module into a single
+  ostringstream — type declarations, global variables, all function
+  bodies. For a large module (hundreds of functions, thousands of
+  instructions), this string could grow to megabytes.
+
+  This is fine for the bootstrap, but streaming the IR to disk
+  incrementally (or using a std::string with reserve()) would reduce
+  peak memory usage.
+
+FINDING: GetOrCreateTypeDecl prevents duplicate type declarations
+  The registry avoids re-emitting a struct type for every reference.
+  Good. This means the total emitted IR is proportional to the number
+  of unique types + instructions, not to the number of type references.
+
+FINDING: LowerFunction keeps all instruction output in a local buffer
+  Per-function IR is accumulated in a stringstream and flushed to
+  the module-level buffer after the function is complete. This is
+  a reasonable two-level buffering strategy.
+
+------------------------------------------------------------------------
+6. SYSTEM-LEVEL CONCERNS
+------------------------------------------------------------------------
+
+FINDING: Backend hard-codes ARM64 calling convention
+  The emitted LLVM IR uses call conventions and attributes appropriate
+  for arm64-apple-darwin. On other targets (x86_64, aarch64-linux),
+  different data layout and target-feature attributes would be needed.
+  The kBootstrapTriple constant propagates into every emitted IR file.
+
+  This is correct for the bootstrap but means the binary literally
+  cannot emit IR for any other target without code changes.
+
+FINDING: No structured error for malformed emitted IR
+  If the backend emits syntactically invalid IR (e.g., wrong number
+  of operands to a phi instruction), the LLVM assembler (invoked by
+  clang -c) will produce an error like:
+
+    error: expected immediate or metadata, got 'x'
+
+  This error has no reference to the original source location. The
+  only way to diagnose it is to inspect the emitted .ll file. There
+  is no mechanism to correlate an assembler error back to a source
+  position.
+
+  Recommendation: In debug builds, write the .ll file to disk before
+  invoking the assembler, and preserve it on failure, with a message
+  pointing the user to it.
+
+FINDING: Platform runtime C source compiled at link time
+  The MC runtime (mc_hosted_runtime.c) is compiled by the backend
+  at link time by passing it directly to clang. This means:
+    a) The runtime is always recompiled on every build (no caching).
+    b) clang must be on the PATH at link time.
+    c) The runtime path must be correct relative to CWD.
+
+  For the bootstrap, this is acceptable, but caching a pre-compiled
+  runtime object and linking it would be faster.
+
+------------------------------------------------------------------------
+7. DOCUMENTATION & REASONING
+------------------------------------------------------------------------
+
+FINDING: No comments on the LowerTypeInfo mutual recursion hazard
+  The mutual recursion between LowerTypeInfo and LowerStructTypeInfo
+  is a subtle correctness dependency. Nothing in the code documents
+  the assumption that sema prevents cyclic types, or what would happen
+  if that assumption were violated.
+
+FINDING: is_packed ignored in LowerStructTypeInfo — no comment or TODO
+  The packed struct bug is silent: there is no TODO, no assert, no
+  comment noting that packed layout is not yet implemented. A developer
+  adding packed struct support to sema would have no indication that
+  the backend needs a corresponding change.
+
+  Recommendation: Add a TODO comment at the relevant location:
+  // TODO: handle is_packed — emit "type <{...}>" for packed structs.
+
+FINDING: kHostedRuntimeSupportPath lacks a comment explaining CWD dependency
+  The relative path constant has no note that it is CWD-relative.
+  A developer who moves the compiler build artifacts would not know
+  why hosting a binary suddenly fails.
+
+FINDING: GetOrCreateTypeDecl registry pattern not explained
+  Why some types (structs, enums) need registry entries but others
+  (primitives, pointers, slices) do not is implicit in the code.
+  A brief comment on GetOrCreateTypeDecl explaining that LLVM requires
+  forward declarations for named struct types would help.
+
+------------------------------------------------------------------------
+PRIORITIZED RECOMMENDATIONS
+------------------------------------------------------------------------
+
+CRITICAL / CORRECTNESS
+  1. [Critical] Fix LowerStructTypeInfo: check type_decl->is_packed and
+     emit `type <{ ... }>` (angle-bracket packed syntax) for packed
+     structs. This is the highest-priority correctness bug in the
+     entire compiler — packed structs currently emit with wrong
+     padding, breaking any code that depends on packed layout.
+
+  2. [High] Add a cycle guard to LowerTypeInfo (a `visiting` set).
+     Return a placeholder + backend error if a cycle is detected.
+     Prevents an infinite loop on any type that slips past sema.
+
+  3. [Medium] Audit all callers of LowerTypeInfo for nullopt propagation.
+     Ensure every caller short-circuits cleanly rather than continuing
+     to emit IR with unresolved types.
+
+CORRECTNESS / SAFETY
+  4. [Medium] Resolve kHostedRuntimeSupportPath relative to the
+     repo root (DiscoverRepositoryRoot result), not the CWD.
+
+  5. [Medium] Sanitize or quote LLVM IR identifiers in BackendFunctionName
+     and peers. Assert identifier characters are in the LLVM-safe set.
+
+  6. [Low] Add a depth limit to LowerTypeInfo (e.g., 64) to guard
+     against adversarially deep type nesting.
+
+DESIGN / MAINTENANCE
+  7. [Medium] Add a TODO comment on is_packed in LowerStructTypeInfo
+     so packed struct support is not silently missing.
+
+  8. [Medium] Move ParseArrayLength to compiler/support/ to eliminate
+     the three-way duplication across check.cpp, mir.cpp, backend.cpp.
+
+  9. [Low] Build a name-to-TypeDecl cache at the start of backend
+     lowering to eliminate the O(n) FindTypeDecl scan per type.
+     Matches the pattern already used in check.cpp's type_map_.
+
+PERFORMANCE / DIAGNOSTICS
+  10. [Low] In debug/verbose mode, preserve the emitted .ll file on
+      assembler failure and print its path, so IR-level errors are
+      diagnosable without rebuilding.
+
+  11. [Low] Pre-compile mc_hosted_runtime.c to an object file and
+      cache it, rather than passing the source to clang on every link.

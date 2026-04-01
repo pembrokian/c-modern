@@ -40,11 +40,15 @@ What landed
 Executable proof now present
 ----------------------------
 - hello-style stdout through `import io` and `write_line`
+- direct borrowed stdout writes through `import io` and `write`
 - borrowed argv forwarding through the explicit hosted runtime boundary
 - explicit heap-backed buffer allocation through `import mem`
 - typed buffer-view formation through `mem.slice_from_buffer<u8>(...)`
+- typed generic buffer view and indexed roundtrip through `mem.buffer_new<i32>` and `mem.slice_from_buffer<i32>(...)`
+- hosted file-size querying through `import fs` and `file_size`
 - hosted file loading through `import fs` plus explicit allocator ownership via
   `import mem`
+- hosted file loading through the admitted convenience wrapper `fs.read_all_default`
 - borrowed-text length and emptiness helpers through `import strings`
 - module-chained borrowed-text helpers through `import utf8`
 
