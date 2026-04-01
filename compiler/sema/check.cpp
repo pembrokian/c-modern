@@ -136,7 +136,7 @@ std::size_t ProcedureParamCount(const Type& type) {
     if (type.kind != Type::Kind::kProcedure || type.metadata.empty()) {
         return 0;
     }
-    return static_cast<std::size_t>(std::stoul(type.metadata));
+    return mc::support::ParseArrayLength(type.metadata).value_or(0);
 }
 
 std::string CombineQualifiedName(const Expr& expr) {
@@ -152,21 +152,6 @@ std::size_t AlignTo(std::size_t value, std::size_t alignment) {
     }
     const std::size_t remainder = value % alignment;
     return remainder == 0 ? value : value + (alignment - remainder);
-}
-
-std::optional<std::size_t> ParseArrayLength(std::string_view text) {
-    if (text.empty()) {
-        return std::nullopt;
-    }
-
-    std::size_t value = 0;
-    for (const char ch : text) {
-        if (ch < '0' || ch > '9') {
-            return std::nullopt;
-        }
-        value = (value * 10) + static_cast<std::size_t>(ch - '0');
-    }
-    return value;
 }
 
 bool IsNumericType(const Type& type) {
@@ -430,6 +415,9 @@ class Checker {
             module_->imports.push_back(import_decl.module_name);
         }
 
+        // Checker phase ordering matters: imported symbols must be seeded before top-level
+        // declaration collection, and function/type lookup tables are incomplete until
+        // CollectTopLevelDecls has finished.
         SeedImportedSymbols();
         CollectTopLevelDecls();
         ValidateExportBlock();
@@ -789,7 +777,7 @@ class Checker {
                 if (!element_layout.valid) {
                     return {};
                 }
-                const auto length = ParseArrayLength(type.metadata);
+                const auto length = mc::support::ParseArrayLength(type.metadata);
                 if (!length.has_value()) {
                     Report(span, "array layout requires an integer constant length, got " + type.metadata);
                     return {};
@@ -1747,34 +1735,6 @@ class Checker {
     int loop_depth_ = 0;
 };
 
-std::optional<std::filesystem::path> ResolveImportPath(const std::filesystem::path& importer_path,
-                                                       std::string_view module_name,
-                                                       const CheckOptions& options,
-                                                       support::DiagnosticSink& diagnostics,
-                                                       const mc::support::SourceSpan& span) {
-    std::vector<std::filesystem::path> search_roots;
-    search_roots.push_back(importer_path.parent_path());
-    for (const auto& root : options.import_roots) {
-        search_roots.push_back(root);
-    }
-
-    for (const auto& root : search_roots) {
-        const std::filesystem::path candidate =
-            std::filesystem::absolute(root / (std::string(module_name) + ".mc")).lexically_normal();
-        if (std::filesystem::exists(candidate)) {
-            return candidate;
-        }
-    }
-
-    diagnostics.Report({
-        .file_path = importer_path,
-        .span = span,
-        .severity = DiagnosticSeverity::kError,
-        .message = "unable to resolve import module: " + std::string(module_name),
-    });
-    return std::nullopt;
-}
-
 std::unique_ptr<ast::SourceFile> ParseFile(const std::filesystem::path& path, support::DiagnosticSink& diagnostics) {
     std::ifstream input(path, std::ios::binary);
     if (!input) {
@@ -1863,7 +1823,11 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
 
     ImportedModules imported_modules;
     for (const auto& import_decl : source_file.imports) {
-        const auto import_path = ResolveImportPath(normalized_path, import_decl.module_name, options, diagnostics, import_decl.span);
+        const auto import_path = mc::support::ResolveImportPath(normalized_path,
+                                    import_decl.module_name,
+                                    options.import_roots,
+                                    diagnostics,
+                                    import_decl.span);
         if (!import_path.has_value()) {
             continue;
         }

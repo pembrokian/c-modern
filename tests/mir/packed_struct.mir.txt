@@ -1,0 +1,15 @@
+Module
+  TypeDecl kind=struct name=PackedPair
+    attributes=[packed]
+    Field name=small type=u8
+    Field name=large type=i32
+  Function name=main returns=[i32]
+    Local name=pair type=PackedPair
+    Block label=entry0
+      const %v0:int_literal op=1
+      const %v1:int_literal op=9
+      aggregate_init %v2:PackedPair target=PackedPair operands=[%v0, %v1] fields=[small, large]
+      store_local target=pair operands=[%v2]
+      load_local %v3:PackedPair target=pair
+      field %v4:i32 target=large operands=[%v3]
+      terminator return values=[%v4]

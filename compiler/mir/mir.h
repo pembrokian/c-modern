@@ -30,6 +30,7 @@ struct TypeDecl {
     Kind kind = Kind::kStruct;
     std::string name;
     std::vector<std::string> type_params;
+    bool is_packed = false;
     std::vector<std::pair<std::string, sema::Type>> fields;
     std::vector<VariantDecl> variants;
     sema::Type aliased_type;

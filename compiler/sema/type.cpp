@@ -2,6 +2,8 @@
 
 #include <sstream>
 
+#include "compiler/support/diagnostics.h"
+
 namespace mc::sema {
 namespace {
 
@@ -342,7 +344,7 @@ std::string FormatType(const Type& type) {
         case Type::Kind::kProcedure: {
             std::size_t param_count = 0;
             if (!canonical.metadata.empty()) {
-                param_count = static_cast<std::size_t>(std::stoul(canonical.metadata));
+                param_count = mc::support::ParseArrayLength(canonical.metadata).value_or(0);
             }
             std::ostringstream stream;
             stream << "proc(";

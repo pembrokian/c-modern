@@ -188,21 +188,6 @@ const mir::TypeDecl* FindTypeDecl(const mir::Module& module,
     return nullptr;
 }
 
-std::optional<std::size_t> ParseArrayLength(std::string_view text) {
-    if (text.empty()) {
-        return std::nullopt;
-    }
-
-    std::size_t value = 0;
-    for (const char ch : text) {
-        if (ch < '0' || ch > '9') {
-            return std::nullopt;
-        }
-        value = (value * 10) + static_cast<std::size_t>(ch - '0');
-    }
-    return value;
-}
-
 std::optional<std::size_t> ParseBackendArrayLength(std::string_view text) {
     if (text.size() < 2 || text.front() != '[') {
         return std::nullopt;
@@ -213,7 +198,7 @@ std::optional<std::size_t> ParseBackendArrayLength(std::string_view text) {
         return std::nullopt;
     }
 
-    return ParseArrayLength(text.substr(1, marker - 1));
+    return mc::support::ParseArrayLength(text.substr(1, marker - 1));
 }
 
 std::size_t AlignTo(std::size_t value,
@@ -240,7 +225,11 @@ std::optional<BackendTypeInfo> LowerStructTypeInfo(const mir::Module& module,
     }
 
     std::ostringstream backend_name;
-    backend_name << '{';
+    if (type_decl.is_packed) {
+        backend_name << "<{";
+    } else {
+        backend_name << '{';
+    }
 
     std::size_t size = 0;
     std::size_t alignment = 1;
@@ -249,21 +238,28 @@ std::optional<BackendTypeInfo> LowerStructTypeInfo(const mir::Module& module,
         if (!lowered_field.has_value()) {
             return std::nullopt;
         }
+        const std::size_t field_alignment = type_decl.is_packed ? 1 : lowered_field->alignment;
 
         if (index > 0) {
             backend_name << ", ";
         }
         backend_name << lowered_field->backend_name;
 
-        size = AlignTo(size, lowered_field->alignment);
+        if (!type_decl.is_packed) {
+            size = AlignTo(size, field_alignment);
+        }
         size += lowered_field->size;
-        alignment = std::max(alignment, lowered_field->alignment);
+        alignment = std::max(alignment, field_alignment);
     }
 
-    backend_name << '}';
+    if (type_decl.is_packed) {
+        backend_name << "}>";
+    } else {
+        backend_name << '}';
+    }
     info.backend_name = backend_name.str();
     info.alignment = alignment;
-    info.size = AlignTo(size, alignment);
+    info.size = type_decl.is_packed ? size : AlignTo(size, alignment);
     return info;
 }
 
@@ -355,7 +351,7 @@ std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
                 return std::nullopt;
             }
             auto element = LowerTypeInfo(module, type.subtypes.front());
-            const auto length = ParseArrayLength(type.metadata);
+            const auto length = mc::support::ParseArrayLength(type.metadata);
             if (!element.has_value() || !length.has_value()) {
                 return std::nullopt;
             }
@@ -1592,7 +1588,7 @@ std::string LLVMZeroValue(const BackendTypeInfo& type_info) {
 
 bool IsAggregateType(const BackendTypeInfo& type_info) {
     return !type_info.backend_name.empty() &&
-           (type_info.backend_name.front() == '{' || type_info.backend_name.front() == '[');
+           (type_info.backend_name.front() == '{' || type_info.backend_name.front() == '[' || type_info.backend_name.front() == '<');
 }
 
 bool IsSignedSourceType(std::string_view source_name) {

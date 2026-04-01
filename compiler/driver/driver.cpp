@@ -135,35 +135,6 @@ std::optional<mc::parse::ParseResult> ParseSourcePath(const std::filesystem::pat
     return parse_result;
 }
 
-std::optional<std::filesystem::path> ResolveImportPath(const std::filesystem::path& importer_path,
-                                                       std::string_view module_name,
-                                                       const std::vector<std::filesystem::path>& import_roots,
-                                                       support::DiagnosticSink& diagnostics,
-                                                       const support::SourceSpan& span) {
-    std::vector<std::filesystem::path> search_roots;
-    search_roots.reserve(import_roots.size() + 1);
-    search_roots.push_back(importer_path.parent_path());
-    for (const auto& root : import_roots) {
-        search_roots.push_back(root);
-    }
-
-    for (const auto& root : search_roots) {
-        const std::filesystem::path candidate =
-            std::filesystem::absolute(root / (std::string(module_name) + ".mc")).lexically_normal();
-        if (std::filesystem::exists(candidate)) {
-            return candidate;
-        }
-    }
-
-    diagnostics.Report({
-        .file_path = importer_path,
-        .span = span,
-        .severity = support::DiagnosticSeverity::kError,
-        .message = "unable to resolve import module: " + std::string(module_name),
-    });
-    return std::nullopt;
-}
-
 mc::sema::CheckOptions BuildSemaOptions(const std::filesystem::path& source_path,
                                         const CommandOptions& options) {
     mc::sema::CheckOptions sema_options;
@@ -416,11 +387,11 @@ bool CollectBuildUnits(const std::filesystem::path& source_path,
 
     const auto effective_import_roots = ComputeEffectiveImportRoots(normalized_path, options.import_roots);
     for (const auto& import_decl : parse_result->source_file->imports) {
-        const auto import_path = ResolveImportPath(normalized_path,
-                                                   import_decl.module_name,
-                                                   effective_import_roots,
-                                                   diagnostics,
-                                                   import_decl.span);
+        const auto import_path = mc::support::ResolveImportPath(normalized_path,
+                                                                import_decl.module_name,
+                                                                effective_import_roots,
+                                                                diagnostics,
+                                                                import_decl.span);
         if (!import_path.has_value()) {
             visiting.erase(path_key);
             return false;
@@ -461,6 +432,7 @@ bool CollectBuildUnits(const std::filesystem::path& source_path,
 }
 
 std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& units,
+                                                 const mc::mir::Module& entry_module,
                                                  const std::filesystem::path& entry_source_path) {
     auto merged = std::make_unique<mc::mir::Module>();
     std::unordered_set<std::string> seen_imports;
@@ -484,6 +456,21 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
                                  namespaced_module.functions.begin(),
                                  namespaced_module.functions.end());
     }
+
+    for (const auto& import_name : entry_module.imports) {
+        if (seen_imports.insert(import_name).second) {
+            merged->imports.push_back(import_name);
+        }
+    }
+    merged->type_decls.insert(merged->type_decls.end(),
+                              entry_module.type_decls.begin(),
+                              entry_module.type_decls.end());
+    merged->globals.insert(merged->globals.end(),
+                           entry_module.globals.begin(),
+                           entry_module.globals.end());
+    merged->functions.insert(merged->functions.end(),
+                             entry_module.functions.begin(),
+                             entry_module.functions.end());
     return merged;
 }
 
@@ -521,14 +508,29 @@ std::optional<CheckedProgram> CompileToMir(const CommandOptions& options,
     }
 
     if (include_imports_for_build) {
-        std::unordered_set<std::string> visiting;
+        const std::filesystem::path normalized_entry_path = std::filesystem::absolute(source_file->path).lexically_normal();
+        const std::string entry_key = normalized_entry_path.generic_string();
+        std::unordered_set<std::string> visiting {entry_key};
         std::unordered_map<std::string, std::size_t> built_indices;
         std::vector<BuildUnit> units;
-        if (!CollectBuildUnits(source_file->path, options, diagnostics, visiting, built_indices, units)) {
-            return std::nullopt;
-        }
 
-        auto merged_module = MergeBuildUnits(units, source_file->path);
+        const auto effective_import_roots = ComputeEffectiveImportRoots(normalized_entry_path, options.import_roots);
+        for (const auto& import_decl : parse_result.source_file->imports) {
+            const auto import_path = mc::support::ResolveImportPath(normalized_entry_path,
+                                                                    import_decl.module_name,
+                                                                    effective_import_roots,
+                                                                    diagnostics,
+                                                                    import_decl.span);
+            if (!import_path.has_value()) {
+                return std::nullopt;
+            }
+            if (!CollectBuildUnits(*import_path, options, diagnostics, visiting, built_indices, units)) {
+                return std::nullopt;
+            }
+        }
+        visiting.erase(entry_key);
+
+        auto merged_module = MergeBuildUnits(units, *mir_result.module, normalized_entry_path);
         if (!mc::mir::ValidateModule(*merged_module, source_file->path, diagnostics)) {
             return std::nullopt;
         }

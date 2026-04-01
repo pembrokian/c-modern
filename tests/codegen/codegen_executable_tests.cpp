@@ -391,6 +391,38 @@ int main(int argc, char** argv) {
                     0,
                     {});
 
+    const std::filesystem::path packed_struct_source = work_root / "packed_header.mc";
+    WriteFile(packed_struct_source,
+              "@packed\n"
+              "struct PackedHeader {\n"
+              "    tag: u8,\n"
+              "    value: i32,\n"
+              "    tail: u16,\n"
+              "}\n"
+              "\n"
+              "func make_header() PackedHeader {\n"
+              "    return PackedHeader{ tag: 1, value: 9, tail: 2 }\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    header: PackedHeader = make_header()\n"
+              "    if header.tag != 1 {\n"
+              "        return 1\n"
+              "    }\n"
+              "    if header.value != 9 {\n"
+              "        return 2\n"
+              "    }\n"
+              "    if header.tail != 2 {\n"
+              "        return 3\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    packed_struct_source,
+                    work_root / "packed_header_build",
+                    0,
+                    {});
+
     const std::filesystem::path distinct_source = work_root / "distinct_roundtrip.mc";
     WriteFile(distinct_source,
               "distinct UserId = i32\n"

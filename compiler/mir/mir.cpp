@@ -407,21 +407,6 @@ bool IsUsizeCompatibleType(const sema::Type& type) {
     return type == sema::NamedType("usize") || type.kind == sema::Type::Kind::kIntLiteral;
 }
 
-std::optional<std::size_t> ParseArrayLength(std::string_view text) {
-    if (text.empty()) {
-        return std::nullopt;
-    }
-
-    std::size_t value = 0;
-    for (const char ch : text) {
-        if (ch < '0' || ch > '9') {
-            return std::nullopt;
-        }
-        value = (value * 10) + static_cast<std::size_t>(ch - '0');
-    }
-    return value;
-}
-
 bool IsAssignableType(const sema::Type& expected, const sema::Type& actual) {
     if (sema::IsUnknown(expected) || sema::IsUnknown(actual)) {
         return true;
@@ -653,7 +638,7 @@ std::size_t ProcedureParamCount(const sema::Type& type) {
     if (type.kind != sema::Type::Kind::kProcedure || type.metadata.empty()) {
         return 0;
     }
-    return static_cast<std::size_t>(std::stoul(type.metadata));
+    return mc::support::ParseArrayLength(type.metadata).value_or(0);
 }
 
 std::vector<sema::Type> ProcedureReturnTypes(const sema::Type& type) {
@@ -840,6 +825,8 @@ class FunctionLowerer {
         return function_.blocks.size() - 1;
     }
 
+    // Lowering keeps statements after an unconditional terminator by switching into a
+    // fresh dead block. ValidateModule will later report unreachable blocks.
     void EnsureCurrentBlock() {
         if (!current_block_.has_value()) {
             current_block_ = CreateBlock("dead");
@@ -850,6 +837,8 @@ class FunctionLowerer {
         return "%v" + std::to_string(next_value_id_++);
     }
 
+    // Hidden lowering temporaries use a '$' prefix. Bootstrap lexing still accepts user
+    // identifiers beginning with '$', so this naming convention remains internal-only.
     std::string NewHiddenLocal(const std::string& prefix) {
         return "$" + prefix + std::to_string(next_hidden_local_id_++);
     }
@@ -1350,7 +1339,7 @@ class FunctionLowerer {
     std::optional<ValueInfo> EmitBoundsLengthValue(const ValueInfo& base) {
         const sema::Type stripped_base = StripMirAliasOrDistinct(module_, base.type);
         if (stripped_base.kind == sema::Type::Kind::kArray) {
-            const auto length = ParseArrayLength(stripped_base.metadata);
+            const auto length = mc::support::ParseArrayLength(stripped_base.metadata);
             if (!length.has_value()) {
                 return std::nullopt;
             }
@@ -2452,6 +2441,7 @@ TypeDecl LowerTypeDeclSummary(const sema::TypeDeclSummary& summary) {
 
     type_decl.name = summary.name;
     type_decl.type_params = summary.type_params;
+    type_decl.is_packed = summary.is_packed;
     type_decl.fields = summary.fields;
     type_decl.aliased_type = summary.aliased_type;
     for (const auto& variant : summary.variants) {
@@ -2540,6 +2530,9 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
     };
 }
 
+// Bootstrap MIR validation checks structural integrity and use-def shape, but it does
+// not yet enforce SSA dominance. The current gap should produce false negatives rather
+// than crashes while MIR bring-up continues.
 bool ValidateModule(const Module& module,
                     const std::filesystem::path& file_path,
                     support::DiagnosticSink& diagnostics) {
@@ -3854,6 +3847,9 @@ std::string DumpModule(const Module& module) {
             }
             type_params << ']';
             WriteLine(stream, 2, type_params.str());
+        }
+        if (type_decl.is_packed) {
+            WriteLine(stream, 2, "attributes=[packed]");
         }
         for (const auto& field : type_decl.fields) {
             WriteLine(stream, 2, "Field name=" + field.first + " type=" + sema::FormatType(field.second));

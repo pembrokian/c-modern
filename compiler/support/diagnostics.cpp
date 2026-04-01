@@ -17,6 +17,50 @@ std::string_view ToString(DiagnosticSeverity severity) {
     return "error";
 }
 
+std::optional<std::size_t> ParseArrayLength(std::string_view text) {
+    if (text.empty()) {
+        return std::nullopt;
+    }
+
+    std::size_t value = 0;
+    for (const char ch : text) {
+        if (ch < '0' || ch > '9') {
+            return std::nullopt;
+        }
+        value = (value * 10) + static_cast<std::size_t>(ch - '0');
+    }
+    return value;
+}
+
+std::optional<std::filesystem::path> ResolveImportPath(const std::filesystem::path& importer_path,
+                                                       std::string_view module_name,
+                                                       const std::vector<std::filesystem::path>& import_roots,
+                                                       DiagnosticSink& diagnostics,
+                                                       const SourceSpan& span) {
+    std::vector<std::filesystem::path> search_roots;
+    search_roots.reserve(import_roots.size() + 1);
+    search_roots.push_back(importer_path.parent_path());
+    for (const auto& root : import_roots) {
+        search_roots.push_back(root);
+    }
+
+    for (const auto& root : search_roots) {
+        const std::filesystem::path candidate =
+            std::filesystem::absolute(root / (std::string(module_name) + ".mc")).lexically_normal();
+        if (std::filesystem::exists(candidate)) {
+            return candidate;
+        }
+    }
+
+    diagnostics.Report({
+        .file_path = importer_path,
+        .span = span,
+        .severity = DiagnosticSeverity::kError,
+        .message = "unable to resolve import module: " + std::string(module_name),
+    });
+    return std::nullopt;
+}
+
 std::string FormatDiagnostic(const Diagnostic& diagnostic) {
     std::ostringstream stream;
     const auto rendered_path = diagnostic.file_path.empty() ? std::string("<unknown>") : diagnostic.file_path.generic_string();

@@ -208,7 +208,9 @@ void DumpFieldInit(const FieldInit& init, std::ostringstream& stream, Indent ind
         stream << " name=" << init.name;
     }
     stream << '\n';
-    DumpExpr(*init.value, stream, indent + 1);
+    if (init.value != nullptr) {
+        DumpExpr(*init.value, stream, indent + 1);
+    }
 }
 
 void DumpExpr(const Expr& expr, std::ostringstream& stream, Indent indent) {
