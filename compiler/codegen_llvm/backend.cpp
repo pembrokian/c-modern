@@ -1,8 +1,11 @@
 #include "compiler/codegen_llvm/backend.h"
 
+#include <cstdlib>
+#include <fstream>
 #include <optional>
 #include <sstream>
 #include <string_view>
+#include <sys/wait.h>
 #include <unordered_map>
 
 namespace mc::codegen_llvm {
@@ -191,6 +194,70 @@ std::optional<std::size_t> ParseArrayLength(std::string_view text) {
     return value;
 }
 
+std::optional<std::size_t> ParseBackendArrayLength(std::string_view text) {
+    if (text.size() < 2 || text.front() != '[') {
+        return std::nullopt;
+    }
+
+    const std::size_t marker = text.find(" x ");
+    if (marker == std::string_view::npos || marker <= 1) {
+        return std::nullopt;
+    }
+
+    return ParseArrayLength(text.substr(1, marker - 1));
+}
+
+std::size_t AlignTo(std::size_t value,
+                    std::size_t alignment) {
+    if (alignment == 0) {
+        return value;
+    }
+    const std::size_t remainder = value % alignment;
+    return remainder == 0 ? value : value + (alignment - remainder);
+}
+
+std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
+                                             const sema::Type& type);
+
+std::optional<BackendTypeInfo> LowerStructTypeInfo(const mir::Module& module,
+                                                   const mir::TypeDecl& type_decl,
+                                                   const sema::Type& original_type) {
+    BackendTypeInfo info {
+        .source_name = sema::FormatType(original_type),
+    };
+
+    if (type_decl.kind != mir::TypeDecl::Kind::kStruct) {
+        return std::nullopt;
+    }
+
+    std::ostringstream backend_name;
+    backend_name << '{';
+
+    std::size_t size = 0;
+    std::size_t alignment = 1;
+    for (std::size_t index = 0; index < type_decl.fields.size(); ++index) {
+        const auto lowered_field = LowerTypeInfo(module, type_decl.fields[index].second);
+        if (!lowered_field.has_value()) {
+            return std::nullopt;
+        }
+
+        if (index > 0) {
+            backend_name << ", ";
+        }
+        backend_name << lowered_field->backend_name;
+
+        size = AlignTo(size, lowered_field->alignment);
+        size += lowered_field->size;
+        alignment = std::max(alignment, lowered_field->alignment);
+    }
+
+    backend_name << '}';
+    info.backend_name = backend_name.str();
+    info.alignment = alignment;
+    info.size = AlignTo(size, alignment);
+    return info;
+}
+
 std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
                                              const sema::Type& type) {
     BackendTypeInfo info {
@@ -253,6 +320,9 @@ std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
                     }
                     lowered->source_name = info.source_name;
                     return lowered;
+                }
+                if (type_decl->kind == mir::TypeDecl::Kind::kStruct) {
+                    return LowerStructTypeInfo(module, *type_decl, type);
                 }
             }
             return std::nullopt;
@@ -321,14 +391,18 @@ std::string BackendFunctionName(const std::string& source_name) {
     return "@" + source_name;
 }
 
+std::string BackendGlobalName(const std::string& source_name) {
+    return "@global." + source_name;
+}
+
 std::string BackendLocalName(const std::string& source_name) {
     return "%local." + source_name;
 }
 
 std::string BackendBlockName(std::size_t function_index,
                              std::size_t block_index,
-                             const std::string& source_label) {
-    return "bb" + std::to_string(function_index) + "_" + std::to_string(block_index) + "." + source_label;
+                             const std::string& source_name) {
+    return "bb" + std::to_string(function_index) + "_" + std::to_string(block_index) + "." + source_name;
 }
 
 std::string BackendTempName(std::size_t function_index,
@@ -338,16 +412,27 @@ std::string BackendTempName(std::size_t function_index,
            std::to_string(instruction_index);
 }
 
-std::string FormatReturnTypes(const std::vector<BackendTypeInfo>& return_types) {
+std::string FormatReturnTypes(const std::vector<BackendTypeInfo>& types) {
     std::ostringstream stream;
     stream << '[';
-    for (std::size_t index = 0; index < return_types.size(); ++index) {
+    for (std::size_t index = 0; index < types.size(); ++index) {
         if (index > 0) {
             stream << ", ";
         }
-        stream << FormatTypeInfo(return_types[index]);
+        stream << FormatTypeInfo(types[index]);
     }
     stream << ']';
+    return stream.str();
+}
+
+std::string JoinOperands(const std::vector<std::string>& operands) {
+    std::ostringstream stream;
+    for (std::size_t index = 0; index < operands.size(); ++index) {
+        if (index > 0) {
+            stream << ", ";
+        }
+        stream << operands[index];
+    }
     return stream.str();
 }
 
@@ -373,22 +458,6 @@ const std::string* FindBlock(const FunctionLoweringState& state,
                              const std::string& block_name) {
     const auto it = state.blocks.find(block_name);
     return it == state.blocks.end() ? nullptr : &it->second;
-}
-
-bool RequireInstructionResult(const mir::Instruction& instruction,
-                              const mir::BasicBlock& block,
-                              const std::filesystem::path& source_path,
-                              support::DiagnosticSink& diagnostics) {
-    if (!instruction.result.empty()) {
-        return true;
-    }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap backend requires a result for MIR instruction '" +
-                           std::string(ToString(instruction.kind)) + "' in function '" +
-                           (block.label.empty() ? std::string("<unknown>") : block.label) + "'",
-                       diagnostics);
-    return false;
 }
 
 bool ResolveValue(const FunctionLoweringState& state,
@@ -475,15 +544,174 @@ bool ResolveBlock(const FunctionLoweringState& state,
     return false;
 }
 
-std::string JoinOperands(const std::vector<std::string>& operands) {
-    std::ostringstream stream;
-    for (std::size_t index = 0; index < operands.size(); ++index) {
-        if (index > 0) {
-            stream << ", ";
-        }
-        stream << operands[index];
+bool RequireInstructionResult(const mir::Instruction& instruction,
+                              const mir::BasicBlock& block,
+                              const std::filesystem::path& source_path,
+                              support::DiagnosticSink& diagnostics) {
+    if (!instruction.result.empty()) {
+        return true;
     }
-    return stream.str();
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap backend requires a result for MIR instruction '" +
+                           std::string(ToString(instruction.kind)) + "' in block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+bool RequireOperandCount(const mir::Instruction& instruction,
+                         std::size_t expected_count,
+                         std::string_view backend_name,
+                         std::string_view operation_name,
+                         std::string_view function_name,
+                         const mir::BasicBlock& block,
+                         const std::filesystem::path& source_path,
+                         support::DiagnosticSink& diagnostics) {
+    if (instruction.operands.size() == expected_count) {
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       std::string(backend_name) + " requires " + std::string(operation_name) +
+                           " to use exactly " + std::to_string(expected_count) + " operand" +
+                           (expected_count == 1 ? "" : "s") + " in function '" + std::string(function_name) +
+                           "' block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+void RecordLoweredValue(FunctionLoweringState& state,
+                        const std::string& result_name,
+                        const std::string& backend_name,
+                        const BackendTypeInfo& type_info) {
+    state.values[result_name] = backend_name;
+    state.value_types[result_name] = type_info;
+}
+
+bool ResolveSingleOperand(const FunctionLoweringState& state,
+                          const mir::Instruction& instruction,
+                          std::string_view backend_name,
+                          std::string_view operation_name,
+                          const mir::Function& function,
+                          const mir::BasicBlock& block,
+                          const std::filesystem::path& source_path,
+                          support::DiagnosticSink& diagnostics,
+                          std::string& operand) {
+    if (!RequireOperandCount(instruction,
+                             1,
+                             backend_name,
+                             operation_name,
+                             function.name,
+                             block,
+                             source_path,
+                             diagnostics)) {
+        return false;
+    }
+
+    return ResolveValue(state,
+                        instruction.operands.front(),
+                        function,
+                        block,
+                        source_path,
+                        diagnostics,
+                        operand);
+}
+
+bool ResolveTwoOperands(const FunctionLoweringState& state,
+                        const mir::Instruction& instruction,
+                        std::string_view backend_name,
+                        std::string_view operation_name,
+                        const mir::Function& function,
+                        const mir::BasicBlock& block,
+                        const std::filesystem::path& source_path,
+                        support::DiagnosticSink& diagnostics,
+                        std::string& lhs,
+                        std::string& rhs) {
+    if (!RequireOperandCount(instruction,
+                             2,
+                             backend_name,
+                             operation_name,
+                             function.name,
+                             block,
+                             source_path,
+                             diagnostics)) {
+        return false;
+    }
+
+    return ResolveValue(state,
+                        instruction.operands[0],
+                        function,
+                        block,
+                        source_path,
+                        diagnostics,
+                        lhs) &&
+           ResolveValue(state,
+                        instruction.operands[1],
+                        function,
+                        block,
+                        source_path,
+                        diagnostics,
+                        rhs);
+}
+
+bool ResolveTwoTypedOperands(const FunctionLoweringState& state,
+                             const mir::Instruction& instruction,
+                             std::string_view backend_name,
+                             std::string_view operation_name,
+                             const mir::Function& function,
+                             const mir::BasicBlock& block,
+                             const std::filesystem::path& source_path,
+                             support::DiagnosticSink& diagnostics,
+                             std::string& lhs,
+                             BackendTypeInfo& lhs_type,
+                             std::string& rhs,
+                             BackendTypeInfo& rhs_type) {
+    if (!RequireOperandCount(instruction,
+                             2,
+                             backend_name,
+                             operation_name,
+                             function.name,
+                             block,
+                             source_path,
+                             diagnostics)) {
+        return false;
+    }
+
+    return ResolveTypedValue(state,
+                             instruction.operands[0],
+                             function,
+                             block,
+                             source_path,
+                             diagnostics,
+                             lhs,
+                             lhs_type) &&
+           ResolveTypedValue(state,
+                             instruction.operands[1],
+                             function,
+                             block,
+                             source_path,
+                             diagnostics,
+                             rhs,
+                             rhs_type);
+}
+
+bool ResolveOperands(const FunctionLoweringState& state,
+                     const mir::Instruction& instruction,
+                     const mir::Function& function,
+                     const mir::BasicBlock& block,
+                     const std::filesystem::path& source_path,
+                     support::DiagnosticSink& diagnostics,
+                     std::vector<std::string>& operands) {
+    operands.clear();
+    operands.reserve(instruction.operands.size());
+    for (const auto& operand_name : instruction.operands) {
+        std::string operand;
+        if (!ResolveValue(state, operand_name, function, block, source_path, diagnostics, operand)) {
+            return false;
+        }
+        operands.push_back(std::move(operand));
+    }
+    return true;
 }
 
 bool LowerInstruction(const mir::Instruction& instruction,
@@ -495,12 +723,6 @@ bool LowerInstruction(const mir::Instruction& instruction,
                       BackendBlock& backend_block) {
     const mir::Function& function = *state.function;
     const mir::BasicBlock& block = function.blocks[block_index];
-
-    const auto record_value = [&](const std::string& backend_name,
-                                  const BackendTypeInfo& type_info) {
-        state.values[instruction.result] = backend_name;
-        state.value_types[instruction.result] = type_info;
-    };
 
     switch (instruction.kind) {
         case mir::Instruction::Kind::kConst: {
@@ -517,7 +739,7 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name, type_info);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
             backend_block.instructions.push_back(backend_name + " = const " + FormatTypeInfo(type_info) + " " +
                                                  instruction.op);
             return true;
@@ -532,26 +754,27 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name, local->lowered_type);
+            RecordLoweredValue(state, instruction.result, backend_name, local->lowered_type);
             backend_block.instructions.push_back(backend_name + " = load " + FormatTypeInfo(local->lowered_type) +
                                                  " " + local->backend_name);
             return true;
         }
 
         case mir::Instruction::Kind::kStoreLocal: {
-            if (instruction.operands.size() != 1) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires store_local to use exactly one operand in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
             const BackendLocal* local = nullptr;
             if (!ResolveLocal(state, instruction.target, function, block, source_path, diagnostics, local)) {
                 return false;
             }
             std::string operand;
-            if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
+            if (!ResolveSingleOperand(state,
+                                      instruction,
+                                      "LLVM bootstrap backend",
+                                      "store_local",
+                                      function,
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      operand)) {
                 return false;
             }
             backend_block.instructions.push_back("store " + sema::FormatType(local->type) + " " + operand + " -> " +
@@ -563,15 +786,16 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
-            if (instruction.operands.size() != 1) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires unary to use exactly one operand in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
             std::string operand;
-            if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
+            if (!ResolveSingleOperand(state,
+                                      instruction,
+                                      "LLVM bootstrap backend",
+                                      "unary",
+                                      function,
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      operand)) {
                 return false;
             }
             BackendTypeInfo type_info;
@@ -584,7 +808,7 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name, type_info);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
             backend_block.instructions.push_back(backend_name + " = unary " + instruction.op + " " +
                                                  FormatTypeInfo(type_info) + " " + operand);
             return true;
@@ -594,21 +818,19 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
-            if (instruction.operands.size() != 2) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires binary to use exactly two operands in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
+            std::string lhs;
+            std::string rhs;
+            if (!ResolveTwoOperands(state,
+                                    instruction,
+                                    "LLVM bootstrap backend",
+                                    "binary",
+                                    function,
+                                    block,
+                                    source_path,
+                                    diagnostics,
+                                    lhs,
+                                    rhs)) {
                 return false;
-            }
-            std::vector<std::string> operands;
-            operands.reserve(2);
-            for (const auto& operand_name : instruction.operands) {
-                std::string operand;
-                if (!ResolveValue(state, operand_name, function, block, source_path, diagnostics, operand)) {
-                    return false;
-                }
-                operands.push_back(std::move(operand));
             }
             BackendTypeInfo type_info;
             if (!LowerInstructionType(*state.module,
@@ -620,23 +842,24 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name, type_info);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
 
             std::ostringstream line;
             line << backend_name << " = binary ";
             if (instruction.arithmetic_semantics != mir::Instruction::ArithmeticSemantics::kNone) {
                 line << ToString(instruction.arithmetic_semantics) << ' ';
             }
-            line << instruction.op << ' ' << FormatTypeInfo(type_info) << ' ' << operands[0] << ", "
-                 << operands[1];
+            line << instruction.op << ' ' << FormatTypeInfo(type_info) << ' ' << lhs << ", " << rhs;
             backend_block.instructions.push_back(line.str());
             return true;
         }
 
         case mir::Instruction::Kind::kSymbolRef: {
-            if (instruction.target_kind != mir::Instruction::TargetKind::kFunction || instruction.target_name.empty()) {
+            if ((instruction.target_kind != mir::Instruction::TargetKind::kFunction &&
+                 instruction.target_kind != mir::Instruction::TargetKind::kGlobal) ||
+                instruction.target_name.empty()) {
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only admits function symbol_ref values in the current bootstrap slice; function '" +
+                                   "LLVM bootstrap backend only admits function and global symbol_ref values in the current bootstrap slice; function '" +
                                        function.name + "' block '" + block.label + "' uses target_kind='" +
                                        std::string(ToString(instruction.target_kind)) + "'",
                                    diagnostics);
@@ -655,9 +878,11 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name, type_info);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
             backend_block.instructions.push_back(backend_name + " = symbol_ref " + FormatTypeInfo(type_info) + " " +
-                                                 BackendFunctionName(instruction.target_name));
+                                                 (instruction.target_kind == mir::Instruction::TargetKind::kFunction
+                                                      ? BackendFunctionName(instruction.target_name)
+                                                      : BackendGlobalName(instruction.target_name)));
             return true;
         }
 
@@ -670,13 +895,14 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             std::vector<std::string> operands;
-            operands.reserve(instruction.operands.size());
-            for (const auto& operand_name : instruction.operands) {
-                std::string operand;
-                if (!ResolveValue(state, operand_name, function, block, source_path, diagnostics, operand)) {
-                    return false;
-                }
-                operands.push_back(std::move(operand));
+            if (!ResolveOperands(state,
+                                 instruction,
+                                 function,
+                                 block,
+                                 source_path,
+                                 diagnostics,
+                                 operands)) {
+                return false;
             }
 
             std::ostringstream line;
@@ -694,7 +920,7 @@ bool LowerInstruction(const mir::Instruction& instruction,
                     return false;
                 }
                 const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-                record_value(backend_name, type_info);
+                RecordLoweredValue(state, instruction.result, backend_name, type_info);
                 line << backend_name << " = call " << FormatTypeInfo(type_info) << ' '
                      << BackendFunctionName(instruction.target_name) << '(' << JoinOperands(operands) << ')';
             }
@@ -704,32 +930,36 @@ bool LowerInstruction(const mir::Instruction& instruction,
 
         case mir::Instruction::Kind::kBoundsCheck: {
             std::vector<std::string> operands;
-            operands.reserve(instruction.operands.size());
-            for (const auto& operand_name : instruction.operands) {
-                std::string operand;
-                if (!ResolveValue(state, operand_name, function, block, source_path, diagnostics, operand)) {
-                    return false;
-                }
-                operands.push_back(std::move(operand));
+            if (!ResolveOperands(state,
+                                 instruction,
+                                 function,
+                                 block,
+                                 source_path,
+                                 diagnostics,
+                                 operands)) {
+                return false;
             }
             backend_block.instructions.push_back("check.bounds " + instruction.op + " " + JoinOperands(operands));
             return true;
         }
 
         case mir::Instruction::Kind::kDivCheck: {
-            if (instruction.operands.size() != 2) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires div_check to use two operands in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
             std::string lhs;
             std::string rhs;
             BackendTypeInfo lhs_type;
             BackendTypeInfo rhs_type;
-            if (!ResolveTypedValue(state, instruction.operands[0], function, block, source_path, diagnostics, lhs, lhs_type) ||
-                !ResolveTypedValue(state, instruction.operands[1], function, block, source_path, diagnostics, rhs, rhs_type)) {
+            if (!ResolveTwoTypedOperands(state,
+                                         instruction,
+                                         "LLVM bootstrap backend",
+                                         "div_check",
+                                         function,
+                                         block,
+                                         source_path,
+                                         diagnostics,
+                                         lhs,
+                                         lhs_type,
+                                         rhs,
+                                         rhs_type)) {
                 return false;
             }
             backend_block.instructions.push_back("check.div " + instruction.op + " lhs=" + lhs + " rhs=" + rhs +
@@ -738,19 +968,22 @@ bool LowerInstruction(const mir::Instruction& instruction,
         }
 
         case mir::Instruction::Kind::kShiftCheck: {
-            if (instruction.operands.size() != 2) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires shift_check to use two operands in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
             std::string value;
             std::string count;
             BackendTypeInfo value_type;
             BackendTypeInfo count_type;
-            if (!ResolveTypedValue(state, instruction.operands[0], function, block, source_path, diagnostics, value, value_type) ||
-                !ResolveTypedValue(state, instruction.operands[1], function, block, source_path, diagnostics, count, count_type)) {
+            if (!ResolveTwoTypedOperands(state,
+                                         instruction,
+                                         "LLVM bootstrap backend",
+                                         "shift_check",
+                                         function,
+                                         block,
+                                         source_path,
+                                         diagnostics,
+                                         value,
+                                         value_type,
+                                         count,
+                                         count_type)) {
                 return false;
             }
             backend_block.instructions.push_back("check.shift " + instruction.op + " value=" + value + " count=" + count +
@@ -762,15 +995,16 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
-            if (instruction.operands.size() != 1) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires convert_distinct to use exactly one operand in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
             std::string operand;
-            if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
+            if (!ResolveSingleOperand(state,
+                                      instruction,
+                                      "LLVM bootstrap backend",
+                                      "convert_distinct",
+                                      function,
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      operand)) {
                 return false;
             }
             BackendTypeInfo type_info;
@@ -783,7 +1017,7 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name, type_info);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
             backend_block.instructions.push_back(backend_name + " = convert_distinct " + FormatTypeInfo(type_info) +
                                                  " " + operand);
             return true;
@@ -793,15 +1027,16 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
-            if (instruction.operands.size() != 1) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires pointer_to_int to use exactly one operand in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
             std::string operand;
-            if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
+            if (!ResolveSingleOperand(state,
+                                      instruction,
+                                      "LLVM bootstrap backend",
+                                      "pointer_to_int",
+                                      function,
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      operand)) {
                 return false;
             }
             BackendTypeInfo type_info;
@@ -814,7 +1049,7 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name, type_info);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
             backend_block.instructions.push_back(backend_name + " = ptrtoint " + FormatTypeInfo(type_info) + " " +
                                                  operand);
             return true;
@@ -824,15 +1059,16 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
-            if (instruction.operands.size() != 1) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires int_to_pointer to use exactly one operand in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
             std::string operand;
-            if (!ResolveValue(state, instruction.operands.front(), function, block, source_path, diagnostics, operand)) {
+            if (!ResolveSingleOperand(state,
+                                      instruction,
+                                      "LLVM bootstrap backend",
+                                      "int_to_pointer",
+                                      function,
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      operand)) {
                 return false;
             }
             BackendTypeInfo type_info;
@@ -845,17 +1081,88 @@ bool LowerInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            record_value(backend_name, type_info);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
             backend_block.instructions.push_back(backend_name + " = inttoptr " + FormatTypeInfo(type_info) + " " +
                                                  operand);
             return true;
         }
 
-        case mir::Instruction::Kind::kStoreTarget:
-        case mir::Instruction::Kind::kConvert:
-        case mir::Instruction::Kind::kConvertNumeric:
+        case mir::Instruction::Kind::kStoreTarget: {
+            std::string operand;
+            if (!ResolveSingleOperand(state,
+                                      instruction,
+                                      "LLVM bootstrap backend",
+                                      "store_target",
+                                      function,
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      operand)) {
+                return false;
+            }
+            backend_block.instructions.push_back("store_target " + instruction.target_display + " kind=" +
+                                                 std::string(ToString(instruction.target_kind)) + " value=" + operand);
+            return true;
+        }
+
         case mir::Instruction::Kind::kArrayToSlice:
         case mir::Instruction::Kind::kBufferToSlice:
+        case mir::Instruction::Kind::kField:
+        case mir::Instruction::Kind::kIndex:
+        case mir::Instruction::Kind::kSlice:
+        case mir::Instruction::Kind::kAggregateInit: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            std::vector<std::string> operands;
+            if (!ResolveOperands(state,
+                                 instruction,
+                                 function,
+                                 block,
+                                 source_path,
+                                 diagnostics,
+                                 operands)) {
+                return false;
+            }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      std::string(ToString(instruction.kind)) + " in function '" + function.name +
+                                          "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
+            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
+
+            std::ostringstream line;
+            line << backend_name << " = " << ToString(instruction.kind) << " " << FormatTypeInfo(type_info);
+            if (!instruction.target_display.empty()) {
+                line << " target_display=" << instruction.target_display;
+            } else if (!instruction.target.empty()) {
+                line << " target=" << instruction.target;
+            }
+            if (!instruction.field_names.empty()) {
+                line << " fields=[";
+                for (std::size_t index = 0; index < instruction.field_names.size(); ++index) {
+                    if (index > 0) {
+                        line << ", ";
+                    }
+                    line << instruction.field_names[index];
+                }
+                line << "]";
+            }
+            if (!operands.empty()) {
+                line << " operands=[" << JoinOperands(operands) << "]";
+            }
+            backend_block.instructions.push_back(line.str());
+            return true;
+        }
+
+        case mir::Instruction::Kind::kConvert:
+        case mir::Instruction::Kind::kConvertNumeric:
         case mir::Instruction::Kind::kVolatileLoad:
         case mir::Instruction::Kind::kVolatileStore:
         case mir::Instruction::Kind::kAtomicLoad:
@@ -863,10 +1170,6 @@ bool LowerInstruction(const mir::Instruction& instruction,
         case mir::Instruction::Kind::kAtomicExchange:
         case mir::Instruction::Kind::kAtomicCompareExchange:
         case mir::Instruction::Kind::kAtomicFetchAdd:
-        case mir::Instruction::Kind::kField:
-        case mir::Instruction::Kind::kIndex:
-        case mir::Instruction::Kind::kSlice:
-        case mir::Instruction::Kind::kAggregateInit:
         case mir::Instruction::Kind::kVariantMatch:
         case mir::Instruction::Kind::kVariantExtract:
             ReportBackendError(source_path,
@@ -1082,6 +1385,2158 @@ bool LowerFunction(const mir::Module& module,
     return true;
 }
 
+bool LowerGlobal(const mir::Module& module,
+                 const mir::GlobalDecl& global,
+                 const std::filesystem::path& source_path,
+                 support::DiagnosticSink& diagnostics,
+                 BackendModule& backend_module) {
+    if (global.names.empty()) {
+        ReportBackendError(source_path, "LLVM bootstrap backend requires each global declaration to name at least one global", diagnostics);
+        return false;
+    }
+
+    BackendTypeInfo lowered_type;
+    if (!LowerInstructionType(module,
+                              global.type,
+                              source_path,
+                              diagnostics,
+                              "global declaration",
+                              lowered_type)) {
+        return false;
+    }
+
+    for (const auto& name : global.names) {
+        backend_module.globals.push_back({
+            .is_const = global.is_const,
+            .source_name = name,
+            .backend_name = BackendGlobalName(name),
+            .type = global.type,
+            .lowered_type = lowered_type,
+            .initializers = global.initializers,
+        });
+    }
+    return true;
+}
+
+struct ExecutableValue {
+    std::string text;
+    BackendTypeInfo type;
+};
+
+struct ExecutableGlobalInfo {
+    std::string backend_name;
+    sema::Type type;
+    BackendTypeInfo lowered_type;
+    bool is_const = false;
+    std::vector<std::string> initializers;
+};
+
+struct ExecutableFunctionState {
+    const mir::Module* module = nullptr;
+    const mir::Function* function = nullptr;
+    std::unordered_map<std::string, std::string> block_labels;
+    std::unordered_map<std::string, std::string> local_slots;
+    std::unordered_map<std::string, ExecutableGlobalInfo> globals;
+    std::unordered_map<std::string, ExecutableValue> values;
+};
+
+const mir::Function* FindFunction(const mir::Module& module,
+                                  std::string_view name) {
+    for (const auto& function : module.functions) {
+        if (function.name == name) {
+            return &function;
+        }
+    }
+    return nullptr;
+}
+
+const mir::Local* FindMirLocal(const mir::Function& function,
+                               std::string_view name) {
+    for (const auto& local : function.locals) {
+        if (local.name == name) {
+            return &local;
+        }
+    }
+    return nullptr;
+}
+
+const mir::GlobalDecl* FindMirGlobal(const mir::Module& module,
+                                     std::string_view name) {
+    for (const auto& global : module.globals) {
+        for (const auto& global_name : global.names) {
+            if (global_name == name) {
+                return &global;
+            }
+        }
+    }
+    return nullptr;
+}
+
+std::vector<const mir::Local*> ParameterLocals(const mir::Function& function) {
+    std::vector<const mir::Local*> params;
+    params.reserve(function.locals.size());
+    for (const auto& local : function.locals) {
+        if (local.is_parameter) {
+            params.push_back(&local);
+        }
+    }
+    return params;
+}
+
+std::string LLVMFunctionSymbol(std::string_view source_name,
+                               bool wrap_hosted_main) {
+    if (wrap_hosted_main && source_name == "main") {
+        return "@__mc_user_main";
+    }
+    return "@" + std::string(source_name);
+}
+
+std::string LLVMBlockLabel(std::size_t function_index,
+                           std::size_t block_index,
+                           const std::string& source_label) {
+    return "bb" + std::to_string(function_index) + "_" + std::to_string(block_index) + "." + source_label;
+}
+
+std::string LLVMLocalSlotName(std::string_view source_name) {
+    return "%local." + std::string(source_name);
+}
+
+std::string LLVMParamName(std::string_view source_name) {
+    return "%arg." + std::string(source_name);
+}
+
+std::string LLVMTempName(std::size_t function_index,
+                         std::size_t block_index,
+                         std::size_t instruction_index) {
+    return "%t" + std::to_string(function_index) + "_" + std::to_string(block_index) + "_" +
+           std::to_string(instruction_index);
+}
+
+std::string LLVMTypeName(const BackendTypeInfo& type_info) {
+    return type_info.backend_name;
+}
+
+std::string LLVMGlobalName(std::string_view source_name) {
+    return BackendGlobalName(std::string(source_name));
+}
+
+std::string LLVMZeroValue(const BackendTypeInfo& type_info) {
+    if (type_info.backend_name == "float") {
+        return "0.0";
+    }
+    if (type_info.backend_name == "double") {
+        return "0.0";
+    }
+    if (type_info.backend_name == "ptr") {
+        return "null";
+    }
+    if (type_info.backend_name == "i1") {
+        return "false";
+    }
+    if (!type_info.backend_name.empty() && (type_info.backend_name.front() == '{' || type_info.backend_name.front() == '[')) {
+        return "zeroinitializer";
+    }
+    return "0";
+}
+
+bool IsAggregateType(const BackendTypeInfo& type_info) {
+    return !type_info.backend_name.empty() &&
+           (type_info.backend_name.front() == '{' || type_info.backend_name.front() == '[');
+}
+
+bool IsSignedSourceType(std::string_view source_name) {
+    return source_name == "i8" || source_name == "i16" || source_name == "i32" || source_name == "i64" ||
+           source_name == "isize" || source_name == "int_literal";
+}
+
+std::size_t IntegerBitWidth(const BackendTypeInfo& type_info) {
+    if (type_info.backend_name.size() < 2 || type_info.backend_name.front() != 'i') {
+        return 0;
+    }
+    return static_cast<std::size_t>(std::stoul(type_info.backend_name.substr(1)));
+}
+
+std::optional<std::size_t> FindFieldIndex(const mir::Module& module,
+                                          const sema::Type& base_type,
+                                          std::string_view field_name) {
+    const sema::Type lowered_base = base_type.kind == sema::Type::Kind::kNamed ? base_type : base_type;
+    if (lowered_base.kind == sema::Type::Kind::kNamed) {
+        if (lowered_base.name == "Slice" || lowered_base.name == "str" || lowered_base.name == "string" || lowered_base.name == "cstr") {
+            if (field_name == "ptr") {
+                return 0;
+            }
+            if (field_name == "len") {
+                return 1;
+            }
+        }
+        if (lowered_base.name == "Buffer") {
+            if (field_name == "ptr") {
+                return 0;
+            }
+            if (field_name == "len") {
+                return 1;
+            }
+            if (field_name == "cap") {
+                return 2;
+            }
+            if (field_name == "alloc") {
+                return 3;
+            }
+        }
+        if (const auto* type_decl = FindTypeDecl(module, lowered_base.name)) {
+            for (std::size_t index = 0; index < type_decl->fields.size(); ++index) {
+                if (type_decl->fields[index].first == field_name) {
+                    return index;
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<sema::Type> FindFieldType(const mir::Module& module,
+                                        const sema::Type& base_type,
+                                        std::string_view field_name) {
+    if (base_type.kind == sema::Type::Kind::kNamed) {
+        if (base_type.name == "Slice" || base_type.name == "Buffer") {
+            if (field_name == "ptr") {
+                if (base_type.subtypes.empty()) {
+                    return sema::PointerType(sema::UnknownType());
+                }
+                return sema::PointerType(base_type.subtypes.front());
+            }
+            if (field_name == "len" || field_name == "cap") {
+                return sema::NamedType("usize");
+            }
+            if (field_name == "alloc") {
+                return sema::PointerType(sema::NamedType("Allocator"));
+            }
+        }
+        if (base_type.name == "str" || base_type.name == "string" || base_type.name == "cstr") {
+            if (field_name == "ptr") {
+                return sema::PointerType(sema::ConstType(sema::NamedType("u8")));
+            }
+            if (field_name == "len") {
+                return sema::NamedType("usize");
+            }
+        }
+        if (const auto* type_decl = FindTypeDecl(module, base_type.name)) {
+            for (const auto& field : type_decl->fields) {
+                if (field.first == field_name) {
+                    return field.second;
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+bool ExtendIntegerToI64(const ExecutableValue& value,
+                        std::size_t function_index,
+                        std::size_t block_index,
+                        std::size_t instruction_index,
+                        std::string_view suffix,
+                        std::vector<std::string>& output_lines,
+                        std::string& extended) {
+    if (value.type.backend_name == "i64") {
+        extended = value.text;
+        return true;
+    }
+
+    const std::string temp = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix);
+    if (IsSignedSourceType(value.type.source_name)) {
+        output_lines.push_back(temp + " = sext " + value.type.backend_name + " " + value.text + " to i64");
+    } else {
+        output_lines.push_back(temp + " = zext " + value.type.backend_name + " " + value.text + " to i64");
+    }
+    extended = temp;
+    return true;
+}
+
+std::string LLVMStructInsertBase(const BackendTypeInfo& type_info) {
+    return IsAggregateType(type_info) ? "zeroinitializer" : LLVMZeroValue(type_info);
+}
+
+bool IsFloatType(const BackendTypeInfo& type_info) {
+    return type_info.backend_name == "float" || type_info.backend_name == "double";
+}
+
+bool IsIntegerType(const BackendTypeInfo& type_info) {
+    return !type_info.backend_name.empty() && type_info.backend_name[0] == 'i';
+}
+
+bool IsUnsignedSourceType(std::string_view source_name) {
+    return source_name == "u8" || source_name == "u16" || source_name == "u32" || source_name == "u64" ||
+           source_name == "usize" || source_name == "uintptr";
+}
+
+bool IsProcedureSourceType(std::string_view source_name) {
+    return source_name.rfind("proc(", 0) == 0;
+}
+
+std::string FormatLLVMLiteral(const BackendTypeInfo& type_info,
+                              std::string_view value) {
+    if (type_info.backend_name == "i1") {
+        if (value == "true" || value == "1") {
+            return "true";
+        }
+        return "false";
+    }
+
+    if (type_info.backend_name == "ptr" && (value == "nil" || value == "null")) {
+        return "null";
+    }
+
+    return std::string(value);
+}
+
+bool ResolveExecutableValue(const ExecutableFunctionState& state,
+                            const std::string& value_name,
+                            const mir::BasicBlock& block,
+                            const std::filesystem::path& source_path,
+                            support::DiagnosticSink& diagnostics,
+                            ExecutableValue& value) {
+    const auto it = state.values.find(value_name);
+    if (it != state.values.end()) {
+        value = it->second;
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap executable emission references unknown MIR value '" + value_name +
+                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+void RecordExecutableValue(ExecutableFunctionState& state,
+                           const std::string& result_name,
+                           const std::string& text,
+                           const BackendTypeInfo& type) {
+    state.values[result_name] = {
+        .text = text,
+        .type = type,
+    };
+}
+
+bool ResolveSingleExecutableOperand(const ExecutableFunctionState& state,
+                                    const mir::Instruction& instruction,
+                                    std::string_view operation_name,
+                                    const mir::BasicBlock& block,
+                                    const std::filesystem::path& source_path,
+                                    support::DiagnosticSink& diagnostics,
+                                    ExecutableValue& operand) {
+    if (!RequireOperandCount(instruction,
+                             1,
+                             "LLVM bootstrap executable emission",
+                             operation_name,
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics)) {
+        return false;
+    }
+
+    return ResolveExecutableValue(state,
+                                  instruction.operands.front(),
+                                  block,
+                                  source_path,
+                                  diagnostics,
+                                  operand);
+}
+
+bool RequireOperandRange(const mir::Instruction& instruction,
+                         std::size_t minimum_count,
+                         std::size_t maximum_count,
+                         std::string_view backend_name,
+                         std::string_view requirement,
+                         std::string_view function_name,
+                         const mir::BasicBlock& block,
+                         const std::filesystem::path& source_path,
+                         support::DiagnosticSink& diagnostics) {
+    if (instruction.operands.size() >= minimum_count && instruction.operands.size() <= maximum_count) {
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       std::string(backend_name) + " requires " + std::string(requirement) + " in function '" +
+                           std::string(function_name) + "' block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+bool ResolveTwoExecutableOperands(const ExecutableFunctionState& state,
+                                  const mir::Instruction& instruction,
+                                  std::string_view operation_name,
+                                  const mir::BasicBlock& block,
+                                  const std::filesystem::path& source_path,
+                                  support::DiagnosticSink& diagnostics,
+                                  ExecutableValue& lhs,
+                                  ExecutableValue& rhs) {
+    if (!RequireOperandCount(instruction,
+                             2,
+                             "LLVM bootstrap executable emission",
+                             operation_name,
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics)) {
+        return false;
+    }
+
+    return ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, lhs) &&
+           ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, rhs);
+}
+
+std::string EmitSliceLengthValue(std::size_t function_index,
+                                 std::size_t block_index,
+                                 std::size_t instruction_index,
+                                 std::string_view suffix,
+                                 std::string_view lower_i64,
+                                 const std::optional<std::string>& upper_i64,
+                                 std::string_view fallback_upper_bound,
+                                 std::vector<std::string>& output_lines) {
+    const std::string len_value = LLVMTempName(function_index, block_index, instruction_index) + "." +
+                                  std::string(suffix);
+    if (upper_i64.has_value()) {
+        output_lines.push_back(len_value + " = sub i64 " + *upper_i64 + ", " + std::string(lower_i64));
+    } else {
+        output_lines.push_back(len_value + " = sub i64 " + std::string(fallback_upper_bound) + ", " +
+                               std::string(lower_i64));
+    }
+    return len_value;
+}
+
+bool ResolveExecutableLocal(const ExecutableFunctionState& state,
+                            const std::string& local_name,
+                            const mir::BasicBlock& block,
+                            const std::filesystem::path& source_path,
+                            support::DiagnosticSink& diagnostics,
+                            std::string& local_slot) {
+    const auto it = state.local_slots.find(local_name);
+    if (it != state.local_slots.end()) {
+        local_slot = it->second;
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap executable emission references unknown local '" + local_name +
+                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+bool ResolveExecutableBlock(const ExecutableFunctionState& state,
+                            const std::string& block_name,
+                            const mir::BasicBlock& block,
+                            const std::filesystem::path& source_path,
+                            support::DiagnosticSink& diagnostics,
+                            std::string& label) {
+    const auto it = state.block_labels.find(block_name);
+    if (it != state.block_labels.end()) {
+        label = it->second;
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap executable emission references unknown branch target '" + block_name +
+                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+std::string FunctionBlockContext(std::string_view operation,
+                                 std::string_view function_name,
+                                 const mir::BasicBlock& block) {
+    return std::string(operation) + " in function '" + std::string(function_name) + "' block '" + block.label + "'";
+}
+
+std::string ExecutableFunctionBlockContext(std::string_view operation,
+                                           const ExecutableFunctionState& state,
+                                           const mir::BasicBlock& block) {
+    return std::string(operation) + " in executable emission for function '" + state.function->name + "' block '" +
+           block.label + "'";
+}
+
+std::string EmitAggregateStackSlot(const ExecutableValue& value,
+                                   std::size_t function_index,
+                                   std::size_t block_index,
+                                   std::size_t instruction_index,
+                                   std::string_view suffix,
+                                   std::vector<std::string>& output_lines) {
+    const std::string slot_name = LLVMTempName(function_index, block_index, instruction_index) + "." +
+                                  std::string(suffix);
+    output_lines.push_back(slot_name + " = alloca " + value.type.backend_name + ", align " +
+                           std::to_string(value.type.alignment));
+    output_lines.push_back("store " + value.type.backend_name + " " + value.text + ", ptr " + slot_name + ", align " +
+                           std::to_string(value.type.alignment));
+    return slot_name;
+}
+
+std::string PreferredOperandType(const ExecutableValue& lhs,
+                                 const ExecutableValue& rhs) {
+    if (!IsProcedureSourceType(lhs.type.source_name) && lhs.type.source_name != "int_literal") {
+        return lhs.type.backend_name;
+    }
+    if (!IsProcedureSourceType(rhs.type.source_name) && rhs.type.source_name != "int_literal") {
+        return rhs.type.backend_name;
+    }
+    return lhs.type.backend_name;
+}
+
+std::string BinaryOpcodeForLLVM(const mir::Instruction& instruction,
+                                const ExecutableValue& lhs,
+                                const BackendTypeInfo& result_type) {
+    const bool is_float = IsFloatType(result_type);
+    const bool is_unsigned = IsUnsignedSourceType(lhs.type.source_name);
+
+    if (instruction.op == "+") {
+        return is_float ? "fadd" : "add";
+    }
+    if (instruction.op == "-") {
+        return is_float ? "fsub" : "sub";
+    }
+    if (instruction.op == "*") {
+        return is_float ? "fmul" : "mul";
+    }
+    if (instruction.op == "/") {
+        if (is_float) {
+            return "fdiv";
+        }
+        return is_unsigned ? "udiv" : "sdiv";
+    }
+    if (instruction.op == "%") {
+        if (is_float) {
+            return "frem";
+        }
+        return is_unsigned ? "urem" : "srem";
+    }
+    if (instruction.op == "<<") {
+        return "shl";
+    }
+    if (instruction.op == ">>") {
+        return is_unsigned ? "lshr" : "ashr";
+    }
+    if (instruction.op == "&") {
+        return "and";
+    }
+    if (instruction.op == "|") {
+        return "or";
+    }
+    if (instruction.op == "^") {
+        return "xor";
+    }
+    return {};
+}
+
+std::string ComparePredicateForLLVM(const mir::Instruction& instruction,
+                                    const ExecutableValue& lhs) {
+    const bool is_float = IsFloatType(lhs.type);
+    const bool is_unsigned = IsUnsignedSourceType(lhs.type.source_name);
+
+    if (instruction.op == "==") {
+        return is_float ? "oeq" : "eq";
+    }
+    if (instruction.op == "!=") {
+        return is_float ? "one" : "ne";
+    }
+    if (instruction.op == "<") {
+        if (is_float) {
+            return "olt";
+        }
+        return is_unsigned ? "ult" : "slt";
+    }
+    if (instruction.op == "<=") {
+        if (is_float) {
+            return "ole";
+        }
+        return is_unsigned ? "ule" : "sle";
+    }
+    if (instruction.op == ">") {
+        if (is_float) {
+            return "ogt";
+        }
+        return is_unsigned ? "ugt" : "sgt";
+    }
+    if (instruction.op == ">=") {
+        if (is_float) {
+            return "oge";
+        }
+        return is_unsigned ? "uge" : "sge";
+    }
+    return {};
+}
+
+std::string DivCheckHelperName(const BackendTypeInfo& type_info) {
+    return "@__mc_check_div_" + type_info.backend_name;
+}
+
+std::string ShiftCheckHelperName(const BackendTypeInfo& type_info) {
+    return "@__mc_check_shift_" + std::to_string(IntegerBitWidth(type_info));
+}
+
+bool EmitBoundsCheckCall(const mir::Instruction& instruction,
+                         std::size_t function_index,
+                         std::size_t block_index,
+                         std::size_t instruction_index,
+                         const mir::BasicBlock& block,
+                         const std::filesystem::path& source_path,
+                         support::DiagnosticSink& diagnostics,
+                         ExecutableFunctionState& state,
+                         std::vector<std::string>& output_lines) {
+    if (!RequireOperandRange(instruction,
+                             2,
+                             3,
+                             "LLVM bootstrap executable emission",
+                             "bounds_check to use two or three operands",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics)) {
+        return false;
+    }
+
+    std::vector<std::string> operands_i64;
+    operands_i64.reserve(instruction.operands.size());
+    for (std::size_t index = 0; index < instruction.operands.size(); ++index) {
+        ExecutableValue operand;
+        if (!ResolveExecutableValue(state, instruction.operands[index], block, source_path, diagnostics, operand)) {
+            return false;
+        }
+        std::string extended;
+        if (!ExtendIntegerToI64(operand,
+                                function_index,
+                                block_index,
+                                instruction_index + index,
+                                "bounds",
+                                output_lines,
+                                extended)) {
+            return false;
+        }
+        operands_i64.push_back(std::move(extended));
+    }
+
+    if (instruction.op == "index") {
+        output_lines.push_back("call void @__mc_check_bounds_index(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ")");
+        return true;
+    }
+    if (instruction.op == "slice") {
+        if (operands_i64.size() == 2) {
+            output_lines.push_back("call void @__mc_check_bounds_index(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ")");
+            return true;
+        }
+        output_lines.push_back("call void @__mc_check_bounds_slice(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ", i64 " + operands_i64[2] + ")");
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap executable emission does not recognize bounds_check mode '" + instruction.op +
+                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+bool EmitDivCheckCall(const mir::Instruction& instruction,
+                      std::size_t function_index,
+                      std::size_t block_index,
+                      std::size_t instruction_index,
+                      const mir::BasicBlock& block,
+                      const std::filesystem::path& source_path,
+                      support::DiagnosticSink& diagnostics,
+                      ExecutableFunctionState& state,
+                      std::vector<std::string>& output_lines) {
+    ExecutableValue lhs;
+    ExecutableValue rhs;
+    if (!ResolveTwoExecutableOperands(state,
+                                      instruction,
+                                      "div_check",
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      lhs,
+                                      rhs)) {
+        return false;
+    }
+    output_lines.push_back("call void " + DivCheckHelperName(rhs.type) + "(" + rhs.type.backend_name + " " + rhs.text + ")");
+    return true;
+}
+
+bool EmitShiftCheckCall(const mir::Instruction& instruction,
+                        std::size_t function_index,
+                        std::size_t block_index,
+                        std::size_t instruction_index,
+                        const mir::BasicBlock& block,
+                        const std::filesystem::path& source_path,
+                        support::DiagnosticSink& diagnostics,
+                        ExecutableFunctionState& state,
+                        std::vector<std::string>& output_lines) {
+    ExecutableValue value;
+    ExecutableValue count;
+    if (!ResolveTwoExecutableOperands(state,
+                                      instruction,
+                                      "shift_check",
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      value,
+                                      count)) {
+        return false;
+    }
+
+    std::string count_i64;
+    if (!ExtendIntegerToI64(count,
+                            function_index,
+                            block_index,
+                            instruction_index,
+                            "shift",
+                            output_lines,
+                            count_i64)) {
+        return false;
+    }
+    output_lines.push_back("call void " + ShiftCheckHelperName(value.type) + "(i64 " + count_i64 + ")");
+    return true;
+}
+
+bool EmitBinaryInstruction(const mir::Instruction& instruction,
+                           std::size_t function_index,
+                           std::size_t block_index,
+                           std::size_t instruction_index,
+                           const mir::BasicBlock& block,
+                           const std::filesystem::path& source_path,
+                           support::DiagnosticSink& diagnostics,
+                           ExecutableFunctionState& state,
+                           std::vector<std::string>& output_lines) {
+    if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+        return false;
+    }
+
+    ExecutableValue lhs;
+    ExecutableValue rhs;
+    if (!ResolveTwoExecutableOperands(state,
+                                      instruction,
+                                      "binary",
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      lhs,
+                                      rhs)) {
+        return false;
+    }
+
+    BackendTypeInfo result_type;
+    if (!LowerInstructionType(*state.module,
+                              instruction.type,
+                              source_path,
+                              diagnostics,
+                              ExecutableFunctionBlockContext("binary", state, block),
+                              result_type)) {
+        return false;
+    }
+
+    const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+    const std::string compare_predicate = ComparePredicateForLLVM(instruction, lhs);
+    if (!compare_predicate.empty()) {
+        const std::string operand_type = PreferredOperandType(lhs, rhs);
+        const std::string compare_opcode = IsFloatType(lhs.type) ? "fcmp" : "icmp";
+        output_lines.push_back(temp + " = " + compare_opcode + " " + compare_predicate + " " + operand_type +
+                               " " + lhs.text + ", " + rhs.text);
+        RecordExecutableValue(state, instruction.result, temp, result_type);
+        return true;
+    }
+
+    const std::string opcode = BinaryOpcodeForLLVM(instruction, lhs, result_type);
+    if (opcode.empty()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission does not support binary operator '" + instruction.op +
+                               "' in function '" + state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    output_lines.push_back(temp + " = " + opcode + " " + LLVMTypeName(result_type) + " " + lhs.text + ", " +
+                           rhs.text);
+    RecordExecutableValue(state, instruction.result, temp, result_type);
+    return true;
+}
+
+bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
+                                  std::size_t function_index,
+                                  std::size_t block_index,
+                                  std::size_t instruction_index,
+                                  const mir::BasicBlock& block,
+                                  const std::filesystem::path& source_path,
+                                  support::DiagnosticSink& diagnostics,
+                                  ExecutableFunctionState& state,
+                                  std::vector<std::string>& output_lines) {
+    if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+        return false;
+    }
+
+    BackendTypeInfo aggregate_type;
+    if (!LowerInstructionType(*state.module,
+                              instruction.type,
+                              source_path,
+                              diagnostics,
+                              FunctionBlockContext("aggregate_init", state.function->name, block),
+                              aggregate_type)) {
+        return false;
+    }
+
+    std::string current_value = LLVMStructInsertBase(aggregate_type);
+    for (std::size_t index = 0; index < instruction.operands.size(); ++index) {
+        ExecutableValue operand;
+        if (!ResolveExecutableValue(state, instruction.operands[index], block, source_path, diagnostics, operand)) {
+            return false;
+        }
+
+        const std::string next_value = index + 1 == instruction.operands.size()
+                                           ? LLVMTempName(function_index, block_index, instruction_index)
+                                           : LLVMTempName(function_index, block_index, instruction_index) + ".agg" + std::to_string(index);
+        output_lines.push_back(next_value + " = insertvalue " + aggregate_type.backend_name + " " + current_value + ", " +
+                               operand.type.backend_name + " " + operand.text + ", " + std::to_string(index));
+        current_value = next_value;
+    }
+
+    RecordExecutableValue(state, instruction.result, current_value, aggregate_type);
+    return true;
+}
+
+bool EmitCallInstruction(const mir::Instruction& instruction,
+                         std::size_t function_index,
+                         std::size_t block_index,
+                         std::size_t instruction_index,
+                         const std::unordered_map<std::string, std::string>& function_symbols,
+                         const mir::BasicBlock& block,
+                         const std::filesystem::path& source_path,
+                         support::DiagnosticSink& diagnostics,
+                         ExecutableFunctionState& state,
+                         std::vector<std::string>& output_lines) {
+    const mir::Function* callee = FindFunction(*state.module, instruction.target_name);
+    if (callee == nullptr) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission references unknown direct callee '" +
+                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                               block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    const auto function_it = function_symbols.find(callee->name);
+    if (function_it == function_symbols.end()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission has no symbol mapping for direct callee '" +
+                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                               block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    const auto callee_params = ParameterLocals(*callee);
+    std::size_t argument_start = 0;
+    if (!instruction.operands.empty()) {
+        ExecutableValue maybe_callee;
+        if (!ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, maybe_callee)) {
+            return false;
+        }
+        if (IsProcedureSourceType(maybe_callee.type.source_name)) {
+            argument_start = 1;
+        }
+    }
+
+    const std::size_t argument_count = instruction.operands.size() >= argument_start
+                                           ? instruction.operands.size() - argument_start
+                                           : 0;
+    if (argument_count != callee_params.size()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission expected " +
+                               std::to_string(callee_params.size()) + " call arguments for '" + instruction.target_name +
+                               "' but saw " + std::to_string(argument_count) + " in function '" + state.function->name +
+                               "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    std::ostringstream args;
+    for (std::size_t index = 0; index < callee_params.size(); ++index) {
+        ExecutableValue value;
+        if (!ResolveExecutableValue(state,
+                                    instruction.operands[argument_start + index],
+                                    block,
+                                    source_path,
+                                    diagnostics,
+                                    value)) {
+            return false;
+        }
+
+        BackendTypeInfo param_type;
+        if (!LowerInstructionType(*state.module,
+                                  callee_params[index]->type,
+                                  source_path,
+                                  diagnostics,
+                                  FunctionBlockContext("call argument", state.function->name, block),
+                                  param_type)) {
+            return false;
+        }
+
+        if (index > 0) {
+            args << ", ";
+        }
+        args << LLVMTypeName(param_type) << " " << value.text;
+    }
+
+    if (instruction.result.empty()) {
+        if (!callee->return_types.empty()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires a result for non-void call to '" +
+                                   instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                                   block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        output_lines.push_back("call void " + function_it->second + "(" + args.str() + ")");
+        return true;
+    }
+
+    if (callee->return_types.size() != 1) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission only supports single-value direct calls to '" +
+                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                               block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    BackendTypeInfo result_type;
+    if (!LowerInstructionType(*state.module,
+                              callee->return_types.front(),
+                              source_path,
+                              diagnostics,
+                              FunctionBlockContext("call result", state.function->name, block),
+                              result_type)) {
+        return false;
+    }
+
+    const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+    output_lines.push_back(temp + " = call " + LLVMTypeName(result_type) + " " + function_it->second + "(" +
+                           args.str() + ")");
+    RecordExecutableValue(state, instruction.result, temp, result_type);
+    return true;
+}
+
+bool EmitSliceInstruction(const mir::Instruction& instruction,
+                          std::size_t function_index,
+                          std::size_t block_index,
+                          std::size_t instruction_index,
+                          const mir::BasicBlock& block,
+                          const std::filesystem::path& source_path,
+                          support::DiagnosticSink& diagnostics,
+                          ExecutableFunctionState& state,
+                          std::vector<std::string>& output_lines) {
+    if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+        return false;
+    }
+    if (!RequireOperandRange(instruction,
+                             2,
+                             3,
+                             "LLVM bootstrap executable emission",
+                             "slice to use base plus one or two bounds",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics)) {
+        return false;
+    }
+
+    ExecutableValue base;
+    ExecutableValue lower;
+    if (!ResolveTwoExecutableOperands(state,
+                                      instruction,
+                                      "slice",
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      base,
+                                      lower)) {
+        return false;
+    }
+
+    std::optional<ExecutableValue> upper;
+    if (instruction.operands.size() == 3) {
+        ExecutableValue resolved_upper;
+        if (!ResolveExecutableValue(state, instruction.operands[2], block, source_path, diagnostics, resolved_upper)) {
+            return false;
+        }
+        upper = resolved_upper;
+    }
+
+    BackendTypeInfo slice_type;
+    BackendTypeInfo element_type;
+    if (!LowerInstructionType(*state.module,
+                              instruction.type,
+                              source_path,
+                              diagnostics,
+                              FunctionBlockContext("slice", state.function->name, block),
+                              slice_type) ||
+        instruction.type.subtypes.empty() ||
+        !LowerInstructionType(*state.module,
+                              instruction.type.subtypes.front(),
+                              source_path,
+                              diagnostics,
+                              FunctionBlockContext("slice element", state.function->name, block),
+                              element_type)) {
+        return false;
+    }
+
+    std::string lower_i64;
+    if (!ExtendIntegerToI64(lower,
+                            function_index,
+                            block_index,
+                            instruction_index,
+                            "slice_lower",
+                            output_lines,
+                            lower_i64)) {
+        return false;
+    }
+
+    std::string upper_i64;
+    if (upper.has_value() &&
+        !ExtendIntegerToI64(*upper,
+                            function_index,
+                            block_index,
+                            instruction_index + 1,
+                            "slice_upper",
+                            output_lines,
+                            upper_i64)) {
+        return false;
+    }
+
+    const std::string data_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".slice_ptr";
+    std::string len_value;
+    if (!base.type.backend_name.empty() && base.type.backend_name.front() == '[') {
+        const auto array_length = ParseBackendArrayLength(base.type.backend_name);
+        if (!array_length.has_value()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires statically known array length for slice base in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        const std::string array_slot = EmitAggregateStackSlot(base,
+                                                              function_index,
+                                                              block_index,
+                                                              instruction_index,
+                                                              "slice_array",
+                                                              output_lines);
+        output_lines.push_back(data_ptr + " = getelementptr inbounds " + base.type.backend_name + ", ptr " + array_slot + ", i64 0, i64 " + lower_i64);
+        len_value = EmitSliceLengthValue(function_index,
+                                         block_index,
+                                         instruction_index,
+                                         "slice_len",
+                                         lower_i64,
+                                         upper.has_value() ? std::optional<std::string>(upper_i64) : std::nullopt,
+                                         std::to_string(*array_length),
+                                         output_lines);
+    } else if (base.type.backend_name == "{ptr, i64}") {
+        const std::string base_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".base_ptr";
+        const std::string base_len = LLVMTempName(function_index, block_index, instruction_index) + ".base_len";
+        output_lines.push_back(base_ptr + " = extractvalue {ptr, i64} " + base.text + ", 0");
+        output_lines.push_back(base_len + " = extractvalue {ptr, i64} " + base.text + ", 1");
+        output_lines.push_back(data_ptr + " = getelementptr inbounds " + element_type.backend_name + ", ptr " + base_ptr + ", i64 " + lower_i64);
+        len_value = EmitSliceLengthValue(function_index,
+                                         block_index,
+                                         instruction_index,
+                                         "slice_len",
+                                         lower_i64,
+                                         upper.has_value() ? std::optional<std::string>(upper_i64) : std::nullopt,
+                                         base_len,
+                                         output_lines);
+    } else {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission does not support slice base type '" + base.type.source_name +
+                               "' in function '" + state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    const std::string init_temp = LLVMTempName(function_index, block_index, instruction_index) + ".slice_init";
+    const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
+    output_lines.push_back(init_temp + " = insertvalue " + slice_type.backend_name + " zeroinitializer, ptr " + data_ptr + ", 0");
+    output_lines.push_back(result_temp + " = insertvalue " + slice_type.backend_name + " " + init_temp + ", i64 " + len_value + ", 1");
+    RecordExecutableValue(state, instruction.result, result_temp, slice_type);
+    return true;
+}
+
+bool RenderExecutableInstruction(const mir::Instruction& instruction,
+                                 std::size_t function_index,
+                                 std::size_t block_index,
+                                 std::size_t instruction_index,
+                                 const std::unordered_map<std::string, std::string>& function_symbols,
+                                 const std::filesystem::path& source_path,
+                                 support::DiagnosticSink& diagnostics,
+                                 ExecutableFunctionState& state,
+                                 std::vector<std::string>& output_lines) {
+    const mir::BasicBlock& block = state.function->blocks[block_index];
+
+    switch (instruction.kind) {
+        case mir::Instruction::Kind::kConst: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("const", state, block),
+                                      type_info)) {
+                return false;
+            }
+            RecordExecutableValue(state, instruction.result, FormatLLVMLiteral(type_info, instruction.op), type_info);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kLoadLocal: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            std::string local_slot;
+            if (!ResolveExecutableLocal(state, instruction.target, block, source_path, diagnostics, local_slot)) {
+                return false;
+            }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("load_local", state, block),
+                                      type_info)) {
+                return false;
+            }
+
+            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+            output_lines.push_back(temp + " = load " + LLVMTypeName(type_info) + ", ptr " + local_slot + ", align " +
+                                   std::to_string(type_info.alignment));
+            RecordExecutableValue(state, instruction.result, temp, type_info);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kStoreLocal: {
+            const auto* local = FindMirLocal(*state.function, instruction.target);
+            if (local == nullptr) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission references unknown local '" + instruction.target +
+                                       "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            std::string local_slot;
+            if (!ResolveExecutableLocal(state, instruction.target, block, source_path, diagnostics, local_slot)) {
+                return false;
+            }
+
+            ExecutableValue operand;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "store_local",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                operand)) {
+                return false;
+            }
+
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      local->type,
+                                      source_path,
+                                      diagnostics,
+                                      FunctionBlockContext("store_local destination", state.function->name, block),
+                                      type_info)) {
+                return false;
+            }
+
+            output_lines.push_back("store " + LLVMTypeName(type_info) + " " + operand.text + ", ptr " + local_slot +
+                                   ", align " + std::to_string(type_info.alignment));
+            return true;
+        }
+
+        case mir::Instruction::Kind::kUnary: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue operand;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "unary",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                operand)) {
+                return false;
+            }
+
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("unary", state, block),
+                                      type_info)) {
+                return false;
+            }
+
+            if (instruction.op == "+") {
+                RecordExecutableValue(state, instruction.result, operand.text, type_info);
+                return true;
+            }
+
+            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+            if (instruction.op == "-") {
+                if (IsFloatType(type_info)) {
+                    output_lines.push_back(temp + " = fsub " + LLVMTypeName(type_info) + " 0.0, " + operand.text);
+                } else {
+                    output_lines.push_back(temp + " = sub " + LLVMTypeName(type_info) + " 0, " + operand.text);
+                }
+            } else if (instruction.op == "!") {
+                output_lines.push_back(temp + " = xor i1 " + operand.text + ", true");
+            } else if (instruction.op == "~") {
+                output_lines.push_back(temp + " = xor " + LLVMTypeName(type_info) + " " + operand.text + ", -1");
+            } else {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission does not support unary operator '" + instruction.op +
+                                       "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            RecordExecutableValue(state, instruction.result, temp, type_info);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kBinary: {
+            return EmitBinaryInstruction(instruction,
+                                         function_index,
+                                         block_index,
+                                         instruction_index,
+                                         block,
+                                         source_path,
+                                         diagnostics,
+                                         state,
+                                         output_lines);
+        }
+
+        case mir::Instruction::Kind::kSymbolRef: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            if ((instruction.target_kind != mir::Instruction::TargetKind::kFunction &&
+                 instruction.target_kind != mir::Instruction::TargetKind::kGlobal) ||
+                instruction.target_name.empty()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission only supports function and global symbol_ref values in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("symbol_ref", state, block),
+                                      type_info)) {
+                return false;
+            }
+
+            if (instruction.target_kind == mir::Instruction::TargetKind::kFunction) {
+                const auto function_it = function_symbols.find(instruction.target_name);
+                if (function_it == function_symbols.end()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission references unknown function symbol '" +
+                                           instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                                           block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+
+                RecordExecutableValue(state, instruction.result, function_it->second, type_info);
+                return true;
+            }
+
+            const auto global_it = state.globals.find(instruction.target_name);
+            if (global_it == state.globals.end()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission references unknown global symbol '" +
+                                       instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                                       block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+            output_lines.push_back(temp + " = load " + type_info.backend_name + ", ptr " + global_it->second.backend_name +
+                                   ", align " + std::to_string(type_info.alignment));
+            RecordExecutableValue(state, instruction.result, temp, type_info);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kCall: {
+            return EmitCallInstruction(instruction,
+                                       function_index,
+                                       block_index,
+                                       instruction_index,
+                                       function_symbols,
+                                       block,
+                                       source_path,
+                                       diagnostics,
+                                       state,
+                                       output_lines);
+        }
+
+        case mir::Instruction::Kind::kConvertDistinct: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue operand;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "convert_distinct",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                operand)) {
+                return false;
+            }
+
+            BackendTypeInfo result_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("convert_distinct", state, block),
+                                      result_type)) {
+                return false;
+            }
+
+            RecordExecutableValue(state, instruction.result, operand.text, result_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kPointerToInt:
+        case mir::Instruction::Kind::kIntToPointer: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue operand;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                ToString(instruction.kind),
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                operand)) {
+                return false;
+            }
+
+            BackendTypeInfo result_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext(ToString(instruction.kind), state, block),
+                                      result_type)) {
+                return false;
+            }
+
+            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+            const std::string opcode = instruction.kind == mir::Instruction::Kind::kPointerToInt ? "ptrtoint" : "inttoptr";
+            output_lines.push_back(temp + " = " + opcode + " " + operand.type.backend_name + " " + operand.text +
+                                   " to " + result_type.backend_name);
+            RecordExecutableValue(state, instruction.result, temp, result_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kBoundsCheck:
+            return EmitBoundsCheckCall(instruction,
+                                       function_index,
+                                       block_index,
+                                       instruction_index,
+                                       block,
+                                       source_path,
+                                       diagnostics,
+                                       state,
+                                       output_lines);
+
+        case mir::Instruction::Kind::kDivCheck:
+            return EmitDivCheckCall(instruction,
+                                    function_index,
+                                    block_index,
+                                    instruction_index,
+                                    block,
+                                    source_path,
+                                    diagnostics,
+                                    state,
+                                    output_lines);
+
+        case mir::Instruction::Kind::kShiftCheck:
+            return EmitShiftCheckCall(instruction,
+                                      function_index,
+                                      block_index,
+                                      instruction_index,
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      state,
+                                      output_lines);
+
+        case mir::Instruction::Kind::kStoreTarget: {
+            if (instruction.target_kind != mir::Instruction::TargetKind::kGlobal || instruction.target.empty()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission currently supports only global store_target effects in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            ExecutableValue operand;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "store_target",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                operand)) {
+                return false;
+            }
+
+            const auto global_it = state.globals.find(instruction.target);
+            if (global_it == state.globals.end()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission references unknown global store target '" + instruction.target +
+                                       "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            output_lines.push_back("store " + global_it->second.lowered_type.backend_name + " " + operand.text + ", ptr " +
+                                   global_it->second.backend_name + ", align " +
+                                   std::to_string(global_it->second.lowered_type.alignment));
+            return true;
+        }
+
+        case mir::Instruction::Kind::kConvert:
+        case mir::Instruction::Kind::kConvertNumeric:
+        case mir::Instruction::Kind::kVolatileLoad:
+        case mir::Instruction::Kind::kVolatileStore:
+        case mir::Instruction::Kind::kAtomicLoad:
+        case mir::Instruction::Kind::kAtomicStore:
+        case mir::Instruction::Kind::kAtomicExchange:
+        case mir::Instruction::Kind::kAtomicCompareExchange:
+        case mir::Instruction::Kind::kAtomicFetchAdd:
+        case mir::Instruction::Kind::kVariantMatch:
+        case mir::Instruction::Kind::kVariantExtract:
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission does not support MIR instruction '" +
+                                   std::string(ToString(instruction.kind)) + "' in function '" + state.function->name +
+                                   "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+
+        case mir::Instruction::Kind::kArrayToSlice: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue base;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "array_to_slice",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                base)) {
+                return false;
+            }
+
+            const auto length = ParseBackendArrayLength(base.type.backend_name);
+            if (!length.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires statically known array length for array_to_slice in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            BackendTypeInfo slice_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      FunctionBlockContext("array_to_slice", state.function->name, block),
+                                      slice_type)) {
+                return false;
+            }
+
+            const std::string array_slot = EmitAggregateStackSlot(base,
+                                                                  function_index,
+                                                                  block_index,
+                                                                  instruction_index,
+                                                                  "array",
+                                                                  output_lines);
+            const std::string ptr_temp = LLVMTempName(function_index, block_index, instruction_index) + ".ptr";
+            const std::string init_temp = LLVMTempName(function_index, block_index, instruction_index) + ".init";
+            const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
+            output_lines.push_back(ptr_temp + " = getelementptr inbounds " + base.type.backend_name + ", ptr " + array_slot + ", i64 0, i64 0");
+            output_lines.push_back(init_temp + " = insertvalue " + slice_type.backend_name + " zeroinitializer, ptr " + ptr_temp + ", 0");
+            output_lines.push_back(result_temp + " = insertvalue " + slice_type.backend_name + " " + init_temp + ", i64 " +
+                                   std::to_string(*length) + ", 1");
+            RecordExecutableValue(state, instruction.result, result_temp, slice_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kBufferToSlice:
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission does not support MIR instruction 'buffer_to_slice' in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+
+        case mir::Instruction::Kind::kField: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue base;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "field",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                base)) {
+                return false;
+            }
+
+            const std::string field_name = instruction.target_name.empty() ? instruction.target : instruction.target_name;
+            const auto field_index = FindFieldIndex(*state.module, instruction.target_base_type, field_name);
+            if (!field_index.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not resolve field '" + field_name + "' in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            BackendTypeInfo field_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      FunctionBlockContext("field", state.function->name, block),
+                                      field_type)) {
+                return false;
+            }
+
+            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+            output_lines.push_back(temp + " = extractvalue " + base.type.backend_name + " " + base.text + ", " +
+                                   std::to_string(*field_index));
+            RecordExecutableValue(state, instruction.result, temp, field_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kIndex: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue base;
+            ExecutableValue index;
+            if (!ResolveTwoExecutableOperands(state,
+                                              instruction,
+                                              "index",
+                                              block,
+                                              source_path,
+                                              diagnostics,
+                                              base,
+                                              index)) {
+                return false;
+            }
+
+            BackendTypeInfo result_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      FunctionBlockContext("index", state.function->name, block),
+                                      result_type)) {
+                return false;
+            }
+
+            std::string index_i64;
+            if (!ExtendIntegerToI64(index,
+                                    function_index,
+                                    block_index,
+                                    instruction_index,
+                                    "index",
+                                    output_lines,
+                                    index_i64)) {
+                return false;
+            }
+
+            const std::string ptr_temp = LLVMTempName(function_index, block_index, instruction_index) + ".ptr";
+            if (!base.type.backend_name.empty() && base.type.backend_name.front() == '[') {
+                const std::string array_slot = EmitAggregateStackSlot(base,
+                                                                      function_index,
+                                                                      block_index,
+                                                                      instruction_index,
+                                                                      "array",
+                                                                      output_lines);
+                output_lines.push_back(ptr_temp + " = getelementptr inbounds " + base.type.backend_name + ", ptr " + array_slot + ", i64 0, i64 " + index_i64);
+            } else if (base.type.backend_name == "{ptr, i64}") {
+                const std::string data_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".data";
+                output_lines.push_back(data_ptr + " = extractvalue {ptr, i64} " + base.text + ", 0");
+                output_lines.push_back(ptr_temp + " = getelementptr inbounds " + result_type.backend_name + ", ptr " + data_ptr + ", i64 " + index_i64);
+            } else {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission does not support index base type '" + base.type.source_name +
+                                       "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
+            output_lines.push_back(result_temp + " = load " + result_type.backend_name + ", ptr " + ptr_temp + ", align " +
+                                   std::to_string(result_type.alignment));
+            RecordExecutableValue(state, instruction.result, result_temp, result_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kSlice: {
+            return EmitSliceInstruction(instruction,
+                                        function_index,
+                                        block_index,
+                                        instruction_index,
+                                        block,
+                                        source_path,
+                                        diagnostics,
+                                        state,
+                                        output_lines);
+        }
+
+        case mir::Instruction::Kind::kAggregateInit: {
+            return EmitAggregateInitInstruction(instruction,
+                                                function_index,
+                                                block_index,
+                                                instruction_index,
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                state,
+                                                output_lines);
+        }
+    }
+
+    return false;
+}
+
+bool RenderExecutableTerminator(const mir::BasicBlock& block,
+                                const std::filesystem::path& source_path,
+                                support::DiagnosticSink& diagnostics,
+                                const ExecutableFunctionState& state,
+                                std::vector<std::string>& output_lines) {
+    switch (block.terminator.kind) {
+        case mir::Terminator::Kind::kReturn: {
+            if (block.terminator.values.empty()) {
+                output_lines.push_back("ret void");
+                return true;
+            }
+            if (block.terminator.values.size() != 1 || state.function->return_types.size() != 1) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission only supports single-value returns in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            ExecutableValue value;
+            if (!ResolveExecutableValue(state,
+                                        block.terminator.values.front(),
+                                        block,
+                                        source_path,
+                                        diagnostics,
+                                        value)) {
+                return false;
+            }
+
+            BackendTypeInfo return_type;
+            if (!LowerInstructionType(*state.module,
+                                      state.function->return_types.front(),
+                                      source_path,
+                                      diagnostics,
+                                      "return in executable emission for function '" + state.function->name + "' block '" +
+                                          block.label + "'",
+                                      return_type)) {
+                return false;
+            }
+
+            output_lines.push_back("ret " + return_type.backend_name + " " + value.text);
+            return true;
+        }
+
+        case mir::Terminator::Kind::kBranch: {
+            std::string label;
+            if (!ResolveExecutableBlock(state, block.terminator.true_target, block, source_path, diagnostics, label)) {
+                return false;
+            }
+            output_lines.push_back("br label %" + label);
+            return true;
+        }
+
+        case mir::Terminator::Kind::kCondBranch: {
+            if (block.terminator.values.size() != 1) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires cond_branch to use exactly one condition value in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            ExecutableValue condition;
+            if (!ResolveExecutableValue(state,
+                                        block.terminator.values.front(),
+                                        block,
+                                        source_path,
+                                        diagnostics,
+                                        condition)) {
+                return false;
+            }
+            if (condition.type.backend_name != "i1") {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires i1 branch conditions in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            std::string true_label;
+            std::string false_label;
+            if (!ResolveExecutableBlock(state, block.terminator.true_target, block, source_path, diagnostics, true_label) ||
+                !ResolveExecutableBlock(state, block.terminator.false_target, block, source_path, diagnostics, false_label)) {
+                return false;
+            }
+
+            output_lines.push_back("br i1 " + condition.text + ", label %" + true_label + ", label %" + false_label);
+            return true;
+        }
+
+        case mir::Terminator::Kind::kNone:
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires explicit MIR terminators in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+    }
+
+    return false;
+}
+
+bool RenderExecutableFunction(const mir::Module& module,
+                              const mir::Function& function,
+                              std::size_t function_index,
+                              bool wrap_hosted_main,
+                              const std::unordered_map<std::string, std::string>& function_symbols,
+                              const std::filesystem::path& source_path,
+                              support::DiagnosticSink& diagnostics,
+                              std::ostringstream& stream) {
+    if (function.return_types.size() > 1) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission does not support multi-value returns for function '" +
+                               function.name + "'",
+                           diagnostics);
+        return false;
+    }
+
+    const auto params = ParameterLocals(function);
+    std::vector<BackendTypeInfo> param_types;
+    param_types.reserve(params.size());
+    for (const auto* param : params) {
+        BackendTypeInfo param_type;
+        if (!LowerInstructionType(module,
+                                  param->type,
+                                  source_path,
+                                  diagnostics,
+                                  "parameter '" + param->name + "' for executable emission in function '" + function.name + "'",
+                                  param_type)) {
+            return false;
+        }
+        param_types.push_back(std::move(param_type));
+    }
+
+    BackendTypeInfo return_type;
+    if (!function.return_types.empty() &&
+        !LowerInstructionType(module,
+                              function.return_types.front(),
+                              source_path,
+                              diagnostics,
+                              "return type for executable emission in function '" + function.name + "'",
+                              return_type)) {
+        return false;
+    }
+
+    stream << "define " << (function.return_types.empty() ? std::string("void") : return_type.backend_name) << " "
+           << LLVMFunctionSymbol(function.name, wrap_hosted_main) << "(";
+    for (std::size_t index = 0; index < params.size(); ++index) {
+        if (index > 0) {
+            stream << ", ";
+        }
+        stream << param_types[index].backend_name << " " << LLVMParamName(params[index]->name);
+    }
+    stream << ") {\n";
+    stream << "entry.alloca:\n";
+
+    ExecutableFunctionState state;
+    state.module = &module;
+    state.function = &function;
+    for (const auto& global : module.globals) {
+        BackendTypeInfo global_type;
+        if (!LowerInstructionType(module,
+                                  global.type,
+                                  source_path,
+                                  diagnostics,
+                                  "global for executable emission",
+                                  global_type)) {
+            return false;
+        }
+        for (const auto& name : global.names) {
+            state.globals.emplace(name,
+                                  ExecutableGlobalInfo{
+                                      .backend_name = LLVMGlobalName(name),
+                                      .type = global.type,
+                                      .lowered_type = global_type,
+                                      .is_const = global.is_const,
+                                      .initializers = global.initializers,
+                                  });
+        }
+    }
+    for (const auto& local : function.locals) {
+        state.local_slots.emplace(local.name, LLVMLocalSlotName(local.name));
+    }
+    for (std::size_t block_index = 0; block_index < function.blocks.size(); ++block_index) {
+        state.block_labels.emplace(function.blocks[block_index].label,
+                                   LLVMBlockLabel(function_index, block_index, function.blocks[block_index].label));
+    }
+
+    for (const auto& local : function.locals) {
+        BackendTypeInfo local_type;
+        if (!LowerInstructionType(module,
+                                  local.type,
+                                  source_path,
+                                  diagnostics,
+                                  "local '" + local.name + "' for executable emission in function '" + function.name + "'",
+                                  local_type)) {
+            return false;
+        }
+        stream << "  " << LLVMLocalSlotName(local.name) << " = alloca " << local_type.backend_name << ", align "
+               << local_type.alignment << "\n";
+    }
+    for (std::size_t index = 0; index < params.size(); ++index) {
+        stream << "  store " << param_types[index].backend_name << " " << LLVMParamName(params[index]->name) << ", ptr "
+               << LLVMLocalSlotName(params[index]->name) << ", align " << param_types[index].alignment << "\n";
+    }
+    if (function.blocks.empty()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission requires at least one basic block in function '" +
+                               function.name + "'",
+                           diagnostics);
+        return false;
+    }
+    stream << "  br label %" << LLVMBlockLabel(function_index, 0, function.blocks.front().label) << "\n\n";
+
+    for (std::size_t block_index = 0; block_index < function.blocks.size(); ++block_index) {
+        const auto& block = function.blocks[block_index];
+        stream << LLVMBlockLabel(function_index, block_index, block.label) << ":\n";
+
+        std::vector<std::string> lines;
+        for (std::size_t instruction_index = 0; instruction_index < block.instructions.size(); ++instruction_index) {
+            if (!RenderExecutableInstruction(block.instructions[instruction_index],
+                                             function_index,
+                                             block_index,
+                                             instruction_index,
+                                             function_symbols,
+                                             source_path,
+                                             diagnostics,
+                                             state,
+                                             lines)) {
+                return false;
+            }
+        }
+        if (!RenderExecutableTerminator(block, source_path, diagnostics, state, lines)) {
+            return false;
+        }
+
+        for (const auto& line : lines) {
+            stream << "  " << line << "\n";
+        }
+        stream << "\n";
+    }
+
+    stream << "}\n\n";
+    return true;
+}
+
+bool IsCanonicalHostedMainParam(const mir::Local& local) {
+    return local.type.kind == sema::Type::Kind::kNamed && local.type.name == "Slice" && local.type.subtypes.size() == 1 &&
+           local.type.subtypes.front().kind == sema::Type::Kind::kString;
+}
+
+bool RenderHostedEntryWrapper(const mir::Module& module,
+                              const mir::Function& main_function,
+                              bool wrap_hosted_main,
+                              const std::filesystem::path& source_path,
+                              support::DiagnosticSink& diagnostics,
+                              std::ostringstream& stream) {
+    if (!wrap_hosted_main) {
+        return true;
+    }
+
+    const auto params = ParameterLocals(main_function);
+    if (params.size() > 1) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap hosted entry only supports 'main' with zero parameters or one Slice<cstr>-shaped parameter",
+                           diagnostics);
+        return false;
+    }
+    if (params.size() == 1 && !IsCanonicalHostedMainParam(*params.front())) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap hosted entry only supports 'main(args: Slice<cstr>)' in the current executable slice",
+                           diagnostics);
+        return false;
+    }
+    if (main_function.return_types.size() > 1) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap hosted entry only supports void or i32 returns from 'main'",
+                           diagnostics);
+        return false;
+    }
+
+    bool returns_i32 = false;
+    if (!main_function.return_types.empty()) {
+        BackendTypeInfo return_type;
+        if (!LowerInstructionType(module,
+                                  main_function.return_types.front(),
+                                  source_path,
+                                  diagnostics,
+                                  "hosted entry wrapper for 'main'",
+                                  return_type)) {
+            return false;
+        }
+        if (return_type.backend_name != "i32") {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap hosted entry only supports void or i32 returns from 'main'",
+                               diagnostics);
+            return false;
+        }
+        returns_i32 = true;
+    }
+
+    stream << "define i32 @main(i32 %argc, ptr %argv) {\n";
+    stream << "entry:\n";
+    if (params.empty()) {
+        if (returns_i32) {
+            stream << "  %main.result = call i32 " << LLVMFunctionSymbol(main_function.name, true) << "()\n";
+            stream << "  ret i32 %main.result\n";
+        } else {
+            stream << "  call void " << LLVMFunctionSymbol(main_function.name, true) << "()\n";
+            stream << "  ret i32 0\n";
+        }
+    } else {
+        stream << "  %args.init = insertvalue {ptr, i64} zeroinitializer, ptr %argv, 0\n";
+        stream << "  %argc.ext = sext i32 %argc to i64\n";
+        stream << "  %args.full = insertvalue {ptr, i64} %args.init, i64 %argc.ext, 1\n";
+        if (returns_i32) {
+            stream << "  %main.result = call i32 " << LLVMFunctionSymbol(main_function.name, true) << "({ptr, i64} %args.full)\n";
+            stream << "  ret i32 %main.result\n";
+        } else {
+            stream << "  call void " << LLVMFunctionSymbol(main_function.name, true) << "({ptr, i64} %args.full)\n";
+            stream << "  ret i32 0\n";
+        }
+    }
+    stream << "}\n\n";
+    return true;
+}
+
+bool RenderExecutableModule(const mir::Module& module,
+                            const TargetConfig& target,
+                            const std::filesystem::path& source_path,
+                            support::DiagnosticSink& diagnostics,
+                            std::string& llvm_ir) {
+    const mir::Function* main_function = FindFunction(module, "main");
+    if (main_function == nullptr) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission requires a root 'main' function",
+                           diagnostics);
+        return false;
+    }
+
+    const bool wrap_hosted_main = true;
+    std::unordered_map<std::string, std::string> function_symbols;
+    function_symbols.reserve(module.functions.size());
+    for (const auto& function : module.functions) {
+        function_symbols.emplace(function.name, LLVMFunctionSymbol(function.name, wrap_hosted_main));
+    }
+
+    std::ostringstream stream;
+    stream << "source_filename = \"" << source_path.filename().generic_string() << "\"\n";
+    stream << "target triple = \"" << target.triple << "\"\n\n";
+    stream << "declare void @abort()\n\n";
+    stream << "define private void @__mc_trap() {\n";
+    stream << "entry:\n";
+    stream << "  call void @abort()\n";
+    stream << "  unreachable\n";
+    stream << "}\n\n";
+    stream << "define private void @__mc_check_bounds_index(i64 %index, i64 %len) {\n";
+    stream << "entry:\n";
+    stream << "  %neg = icmp slt i64 %index, 0\n";
+    stream << "  br i1 %neg, label %trap, label %check\n";
+    stream << "check:\n";
+    stream << "  %oob = icmp uge i64 %index, %len\n";
+    stream << "  br i1 %oob, label %trap, label %ok\n";
+    stream << "trap:\n";
+    stream << "  call void @__mc_trap()\n";
+    stream << "  unreachable\n";
+    stream << "ok:\n";
+    stream << "  ret void\n";
+    stream << "}\n\n";
+    stream << "define private void @__mc_check_bounds_slice(i64 %lower, i64 %upper, i64 %len) {\n";
+    stream << "entry:\n";
+    stream << "  %lower.neg = icmp slt i64 %lower, 0\n";
+    stream << "  br i1 %lower.neg, label %trap, label %check.upper.neg\n";
+    stream << "check.upper.neg:\n";
+    stream << "  %upper.neg = icmp slt i64 %upper, 0\n";
+    stream << "  br i1 %upper.neg, label %trap, label %check.order\n";
+    stream << "check.order:\n";
+    stream << "  %bad.order = icmp ugt i64 %lower, %upper\n";
+    stream << "  br i1 %bad.order, label %trap, label %check.len\n";
+    stream << "check.len:\n";
+    stream << "  %bad.len = icmp ugt i64 %upper, %len\n";
+    stream << "  br i1 %bad.len, label %trap, label %ok\n";
+    stream << "trap:\n";
+    stream << "  call void @__mc_trap()\n";
+    stream << "  unreachable\n";
+    stream << "ok:\n";
+    stream << "  ret void\n";
+    stream << "}\n\n";
+    stream << "define private void @__mc_check_div_i32(i32 %rhs) {\n";
+    stream << "entry:\n";
+    stream << "  %is.zero = icmp eq i32 %rhs, 0\n";
+    stream << "  br i1 %is.zero, label %trap, label %ok\n";
+    stream << "trap:\n";
+    stream << "  call void @__mc_trap()\n";
+    stream << "  unreachable\n";
+    stream << "ok:\n";
+    stream << "  ret void\n";
+    stream << "}\n\n";
+    stream << "define private void @__mc_check_shift_32(i64 %count) {\n";
+    stream << "entry:\n";
+    stream << "  %bad = icmp uge i64 %count, 32\n";
+    stream << "  br i1 %bad, label %trap, label %ok\n";
+    stream << "trap:\n";
+    stream << "  call void @__mc_trap()\n";
+    stream << "  unreachable\n";
+    stream << "ok:\n";
+    stream << "  ret void\n";
+    stream << "}\n\n";
+
+    for (const auto& global : module.globals) {
+        BackendTypeInfo global_type;
+        if (!LowerInstructionType(module,
+                                  global.type,
+                                  source_path,
+                                  diagnostics,
+                                  "global executable emission",
+                                  global_type)) {
+            return false;
+        }
+        const std::string init_value = global.initializers.empty() ? LLVMZeroValue(global_type)
+                                                                   : FormatLLVMLiteral(global_type, global.initializers.front());
+        for (const auto& name : global.names) {
+            stream << LLVMGlobalName(name) << " = " << (global.is_const ? "constant " : "global ")
+                   << global_type.backend_name << " " << init_value << ", align " << global_type.alignment << "\n";
+        }
+    }
+    if (!module.globals.empty()) {
+        stream << "\n";
+    }
+
+    for (std::size_t function_index = 0; function_index < module.functions.size(); ++function_index) {
+        if (!RenderExecutableFunction(module,
+                                      module.functions[function_index],
+                                      function_index,
+                                      wrap_hosted_main,
+                                      function_symbols,
+                                      source_path,
+                                      diagnostics,
+                                      stream)) {
+            return false;
+        }
+    }
+
+    if (!RenderHostedEntryWrapper(module, *main_function, wrap_hosted_main, source_path, diagnostics, stream)) {
+        return false;
+    }
+
+    llvm_ir = stream.str();
+    return true;
+}
+
+std::string QuoteShellArg(std::string_view argument) {
+    std::string quoted;
+    quoted.reserve(argument.size() + 2);
+    quoted.push_back('\'');
+    for (const char ch : argument) {
+        if (ch == '\'') {
+            quoted += "'\\''";
+            continue;
+        }
+        quoted.push_back(ch);
+    }
+    quoted.push_back('\'');
+    return quoted;
+}
+
+std::string JoinCommand(const std::vector<std::string>& args) {
+    std::ostringstream command;
+    for (std::size_t index = 0; index < args.size(); ++index) {
+        if (index > 0) {
+            command << ' ';
+        }
+        command << QuoteShellArg(args[index]);
+    }
+    return command.str();
+}
+
+bool RunHostCommand(const std::vector<std::string>& args,
+                    const std::filesystem::path& source_path,
+                    support::DiagnosticSink& diagnostics,
+                    const std::string& description) {
+    const std::string command = JoinCommand(args);
+    const int raw_status = std::system(command.c_str());
+    if (raw_status == 0) {
+        return true;
+    }
+
+    int exit_code = raw_status;
+#ifdef WIFEXITED
+    if (WIFEXITED(raw_status)) {
+        exit_code = WEXITSTATUS(raw_status);
+    }
+#endif
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap backend failed to " + description + " using host toolchain command: " + command +
+                           " (exit=" + std::to_string(exit_code) + ")",
+                       diagnostics);
+    return false;
+}
+
 }  // namespace
 
 TargetConfig BootstrapTargetConfig() {
@@ -1105,25 +3560,17 @@ LowerResult LowerModule(const mir::Module& module,
         return {};
     }
 
-    if (!module.globals.empty()) {
-        std::ostringstream names;
-        for (std::size_t index = 0; index < module.globals.front().names.size(); ++index) {
-            if (index > 0) {
-                names << ", ";
-            }
-            names << module.globals.front().names[index];
-        }
-        ReportBackendError(source_path,
-                               "LLVM bootstrap backend does not lower globals in the current bootstrap slice; first global names=[" +
-                               names.str() + "]",
-                           diagnostics);
-        return {};
-    }
-
     auto backend_module = std::make_unique<BackendModule>();
     backend_module->target = options.target;
     backend_module->inspect_surface = std::string(kInspectSurface);
+    backend_module->globals.reserve(module.globals.size());
     backend_module->functions.reserve(module.functions.size());
+
+    for (const auto& global : module.globals) {
+        if (!LowerGlobal(module, global, source_path, diagnostics, *backend_module)) {
+            return {};
+        }
+    }
 
     for (std::size_t function_index = 0; function_index < module.functions.size(); ++function_index) {
         if (!LowerFunction(module,
@@ -1142,11 +3589,96 @@ LowerResult LowerModule(const mir::Module& module,
     };
 }
 
+BuildResult BuildExecutable(const mir::Module& module,
+                            const std::filesystem::path& source_path,
+                            const BuildOptions& options,
+                            support::DiagnosticSink& diagnostics) {
+    const auto lowered = LowerModule(module, source_path, {.target = options.target}, diagnostics);
+    if (!lowered.ok) {
+        return {};
+    }
+
+    std::string llvm_ir;
+    if (!RenderExecutableModule(module, options.target, source_path, diagnostics, llvm_ir)) {
+        return {};
+    }
+
+    std::filesystem::create_directories(options.artifacts.llvm_ir_path.parent_path());
+    std::filesystem::create_directories(options.artifacts.object_path.parent_path());
+    std::filesystem::create_directories(options.artifacts.executable_path.parent_path());
+
+    {
+        std::ofstream output(options.artifacts.llvm_ir_path, std::ios::binary);
+        output << llvm_ir;
+        if (!output) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend could not write LLVM IR artifact '" +
+                                   options.artifacts.llvm_ir_path.generic_string() + "'",
+                               diagnostics);
+            return {};
+        }
+    }
+
+    if (!RunHostCommand({"xcrun",
+                         "clang",
+                         "-target",
+                         options.target.triple,
+                         "-x",
+                         "ir",
+                         options.artifacts.llvm_ir_path.generic_string(),
+                         "-c",
+                         "-o",
+                         options.artifacts.object_path.generic_string()},
+                        source_path,
+                        diagnostics,
+                        "emit an object file")) {
+        return {};
+    }
+
+    if (!RunHostCommand({"xcrun",
+                         "clang",
+                         "-target",
+                         options.target.triple,
+                         options.artifacts.object_path.generic_string(),
+                         "-o",
+                         options.artifacts.executable_path.generic_string()},
+                        source_path,
+                        diagnostics,
+                        "link a hosted executable")) {
+        return {};
+    }
+
+    return {
+        .artifacts = options.artifacts,
+        .ok = true,
+    };
+}
+
 std::string DumpModule(const BackendModule& module) {
     std::ostringstream stream;
     stream << "BackendModule surface=" << module.inspect_surface << " triple=" << module.target.triple
            << " target_family=" << module.target.target_family << " object_format=" << module.target.object_format
            << " hosted=" << (module.target.hosted ? "true" : "false") << '\n';
+
+    for (const auto& global : module.globals) {
+        std::ostringstream global_line;
+        global_line << "Global source=" << global.source_name << " backend=" << global.backend_name
+                    << " type=" << FormatTypeInfo(global.lowered_type);
+        if (global.is_const) {
+            global_line << " const";
+        }
+        if (!global.initializers.empty()) {
+            global_line << " init=[";
+            for (std::size_t index = 0; index < global.initializers.size(); ++index) {
+                if (index > 0) {
+                    global_line << ", ";
+                }
+                global_line << global.initializers[index];
+            }
+            global_line << "]";
+        }
+        WriteLine(stream, 1, global_line.str());
+    }
 
     for (const auto& function : module.functions) {
         std::ostringstream header;

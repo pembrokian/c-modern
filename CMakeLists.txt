@@ -76,6 +76,13 @@ add_executable(mc_codegen_fixture_tests
 target_include_directories(mc_codegen_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_codegen_fixture_tests PRIVATE mc_codegen_llvm mc_frontend_stub mc_mir mc_support)
 
+add_executable(mc_codegen_executable_tests
+    tests/codegen/codegen_executable_tests.cpp
+)
+
+target_include_directories(mc_codegen_executable_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_codegen_executable_tests PRIVATE mc_support)
+
 add_executable(mc_parser_fixture_tests
     tests/parser/parser_fixture_tests.cpp
 )
@@ -107,12 +114,14 @@ target_link_libraries(mc_sema_fixture_tests PRIVATE mc_sema_bootstrap mc_fronten
 add_test(NAME mc_bootstrap_unit COMMAND mc_bootstrap_tests)
 add_test(NAME mc_codegen_llvm_unit COMMAND mc_codegen_llvm_tests)
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME mc_codegen_executable_unit COMMAND mc_codegen_executable_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_parser_fixture_unit COMMAND mc_parser_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_sema_fixture_unit COMMAND mc_sema_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_mir_unit COMMAND mc_mir_tests)
 add_test(NAME mc_mir_fixture_unit COMMAND mc_mir_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_help_smoke COMMAND mc --help)
 add_test(NAME mc_check_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc)
+add_test(NAME mc_build_smoke COMMAND mc build ${CMAKE_CURRENT_SOURCE_DIR}/tests/codegen/smoke_return_zero.mc --build-dir ${CMAKE_CURRENT_BINARY_DIR}/stage5_smoke)
 add_test(NAME mc_check_import_root_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_root_ok_main.mc --import-root ${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_roots)
 add_test(NAME mc_check_dump_mir_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --dump-mir --build-dir ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_dump_paths_smoke COMMAND mc dump-paths ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --build-dir ${CMAKE_CURRENT_BINARY_DIR})

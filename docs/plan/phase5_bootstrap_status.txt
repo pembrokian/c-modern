@@ -1,6 +1,6 @@
 Bootstrap Phase 5 Status
 
-This repository has completed Stage 0, Stage 1, and Stage 2 of the narrower bootstrap Phase 5 plan, and it should still not claim that the full Phase 5 from plan.txt is finished.
+This repository has completed Stage 0 through Stage 5 of the narrower bootstrap Phase 5 plan, and it should still not claim that the full Phase 5 from plan.txt is finished.
 
 The ordered implementation sequence for this status note now lives in `docs/plan/phase5_bootstrap_execution_plan.txt`.
 The Stage 0 freeze note for that sequence now lives in `docs/plan/phase5_bootstrap_backend_slice.txt`.
@@ -10,7 +10,7 @@ What is in place now:
 - `mc check` can parse, semantically check, lower to MIR, validate MIR, and emit deterministic MIR dumps for the currently supported bootstrap subset
 - deterministic semantic and MIR fixture coverage exists under `tests/sema/` and `tests/mir/`, giving Phase 5 a stable frontend contract to lower from
 - the tree now includes a real backend scaffold under `compiler/codegen_llvm/` plus a dedicated `mc_codegen_llvm` CMake target and focused backend unit coverage
-- the current driver remains intentionally thin and does not yet emit object code, invoke a linker, or produce executables
+- the current driver remains intentionally thin while now being able to emit LLVM IR, invoke the host toolchain, and produce one hosted executable through bootstrap `mc build`
 - the current build stays green under the canonical local workflow, so later backend work can start from a known-good Stage 1 baseline
 
 What Stage 0 has now fixed explicitly:
@@ -32,6 +32,13 @@ What Stage 2 has now fixed explicitly:
 - backend naming is reviewable and stable for this slice: functions use `@name`, locals use `%local.name`, blocks use `bb<function>_<block>.<source-label>`, temporaries use `%t<function>_<block>_<instruction>`, and reserved future globals use `@g.name`
 - `tests/codegen/` now contains focused backend snapshot coverage, and smoke coverage proves one or more checked modules can lower to backend output deterministically without linking
 
+What Stage 5 has now fixed explicitly:
+- the backend can render real LLVM IR for the runnable scalar control-flow slice and write deterministic `.ll` artifacts under `build/*/dumps/backend/`
+- the backend now emits object files and links hosted executables through the ordinary host `xcrun clang` path on Darwin arm64, with deterministic object and executable paths under `build/*/obj/` and `build/*/bin/`
+- the thin driver now exposes `mc build` while still remaining bootstrap-scoped; it reuses the existing parse -> sema -> MIR pipeline and only adds the backend, object, and link path required for one-module executable bring-up
+- the hosted entry boundary is now explicit in codegen: an emitted wrapper bridges the C-runtime `main(argc, argv)` entry into bootstrap Modern C `main` procedures with either zero parameters or the canonical `Slice<cstr>`-shaped argument surface
+- end-to-end executable coverage now exists in `tests/codegen/codegen_executable_tests.cpp`, and the canonical local workflow proves hello-style and direct-call programs build and run on the first hosted target
+
 What a narrower bootstrap Phase 5 will need to satisfy:
 - lower the supported typed MIR subset to backend IR without letting backend defaults redefine Modern C language semantics
 - support enough code generation for ordinary procedures, globals, aggregates, calls, branches, and returns to produce runnable hosted executables
@@ -39,10 +46,10 @@ What a narrower bootstrap Phase 5 will need to satisfy:
 - provide a thin bootstrap path for object emission and linking without prematurely claiming the broader Phase 7 tool workflow
 - add executable-focused tests under `tests/codegen/` that prove the supported bootstrap subset runs end to end on the first hosted target
 
-What still blocks a Phase 5 completion claim:
-- no object emission, assembly emission, or linker invocation path exists in the driver or test harness
-- no hosted runtime entry path is integrated for executable bring-up on a real target
-- no codegen integration tests exist yet for executable behavior, runtime faults, layout-sensitive data, or host linking
+What still blocks a fuller Phase 5 completion claim:
+- checked runtime faults are not yet executable-supported in the Stage 5 build path even though backend inspectability already names them explicitly
+- globals, aggregate-heavy lowering beyond the hosted entry boundary, and broader representation-sensitive cases are still outside the runnable executable slice
+- Stage 6 still needs a broader executable evidence set before the repository can write a narrower `phase5_bootstrap_finish.txt`
 
 Current structural debt worth tracking explicitly:
 - the current driver surface is inspection-oriented around `mc check`; Phase 5 should extend it only as far as backend bring-up requires and should avoid collapsing Phase 7 workflow concerns into early backend work
@@ -89,16 +96,16 @@ Theme: Type, layout, and data representation
 - pending: add layout-sensitive tests that prove backend data placement matches the current bootstrap semantic contract on the first hosted target
 
 Theme: Calls, globals, and hosted entry bring-up
-- pending: lower direct procedure calls, parameter passing, return values, and global definitions for the supported bootstrap calling surface
-- pending: define the minimal hosted entry path needed to turn a checked Modern C root module into a runnable program on the first target
-- pending: integrate the narrow runtime startup shim and any required support objects without turning runtime glue into ad hoc compiler semantics
-- pending: prove that simple executable cases such as hello-world-style entry, aggregate passing where supported, and global initialization work end to end
+- completed: lower the admitted direct procedure call, parameter passing, and return surface needed by the current runnable executable slice
+- completed: define the minimal hosted entry path needed to turn a checked Modern C root module into a runnable program on the first target
+- completed: integrate the narrow hosted startup boundary through an emitted `main(argc, argv)` wrapper without turning runtime glue into ad hoc compiler semantics
+- pending: extend executable proof beyond hello-style entry and direct calls into globals and wider aggregate-sensitive cases when those forms enter scope
 
 Theme: Object emission, linking, and bootstrap driver surface
-- pending: add the minimum driver or internal tool path needed to emit backend output and produce an object file from one checked source module
-- pending: add a narrow link step through ordinary host platform tools so Phase 5 can produce executables without claiming a full `mc build` workflow
-- pending: define where build artifacts, temporary backend dumps, and produced executables live inside `build/` so output paths remain deterministic and disposable
-- pending: keep command-line surface growth minimal and explicitly bootstrap-scoped until separate compilation and broader tool workflow work begins later
+- completed: add the minimum driver and backend path needed to emit LLVM IR, produce an object file, and link one hosted executable from one checked source module
+- completed: add the narrow link step through ordinary host platform tools without claiming the broader Phase 7 workflow
+- completed: define deterministic locations for backend dumps, objects, and linked executables under `build/`
+- completed: keep command-line growth bootstrap-thin by adding only `mc build` on top of the existing inspection-oriented surface
 
 Theme: Checked behavior and runtime fault realization
 - pending: decide how the first hosted target realizes checked runtime faults emitted by MIR, including the supported divide, shift, and bounds failure cases
@@ -107,7 +114,7 @@ Theme: Checked behavior and runtime fault realization
 - pending: add executable tests that distinguish correct checked behavior from silent miscompilation or target-default behavior
 
 Theme: Executable test coverage and milestone evidence
-- pending: populate `tests/codegen/` with narrow end-to-end executable cases that exercise the first supported backend surface before scaling up to broader examples
+- completed: populate `tests/codegen/` with narrow end-to-end executable cases that exercise the first supported backend surface before scaling up to broader examples
 - pending: add tests for ordinary procedures, globals, branches, returns, aggregates, arrays or slices where already supported, and the minimal hosted entry path
 - pending: add negative or diagnostic-oriented coverage where backend bring-up should fail crisply because a MIR form or target behavior is not yet supported
 - pending: define the evidence required for a future `phase5_bootstrap_finish.txt`, including green build-and-run coverage for the chosen hosted target and clear alignment with the original plan.txt Phase 5 exit criteria

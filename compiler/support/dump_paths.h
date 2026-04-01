@@ -13,8 +13,17 @@ struct DumpTargets {
     std::filesystem::path mci;
 };
 
+struct BuildArtifactTargets {
+    std::filesystem::path llvm_ir;
+    std::filesystem::path object;
+    std::filesystem::path executable;
+};
+
 DumpTargets ComputeDumpTargets(const std::filesystem::path& source_path,
                                const std::filesystem::path& build_dir);
+
+BuildArtifactTargets ComputeBuildArtifactTargets(const std::filesystem::path& source_path,
+                                                 const std::filesystem::path& build_dir);
 
 std::string SanitizeArtifactStem(const std::filesystem::path& source_path);
 

@@ -209,7 +209,7 @@ void TestLowerModuleRejectsUnsupportedTarget() {
 void TestLowerModuleRejectsUnsupportedInstruction() {
     auto module = MakeMinimalSupportedModule();
     module.functions[0].blocks[0].instructions.push_back({
-        .kind = mc::mir::Instruction::Kind::kAggregateInit,
+        .kind = mc::mir::Instruction::Kind::kVariantMatch,
         .operands = {"%v0", "%v0"},
     });
 
@@ -221,7 +221,7 @@ void TestLowerModuleRejectsUnsupportedInstruction() {
     const auto result = mc::codegen_llvm::LowerModule(module, "tests/cases/hello.mc", options, diagnostics);
     Expect(!result.ok, "out-of-scope MIR should fail backend preflight");
     Expect(diagnostics.HasErrors(), "out-of-scope MIR should emit backend diagnostics");
-    Expect(diagnostics.Render().find("does not support MIR instruction 'aggregate_init'") != std::string::npos,
+    Expect(diagnostics.Render().find("does not support MIR instruction 'variant_match'") != std::string::npos,
            "instruction diagnostic should name the unsupported MIR opcode");
 }
 

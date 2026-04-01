@@ -41,4 +41,14 @@ DumpTargets ComputeDumpTargets(const std::filesystem::path& source_path,
     };
 }
 
+BuildArtifactTargets ComputeBuildArtifactTargets(const std::filesystem::path& source_path,
+                                                 const std::filesystem::path& build_dir) {
+    const auto stem = SanitizeArtifactStem(source_path);
+    return {
+        .llvm_ir = build_dir / "dumps" / "backend" / (stem + ".ll"),
+        .object = build_dir / "obj" / (stem + ".o"),
+        .executable = build_dir / "bin" / stem,
+    };
+}
+
 }  // namespace mc::support

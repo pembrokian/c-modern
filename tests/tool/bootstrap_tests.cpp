@@ -65,6 +65,7 @@ void TestSourceManagerLoad() {
 
 void TestDumpPaths() {
     const auto targets = mc::support::ComputeDumpTargets("tests/cases/hello.mc", "build/debug");
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets("tests/cases/hello.mc", "build/debug");
     Expect(targets.ast.generic_string() == "build/debug/dumps/ast/tests_cases_hello.mc.ast.txt",
            "ast dump path should be deterministic");
     Expect(targets.mir.generic_string() == "build/debug/dumps/mir/tests_cases_hello.mc.mir.txt",
@@ -73,6 +74,12 @@ void TestDumpPaths() {
         "backend dump path should be deterministic");
     Expect(targets.mci.generic_string() == "build/debug/mci/tests_cases_hello.mc.mci",
            "mci path should be deterministic");
+    Expect(build_targets.llvm_ir.generic_string() == "build/debug/dumps/backend/tests_cases_hello.mc.ll",
+        "llvm ir path should be deterministic");
+    Expect(build_targets.object.generic_string() == "build/debug/obj/tests_cases_hello.mc.o",
+        "object path should be deterministic");
+    Expect(build_targets.executable.generic_string() == "build/debug/bin/tests_cases_hello.mc",
+        "executable path should be deterministic");
 }
 
 void TestLexerTracksKeywordsAndSeparators() {

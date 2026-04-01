@@ -155,6 +155,9 @@ Stage 5 - Object emission, linking, and hosted entry
 Objective:
 Produce a real hosted executable from one checked module.
 
+Stage 5 status:
+Completed for the narrower bootstrap slice with deterministic LLVM IR, object, and executable artifacts under `build/`, a thin `mc build` command, and a hosted entry wrapper that bridges the Darwin process `main(argc, argv)` boundary into bootstrap Modern C `main` procedures with either zero parameters or the canonical `Slice<cstr>`-shaped argument surface.
+
 Tasks:
 1. Add the minimum backend output path needed to emit an object file.
 2. Add the thinnest viable link step through ordinary host tooling.
@@ -166,6 +169,12 @@ Tasks:
 Outputs:
 - one checked source can produce one linked hosted executable
 - deterministic build artifact locations for backend outputs
+
+Stage 5 close-out note:
+- `compiler/codegen_llvm/` now renders real LLVM IR for the admitted runnable slice, writes it under `build/*/dumps/backend/*.ll`, and uses the ordinary host `xcrun clang` path to emit objects and link hosted executables
+- the thin driver now exposes `mc build` without expanding into broader Phase 7 workflow concerns; it still runs the existing parse -> sema -> MIR pipeline before invoking backend emission
+- deterministic Stage 5 artifacts now live under `build/*/dumps/backend/` for LLVM IR, `build/*/obj/` for objects, and `build/*/bin/` for linked executables
+- the current hosted entry path stays explicit: the emitted wrapper provides a C-runtime `main(argc, argv)` entry, constructs the bootstrap `Slice<cstr>` argument aggregate when required, and then calls the user `main`
 
 Validation gate:
 - an end-to-end hello-style executable builds and runs on the chosen hosted target

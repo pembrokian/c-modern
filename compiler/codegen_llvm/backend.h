@@ -47,6 +47,15 @@ struct BackendBlock {
     std::string terminator;
 };
 
+struct BackendGlobal {
+    bool is_const = false;
+    std::string source_name;
+    std::string backend_name;
+    sema::Type type;
+    BackendTypeInfo lowered_type;
+    std::vector<std::string> initializers;
+};
+
 struct BackendFunction {
     std::string source_name;
     std::string backend_name;
@@ -59,11 +68,28 @@ struct BackendFunction {
 struct BackendModule {
     TargetConfig target;
     std::string inspect_surface;
+    std::vector<BackendGlobal> globals;
     std::vector<BackendFunction> functions;
 };
 
 struct LowerResult {
     std::unique_ptr<BackendModule> module;
+    bool ok = false;
+};
+
+struct BuildArtifacts {
+    std::filesystem::path llvm_ir_path;
+    std::filesystem::path object_path;
+    std::filesystem::path executable_path;
+};
+
+struct BuildOptions {
+    TargetConfig target;
+    BuildArtifacts artifacts;
+};
+
+struct BuildResult {
+    BuildArtifacts artifacts;
     bool ok = false;
 };
 
@@ -73,6 +99,11 @@ LowerResult LowerModule(const mir::Module& module,
                         const std::filesystem::path& source_path,
                         const LowerOptions& options,
                         support::DiagnosticSink& diagnostics);
+
+BuildResult BuildExecutable(const mir::Module& module,
+                            const std::filesystem::path& source_path,
+                            const BuildOptions& options,
+                            support::DiagnosticSink& diagnostics);
 
 std::string DumpModule(const BackendModule& module);
 
