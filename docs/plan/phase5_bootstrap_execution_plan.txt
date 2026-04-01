@@ -18,6 +18,35 @@ Phase 5 bootstrap objective
 
 Implement the minimum backend path needed for one checked Modern C module to lower from typed MIR to backend output, emit an object, link a hosted executable, and run a narrow executable test suite on the first supported target.
 
+Current completion assessment
+
+- Stage 0 through Stage 6 are complete for the narrower repository-specific bootstrap path.
+- The narrower repository-specific Phase 5 finish note now exists and should be treated as the milestone close-out record.
+- The main remaining work is no longer Phase 5 bootstrap closure. The main remaining work is later-surface expansion beyond the narrower admitted slice.
+
+Current finish sequence
+
+This was the shortest ordered path from the in-progress repository state to a narrower Phase 5 completion note, and it is now complete.
+
+1. Align the docs with the code that now exists.
+	Specifically: stop presenting already-implemented globals, aggregates, checked faults, and related executable coverage as still-pending Stage 3 through Stage 5 bring-up work.
+2. Close the remaining Stage 6 evidence gaps for the admitted slice.
+	Specifically: keep the executable suite green, retain the negative or crisp-failure cases for unsupported forms, and decide whether any additional representation-sensitive case is truly required for the admitted slice rather than just desirable widening work.
+3. Write the explicit deferred-scope statement.
+	Document what remains outside narrower Phase 5 and belongs to later work, especially broader checked-operation surface, volatile or atomic lowering, wider memory-model work, and syntax or runtime shapes that are currently rejected cleanly rather than supported.
+4. Write `phase5_bootstrap_finish.txt`.
+	That note should point at the concrete executable evidence set, the supported slice, the explicit exclusions, and the fact that the repository milestone remains narrower than full `plan.txt` Phase 5.
+
+Completion result
+
+- Those close-out steps are now complete.
+- This execution plan should now be read as the historical implementation sequence plus the ordering rules that were used to reach the narrower repository-specific Phase 5 finish note.
+
+Decision rule
+
+- The current executable evidence and crisp-failure coverage were treated as sufficient for the slice the repository now claims, so the narrower Phase 5 milestone is now closed in repository terms.
+- If the repository wants to claim a broader executable surface than it currently documents, it should widen the code and tests first and then record that in a later status note rather than reopening this narrower milestone implicitly.
+
 Explicit non-goals for this bootstrap plan
 
 - separate compilation or `.mci` consumption

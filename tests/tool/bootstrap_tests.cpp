@@ -166,6 +166,24 @@ void TestParserReportsMalformedInput() {
            "parser should report a direct syntax diagnostic");
 }
 
+void TestParserRejectsArrayLiteralCallArgumentWithoutHanging() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "func view(values: [4]i32) i32 {\n"
+        "    return 0\n"
+        "}\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return view([4]i32{ 1, 2, 3, 4 })\n"
+        "}\n",
+        diagnostics);
+
+    Expect(!parsed.ok, "parser should reject unsupported array literal call arguments rather than hanging");
+    Expect(diagnostics.HasErrors(), "parser should report diagnostics for unsupported array literal call arguments");
+    Expect(diagnostics.Render().find("expected expression") != std::string::npos,
+           "parser should report the unexpected array literal token directly");
+}
+
 void TestParserHandlesMultiTargetAssignment() {
     mc::support::DiagnosticSink diagnostics;
     const auto parsed = ParseText(
@@ -210,6 +228,7 @@ int main() {
     TestParserBuildsDeterministicAstDump();
     TestParserHandlesTypesAndLoopForms();
     TestParserReportsMalformedInput();
+    TestParserRejectsArrayLiteralCallArgumentWithoutHanging();
     TestParserHandlesMultiTargetAssignment();
     TestParserPreservesBindingAssignmentAmbiguity();
     return 0;

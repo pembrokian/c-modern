@@ -1,0 +1,56 @@
+Bootstrap Phase 5 Completion
+
+This repository does not implement the full language-wide Phase 5 defined in `plan.txt`.
+It now implements a narrower, explicit bootstrap Phase 5 for the currently admitted hosted executable slice on Darwin arm64.
+
+Plan alignment for this milestone:
+- this note is grounded in the original `plan.txt` Phase 5 objective: stand up a real backend path after typed MIR that can lower supported programs to runnable hosted executables
+- this note is grounded in the repository-specific Phase 5 execution plan and Stage 0 freeze, while acknowledging that the admitted runnable slice widened beyond the very first frozen subset during bootstrap bring-up
+- this repository milestone claims only the supported bootstrap subset that now has direct executable evidence on the first hosted target
+
+Completed in this milestone:
+- the repository has a real backend under `compiler/codegen_llvm/` rather than a placeholder, with `BootstrapTargetConfig()` and `LowerModule(...)` as explicit entrypoints from typed MIR into backend lowering
+- the backend produces deterministic backend IR text through `DumpModule(...)` and optional `mc check --dump-backend`, with deterministic backend dump paths under `build/*/dumps/backend/`
+- the backend renders real LLVM IR for the admitted runnable slice and writes deterministic `.ll` artifacts under `build/*/dumps/backend/`
+- the thin driver now exposes `mc build`, reusing the existing parse -> sema -> MIR pipeline and then performing backend emission, object generation, and hosted linking through the ordinary host `xcrun clang` path on Darwin arm64
+- deterministic build artifacts exist under `build/*/dumps/backend/` for LLVM IR, `build/*/obj/` for objects, and `build/*/bin/` for linked executables
+- the hosted entry boundary is explicit in codegen: an emitted wrapper bridges the C-runtime `main(argc, argv)` entry into bootstrap Modern C `main` procedures with either zero parameters or the canonical `Slice<cstr>`-shaped argument surface
+- the admitted runnable slice now includes ordinary procedures, direct calls, locals, branches, returns, scalar globals, aggregate-return and field-sensitive cases, and the currently admitted integer-width checked divide, shift, and bounds-fault realization
+- executable checked-fault behavior is realized through explicit private helpers in executable LLVM IR rather than by relying on accidental host-default behavior
+- representative unsupported executable forms now fail crisply, including unsupported hosted-entry shapes and unsupported executable MIR such as `buffer_to_slice`
+- the executable suite under `tests/codegen/codegen_executable_tests.cpp` provides end-to-end runnable evidence for the admitted slice on the first hosted target
+- the canonical local workflow is green for the current repository state, including `mc_bootstrap_unit`, backend unit tests, codegen fixture tests, executable codegen tests, parser/sema/MIR fixture tests, and the existing smoke tests
+
+Explicitly claimed evidence for this milestone:
+- hello-style and direct-call executable coverage on the hosted target
+- scalar global executable coverage
+- aggregate-sensitive executable coverage, including padded struct layout-sensitive field access within the admitted slice
+- distinct-type executable roundtrip coverage within the admitted representation-preserving subset
+- checked divide, shift, and bounds success or failure coverage for the admitted integer-width subset
+- representative crisp-failure coverage for unsupported executable forms
+
+Explicitly not claimed complete here:
+- full language-wide Phase 5 completion from `plan.txt`
+- multi-target or cross-compilation backend support
+- separate compilation, `.mci` consumption, or broader Phase 7 workflow completion
+- exhaustive lowering for the full MIR surface
+- broad checked-operation coverage across every MIR type family
+- full volatile or atomic lowering support on the executable path
+- broader representation-sensitive executable support beyond the currently admitted slice
+- array aggregate literals in expression position or other syntax shapes that are currently rejected cleanly rather than supported
+
+Meaning of “Phase 5 finished” in the current repository:
+- the bootstrap compiler now has a real typed-MIR-to-backend-to-executable path on one hosted target
+- the supported bootstrap codegen surface has direct end-to-end executable evidence rather than only backend dumps or intended future work
+- unsupported executable forms fail narrowly enough that the repository is not relying on vague driver, linker, or host-runtime failures to define the slice
+- the milestone wording remains narrower than the full `plan.txt` Phase 5 and does not imply full backend, full workflow, or full language-surface completion
+
+Deferred scope after this milestone:
+- broader checked-operation surface beyond the admitted integer-width divide, shift, and bounds slice
+- wider representation-sensitive lowering and executable evidence beyond the currently admitted globals and aggregate-sensitive cases
+- volatile and atomic lowering on the executable path
+- broader memory-model and low-level boundary work
+- syntax and lowering support for shapes that are still rejected cleanly today but may be desirable later
+- broader workflow and tooling concerns that belong to later phases rather than to bootstrap backend bring-up
+
+The original `plan.txt` Phase 5 remains the full target. This file records the narrower repository milestone that closes bootstrap backend bring-up without overstating full backend or workflow readiness.

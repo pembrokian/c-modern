@@ -1326,10 +1326,14 @@ class Parser {
             return expr;
         }
 
+        const auto error_token = Current();
         ReportError(Current(), "expected expression");
+        if (!AtEnd()) {
+            Advance();
+        }
         auto expr = std::make_unique<Expr>();
         expr->kind = Expr::Kind::kLiteral;
-        expr->span = Current().span;
+        expr->span = error_token.span;
         expr->text = "<error>";
         return expr;
     }

@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string_view>
 #include <sys/wait.h>
@@ -1709,6 +1710,20 @@ bool ResolveExecutableValue(const ExecutableFunctionState& state,
     return false;
 }
 
+std::optional<sema::Type> ResolveExecutableFieldBaseType(const mir::Module& module,
+                                                         const sema::Type& metadata_base_type,
+                                                         const ExecutableValue& base_value) {
+    if (!sema::IsUnknown(metadata_base_type)) {
+        return metadata_base_type;
+    }
+
+    if (FindTypeDecl(module, base_value.type.source_name) != nullptr) {
+        return sema::NamedType(base_value.type.source_name);
+    }
+
+    return std::nullopt;
+}
+
 void RecordExecutableValue(ExecutableFunctionState& state,
                            const std::string& result_name,
                            const std::string& text,
@@ -1975,6 +1990,191 @@ std::string ShiftCheckHelperName(const BackendTypeInfo& type_info) {
     return "@__mc_check_shift_" + std::to_string(IntegerBitWidth(type_info));
 }
 
+void EmitDivCheckHelperDefinition(std::ostringstream& stream,
+                                  std::string_view backend_name) {
+    stream << "define private void @__mc_check_div_" << backend_name << "(" << backend_name << " %rhs) {\n";
+    stream << "entry:\n";
+    stream << "  %is.zero = icmp eq " << backend_name << " %rhs, 0\n";
+    stream << "  br i1 %is.zero, label %trap, label %ok\n";
+    stream << "trap:\n";
+    stream << "  call void @__mc_trap()\n";
+    stream << "  unreachable\n";
+    stream << "ok:\n";
+    stream << "  ret void\n";
+    stream << "}\n\n";
+}
+
+void EmitShiftCheckHelperDefinition(std::ostringstream& stream,
+                                    std::size_t bit_width) {
+    stream << "define private void @__mc_check_shift_" << bit_width << "(i64 %count) {\n";
+    stream << "entry:\n";
+    stream << "  %bad = icmp uge i64 %count, " << bit_width << "\n";
+    stream << "  br i1 %bad, label %trap, label %ok\n";
+    stream << "trap:\n";
+    stream << "  call void @__mc_trap()\n";
+    stream << "  unreachable\n";
+    stream << "ok:\n";
+    stream << "  ret void\n";
+    stream << "}\n\n";
+}
+
+struct CheckedHelperRequirements {
+    std::set<std::string> div_backend_names;
+    std::set<std::size_t> shift_widths;
+};
+
+struct CheckedHelperRequirementsPass {
+    const mir::Module& module;
+    const std::filesystem::path& source_path;
+    support::DiagnosticSink& diagnostics;
+
+    bool Run(CheckedHelperRequirements& requirements) {
+        for (const auto& function : module.functions) {
+            std::unordered_map<std::string, sema::Type> value_types;
+            SeedFunctionValueTypes(function, value_types);
+            if (!CollectFunctionRequirements(function, value_types, requirements)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+  private:
+    void SeedFunctionValueTypes(const mir::Function& function,
+                                std::unordered_map<std::string, sema::Type>& value_types) const {
+        value_types.reserve(function.locals.size());
+        for (const auto& local : function.locals) {
+            value_types.emplace(local.name, local.type);
+        }
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                if (!instruction.result.empty()) {
+                    value_types.insert_or_assign(instruction.result, instruction.type);
+                }
+            }
+        }
+    }
+
+    bool CollectFunctionRequirements(const mir::Function& function,
+                                     const std::unordered_map<std::string, sema::Type>& value_types,
+                                     CheckedHelperRequirements& requirements) {
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                switch (instruction.kind) {
+                    case mir::Instruction::Kind::kDivCheck:
+                        if (!AddDivCheckRequirement(function, block, instruction, value_types, requirements)) {
+                            return false;
+                        }
+                        break;
+                    case mir::Instruction::Kind::kShiftCheck:
+                        if (!AddShiftCheckRequirement(function, block, instruction, value_types, requirements)) {
+                            return false;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        return true;
+    }
+
+    const sema::Type* LookupValueType(const mir::Function& function,
+                                      const mir::BasicBlock& block,
+                                      const std::unordered_map<std::string, sema::Type>& value_types,
+                                      std::string_view value_name,
+                                      std::string_view check_name) {
+        const auto it = value_types.find(std::string(value_name));
+        if (it != value_types.end()) {
+            return &it->second;
+        }
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission could not resolve " + std::string(check_name) +
+                               " operand type for '" + std::string(value_name) + "' in function '" + function.name +
+                               "' block '" + block.label + "'",
+                           diagnostics);
+        return nullptr;
+    }
+
+    bool AddDivCheckRequirement(const mir::Function& function,
+                                const mir::BasicBlock& block,
+                                const mir::Instruction& instruction,
+                                const std::unordered_map<std::string, sema::Type>& value_types,
+                                CheckedHelperRequirements& requirements) {
+        if (instruction.operands.size() != 2) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires div_check to use exactly two operands in function '" +
+                                   function.name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        const sema::Type* rhs_type =
+            LookupValueType(function, block, value_types, instruction.operands[1], "div_check");
+        if (rhs_type == nullptr) {
+            return false;
+        }
+        BackendTypeInfo lowered_type;
+        if (!LowerInstructionType(module,
+                                  *rhs_type,
+                                  source_path,
+                                  diagnostics,
+                                  "checked-helper analysis for div_check in function '" + function.name + "' block '" +
+                                      block.label + "'",
+                                  lowered_type)) {
+            return false;
+        }
+        requirements.div_backend_names.insert(lowered_type.backend_name);
+        return true;
+    }
+
+    bool AddShiftCheckRequirement(const mir::Function& function,
+                                  const mir::BasicBlock& block,
+                                  const mir::Instruction& instruction,
+                                  const std::unordered_map<std::string, sema::Type>& value_types,
+                                  CheckedHelperRequirements& requirements) {
+        if (instruction.operands.size() != 2) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires shift_check to use exactly two operands in function '" +
+                                   function.name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        const sema::Type* value_type =
+            LookupValueType(function, block, value_types, instruction.operands[0], "shift_check");
+        if (value_type == nullptr) {
+            return false;
+        }
+        BackendTypeInfo lowered_type;
+        if (!LowerInstructionType(module,
+                                  *value_type,
+                                  source_path,
+                                  diagnostics,
+                                  "checked-helper analysis for shift_check in function '" + function.name + "' block '" +
+                                      block.label + "'",
+                                  lowered_type)) {
+            return false;
+        }
+        const std::size_t bit_width = IntegerBitWidth(lowered_type);
+        if (bit_width == 0) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires integer shift_check values in function '" +
+                                   function.name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        requirements.shift_widths.insert(bit_width);
+        return true;
+    }
+};
+
+bool CollectCheckedHelperRequirements(const mir::Module& module,
+                                      const std::filesystem::path& source_path,
+                                      support::DiagnosticSink& diagnostics,
+                                      CheckedHelperRequirements& requirements) {
+    CheckedHelperRequirementsPass pass{module, source_path, diagnostics};
+    return pass.Run(requirements);
+}
+
 bool EmitBoundsCheckCall(const mir::Instruction& instruction,
                          std::size_t function_index,
                          std::size_t block_index,
@@ -2182,6 +2382,39 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
         return false;
     }
 
+    std::vector<BackendTypeInfo> field_types;
+    field_types.reserve(instruction.operands.size());
+    if (instruction.type.kind == sema::Type::Kind::kNamed) {
+        const mir::TypeDecl* type_decl = FindTypeDecl(*state.module, instruction.type.name);
+        if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kStruct ||
+            type_decl->fields.size() != instruction.operands.size()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission could not resolve aggregate_init field layout for type '" +
+                                   sema::FormatType(instruction.type) + "' in function '" + state.function->name +
+                                   "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        for (const auto& field : type_decl->fields) {
+            BackendTypeInfo field_type;
+            if (!LowerInstructionType(*state.module,
+                                      field.second,
+                                      source_path,
+                                      diagnostics,
+                                      FunctionBlockContext("aggregate_init field", state.function->name, block),
+                                      field_type)) {
+                return false;
+            }
+            field_types.push_back(std::move(field_type));
+        }
+    } else {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission only supports named-struct aggregate_init in function '" +
+                               state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
     std::string current_value = LLVMStructInsertBase(aggregate_type);
     for (std::size_t index = 0; index < instruction.operands.size(); ++index) {
         ExecutableValue operand;
@@ -2193,7 +2426,7 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
                                            ? LLVMTempName(function_index, block_index, instruction_index)
                                            : LLVMTempName(function_index, block_index, instruction_index) + ".agg" + std::to_string(index);
         output_lines.push_back(next_value + " = insertvalue " + aggregate_type.backend_name + " " + current_value + ", " +
-                               operand.type.backend_name + " " + operand.text + ", " + std::to_string(index));
+                               field_types[index].backend_name + " " + operand.text + ", " + std::to_string(index));
         current_value = next_value;
     }
 
@@ -2349,14 +2582,8 @@ bool EmitSliceInstruction(const mir::Instruction& instruction,
 
     ExecutableValue base;
     ExecutableValue lower;
-    if (!ResolveTwoExecutableOperands(state,
-                                      instruction,
-                                      "slice",
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      base,
-                                      lower)) {
+    if (!ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, base) ||
+        !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, lower)) {
         return false;
     }
 
@@ -2917,7 +3144,12 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             }
 
             const std::string field_name = instruction.target_name.empty() ? instruction.target : instruction.target_name;
-            const auto field_index = FindFieldIndex(*state.module, instruction.target_base_type, field_name);
+            const auto field_base_type = ResolveExecutableFieldBaseType(*state.module,
+                                                                       instruction.target_base_type,
+                                                                       base);
+            const auto field_index = field_base_type.has_value()
+                                         ? FindFieldIndex(*state.module, *field_base_type, field_name)
+                                         : std::nullopt;
             if (!field_index.has_value()) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission could not resolve field '" + field_name + "' in function '" +
@@ -3383,13 +3615,18 @@ bool RenderExecutableModule(const mir::Module& module,
         function_symbols.emplace(function.name, LLVMFunctionSymbol(function.name, wrap_hosted_main));
     }
 
+    CheckedHelperRequirements checked_helpers;
+    if (!CollectCheckedHelperRequirements(module, source_path, diagnostics, checked_helpers)) {
+        return false;
+    }
+
     std::ostringstream stream;
     stream << "source_filename = \"" << source_path.filename().generic_string() << "\"\n";
     stream << "target triple = \"" << target.triple << "\"\n\n";
-    stream << "declare void @abort()\n\n";
+    stream << "declare void @exit(i32)\n\n";
     stream << "define private void @__mc_trap() {\n";
     stream << "entry:\n";
-    stream << "  call void @abort()\n";
+    stream << "  call void @exit(i32 134)\n";
     stream << "  unreachable\n";
     stream << "}\n\n";
     stream << "define private void @__mc_check_bounds_index(i64 %index, i64 %len) {\n";
@@ -3424,26 +3661,12 @@ bool RenderExecutableModule(const mir::Module& module,
     stream << "ok:\n";
     stream << "  ret void\n";
     stream << "}\n\n";
-    stream << "define private void @__mc_check_div_i32(i32 %rhs) {\n";
-    stream << "entry:\n";
-    stream << "  %is.zero = icmp eq i32 %rhs, 0\n";
-    stream << "  br i1 %is.zero, label %trap, label %ok\n";
-    stream << "trap:\n";
-    stream << "  call void @__mc_trap()\n";
-    stream << "  unreachable\n";
-    stream << "ok:\n";
-    stream << "  ret void\n";
-    stream << "}\n\n";
-    stream << "define private void @__mc_check_shift_32(i64 %count) {\n";
-    stream << "entry:\n";
-    stream << "  %bad = icmp uge i64 %count, 32\n";
-    stream << "  br i1 %bad, label %trap, label %ok\n";
-    stream << "trap:\n";
-    stream << "  call void @__mc_trap()\n";
-    stream << "  unreachable\n";
-    stream << "ok:\n";
-    stream << "  ret void\n";
-    stream << "}\n\n";
+    for (const auto& backend_name : checked_helpers.div_backend_names) {
+        EmitDivCheckHelperDefinition(stream, backend_name);
+    }
+    for (const auto bit_width : checked_helpers.shift_widths) {
+        EmitShiftCheckHelperDefinition(stream, bit_width);
+    }
 
     for (const auto& global : module.globals) {
         BackendTypeInfo global_type;

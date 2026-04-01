@@ -1,0 +1,39 @@
+Post-Phase-5 Checked Operation Widening
+
+Purpose
+
+This note starts the first post-Phase-5 widening target for the repository-specific bootstrap path.
+Phase 5 is finished in the narrower repository sense; this note records the next bounded expansion instead of reopening bootstrap closure.
+
+Target
+
+Broaden executable checked-operation support beyond the currently admitted integer-width divide, shift, and bounds slice.
+Keep the widening target narrow enough to preserve deterministic executable evidence and crisp unsupported-failure behavior.
+
+Plan alignment
+
+- this work follows the finished narrower bootstrap Phase 5 milestone recorded in `phase5_bootstrap_finish.txt`
+- it does not claim the broader Phase 6 runtime and standard-library boundary work from `plan.txt`
+- it focuses on widening the admitted checked-runtime surface while preserving the current backend and hosted executable shape
+
+Work
+
+- generalize checked-helper generation across more integer widths and signedness combinations
+- keep helper selection explicit in MIR-to-backend lowering
+- add executable coverage for newly admitted checked forms
+- preserve crisp failure for still-unsupported checked forms
+- keep representation-sensitive follow-ons separate until this target is stable
+
+Exit criteria
+
+- checked operations admitted by this target lower deterministically to executable IR
+- targeted executable tests cover the new widths or forms and remain green
+- unsupported checked forms still fail crisply
+- no broader backend surface is pulled in implicitly
+
+Non-goals
+
+- full standard library or runtime boundary work
+- volatile or atomic lowering
+- broader representation-sensitive aggregates beyond what this target needs
+- multi-target or cross-compilation work

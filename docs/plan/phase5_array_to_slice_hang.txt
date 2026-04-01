@@ -1,0 +1,62 @@
+Phase 5 Array Literal Call-Site Follow-Up
+
+Purpose
+
+This note records a resolved parser-progress bug and the remaining unsupported syntax shape that originally surfaced while expanding Phase 5 executable coverage.
+It is no longer a live hang investigation, and it should not be read as an active blocker on the narrower Phase 5 backend slice.
+
+Status
+
+- the original executable case was removed from `tests/codegen/codegen_executable_tests.cpp` so `mc_codegen_executable_unit` can remain a stable regression suite
+- the repro source now lives in `tests/codegen/array_to_slice_len_hang.mc`
+- the original hang was traced to a parser no-progress path on an unexpected `[` token inside call-argument parsing
+- that parser-progress bug is now fixed
+- the current behavior is a fast parse failure for unsupported array literal syntax in expression position
+
+Current repro
+
+From the repository root:
+
+```sh
+./build/mc check tests/codegen/array_to_slice_len_hang.mc --build-dir build/array_to_slice_len_hang_probe
+```
+
+Observed behavior on the current host:
+
+- before the parser fix, the command did not complete in a reasonable time
+- when left running under the broader executable suite, it could make the whole `mc_codegen_executable_unit` run appear stalled
+- on the current macOS host, this was severe enough to contribute to memory pressure during test execution
+- after the parser fix, the same repro exits quickly with parse diagnostics instead of hanging
+
+Why this is tracked separately
+
+- the surrounding executable suite is intended to prove the currently admitted runnable Phase 5 slice
+- a hanging build is a different class of failure from either a supported runnable case or a crisp unsupported diagnostic
+- keeping this repro in the normal suite would hide the rest of the executable evidence behind a syntax shape that is not currently admitted anyway
+
+Current finding
+
+- the immediate non-terminating behavior was caused by `ParsePrimaryExpr()` reporting an unexpected token without consuming it
+- in the call-site repro `view([4]i32{ 1, 2, 3, 4 })`, the parser encountered `[` where it could not form a primary expression and then failed to make forward progress inside call-argument parsing
+- the parser now consumes the unexpected token and returns an error expression, which turns the former hang into ordinary diagnostics
+
+What still remains
+
+- broader support for `[4]i32{ ... }` in expression position is still not implemented
+- the nearby Phase 4 and Phase 5 array-to-slice paths are otherwise healthy for admitted forms such as named array parameters and local array-to-slice conversions that the parser already accepts
+- the remaining issue is therefore a syntax-support question, not a live backend hang
+
+Why this is acceptable for now
+
+- the narrower Phase 5 backend slice does not require array aggregate literals in expression position
+- the important correctness property here was compiler progress and stability, and that has been restored
+- leaving the syntax unsupported is acceptable unless the language surface or upcoming executable coverage explicitly requires it
+
+Possible future follow-up
+
+One of these would be reasonable later:
+
+1. add real parser and lowering support for array aggregate literals in expression position, after which the repro can return as a normal executable test
+2. keep the syntax unsupported but improve the diagnostic so it says explicitly that array aggregate literals are not yet supported in expression position
+
+Until then, this repro should remain outside the ordinary executable test suite and serve only as a targeted follow-up record.

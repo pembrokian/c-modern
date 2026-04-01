@@ -6,6 +6,12 @@ This document closes Stage 0 of `phase5_bootstrap_execution_plan.txt`.
 It fixes the first backend choice, first hosted target, initial MIR lowering slice, and the narrower repository-specific meaning of Phase 5 bootstrap completion.
 It is intentionally narrower than the full backend surface described in `plan.txt`.
 
+Historical note
+
+- This file records the Stage 0 freeze for the initial backend bring-up slice.
+- Later Phase 5 work widened the admitted runnable slice beyond this initial freeze.
+- The current narrower repository completion claim is recorded in `phase5_bootstrap_finish.txt`, not in this historical Stage 0 freeze file.
+
 Frozen backend choice
 
 - first backend: LLVM

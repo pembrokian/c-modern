@@ -1,6 +1,12 @@
 Bootstrap Phase 5 Status
 
-This repository has completed Stage 0 through Stage 5 of the narrower bootstrap Phase 5 plan, and it should still not claim that the full Phase 5 from plan.txt is finished.
+This repository has now completed the narrower repository-specific bootstrap Phase 5 milestone, and it should still not claim that the full Phase 5 from plan.txt is finished.
+
+Short answer on completion status:
+
+- Yes, the narrower repository-specific Phase 5 milestone is now complete.
+- No, this is not a claim that the full language-wide Phase 5 in `plan.txt` is complete.
+- The repository now has the real hosted executable path that the narrower bootstrap Phase 5 plan was intended to establish, along with the executable evidence and explicit exclusions needed to describe that milestone responsibly.
 
 The ordered implementation sequence for this status note now lives in `docs/plan/phase5_bootstrap_execution_plan.txt`.
 The Stage 0 freeze note for that sequence now lives in `docs/plan/phase5_bootstrap_backend_slice.txt`.
@@ -47,9 +53,9 @@ What a narrower bootstrap Phase 5 will need to satisfy:
 - add executable-focused tests under `tests/codegen/` that prove the supported bootstrap subset runs end to end on the first hosted target
 
 What still blocks a fuller Phase 5 completion claim:
-- checked runtime faults are not yet executable-supported in the Stage 5 build path even though backend inspectability already names them explicitly
-- globals, aggregate-heavy lowering beyond the hosted entry boundary, and broader representation-sensitive cases are still outside the runnable executable slice
-- Stage 6 still needs a broader executable evidence set before the repository can write a narrower `phase5_bootstrap_finish.txt`
+- checked runtime fault support is still narrow: the runnable Stage 5 path now realizes the admitted integer-width divide, shift, and bounds traps for the current bootstrap slice, but it does not yet claim broader checked-operation coverage across the full MIR type surface
+- globals and aggregate-sensitive lowering are now admitted for the current narrow runnable slice, but broader representation-sensitive cases are still outside the executable surface
+- the repository-specific finish note is intentionally narrower than the full `plan.txt` Phase 5 and leaves broader backend and workflow surface for later work
 
 Current structural debt worth tracking explicitly:
 - the current driver surface is inspection-oriented around `mc check`; Phase 5 should extend it only as far as backend bring-up requires and should avoid collapsing Phase 7 workflow concerns into early backend work
@@ -61,14 +67,15 @@ Practical bootstrap interpretation:
 - the immediate goal is not a full toolchain or build-system surface; it is a narrow, inspectable backend path that can turn the already-supported MIR subset into working executables on one hosted target
 - Phase 5 should continue to distinguish a narrower repository bootstrap milestone from the broader Phase 5 target in plan.txt
 
-Concrete next steps toward a narrower bootstrap completion note:
-1. implement the initial MIR-to-backend lowering contract defined in `phase5_bootstrap_backend_slice.txt`
-2. expand the backend text surface from structural inspectability into the first real runnable lowering slice
-3. add the thinnest viable executable-emission path that can lower one checked module, emit an object, and link it with the hosted runtime boundary
-4. stand up `tests/codegen/` with a small end-to-end executable suite before expanding backend surface area
-5. only after those steps, consider writing a repository-specific `phase5_bootstrap_finish.txt` analogous to the earlier bootstrap milestone notes
+Repository finish-note status:
+1. the narrower milestone evidence is now recorded in `phase5_bootstrap_finish.txt`
+2. this status note should now be read as a summary of what the narrower milestone includes and what still remains outside it
+3. later work should treat broader checked-operation coverage, wider representation-sensitive lowering, volatile or atomic lowering, and broader workflow surface as post-Phase-5 expansion rather than as missing bootstrap bring-up
 
-Detailed close-out task map:
+Historical bring-up map and deferred follow-up:
+
+The detailed themes below record the bootstrap bring-up work and the larger follow-up surface around it.
+Items still marked pending should be read as explicitly deferred beyond the finished narrower repository-specific Phase 5 milestone, not as blockers to that milestone.
 
 Theme: Backend scope and milestone framing
 - completed: restate the narrower bootstrap Phase 5 objective in repository terms so future work tracks the original plan.txt Phase 5 goal without overstating readiness
@@ -99,7 +106,7 @@ Theme: Calls, globals, and hosted entry bring-up
 - completed: lower the admitted direct procedure call, parameter passing, and return surface needed by the current runnable executable slice
 - completed: define the minimal hosted entry path needed to turn a checked Modern C root module into a runnable program on the first target
 - completed: integrate the narrow hosted startup boundary through an emitted `main(argc, argv)` wrapper without turning runtime glue into ad hoc compiler semantics
-- pending: extend executable proof beyond hello-style entry and direct calls into globals and wider aggregate-sensitive cases when those forms enter scope
+- completed: extend executable proof beyond hello-style entry and direct calls into scalar globals plus aggregate-return and field-sensitive cases in the current admitted slice
 
 Theme: Object emission, linking, and bootstrap driver surface
 - completed: add the minimum driver and backend path needed to emit LLVM IR, produce an object file, and link one hosted executable from one checked source module
@@ -108,13 +115,28 @@ Theme: Object emission, linking, and bootstrap driver surface
 - completed: keep command-line growth bootstrap-thin by adding only `mc build` on top of the existing inspection-oriented surface
 
 Theme: Checked behavior and runtime fault realization
-- pending: decide how the first hosted target realizes checked runtime faults emitted by MIR, including the supported divide, shift, and bounds failure cases
+- completed: realize the current admitted checked runtime faults through module-driven private executable helpers for divide, shift, and bounds failure on the first hosted target
 - pending: ensure backend lowering preserves wraparound integer behavior where MIR already records it explicitly instead of inheriting accidental backend defaults
 - pending: validate that the supported volatile and atomic MIR instructions lower to correct backend operations for the chosen target subset
-- pending: add executable tests that distinguish correct checked behavior from silent miscompilation or target-default behavior
+- completed: add executable tests that distinguish supported checked fault behavior from silent host-default execution for the current admitted integer-width divide, shift, and bounds slice
 
 Theme: Executable test coverage and milestone evidence
 - completed: populate `tests/codegen/` with narrow end-to-end executable cases that exercise the first supported backend surface before scaling up to broader examples
-- pending: add tests for ordinary procedures, globals, branches, returns, aggregates, arrays or slices where already supported, and the minimal hosted entry path
-- pending: add negative or diagnostic-oriented coverage where backend bring-up should fail crisply because a MIR form or target behavior is not yet supported
-- pending: define the evidence required for a future `phase5_bootstrap_finish.txt`, including green build-and-run coverage for the chosen hosted target and clear alignment with the original plan.txt Phase 5 exit criteria
+- completed: add tests for ordinary procedures, globals, returns, aggregates, checked divide or shift behavior, bounds-checked slice or index behavior, and the minimal hosted entry path within the current narrow slice
+- completed: add representative negative or diagnostic-oriented coverage where backend bring-up should fail crisply because a MIR form or target behavior is not yet supported
+- completed: define the evidence required for the narrower repository-specific `phase5_bootstrap_finish.txt`, including green build-and-run coverage for the chosen hosted target and clear alignment with the narrower repository milestone
+
+Overall status update:
+- The narrower repository-specific bootstrap Phase 5 milestone is complete enough to support a real hosted executable path on Darwin arm64, and that narrower completion is now recorded explicitly in `phase5_bootstrap_finish.txt`.
+- In practical terms, the repository is no longer blocked on backend bring-up; it already has a working LLVM path, object emission, linking, hosted entry wiring, globals and aggregate-sensitive runnable cases in the admitted slice, executable checked-fault proof for the currently admitted integer-width divide, shift, and bounds cases, and crisp-failure coverage for representative unsupported forms.
+- The remaining work is no longer Phase 5 bootstrap closure. The remaining work is later-surface expansion and broader workflow or semantics work that remains outside the narrower repository milestone.
+- The first widening note now lives in `docs/plan/post_phase5_checked_operation_widening.txt`.
+
+Current ordered follow-up sequence:
+1. keep the narrower admitted executable slice green under the canonical local workflow
+2. widen the admitted slice only when the repository is ready to prove the new behavior with targeted executable coverage
+3. keep broader backend surface, volatile or atomic lowering, wider checked-operation coverage, and broader workflow concerns explicitly outside this finished narrower milestone until they are implemented and evidenced separately
+
+How the remaining next steps fit into the stages:
+- They are post-Phase-5 widening tasks, not missing Stage 0 through Stage 6 implementation steps. The bootstrap sequence established the initial backend, inspectability, runnable executable path, executable checked/runtime proof, and the narrower finish note that now closes the repository milestone.
+- Any broader backend expansion beyond that point should be treated as new admitted-slice work. In other words, more checked-operation surface, more memory-model work, and volatile or atomic lowering are valuable, but they should be understood as later widening work rather than as unfinished bootstrap closure.
