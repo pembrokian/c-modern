@@ -1,0 +1,558 @@
+Phase 6 -- Minimal Standard Library And Runtime Boundary
+========================================================
+
+Status
+------
+PLANNED
+
+Dependency note
+---------------
+Phase 6 depends on the executable bootstrap boundary completed by Phase 5 and
+on the earlier parser, sema, MIR, and backend milestones that already let the
+repository build and run one admitted hosted executable slice on Darwin arm64.
+
+Phase 6 also consumes existing repository posture from:
+
+- `docs/plan/plan.txt`
+- `docs/plan/phase5_bootstrap_finish.txt`
+- `docs/arch/runtime_spec.txt`
+- `docs/arch/stdlib_spec.txt`
+- `docs/arch/allocation_spec.txt`
+- `docs/arch/canonical_programs.txt`
+- `docs/arch/build_spec.txt`
+- the current driver, sema, MIR, and LLVM backend entrypoints under
+  `compiler/`
+- the checked executable proof already present under `tests/codegen/`
+- the existing but still-empty module buckets under `stdlib/` and the hosted
+  runtime bucket under `runtime/hosted/`
+
+Repository-specific scope note
+------------------------------
+`docs/arch/stdlib_spec.txt` defines `net` as part of the canonical long-term
+portable packaging surface.
+
+The original Phase 6 text in `plan.txt` names `mem`, `io`, `strings`, `utf8`,
+`fs`, `sync`, `time`, `os`, and `hal`, while keeping `testing` as a toolchain
+companion and startup outside the normal import surface.
+
+This repository-specific Phase 6 implementation plan follows the Phase 6 scope
+written in `plan.txt` and treats `net` as deferred unless a concrete admitted
+example or test requires it during implementation.
+
+Purpose
+-------
+Execute the next bring-up phase by turning the current executable compiler path
+into a usable hosted language environment with:
+
+- a minimal but real standard library surface
+- an explicit hosted startup boundary outside the core language
+- stable allocation and owned-buffer conventions
+- deterministic tests proving that canonical library-dependent examples compile
+  and run through ordinary toolchain behavior rather than through ad hoc
+  compiler magic
+
+Problem being solved
+--------------------
+The repository can now parse, type-check, lower, emit LLVM IR, link, and run a
+bounded executable slice, but it still lacks the library and runtime boundary
+that makes hosted programs real rather than compiler-only smoke tests.
+
+Without one bounded Phase 6 compression pass:
+
+- standard-library examples can only exist as architecture text instead of as
+  executable repository truth
+- allocation, I/O, string, and file APIs can drift between docs, examples, and
+  implementation because no module surface has been frozen in code
+- hosted startup can remain partially trapped inside backend-local behavior
+  instead of becoming an explicit runtime boundary under `runtime/hosted/`
+- future build-tool and real-program work can start depending on hidden import
+  roots, hidden allocator access, or backend-owned library semantics
+- `stdlib/` and `runtime/` can remain placeholder directories instead of
+  becoming a real ownership boundary for Phase 6 and later phases
+
+This phase therefore exists to close the gap between “the compiler can run a
+small executable” and “the toolchain provides a thin, explicit hosted library
+environment with visible ownership boundaries”.
+
+Core rule
+---------
+
+  The compiler owns language meaning, the standard library owns library APIs,
+  and `runtime/hosted/` owns only the minimal hosted startup bridge.
+  Phase 6 may add explicit module implementations and hosted support code, but
+  it must not turn startup, allocation, or I/O into hidden compiler semantics
+  or a disguised language runtime.
+
+Summary
+-------
+After Phase 6:
+
+- `stdlib/` contains the first admitted bootstrap implementations of `mem`,
+  `io`, `strings`, `utf8`, `fs`, `sync`, `time`, `os`, and `hal`, but only for
+  the surfaces actually required by current examples and tests
+- `testing` exists as an ordinary toolchain companion module rather than as
+  compiler magic
+- `runtime/hosted/` contains the minimal hosted startup shim or hosted support
+  object boundary for the first target, and that boundary remains replaceable
+- `mem.default_allocator()`, `Allocator`, `Buffer<T>`, and the canonical slice
+  helper spellings become executable repository truth rather than architecture-
+  only text
+- canonical library-dependent hosted examples such as hello-style output and
+  explicit allocation or file-loading flows build and run end to end
+- the compiler stops accreting backend-local special handling for library
+  behavior that belongs in sema-owned layout, stdlib modules, or the runtime
+  boundary
+
+Current repository posture
+--------------------------
+Phase 6 begins from this repository truth:
+
+- the compiler pipeline through LLVM executable emission exists and is already
+  tested on Darwin arm64
+- the backend currently renders the hosted `main(argc, argv)` wrapper itself
+  and constructs the `Slice<cstr>` entry argument shape inline
+- `stdlib/` and `runtime/hosted/` exist in the tree, but they do not yet
+  provide real code or tests
+- there is no dedicated `tests/stdlib/` coverage yet
+- the current codebase already contains narrow compiler knowledge of library-
+  shaped types such as `Slice`, `Buffer`, `str`, `cstr`, and `Allocator`
+  representation details in backend lowering
+
+Phase 6 must preserve the working executable baseline while moving library and
+runtime ownership to the right places instead of widening backend-local magic.
+
+Canonical posture
+-----------------
+The target posture is:
+
+- one explicit hosted startup boundary outside the normal import surface
+- one explicit standard-library root under `stdlib/`
+- one thin admission rule: only implement what current examples and tests need
+- one allocator protocol centered on `Allocator` and explicit `*Allocator`
+  passing
+- one conventional owned-buffer path through `Buffer<T>`
+- one explicit hosted allocator accessor, `mem.default_allocator()`
+- one explicit slice-helper family, not ambient coercion disguised as library
+  behavior
+- one toolchain companion testing module that stays ordinary library code
+- zero hidden prelude imports
+- zero hidden allocation, scheduler, or initialization behavior
+- zero backend-local redefinition of library semantics when sema, stdlib, or
+  runtime code can own them directly
+
+Canonical implementation requirements
+-------------------------------------
+Phase 6 must define and enforce:
+
+- one explicit rule that hosted startup support lives under `runtime/hosted/`
+  and is not a normal importable standard-library module
+- one explicit rule that the default hosted startup path constructs
+  `Slice<cstr>` arguments without heap allocation and without mutating argument
+  bytes
+- one explicit rule that `mem.default_allocator()` is library access, not
+  ambient state, and is required only for hosted builds
+- one explicit rule that allocating library APIs keep allocator choice visible
+  unless a deliberately narrow hosted convenience wrapper is documented as such
+- one explicit rule that `Buffer<T>` is the bootstrap owning dynamic contiguous
+  storage type for library APIs that return newly allocated data
+- one explicit rule that `slice_from_array` and `slice_from_buffer` are the
+  canonical explicit slice-formation helpers rather than compiler-only hidden
+  conveniences
+- one explicit rule that `strings` stays non-allocating by default in the
+  bootstrap surface
+- one explicit rule that `testing` is shipped library code, not compiler
+  behavior
+- one explicit rule that module packaging follows `stdlib_spec.txt` and does
+  not collapse `io`, `fs`, `os`, `sync`, `time`, and `hal` into a blurred
+  utility surface
+- one explicit rule that Phase 6 does not turn checked-operation support hooks,
+  memcpy-like support hooks, or hosted startup glue into broad runtime
+  services
+- one explicit rule that the compiler may preserve only the minimum type-shape
+  knowledge required for already-admitted language-owned forms, and should not
+  broaden backend-local field or helper semantics for stdlib types when sema
+  layout or library declarations can provide the same truth
+
+Bootstrap module admission matrix
+---------------------------------
+Phase 6 should admit modules in dependency order and only to the extent that a
+current example or test needs them.
+
+Tier 1 -- required foundation
+
+- `mem`
+- `io`
+- `fs`
+- `strings`
+- `utf8`
+- hosted startup under `runtime/hosted/`
+
+Tier 2 -- required when a concrete admitted consumer appears
+
+- `os`
+- `time`
+- `sync`
+- `hal`
+- `testing`
+
+Tier 3 -- explicitly deferred from this repository-specific Phase 6 plan unless
+pressure proves otherwise
+
+- `net`
+- broad convenience wrapper families that silently use the default allocator
+- broad directory, subprocess, environment, thread, poller, or MMIO surfaces
+  that do not yet have executable proof demand
+
+Canonical artifacts
+-------------------
+Phase 6 must produce or update the following canonical surfaces:
+
+- `docs/plan/phase6_minimal_standard_library_and_runtime_boundary.txt`
+- `docs/plan/phase6_implementation_summary.txt`
+- bounded updates to `README.md`
+- bounded updates to `stdlib/README.md`
+- bounded updates to `runtime/README.md`
+- bootstrap library sources under the relevant subdirectories of `stdlib/`
+- hosted startup support sources under `runtime/hosted/`
+- any required compiler integration changes under `compiler/`
+- test coverage under `tests/stdlib/`, `tests/tool/`, and `tests/codegen/`
+- canonical example or fixture updates under `examples/` and `tests/cases/`
+- CMake wiring in `CMakeLists.txt` for any new library, runtime, or test
+  targets required by the admitted Phase 6 slice
+
+Allowed edit surface
+--------------------
+- `docs/plan/`
+- `README.md`
+- `stdlib/`
+- `runtime/`
+- `compiler/driver/`
+- `compiler/sema/`
+- `compiler/mir/` only if a real Phase 6 boundary issue requires it
+- `compiler/codegen_llvm/`
+- `compiler/support/`
+- `tests/stdlib/`
+- `tests/tool/`
+- `tests/codegen/`
+- `tests/cases/`
+- `examples/`
+- `CMakeLists.txt`
+
+Out of scope
+------------
+- full language-wide standard library completion
+- general package management or remote dependency fetching
+- broad `mc build` and `mc test` workflow completion from Phase 7
+- separate compilation or `.mci` consumption
+- networking module bring-up unless a concrete admitted Phase 6 consumer
+  requires it
+- broad platform process control or subprocess orchestration beyond what a
+  current example or test proves necessary
+- scheduler, async, futures, channels, or any hidden runtime loop
+- garbage collection, panic unwinding, hidden initialization registries, or
+  hidden allocator state
+- broad freestanding runtime work
+- broad convenience-wrapper duplication for every allocating API
+
+Workstream 6A -- Ownership and contract closure
+-----------------------------------------------
+Objective
+~~~~~~~~~
+Freeze the actual Phase 6 ownership split so stdlib and hosted startup stop
+being “future directories” and become the canonical homes for library and
+runtime boundary code.
+
+Tasks
+~~~~~
+1. Re-audit `runtime_spec.txt`, `stdlib_spec.txt`, and `allocation_spec.txt`
+   against the current repository posture.
+2. Record exactly which Phase 6 surfaces are foundation requirements and which
+   are deferred until concrete pressure appears.
+3. Freeze the startup-versus-stdlib-versus-compiler ownership split in repo-
+   specific terms.
+4. Identify any current backend-local or sema-local knowledge of stdlib-shaped
+   types that is acceptable as retained bootstrap truth versus knowledge that
+   should be migrated out during Phase 6.
+
+Workstream 6B -- Standard-library import and packaging closure
+--------------------------------------------------------------
+Objective
+~~~~~~~~~
+Make the standard library importable as an explicit repository-controlled
+module surface without introducing a hidden prelude or a premature package
+system.
+
+Tasks
+~~~~~
+1. Define how `mc check` and `mc build` find the canonical stdlib root during
+   repository-local development and tests.
+2. Preserve ordinary explicit imports; do not add hidden automatic module
+   injection.
+3. Keep stdlib-root wiring bootstrap-thin and repository-local rather than
+   turning Phase 6 into a full package-graph or install-layout design.
+4. Add import-resolution proof that ordinary code can import admitted stdlib
+   modules through the chosen Phase 6 mechanism.
+
+Workstream 6C -- Hosted startup externalization
+-----------------------------------------------
+Objective
+~~~~~~~~~
+Move the first hosted startup boundary into `runtime/hosted/` while preserving
+the already-working Phase 5 executable behavior.
+
+Tasks
+~~~~~
+1. Define the minimal support object or shim interface between codegen output
+   and hosted process startup for Darwin arm64.
+2. Preserve the canonical hosted `main(args: Slice<cstr>) i32` boundary and
+   the zero-parameter compatibility path already admitted by the repository.
+3. Ensure the hosted argument slice is formed without heap allocation and
+   without making argument handling hidden library state.
+4. Keep the startup layer replaceable in design even if the first repository
+   implementation ships only one default hosted shim.
+5. Add executable tests that prove the startup boundary is explicit and stable,
+   especially around `args.len` and argument borrowing behavior.
+
+Workstream 6D -- Memory and slice foundation
+--------------------------------------------
+Objective
+~~~~~~~~~
+Land the minimum `mem` surface required for explicit allocation, owned buffers,
+and standard slice helper usage in real hosted examples.
+
+Tasks
+~~~~~
+1. Implement or stabilize `Allocator` as the one allocator protocol surface.
+2. Implement `mem.default_allocator()` as the conventional hosted allocator
+   accessor.
+3. Implement `Buffer<T>` ownership helpers required by admitted examples and
+   tests.
+4. Implement the first helper slice: `buffer_new<T>`, `buffer_free<T>`,
+   `slice_from_array`, `slice_from_buffer`, `copy_bytes`, and `fill_bytes` only
+   if current proof demands them.
+5. Keep allocator choice visible in allocating APIs; do not proliferate
+   default-allocator wrapper families.
+6. Add proof that `Buffer<T>` release paths are deterministic and do not leave
+   ownership conventions ambiguous.
+
+Workstream 6E -- Hosted text, I/O, and file surface
+---------------------------------------------------
+Objective
+~~~~~~~~~
+Implement the smallest portable hosted module surface needed for hello-style
+output, borrowed string processing, and explicit file loading.
+
+Tasks
+~~~~~
+1. Implement the minimum `io` surface needed for `stdout` or equivalent write
+   behavior, `write`, `write_line`, and `close` if current tests require it.
+2. Implement the minimum `fs` surface needed for `file_size`, `read_all`, and
+   the path or handle helpers actually required by admitted examples.
+3. Implement the minimum `strings` surface needed for borrowed, non-allocating
+   helpers such as `lines`, `split_once`, `equal`, `is_blank`, or other helpers
+   only where repository proof requires them.
+4. Implement the minimum `utf8` surface needed to support string invariants or
+   validation demanded by admitted examples.
+5. Keep `strings` non-allocating by default and avoid turning `io` or `fs`
+   into hidden-buffering convenience layers.
+
+Workstream 6F -- Deferred-control modules and testing companion
+---------------------------------------------------------------
+Objective
+~~~~~~~~~
+Admit `sync`, `time`, `os`, `hal`, and `testing` only through concrete proof
+pressure and keep their surfaces thin.
+
+Tasks
+~~~~~
+1. Add `os` only for explicit platform-facing needs such as environment,
+   descriptor, or errno bridging that cannot stay inside `io` or `fs`.
+2. Add `time` only for minimal clock, duration, or sleep surfaces required by
+   concrete examples or tests.
+3. Add `sync` only for real thread or coordination proof, not as a home for
+   I/O multiplexing or pseudo-runtime abstractions.
+4. Add `hal` only for explicit volatile or MMIO proof that belongs in hardware
+   or low-level boundary code.
+5. Add `testing` as ordinary shipped library code for test helpers without any
+   compiler special cases.
+
+Workstream 6G -- Proof closure and regression safety
+----------------------------------------------------
+Objective
+~~~~~~~~~
+Make the Phase 6 library and runtime boundary executable, reviewable, and hard
+to regress.
+
+Tasks
+~~~~~
+1. Populate `tests/stdlib/` with focused module-behavior tests.
+2. Add end-to-end executable fixtures for the hello-output, allocator, and
+   file-loading slices.
+3. Add import-resolution smoke tests proving stdlib modules are found through
+   the Phase 6 mechanism.
+4. Add targeted negative tests for out-of-scope surfaces so unsupported library
+   breadth fails narrowly instead of silently widening.
+5. Keep library and startup proof deterministic and scoped to the narrow Phase
+   6 slice.
+
+Ordered implementation steps
+----------------------------
+1. Publish this plan and one implementation summary under `docs/plan/`.
+2. Freeze the repository-specific module admission matrix and the startup or
+   stdlib or compiler ownership split.
+3. Decide the bootstrap stdlib import-root mechanism and prove it through
+   driver or test wiring.
+4. Externalize the hosted startup shim or support-object boundary into
+   `runtime/hosted/` without regressing the current executable slice.
+5. Land the `mem` foundation: `Allocator`, `mem.default_allocator()`,
+   `Buffer<T>`, and the canonical slice or buffer helpers required by admitted
+   proof.
+6. Land the hello-output slice through `io` and the explicit hosted startup
+   path.
+7. Land the file-loading slice through `fs` plus any required `strings` or
+   `utf8` helpers.
+8. Admit `os`, `time`, `sync`, `hal`, and `testing` only where a concrete
+   repository consumer forces them.
+9. Add focused `tests/stdlib/` coverage plus executable proof for the admitted
+   library-dependent examples.
+10. Run the canonical local build and test workflow plus the new Phase 6 proof
+    cases only.
+
+Execution slices used for implementation
+----------------------------------------
+1. Stdlib-root and import closure
+   - choose one bootstrap mechanism for finding `stdlib/` during repository
+     builds and tests
+   - preserve explicit imports and current import-root behavior
+   - add smoke proof that `import io` and `import mem` resolve through the
+     chosen mechanism
+
+2. Hosted startup and hello-output slice
+   - preserve the working hosted `Slice<cstr>` entry contract
+   - move startup support under `runtime/hosted/`
+   - implement the first `io.write_line`-style proof path
+   - validate that the compiler still produces a normal hosted executable with
+     no hidden allocation or initialization
+
+3. Allocator and owned-buffer slice
+   - implement `Allocator`, `mem.default_allocator()`, `Buffer<T>`,
+     `buffer_new<T>`, and `buffer_free<T>`
+   - validate explicit allocation, release, and slice-view formation through
+     executable or focused stdlib tests
+   - keep default-allocator access explicit at every call site
+
+4. File-loading and borrowed-string slice
+   - implement the minimum `fs.file_size`, `fs.read_all`, `strings.lines`,
+     `strings.split_once`, and `utf8.valid` family actually required by current
+     proof
+   - validate the read-file and config-parser style examples from
+     `canonical_programs.txt` in narrowed repository form
+
+5. Deferred module admission slice
+   - admit `os`, `time`, `sync`, `hal`, and `testing` only against a named
+     fixture or example
+   - do not front-load speculative APIs for pollers, subprocesses, threads,
+     atomics, or MMIO beyond what current proof requires
+
+Implementation task breakdown
+-----------------------------
+1. Planning and authority closure
+   - publish this plan under `docs/plan/`
+   - publish one implementation summary under `docs/plan/`
+   - record the bootstrap module matrix, dependency order, and deferred scope
+   - record the exact hosted startup ownership boundary carried forward from
+     Phase 5
+
+2. Compiler and build integration
+   - decide how stdlib imports are found in repository-local builds
+   - keep the driver thin while adding only the minimum stdlib-root and
+     runtime-support wiring needed for Phase 6
+   - preserve existing import-root options for non-stdlib tests and fixtures
+   - move any startup-specific build integration into `runtime/hosted/` or the
+     thinnest possible codegen boundary rather than expanding compiler-owned
+     runtime meaning
+
+3. Memory module foundation
+   - add the first admitted `mem` declarations and implementations
+   - ensure `Buffer<T>` layout and helper behavior are deterministic
+   - keep compiler knowledge of `Buffer<T>` and related forms bounded to real
+     representation needs, not library-policy behavior
+   - add tests for explicit allocator use, failure handling, and buffer release
+
+4. Hosted output and file modules
+   - add the minimum `io` surface required for hello-style hosted output
+   - add the minimum `fs` surface required for explicit file-size and read-all
+     behavior
+   - add the borrowed-text helpers in `strings` and validation helpers in
+     `utf8` only where real Phase 6 fixtures need them
+   - keep allocation explicit when file or string helpers return owned results
+
+5. Deferred module admission and companion testing
+   - admit `testing` as ordinary module code first if it materially simplifies
+     Phase 6 test authoring
+   - keep `sync`, `time`, `os`, and `hal` behind named proof requirements
+   - prefer narrow type or function sets over broad umbrella modules
+
+6. Documentation and proof closure
+   - update top-level and subtree READMEs to describe the actual Phase 6
+     surface rather than the placeholder posture
+   - add `tests/stdlib/` coverage and any necessary executable cases under
+     `tests/codegen/`
+   - keep fixture dumps and executable output deterministic
+
+Validation guidance
+-------------------
+Validate this phase with the canonical repository workflow plus focused Phase 6
+proof cases:
+
+- `cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug`
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build/debug --output-on-failure`
+- focused reruns of `mc_build_smoke`, `mc_codegen_executable_unit`, and the new
+  `tests/stdlib/` targets once they exist
+- direct `mc check` and `mc build` runs for the admitted Phase 6 examples using
+  the chosen stdlib-root wiring
+
+Validation rules
+----------------
+- do not claim Phase 6 completion from compile-only proofs if the admitted
+  canonical examples are supposed to run
+- do not widen module APIs without an executable or focused stdlib proof case
+- do not preserve backend-local startup or library behavior merely because it
+  already works if that behavior belongs in `runtime/hosted/` or `stdlib/`
+- do not broaden convenience wrappers that silently allocate through
+  `mem.default_allocator()` unless a narrow, documented hosted convenience path
+  is intentionally chosen
+- do not turn `testing` into a compiler feature or special import rule
+
+Acceptance criteria
+-------------------
+- the repository contains a real hosted startup boundary under
+  `runtime/hosted/` or an equivalently explicit hosted-support seam whose
+  ownership is no longer merely backend-local convention
+- admitted stdlib modules are importable through a deterministic, explicit
+  Phase 6 mechanism
+- `mem.default_allocator()`, `Allocator`, `Buffer<T>`, and the admitted slice
+  helpers exist as executable repository truth
+- hello-style standard-output programs compile and run through `io`
+- explicit allocation and owned-buffer examples compile and run through `mem`
+- explicit file-loading examples compile and run through `fs` plus any required
+  `strings` or `utf8` helpers
+- the library boundary matches `stdlib_spec.txt` packaging and does not collapse
+  into hidden runtime behavior
+- `testing` remains ordinary library code and startup remains outside the
+  importable standard-library surface
+- the canonical local build and test workflow stays green with the new Phase 6
+  coverage in place
+
+Implementation status target
+----------------------------
+Phase 6 should be considered implemented only when:
+
+- the admitted Phase 6 library-dependent canonical examples compile and run on
+  the first hosted target
+- startup, allocation, I/O, and file-boundary behavior are owned by the
+  documented runtime and stdlib layers rather than by incidental compiler or
+  backend behavior
+- the repository has a narrow finish note that records the supported bootstrap
+  Phase 6 slice without overstating full standard-library or runtime maturity
