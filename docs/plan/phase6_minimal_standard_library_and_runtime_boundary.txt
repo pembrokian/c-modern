@@ -3,31 +3,7 @@ Phase 6 -- Minimal Standard Library And Runtime Boundary
 
 Status
 ------
-IN PROGRESS -- bootstrap hosted slice implemented
-
-Repository status note
-----------------------
-The repository now contains a real Phase 6 bootstrap slice, but not the full
-long-term Phase 6 surface described in this plan.
-
-Implemented bootstrap slice:
-
-- repository-local stdlib discovery during `mc check` and `mc build`
-- executable builds that merge imported `.mc` modules into one hosted build unit
-- an explicit hosted runtime support source under `runtime/hosted/`
-- first admitted stdlib modules for `mem`, `io`, `fs`, `strings`, and `utf8`
-- module-qualified imported value access such as `io.write_line(...)`
-- dotted imported type expressions such as `mem.Allocator`
-- executable proof for hosted stdout, borrowed argv forwarding, explicit buffer
-  allocation, hosted file loading, and borrowed-text helpers
-
-Still deferred within Phase 6:
-
-- broader module admission for `os`, `time`, `sync`, `hal`, and `testing`
-- the long-term `(value, Error)` API shape across the stdlib surface
-- generic helper families such as fully canonical `buffer_new<T>` and
-  `slice_from_buffer<T>` spellings
-- fuller canonical `utf8` helpers such as `utf8.valid`, `decode`, and `encode`
+PLANNED
 
 Dependency note
 ---------------
