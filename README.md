@@ -12,6 +12,7 @@ What is in place:
 - typed MIR lowering, validation, and deterministic MIR fixture coverage for the currently supported semantic subset
 - bootstrap LLVM backend scaffolding for the frozen hosted Darwin arm64 target, with narrow backend preflight diagnostics for out-of-scope MIR
 - a thin `mc` driver with `check`, bootstrap `build`, `dump-paths`, and optional AST/MIR/backend dump emission for compiler inspection
+- a bootstrap Phase 6 hosted slice with automatic repository-local stdlib discovery, imported-module executable builds, and explicit runtime support under `runtime/hosted/`
 - parser, sema, MIR, and tool smoke tests wired through CTest and exposed through the same `make` command path used for local development
 
 Bootstrap commands:
@@ -28,6 +29,8 @@ cmake --build build/debug
 ctest --test-dir build/debug --output-on-failure
 build/debug/mc check tests/cases/hello.mc --dump-ast --emit-dump-paths
 build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/stage5_smoke --dump-backend
+build/debug/mc check tests/stdlib/hello_stdout.mc
+build/debug/mc build tests/stdlib/hello_stdout.mc --build-dir build/debug/phase6_stdout
 ```
 
 Notes:
@@ -36,4 +39,8 @@ Notes:
 - `make format` expects `clang-format` to be available on the host machine.
 - The current `mc check` command runs the bootstrap frontend, semantic checker, and MIR pipeline and can emit deterministic AST, MIR, and backend dumps.
 - The bootstrap `mc build` command now lowers one checked module through the LLVM backend, emits deterministic LLVM IR and object artifacts under `build/`, and links one hosted executable on Darwin arm64 through the ordinary host Clang toolchain.
+- repository-local `mc check` and `mc build` now discover `stdlib/` automatically for the admitted hosted Phase 6 slice.
+- imported stdlib values now use module-qualified access such as `io.write_line(...)`.
+- imported user-defined types now support dotted imported type expressions such as `mem.Allocator`.
+- the current standard-library boundary is still a bootstrap slice, not the full long-term Phase 6 surface from `docs/plan/plan.txt`.
 - `make` is a thin convenience wrapper around the canonical CMake workflow above.

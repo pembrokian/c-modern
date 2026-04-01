@@ -252,6 +252,18 @@ class Parser {
         return names;
     }
 
+    std::vector<std::unique_ptr<TypeExpr>> ParseCallTypeArgs() {
+        std::vector<std::unique_ptr<TypeExpr>> args;
+        Consume(TokenKind::kLt, "expected '<' before call type arguments");
+        if (!Check(TokenKind::kGt)) {
+            do {
+                args.push_back(ParseTypeExpr());
+            } while (Match(TokenKind::kComma));
+        }
+        Consume(TokenKind::kGt, "expected '>' after call type arguments");
+        return args;
+    }
+
     std::optional<Decl> ParseTopLevelDecl() {
         auto attributes = ParseAttributes();
         if (!attributes.empty()) {
@@ -592,6 +604,14 @@ class Parser {
         type->span.begin = Current().span.begin;
         type->name = Current().lexeme;
         Advance();
+
+        while (Match(TokenKind::kDot)) {
+            const auto member = ParseIdentifier("expected type name after '.'");
+            if (!member.has_value()) {
+                break;
+            }
+            type->name += "." + *member;
+        }
 
         if (Match(TokenKind::kLt)) {
             if (!Check(TokenKind::kGt)) {
@@ -1132,6 +1152,32 @@ class Parser {
         return inner_type_end.has_value() && Peek(*inner_type_end).kind == TokenKind::kRParen && Peek(*inner_type_end + 1).kind == TokenKind::kLParen;
     }
 
+    bool LooksLikePostfixTypeArgs() const {
+        if (!Check(TokenKind::kLt)) {
+            return false;
+        }
+
+        std::size_t next = 1;
+        if (Peek(next).kind == TokenKind::kGt) {
+            return Peek(next + 1).kind == TokenKind::kLParen || Peek(next + 1).kind == TokenKind::kLBrace;
+        }
+
+        while (true) {
+            const auto type_end = SkipTypeExprLookahead(next, true);
+            if (!type_end.has_value()) {
+                return false;
+            }
+            next = *type_end;
+            if (Peek(next).kind == TokenKind::kGt) {
+                return Peek(next + 1).kind == TokenKind::kLParen || Peek(next + 1).kind == TokenKind::kLBrace;
+            }
+            if (Peek(next).kind != TokenKind::kComma) {
+                return false;
+            }
+            next += 1;
+        }
+    }
+
     std::unique_ptr<Expr> ParseTypeCallExpr() {
         auto expr = std::make_unique<Expr>();
         expr->kind = Expr::Kind::kCall;
@@ -1227,6 +1273,11 @@ class Parser {
                 }
                 node->span.end = Previous().span.end;
                 expr = std::move(node);
+                continue;
+            }
+
+            if (expr->type_args.empty() && LooksLikePostfixTypeArgs()) {
+                expr->type_args = ParseCallTypeArgs();
                 continue;
             }
 

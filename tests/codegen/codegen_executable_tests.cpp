@@ -149,6 +149,25 @@ void ExpectExecutableFailure(const std::filesystem::path& executable,
     }
 }
 
+void ExpectExecutableOutput(const std::filesystem::path& executable,
+                            const std::vector<std::string>& args,
+                            int expected_exit_code,
+                            std::string_view expected_output,
+                            const std::filesystem::path& output_path,
+                            const std::string& context) {
+    std::vector<std::string> command;
+    command.push_back(executable.generic_string());
+    command.insert(command.end(), args.begin(), args.end());
+    const auto [outcome, output] = RunCommandCapture(command, output_path, context);
+    if (!outcome.exited || outcome.exit_code != expected_exit_code) {
+        Fail(context + ": expected exit code " + std::to_string(expected_exit_code) + ", got " +
+             std::to_string(outcome.exit_code));
+    }
+    if (output != expected_output) {
+        Fail(context + ": expected output '" + std::string(expected_output) + "', got '" + output + "'");
+    }
+}
+
 void WriteFile(const std::filesystem::path& path,
                std::string_view contents) {
     std::filesystem::create_directories(path.parent_path());
@@ -254,6 +273,31 @@ void RunBuildFailureFixture(const std::filesystem::path& mc_path,
     if (output.find(required_output_snippet) == std::string::npos) {
         Fail("expected build failure output snippet '" + required_output_snippet + "' in " + output_path.generic_string());
     }
+}
+
+void RunBuiltOutputFixture(const std::filesystem::path& mc_path,
+                           const std::filesystem::path& source_path,
+                           const std::filesystem::path& build_dir,
+                           const std::vector<std::string>& run_args,
+                           int expected_exit_code,
+                           std::string_view expected_output) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          source_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build " + source_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
+    ExpectExecutableOutput(artifacts.executable,
+                           run_args,
+                           expected_exit_code,
+                           expected_output,
+                           build_dir / "captured_output.txt",
+                           "run built executable " + artifacts.executable.generic_string());
 }
 
 }  // namespace
@@ -526,6 +570,64 @@ int main(int argc, char** argv) {
                     0,
                     {"alpha", "beta"});
 
+    RunBuiltOutputFixture(mc_path,
+                          source_root / "tests/stdlib/hello_stdout.mc",
+                          work_root / "phase6_hello_stdout_build",
+                          {},
+                          0,
+                          "hello, stdlib\n");
+
+    RunBuiltOutputFixture(mc_path,
+                          source_root / "tests/stdlib/echo_arg.mc",
+                          work_root / "phase6_echo_arg_build",
+                          {"borrowed-arg"},
+                          0,
+                          "borrowed-arg\n");
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/allocator_buffer_len.mc",
+                    work_root / "phase6_allocator_buffer_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/string_byte_len.mc",
+                    work_root / "phase6_string_byte_len_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/utf8_byte_len.mc",
+                    work_root / "phase6_utf8_byte_len_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/utf8_valid.mc",
+                    work_root / "phase6_utf8_valid_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/utf8_invalid_bytes.mc",
+                    work_root / "phase6_utf8_invalid_bytes_build",
+                    0,
+                    {});
+
+    const std::filesystem::path phase6_file_input = work_root / "phase6_file_input.txt";
+    WriteFile(phase6_file_input, "phase6\n");
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/file_read_len.mc",
+                    work_root / "phase6_file_read_len_build",
+                    7,
+                    {phase6_file_input.generic_string()});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/slice_from_buffer_len.mc",
+                    work_root / "phase6_slice_from_buffer_len_build",
+                    0,
+                    {});
+
     const std::filesystem::path hosted_bad_return_source = work_root / "hosted_main_bad_return.mc";
     WriteFile(hosted_bad_return_source,
               "func main() u64 {\n"
@@ -536,11 +638,13 @@ int main(int argc, char** argv) {
                            work_root / "hosted_main_bad_return_build",
                            "hosted entry only supports void or i32 returns from 'main'");
 
-    const std::filesystem::path buffer_slice_source = work_root / "buffer_to_slice_unsupported.mc";
+    const std::filesystem::path buffer_slice_source = work_root / "buffer_to_slice_supported.mc";
     WriteFile(buffer_slice_source,
               "struct Buffer<T> {\n"
               "    ptr: *T,\n"
               "    len: usize,\n"
+              "    cap: usize,\n"
+              "    alloc: *u8,\n"
               "}\n"
               "\n"
               "func view(values: Buffer<i32>) Slice<i32> {\n"
@@ -550,10 +654,11 @@ int main(int argc, char** argv) {
               "func main() i32 {\n"
               "    return 0\n"
               "}\n");
-    RunBuildFailureFixture(mc_path,
-                           buffer_slice_source,
-                           work_root / "buffer_to_slice_unsupported_build",
-                           "does not support MIR instruction 'buffer_to_slice'");
+    RunBuiltFixture(mc_path,
+                    buffer_slice_source,
+                    work_root / "buffer_to_slice_supported_build",
+                    0,
+                    {});
 
     return 0;
 }

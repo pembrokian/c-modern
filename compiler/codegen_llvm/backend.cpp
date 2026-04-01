@@ -8,6 +8,7 @@
 #include <string_view>
 #include <sys/wait.h>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace mc::codegen_llvm {
 namespace {
@@ -16,6 +17,7 @@ constexpr std::string_view kBootstrapTriple = "arm64-apple-darwin25.4.0";
 constexpr std::string_view kBootstrapTargetFamily = "arm64-apple-darwin";
 constexpr std::string_view kBootstrapObjectFormat = "macho";
 constexpr std::string_view kInspectSurface = "backend_ir_text";
+constexpr std::string_view kHostedRuntimeSupportPath = "runtime/hosted/mc_hosted_runtime.c";
 
 struct FunctionLoweringState {
     std::size_t function_index = 0;
@@ -26,6 +28,34 @@ struct FunctionLoweringState {
     std::unordered_map<std::string, std::string> values;
     std::unordered_map<std::string, BackendTypeInfo> value_types;
 };
+
+std::vector<std::pair<std::string, sema::Type>> BuiltinAggregateFields(const sema::Type& type) {
+    std::vector<std::pair<std::string, sema::Type>> fields;
+    if (type.kind == sema::Type::Kind::kString ||
+        (type.kind == sema::Type::Kind::kNamed && (type.name == "str" || type.name == "string" || type.name == "cstr"))) {
+        fields.push_back({"ptr", sema::PointerType(sema::NamedType("u8"))});
+        fields.push_back({"len", sema::NamedType("usize")});
+        return fields;
+    }
+    if (type.kind != sema::Type::Kind::kNamed) {
+        return fields;
+    }
+    if (type.name == "Slice") {
+        const sema::Type element_type = type.subtypes.empty() ? sema::UnknownType() : type.subtypes.front();
+        fields.push_back({"ptr", sema::PointerType(element_type)});
+        fields.push_back({"len", sema::NamedType("usize")});
+        return fields;
+    }
+    if (type.name == "Buffer") {
+        const sema::Type element_type = type.subtypes.empty() ? sema::UnknownType() : type.subtypes.front();
+        fields.push_back({"ptr", sema::PointerType(element_type)});
+        fields.push_back({"len", sema::NamedType("usize")});
+        fields.push_back({"cap", sema::NamedType("usize")});
+        fields.push_back({"alloc", sema::PointerType(sema::NamedType("Allocator"))});
+        return fields;
+    }
+    return fields;
+}
 
 std::string_view ToString(mir::Instruction::Kind kind) {
     switch (kind) {
@@ -63,6 +93,12 @@ std::string_view ToString(mir::Instruction::Kind kind) {
             return "array_to_slice";
         case mir::Instruction::Kind::kBufferToSlice:
             return "buffer_to_slice";
+        case mir::Instruction::Kind::kBufferNew:
+            return "buffer_new";
+        case mir::Instruction::Kind::kBufferFree:
+            return "buffer_free";
+        case mir::Instruction::Kind::kSliceFromBuffer:
+            return "slice_from_buffer";
         case mir::Instruction::Kind::kCall:
             return "call";
         case mir::Instruction::Kind::kVolatileLoad:
@@ -1108,6 +1144,8 @@ bool LowerInstruction(const mir::Instruction& instruction,
 
         case mir::Instruction::Kind::kArrayToSlice:
         case mir::Instruction::Kind::kBufferToSlice:
+        case mir::Instruction::Kind::kBufferNew:
+        case mir::Instruction::Kind::kSliceFromBuffer:
         case mir::Instruction::Kind::kField:
         case mir::Instruction::Kind::kIndex:
         case mir::Instruction::Kind::kSlice:
@@ -1157,6 +1195,26 @@ bool LowerInstruction(const mir::Instruction& instruction,
             }
             if (!operands.empty()) {
                 line << " operands=[" << JoinOperands(operands) << "]";
+            }
+            backend_block.instructions.push_back(line.str());
+            return true;
+        }
+
+        case mir::Instruction::Kind::kBufferFree: {
+            std::vector<std::string> operands;
+            if (!ResolveOperands(state,
+                                 instruction,
+                                 function,
+                                 block,
+                                 source_path,
+                                 diagnostics,
+                                 operands)) {
+                return false;
+            }
+            std::ostringstream line;
+            line << ToString(instruction.kind);
+            if (!operands.empty()) {
+                line << " operands=[" << JoinOperands(operands) << ']';
             }
             backend_block.instructions.push_back(line.str());
             return true;
@@ -1295,12 +1353,8 @@ bool LowerFunction(const mir::Module& module,
                    const std::filesystem::path& source_path,
                    support::DiagnosticSink& diagnostics,
                    BackendModule& backend_module) {
-    if (function.is_extern) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend does not lower extern functions in the current bootstrap slice; function '" +
-                               function.name + "'",
-                           diagnostics);
-        return false;
+    if (function.is_extern || !function.type_params.empty()) {
+        return true;
     }
 
     BackendFunction backend_function;
@@ -1424,6 +1478,12 @@ struct ExecutableValue {
     BackendTypeInfo type;
 };
 
+struct ExecutableStringConstant {
+    std::string global_name;
+    std::string array_type;
+    std::size_t length = 0;
+};
+
 struct ExecutableGlobalInfo {
     std::string backend_name;
     sema::Type type;
@@ -1438,6 +1498,7 @@ struct ExecutableFunctionState {
     std::unordered_map<std::string, std::string> block_labels;
     std::unordered_map<std::string, std::string> local_slots;
     std::unordered_map<std::string, ExecutableGlobalInfo> globals;
+    std::unordered_map<std::string, ExecutableStringConstant> string_constants;
     std::unordered_map<std::string, ExecutableValue> values;
 };
 
@@ -1675,6 +1736,65 @@ bool IsProcedureSourceType(std::string_view source_name) {
     return source_name.rfind("proc(", 0) == 0;
 }
 
+std::string DecodeStringLiteral(std::string_view literal) {
+    if (literal.size() >= 2 && literal.front() == '"' && literal.back() == '"') {
+        literal.remove_prefix(1);
+        literal.remove_suffix(1);
+    }
+
+    std::string decoded;
+    decoded.reserve(literal.size());
+    for (std::size_t index = 0; index < literal.size(); ++index) {
+        const char ch = literal[index];
+        if (ch != '\\' || index + 1 >= literal.size()) {
+            decoded.push_back(ch);
+            continue;
+        }
+
+        const char escaped = literal[++index];
+        switch (escaped) {
+            case 'n':
+                decoded.push_back('\n');
+                break;
+            case 'r':
+                decoded.push_back('\r');
+                break;
+            case 't':
+                decoded.push_back('\t');
+                break;
+            case '\\':
+                decoded.push_back('\\');
+                break;
+            case '"':
+                decoded.push_back('"');
+                break;
+            case '0':
+                decoded.push_back('\0');
+                break;
+            default:
+                decoded.push_back(escaped);
+                break;
+        }
+    }
+    return decoded;
+}
+
+std::string EncodeLLVMStringBytes(std::string_view decoded) {
+    std::ostringstream encoded;
+    for (const unsigned char ch : decoded) {
+        if (ch >= 32 && ch <= 126 && ch != '\\' && ch != '"') {
+            encoded << static_cast<char>(ch);
+            continue;
+        }
+
+        encoded << '\\';
+        constexpr char kHex[] = "0123456789ABCDEF";
+        encoded << kHex[(ch >> 4) & 0xF] << kHex[ch & 0xF];
+    }
+    encoded << "\\00";
+    return encoded.str();
+}
+
 std::string FormatLLVMLiteral(const BackendTypeInfo& type_info,
                               std::string_view value) {
     if (type_info.backend_name == "i1") {
@@ -1715,6 +1835,17 @@ std::optional<sema::Type> ResolveExecutableFieldBaseType(const mir::Module& modu
                                                          const ExecutableValue& base_value) {
     if (!sema::IsUnknown(metadata_base_type)) {
         return metadata_base_type;
+    }
+
+    if (base_value.type.source_name == "str" || base_value.type.source_name == "string" ||
+        base_value.type.source_name == "cstr") {
+        return sema::NamedType(base_value.type.source_name);
+    }
+    if (base_value.type.source_name == "Slice" || base_value.type.source_name.rfind("Slice<", 0) == 0) {
+        return sema::NamedType("Slice");
+    }
+    if (base_value.type.source_name == "Buffer" || base_value.type.source_name.rfind("Buffer<", 0) == 0) {
+        return sema::NamedType("Buffer");
     }
 
     if (FindTypeDecl(module, base_value.type.source_name) != nullptr) {
@@ -2386,8 +2517,12 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
     field_types.reserve(instruction.operands.size());
     if (instruction.type.kind == sema::Type::Kind::kNamed) {
         const mir::TypeDecl* type_decl = FindTypeDecl(*state.module, instruction.type.name);
-        if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kStruct ||
-            type_decl->fields.size() != instruction.operands.size()) {
+        std::vector<std::pair<std::string, sema::Type>> builtin_fields;
+        if (type_decl == nullptr) {
+            builtin_fields = BuiltinAggregateFields(instruction.type);
+        }
+        const auto field_count = type_decl != nullptr ? type_decl->fields.size() : builtin_fields.size();
+        if ((type_decl != nullptr && type_decl->kind != mir::TypeDecl::Kind::kStruct) || field_count != instruction.operands.size()) {
             ReportBackendError(source_path,
                                "LLVM bootstrap executable emission could not resolve aggregate_init field layout for type '" +
                                    sema::FormatType(instruction.type) + "' in function '" + state.function->name +
@@ -2395,7 +2530,8 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
                                diagnostics);
             return false;
         }
-        for (const auto& field : type_decl->fields) {
+        const auto& fields = type_decl != nullptr ? type_decl->fields : builtin_fields;
+        for (const auto& field : fields) {
             BackendTypeInfo field_type;
             if (!LowerInstructionType(*state.module,
                                       field.second,
@@ -2718,6 +2854,19 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                       type_info)) {
                 return false;
             }
+            const auto string_constant = state.string_constants.find(instruction.result);
+            if (string_constant != state.string_constants.end()) {
+                const std::string data_temp = LLVMTempName(function_index, block_index, instruction_index) + ".str.ptr";
+                const std::string init_temp = LLVMTempName(function_index, block_index, instruction_index) + ".str.init";
+                const std::string value_temp = LLVMTempName(function_index, block_index, instruction_index);
+                output_lines.push_back(data_temp + " = getelementptr inbounds " + string_constant->second.array_type + ", ptr " +
+                                       string_constant->second.global_name + ", i64 0, i64 0");
+                output_lines.push_back(init_temp + " = insertvalue {ptr, i64} zeroinitializer, ptr " + data_temp + ", 0");
+                output_lines.push_back(value_temp + " = insertvalue {ptr, i64} " + init_temp + ", i64 " +
+                                       std::to_string(string_constant->second.length) + ", 1");
+                RecordExecutableValue(state, instruction.result, value_temp, type_info);
+                return true;
+            }
             RecordExecutableValue(state, instruction.result, FormatLLVMLiteral(type_info, instruction.op), type_info);
             return true;
         }
@@ -2819,7 +2968,17 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             }
 
             const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
-            if (instruction.op == "-") {
+            if (instruction.op == "*") {
+                if (operand.type.backend_name != "ptr") {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission requires pointer operand for unary '*' in function '" +
+                                           state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                output_lines.push_back(temp + " = load " + type_info.backend_name + ", ptr " + operand.text + ", align " +
+                                       std::to_string(type_info.alignment));
+            } else if (instruction.op == "-") {
                 if (IsFloatType(type_info)) {
                     output_lines.push_back(temp + " = fsub " + LLVMTypeName(type_info) + " 0.0, " + operand.text);
                 } else {
@@ -3121,10 +3280,145 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             return true;
         }
 
-        case mir::Instruction::Kind::kBufferToSlice:
+        case mir::Instruction::Kind::kBufferToSlice: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue base;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "buffer_to_slice",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                base)) {
+                return false;
+            }
+
+            BackendTypeInfo slice_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      FunctionBlockContext("buffer_to_slice", state.function->name, block),
+                                      slice_type)) {
+                return false;
+            }
+
+            const std::string ptr_temp = LLVMTempName(function_index, block_index, instruction_index) + ".ptr";
+            const std::string len_temp = LLVMTempName(function_index, block_index, instruction_index) + ".len";
+            const std::string init_temp = LLVMTempName(function_index, block_index, instruction_index) + ".init";
+            const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
+            output_lines.push_back(ptr_temp + " = extractvalue " + base.type.backend_name + " " + base.text + ", 0");
+            output_lines.push_back(len_temp + " = extractvalue " + base.type.backend_name + " " + base.text + ", 1");
+            output_lines.push_back(init_temp + " = insertvalue " + slice_type.backend_name + " zeroinitializer, ptr " + ptr_temp + ", 0");
+            output_lines.push_back(result_temp + " = insertvalue " + slice_type.backend_name + " " + init_temp + ", i64 " + len_temp + ", 1");
+            RecordExecutableValue(state, instruction.result, result_temp, slice_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kBufferNew: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue alloc;
+            ExecutableValue cap;
+            if (!ResolveTwoExecutableOperands(state,
+                                             instruction,
+                                             "buffer_new",
+                                             block,
+                                             source_path,
+                                             diagnostics,
+                                             alloc,
+                                             cap)) {
+                return false;
+            }
+
+            BackendTypeInfo result_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      FunctionBlockContext("buffer_new", state.function->name, block),
+                                      result_type)) {
+                return false;
+            }
+
+            const sema::Type buffer_type = instruction.type.subtypes.empty() ? sema::UnknownType() : instruction.type.subtypes.front();
+            const auto element_ptr_type = FindFieldType(*state.module, buffer_type, "ptr");
+            if (!element_ptr_type.has_value() || element_ptr_type->kind != sema::Type::Kind::kPointer || element_ptr_type->subtypes.empty()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not resolve Buffer element type for buffer_new in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            BackendTypeInfo element_type;
+            if (!LowerInstructionType(*state.module,
+                                      element_ptr_type->subtypes.front(),
+                                      source_path,
+                                      diagnostics,
+                                      FunctionBlockContext("buffer_new element", state.function->name, block),
+                                      element_type)) {
+                return false;
+            }
+
+            std::string cap_i64;
+            if (!ExtendIntegerToI64(cap, function_index, block_index, instruction_index, "cap", output_lines, cap_i64)) {
+                return false;
+            }
+            const std::string bytes_temp = LLVMTempName(function_index, block_index, instruction_index) + ".bytes";
+            const std::string zero_temp = LLVMTempName(function_index, block_index, instruction_index) + ".zero";
+            const std::string alloc_bytes = LLVMTempName(function_index, block_index, instruction_index) + ".alloc_bytes";
+            const std::string data_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".data_ptr";
+            const std::string buffer_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".buf_ptr";
+            output_lines.push_back(bytes_temp + " = mul i64 " + cap_i64 + ", " + std::to_string(element_type.size));
+            output_lines.push_back(zero_temp + " = icmp eq i64 " + bytes_temp + ", 0");
+            output_lines.push_back(alloc_bytes + " = select i1 " + zero_temp + ", i64 1, i64 " + bytes_temp);
+            output_lines.push_back(data_ptr + " = call ptr @malloc(i64 " + alloc_bytes + ")");
+            output_lines.push_back(buffer_ptr + " = call ptr @malloc(i64 32)");
+
+            const std::string ptr_slot = LLVMTempName(function_index, block_index, instruction_index) + ".ptr_slot";
+            const std::string len_slot = LLVMTempName(function_index, block_index, instruction_index) + ".len_slot";
+            const std::string cap_slot = LLVMTempName(function_index, block_index, instruction_index) + ".cap_slot";
+            const std::string alloc_slot = LLVMTempName(function_index, block_index, instruction_index) + ".alloc_slot";
+            output_lines.push_back(ptr_slot + " = getelementptr inbounds {ptr, i64, i64, ptr}, ptr " + buffer_ptr + ", i64 0, i32 0");
+            output_lines.push_back(len_slot + " = getelementptr inbounds {ptr, i64, i64, ptr}, ptr " + buffer_ptr + ", i64 0, i32 1");
+            output_lines.push_back(cap_slot + " = getelementptr inbounds {ptr, i64, i64, ptr}, ptr " + buffer_ptr + ", i64 0, i32 2");
+            output_lines.push_back(alloc_slot + " = getelementptr inbounds {ptr, i64, i64, ptr}, ptr " + buffer_ptr + ", i64 0, i32 3");
+            output_lines.push_back("store ptr " + data_ptr + ", ptr " + ptr_slot + ", align 8");
+            output_lines.push_back("store i64 " + cap_i64 + ", ptr " + len_slot + ", align 8");
+            output_lines.push_back("store i64 " + cap_i64 + ", ptr " + cap_slot + ", align 8");
+            output_lines.push_back("store ptr " + alloc.text + ", ptr " + alloc_slot + ", align 8");
+            RecordExecutableValue(state, instruction.result, buffer_ptr, result_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kBufferFree: {
+            ExecutableValue buffer;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "buffer_free",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                buffer)) {
+                return false;
+            }
+            const std::string loaded = LLVMTempName(function_index, block_index, instruction_index) + ".buffer";
+            const std::string data_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".data_ptr";
+            output_lines.push_back(loaded + " = load {ptr, i64, i64, ptr}, ptr " + buffer.text + ", align 8");
+            output_lines.push_back(data_ptr + " = extractvalue {ptr, i64, i64, ptr} " + loaded + ", 0");
+            output_lines.push_back("call void @free(ptr " + data_ptr + ")");
+            output_lines.push_back("call void @free(ptr " + buffer.text + ")");
+            return true;
+        }
+
+        case mir::Instruction::Kind::kSliceFromBuffer:
             ReportBackendError(source_path,
-                               "LLVM bootstrap executable emission does not support MIR instruction 'buffer_to_slice' in function '" +
-                                   state.function->name + "' block '" + block.label + "'",
+                               "slice_from_buffer should lower before executable emission in function '" + state.function->name +
+                                   "' block '" + block.label + "'",
                                diagnostics);
             return false;
 
@@ -3402,6 +3696,45 @@ bool RenderExecutableFunction(const mir::Module& module,
         param_types.push_back(std::move(param_type));
     }
 
+    std::size_t string_constant_index = 0;
+    std::unordered_map<std::string, ExecutableStringConstant> string_constants;
+    for (const auto& block : function.blocks) {
+        for (const auto& instruction : block.instructions) {
+            if (instruction.kind != mir::Instruction::Kind::kConst || instruction.result.empty() || instruction.op.size() < 2 ||
+                instruction.op.front() != '"') {
+                continue;
+            }
+
+            BackendTypeInfo string_type;
+            if (!LowerInstructionType(module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "string literal constant for executable emission in function '" + function.name + "'",
+                                      string_type)) {
+                return false;
+            }
+            if (string_type.backend_name != "{ptr, i64}") {
+                continue;
+            }
+
+            const std::string decoded = DecodeStringLiteral(instruction.op);
+            const std::string global_name = "@.mc.str." + std::to_string(function_index) + "." + std::to_string(string_constant_index++);
+            const std::string array_type = "[" + std::to_string(decoded.size() + 1) + " x i8]";
+            stream << global_name << " = private unnamed_addr constant " << array_type << " c\""
+                   << EncodeLLVMStringBytes(decoded) << "\", align 1\n";
+            string_constants.emplace(instruction.result,
+                                     ExecutableStringConstant {
+                                         .global_name = global_name,
+                                         .array_type = array_type,
+                                         .length = decoded.size(),
+                                     });
+        }
+    }
+    if (!string_constants.empty()) {
+        stream << "\n";
+    }
+
     BackendTypeInfo return_type;
     if (!function.return_types.empty() &&
         !LowerInstructionType(module,
@@ -3427,6 +3760,7 @@ bool RenderExecutableFunction(const mir::Module& module,
     ExecutableFunctionState state;
     state.module = &module;
     state.function = &function;
+    state.string_constants = std::move(string_constants);
     for (const auto& global : module.globals) {
         BackendTypeInfo global_type;
         if (!LowerInstructionType(module,
@@ -3519,6 +3853,74 @@ bool IsCanonicalHostedMainParam(const mir::Local& local) {
            local.type.subtypes.front().kind == sema::Type::Kind::kString;
 }
 
+bool RenderExternFunctionDeclaration(const mir::Module& module,
+                                     const mir::Function& function,
+                                     bool wrap_hosted_main,
+                                     const std::filesystem::path& source_path,
+                                     support::DiagnosticSink& diagnostics,
+                                     std::ostringstream& stream) {
+    if (!function.is_extern) {
+        return true;
+    }
+    if (!function.type_params.empty()) {
+        return true;
+    }
+    if (!function.extern_abi.empty() && function.extern_abi != "c") {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission only supports extern(c) functions; function '" +
+                               function.name + "' uses abi '" + function.extern_abi + "'",
+                           diagnostics);
+        return false;
+    }
+    if (function.return_types.size() > 1) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission does not support multi-value extern returns for function '" +
+                               function.name + "'",
+                           diagnostics);
+        return false;
+    }
+
+    const auto params = ParameterLocals(function);
+    std::vector<BackendTypeInfo> param_types;
+    param_types.reserve(params.size());
+    for (const auto* param : params) {
+        BackendTypeInfo param_type;
+        if (!LowerInstructionType(module,
+                                  param->type,
+                                  source_path,
+                                  diagnostics,
+                                  "extern parameter '" + param->name + "' for '" + function.name + "'",
+                                  param_type)) {
+            return false;
+        }
+        param_types.push_back(std::move(param_type));
+    }
+
+    std::string return_backend_name = "void";
+    if (!function.return_types.empty()) {
+        BackendTypeInfo return_type;
+        if (!LowerInstructionType(module,
+                                  function.return_types.front(),
+                                  source_path,
+                                  diagnostics,
+                                  "extern return type for '" + function.name + "'",
+                                  return_type)) {
+            return false;
+        }
+        return_backend_name = return_type.backend_name;
+    }
+
+    stream << "declare " << return_backend_name << " " << LLVMFunctionSymbol(function.name, wrap_hosted_main) << "(";
+    for (std::size_t index = 0; index < param_types.size(); ++index) {
+        if (index > 0) {
+            stream << ", ";
+        }
+        stream << param_types[index].backend_name;
+    }
+    stream << ")\n";
+    return true;
+}
+
 bool RenderHostedEntryWrapper(const mir::Module& module,
                               const mir::Function& main_function,
                               bool wrap_hosted_main,
@@ -3569,7 +3971,7 @@ bool RenderHostedEntryWrapper(const mir::Module& module,
         returns_i32 = true;
     }
 
-    stream << "define i32 @main(i32 %argc, ptr %argv) {\n";
+    stream << "define i32 @__mc_hosted_entry({ptr, i64} %args) {\n";
     stream << "entry:\n";
     if (params.empty()) {
         if (returns_i32) {
@@ -3580,14 +3982,11 @@ bool RenderHostedEntryWrapper(const mir::Module& module,
             stream << "  ret i32 0\n";
         }
     } else {
-        stream << "  %args.init = insertvalue {ptr, i64} zeroinitializer, ptr %argv, 0\n";
-        stream << "  %argc.ext = sext i32 %argc to i64\n";
-        stream << "  %args.full = insertvalue {ptr, i64} %args.init, i64 %argc.ext, 1\n";
         if (returns_i32) {
-            stream << "  %main.result = call i32 " << LLVMFunctionSymbol(main_function.name, true) << "({ptr, i64} %args.full)\n";
+            stream << "  %main.result = call i32 " << LLVMFunctionSymbol(main_function.name, true) << "({ptr, i64} %args)\n";
             stream << "  ret i32 %main.result\n";
         } else {
-            stream << "  call void " << LLVMFunctionSymbol(main_function.name, true) << "({ptr, i64} %args.full)\n";
+            stream << "  call void " << LLVMFunctionSymbol(main_function.name, true) << "({ptr, i64} %args)\n";
             stream << "  ret i32 0\n";
         }
     }
@@ -3612,6 +4011,9 @@ bool RenderExecutableModule(const mir::Module& module,
     std::unordered_map<std::string, std::string> function_symbols;
     function_symbols.reserve(module.functions.size());
     for (const auto& function : module.functions) {
+        if (!function.type_params.empty()) {
+            continue;
+        }
         function_symbols.emplace(function.name, LLVMFunctionSymbol(function.name, wrap_hosted_main));
     }
 
@@ -3623,7 +4025,9 @@ bool RenderExecutableModule(const mir::Module& module,
     std::ostringstream stream;
     stream << "source_filename = \"" << source_path.filename().generic_string() << "\"\n";
     stream << "target triple = \"" << target.triple << "\"\n\n";
-    stream << "declare void @exit(i32)\n\n";
+    stream << "declare void @exit(i32)\n";
+    stream << "declare ptr @malloc(i64)\n";
+    stream << "declare void @free(ptr)\n\n";
     stream << "define private void @__mc_trap() {\n";
     stream << "entry:\n";
     stream << "  call void @exit(i32 134)\n";
@@ -3668,6 +4072,20 @@ bool RenderExecutableModule(const mir::Module& module,
         EmitShiftCheckHelperDefinition(stream, bit_width);
     }
 
+    bool emitted_extern_declaration = false;
+    for (const auto& function : module.functions) {
+        if (!function.is_extern || !function.type_params.empty()) {
+            continue;
+        }
+        if (!RenderExternFunctionDeclaration(module, function, wrap_hosted_main, source_path, diagnostics, stream)) {
+            return false;
+        }
+        emitted_extern_declaration = true;
+    }
+    if (emitted_extern_declaration) {
+        stream << "\n";
+    }
+
     for (const auto& global : module.globals) {
         BackendTypeInfo global_type;
         if (!LowerInstructionType(module,
@@ -3690,6 +4108,9 @@ bool RenderExecutableModule(const mir::Module& module,
     }
 
     for (std::size_t function_index = 0; function_index < module.functions.size(); ++function_index) {
+        if (module.functions[function_index].is_extern || !module.functions[function_index].type_params.empty()) {
+            continue;
+        }
         if (!RenderExecutableFunction(module,
                                       module.functions[function_index],
                                       function_index,
@@ -3760,6 +4181,38 @@ bool RunHostCommand(const std::vector<std::string>& args,
     return false;
 }
 
+std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesystem::path& start_path) {
+    std::filesystem::path current = std::filesystem::absolute(start_path).lexically_normal();
+    if (!std::filesystem::is_directory(current)) {
+        current = current.parent_path();
+    }
+
+    while (!current.empty()) {
+        if (std::filesystem::exists(current / "stdlib") && std::filesystem::exists(current / "runtime")) {
+            return current;
+        }
+        if (current == current.root_path()) {
+            break;
+        }
+        current = current.parent_path();
+    }
+
+    return std::nullopt;
+}
+
+std::optional<std::filesystem::path> DiscoverHostedRuntimeSupportSource(const std::filesystem::path& source_path) {
+    const auto repo_root = DiscoverRepositoryRoot(source_path);
+    if (!repo_root.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::filesystem::path runtime_source = *repo_root / std::string(kHostedRuntimeSupportPath);
+    if (!std::filesystem::exists(runtime_source)) {
+        return std::nullopt;
+    }
+    return runtime_source;
+}
+
 }  // namespace
 
 TargetConfig BootstrapTargetConfig() {
@@ -3796,6 +4249,9 @@ LowerResult LowerModule(const mir::Module& module,
     }
 
     for (std::size_t function_index = 0; function_index < module.functions.size(); ++function_index) {
+        if (!module.functions[function_index].type_params.empty()) {
+            continue;
+        }
         if (!LowerFunction(module,
                    module.functions[function_index],
                            function_index,
@@ -3830,6 +4286,17 @@ BuildResult BuildExecutable(const mir::Module& module,
     std::filesystem::create_directories(options.artifacts.object_path.parent_path());
     std::filesystem::create_directories(options.artifacts.executable_path.parent_path());
 
+    const auto runtime_support_source = DiscoverHostedRuntimeSupportSource(source_path);
+    if (!runtime_support_source.has_value()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend could not locate hosted runtime support source '" +
+                               std::string(kHostedRuntimeSupportPath) + "'",
+                           diagnostics);
+        return {};
+    }
+    const std::filesystem::path runtime_object_path = options.artifacts.object_path.parent_path() /
+                                                      (options.artifacts.object_path.stem().generic_string() + ".runtime.o");
+
     {
         std::ofstream output(options.artifacts.llvm_ir_path, std::ios::binary);
         output << llvm_ir;
@@ -3862,7 +4329,22 @@ BuildResult BuildExecutable(const mir::Module& module,
                          "clang",
                          "-target",
                          options.target.triple,
+                         "-c",
+                         runtime_support_source->generic_string(),
+                         "-o",
+                         runtime_object_path.generic_string()},
+                        source_path,
+                        diagnostics,
+                        "compile hosted runtime support")) {
+        return {};
+    }
+
+    if (!RunHostCommand({"xcrun",
+                         "clang",
+                         "-target",
+                         options.target.triple,
                          options.artifacts.object_path.generic_string(),
+                         runtime_object_path.generic_string(),
                          "-o",
                          options.artifacts.executable_path.generic_string()},
                         source_path,

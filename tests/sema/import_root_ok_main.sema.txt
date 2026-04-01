@@ -1,4 +1,3 @@
 SemanticModule
   Import name=helper_root
-  Function name=helper_value params=[] returns=[i32]
   Function name=main params=[] returns=[i32]

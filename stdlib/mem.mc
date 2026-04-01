@@ -1,0 +1,20 @@
+export { Allocator, default_allocator, buffer_new, buffer_free, buffer_len, slice_from_buffer }
+
+struct Allocator {
+    raw: uintptr
+}
+
+extern(c) func __mc_mem_default_allocator() *Allocator
+extern(c) func __mc_mem_buffer_len_u8(buf: *Buffer<u8>) usize
+
+extern(c) func buffer_new<T>(alloc: *Allocator, cap: usize) *Buffer<T>
+extern(c) func buffer_free<T>(buf: *Buffer<T>)
+extern(c) func slice_from_buffer<T>(buf: *Buffer<T>) Slice<T>
+
+func default_allocator() *Allocator {
+    return __mc_mem_default_allocator()
+}
+
+func buffer_len(buf: *Buffer<u8>) usize {
+    return __mc_mem_buffer_len_u8(buf)
+}

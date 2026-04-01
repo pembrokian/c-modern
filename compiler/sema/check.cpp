@@ -31,6 +31,8 @@ enum class VisitState {
     kDone,
 };
 
+using ImportedModules = std::unordered_map<std::string, Module>;
+
 bool IsIntegerTypeName(std::string_view name) {
     static const std::unordered_set<std::string_view> names = {
         "i8", "i16", "i32", "i64", "isize", "u8", "u16", "u32", "u64", "usize", "uintptr",
@@ -45,6 +47,89 @@ bool IsFloatTypeName(std::string_view name) {
 bool IsBuiltinNamedType(std::string_view name) {
     return IsIntegerTypeName(name) || IsFloatTypeName(name) || name == "bool" || name == "string" || name == "str" ||
            name == "cstr" || name == "void" || name == "Slice" || name == "Buffer" || name == "Result";
+}
+
+std::string QualifyImportedName(std::string_view module_name, std::string_view name) {
+    return std::string(module_name) + "." + std::string(name);
+}
+
+Type RewriteImportedTypeNames(Type type,
+                              std::string_view module_name,
+                              const std::unordered_set<std::string>& local_type_names,
+                              const std::vector<std::string>& type_params = {}) {
+    for (auto& subtype : type.subtypes) {
+        subtype = RewriteImportedTypeNames(std::move(subtype), module_name, local_type_names, type_params);
+    }
+
+    if (type.kind != Type::Kind::kNamed || type.name.empty() || type.name.find('.') != std::string::npos) {
+        return type;
+    }
+    if (IsBuiltinNamedType(type.name) || std::find(type_params.begin(), type_params.end(), type.name) != type_params.end()) {
+        return type;
+    }
+    if (local_type_names.contains(type.name)) {
+        type.name = QualifyImportedName(module_name, type.name);
+    }
+    return type;
+}
+
+Type SubstituteTypeParams(Type type, const std::vector<std::string>& type_params, const std::vector<Type>& type_args) {
+    for (auto& subtype : type.subtypes) {
+        subtype = SubstituteTypeParams(std::move(subtype), type_params, type_args);
+    }
+
+    if (type.kind != Type::Kind::kNamed) {
+        return type;
+    }
+
+    for (std::size_t index = 0; index < type_params.size() && index < type_args.size(); ++index) {
+        if (type.name == type_params[index]) {
+            return type_args[index];
+        }
+    }
+
+    return type;
+}
+
+TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,
+                                        std::string_view module_name,
+                                        const std::unordered_set<std::string>& local_type_names) {
+    TypeDeclSummary qualified = type_decl;
+    qualified.name = type_decl.name.find('.') == std::string::npos ? QualifyImportedName(module_name, type_decl.name) : type_decl.name;
+    for (auto& field : qualified.fields) {
+        field.second = RewriteImportedTypeNames(std::move(field.second), module_name, local_type_names, qualified.type_params);
+    }
+    for (auto& variant : qualified.variants) {
+        for (auto& payload_field : variant.payload_fields) {
+            payload_field.second = RewriteImportedTypeNames(std::move(payload_field.second), module_name, local_type_names, qualified.type_params);
+        }
+    }
+    qualified.aliased_type = RewriteImportedTypeNames(std::move(qualified.aliased_type), module_name, local_type_names, qualified.type_params);
+    return qualified;
+}
+
+Module RewriteImportedModuleSurfaceTypes(const Module& module, std::string_view module_name) {
+    Module rewritten = module;
+    std::unordered_set<std::string> local_type_names;
+    for (const auto& type_decl : module.type_decls) {
+        local_type_names.insert(type_decl.name);
+    }
+
+    for (auto& type_decl : rewritten.type_decls) {
+        type_decl = RewriteImportedTypeDecl(type_decl, module_name, local_type_names);
+    }
+    for (auto& global : rewritten.globals) {
+        global.type = RewriteImportedTypeNames(std::move(global.type), module_name, local_type_names);
+    }
+    for (auto& function : rewritten.functions) {
+        for (auto& param_type : function.param_types) {
+            param_type = RewriteImportedTypeNames(std::move(param_type), module_name, local_type_names, function.type_params);
+        }
+        for (auto& return_type : function.return_types) {
+            return_type = RewriteImportedTypeNames(std::move(return_type), module_name, local_type_names, function.type_params);
+        }
+    }
+    return rewritten;
 }
 
 std::size_t ProcedureParamCount(const Type& type) {
@@ -329,9 +414,9 @@ class Checker {
   public:
     Checker(const ast::SourceFile& source_file,
             const std::filesystem::path& file_path,
-                        const Module* imported_module,
+            const ImportedModules* imported_modules,
             support::DiagnosticSink& diagnostics)
-                : source_file_(source_file), file_path_(file_path), imported_module_(imported_module), diagnostics_(diagnostics) {}
+        : source_file_(source_file), file_path_(file_path), imported_modules_(imported_modules), diagnostics_(diagnostics) {}
 
     CheckResult Run() {
         auto module = std::make_unique<Module>();
@@ -365,44 +450,48 @@ class Checker {
     }
 
     void SeedImportedSymbols() {
-        if (imported_module_ == nullptr) {
+        if (imported_modules_ == nullptr) {
             return;
         }
 
-        for (const auto& type_decl : imported_module_->type_decls) {
-            if (!type_symbols_.emplace(type_decl.name, type_decl.kind).second) {
-                Report(source_file_.span, "duplicate imported type symbol: " + type_decl.name);
+        std::unordered_set<std::string> seen_import_names;
+        for (const auto& import_decl : source_file_.imports) {
+            if (!seen_import_names.insert(import_decl.module_name).second) {
+                Report(import_decl.span, "duplicate import module: " + import_decl.module_name);
                 continue;
             }
-            module_->type_decls.push_back(type_decl);
-        }
-
-        for (const auto& function : imported_module_->functions) {
-            if (!value_symbols_.emplace(function.name, function.is_extern ? Decl::Kind::kExternFunc : Decl::Kind::kFunc).second) {
-                Report(source_file_.span, "duplicate imported value symbol: " + function.name);
+            const Module* imported_module = FindImportedModule(import_decl.module_name);
+            if (imported_module == nullptr) {
+                Report(import_decl.span, "internal error: missing checked import module: " + import_decl.module_name);
                 continue;
             }
-            module_->functions.push_back(function);
-        }
 
-        for (const auto& global : imported_module_->globals) {
-            GlobalSummary imported_global = global;
-            imported_global.names.clear();
-            for (const auto& name : global.names) {
-                if (!value_symbols_.emplace(name, global.is_const ? Decl::Kind::kConst : Decl::Kind::kVar).second) {
-                    Report(source_file_.span, "duplicate imported value symbol: " + name);
+            std::unordered_set<std::string> imported_type_names;
+            for (const auto& type_decl : imported_module->type_decls) {
+                imported_type_names.insert(type_decl.name);
+            }
+
+            for (const auto& type_decl : imported_module->type_decls) {
+                TypeDeclSummary qualified_type = RewriteImportedTypeDecl(type_decl, import_decl.module_name, imported_type_names);
+                if (!type_symbols_.emplace(qualified_type.name, qualified_type.kind).second) {
+                    Report(import_decl.span, "duplicate imported type symbol: " + qualified_type.name);
                     continue;
                 }
-                imported_global.names.push_back(name);
-                global_symbols_[name] = {
-                    .type = global.type,
-                    .is_mutable = !global.is_const,
-                };
-            }
-            if (!imported_global.names.empty()) {
-                module_->globals.push_back(std::move(imported_global));
+                module_->type_decls.push_back(std::move(qualified_type));
             }
         }
+    }
+
+    const Module* FindImportedModule(std::string_view name) const {
+        if (imported_modules_ == nullptr) {
+            return nullptr;
+        }
+
+        const auto found = imported_modules_->find(std::string(name));
+        if (found == imported_modules_->end()) {
+            return nullptr;
+        }
+        return &found->second;
     }
 
     void CollectTopLevelDecls() {
@@ -512,6 +601,53 @@ class Checker {
     bool IsKnownTypeName(const std::string& name, const std::vector<std::string>& type_params) const {
         return IsBuiltinNamedType(name) || type_map_.contains(name) ||
                std::find(type_params.begin(), type_params.end(), name) != type_params.end();
+    }
+
+    std::vector<std::string> CurrentTypeParams() const {
+        return current_function_ != nullptr ? current_function_->type_params : std::vector<std::string> {};
+    }
+
+    Type InstantiateFunctionType(const FunctionSignature& function, const Expr& expr, std::string_view display_name) {
+        if (function.type_params.empty()) {
+            if (!expr.type_args.empty()) {
+                Report(expr.span, "function " + std::string(display_name) + " does not accept type arguments");
+                return UnknownType();
+            }
+            return ProcedureType(function.param_types, function.return_types);
+        }
+
+        if (expr.type_args.empty()) {
+            Report(expr.span, "generic function " + std::string(display_name) + " requires explicit type arguments");
+            return UnknownType();
+        }
+
+        if (expr.type_args.size() != function.type_params.size()) {
+            Report(expr.span,
+                   "generic function " + std::string(display_name) + " expects " + std::to_string(function.type_params.size()) +
+                       " type arguments but got " + std::to_string(expr.type_args.size()));
+            return UnknownType();
+        }
+
+        std::vector<Type> type_args;
+        type_args.reserve(expr.type_args.size());
+        for (const auto& type_arg : expr.type_args) {
+            ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
+            type_args.push_back(TypeFromAst(type_arg.get()));
+        }
+
+        std::vector<Type> param_types;
+        param_types.reserve(function.param_types.size());
+        for (const auto& param_type : function.param_types) {
+            param_types.push_back(SubstituteTypeParams(param_type, function.type_params, type_args));
+        }
+
+        std::vector<Type> return_types;
+        return_types.reserve(function.return_types.size());
+        for (const auto& return_type : function.return_types) {
+            return_types.push_back(SubstituteTypeParams(return_type, function.type_params, type_args));
+        }
+
+        return ProcedureType(std::move(param_types), std::move(return_types));
     }
 
     TypeDeclSummary* FindMutableTypeDecl(std::string_view name) {
@@ -897,7 +1033,7 @@ class Checker {
 
         Type conversion_target = UnknownType();
         if (expr.type_target != nullptr) {
-            ValidateTypeExpr(expr.type_target.get(), current_function_ != nullptr ? current_function_->type_params : std::vector<std::string> {}, expr.type_target->span);
+            ValidateTypeExpr(expr.type_target.get(), CurrentTypeParams(), expr.type_target->span);
             conversion_target = TypeFromAst(expr.type_target.get());
         }
 
@@ -929,7 +1065,7 @@ class Checker {
         const Type callee_type = AnalyzeExpr(*expr.left);
         if (IsUnknown(callee_type)) {
             if (expr.left != nullptr && expr.left->kind == Expr::Kind::kName &&
-                IsKnownTypeName(expr.left->text, current_function_ != nullptr ? current_function_->type_params : std::vector<std::string> {})) {
+                IsKnownTypeName(expr.left->text, CurrentTypeParams())) {
                 Report(expr.span, "explicit conversions require parenthesized type-expression syntax");
             }
             return UnknownType();
@@ -999,12 +1135,20 @@ class Checker {
             case Expr::Kind::kName: {
                 const auto binding = LookupValue(expr.text);
                 if (binding.has_value()) {
+                    if (!expr.type_args.empty()) {
+                        Report(expr.span, "type arguments apply only to functions: " + expr.text);
+                        return record(UnknownType());
+                    }
                     return record(binding->type);
                 }
                 if (const auto* function = FindFunctionSignature(*module_, expr.text); function != nullptr) {
-                    return record(ProcedureType(function->param_types, function->return_types));
+                    return record(InstantiateFunctionType(*function, expr, expr.text));
                 }
                 if (const auto* global = FindGlobalSummary(*module_, expr.text); global != nullptr) {
+                    if (!expr.type_args.empty()) {
+                        Report(expr.span, "type arguments apply only to functions: " + expr.text);
+                        return record(UnknownType());
+                    }
                     return record(global->type);
                 }
                 Report(expr.span, "unknown name: " + expr.text);
@@ -1012,12 +1156,27 @@ class Checker {
             }
             case Expr::Kind::kQualifiedName:
                 if (const auto binding = LookupValue(expr.text); binding.has_value()) {
+                    if (!expr.type_args.empty()) {
+                        Report(expr.span, "type arguments apply only to functions: " + CombineQualifiedName(expr));
+                        return record(UnknownType());
+                    }
                     const Type base = binding->type;
-                    if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer") && expr.secondary_text == "len") {
-                        return record(NamedType("usize"));
+                    if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer")) {
+                        if ((expr.secondary_text == "ptr") && !base.subtypes.empty()) {
+                            return record(PointerType(base.subtypes.front()));
+                        }
+                        if (expr.secondary_text == "len" || (base.name == "Buffer" && expr.secondary_text == "cap")) {
+                            return record(NamedType("usize"));
+                        }
+                        if (base.name == "Buffer" && expr.secondary_text == "alloc") {
+                            return record(PointerType(NamedType("Allocator")));
+                        }
                     }
                     if ((base.kind == Type::Kind::kString || (base.kind == Type::Kind::kNamed && (base.name == "str" || base.name == "string"))) &&
-                        expr.secondary_text == "len") {
+                        (expr.secondary_text == "ptr" || expr.secondary_text == "len")) {
+                        if (expr.secondary_text == "ptr") {
+                            return record(PointerType(NamedType("u8")));
+                        }
                         return record(NamedType("usize"));
                     }
                     const TypeDeclSummary* type_decl = LookupStructType(base);
@@ -1032,13 +1191,43 @@ class Checker {
                     return record(UnknownType());
                 }
                 if (const auto* global = FindGlobalSummary(*module_, expr.text); global != nullptr) {
+                    if (!expr.type_args.empty()) {
+                        Report(expr.span, "type arguments apply only to functions: " + CombineQualifiedName(expr));
+                        return record(UnknownType());
+                    }
                     const Type base = global->type;
-                    if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer") && expr.secondary_text == "len") {
-                        return record(NamedType("usize"));
+                    if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer")) {
+                        if ((expr.secondary_text == "ptr") && !base.subtypes.empty()) {
+                            return record(PointerType(base.subtypes.front()));
+                        }
+                        if (expr.secondary_text == "len" || (base.name == "Buffer" && expr.secondary_text == "cap")) {
+                            return record(NamedType("usize"));
+                        }
+                        if (base.name == "Buffer" && expr.secondary_text == "alloc") {
+                            return record(PointerType(NamedType("Allocator")));
+                        }
                     }
                 }
+                if (const Module* imported_module = FindImportedModule(expr.text); imported_module != nullptr) {
+                    if (const auto* function = FindFunctionSignature(*imported_module, expr.secondary_text); function != nullptr) {
+                        return record(InstantiateFunctionType(*function, expr, CombineQualifiedName(expr)));
+                    }
+                    if (const auto* global = FindGlobalSummary(*imported_module, expr.secondary_text); global != nullptr) {
+                        if (!expr.type_args.empty()) {
+                            Report(expr.span, "type arguments apply only to functions: " + CombineQualifiedName(expr));
+                            return record(UnknownType());
+                        }
+                        return record(global->type);
+                    }
+                    Report(expr.span, "module " + expr.text + " has no exported member named " + expr.secondary_text);
+                    return record(UnknownType());
+                }
                 if (const auto* function = FindFunctionSignature(*module_, expr.text + "." + expr.secondary_text); function != nullptr) {
-                    return record(ProcedureType(function->param_types, function->return_types));
+                    return record(InstantiateFunctionType(*function, expr, CombineQualifiedName(expr)));
+                }
+                if (!expr.type_args.empty()) {
+                    Report(expr.span, "type arguments apply only to functions: " + CombineQualifiedName(expr));
+                    return record(UnknownType());
                 }
                 if (const auto* type_decl = FindTypeDecl(*module_, expr.text);
                     type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
@@ -1127,11 +1316,22 @@ class Checker {
             case Expr::Kind::kField:
             case Expr::Kind::kDerefField: {
                 const Type base = AnalyzeExpr(*expr.left);
-                if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer") && expr.text == "len") {
-                    return record(NamedType("usize"));
+                if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer")) {
+                    if (expr.text == "ptr" && !base.subtypes.empty()) {
+                        return record(PointerType(base.subtypes.front()));
+                    }
+                    if (expr.text == "len" || (base.name == "Buffer" && expr.text == "cap")) {
+                        return record(NamedType("usize"));
+                    }
+                    if (base.name == "Buffer" && expr.text == "alloc") {
+                        return record(PointerType(NamedType("Allocator")));
+                    }
                 }
                 if ((base.kind == Type::Kind::kString || (base.kind == Type::Kind::kNamed && (base.name == "str" || base.name == "string"))) &&
-                    expr.text == "len") {
+                    (expr.text == "ptr" || expr.text == "len")) {
+                    if (expr.text == "ptr") {
+                        return record(PointerType(NamedType("u8")));
+                    }
                     return record(NamedType("usize"));
                 }
                 const TypeDeclSummary* type_decl = LookupStructType(base);
@@ -1185,8 +1385,12 @@ class Checker {
             }
             case Expr::Kind::kAggregateInit: {
                 Type aggregate_type = UnknownType();
-                if (expr.left != nullptr && expr.left->kind == Expr::Kind::kName) {
-                    aggregate_type = NamedType(expr.left->text);
+                if (expr.left != nullptr && (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {
+                    aggregate_type = NamedType(CombineQualifiedName(*expr.left));
+                    for (const auto& type_arg : expr.left->type_args) {
+                        ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
+                        aggregate_type.subtypes.push_back(TypeFromAst(type_arg.get()));
+                    }
                 }
                 const TypeDeclSummary* type_decl = LookupStructType(aggregate_type);
                 if (type_decl != nullptr) {
@@ -1523,7 +1727,7 @@ class Checker {
 
     const ast::SourceFile& source_file_;
     std::filesystem::path file_path_;
-    const Module* imported_module_;
+    const ImportedModules* imported_modules_;
     support::DiagnosticSink& diagnostics_;
     Module* module_ = nullptr;
     std::unordered_map<std::string, Decl::Kind> value_symbols_;
@@ -1650,7 +1854,7 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
 
     visit_state[normalized_path] = VisitState::kVisiting;
 
-    Module imported_symbols;
+    ImportedModules imported_modules;
     for (const auto& import_decl : source_file.imports) {
         const auto import_path = ResolveImportPath(normalized_path, import_decl.module_name, options, diagnostics, import_decl.span);
         if (!import_path.has_value()) {
@@ -1679,16 +1883,14 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
             }
             const auto checked_import = CheckProgramInternal(*parsed_import, *import_path, options, diagnostics, exported_cache, visit_state);
             if (checked_import.module != nullptr) {
-                exported_module = *checked_import.module;
+                exported_module = BuildExportedModule(*checked_import.module, *parsed_import);
             }
         }
 
-        imported_symbols.functions.insert(imported_symbols.functions.end(), exported_module.functions.begin(), exported_module.functions.end());
-        imported_symbols.type_decls.insert(imported_symbols.type_decls.end(), exported_module.type_decls.begin(), exported_module.type_decls.end());
-        imported_symbols.globals.insert(imported_symbols.globals.end(), exported_module.globals.begin(), exported_module.globals.end());
+        imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(exported_module, import_decl.module_name);
     }
 
-    auto checked = Checker(source_file, normalized_path, &imported_symbols, diagnostics).Run();
+    auto checked = Checker(source_file, normalized_path, &imported_modules, diagnostics).Run();
     Module exported_module = checked.module != nullptr ? BuildExportedModule(*checked.module, source_file) : Module {};
     exported_cache[normalized_path] = exported_module;
     visit_state[normalized_path] = VisitState::kDone;

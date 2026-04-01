@@ -237,6 +237,13 @@ void DumpExpr(const Expr& expr, std::ostringstream& stream, Indent indent) {
         DumpExpr(*expr.extra, stream, indent + 2);
     }
 
+    if (!expr.type_args.empty()) {
+        WriteLine(stream, indent + 1, "typeArgs:");
+        for (const auto& arg : expr.type_args) {
+            DumpType(*arg, stream, indent + 2);
+        }
+    }
+
     if (expr.type_target != nullptr) {
         WriteLine(stream, indent + 1, "typeTarget:");
         DumpType(*expr.type_target, stream, indent + 2);

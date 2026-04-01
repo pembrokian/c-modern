@@ -1,0 +1,75 @@
+Phase 6 -- Bootstrap Implementation Summary
+===========================================
+
+Summary
+-------
+The repository now has a real hosted standard-library and runtime boundary for
+an admitted bootstrap Phase 6 slice.
+
+This is not the full long-term Phase 6 surface from `plan.txt`.
+It is the narrow repository truth currently proven by executable tests.
+
+What landed
+-----------
+- `mc check` and `mc build` now discover the repository `stdlib/` root
+  automatically by walking upward from the source path.
+- executable builds now collect imported `.mc` modules and merge them into one
+  hosted build unit before backend lowering and linking.
+- the LLVM backend now accepts `extern(c)` declarations for the hosted support
+  seam used by the admitted stdlib modules.
+- hosted process entry moved out of backend-local `main(argc, argv)` IR
+  synthesis into `runtime/hosted/mc_hosted_runtime.c`.
+- the hosted runtime shim now builds a borrowed `Slice<cstr>` argument view on
+  the stack from `argv` without heap allocation.
+- `stdlib/io.mc` provides hosted `write` and `write_line`.
+- `stdlib/mem.mc` provides hosted `default_allocator`, `buffer_new`,
+  `buffer_free`, `buffer_len`, and `slice_from_buffer`; `buffer_new<T>` and
+  `buffer_free<T>` now use a real callable generic helper path in the admitted
+  bootstrap surface.
+- `stdlib/fs.mc` provides hosted `file_size`, `read_all`, and
+  `read_all_default`, with explicit allocator flow through `mem.Allocator` for
+  the admitted file-loading proof.
+- `stdlib/strings.mc` provides non-allocating borrowed-text helpers.
+- `stdlib/utf8.mc` provides a narrow borrowed-text helper slice layered on
+  `strings`.
+- imported stdlib values now resolve through real module-qualified access such
+  as `io.write_line(...)`.
+- imported user-defined types now support dotted type expressions such as
+  `mem.Allocator`.
+
+Executable proof now present
+----------------------------
+- hello-style stdout through `import io` and `write_line`
+- borrowed argv forwarding through the explicit hosted runtime boundary
+- explicit heap-backed buffer allocation through `import mem`
+- typed buffer-view formation through `mem.slice_from_buffer<u8>(...)`
+- hosted file loading through `import fs` plus explicit allocator ownership via
+  `import mem`
+- borrowed-text length and emptiness helpers through `import strings`
+- module-chained borrowed-text helpers through `import utf8`
+
+Key repository-specific constraints still in force
+--------------------------------------------------
+- executable lowering still does not support the full long-term multi-value
+  `(value, Error)` standard-library API shape
+- the admitted mem buffer surface now supports explicit generic helper calls
+  such as `buffer_new<T>`, `buffer_free<T>`, and `slice_from_buffer<T>`, but
+  it still returns pointer-backed bootstrap `*Buffer<T>` values rather than
+  the long-term multi-value canonical API shape
+- `fs.read_all_default` remains a narrow hosted convenience path, but the more
+  explicit admitted flow now uses `fs.read_all(path, mem.default_allocator())`
+- fuller canonical `utf8` validation is no longer blocked by generic helper
+  calls or executable `buffer_to_slice` lowering, but the library itself still
+  only exposes the narrow borrowed-text helper slice landed earlier
+
+Deferred within Phase 6
+-----------------------
+- `os`, `time`, `sync`, `hal`, and `testing`
+- fuller canonical `utf8` helpers such as `utf8.valid`, `decode`, and `encode`
+- broader nil-lowering and address-of coverage beyond the admitted hosted shim
+  boundary
+
+Validation
+----------
+- `cmake --build build/debug -j4`
+- full `ctest` pass in `build/debug`

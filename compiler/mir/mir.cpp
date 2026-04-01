@@ -74,6 +74,12 @@ std::string_view ToString(Instruction::Kind kind) {
             return "array_to_slice";
         case Instruction::Kind::kBufferToSlice:
             return "buffer_to_slice";
+        case Instruction::Kind::kBufferNew:
+            return "buffer_new";
+        case Instruction::Kind::kBufferFree:
+            return "buffer_free";
+        case Instruction::Kind::kSliceFromBuffer:
+            return "slice_from_buffer";
         case Instruction::Kind::kCall:
             return "call";
         case Instruction::Kind::kVolatileLoad:
@@ -198,9 +204,51 @@ std::string CombineQualifiedName(const Expr& expr) {
 std::string RenderExprInline(const Expr& expr) {
     switch (expr.kind) {
         case Expr::Kind::kName:
-            return expr.text;
-        case Expr::Kind::kQualifiedName:
-            return CombineQualifiedName(expr);
+        case Expr::Kind::kQualifiedName: {
+            const std::string base = expr.kind == Expr::Kind::kQualifiedName ? CombineQualifiedName(expr) : expr.text;
+            if (expr.type_args.empty()) {
+                return base;
+            }
+            std::ostringstream stream;
+            const auto render_type = [&](const ast::TypeExpr& type, const auto& self) -> std::string {
+                switch (type.kind) {
+                    case ast::TypeExpr::Kind::kNamed: {
+                        if (type.type_args.empty()) {
+                            return type.name;
+                        }
+                        std::ostringstream type_stream;
+                        type_stream << type.name << '<';
+                        for (std::size_t index = 0; index < type.type_args.size(); ++index) {
+                            if (index > 0) {
+                                type_stream << ", ";
+                            }
+                            type_stream << self(*type.type_args[index], self);
+                        }
+                        type_stream << '>';
+                        return type_stream.str();
+                    }
+                    case ast::TypeExpr::Kind::kPointer:
+                        return "*" + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
+                    case ast::TypeExpr::Kind::kConst:
+                        return "const " + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
+                    case ast::TypeExpr::Kind::kArray:
+                        return "[" + (type.length_expr != nullptr ? RenderExprInline(*type.length_expr) : std::string("?")) + "]" +
+                               (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
+                    case ast::TypeExpr::Kind::kParen:
+                        return "(" + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>")) + ")";
+                }
+                return "<?>";
+            };
+            stream << base << '<';
+            for (std::size_t index = 0; index < expr.type_args.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                stream << render_type(*expr.type_args[index], render_type);
+            }
+            stream << '>';
+            return stream.str();
+        }
         case Expr::Kind::kLiteral:
             return expr.text;
         case Expr::Kind::kUnary:
@@ -354,6 +402,34 @@ bool IsBuiltinNamedNonAggregate(const sema::Type& type) {
     return IsIntegerType(type) || IsFloatType(type) || type.name == "bool" || type.name == "string" || type.name == "str" || type.name == "cstr";
 }
 
+std::vector<std::pair<std::string, sema::Type>> BuiltinAggregateFields(const sema::Type& type) {
+    std::vector<std::pair<std::string, sema::Type>> fields;
+    if (type.kind == sema::Type::Kind::kString ||
+        (type.kind == sema::Type::Kind::kNamed && (type.name == "str" || type.name == "string" || type.name == "cstr"))) {
+        fields.push_back({"ptr", sema::PointerType(sema::NamedType("u8"))});
+        fields.push_back({"len", sema::NamedType("usize")});
+        return fields;
+    }
+    if (type.kind != sema::Type::Kind::kNamed) {
+        return fields;
+    }
+    if (type.name == "Slice") {
+        const sema::Type element_type = type.subtypes.empty() ? sema::UnknownType() : type.subtypes.front();
+        fields.push_back({"ptr", sema::PointerType(element_type)});
+        fields.push_back({"len", sema::NamedType("usize")});
+        return fields;
+    }
+    if (type.name == "Buffer") {
+        const sema::Type element_type = type.subtypes.empty() ? sema::UnknownType() : type.subtypes.front();
+        fields.push_back({"ptr", sema::PointerType(element_type)});
+        fields.push_back({"len", sema::NamedType("usize")});
+        fields.push_back({"cap", sema::NamedType("usize")});
+        fields.push_back({"alloc", sema::PointerType(sema::NamedType("Allocator"))});
+        return fields;
+    }
+    return fields;
+}
+
 bool IsUsizeCompatibleType(const sema::Type& type) {
     return type == sema::NamedType("usize") || type.kind == sema::Type::Kind::kIntLiteral;
 }
@@ -476,6 +552,9 @@ std::optional<sema::Type> AtomicElementType(const Module& module, const sema::Ty
 enum class SpecialCallKind {
     kNone,
     kMmioPtr,
+    kBufferNew,
+    kBufferFree,
+    kSliceFromBuffer,
     kVolatileLoad,
     kVolatileStore,
     kAtomicLoad,
@@ -488,6 +567,15 @@ enum class SpecialCallKind {
 SpecialCallKind ClassifySpecialCall(std::string_view callee_name) {
     if (callee_name == "mmio_ptr" || callee_name == "hal.mmio_ptr") {
         return SpecialCallKind::kMmioPtr;
+    }
+    if (callee_name == "buffer_new" || callee_name == "mem.buffer_new") {
+        return SpecialCallKind::kBufferNew;
+    }
+    if (callee_name == "buffer_free" || callee_name == "mem.buffer_free") {
+        return SpecialCallKind::kBufferFree;
+    }
+    if (callee_name == "slice_from_buffer" || callee_name == "mem.slice_from_buffer") {
+        return SpecialCallKind::kSliceFromBuffer;
     }
     if (callee_name == "volatile_load" || callee_name == "hal.volatile_load") {
         return SpecialCallKind::kVolatileLoad;
@@ -820,12 +908,40 @@ class FunctionLowerer {
         return {};
     }
 
+    bool IsImportedModuleName(std::string_view name) const {
+        return std::find(sema_module_.imports.begin(), sema_module_.imports.end(), name) != sema_module_.imports.end();
+    }
+
+    Instruction::TargetKind InferTargetKindForExpr(const Expr& expr) const {
+        const std::string canonical_name = CalleeName(expr);
+        if (canonical_name.empty()) {
+            return Instruction::TargetKind::kNone;
+        }
+
+        const Instruction::TargetKind existing_kind = InferSymbolRefKind(canonical_name);
+        if (existing_kind != Instruction::TargetKind::kOther) {
+            return existing_kind;
+        }
+
+        if (expr.kind == Expr::Kind::kQualifiedName && IsImportedModuleName(expr.text)) {
+            const sema::Type type = ExprTypeOrUnknown(expr);
+            if (type.kind == sema::Type::Kind::kProcedure) {
+                return Instruction::TargetKind::kFunction;
+            }
+            if (!sema::IsUnknown(type)) {
+                return Instruction::TargetKind::kGlobal;
+            }
+        }
+
+        return Instruction::TargetKind::kOther;
+    }
+
     TargetMetadata TargetMetadataForExpr(const Expr& expr) const {
         const std::string canonical_name = CalleeName(expr);
         if (!canonical_name.empty()) {
             return {
                 .target = canonical_name,
-                .kind = InferSymbolRefKind(canonical_name),
+                .kind = InferTargetKindForExpr(expr),
                 .name = canonical_name,
                 .display = canonical_name,
             };
@@ -859,7 +975,8 @@ class FunctionLowerer {
     }
 
     bool SpecialCallProducesValue(SpecialCallKind kind) const {
-        return kind == SpecialCallKind::kMmioPtr || kind == SpecialCallKind::kVolatileLoad || kind == SpecialCallKind::kAtomicLoad ||
+         return kind == SpecialCallKind::kMmioPtr || kind == SpecialCallKind::kBufferNew || kind == SpecialCallKind::kSliceFromBuffer ||
+             kind == SpecialCallKind::kVolatileLoad || kind == SpecialCallKind::kAtomicLoad ||
                kind == SpecialCallKind::kAtomicExchange || kind == SpecialCallKind::kAtomicCompareExchange ||
                kind == SpecialCallKind::kAtomicFetchAdd;
     }
@@ -874,6 +991,9 @@ class FunctionLowerer {
                 return RenderOrderMetadata(expr, 2);
             case SpecialCallKind::kAtomicCompareExchange:
                 return RenderCompareExchangeOrderMetadata(expr);
+            case SpecialCallKind::kBufferNew:
+            case SpecialCallKind::kBufferFree:
+            case SpecialCallKind::kSliceFromBuffer:
             case SpecialCallKind::kNone:
             case SpecialCallKind::kMmioPtr:
             case SpecialCallKind::kVolatileLoad:
@@ -915,6 +1035,35 @@ class FunctionLowerer {
             return true;
         }
 
+        if (kind == SpecialCallKind::kSliceFromBuffer) {
+            if (args.size() != 1) {
+                Report({}, "slice_from_buffer expects exactly one argument during MIR lowering");
+                return false;
+            }
+            const sema::Type pointed = PointerPointeeType(args.front().type).value_or(sema::UnknownType());
+            const std::string value = NewValue();
+            Emit({
+                .kind = Instruction::Kind::kUnary,
+                .result = value,
+                .type = pointed,
+                .op = "*",
+                .operands = {args.front().value},
+            });
+            const std::string result_value = NewValue();
+            Emit({
+                .kind = Instruction::Kind::kBufferToSlice,
+                .result = result_value,
+                .type = result_type,
+                .target = sema::FormatType(result_type),
+                .target_display = sema::FormatType(result_type),
+                .operands = {value},
+            });
+            if (wants_result && result != nullptr) {
+                *result = {result_value, result_type};
+            }
+            return true;
+        }
+
         Instruction instruction {
             .type = result_type,
             .op = metadata,
@@ -931,6 +1080,12 @@ class FunctionLowerer {
         }
 
         switch (kind) {
+            case SpecialCallKind::kBufferNew:
+                instruction.kind = Instruction::Kind::kBufferNew;
+                break;
+            case SpecialCallKind::kBufferFree:
+                instruction.kind = Instruction::Kind::kBufferFree;
+                break;
             case SpecialCallKind::kVolatileLoad:
                 instruction.kind = Instruction::Kind::kVolatileLoad;
                 break;
@@ -954,6 +1109,7 @@ class FunctionLowerer {
                 break;
             case SpecialCallKind::kNone:
             case SpecialCallKind::kMmioPtr:
+            case SpecialCallKind::kSliceFromBuffer:
                 return false;
         }
 
@@ -1047,7 +1203,7 @@ class FunctionLowerer {
                 .result = value,
                 .type = type,
                 .target = qualified_name,
-                .target_kind = InferSymbolRefKind(qualified_name),
+                .target_kind = InferTargetKindForExpr(expr),
                 .target_name = qualified_name,
                 .target_display = qualified_name,
             });
@@ -1460,7 +1616,7 @@ class FunctionLowerer {
                     .result = value,
                     .type = type,
                     .target = qualified_name,
-                    .target_kind = InferSymbolRefKind(qualified_name),
+                    .target_kind = InferTargetKindForExpr(expr),
                     .target_name = qualified_name,
                     .target_display = qualified_name,
                 });
@@ -2297,6 +2453,38 @@ class FunctionLowerer {
 
 }  // namespace
 
+TypeDecl LowerTypeDeclSummary(const sema::TypeDeclSummary& summary) {
+    TypeDecl type_decl;
+    switch (summary.kind) {
+        case Decl::Kind::kStruct:
+            type_decl.kind = TypeDecl::Kind::kStruct;
+            break;
+        case Decl::Kind::kEnum:
+            type_decl.kind = TypeDecl::Kind::kEnum;
+            break;
+        case Decl::Kind::kDistinct:
+            type_decl.kind = TypeDecl::Kind::kDistinct;
+            break;
+        case Decl::Kind::kTypeAlias:
+            type_decl.kind = TypeDecl::Kind::kAlias;
+            break;
+        default:
+            break;
+    }
+
+    type_decl.name = summary.name;
+    type_decl.type_params = summary.type_params;
+    type_decl.fields = summary.fields;
+    type_decl.aliased_type = summary.aliased_type;
+    for (const auto& variant : summary.variants) {
+        VariantDecl mir_variant;
+        mir_variant.name = variant.name;
+        mir_variant.payload_fields = variant.payload_fields;
+        type_decl.variants.push_back(std::move(mir_variant));
+    }
+    return type_decl;
+}
+
 LowerResult LowerSourceFile(const ast::SourceFile& source_file,
                             const sema::Module& sema_module,
                             const std::filesystem::path& file_path,
@@ -2311,39 +2499,10 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
     for (const auto& decl : source_file.decls) {
         if (decl.kind == Decl::Kind::kStruct || decl.kind == Decl::Kind::kEnum || decl.kind == Decl::Kind::kDistinct ||
             decl.kind == Decl::Kind::kTypeAlias) {
-            TypeDecl type_decl;
-            switch (decl.kind) {
-                case Decl::Kind::kStruct:
-                    type_decl.kind = TypeDecl::Kind::kStruct;
-                    break;
-                case Decl::Kind::kEnum:
-                    type_decl.kind = TypeDecl::Kind::kEnum;
-                    break;
-                case Decl::Kind::kDistinct:
-                    type_decl.kind = TypeDecl::Kind::kDistinct;
-                    break;
-                case Decl::Kind::kTypeAlias:
-                    type_decl.kind = TypeDecl::Kind::kAlias;
-                    break;
-                default:
-                    break;
+            const sema::TypeDeclSummary* summary = sema::FindTypeDecl(sema_module, decl.name);
+            if (summary != nullptr) {
+                module->type_decls.push_back(LowerTypeDeclSummary(*summary));
             }
-
-            type_decl.name = decl.name;
-            type_decl.type_params = decl.type_params;
-            for (const auto& field : decl.fields) {
-                type_decl.fields.emplace_back(field.name, sema::TypeFromAst(field.type.get()));
-            }
-            for (const auto& variant : decl.variants) {
-                VariantDecl mir_variant;
-                mir_variant.name = variant.name;
-                for (const auto& field : variant.payload_fields) {
-                    mir_variant.payload_fields.emplace_back(field.name, sema::TypeFromAst(field.type.get()));
-                }
-                type_decl.variants.push_back(std::move(mir_variant));
-            }
-            type_decl.aliased_type = sema::TypeFromAst(decl.aliased_type.get());
-            module->type_decls.push_back(std::move(type_decl));
             continue;
         }
 
@@ -2357,6 +2516,17 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
             }
             module->globals.push_back(std::move(global));
         }
+    }
+
+    std::unordered_set<std::string> seen_type_names;
+    for (const auto& type_decl : module->type_decls) {
+        seen_type_names.insert(type_decl.name);
+    }
+    for (const auto& type_decl : sema_module.type_decls) {
+        if (!seen_type_names.insert(type_decl.name).second) {
+            continue;
+        }
+        module->type_decls.push_back(LowerTypeDeclSummary(type_decl));
     }
 
     for (const auto& decl : source_file.decls) {
@@ -3010,6 +3180,48 @@ bool ValidateModule(const Module& module,
                             }
                         }
                         break;
+                    case Instruction::Kind::kBufferNew: {
+                        if (instruction.result.empty()) {
+                            report("buffer_new must produce a result in function " + function.name);
+                        }
+                        if (instruction.operands.size() != 2) {
+                            report("buffer_new must use allocator and capacity operands in function " + function.name);
+                            break;
+                        }
+                        const sema::Type pointee = PointerPointeeType(instruction.type).value_or(sema::UnknownType());
+                        if (instruction.type.kind != sema::Type::Kind::kPointer || pointee.kind != sema::Type::Kind::kNamed || pointee.name != "Buffer") {
+                            report("buffer_new must produce *Buffer<T> in function " + function.name);
+                        }
+                        if (operand_types.size() == 2) {
+                            if (operand_types[0].kind != sema::Type::Kind::kPointer) {
+                                report("buffer_new allocator operand must be a pointer in function " + function.name);
+                            }
+                            if (!IsIntegerLikeType(operand_types[1])) {
+                                report("buffer_new capacity operand must be an integer type in function " + function.name);
+                            }
+                        }
+                        break;
+                    }
+                    case Instruction::Kind::kBufferFree: {
+                        if (!instruction.result.empty()) {
+                            report("buffer_free must not produce a result in function " + function.name);
+                        }
+                        if (instruction.operands.size() != 1) {
+                            report("buffer_free must use exactly one operand in function " + function.name);
+                            break;
+                        }
+                        if (operand_types.size() == 1) {
+                            const sema::Type pointee = PointerPointeeType(operand_types.front()).value_or(sema::UnknownType());
+                            if (operand_types.front().kind != sema::Type::Kind::kPointer || pointee.kind != sema::Type::Kind::kNamed || pointee.name != "Buffer") {
+                                report("buffer_free requires *Buffer<T> operand in function " + function.name);
+                            }
+                        }
+                        break;
+                    }
+                    case Instruction::Kind::kSliceFromBuffer:
+                        report("slice_from_buffer should lower to unary '*' plus buffer_to_slice before MIR validation in function " +
+                               function.name);
+                        break;
                     case Instruction::Kind::kCall: {
                         if (instruction.operands.empty()) {
                             report("call must include a callee operand in function " + function.name);
@@ -3221,18 +3433,26 @@ bool ValidateModule(const Module& module,
                             instruction.target_base_type != operand_base_type) {
                             report("field target base metadata mismatch in function " + function.name);
                         }
-                        if (field_name == "len") {
-                            const bool len_ok = (base_type.kind == sema::Type::Kind::kNamed &&
-                                                 (base_type.name == "Slice" || base_type.name == "Buffer" || base_type.name == "str" ||
-                                                  base_type.name == "string")) ||
-                                                base_type.kind == sema::Type::Kind::kString;
-                            if (!sema::IsUnknown(base_type) && !len_ok) {
-                                report("field len requires slice, buffer, or string base in function " + function.name);
+                        const auto builtin_fields = BuiltinAggregateFields(base_type);
+                        bool handled_builtin_field = false;
+                        if (!builtin_fields.empty()) {
+                            for (const auto& field : builtin_fields) {
+                                if (field.first == field_name) {
+                                    handled_builtin_field = true;
+                                    if (instruction.type != field.second) {
+                                        report("field result type mismatch in function " + function.name + " for " + std::string(field_name));
+                                    }
+                                    break;
+                                }
                             }
-                            if (instruction.type != sema::NamedType("usize")) {
-                                report("field len must produce usize in function " + function.name);
+                            if (!handled_builtin_field && base_type.kind != sema::Type::Kind::kNamed) {
+                                report("field references unknown member in function " + function.name + ": " + std::string(field_name));
                             }
-                        } else if (base_type.kind == sema::Type::Kind::kNamed) {
+                        }
+                        if (handled_builtin_field) {
+                            break;
+                        }
+                        if (base_type.kind == sema::Type::Kind::kNamed) {
                             const TypeDecl* type_decl = FindMirTypeDecl(module, base_type.name);
                             if (type_decl != nullptr) {
                                 bool found_field = false;
@@ -3355,7 +3575,7 @@ bool ValidateModule(const Module& module,
                         }
                         break;
                     }
-                    case Instruction::Kind::kAggregateInit:
+                    case Instruction::Kind::kAggregateInit: {
                         if (instruction.result.empty()) {
                             report("aggregate_init must produce a result in function " + function.name);
                         }
@@ -3368,7 +3588,9 @@ bool ValidateModule(const Module& module,
                             }
                             break;
                         }
-                        if (const TypeDecl* type_decl = FindMirTypeDecl(module, instruction.type.name); type_decl == nullptr) {
+                        const TypeDecl* type_decl = FindMirTypeDecl(module, instruction.type.name);
+                        const auto builtin_fields = BuiltinAggregateFields(instruction.type);
+                        if (type_decl == nullptr && builtin_fields.empty()) {
                             report("aggregate_init references unknown type in function " + function.name + ": " + instruction.type.name);
                         } else {
                             if (!instruction.target.empty() && instruction.target != sema::FormatType(instruction.type)) {
@@ -3379,17 +3601,19 @@ bool ValidateModule(const Module& module,
                                 const std::string& field_name = instruction.field_names[index];
                                 sema::Type expected_type = sema::UnknownType();
                                 if (field_name == "_") {
-                                    if (index >= type_decl->fields.size()) {
+                                    const std::size_t field_count = type_decl != nullptr ? type_decl->fields.size() : builtin_fields.size();
+                                    if (index >= field_count) {
                                         report("aggregate_init has too many positional fields in function " + function.name);
                                         continue;
                                     }
-                                    expected_type = type_decl->fields[index].second;
+                                    expected_type = type_decl != nullptr ? type_decl->fields[index].second : builtin_fields[index].second;
                                 } else {
                                     if (!seen_named_fields.insert(field_name).second) {
                                         report("aggregate_init has duplicate named field in function " + function.name + ": " + field_name);
                                         continue;
                                     }
-                                    for (const auto& field : type_decl->fields) {
+                                    const auto& fields = type_decl != nullptr ? type_decl->fields : builtin_fields;
+                                    for (const auto& field : fields) {
                                         if (field.first == field_name) {
                                             expected_type = field.second;
                                             break;
@@ -3407,6 +3631,7 @@ bool ValidateModule(const Module& module,
                             }
                         }
                         break;
+                    }
                     case Instruction::Kind::kVariantMatch: {
                         if (instruction.result.empty()) {
                             report("variant_match must produce a result in function " + function.name);

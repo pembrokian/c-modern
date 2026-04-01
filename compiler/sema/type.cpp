@@ -41,9 +41,22 @@ std::string RenderTypeInline(const ast::TypeExpr& type) {
 std::string RenderExprInline(const ast::Expr& expr) {
     switch (expr.kind) {
         case ast::Expr::Kind::kName:
-            return expr.text;
-        case ast::Expr::Kind::kQualifiedName:
-            return expr.text + "." + expr.secondary_text;
+        case ast::Expr::Kind::kQualifiedName: {
+            const std::string base = expr.kind == ast::Expr::Kind::kQualifiedName ? expr.text + "." + expr.secondary_text : expr.text;
+            if (expr.type_args.empty()) {
+                return base;
+            }
+            std::ostringstream stream;
+            stream << base << '<';
+            for (std::size_t index = 0; index < expr.type_args.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                stream << RenderTypeInline(*expr.type_args[index]);
+            }
+            stream << '>';
+            return stream.str();
+        }
         case ast::Expr::Kind::kLiteral:
             return expr.text;
         case ast::Expr::Kind::kUnary:

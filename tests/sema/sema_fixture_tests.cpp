@@ -102,6 +102,7 @@ int main(int argc, char** argv) {
     const std::vector<FixtureCase> fixtures = {
         {"basic_ok.mc", "basic_ok.sema.txt", {}, true},
         {"import_ok_main.mc", "import_ok_main.sema.txt", {}, true},
+        {"import_type_ok_main.mc", "import_type_ok_main.sema.txt", {}, true},
         {"import_root_ok_main.mc", "import_root_ok_main.sema.txt", {"tests/sema/import_roots"}, true},
         {"layout_ok.mc", "layout_ok.sema.txt", {}, true},
         {"unknown_name_bad.mc", "unknown_name_bad.errors.txt", {}, false},

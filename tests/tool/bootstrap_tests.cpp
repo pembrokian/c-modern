@@ -139,7 +139,12 @@ void TestParserHandlesTypesAndLoopForms() {
         "    while total < 100 {\n"
         "        total = total + 1\n"
         "    }\n"
+        "    total = id<i32>(total)\n"
         "    return total\n"
+        "}\n"
+        "\n"
+        "func id<T>(value: T) T {\n"
+        "    return value\n"
         "}\n",
         diagnostics);
 
@@ -147,6 +152,7 @@ void TestParserHandlesTypesAndLoopForms() {
     const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
     Expect(dump.find("StructDecl name=Buffer") != std::string::npos, "dump should include struct declaration");
     Expect(dump.find("PointerType") != std::string::npos, "dump should include pointer types");
+    Expect(dump.find("typeArgs:") != std::string::npos, "dump should include call type arguments");
     Expect(dump.find("ForEachIndexStmt") != std::string::npos, "dump should include index foreach loop");
     Expect(dump.find("ForRangeStmt") != std::string::npos, "dump should include range loop");
     Expect(dump.find("WhileStmt") != std::string::npos, "dump should include while loop");
