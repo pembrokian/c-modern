@@ -78,3 +78,7 @@ Real utility candidates
 - file walker finding: the hosted bootstrap slice had whole-file loading but no admitted directory traversal surface, which made honest recursive utilities impossible
 - Classification: stdlib or runtime gap closed
 - Resolution: admitted a narrow hosted fs.is_dir plus newline-delimited, sorted fs.list_dir surface; the file walker now proves recursive traversal and path handling without inventing a richer directory-entry API too early
+- Status: hashing tool implemented as the next explicit Phase 8 real-program project
+- hashing tool finding: the original matrix assumed streaming reads were mandatory, but the current admitted slice can still prove a bounded checksum utility honestly with whole-file reads and explicit hex formatting
+- Classification: bootstrap capability expectation corrected
+- Resolution: landed a narrow whole-file checksum utility over fs.read_all with explicit fixed-width hex formatting; streaming reads and richer buffer helpers stay deferred as later pressure work rather than blocking first-pass hashing proof

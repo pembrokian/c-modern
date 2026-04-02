@@ -698,6 +698,55 @@ void TestRealFileWalkerProject(const std::filesystem::path& source_root,
                          "phase8 file walker test summary should be deterministic");
 }
 
+void TestRealHashToolProject(const std::filesystem::path& source_root,
+                             const std::filesystem::path& binary_root,
+                             const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_path = source_root / "examples/real/hash_tool/build.toml";
+    const std::filesystem::path sample_path = source_root / "examples/real/hash_tool/tests/sample.txt";
+    const std::filesystem::path build_dir = binary_root / "phase8_hash_tool_build";
+
+    const std::string expected_line =
+        "d17af4fb11e13fbf  " + sample_path.generic_string() + "\n";
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string(),
+                                                              "--",
+                                                              sample_path.generic_string()},
+                                                             build_dir / "phase8_hash_tool_run_output.txt",
+                                                             "phase8 hash tool run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("phase8 hash tool run should succeed:\n" + run_output);
+    }
+    ExpectOutputContains(run_output,
+                         expected_line,
+                         "phase8 hash tool should print the deterministic hash line");
+
+    const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                "test",
+                                                                "--project",
+                                                                project_path.generic_string(),
+                                                                "--build-dir",
+                                                                build_dir.generic_string()},
+                                                               build_dir / "phase8_hash_tool_test_output.txt",
+                                                               "phase8 hash tool test");
+    if (!test_outcome.exited || test_outcome.exit_code != 0) {
+        Fail("phase8 hash tool tests should pass:\n" + test_output);
+    }
+    ExpectOutputContains(test_output,
+                         "PASS hash_bytes_test.test_hash_bytes",
+                         "phase8 hash tool ordinary tests should include byte-hash coverage");
+    ExpectOutputContains(test_output,
+                         "PASS hex_u64_test.test_hex_u64",
+                         "phase8 hash tool ordinary tests should include hex encoding coverage");
+    ExpectOutputContains(test_output,
+                         "3 tests, 3 passed, 0 failed",
+                         "phase8 hash tool test summary should be deterministic");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -720,5 +769,6 @@ int main(int argc, char** argv) {
     TestProjectAmbiguousImportFails(source_root, binary_root, mc_path);
     TestRealGrepLiteProject(source_root, binary_root, mc_path);
     TestRealFileWalkerProject(source_root, binary_root, mc_path);
+    TestRealHashToolProject(source_root, binary_root, mc_path);
     return 0;
 }

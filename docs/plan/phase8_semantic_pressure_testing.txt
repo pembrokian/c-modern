@@ -4,7 +4,7 @@ Phase 8 -- Semantic Pressure Testing
 Status
 ------
 - Repository posture is ready for Phase 8 entry: project-driven mc check, mc build, mc run, mc test, deterministic .mci, and incremental rebuild reuse are already admitted in phase7_implementation_summary.txt.
-- Pressure-program posture is advancing through repository-owned proofs: the first-pass canonical slice is landed, and real project pressure now includes grep-lite plus file walker.
+- Pressure-program posture is advancing through repository-owned proofs: the first-pass canonical slice is landed, and real project pressure now includes grep-lite, file walker, and a bounded hashing tool.
 - Phase 8 should therefore focus on closing the gap between the normative pressure set in canonical_programs.txt and the current repository-owned examples and tests.
 
 Purpose
@@ -216,7 +216,7 @@ Ordered Implementation Steps
 8. Convert blocked canonical programs into named backlog or enabling-gap entries rather than implicit omissions.
 9. Add the first real utility project, preferably a small grep-like tool. Status: implemented as examples/real/grep_lite with project-level mc run and mc test proof.
    - Follow-up resolved: project-mode imported interface qualification now preserves named exported types across stdlib module boundaries well enough for grep-lite to import fs and mem directly.
-10. Expand from grep-lite and file walker into hashing and arena-backed utilities one pressure dimension at a time.
+10. Expand from grep-lite, file walker, and the bounded hashing tool into arena-backed utilities one pressure dimension at a time.
 11. Add a bounded threaded example only if it fits the admitted runtime honestly.
 12. Convert all discovered issues into stable tests or documented blocked items.
 13. Close documentation, findings capture, and acceptance proof.

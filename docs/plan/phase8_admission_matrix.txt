@@ -139,10 +139,12 @@ file walker
 
 hashing tool
 ~~~~~~~~~~~~
-- Status: deferred
+- Status: implemented
 - Packaging: dedicated build.toml project
 - Intended proof: project build plus deterministic output tests
-- Reason: depends on streaming reads and richer buffer helpers than the current bootstrap slice admits
+- Pressure focus: whole-file reads, byte-wise integer hashing, fixed-width hex encoding, stdout formatting, and project-owned ordinary tests
+- Proof artifact: examples/real/hash_tool/build.toml plus tool-level mc run/mc test coverage in tests/tool/phase7_tool_tests.cpp
+- Resolution note: the admitted first pass uses whole-file fs.read_all rather than streaming reads; streaming and richer buffer helpers remain later follow-up work instead of a blocker for a bounded checksum utility
 
 bounded threaded example
 ~~~~~~~~~~~~~~~~~~~~~~~~
