@@ -2696,9 +2696,8 @@ Function LowerFunctionDecl(const ast::Decl& decl,
     return FunctionLowerer(decl, module, file_path, sema_module, diagnostics).Run();
 }
 
-// Bootstrap MIR validation checks structural integrity and use-def shape, but it does
-// not yet enforce SSA dominance. The current gap should produce false negatives rather
-// than crashes while MIR bring-up continues.
+// Bootstrap MIR validation checks structural integrity, use-def shape, and SSA dominance.
+// Every operand use must be in a block dominated by the block where the value is defined.
 bool ValidateModule(const Module& module,
                     const std::filesystem::path& file_path,
                     support::DiagnosticSink& diagnostics) {
@@ -4088,6 +4087,182 @@ bool ValidateModule(const Module& module,
                     break;
             }
         }
+
+        // ── SSA dominance pass ──────────────────────────────────────────────
+        // Uses Cooper's iterative algorithm to compute the immediate dominator
+        // of each reachable block, then verifies that for every value operand V
+        // used in block B, the block that defines V dominates B.
+
+        // Step A: build predecessor map (only reachable blocks).
+        std::unordered_map<std::string, std::vector<std::string>> preds;
+        for (const auto& label : reachable_blocks) {
+            preds.emplace(label, std::vector<std::string>{});
+        }
+        for (const auto& blk : function.blocks) {
+            if (!reachable_blocks.contains(blk.label)) {
+                continue;
+            }
+            auto add_edge = [&](const std::string& target) {
+                if (reachable_blocks.contains(target)) {
+                    preds[target].push_back(blk.label);
+                }
+            };
+            if (blk.terminator.kind == Terminator::Kind::kBranch) {
+                add_edge(blk.terminator.true_target);
+            } else if (blk.terminator.kind == Terminator::Kind::kCondBranch) {
+                add_edge(blk.terminator.true_target);
+                add_edge(blk.terminator.false_target);
+            }
+        }
+
+        // Step B: compute RPO via DFS and build rpo_number.
+        const std::string entry_label = function.blocks.front().label;
+        std::vector<std::string> rpo;
+        {
+            std::unordered_set<std::string> visited;
+            std::vector<std::pair<std::string, bool>> stack;
+            stack.push_back({entry_label, false});
+            while (!stack.empty()) {
+                auto [label, processed] = stack.back();
+                stack.pop_back();
+                if (processed) {
+                    rpo.push_back(label);
+                    continue;
+                }
+                if (!visited.insert(label).second) {
+                    continue;
+                }
+                stack.push_back({label, true});
+                const auto found = blocks_by_label.find(label);
+                if (found == blocks_by_label.end()) {
+                    continue;
+                }
+                const auto& t = found->second->terminator;
+                if (t.kind == Terminator::Kind::kCondBranch) {
+                    if (reachable_blocks.contains(t.false_target)) {
+                        stack.push_back({t.false_target, false});
+                    }
+                    if (reachable_blocks.contains(t.true_target)) {
+                        stack.push_back({t.true_target, false});
+                    }
+                } else if (t.kind == Terminator::Kind::kBranch) {
+                    if (reachable_blocks.contains(t.true_target)) {
+                        stack.push_back({t.true_target, false});
+                    }
+                }
+            }
+            std::reverse(rpo.begin(), rpo.end());
+        }
+        std::unordered_map<std::string, std::size_t> rpo_number;
+        for (std::size_t i = 0; i < rpo.size(); ++i) {
+            rpo_number[rpo[i]] = i;
+        }
+
+        // Step C: Cooper's iterative dominator algorithm.
+        std::unordered_map<std::string, std::string> idom;
+        idom[entry_label] = entry_label;
+        auto intersect = [&](const std::string& a, const std::string& b) -> std::string {
+            std::string finger1 = a;
+            std::string finger2 = b;
+            while (finger1 != finger2) {
+                while (rpo_number.count(finger1) && rpo_number.count(finger2) &&
+                       rpo_number.at(finger1) > rpo_number.at(finger2)) {
+                    finger1 = idom.at(finger1);
+                }
+                while (rpo_number.count(finger1) && rpo_number.count(finger2) &&
+                       rpo_number.at(finger2) > rpo_number.at(finger1)) {
+                    finger2 = idom.at(finger2);
+                }
+            }
+            return finger1;
+        };
+        bool dom_changed = true;
+        while (dom_changed) {
+            dom_changed = false;
+            for (const auto& b_label : rpo) {
+                if (b_label == entry_label) {
+                    continue;
+                }
+                const auto& b_preds = preds.at(b_label);
+                std::string new_idom;
+                for (const auto& p : b_preds) {
+                    if (idom.count(p)) {
+                        new_idom = p;
+                        break;
+                    }
+                }
+                if (new_idom.empty()) {
+                    continue;
+                }
+                for (const auto& p : b_preds) {
+                    if (p == new_idom || !idom.count(p)) {
+                        continue;
+                    }
+                    new_idom = intersect(p, new_idom);
+                }
+                if (!idom.count(b_label) || idom.at(b_label) != new_idom) {
+                    idom[b_label] = new_idom;
+                    dom_changed = true;
+                }
+            }
+        }
+
+        // Step D: record which block defines each SSA value.
+        std::unordered_map<std::string, std::string> value_def_block;
+        for (const auto& blk : function.blocks) {
+            if (!reachable_blocks.contains(blk.label)) {
+                continue;
+            }
+            for (const auto& instr : blk.instructions) {
+                if (!instr.result.empty()) {
+                    value_def_block[instr.result] = blk.label;
+                }
+            }
+        }
+
+        // Step E: dominance helper and check.
+        auto dominates = [&](const std::string& def_block, const std::string& use_block) -> bool {
+            std::string cursor = use_block;
+            while (cursor != def_block) {
+                const auto it = idom.find(cursor);
+                if (it == idom.end() || it->second == cursor) {
+                    return false;
+                }
+                cursor = it->second;
+            }
+            return true;
+        };
+        auto check_operand_dominance = [&](const std::string& operand, const std::string& use_block_label) {
+            const auto def_it = value_def_block.find(operand);
+            if (def_it == value_def_block.end()) {
+                return;  // not an SSA value (local name) or already caught by pass 1
+            }
+            if (def_it->second == use_block_label) {
+                return;  // same-block — sequential order enforced by pass 1
+            }
+            if (!dominates(def_it->second, use_block_label)) {
+                report("SSA dominance violation in function " + function.name + ": " + operand +
+                       " (defined in " + def_it->second + ") used in " + use_block_label);
+            }
+        };
+        for (const auto& blk : function.blocks) {
+            if (!reachable_blocks.contains(blk.label)) {
+                continue;
+            }
+            for (const auto& instr : blk.instructions) {
+                for (const auto& operand : instr.operands) {
+                    if (!operand.empty()) {
+                        check_operand_dominance(operand, blk.label);
+                    }
+                }
+            }
+            for (const auto& val : blk.terminator.values) {
+                if (!val.empty()) {
+                    check_operand_dominance(val, blk.label);
+                }
+            }
+        }
+        // ── end SSA dominance pass ───────────────────────────────────────────
     }
 
     return ok;

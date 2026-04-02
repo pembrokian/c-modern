@@ -2235,6 +2235,171 @@ void TestValidatorRejectsBranchTerminatorWithValues() {
     }
 }
 
+// CFG: entry --cond--> then | merge
+//       then -----------> merge
+// %v1 is defined only in `then`; `merge` uses it as an operand.
+// `then` does not dominate `merge`, so this must be rejected.
+void TestValidatorRejectsSSADominanceViolation() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "bad_dom";
+    function.return_types.push_back(mc::sema::NamedType("i32"));
+    // entry: define %cond (bool), cond-branch to then/merge
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%cond",
+                .type = mc::sema::BoolType(),
+                .op = "true",
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kCondBranch,
+            .values = {"%cond"},
+            .true_target = "then",
+            .false_target = "merge",
+        },
+    });
+    // then: define %v1, branch to merge
+    function.blocks.push_back({
+        .label = "then",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("i32"),
+                .op = "42",
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kBranch,
+            .true_target = "merge",
+        },
+    });
+    // merge: uses %v1 — dominance violation
+    function.blocks.push_back({
+        .label = "merge",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%zero",
+                .type = mc::sema::NamedType("i32"),
+                .op = "0",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBinary,
+                .result = "%result",
+                .type = mc::sema::NamedType("i32"),
+                .op = "+",
+                .operands = {"%v1", "%zero"},
+                .arithmetic_semantics = mc::mir::Instruction::ArithmeticSemantics::kWrap,
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%result"},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject SSA dominance violation");
+    }
+    if (diagnostics.Render().find("SSA dominance violation") == std::string::npos) {
+        Fail("validator should name the SSA dominance violation: " + diagnostics.Render());
+    }
+}
+
+// CFG: entry --cond--> then | else_blk; then --> exit; else_blk --> exit
+// %v0 is defined in entry (which dominates all blocks); both successors may use it.
+void TestValidatorAcceptsDominatingBlockValue() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "good_dom";
+    function.return_types.push_back(mc::sema::NamedType("i32"));
+    // entry: define %cond and %v0, cond-branch
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%cond",
+                .type = mc::sema::BoolType(),
+                .op = "true",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("i32"),
+                .op = "1",
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kCondBranch,
+            .values = {"%cond"},
+            .true_target = "then",
+            .false_target = "else_blk",
+        },
+    });
+    // then: use %v0 (dominated by entry — OK)
+    function.blocks.push_back({
+        .label = "then",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%one",
+                .type = mc::sema::NamedType("i32"),
+                .op = "1",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBinary,
+                .result = "%then_res",
+                .type = mc::sema::NamedType("i32"),
+                .op = "+",
+                .operands = {"%v0", "%one"},
+                .arithmetic_semantics = mc::mir::Instruction::ArithmeticSemantics::kWrap,
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%then_res"},
+        },
+    });
+    // else_blk: use %v0 (dominated by entry — OK)
+    function.blocks.push_back({
+        .label = "else_blk",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%two",
+                .type = mc::sema::NamedType("i32"),
+                .op = "2",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBinary,
+                .result = "%else_res",
+                .type = mc::sema::NamedType("i32"),
+                .op = "+",
+                .operands = {"%v0", "%two"},
+                .arithmetic_semantics = mc::mir::Instruction::ArithmeticSemantics::kWrap,
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%else_res"},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (!mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should accept value uses dominated by definition: " + diagnostics.Render());
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -2298,5 +2463,7 @@ int main() {
     TestValidatorRejectsDirectCallMissingTargetName();
     TestValidatorRejectsUnterminatedUnreachableBlock();
     TestValidatorRejectsBranchTerminatorWithValues();
+    TestValidatorRejectsSSADominanceViolation();
+    TestValidatorAcceptsDominatingBlockValue();
     return 0;
 }
