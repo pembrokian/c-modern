@@ -1,1 +1,1 @@
-defer requires a call expression in the bootstrap semantic checker
+defer requires a call expression

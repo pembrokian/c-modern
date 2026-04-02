@@ -86,10 +86,12 @@ void TestDumpPaths() {
 void TestMciRoundTrip() {
     mc::sema::Module module;
     module.imports.push_back("helper_dep");
-    module.functions.push_back({
-        .name = "answer",
-        .return_types = {mc::sema::NamedType("i32")},
-    });
+    mc::sema::FunctionSignature function;
+    function.name = "answer";
+    function.param_types = {mc::sema::PointerType(mc::sema::NamedType("i32"))};
+    function.param_is_noalias = {true};
+    function.return_types = {mc::sema::NamedType("i32")};
+    module.functions.push_back(std::move(function));
 
     mc::sema::TypeDeclSummary type_decl;
     type_decl.kind = mc::ast::Decl::Kind::kStruct;
@@ -102,6 +104,13 @@ void TestMciRoundTrip() {
         .field_offsets = {0, 4},
     };
     module.type_decls.push_back(type_decl);
+
+    mc::sema::GlobalSummary global;
+    global.is_const = true;
+    global.names = {"answer_seed"};
+    global.type = mc::sema::NamedType("i32");
+    global.constant_values = {"42"};
+    module.globals.push_back(std::move(global));
 
     mc::support::DiagnosticSink diagnostics;
     const auto temp_path = std::filesystem::temp_directory_path() / "c_modern_phase7_roundtrip.mci";
@@ -124,8 +133,13 @@ void TestMciRoundTrip() {
            "mci loader should preserve import lists");
     Expect(loaded->module.functions.size() == 1 && loaded->module.functions[0].name == "answer",
            "mci loader should preserve exported function signatures");
+        Expect(loaded->module.functions[0].param_is_noalias.size() == 1 && loaded->module.functions[0].param_is_noalias[0],
+            "mci loader should preserve exported function parameter attributes");
     Expect(loaded->module.type_decls.size() == 1 && loaded->module.type_decls[0].name == "Pair",
            "mci loader should preserve exported type declarations");
+        Expect(loaded->module.globals.size() == 1 && loaded->module.globals[0].constant_values.size() == 1 &&
+             loaded->module.globals[0].constant_values[0] == "42",
+            "mci loader should preserve exported compile-time constant values");
     Expect(!loaded->interface_hash.empty(), "mci loader should preserve interface hashes");
 
     std::filesystem::remove(temp_path);

@@ -20,6 +20,7 @@ struct FunctionSignature {
     std::string extern_abi;
     std::vector<std::string> type_params;
     std::vector<Type> param_types;
+    std::vector<bool> param_is_noalias;
     std::vector<Type> return_types;
 };
 

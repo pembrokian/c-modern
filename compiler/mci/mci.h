@@ -11,7 +11,7 @@
 namespace mc::mci {
 
 struct InterfaceArtifact {
-    int format_version = 1;
+    int format_version = 2;
     std::string target_identity;
     std::string module_name;
     std::filesystem::path source_path;

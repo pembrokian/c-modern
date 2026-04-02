@@ -1,0 +1,1 @@
+Error return type must appear last in function signature

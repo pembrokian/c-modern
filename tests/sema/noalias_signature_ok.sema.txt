@@ -1,0 +1,2 @@
+SemanticModule
+  Function name=load params=[*i32, *i32] returns=[i32] paramAttrs=[noalias, -]

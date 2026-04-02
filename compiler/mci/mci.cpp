@@ -13,7 +13,9 @@ namespace {
 
 using mc::support::DiagnosticSeverity;
 
-constexpr int kFormatVersion = 1;
+constexpr int kFormatVersion = 2;
+
+bool ParseBoolField(std::string_view text, bool& value);
 
 std::string EscapeText(std::string_view text) {
     std::string escaped;
@@ -90,6 +92,17 @@ std::string JoinEscaped(const std::vector<std::string>& values) {
     return stream.str();
 }
 
+std::string JoinBoolFlags(const std::vector<bool>& values) {
+    std::ostringstream stream;
+    for (std::size_t index = 0; index < values.size(); ++index) {
+        if (index > 0) {
+            stream << ';';
+        }
+        stream << (values[index] ? '1' : '0');
+    }
+    return stream.str();
+}
+
 std::string JoinEscapedPaths(const std::vector<std::size_t>& values) {
     std::ostringstream stream;
     for (std::size_t index = 0; index < values.size(); ++index) {
@@ -150,6 +163,24 @@ std::optional<std::vector<std::string>> SplitEscaped(std::string_view text) {
         values.push_back(current);
     }
     return values;
+}
+
+std::optional<std::vector<bool>> SplitBoolFlags(std::string_view text) {
+    const auto values = SplitEscaped(text);
+    if (!values.has_value()) {
+        return std::nullopt;
+    }
+
+    std::vector<bool> flags;
+    flags.reserve(values->size());
+    for (const auto& value : *values) {
+        bool parsed = false;
+        if (!ParseBoolField(value, parsed)) {
+            return std::nullopt;
+        }
+        flags.push_back(parsed);
+    }
+    return flags;
 }
 
 std::optional<std::vector<std::size_t>> SplitOffsets(std::string_view text) {
@@ -446,7 +477,7 @@ std::optional<sema::Type> ParseTypeText(std::string_view text) {
     return TypeParser(text).Parse();
 }
 
-std::string SerializeArtifactWithoutHash(const InterfaceArtifact& artifact) {
+std::string SerializeArtifactWithoutHashV1(const InterfaceArtifact& artifact) {
     std::ostringstream output;
     output << "format\t" << artifact.format_version << '\n';
     output << "target\t" << EscapeText(artifact.target_identity) << '\n';
@@ -472,7 +503,7 @@ std::string SerializeArtifactWithoutHash(const InterfaceArtifact& artifact) {
                << '\t' << EscapeText(function.extern_abi)
                << '\t' << JoinEscaped(function.type_params)
                << '\t' << JoinEscaped(param_types)
-               << '\t' << JoinEscaped(return_types)
+             << '\t' << JoinEscaped(return_types)
                << '\n';
     }
 
@@ -515,6 +546,87 @@ std::string SerializeArtifactWithoutHash(const InterfaceArtifact& artifact) {
         output << "global\t" << (global.is_const ? "1" : "0")
                << '\t' << JoinEscaped(global.names)
                << '\t' << EscapeText(sema::FormatType(global.type))
+               << '\n';
+    }
+
+    return output.str();
+}
+
+std::string SerializeArtifactWithoutHash(const InterfaceArtifact& artifact) {
+    if (artifact.format_version == 1) {
+        return SerializeArtifactWithoutHashV1(artifact);
+    }
+
+    std::ostringstream output;
+    output << "format\t" << artifact.format_version << '\n';
+    output << "target\t" << EscapeText(artifact.target_identity) << '\n';
+    output << "module\t" << EscapeText(artifact.module_name) << '\n';
+    output << "source\t" << EscapeText(artifact.source_path.generic_string()) << '\n';
+    output << "imports\t" << JoinEscaped(artifact.module.imports) << '\n';
+
+    for (const auto& function : artifact.module.functions) {
+        std::vector<std::string> param_types;
+        param_types.reserve(function.param_types.size());
+        for (const auto& type : function.param_types) {
+            param_types.push_back(sema::FormatType(type));
+        }
+
+        std::vector<std::string> return_types;
+        return_types.reserve(function.return_types.size());
+        for (const auto& type : function.return_types) {
+            return_types.push_back(sema::FormatType(type));
+        }
+
+        output << "function\t" << EscapeText(function.name)
+               << '\t' << (function.is_extern ? "1" : "0")
+               << '\t' << EscapeText(function.extern_abi)
+               << '\t' << JoinEscaped(function.type_params)
+               << '\t' << JoinEscaped(param_types)
+               << '\t' << JoinEscaped(return_types)
+               << '\t' << JoinBoolFlags(function.param_is_noalias)
+               << '\n';
+    }
+
+    for (const auto& type_decl : artifact.module.type_decls) {
+        output << "type\t" << TypeKindName(type_decl.kind)
+               << '\t' << EscapeText(type_decl.name)
+               << '\t' << JoinEscaped(type_decl.type_params)
+               << '\t' << (type_decl.is_packed ? "1" : "0")
+               << '\t' << (type_decl.is_abi_c ? "1" : "0")
+               << '\t' << (type_decl.layout.valid ? "1" : "0")
+               << '\t' << type_decl.layout.size
+               << '\t' << type_decl.layout.alignment
+               << '\t' << JoinEscapedPaths(type_decl.layout.field_offsets)
+               << '\t' << EscapeText(sema::FormatType(type_decl.aliased_type))
+               << '\n';
+
+        for (const auto& field : type_decl.fields) {
+            output << "type_field\t" << EscapeText(type_decl.name)
+                   << '\t' << EscapeText(field.first)
+                   << '\t' << EscapeText(sema::FormatType(field.second))
+                   << '\n';
+        }
+
+        for (const auto& variant : type_decl.variants) {
+            output << "type_variant\t" << EscapeText(type_decl.name)
+                   << '\t' << EscapeText(variant.name)
+                   << '\n';
+
+            for (const auto& payload_field : variant.payload_fields) {
+                output << "type_variant_field\t" << EscapeText(type_decl.name)
+                       << '\t' << EscapeText(variant.name)
+                       << '\t' << EscapeText(payload_field.first)
+                       << '\t' << EscapeText(sema::FormatType(payload_field.second))
+                       << '\n';
+            }
+        }
+    }
+
+    for (const auto& global : artifact.module.globals) {
+        output << "global\t" << (global.is_const ? "1" : "0")
+               << '\t' << JoinEscaped(global.names)
+               << '\t' << EscapeText(sema::FormatType(global.type))
+               << '\t' << JoinEscaped(global.constant_values)
                << '\n';
     }
 
@@ -668,7 +780,7 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
             continue;
         }
         if (fields[0] == "function") {
-            if (fields.size() != 7) {
+            if (fields.size() != 7 && fields.size() != 8) {
                 ReportMciError(path, line_number, "invalid function record in interface artifact", diagnostics);
                 return std::nullopt;
             }
@@ -679,8 +791,9 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
             const auto type_params = SplitEscaped(fields[4]);
             const auto params = SplitEscaped(fields[5]);
             const auto returns = SplitEscaped(fields[6]);
+            const auto noalias_flags = fields.size() == 8 ? SplitBoolFlags(fields[7]) : std::optional<std::vector<bool>> {std::vector<bool> {}};
             if (!name.has_value() || !abi.has_value() || !type_params.has_value() || !params.has_value() || !returns.has_value() ||
-                !ParseBoolField(fields[2], function.is_extern)) {
+                !noalias_flags.has_value() || !ParseBoolField(fields[2], function.is_extern)) {
                 ReportMciError(path, line_number, "invalid function payload in interface artifact", diagnostics);
                 return std::nullopt;
             }
@@ -702,6 +815,15 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
                     return std::nullopt;
                 }
                 function.return_types.push_back(*type);
+            }
+            if (!noalias_flags->empty() && noalias_flags->size() != function.param_types.size()) {
+                ReportMciError(path, line_number, "function noalias flag count does not match parameter count", diagnostics);
+                return std::nullopt;
+            }
+            if (noalias_flags->empty()) {
+                function.param_is_noalias.assign(function.param_types.size(), false);
+            } else {
+                function.param_is_noalias = *noalias_flags;
             }
             artifact.module.functions.push_back(std::move(function));
             continue;
@@ -818,7 +940,7 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
             continue;
         }
         if (fields[0] == "global") {
-            if (fields.size() != 4) {
+            if (fields.size() != 4 && fields.size() != 5) {
                 ReportMciError(path, line_number, "invalid global record in interface artifact", diagnostics);
                 return std::nullopt;
             }
@@ -826,12 +948,18 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
             const auto names = SplitEscaped(fields[2]);
             const auto type_text = UnescapeText(fields[3]);
             const auto type = type_text.has_value() ? ParseTypeText(*type_text) : std::nullopt;
-            if (!names.has_value() || !type.has_value() || !ParseBoolField(fields[1], global.is_const)) {
+            const auto constant_values = fields.size() == 5 ? SplitEscaped(fields[4]) : std::optional<std::vector<std::string>> {std::vector<std::string> {}};
+            if (!names.has_value() || !type.has_value() || !constant_values.has_value() || !ParseBoolField(fields[1], global.is_const)) {
                 ReportMciError(path, line_number, "invalid global payload in interface artifact", diagnostics);
                 return std::nullopt;
             }
             global.names = *names;
             global.type = *type;
+            if (!constant_values->empty() && constant_values->size() != global.names.size()) {
+                ReportMciError(path, line_number, "global constant value count does not match bound name count", diagnostics);
+                return std::nullopt;
+            }
+            global.constant_values = *constant_values;
             artifact.module.globals.push_back(std::move(global));
             continue;
         }
@@ -848,7 +976,7 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
         return std::nullopt;
     }
 
-    if (artifact.format_version != kFormatVersion) {
+    if (artifact.format_version != 1 && artifact.format_version != kFormatVersion) {
         diagnostics.Report({
             .file_path = path,
             .span = mc::support::kDefaultSourceSpan,

@@ -165,6 +165,10 @@ std::string QualifyImportedName(std::string_view module_name, std::string_view n
     return std::string(module_name) + "." + std::string(name);
 }
 
+bool HasSuffix(std::string_view text, std::string_view suffix) {
+    return text.size() >= suffix.size() && text.substr(text.size() - suffix.size()) == suffix;
+}
+
 Type RewriteImportedTypeNames(Type type,
                               std::string_view module_name,
                               const std::unordered_set<std::string>& local_type_names,
@@ -329,6 +333,22 @@ bool IsPointerLikeType(const Type& type, const Module& module) {
 bool IsUintPtrType(const Type& type, const Module& module) {
     const Type stripped = StripTypeAliases(type, module);
     return stripped.kind == Type::Kind::kNamed && stripped.name == "uintptr";
+}
+
+Type StripAliasOrDistinct(Type type, const Module& module);
+
+bool IsNoAliasEligibleType(Type type, const Module& module) {
+    type = StripTypeAliases(std::move(type), module);
+    while (type.kind == Type::Kind::kConst && !type.subtypes.empty()) {
+        type = StripTypeAliases(std::move(type.subtypes.front()), module);
+    }
+    return type.kind == Type::Kind::kPointer;
+}
+
+bool IsErrorType(Type type, const Module& module) {
+    type = StripAliasOrDistinct(std::move(type), module);
+    type = CanonicalizeBuiltinType(std::move(type));
+    return type.kind == Type::Kind::kNamed && (type.name == "Error" || HasSuffix(type.name, ".Error"));
 }
 
 bool IsAddressableExpr(const Expr& expr) {
@@ -601,6 +621,7 @@ class Checker {
         ValidateExportBlock();
         ValidateTypeDecls();
         ValidateGlobals();
+        ValidateFunctionSignatures();
         ValidateFunctions();
         BuildModuleLookupMaps(*module);
 
@@ -1025,6 +1046,13 @@ class Checker {
         signature.type_params = decl.type_params;
         for (const auto& param : decl.params) {
             signature.param_types.push_back(SemanticTypeFromAst(param.type.get(), decl.type_params));
+            bool has_noalias = false;
+            for (const auto& attribute : param.attributes) {
+                if (attribute.name == "noalias") {
+                    has_noalias = true;
+                }
+            }
+            signature.param_is_noalias.push_back(has_noalias);
         }
         for (const auto& return_type : decl.return_types) {
             signature.return_types.push_back(SemanticTypeFromAst(return_type.get(), decl.type_params));
@@ -1395,6 +1423,22 @@ class Checker {
         }
     }
 
+    void ValidateFunctionSignatures() {
+        for (const auto& decl : source_file_.decls) {
+            if (decl.kind != Decl::Kind::kFunc && decl.kind != Decl::Kind::kExternFunc) {
+                continue;
+            }
+
+            const FunctionSignature* signature = FindFunctionSignature(*module_, decl.name);
+            if (signature == nullptr) {
+                continue;
+            }
+
+            ValidateFunctionParamAttributes(decl, *signature);
+            ValidateFunctionReturnContract(decl, *signature);
+        }
+    }
+
     void ValidateFunctions() {
         for (const auto& decl : source_file_.decls) {
             if (decl.kind != Decl::Kind::kFunc) {
@@ -1418,8 +1462,79 @@ class Checker {
                 ValidateTypeExpr(return_type.get(), signature->type_params, return_type->span);
             }
             CheckStmt(*decl.body);
+            if (!signature->return_types.empty() && !StmtAlwaysReturns(*decl.body)) {
+                Report(decl.span, "function " + decl.name + " may exit without returning a value");
+            }
             PopScope();
             current_function_ = nullptr;
+        }
+    }
+
+    void ValidateFunctionParamAttributes(const Decl& decl, const FunctionSignature& signature) {
+        for (std::size_t index = 0; index < decl.params.size() && index < signature.param_types.size(); ++index) {
+            bool saw_noalias = false;
+            for (const auto& attribute : decl.params[index].attributes) {
+                if (attribute.name != "noalias") {
+                    continue;
+                }
+                if (!attribute.args.empty()) {
+                    Report(attribute.span, "@noalias does not take arguments");
+                    continue;
+                }
+                if (saw_noalias) {
+                    Report(attribute.span, "duplicate @noalias attribute on parameter " + decl.params[index].name);
+                    continue;
+                }
+                saw_noalias = true;
+            }
+            if (saw_noalias && !IsNoAliasEligibleType(signature.param_types[index], *module_)) {
+                Report(decl.params[index].span, "@noalias parameter must have pointer type");
+            }
+        }
+    }
+
+    void ValidateFunctionReturnContract(const Decl& decl, const FunctionSignature& signature) {
+        if (signature.return_types.empty()) {
+            return;
+        }
+
+        for (std::size_t index = 0; index + 1 < signature.return_types.size(); ++index) {
+            if (index < decl.return_types.size() && IsErrorType(signature.return_types[index], *module_)) {
+                Report(decl.return_types[index]->span, "Error return type must appear last in function signature");
+            }
+        }
+    }
+
+    bool StmtListAlwaysReturns(const std::vector<std::unique_ptr<Stmt>>& statements) const {
+        for (const auto& stmt : statements) {
+            if (stmt != nullptr && StmtAlwaysReturns(*stmt)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool StmtAlwaysReturns(const Stmt& stmt) const {
+        switch (stmt.kind) {
+            case Stmt::Kind::kReturn:
+                return true;
+            case Stmt::Kind::kBlock:
+                return StmtListAlwaysReturns(stmt.statements);
+            case Stmt::Kind::kIf:
+                return stmt.then_branch != nullptr && stmt.else_branch != nullptr && StmtAlwaysReturns(*stmt.then_branch) &&
+                       StmtAlwaysReturns(*stmt.else_branch);
+            case Stmt::Kind::kSwitch:
+                if (!stmt.has_default_case) {
+                    return false;
+                }
+                for (const auto& switch_case : stmt.switch_cases) {
+                    if (!StmtListAlwaysReturns(switch_case.statements)) {
+                        return false;
+                    }
+                }
+                return StmtListAlwaysReturns(stmt.default_case.statements);
+            default:
+                return false;
         }
     }
 
@@ -2080,7 +2195,7 @@ class Checker {
                 return;
             case Stmt::Kind::kDefer:
                 if (stmt.exprs.empty() || stmt.exprs.front()->kind != Expr::Kind::kCall) {
-                    Report(stmt.span, "defer requires a call expression in the bootstrap semantic checker");
+                    Report(stmt.span, "defer requires a call expression");
                     return;
                 }
                 (void)AnalyzeExpr(*stmt.exprs.front());
@@ -2332,9 +2447,13 @@ Module BuildExportedModuleSurfaceInternal(const Module& module, const ast::Sourc
     for (const auto& global : module.globals) {
         GlobalSummary filtered = global;
         filtered.names.clear();
-        for (const auto& name : global.names) {
-            if (exported_names.contains(name)) {
-                filtered.names.push_back(name);
+        filtered.constant_values.clear();
+        for (std::size_t index = 0; index < global.names.size(); ++index) {
+            if (exported_names.contains(global.names[index])) {
+                filtered.names.push_back(global.names[index]);
+                if (index < global.constant_values.size()) {
+                    filtered.constant_values.push_back(global.constant_values[index]);
+                }
             }
         }
         if (!filtered.names.empty()) {
@@ -2662,6 +2781,23 @@ std::string DumpModule(const Module& module) {
             line << FormatType(function.return_types[index]);
         }
         line << ']';
+        bool has_any_noalias = false;
+        for (bool value : function.param_is_noalias) {
+            if (value) {
+                has_any_noalias = true;
+                break;
+            }
+        }
+        if (has_any_noalias) {
+            line << " paramAttrs=[";
+            for (std::size_t index = 0; index < function.param_is_noalias.size(); ++index) {
+                if (index > 0) {
+                    line << ", ";
+                }
+                line << (function.param_is_noalias[index] ? "noalias" : "-");
+            }
+            line << ']';
+        }
         WriteLine(stream, 1, line.str());
     }
     return stream.str();
