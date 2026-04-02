@@ -1,0 +1,1 @@
+global initializer type mismatch for BAD: expected i32, got bool

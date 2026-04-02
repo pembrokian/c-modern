@@ -1,0 +1,301 @@
+Phase 9 -- Phase 3 Semantic Authority Expansion
+================================================
+
+Status
+------
+PLANNED
+
+Repository status note
+----------------------
+- The repository already has a real bootstrap Phase 3 boundary recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase3_bootstrap_finish.txt` and a broader
+  non-bootstrap roadmap recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`.
+- This file does not introduce a new architecture phase after Phase 8.
+  It is a repository-specific execution label for the unfinished semantic work
+  that still belongs to Phase 3 ownership.
+- Do not describe Phase 9 as a new language or toolchain layer.
+  It is the concrete closure plan for making sema authoritative enough that
+  later Phase 4, Phase 5, and Phase 7 work can consume semantic truth instead
+  of reconstructing or compensating for it.
+
+Dependency note
+---------------
+- Phase 9 depends on the current repository posture described in:
+  - `/Users/ro/dev/c_modern/docs/plan/plan.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase3_bootstrap_finish.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/canonical_programs.txt`
+  - the current semantic entrypoints under
+    `/Users/ro/dev/c_modern/compiler/sema/`
+  - the current semantic fixture harness under
+    `/Users/ro/dev/c_modern/tests/sema/`
+- Phase 9 must preserve the existing ownership split:
+  - sema owns language meaning
+  - MIR owns typed lowered semantic truth
+  - the backend consumes MIR rather than redefining language policy
+  - the driver and build layer orchestrate workflow rather than repairing
+    missing semantic facts
+
+Repository-specific scope note
+-----------------------------
+- The architecture texts stop at Phase 8 and already state that later pressure
+  findings must route back to the smallest correct owner.
+- This repository uses the Phase 9 label only to package the next execution
+  wave as a concrete plan document under `docs/plan/`.
+- In substance, Phase 9 is the implementation plan for Workstreams 3A through
+  3F from the non-bootstrap roadmap, with the first execution wave explicitly
+  prioritizing type-system completion and explicit conversion closure.
+
+Purpose
+-------
+Turn the broad non-bootstrap Phase 3 roadmap into an execution-ready plan that
+can be implemented in reviewable waves without blurring ownership boundaries.
+
+After Phase 9:
+
+- sema is the authoritative checker for the admitted v0.2 core rather than a
+  bootstrap-valid subset that later stages quietly constrain
+- imported type identity, layout-sensitive truth, and exported semantic facts
+  are precise enough that `.mci` work becomes serialization rather than
+  semantic reconstruction
+- explicit conversions, compile-time rules, representation rules, and semantic
+  control-flow contracts are enforced in sema with deterministic diagnostics
+- tests under `/Users/ro/dev/c_modern/tests/sema/` cover every admitted rule
+  that the repository claims for the deeper Phase 3 surface
+
+Problem being solved
+--------------------
+- The repository can already parse, resolve imports, perform bootstrap
+  semantic checking, produce a semantic module, and lower an admitted slice to
+  MIR.
+- That semantic layer is still incomplete relative to the long-term Phase 3
+  contract in `plan.txt` and the repository's own non-bootstrap roadmap.
+- The main remaining risk is not absence of a checker, but partial authority:
+  some type rules, conversion rules, layout rules, constant-evaluation rules,
+  control-flow contracts, and export facts are still bootstrap-shaped.
+- Without an explicit execution plan:
+  - type and conversion gaps will continue to leak into MIR or backend-shaped
+    workarounds
+  - layout-sensitive behavior can drift away from sema-owned truth
+  - future `.mci` work can harden around incomplete export facts
+  - Phase 8 pressure findings will remain anecdotal instead of converting into
+    narrow semantic regressions
+
+Core rule
+---------
+- Fix semantic gaps in sema, not in MIR, the backend, the driver, or the
+  stdlib.
+- Deepen the admitted semantic surface before widening target or workflow
+  breadth.
+- Prefer a narrower honest semantic contract over a broader bootstrap
+  convenience rule.
+- Keep semantic dumps and diagnostics deterministic so the fixture layer stays
+  authoritative.
+
+Current repository posture
+--------------------------
+- The main semantic entrypoints live in
+  `/Users/ro/dev/c_modern/compiler/sema/check.h` and
+  `/Users/ro/dev/c_modern/compiler/sema/check.cpp`.
+- The canonical semantic type model currently lives in
+  `/Users/ro/dev/c_modern/compiler/sema/type.h` and
+  `/Users/ro/dev/c_modern/compiler/sema/type.cpp`.
+- The current semantic module already records functions, type declarations,
+  globals, expression-type facts, binding-or-assignment facts, and first-cut
+  layout summaries.
+- Import loading, export filtering, and imported-surface rewriting already
+  exist in bootstrap form.
+- Layout computation exists for the current struct-focused bootstrap slice,
+  including `@packed` and bootstrap `@abi(c)` handling.
+- The semantic fixture harness under
+  `/Users/ro/dev/c_modern/tests/sema/sema_fixture_tests.cpp` already supports
+  deterministic pass and fail fixtures plus import-root configuration.
+- The current tree still lacks full closure for distinct-type semantics,
+  explicit conversion coverage across the admitted surface, compile-time
+  evaluation completeness, semantic `@noalias` and explicit error-return rules,
+  and export completeness sufficient for later interface-artifact trust.
+
+Phase 9 execution waves
+-----------------------
+Phase 9A -- Type and Conversion Foundation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Finish the type rules and explicit conversion rules first so later layout,
+compile-time, control-flow, and export work can depend on stable semantic
+identity instead of shifting bootstrap assumptions.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 3A -- Type-system completion
+- 3B -- Explicit conversion and coercion closure
+
+Tasks
+~~~~~
+1. Re-audit the current canonical type model against the admitted primitive,
+   pointer, array, slice, buffer, procedure, struct, and distinct-type surface.
+2. Close remaining holes where sema accepts or rejects code only because later
+   stages are narrower.
+3. Tighten imported user-defined type identity so qualified imported types and
+   exported semantic identities survive module boundaries precisely.
+4. Centralize explicit conversion checks and enforce the full no-implicit-
+   numeric-conversions rule consistently across assignments, returns, calls,
+   aggregate initialization, and explicit conversion expressions.
+5. Extend distinct-type conversion rules only where the admitted Phase 3
+   contract already authorizes them.
+6. Add sema fixtures covering pass and fail cases for imported named types,
+   distinct types, procedure signatures, and conversion-heavy expressions.
+
+Phase 9B -- Representation and Compile-Time Authority
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Make sema the authoritative owner for representation-sensitive truth and the
+admitted compile-time subset so later stages consume already-checked meaning.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 3C -- Layout and ABI correctness
+- 3D -- Constant evaluation and compile-time rules
+
+Tasks
+~~~~~
+1. Extend layout computation so sema owns size, alignment, field offsets,
+   padding, packed behavior, `@abi(c)` behavior, nested aggregate layout, and
+   imported layout-sensitive facts across the admitted slice.
+2. Ensure representation-sensitive semantic facts are exported in deterministic
+   form rather than recomputed later by the backend.
+3. Implement deterministic evaluation for top-level constants and required
+   compile-time expressions within the admitted subset.
+4. Convert invalid compile-time forms into stable semantic diagnostics rather
+   than latent runtime behavior or backend crashes.
+5. Add layout and constant-evaluation fixtures for packed aggregates,
+   `@abi(c)` declarations, nested aggregates, imported layout-sensitive types,
+   and invalid compile-time expressions.
+
+Phase 9C -- Semantic Contracts and Interface Authority
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Complete the semantic contracts that remain bootstrap-shaped and make the
+semantic export surface trustworthy enough for later interface-artifact and
+project-mode work.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 3E -- Control flow and semantic contracts
+- 3F -- Export and interface authority
+
+Tasks
+~~~~~
+1. Deepen semantic checking for `defer` beyond the current bootstrap-valid
+   subset.
+2. Implement explicit error-return semantics where the architecture texts
+   already require them.
+3. Implement semantic `@noalias` checking where the admitted surface claims it.
+4. Strengthen return, break, continue, and lifetime-sensitive diagnostics in
+   multi-branch and nested-scope cases.
+5. Tighten exported-module surface construction so later `.mci` work is a
+   serialization problem rather than a meaning-reconstruction problem.
+6. Ensure imported semantic facts preserve callable signatures, type identity,
+   and layout-sensitive truth without downstream repair.
+7. Add multi-module fixtures that prove exported semantic truth is complete
+   enough for later phases to consume directly.
+
+Canonical artifacts
+-------------------
+Phase 9 should produce or update the following canonical surfaces:
+
+- `/Users/ro/dev/c_modern/docs/plan/phase9_phase3_semantic_authority_expansion.txt`
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  where the roadmap should reference the concrete Phase 9 follow-up plan
+- semantic implementation updates under `/Users/ro/dev/c_modern/compiler/sema/`
+- any future interface-consumption adjustments under
+  `/Users/ro/dev/c_modern/compiler/mci/` only after Phase 9 semantic facts are
+  frozen clearly enough to serialize
+- deterministic semantic regression coverage under
+  `/Users/ro/dev/c_modern/tests/sema/`
+- narrow MIR or tool regressions only when newly authoritative semantic truth
+  intentionally changes downstream behavior
+
+Allowed edit surface
+--------------------
+- `/Users/ro/dev/c_modern/docs/plan/`
+- `/Users/ro/dev/c_modern/compiler/sema/`
+- `/Users/ro/dev/c_modern/tests/sema/`
+- `/Users/ro/dev/c_modern/compiler/mci/` only for serialization-facing follow-
+  up once semantic export facts are actually ready
+- `/Users/ro/dev/c_modern/compiler/mir/` only for narrow downstream updates if
+  Phase 9 semantics intentionally change the consumed semantic surface
+- `/Users/ro/dev/c_modern/compiler/driver/` only when command plumbing must
+  expose already-existing semantic behavior rather than defining it
+- `/Users/ro/dev/c_modern/CMakeLists.txt` only if new semantic tests require
+  wiring
+
+Out of scope
+------------
+- broad MIR feature work that belongs to Phase 4 surface completion rather than
+  semantic authority
+- backend deepening that belongs to Phase 5 executable closure
+- broad stdlib or runtime API redesign that belongs to Phase 6 ownership
+- project-graph, rebuild, or `.mci` workflow maturity beyond what is required
+  to prove the semantic export surface is complete enough to serialize later
+- adding new language surface beyond the admitted v0.2 core already claimed by
+  the current roadmap and architecture texts
+- widening the target matrix or hiding semantic gaps behind target-specific
+  behavior
+
+Suggested proof and artifacts
+-----------------------------
+- expand `/Users/ro/dev/c_modern/tests/sema/` with pass and fail fixtures for
+  each admitted rule claimed by Phase 9A through Phase 9C
+- keep deterministic semantic dump coverage for imports, conversions, layout,
+  and compile-time behavior
+- add representative multi-module fixtures proving imported type identity,
+  export filtering, and imported layout-sensitive facts
+- promote representative pressure-program findings into sema fixtures when the
+  semantic contract is the clearest stable layer
+- add narrow MIR regressions only when sema truth intentionally changes what
+  MIR must consume
+
+Exit criteria
+-------------
+- sema can fully check small multi-module programs across the admitted core
+  surface without backend-specific assumptions
+- type, conversion, layout, and compile-time behavior match the repository's
+  adopted v0.2 intent for the admitted slice
+- semantic control-flow contracts no longer depend on bootstrap-only checker
+  restrictions where the architecture texts already require deeper coverage
+- exported semantic truth is complete enough that later `.mci` work is not
+  reconstructing missing meaning
+- semantic test coverage exists for every feature Phase 9 claims to have
+  completed
+
+Ordered implementation steps
+----------------------------
+1. Freeze the repository meaning of the Phase 9 label so it cannot drift into a
+   post-Phase-8 architecture claim.
+2. Build a Phase 3 closure matrix from `plan.txt`, the non-bootstrap roadmap,
+   the current semantic implementation, and the current semantic fixtures.
+3. Execute Phase 9A type-system completion work and fixture expansion.
+4. Execute Phase 9A explicit conversion closure and fixture expansion.
+5. Execute Phase 9B layout and ABI authority work.
+6. Execute Phase 9B constant-evaluation and compile-time rule work.
+7. Execute Phase 9C control-flow and semantic contract work.
+8. Execute Phase 9C export and interface authority work.
+9. Re-run the semantic fixture suite after each wave and update only the
+   narrowest relevant proof artifacts.
+10. Re-audit remaining gaps and route any non-semantic leftovers back to Phase
+    4, Phase 5, or Phase 7 ownership rather than stretching Phase 9.
+
+Acceptance criteria for this plan document
+------------------------------------------
+- The repository has one explicit execution plan for the unfinished semantic
+  closure work that still belongs to Phase 3 ownership.
+- The plan preserves the existing phase-boundary rules from the roadmap and
+  does not recast semantic gaps as backend, driver, or library workarounds.
+- The plan gives the repository a reviewable order of operations with type and
+  conversion work first, representation and compile-time work second, and
+  semantic contracts plus export authority third.

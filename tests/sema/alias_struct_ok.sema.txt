@@ -1,0 +1,11 @@
+SemanticModule
+  TypeDecl name=Count kind=alias
+    AliasedType=i32
+  TypeDecl name=Pair kind=struct
+    Field name=left type=Count
+    Field name=right type=Count
+    Layout size=8 align=4 offsets=[0, 4]
+  TypeDecl name=PairAlias kind=alias
+    AliasedType=Pair
+  Function name=sum params=[PairAlias] returns=[Count]
+  Function name=main params=[] returns=[Count]

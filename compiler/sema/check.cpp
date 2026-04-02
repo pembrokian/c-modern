@@ -91,6 +91,38 @@ Type SubstituteTypeParams(Type type, const std::vector<std::string>& type_params
     return type;
 }
 
+Type StripTypeAliasesInternal(Type type, const Module& module, std::unordered_set<std::string>& active_aliases) {
+    for (auto& subtype : type.subtypes) {
+        subtype = StripTypeAliasesInternal(std::move(subtype), module, active_aliases);
+    }
+
+    if (type.kind != Type::Kind::kNamed) {
+        return type;
+    }
+
+    const TypeDeclSummary* type_decl = FindTypeDecl(module, type.name);
+    if (type_decl == nullptr || type_decl->kind != Decl::Kind::kTypeAlias) {
+        return type;
+    }
+
+    if (!active_aliases.insert(type.name).second) {
+        return type;
+    }
+
+    Type expanded = type_decl->aliased_type;
+    if (!type_decl->type_params.empty()) {
+        expanded = SubstituteTypeParams(std::move(expanded), type_decl->type_params, type.subtypes);
+    }
+    expanded = StripTypeAliasesInternal(std::move(expanded), module, active_aliases);
+    active_aliases.erase(type.name);
+    return expanded;
+}
+
+Type StripTypeAliases(Type type, const Module& module) {
+    std::unordered_set<std::string> active_aliases;
+    return StripTypeAliasesInternal(std::move(type), module, active_aliases);
+}
+
 TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,
                                         std::string_view module_name,
                                         const std::unordered_set<std::string>& local_type_names) {
@@ -154,33 +186,37 @@ std::size_t AlignTo(std::size_t value, std::size_t alignment) {
     return remainder == 0 ? value : value + (alignment - remainder);
 }
 
-bool IsNumericType(const Type& type) {
-    if (type.kind == Type::Kind::kIntLiteral || type.kind == Type::Kind::kFloatLiteral) {
+bool IsNumericType(const Type& type, const Module& module) {
+    const Type stripped = CanonicalizeBuiltinType(StripTypeAliases(type, module));
+    if (stripped.kind == Type::Kind::kIntLiteral || stripped.kind == Type::Kind::kFloatLiteral) {
         return true;
     }
-    if (type.kind != Type::Kind::kNamed) {
+    if (stripped.kind != Type::Kind::kNamed) {
         return false;
     }
-    return IsIntegerTypeName(type.name) || IsFloatTypeName(type.name);
+    return IsIntegerTypeName(stripped.name) || IsFloatTypeName(stripped.name);
 }
 
-bool IsIntegerLikeType(const Type& type) {
-    if (type.kind == Type::Kind::kIntLiteral) {
+bool IsIntegerLikeType(const Type& type, const Module& module) {
+    const Type stripped = CanonicalizeBuiltinType(StripTypeAliases(type, module));
+    if (stripped.kind == Type::Kind::kIntLiteral) {
         return true;
     }
-    return type.kind == Type::Kind::kNamed && IsIntegerTypeName(type.name);
+    return stripped.kind == Type::Kind::kNamed && IsIntegerTypeName(stripped.name);
 }
 
-bool IsBoolType(const Type& type) {
-    return type.kind == Type::Kind::kBool || (type.kind == Type::Kind::kNamed && type.name == "bool");
+bool IsBoolType(const Type& type, const Module& module) {
+    const Type stripped = CanonicalizeBuiltinType(StripTypeAliases(type, module));
+    return stripped.kind == Type::Kind::kBool || (stripped.kind == Type::Kind::kNamed && stripped.name == "bool");
 }
 
-bool IsPointerLikeType(const Type& type) {
-    return type.kind == Type::Kind::kPointer;
+bool IsPointerLikeType(const Type& type, const Module& module) {
+    return StripTypeAliases(type, module).kind == Type::Kind::kPointer;
 }
 
-bool IsUintPtrType(const Type& type) {
-    return type.kind == Type::Kind::kNamed && type.name == "uintptr";
+bool IsUintPtrType(const Type& type, const Module& module) {
+    const Type stripped = StripTypeAliases(type, module);
+    return stripped.kind == Type::Kind::kNamed && stripped.name == "uintptr";
 }
 
 bool IsAddressableExpr(const Expr& expr) {
@@ -198,12 +234,16 @@ bool IsAddressableExpr(const Expr& expr) {
     }
 }
 
-bool IsAssignable(const Type& expected, const Type& actual);
+bool IsAssignable(const Type& expected, const Type& actual, const Module& module);
 bool IsExplicitlyConvertible(const Type& expected, const Type& actual, const Module& module);
 
 Type StripAliasOrDistinct(Type type, const Module& module) {
     std::unordered_set<std::string> visited;
     while (type.kind == Type::Kind::kNamed) {
+        type = StripTypeAliases(std::move(type), module);
+        if (type.kind != Type::Kind::kNamed) {
+            break;
+        }
         if (!visited.insert(type.name).second) {
             break;
         }
@@ -220,6 +260,17 @@ Type StripAliasOrDistinct(Type type, const Module& module) {
     }
 
     return type;
+}
+
+bool IsValidDistinctBaseType(const Type& type, const Module& module) {
+    const Type stripped = CanonicalizeBuiltinType(StripTypeAliases(type, module));
+    if (stripped.kind == Type::Kind::kBool || stripped.kind == Type::Kind::kPointer) {
+        return true;
+    }
+    if (stripped.kind != Type::Kind::kNamed) {
+        return false;
+    }
+    return IsIntegerTypeName(stripped.name) || IsFloatTypeName(stripped.name);
 }
 
 Type InferExplicitConversionTarget(Type target, const Type& actual, const Module& module) {
@@ -251,41 +302,41 @@ Type InferExplicitConversionTarget(Type target, const Type& actual, const Module
 }
 
 bool IsExplicitlyConvertible(const Type& expected, const Type& actual, const Module& module) {
-    if (IsAssignable(expected, actual)) {
+    if (IsAssignable(expected, actual, module)) {
         return true;
     }
 
     if (expected.kind == Type::Kind::kNamed && expected.name == "Slice" && !expected.subtypes.empty()) {
         if (actual.kind == Type::Kind::kArray && !actual.subtypes.empty()) {
-            return IsAssignable(expected.subtypes.front(), actual.subtypes.front());
+            return IsAssignable(expected.subtypes.front(), actual.subtypes.front(), module);
         }
         if (actual.kind == Type::Kind::kNamed && (actual.name == "Slice" || actual.name == "Buffer") && !actual.subtypes.empty()) {
-            return IsAssignable(expected.subtypes.front(), actual.subtypes.front());
+            return IsAssignable(expected.subtypes.front(), actual.subtypes.front(), module);
         }
     }
 
     const Type stripped_expected = StripAliasOrDistinct(expected, module);
     const Type stripped_actual = StripAliasOrDistinct(actual, module);
-    if (IsAssignable(stripped_expected, stripped_actual)) {
+    if (IsAssignable(stripped_expected, stripped_actual, module)) {
         return true;
     }
 
     if (stripped_expected.kind == Type::Kind::kNamed && stripped_expected.name == "Slice" && !stripped_expected.subtypes.empty()) {
         if (stripped_actual.kind == Type::Kind::kArray && !stripped_actual.subtypes.empty()) {
-            return IsAssignable(stripped_expected.subtypes.front(), stripped_actual.subtypes.front());
+            return IsAssignable(stripped_expected.subtypes.front(), stripped_actual.subtypes.front(), module);
         }
         if (stripped_actual.kind == Type::Kind::kNamed && (stripped_actual.name == "Slice" || stripped_actual.name == "Buffer") &&
             !stripped_actual.subtypes.empty()) {
-            return IsAssignable(stripped_expected.subtypes.front(), stripped_actual.subtypes.front());
+            return IsAssignable(stripped_expected.subtypes.front(), stripped_actual.subtypes.front(), module);
         }
     }
 
-    if ((IsPointerLikeType(stripped_expected) && IsUintPtrType(stripped_actual)) ||
-        (IsUintPtrType(stripped_expected) && IsPointerLikeType(stripped_actual))) {
+    if ((IsPointerLikeType(stripped_expected, module) && IsUintPtrType(stripped_actual, module)) ||
+        (IsUintPtrType(stripped_expected, module) && IsPointerLikeType(stripped_actual, module))) {
         return true;
     }
 
-    return IsNumericType(stripped_expected) && IsNumericType(stripped_actual);
+    return IsNumericType(stripped_expected, module) && IsNumericType(stripped_actual, module);
 }
 
 Type InferLiteralType(const Expr& expr) {
@@ -304,37 +355,43 @@ Type InferLiteralType(const Expr& expr) {
     return IntLiteralType();
 }
 
-Type MergeNumericTypes(const Type& left, const Type& right) {
-    if (IsUnknown(left) || IsUnknown(right)) {
+Type MergeNumericTypes(const Type& left, const Type& right, const Module& module) {
+    const Type stripped_left = CanonicalizeBuiltinType(StripTypeAliases(left, module));
+    const Type stripped_right = CanonicalizeBuiltinType(StripTypeAliases(right, module));
+    if (IsUnknown(stripped_left) || IsUnknown(stripped_right)) {
         return UnknownType();
     }
-    if (left == right) {
-        return left;
+    if (stripped_left == stripped_right) {
+        return stripped_left;
     }
-    if (left.kind == Type::Kind::kNamed && right.kind == Type::Kind::kIntLiteral && IsIntegerTypeName(left.name)) {
-        return left;
+    if (stripped_left.kind == Type::Kind::kNamed && stripped_right.kind == Type::Kind::kIntLiteral &&
+        IsIntegerTypeName(stripped_left.name)) {
+        return stripped_left;
     }
-    if (right.kind == Type::Kind::kNamed && left.kind == Type::Kind::kIntLiteral && IsIntegerTypeName(right.name)) {
-        return right;
+    if (stripped_right.kind == Type::Kind::kNamed && stripped_left.kind == Type::Kind::kIntLiteral &&
+        IsIntegerTypeName(stripped_right.name)) {
+        return stripped_right;
     }
-    if (left.kind == Type::Kind::kNamed && right.kind == Type::Kind::kFloatLiteral && IsFloatTypeName(left.name)) {
-        return left;
+    if (stripped_left.kind == Type::Kind::kNamed && stripped_right.kind == Type::Kind::kFloatLiteral &&
+        IsFloatTypeName(stripped_left.name)) {
+        return stripped_left;
     }
-    if (right.kind == Type::Kind::kNamed && left.kind == Type::Kind::kFloatLiteral && IsFloatTypeName(right.name)) {
-        return right;
+    if (stripped_right.kind == Type::Kind::kNamed && stripped_left.kind == Type::Kind::kFloatLiteral &&
+        IsFloatTypeName(stripped_right.name)) {
+        return stripped_right;
     }
-    if (left.kind == Type::Kind::kFloatLiteral && right.kind == Type::Kind::kIntLiteral) {
-        return left;
+    if (stripped_left.kind == Type::Kind::kFloatLiteral && stripped_right.kind == Type::Kind::kIntLiteral) {
+        return stripped_left;
     }
-    if (right.kind == Type::Kind::kFloatLiteral && left.kind == Type::Kind::kIntLiteral) {
-        return right;
+    if (stripped_right.kind == Type::Kind::kFloatLiteral && stripped_left.kind == Type::Kind::kIntLiteral) {
+        return stripped_right;
     }
     return UnknownType();
 }
 
-bool IsAssignable(const Type& expected, const Type& actual) {
-    const Type canonical_expected = CanonicalizeBuiltinType(expected);
-    const Type canonical_actual = CanonicalizeBuiltinType(actual);
+bool IsAssignable(const Type& expected, const Type& actual, const Module& module) {
+    const Type canonical_expected = CanonicalizeBuiltinType(StripTypeAliases(expected, module));
+    const Type canonical_actual = CanonicalizeBuiltinType(StripTypeAliases(actual, module));
     if (IsUnknown(canonical_expected) || IsUnknown(canonical_actual)) {
         return true;
     }
@@ -349,7 +406,7 @@ bool IsAssignable(const Type& expected, const Type& actual) {
         IsFloatTypeName(canonical_expected.name)) {
         return true;
     }
-    if (IsPointerLikeType(canonical_expected) && canonical_actual.kind == Type::Kind::kNil) {
+    if (IsPointerLikeType(canonical_expected, module) && canonical_actual.kind == Type::Kind::kNil) {
         return true;
     }
     return false;
@@ -721,6 +778,12 @@ class Checker {
             }
 
             ValidateTypeExpr(decl.aliased_type.get(), decl.type_params, decl.span);
+            if (decl.kind == Decl::Kind::kDistinct) {
+                const Type aliased_type = TypeFromAst(decl.aliased_type.get());
+                if (!IsUnknown(aliased_type) && !IsValidDistinctBaseType(aliased_type, *module_)) {
+                    Report(decl.span, "distinct type " + decl.name + " must use a scalar base type in v0.2");
+                }
+            }
         }
 
         ComputeTypeLayouts();
@@ -898,8 +961,18 @@ class Checker {
             }
 
             ValidateTypeExpr(decl.type_ann.get(), {}, decl.span);
-            for (const auto& value : decl.values) {
-                (void)AnalyzeExpr(*value);
+            const Type declared_type = TypeFromAst(decl.type_ann.get());
+            if (decl.has_initializer && decl.pattern.names.size() != decl.values.size()) {
+                Report(decl.span, "binding requires one initializer per bound name");
+                continue;
+            }
+            for (std::size_t index = 0; index < decl.values.size(); ++index) {
+                const Type value_type = AnalyzeExpr(*decl.values[index]);
+                if (!IsUnknown(declared_type) && !IsAssignable(declared_type, value_type, *module_)) {
+                    Report(decl.values[index]->span,
+                           "global initializer type mismatch for " + decl.pattern.names[index] + ": expected " +
+                               FormatType(declared_type) + ", got " + FormatType(value_type));
+                }
             }
         }
     }
@@ -996,18 +1069,20 @@ class Checker {
     }
 
     const TypeDeclSummary* LookupStructType(const Type& type) const {
-        if (type.kind != Type::Kind::kNamed) {
+        const Type stripped = StripTypeAliases(type, *module_);
+        if (stripped.kind != Type::Kind::kNamed) {
             return nullptr;
         }
-        return FindTypeDecl(*module_, type.name);
+        return FindTypeDecl(*module_, stripped.name);
     }
 
     const VariantSummary* LookupVariant(const Type& selector_type, std::string_view variant_name) const {
-        if (selector_type.kind != Type::Kind::kNamed) {
+        const Type stripped_selector = StripTypeAliases(selector_type, *module_);
+        if (stripped_selector.kind != Type::Kind::kNamed) {
             return nullptr;
         }
 
-        const TypeDeclSummary* type_decl = FindTypeDecl(*module_, selector_type.name);
+        const TypeDeclSummary* type_decl = FindTypeDecl(*module_, stripped_selector.name);
         if (type_decl == nullptr) {
             return nullptr;
         }
@@ -1016,9 +1091,10 @@ class Checker {
         //   "Foo.Bar"     → qualified_type="Foo",     leaf_name="Bar"
         //   "mod.Foo.Bar" → qualified_type="mod.Foo", leaf_name="Bar"
         const std::size_t separator = variant_name.rfind('.');
-        const std::string qualified_type = separator == std::string_view::npos ? selector_type.name : std::string(variant_name.substr(0, separator));
+        const std::string qualified_type = separator == std::string_view::npos ? stripped_selector.name
+                                                                                : std::string(variant_name.substr(0, separator));
         const std::string leaf_name = separator == std::string_view::npos ? std::string(variant_name) : std::string(variant_name.substr(separator + 1));
-        if (!qualified_type.empty() && qualified_type != selector_type.name) {
+        if (!qualified_type.empty() && qualified_type != stripped_selector.name) {
             return nullptr;
         }
 
@@ -1054,7 +1130,7 @@ class Checker {
         for (std::size_t index = 0; index < arg_types.size(); ++index) {
             const Type& expected = variant->payload_fields[index].second;
             const Type& actual = arg_types[index];
-            if (!IsAssignable(expected, actual)) {
+            if (!IsAssignable(expected, actual, *module_)) {
                 Report(expr.args[index]->span,
                        "argument type mismatch for parameter " + std::to_string(index + 1) + " of " + callee_name +
                            ": expected " + FormatType(expected) + ", got " + FormatType(actual));
@@ -1148,7 +1224,7 @@ class Checker {
         for (std::size_t index = 0; index < expr.args.size(); ++index) {
             const Type& actual = arg_types[index];
             const Type& expected = stripped_callee.subtypes[index];
-            if (!IsAssignable(expected, actual)) {
+            if (!IsAssignable(expected, actual, *module_)) {
                 const std::string callee_label = has_named_callee ? callee_name : "call target";
                 Report(expr.args[index]->span,
                        "argument type mismatch for parameter " + std::to_string(index + 1) + " of " + callee_label +
@@ -1288,7 +1364,7 @@ class Checker {
                 return record(InferLiteralType(expr));
             case Expr::Kind::kUnary: {
                 const Type operand = AnalyzeExpr(*expr.left);
-                if (expr.text == "!" && !IsUnknown(operand) && !IsBoolType(operand)) {
+                if (expr.text == "!" && !IsUnknown(operand) && !IsBoolType(operand, *module_)) {
                     Report(expr.span, "logical not requires bool operand");
                 }
                 if (expr.text == "&") {
@@ -1314,44 +1390,45 @@ class Checker {
                 const Type left = AnalyzeExpr(*expr.left);
                 const Type right = AnalyzeExpr(*expr.right);
                 if (expr.kind == Expr::Kind::kRange) {
-                    const Type element = MergeNumericTypes(left, right);
+                    const Type element = MergeNumericTypes(left, right, *module_);
                     if (IsUnknown(element)) {
                         Report(expr.span, "range bounds must be compatible numeric types");
                     }
                     return record(RangeType(element));
                 }
                 if (expr.text == "&&" || expr.text == "||") {
-                    if (!IsUnknown(left) && !IsBoolType(left)) {
+                    if (!IsUnknown(left) && !IsBoolType(left, *module_)) {
                         Report(expr.left->span, "logical operator requires bool operands");
                     }
-                    if (!IsUnknown(right) && !IsBoolType(right)) {
+                    if (!IsUnknown(right) && !IsBoolType(right, *module_)) {
                         Report(expr.right->span, "logical operator requires bool operands");
                     }
                     return record(BoolType());
                 }
                 if (expr.text == "==" || expr.text == "!=" || expr.text == "<" || expr.text == ">" || expr.text == "<=" ||
                     expr.text == ">=") {
-                    if (IsUnknown(MergeNumericTypes(left, right)) && !IsAssignable(left, right) && !IsAssignable(right, left)) {
+                    if (IsUnknown(MergeNumericTypes(left, right, *module_)) && !IsAssignable(left, right, *module_) &&
+                        !IsAssignable(right, left, *module_)) {
                         Report(expr.span, "comparison requires compatible operand types");
                     }
                     return record(BoolType());
                 }
                 if (expr.text == "<<" || expr.text == ">>") {
-                    if (!IsUnknown(left) && !IsIntegerLikeType(left)) {
+                    if (!IsUnknown(left) && !IsIntegerLikeType(left, *module_)) {
                         Report(expr.left->span, "shift operator requires integer left operand");
                     }
-                    if (!IsUnknown(right) && !IsIntegerLikeType(right)) {
+                    if (!IsUnknown(right) && !IsIntegerLikeType(right, *module_)) {
                         Report(expr.right->span, "shift operator requires integer right operand");
                     }
                     return record(left);
                 }
-                if (!IsNumericType(left) || !IsNumericType(right)) {
+                if (!IsNumericType(left, *module_) || !IsNumericType(right, *module_)) {
                     if (!IsUnknown(left) && !IsUnknown(right)) {
                         Report(expr.span, "operator " + expr.text + " requires numeric operands");
                     }
                     return record(UnknownType());
                 }
-                const Type merged = MergeNumericTypes(left, right);
+                const Type merged = MergeNumericTypes(left, right, *module_);
                 if (IsUnknown(merged)) {
                     Report(expr.span, "operator " + expr.text + " requires compatible numeric operand types");
                 }
@@ -1361,7 +1438,7 @@ class Checker {
                 return record(AnalyzeCall(expr));
             case Expr::Kind::kField:
             case Expr::Kind::kDerefField: {
-                const Type base = AnalyzeExpr(*expr.left);
+                const Type base = StripTypeAliases(AnalyzeExpr(*expr.left), *module_);
                 if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer")) {
                     if (expr.text == "ptr" && !base.subtypes.empty()) {
                         return record(PointerType(base.subtypes.front()));
@@ -1392,7 +1469,7 @@ class Checker {
                 return record(UnknownType());
             }
             case Expr::Kind::kIndex: {
-                const Type base = AnalyzeExpr(*expr.left);
+                const Type base = StripTypeAliases(AnalyzeExpr(*expr.left), *module_);
                 (void)AnalyzeExpr(*expr.right);
                 if (base.kind == Type::Kind::kArray && !base.subtypes.empty()) {
                     return record(base.subtypes.front());
@@ -1404,7 +1481,7 @@ class Checker {
             }
             case Expr::Kind::kSlice:
             {
-                const Type base = AnalyzeExpr(*expr.left);
+                const Type base = StripTypeAliases(AnalyzeExpr(*expr.left), *module_);
                 if (expr.right != nullptr) {
                     (void)AnalyzeExpr(*expr.right);
                 }
@@ -1438,8 +1515,9 @@ class Checker {
                         aggregate_type.subtypes.push_back(TypeFromAst(type_arg.get()));
                     }
                 }
-                const TypeDeclSummary* type_decl = LookupStructType(aggregate_type);
-                const auto builtin_fields = BuiltinAggregateFields(aggregate_type);
+                const Type resolved_aggregate = StripTypeAliases(aggregate_type, *module_);
+                const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
+                const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
                 if (type_decl != nullptr || !builtin_fields.empty()) {
                     std::unordered_map<std::string, Type> fields;
                     const auto& field_source = type_decl != nullptr ? type_decl->fields : builtin_fields;
@@ -1456,7 +1534,7 @@ class Checker {
                                        "type " + FormatType(aggregate_type) + " has no field named " + field_init.name);
                                 continue;
                             }
-                            if (!IsAssignable(found->second, value_type)) {
+                            if (!IsAssignable(found->second, value_type, *module_)) {
                                 Report(field_init.span,
                                        "aggregate field type mismatch for " + field_init.name + ": expected " + FormatType(found->second) +
                                            ", got " + FormatType(value_type));
@@ -1467,7 +1545,7 @@ class Checker {
                             Report(field_init.span, "too many aggregate initializer values for type " + FormatType(aggregate_type));
                             continue;
                         }
-                        if (!IsAssignable(field_source[index].second, value_type)) {
+                        if (!IsAssignable(field_source[index].second, value_type, *module_)) {
                             Report(field_init.span,
                                    "aggregate field type mismatch for " + field_source[index].first + ": expected " +
                                        FormatType(field_source[index].second) + ", got " + FormatType(value_type));
@@ -1498,7 +1576,7 @@ class Checker {
                 Report(expr.span, "assignment target is readonly: " + expr.text);
                 return;
             }
-            if (!IsAssignable(binding->type, value_type)) {
+            if (!IsAssignable(binding->type, value_type, *module_)) {
                 Report(expr.span, "assignment type mismatch for " + expr.text + ": expected " + FormatType(binding->type) + ", got " +
                                       FormatType(value_type));
             }
@@ -1544,7 +1622,7 @@ class Checker {
             case Stmt::Kind::kIf:
                 if (!stmt.exprs.empty()) {
                     const Type condition = AnalyzeExpr(*stmt.exprs.front());
-                    if (!IsUnknown(condition) && !IsBoolType(condition)) {
+                    if (!IsUnknown(condition) && !IsBoolType(condition, *module_)) {
                         Report(stmt.exprs.front()->span, "if condition must have type bool");
                     }
                 }
@@ -1606,7 +1684,7 @@ class Checker {
             Type value_type = declared_type;
             if (index < stmt.exprs.size()) {
                 value_type = AnalyzeExpr(*stmt.exprs[index]);
-                if (!IsUnknown(declared_type) && !IsAssignable(declared_type, value_type)) {
+                if (!IsUnknown(declared_type) && !IsAssignable(declared_type, value_type, *module_)) {
                     Report(stmt.exprs[index]->span, "binding type mismatch for " + stmt.pattern.names[index] + ": expected " +
                                                    FormatType(declared_type) + ", got " + FormatType(value_type));
                 }
@@ -1668,7 +1746,8 @@ class Checker {
             PushScope();
             if (switch_case.pattern.kind == mc::ast::CasePattern::Kind::kExpr && switch_case.pattern.expr != nullptr) {
                 const Type pattern_type = AnalyzeExpr(*switch_case.pattern.expr);
-                if (!IsUnknown(selector) && !IsUnknown(pattern_type) && !IsAssignable(selector, pattern_type) && !IsAssignable(pattern_type, selector)) {
+                if (!IsUnknown(selector) && !IsUnknown(pattern_type) && !IsAssignable(selector, pattern_type, *module_) &&
+                    !IsAssignable(pattern_type, selector, *module_)) {
                     Report(switch_case.pattern.span, "switch case pattern type does not match selector type");
                 }
             } else if (switch_case.pattern.kind == mc::ast::CasePattern::Kind::kVariant) {
@@ -1698,7 +1777,7 @@ class Checker {
     void CheckConditionLoop(const Stmt& stmt) {
         if (!stmt.exprs.empty()) {
             const Type condition = AnalyzeExpr(*stmt.exprs.front());
-            if (!IsUnknown(condition) && !IsBoolType(condition)) {
+            if (!IsUnknown(condition) && !IsBoolType(condition, *module_)) {
                 Report(stmt.exprs.front()->span, "loop condition must have type bool");
             }
         }
@@ -1766,7 +1845,7 @@ class Checker {
         }
         for (std::size_t index = 0; index < stmt.exprs.size(); ++index) {
             const Type actual = AnalyzeExpr(*stmt.exprs[index]);
-            if (!IsAssignable(current_function_->return_types[index], actual)) {
+            if (!IsAssignable(current_function_->return_types[index], actual, *module_)) {
                 Report(stmt.exprs[index]->span,
                        "return type mismatch: expected " + FormatType(current_function_->return_types[index]) + ", got " +
                            FormatType(actual));

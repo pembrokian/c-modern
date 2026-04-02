@@ -1,0 +1,582 @@
+Phase 3 Through Phase 8 -- Non-Bootstrap Roadmap
+================================================
+
+Status
+------
+PLANNED
+
+Source documents
+----------------
+- /Users/ro/dev/c_modern/docs/plan/plan.txt
+- /Users/ro/dev/c_modern/docs/plan/phase3_bootstrap_finish.txt
+- /Users/ro/dev/c_modern/docs/plan/phase4_bootstrap_finish.txt
+- /Users/ro/dev/c_modern/docs/plan/phase5_bootstrap_finish.txt
+- /Users/ro/dev/c_modern/docs/plan/phase6_implementation_summary.txt
+- /Users/ro/dev/c_modern/docs/plan/phase7_implementation_summary.txt
+- /Users/ro/dev/c_modern/docs/plan/phase8_implementation_summary.txt
+- /Users/ro/dev/c_modern/docs/arch/canonical_programs.txt
+- /Users/ro/dev/c_modern/docs/arch/build_spec.txt
+- /Users/ro/dev/c_modern/docs/arch/test_spec.txt
+- /Users/ro/dev/c_modern/docs/arch/runtime_spec.txt
+- /Users/ro/dev/c_modern/docs/arch/stdlib_spec.txt
+
+Repository status note
+----------------------
+- The repository has completed repository-specific bootstrap closures for
+  Phases 3, 4, and 5, plus admitted hosted slices for Phases 6, 7, and 8.
+- Those closures do not satisfy the full long-term Phase 3 through Phase 8
+  scope described in plan.txt and the architecture texts.
+- This document exists to define the next expansion path without overstating
+  present completeness.
+
+Purpose
+-------
+Define a concrete roadmap for expanding the compiler and toolchain beyond the
+current bootstrap slices while preserving the repository ownership rules:
+
+- sema owns language meaning
+- MIR owns typed lowered semantic truth
+- the backend realizes MIR on the first hosted target
+- stdlib and runtime own library and startup boundaries
+- the driver and build layer own workflow rather than semantic policy
+- pressure programs validate the design instead of redefining it
+
+Problem being solved
+--------------------
+The repository can already parse, check, lower, build, run, and pressure-test
+an admitted hosted slice, but many of the broader plan-level obligations are
+still open. Without an explicit non-bootstrap roadmap:
+
+- Phase 3 risks remaining "good enough for current examples" instead of
+  becoming the authoritative language contract.
+- Phase 4 risks remaining a useful lowering format instead of the stable
+  semantic boundary independent of LLVM defaults.
+- Phase 5 risks remaining a runnable subset on one target instead of a deep
+  executable implementation of the admitted language surface.
+- Phase 6 risks preserving bootstrap-shaped library seams rather than maturing
+  into an honest standard library and runtime boundary.
+- Phase 7 risks remaining a curated project-demo workflow rather than a normal
+  developer toolchain path.
+- Phase 8 risks proving only bounded examples instead of acting as the main
+  pressure signal for missing semantics, library gaps, and workflow weakness.
+
+Core rule
+---------
+Expand breadth only after the owning lower layer is authoritative enough that
+the higher layer is not compensating for it.
+
+In practice this means:
+
+- do not widen backend or stdlib behavior to hide sema gaps
+- do not widen driver or build logic to hide import, interface, or library gaps
+- do not treat examples as proof if the owning compiler or library layer still
+  lacks a stable contract
+- keep the first hosted target narrow, but make that target deep before adding
+  portability pressure
+
+Sequencing strategy
+-------------------
+Recommended execution order:
+
+1. Finish non-bootstrap Phase 3 closure first.
+2. Advance Phase 4 and Phase 5 together once Phase 3 owns the relevant rules.
+3. Mature Phase 6 once the executable path can support a more honest API
+   surface without backend-local special handling.
+4. Deepen Phase 7 after separate-compilation and project workflow semantics are
+   stable enough to support ordinary multi-module development.
+5. Use Phase 8 as the proving ground after each deeper layer lands, and route
+   findings back to the smallest correct owner.
+
+Priority order by leverage:
+
+1. Phase 3
+2. Phase 5
+3. Phase 6
+4. Phase 4
+5. Phase 7
+6. Phase 8
+
+The priority order differs slightly from the execution order because MIR work
+should move with sema and backend work rather than as a totally separate block.
+
+Non-goals for this roadmap
+--------------------------
+- adding multiple backend targets before the first hosted target is deeper
+- broad package management or remote dependency fetching
+- self-hosting
+- large stdlib breadth before the existing module surfaces are honest
+- speculative design expansion not driven by repeated program pressure
+- replacing the current C++ fixture suites wholesale with new tooling in one
+  step
+
+Phase 3 -- Semantic Checking And Layout Beyond Bootstrap
+--------------------------------------------------------
+Objective
+~~~~~~~~~
+Turn sema from a supported bootstrap checker into the authoritative language
+contract for the admitted v0.2 core.
+
+Current bootstrap boundary
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- bootstrap semantic checking runs before MIR lowering
+- import resolution, cycle rejection, local scope rules, selected expression
+  checking, and first-cut layout reporting exist
+- the bootstrap note explicitly does not claim complete separate-compilation
+  interface consumption, full layout or ABI enforcement, full distinct-type
+  semantics, full explicit conversion coverage, constant-evaluation
+  completeness, noalias semantics, explicit error-return semantics, or full
+  canonical-program coverage
+
+Non-bootstrap expansion scope
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Workstream 3A -- Type-system completion
+
+- finish the admitted primitive, pointer, array, slice, buffer, procedure,
+  struct, and distinct-type rules across the whole active surface
+- remove remaining bootstrap holes where sema accepts or rejects forms only
+  because later stages are narrower
+- ensure imported user-defined types and exported semantic identities remain
+  precise across module boundaries
+
+Workstream 3B -- Explicit conversion and coercion closure
+
+- implement the full "no implicit numeric conversions" rule consistently
+- complete explicit conversion checking across integer, pointer, array, slice,
+  buffer, and distinct-type boundaries
+- reject ambiguous or convenience-driven conversions in sema rather than in MIR
+  or backend lowering
+
+Workstream 3C -- Layout and ABI correctness
+
+- complete size, alignment, field-offset, padding, packed, and abi(c) behavior
+- ensure sema, not the backend, is the source of truth for representation
+- add representative layout fixtures for packed, C ABI, nested aggregates, and
+  imported layout-sensitive types
+
+Workstream 3D -- Constant evaluation and compile-time rules
+
+- finish the intentionally admitted compile-time expression subset
+- make top-level constants and required compile-time expressions deterministic
+- convert invalid compile-time forms into stable sema diagnostics instead of
+  latent runtime behavior or backend crashes
+
+Workstream 3E -- Control flow and semantic contracts
+
+- complete defer rules beyond the current bootstrap-valid subset
+- complete explicit error-return semantics where the architecture texts require
+  them
+- implement noalias checking where the language surface already claims it
+- strengthen return, break, continue, and lifetime-sensitive diagnostics in
+  multi-branch and nested-scope cases
+
+Workstream 3F -- Export and interface authority
+
+- make the semantic export surface complete enough that later .mci work is a
+  serialization and dependency problem rather than a meaning-reconstruction
+  problem
+- ensure imported semantic facts are preserved without ad hoc downstream repair
+
+Suggested proof and artifacts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- expand tests/sema with feature-complete pass and fail fixtures for each rule
+- add more deterministic semantic dump coverage for layout, imports, and
+  conversion-heavy cases
+- mirror representative canonical-program pressure back into narrow sema tests
+
+Exit criteria
+~~~~~~~~~~~~~
+- sema can fully check small multi-module programs across the admitted core
+  surface without backend-specific assumptions
+- layout and conversion behavior match the architecture intent for the adopted
+  v0.2 subset
+- exported semantic truth is complete enough that later phases are not
+  reconstructing missing meaning
+
+Phase 4 -- Typed MIR And Validation Beyond Bootstrap
+----------------------------------------------------
+Objective
+~~~~~~~~~
+Make MIR the full typed semantic boundary for the admitted non-bootstrap core,
+not only the currently supported lowering subset.
+
+Current bootstrap boundary
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- checked semantic programs for the supported subset lower deterministically to
+  typed MIR
+- supported semantic-boundary operations now have dedicated MIR forms for the
+  currently emitted surface
+- validators reject malformed control flow and representative illegal typed
+  operations
+- the bootstrap note explicitly does not claim exhaustive lowering or
+  validation across the full language surface
+
+Non-bootstrap expansion scope
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Workstream 4A -- MIR surface completion
+
+- widen MIR lowering to cover the full admitted sema surface
+- finish representation for more aggregates, conversions, address-sensitive
+  operations, and low-level boundary forms
+- ensure no supported semantic construct needs backend-shaped call hacks to be
+  represented
+
+Workstream 4B -- Semantic-boundary instruction completion
+
+- make checked faults, pointer-int boundaries, array-slice and buffer-slice
+  boundaries, volatile forms, and atomic forms explicit wherever the admitted
+  language surface requires them
+- avoid encoding these rules as backend defaults or runtime accidents
+
+Workstream 4C -- Validation hardening
+
+- extend validators to cover all admitted instruction categories
+- strengthen type-consistency, block-termination, operand-shape, aggregate,
+  and control-flow legality checks
+- add negative tests for malformed MIR beyond the currently emitted subset
+
+Workstream 4D -- MIR debugging quality
+
+- keep MIR dumps deterministic and sufficiently rich to localize lowering bugs
+- ensure fixture coverage includes realistic semantic cases, not only narrow
+  synthetic inputs
+
+Suggested proof and artifacts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- expand tests/mir fixture goldens for newly admitted semantic constructs
+- add validator-negative tests for each major MIR family
+- promote representative Phase 8 findings into MIR-level regressions when MIR
+  is the clearest stable contract
+
+Exit criteria
+~~~~~~~~~~~~~
+- the admitted non-bootstrap sema surface lowers completely and deterministically
+  to MIR
+- validators catch malformed or semantically impossible MIR before backend work
+- MIR is detailed enough to act as the compiler's main implementation contract
+  independent of LLVM
+
+Phase 5 -- Backend Bring-Up Beyond Bootstrap
+--------------------------------------------
+Objective
+~~~~~~~~~
+Deepen executable correctness on the first hosted target until most admitted
+non-bootstrap semantics run end to end.
+
+Current bootstrap boundary
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- the repository has a real LLVM backend path for an admitted Darwin arm64
+  hosted slice
+- deterministic backend dumps, object emission, linking, and executable tests
+  exist for the current runnable surface
+- the bootstrap note explicitly does not claim exhaustive MIR lowering,
+  full checked-operation coverage, volatile or atomic lowering, broader
+  representation-sensitive support, or multi-target completion
+
+Non-bootstrap expansion scope
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Workstream 5A -- Executable surface widening on the first target
+
+- support more of the admitted MIR surface end to end before adding new target
+  platforms
+- reduce the set of forms that are still "cleanly rejected" only because the
+  backend has not yet been deepened
+
+Workstream 5B -- Checked-operation completion
+
+- complete checked divide, shift, bounds, and related fault behavior across the
+  admitted executable surface
+- keep checked-mode behavior explicit and testable rather than host-default
+  dependent
+
+Workstream 5C -- Representation-sensitive lowering
+
+- deepen support for globals, locals, aggregates, address-taken values,
+  conversions, and imported layout-sensitive forms
+- ensure backend layout use follows sema-computed truth instead of recomputing
+  language policy implicitly
+
+Workstream 5D -- Low-level operation support
+
+- add honest executable lowering for admitted volatile and atomic operations
+- define crisp unsupported boundaries when a low-level form is still outside the
+  admitted executable slice
+
+Workstream 5E -- Backend hygiene and inspectability
+
+- keep backend dumps deterministic
+- keep unsupported forms failing narrowly and intentionally
+- avoid turning backend code into a second semantic engine
+
+Suggested proof and artifacts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- widen tests/codegen executable coverage for checked faults, aggregates,
+  conversions, imported types, layout-sensitive loads and stores, and interop
+- add targeted backend dump fixtures when a regression is easier to pin at IR
+  level than full executable behavior
+
+Exit criteria
+~~~~~~~~~~~~~
+- most sema-admitted, MIR-valid programs in the current non-bootstrap scope
+  build and run on the first hosted target
+- checked behavior is explicit and tested across the admitted executable forms
+- unsupported executable cases are deliberate exceptions rather than the normal
+  path
+
+Phase 6 -- Stdlib And Runtime Boundary Beyond Bootstrap
+-------------------------------------------------------
+Objective
+~~~~~~~~~
+Replace bootstrap-shaped hosted library seams with an honest minimal standard
+library and runtime boundary that real programs can rely on.
+
+Current bootstrap boundary
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- the repository has an admitted hosted stdlib/runtime slice for mem, io, fs,
+  strings, utf8, and hosted startup
+- the current summary explicitly leaves much of the long-term Phase 6 surface
+  deferred, including time, os, sync, hal, testing, richer utf8 behavior, and
+  broader ownership or nil-lowering cleanup
+- some current library APIs remain bootstrap-shaped rather than closely aligned
+  with the long-term architecture intent
+
+Non-bootstrap expansion scope
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Workstream 6A -- API honesty for existing modules
+
+- move existing mem, io, fs, strings, and utf8 APIs toward the intended long-
+  term ownership and error conventions where repository pressure justifies it
+- reduce bootstrap convenience seams that distort allocator, buffer, or error
+  behavior
+
+Workstream 6B -- Runtime boundary cleanup
+
+- keep hosted startup and low-level support in runtime/hosted rather than in
+  backend-local synthesis
+- reduce compiler knowledge of stdlib implementation details where sema layout
+  or library declarations can carry the truth
+
+Workstream 6C -- Deferred module admission
+
+- admit time, os, sync, hal, and testing only when real programs require them
+- keep each new module bounded, explicit, and backed by executable proof
+- do not land module shells without concrete repository consumers
+
+Workstream 6D -- String, utf8, and allocation realism
+
+- expand borrowed-string, UTF-8, and allocator helper surfaces enough to make
+  canonical parsers, file processors, and arena-backed tools natural rather
+  than workaround-heavy
+- preserve the rule that strings stays non-allocating by default unless an API
+  explicitly owns allocation behavior
+
+Workstream 6E -- Stdlib-focused test discipline
+
+- grow tests/stdlib as a real layer for library behavior, not just smoke
+  examples or full program proofs
+- convert repeated Phase 8 library findings into narrow stdlib regressions where
+  practical
+
+Suggested proof and artifacts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- add or expand tests/stdlib for allocation, files, text, utf8, and testing
+  module behavior
+- update examples and canonical program proofs only after the owning library
+  surface is stabilized enough to be truthful
+
+Exit criteria
+~~~~~~~~~~~~~
+- real hosted programs use stdlib and runtime APIs that reflect deliberate
+  ownership and error contracts rather than bootstrap shortcuts
+- runtime support remains small and explicit
+- admitted modules have executable proof and focused library tests
+
+Phase 7 -- Build Tool And Test Harness Beyond Bootstrap
+-------------------------------------------------------
+Objective
+~~~~~~~~~
+Turn the admitted bootstrap project workflow into a credible ordinary
+multi-module developer toolchain path.
+
+Current bootstrap boundary
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- build.toml schema v1, project check and build, run, test, deterministic .mci,
+  and incremental rebuild reuse are implemented for the admitted hosted slice
+- the current summary explicitly does not claim non-default startup selection,
+  non-hosted targets, non-executable target kinds, full spec-level ordinary
+  test ergonomics, or timeout enforcement
+
+Non-bootstrap expansion scope
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Workstream 7A -- Separate-compilation maturity
+
+- make .mci a fully trusted interface boundary rather than only a narrow
+  bootstrap reuse mechanism
+- tighten public semantic export modeling, serialization, validation, and
+  import consumption across normal builds
+
+Workstream 7B -- Build graph and target-model deepening
+
+- broaden target-model support only where the architecture already calls for it
+- improve validation of target graphs, roots, startup settings, and build-mode
+  behavior
+- keep the graph explicit and inspectable rather than hidden behind a scripting
+  layer
+
+Workstream 7C -- Test harness completion
+
+- align mc test more closely with test_spec.txt
+- improve ordinary test ergonomics beyond the current repository-owned bootstrap
+  function-shape contract when the owning language and stdlib surfaces support
+  it honestly
+- implement timeout handling and richer deterministic reporting
+
+Workstream 7D -- Determinism and rebuild correctness
+
+- preserve deterministic interface artifacts, hashes, dumps, and rebuild
+  behavior as the project model grows
+- ensure downstream invalidation tracks interface change rather than accidental
+  source churn
+
+Workstream 7E -- Diagnostics and workflow strictness
+
+- improve missing-root, duplicate-module, ambiguous-graph, and invalid-target
+  diagnostics
+- keep direct-source and project workflows coherent without allowing them to
+  drift into two incompatible toolchain models
+
+Suggested proof and artifacts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- expand tests/tool around graph validation, .mci validation, rebuild behavior,
+  target settings, ordinary tests, and regression-manifest classes
+- add focused project fixtures that prove multi-module import behavior through
+  the real project path
+
+Exit criteria
+~~~~~~~~~~~~~
+- normal multi-module development and testing use a deterministic, inspectable,
+  and semantically faithful workflow
+- interface artifacts, graph ordering, and rebuild behavior are trusted enough
+  to support real projects beyond curated examples
+
+Phase 8 -- Semantic Pressure Testing Beyond Bootstrap
+-----------------------------------------------------
+Objective
+~~~~~~~~~
+Use the deeper compiler and toolchain to finish the meaningful canonical
+pressure set and a bounded real-program suite, then feed the resulting friction
+back into the owning phases.
+
+Current bootstrap boundary
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- the repository has an admitted first-pass canonical set and bounded real
+  utilities including text filtering, file walking, hashing, and arena-backed
+  parsing
+- the current summary explicitly leaves threaded and evented-networking
+  canonical pressure deferred, along with broader streaming, richer buffer
+  helpers, and wider runtime surfaces
+
+Non-bootstrap expansion scope
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Workstream 8A -- Canonical-program closure
+
+- finish the meaningful canonical set from canonical_programs.txt or record a
+  named enabling gap for each blocked entry
+- especially revisit the deferred threaded and evented-networking examples once
+  sync, io poller, and net boundaries are honest enough to pressure-test
+
+Workstream 8B -- Real-program family expansion
+
+- add more bounded real utilities one family at a time: text processing,
+  traversal, hashing, parsing, concurrency, and networking as enabled
+- prefer reviewable, deterministic utilities over breadth for its own sake
+
+Workstream 8C -- Pressure-driven finding routing
+
+- route every repeated awkwardness back to the smallest correct owner: sema,
+  MIR, backend, stdlib, runtime, or driver
+- do not normalize repeated friction into examples when it is really a compiler
+  or library backlog item
+
+Workstream 8D -- Design-signal capture
+
+- distinguish implementation bugs from real specification pressure
+- reopen language or build-model questions only after repeated multi-program
+  evidence rather than one awkward example
+
+Workstream 8E -- Regression hardening from pressure findings
+
+- convert program-level bugs into the narrowest stable regression layer when
+  practical
+- keep program proofs for user-facing behavior and lower-layer tests for clearer
+  contracts
+
+Suggested proof and artifacts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- keep the admission matrix and findings log explicit
+- add focused project and executable proofs for every newly admitted canonical
+  or real program
+- convert repeated findings into sema, MIR, stdlib, runtime, or tool regressions
+
+Exit criteria
+~~~~~~~~~~~~~
+- every meaningful admitted canonical program is either implemented and proven
+  or blocked by a named enabling gap
+- the repository has a bounded but meaningful real-program suite that exercises
+  the deeper Phase 3 through Phase 7 work honestly
+- Phase 8 findings are systematically converted into backlog or regression work
+  instead of remaining anecdotal
+
+Cross-phase implementation rules
+--------------------------------
+1. Preserve phase ownership.  If a problem is semantic, do not solve it in the
+   driver, stdlib, or backend.
+2. Keep deterministic dumps and fixture outputs stable.  When behavior changes
+   intentionally, update the narrowest relevant proof artifact.
+3. Deepen one hosted target before widening the target matrix.
+4. Add module or runtime surface only when a real program or spec obligation
+   requires it.
+5. Prefer a narrower honest contract over a broader bootstrap convenience API.
+6. Promote repeated Phase 8 findings into earlier phase backlog rather than
+   carrying them indefinitely in examples.
+
+Ordered implementation steps
+----------------------------
+1. Re-audit the current Phase 3 semantic gaps against plan.txt and the active
+   canonical pressure set.
+2. Freeze the intended non-bootstrap Phase 3 closure criteria for types,
+   conversions, layout, constants, and control-flow rules.
+3. Implement the missing sema work and expand semantic fixtures until sema owns
+   the admitted core without backend compensation.
+4. Widen MIR lowering and validator coverage to match the deeper sema surface.
+5. Deepen the first hosted backend target to execute the widened MIR surface.
+6. Mature the existing stdlib and runtime APIs where real programs still expose
+   bootstrap-shaped seams.
+7. Deepen .mci, project-graph, and test-harness behavior until ordinary
+   multi-module workflows are credible.
+8. Re-run and expand the canonical and real-program suite after each deeper
+   layer lands.
+9. Capture every repeated pressure finding as either implementation backlog,
+   explicit enabling gap, or deliberate post-v0.2 design follow-up.
+
+Recommended next concrete planning documents
+--------------------------------------------
+Once work starts, the roadmap should split into narrower execution plans in the
+same style as the existing repository phase docs.
+
+Recommended first follow-up documents:
+
+- `/Users/ro/dev/c_modern/docs/plan/phase9_phase3_semantic_authority_expansion.txt`
+  as the repository-specific execution plan for unfinished Phase 3 closure work
+- a Phase 5 backend deepening plan for the first hosted target
+- a Phase 6 library-surface critique and closure plan
+- a Phase 7 toolchain maturity plan focused on .mci and mc test correctness
+- a refreshed Phase 8 admission matrix once the enabling layers deepen
+
+Acceptance criteria for this roadmap document
+---------------------------------------------
+- The repository has one explicit written path from the admitted bootstrap
+  slices to deeper non-bootstrap completion for Phases 3 through 8.
+- The roadmap preserves the current repository ownership model and does not
+  collapse missing semantics into tooling or library workarounds.
+- The roadmap keeps the first-hosted-target strategy narrow while making that
+  target deeper.

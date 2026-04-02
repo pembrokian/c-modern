@@ -1,0 +1,5 @@
+SemanticModule
+  Import name=helper_aliases
+  TypeDecl name=helper_aliases.Counter kind=alias
+    AliasedType=i32
+  Function name=main params=[] returns=[i32]
