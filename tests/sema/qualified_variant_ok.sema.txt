@@ -1,0 +1,8 @@
+SemanticModule
+  Import name=color_module
+  TypeDecl name=color_module.Color kind=enum
+    Variant name=Red
+    Variant name=Green
+    Variant name=Blue
+      PayloadField name=value type=i32
+  Function name=get_value params=[color_module.Color] returns=[i32]

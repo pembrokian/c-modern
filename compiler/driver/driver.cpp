@@ -556,11 +556,19 @@ bool ShouldReuseModuleObject(const ModuleBuildState& state,
                              const ModuleBuildState& current,
                              const std::filesystem::path& object_path,
                              const std::filesystem::path& mci_path) {
-    return std::filesystem::exists(object_path) && std::filesystem::exists(mci_path) &&
-           state.target_identity == current.target_identity && state.mode == current.mode && state.env == current.env &&
-        state.source_hash == current.source_hash && state.interface_hash == current.interface_hash &&
-        state.wrap_hosted_main == current.wrap_hosted_main &&
-           state.imported_interface_hashes == current.imported_interface_hashes;
+    if (!std::filesystem::exists(object_path) || !std::filesystem::exists(mci_path)) {
+        return false;
+    }
+    if (state.target_identity != current.target_identity || state.mode != current.mode ||
+        state.env != current.env || state.source_hash != current.source_hash ||
+        state.interface_hash != current.interface_hash ||
+        state.wrap_hosted_main != current.wrap_hosted_main) {
+        return false;
+    }
+    // Sort both sides before comparing so that import-resolution order
+    // differences between builds do not cause spurious cache misses.
+    auto sorted = [](auto v) { std::sort(v.begin(), v.end()); return v; };
+    return sorted(state.imported_interface_hashes) == sorted(current.imported_interface_hashes);
 }
 
 std::optional<ProjectFile> LoadSelectedProject(const CommandOptions& options,
@@ -1041,6 +1049,14 @@ void RewriteImportedSymbolReference(const std::unordered_map<std::string, std::s
     }
 }
 
+// NamespaceImportedBuildUnit qualifies every non-extern symbol in `module`
+// with `module_name` as a prefix (e.g. "Foo" becomes "mymod.Foo").
+//
+// INVARIANT: all name-bearing fields in mir::Instruction must be rewritten
+// here.  When adding a new Instruction field that carries a symbol name
+// (function reference, type reference, global reference), add a rewrite case
+// in this function.  Forgetting to do so will produce broken cross-module
+// references in the merged module that are invisible until link time.
 void NamespaceImportedBuildUnit(mc::mir::Module& module,
                                 std::string_view module_name) {
     std::unordered_map<std::string, std::string> renamed_types;
@@ -1194,9 +1210,7 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
             continue;
         }
         mc::mir::Module namespaced_module = *unit.mir_result.module;
-        if (unit.source_path != std::filesystem::absolute(entry_source_path).lexically_normal()) {
-            NamespaceImportedBuildUnit(namespaced_module, unit.source_path.stem().string());
-        }
+        NamespaceImportedBuildUnit(namespaced_module, unit.source_path.stem().string());
         for (const auto& import_name : unit.mir_result.module->imports) {
             if (seen_imports.insert(import_name).second) {
                 merged->imports.push_back(import_name);

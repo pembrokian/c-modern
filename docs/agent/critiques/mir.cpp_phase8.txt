@@ -1,0 +1,392 @@
+ARCHITECTURAL REVIEW: compiler/mir/mir.cpp
+Phase 8 — Senior Compiler Systems Engineering Critique
+=======================================================
+
+FILE SUMMARY
+------------
+mir.cpp is the typed mid-level intermediate representation for the Modern C
+bootstrap compiler. At ~4200+ lines it is the second-largest file in the compiler.
+It contains:
+  - String-to-enum helpers for IR instruction kinds
+  - RenderExprInline: in-lowering inline expression renderer for diagnostic metadata
+  - SpecialCallKind classification for intrinsic functions
+  - ExplicitConversionKind classification for type casts
+  - FunctionLowerer: ~2000-line class that walks AST stmts/exprs and emits MIR
+  - LowerSourceFile: entry point for per-file lowering
+  - ValidateModule: ~1400-line structural integrity validator
+  - DumpModule: serialization for golden-file tests
+
+The file's primary role is the AST→MIR translation. It is a critical soundness
+boundary: errors here produce incorrect codegen rather than incorrect diagnostics.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DESIGN & ARCHITECTURE
+------------------------
+
+STRENGTH — FunctionLowerer is a well-decomposed class that encapsulates all
+  per-function lowering state. Block index management, loop stack, defer scope
+  stack, and local type maps are all private members. The Run() method is the
+  single entry point and it produces a self-contained Function value. This
+  respects the "no shared global mutable state" rule for compiler passes.
+
+STRENGTH — Defer is lowered eagerly at each block exit point using EmitDeferredCalls,
+  which avoids the need for a late cleanup phase. The DeferScope stack correctly
+  tracks nesting depth so break/continue/return emit the appropriate subset of
+  deferred calls via EmitDeferredScopesToDepth.
+
+STRENGTH — The EnsureCurrentBlock() / dead-block pattern is clean.
+  After an unconditional terminator (return, break, continue), current_block_ is
+  set to nullopt and subsequent statements are routed into a "dead" block.
+  ValidateModule then reports unreachable dead blocks. This produces good diagnostics
+  without crashing on unreachable code.
+
+ISSUE — FunctionLowerer belongs in its own translation unit or header.
+  At ~2000 lines, FunctionLowerer is embedded in an anonymous namespace inside
+  mir.cpp. This prevents unit-testing the lowerer independently of the full
+  LowerSourceFile pipeline. Since there is no visible way to call FunctionLowerer
+  directly in tests, lowering bugs can only be caught via golden-file fixture tests.
+  Extracting FunctionLowerer into a separate .cpp/.h pair (even private to the mir
+  module) would allow direct lowering tests for individual AST fragments.
+
+ISSUE — Block index invalidation via vector erase.
+  LowerIf and LowerSwitch both call:
+    function_.blocks.erase(function_.blocks.begin() + static_cast<ptrdiff_t>(merge_block));
+  when the merge block is unreachable. This erases from the middle of a
+  std::vector<BasicBlock> by index. The problem is that any indices previously
+  stored in current_block_, loop_stack_ targets, or test_blocks[] that are greater
+  than `merge_block` are now invalid. The code avoids using those indices after the
+  erase by setting current_block_ = nullopt, but this invariant is entirely implicit.
+
+  Branch targets in these structures are stored as *label strings* in the Terminator
+  (e.g., true_target = "switch_merge0"), not as numeric indices, so string-based
+  labels survive the erase correctly. But the numeric index `current_block_` is set
+  to nullopt before the erase in the code paths that call erase, which means the
+  index-to-label mismatch does not actually manifest as a bug. However this depends
+  on two implicit facts:
+    (a) current_block_ is never read after erase returns
+    (b) loop_stack_ entries don't hold block indices (they hold label strings — OK)
+  Adding an assertion `assert(!current_block_.has_value() || *current_block_ < merge_block)`
+  before each erase call would make the safety invariant explicit.
+
+  Longer term: switching to label-only navigation (no numeric indices held across
+  block creation) would eliminate the fragility entirely.
+
+ISSUE — ClassifySpecialCall uses linear string-equality matching for every call site.
+  ClassifySpecialCall checks 13 intrinsic names via if-else chains of string
+  comparisons. This is called once per call expression during lowering. For large
+  functions with many calls, this is an O(name-length * 13) scan per call.
+  Replacing this with a static hash map (std::unordered_map, initialized once) would
+  reduce each lookup to O(1) average. The pattern could also be pulled into sema:
+  classify intrinsic calls once during CheckProgram and annotate them in the Module,
+  so MIR lowering doesn't need to re-recognize them by name.
+
+ISSUE — InferSymbolRefKind calls sema::FindGlobalSummary and
+  sema::FindFunctionSignature for every SymbolRef instruction. Both are O(n) linear
+  scans over module data. For a function with K call sites and a module with N
+  symbols, symbol classification during lowering is O(K * N). This is called at
+  minimum once per expression node in LowerExpr. For a module with 50 functions and
+  100 expressions per function, that is 5000 linear scans of the entire sema module.
+
+ISSUE — RenderExprInline is called from multiple lowering sites to produce human-
+  readable debug text embedded in IR instructions (target_display, etc.). This
+  renderer is a legitimate concern (it makes MIR dumps readable), but it is called
+  on the hot path inside LowerExpr and its cost depends on expression tree size.
+  For deeply nested field access chains, RenderExprInline recurses proportionally to
+  depth. This should be a dump-time-only operation, not a lowering-time cost.
+  Consider recording the source span instead and rendering the display lazily during
+  DumpModule.
+
+ISSUE — FunctionLowerer re-calls TypeFromAst for return types in its constructor and
+  for each parameter in Run(). TypeFromAst runs an AST traversal to build a sema::Type.
+  This work was already done by the sema Checker during ValidateFunctions. The results
+  (FunctionSignature) are available through sema_module_. The lowerer should read
+  param types from the sema signature rather than re-deriving them from AST TypeExprs.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. CORRECTNESS & SOUNDNESS
+--------------------------
+
+CRITICAL — SSA dominance not enforced (acknowledged in comment).
+  The ValidateModule comment states: "Bootstrap MIR validation checks structural
+  integrity and use-def shape, but it does not yet enforce SSA dominance. The current
+  gap should produce false negatives rather than crashes."
+
+  This means the validator may accept a value used before its definition in all
+  control flow predecessors. If codegen trusts ValidateModule as a correctness gate,
+  it may generate code that has undefined behavior in the LLVM IR (using an
+  undefined %value before its def). The LLVM verifier will catch such cases, but
+  that produces a backend error rather than a useful compile-time diagnostic with
+  source location. This gap should be closed before Phase 8 is considered complete.
+
+ISSUE — LowerSwitch: when there are no switch cases and stmt.switch_cases.empty(),
+  the code emits an unconditional branch to the default block (or merge block):
+    entry.terminator.kind = kBranch;
+    entry.terminator.true_target = default_block or merge_block label;
+  This is correct for an empty switch, but ValidateModule's behavior for a switch
+  with zero cases is not verified in the lowering tests. A switch with only a default
+  case and zero case-branches should be tested explicitly.
+
+ISSUE — LowerForEach assumes the iterable has a .len field accessible via kField
+  instruction. If the iterable is a string or str (size tracked differently by
+  codegen), the bounds check in EmitBoundsLengthValue also emits a kField("len")
+  instruction. For string types, backend.cpp must understand that len is a field
+  of the string's internal layout. If the backend and the MIR lowerer disagree on
+  what "field len" means for string type, the generated code is wrong. The current
+  approach works because both sides use kField with target="len" and rely on the
+  backend to map it to the correct offset. That coupling should be documented.
+
+ISSUE — BindLocal calls EnsureLocal which searches local_types_ and function_.locals.
+  The lookup in EnsureLocal:
+    const auto found = local_types_.find(name);
+    if (found != local_types_.end() && IsUnknown(found->second)) { ... update ... }
+  This means an existing local with a known type is silently reused without checking
+  whether the new type matches. If BindLocal is called with a different type for a
+  local that already has a concrete type, the type mismatch is silently ignored and
+  the original type is kept. This can produce an instruction that stores a value of
+  type T into a local declared as type U.
+
+  In the current grammar, BindLocal is only called once per name (sema would have
+  reported duplicate bindings), so this path is not reachable in correct inputs.
+  But an assertion here would make the invariant explicit:
+    assert(IsUnknown(found->second) || found->second == local_type) << "type conflict";
+
+ISSUE — LowerBindingLike (for var/const statements) requires
+  `stmt.pattern.names.size() == stmt.exprs.size()` and reports an error if not.
+  But the error path does not emit the binding stubs, leaving those names
+  unregistered in local_types_. Subsequent uses of those names call Report() on
+  "undeclared local" rather than "type error." The cascade is correct (all errors
+  are reported) but the root-cause message ("bootstrap MIR requires one initializer
+  per binding name") is more confusing than a sema-level error would be.
+
+ISSUE — LowerReturn emits deferred calls before the terminator via
+  EmitDeferredScopesToDepth(0). This is correct for the current lowering. However,
+  the call args are pre-evaluated and stored in hidden locals when the defer is
+  registered. If an argument capture copies a mutable local whose value changes
+  between defer registration and function exit, the deferred call will see the
+  *captured* (early) value, not the current value. This is correct defer semantics
+  (capture-by-value at registration site), but it should be documented explicitly.
+  Currently the CaptureDeferredCall function snapshots via SnapshotValueToLocal, which
+  is the correct behavior — but the comment "hidden lowering temporary" in
+  NewHiddenLocal doesn't explain the capture-at-registration semantics.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. SIMPLICITY & ELEGANCE
+------------------------
+
+ISSUE — SpecialCallKind dispatch is a tripartite pattern:
+  TryEmitSpecialCall → ClassifySpecialCall → EmitSpecialCallInstruction → switch(kind)
+  Each call site goes through all three layers. The final switch in
+  EmitSpecialCallInstruction has two return-false branches in cases that should never
+  be reached (kArenaNew, kMmioPtr, kSliceFromBuffer are handled early):
+    case SpecialCallKind::kArenaNew:
+    case SpecialCallKind::kNone:
+    case SpecialCallKind::kMmioPtr:
+    case SpecialCallKind::kSliceFromBuffer:
+        return false;
+  These early-exit cases at the end of the dispatch switch create dead code that
+  is confusing: if kArenaNew and kMmioPtr are handled by early branches in
+  EmitSpecialCallInstruction, the final switch cases for them are never reached.
+  Restructure so each sub-kind has exactly one handler path with no dead fallthrough.
+
+ISSUE — The indentation of `case SpecialCallKind::kArenaNew:` in
+  ClassifySpecialCall is different from the surrounding cases (extra indent). This
+  appears to be a copy-paste artifact. It is a cosmetic issue but signals a lack
+  of code review attention to this area.
+
+ISSUE — EnsureLocal both ensures the local exists and returns its type. The
+  function name "EnsureLocal" reads as a side-effecting "make it exist" operation,
+  but it is also used as a type retrieval in StoreLocal:
+    const sema::Type local_type = EnsureLocal(name, type, is_mutable);
+  This dual purpose (create-if-absent + return-type) is not immediately obvious.
+  Separating into EnsureLocalExists(name, type, is_mutable) and GetLocalType(name)
+  would clarify intent at each call site.
+
+MINOR — ExpandReturnTypes is a tiny utility that converts a sema::Type into a
+  vector for multi-return handling. It is used in a couple of places. Equivalent
+  logic exists in check.cpp (ProcedureReturnTypes helper). This could be moved to
+  the sema layer as a utility function.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. SAFETY & ROBUSTNESS
+-----------------------
+
+ISSUE — function_.blocks is indexed during loop lowering (LowerWhileLike, LowerForRange,
+  LowerSwitch) using numeric indices (cond_block, body_block, exit_block, etc.).
+  After the blocks are created and before any erase, these indices are valid. The code
+  accesses `function_.blocks[*current_block_]` and `function_.blocks[cond_block]`
+  simultaneously. If any path in between calls CreateBlock (which pushes a new block),
+  the vector may reallocate, invalidating any previous references and pointers.
+
+  In the current code, CreateBlock returns a size_t index (not a reference or pointer
+  into the vector), so reallocation does not invalidate the stored indices. But
+  any temporary variable of type `BasicBlock&` (reference) held across a CreateBlock
+  call would invalidate:
+    auto& current = function_.blocks[*current_block_];   // reference
+    const std::size_t then_block = CreateBlock("if_then"); // might reallocate!
+    current.terminator.kind = ...;   // UB if reallocated
+  This exact pattern exists in LowerIf:
+    auto& current = function_.blocks[*current_block_];
+    current.terminator.kind = kCondBranch;
+    current.terminator.values = {condition.value};
+    current.terminator.true_target = function_.blocks[then_block].label;  // fresh index read after creation
+  But then_block is created BEFORE `current` is assigned. Wait — let me re-read the
+  order in LowerIf:
+    EnsureCurrentBlock();
+    const auto condition = LowerExpr(...)  // may call CreateBlock (dead block)
+    const std::size_t then_block = CreateBlock("if_then");
+    ...
+    const std::size_t merge_block = CreateBlock("if_merge");
+    auto& current = function_.blocks[*current_block_];  // taken AFTER all CreateBlock calls
+  So `current` is obtained AFTER all block creation — this is safe.
+
+  But in LowerSwitch:
+    test_blocks.push_back(*current_block_);
+    for (...) { test_blocks.push_back(CreateBlock("switch_test")); }
+    for (...) {
+      current_block_ = test_blocks[index];
+      ...
+      const std::size_t body_block = CreateBlock("switch_case");  // may reallocate
+      const std::string false_target = ...function_.blocks[test_blocks[index + 1]].label...;
+      auto& test = function_.blocks[*current_block_];  // reference taken AFTER CreateBlock
+  The `auto& test` reference is taken after `function_.blocks` has potentially been
+  modified by CreateBlock. This is safe only if function_.blocks does not reallocate
+  between the last CreateBlock and the `auto& test` assignment. Since functions_.blocks
+  uses push_back (amortized O(1), may reallocate), any previously stored reference
+  to a vector element would be invalidated. However since `auto& test` is acquired
+  AFTER the last CreateBlock, as long as no further CreateBlock is called before
+  `test` is written, this is safe. The pattern is non-obvious and should use index
+  access rather than reference variables:
+    function_.blocks[*current_block_].terminator.kind = ...;  // safer, no reference
+
+ISSUE — LowerExpr falls through the bottom of its switch to emit a `0` literal
+  of VoidType:
+    Report(expr.span, "not yet supported in MIR: ...");
+    return EmitLiteralValue("0", sema::VoidType());
+  Returning a VoidType value where a valid type was expected causes cascading
+  type errors in downstream instructions. A safer error value would be
+  UnknownType() rather than VoidType(), to signal "we don't know" rather than
+  "this is explicitly void." That said, either approach produces a cascade; the
+  root error has already been reported.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. PERFORMANCE & SCALABILITY
+----------------------------
+
+CRITICAL — ValidateModule (lines 2651–4040) is ~1400 lines.
+  The validator does structural checks for every function × block × instruction.
+  For a module with F functions, each with B blocks and I instructions, validation
+  is O(F * B * I). This is the right order for a validator, but the linear scans
+  within the validator (finding type decls, finding local declarations) compound it.
+  Any O(n) lookup inside an O(F * I) loop is an O(F * I * N) total cost. At
+  bootstrap scale this is invisible; at 100K-line programs it would be felt.
+
+ISSUE — LowerExpr constructs std::string values (NewValue() → "%v0", "%v1", ...)
+  for every sub-expression. For a function with 1000 expressions, this is 1000
+  small short string allocations. SSO mitigates this for short names, but
+  `NewValue()` returns `"%v" + std::to_string(next_value_id_++)` which always
+  constructs a heap string for names longer than the SSO threshold (typically
+  around 15 characters). For value IDs up to 9999, the string "%v9999" is 6
+  characters, well within SSO. This is fine at current scale.
+
+ISSUE — ClassifySpecialCall with 13 branches is called once per call expression
+  in TryEmitSpecialCall, which is called twice per call site (once in LowerCallStmt,
+  once in LowerExpr for call expressions). For functions with many calls to
+  non-intrinsic functions, this is 26 wasted comparisons per call site. A hash map
+  would cost only the lookup overhead.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. SYSTEM-LEVEL CONCERNS
+------------------------
+
+CONCERN — MIR is the last typed boundary before codegen. Anything wrong in MIR
+  that ValidateModule accepts will produce incorrect LLVM IR. The acknowledged
+  absence of SSA dominance checking means ValidateModule is not a complete
+  correctness gate. The comment should be updated to list exactly which checks are
+  missing and tracked as known gaps, not left as an in-file footnote.
+
+CONCERN — The dual lowering paths for "direct source" builds vs. "project" builds
+  (driver.cpp merges MIR modules via NamespaceImportedBuildUnit/MergeBuildUnits)
+  mean that ValidateModule is called twice: once per-module and once on the merged
+  module. The merged module has additional type declarations (imported types with
+  qualified names) that the per-module validator has not seen. If the validator
+  makes assumptions about type names being unqualified (no dots), the merged module
+  validation may fail or suppress errors.
+
+CONCERN — RenderExprInline is invoked at lowering time to produce display strings
+  stored in instruction metadata. These strings are serialized into the MIR dump.
+  If RenderExprInline produces non-deterministic output for any expression kind
+  (e.g., by including memory addresses or non-stable formatting), MIR golden tests
+  would become flaky. Currently the output appears deterministic, but this should
+  be enforced by a review of RenderExprInline for non-deterministic paths.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. DOCUMENTATION & REASONING
+-----------------------------
+
+STRENGTH — The `EnsureCurrentBlock()` / dead-block pattern has a clear comment
+  explaining why dead blocks are created rather than dropping instructions.
+
+STRENGTH — The `$` prefix convention for hidden lowering locals is documented with
+  a comment at NewHiddenLocal, explaining that it avoids collision with user
+  identifiers.
+
+GAP — The FunctionLowerer class has no class-level doc comment. Its responsibilities,
+  invariants, and the expected call sequence (construct, Run(), take result) are
+  implicit.
+
+GAP — LowerForEach is the most complex lowering path (8 new blocks, index tracking,
+  iterable snapshot). It has no comments explaining the block structure. A diagram
+  or comment describing the CFG shape (incoming → cond → body/exit, body → step →
+  cond) would make this function maintainable.
+
+GAP — The ValidateModule comment about SSA dominance should be expanded into a
+  tracked TODO with a precise description of what needs to be implemented and what
+  the failure mode is when missing.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRIORITIZED RECOMMENDATIONS
+----------------------------
+
+CRITICAL / CORRECTNESS:
+  1. SSA dominance checking is absent from ValidateModule. This is the most
+     significant correctness gap in the file. Plan and implement dominance validation
+     — even a simple per-block def-before-use check over a reverse-postorder
+     traversal would catch most violations and produce better diagnostics than
+     LLVM's backend verifier errors.
+  2. Audit all `auto& current = function_.blocks[*current_block_]` patterns to
+     confirm no CreateBlock() call happens between the reference binding and last
+     write through the reference. Replace with indexed access where this is
+     ambiguous.
+  3. BindLocal / EnsureLocal should assert that the new type matches any previously
+     recorded concrete type for the same name to catch lowering-level type
+     inconsistencies.
+
+ARCHITECTURAL:
+  4. FunctionLowerer should be extracted to its own translation unit or at minimum
+     its own header so it can be unit-tested in isolation.
+  5. InferSymbolRefKind should be replaced with a pre-built lookup map in
+     LowerSourceFile to avoid O(N) sema module scans per call site.
+  6. ClassifySpecialCall should use a static hash map initialized once, or intrinsics
+     should be annotated at sema time and stored in Module.
+
+SIMPLIFICATION:
+  7. Remove the dead fallthrough cases (kArenaNew, kMmioPtr, kSliceFromBuffer) from
+     the bottom of EmitSpecialCallInstruction's switch — they are unreachable and add
+     confusion.
+  8. Add assertion before each function_.blocks.erase() call confirming
+     current_block_ is nullopt, making the index-safety invariant explicit.
+  9. Document LowerForEach CFG shape with a comment diagram.
+
+PERFORMANCE (OPTIONAL):
+  10. Move RenderExprInline calls out of the hot lowering path; record source spans
+      and render display strings lazily during DumpModule instead.
+  11. Replace FunctionLowerer TypeFromAst param-type construction with reads from
+      the pre-computed FunctionSignature in sema_module_.

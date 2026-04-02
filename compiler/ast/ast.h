@@ -99,6 +99,35 @@ struct DefaultCase : Node {
     std::vector<std::unique_ptr<Stmt>> statements;
 };
 
+// Expr — bootstrap AST expression node.
+//
+// Design: a single fat struct covers all expression kinds so that the tree can
+// be allocated with ordinary unique_ptr and traversed without virtual dispatch.
+// This is deliberate for the bootstrap phase; a discriminated-union redesign
+// is out of scope until the full type system is stable.
+//
+// Field usage by Kind:
+//   kName            : text = identifier name
+//   kQualifiedName   : text = module name, secondary_text = member name
+//   kLiteral         : text = literal token text, secondary_text = suffix (e.g. "i32")
+//   kUnary           : text = operator, left = operand
+//   kBinary          : text = operator, left = lhs, right = rhs
+//   kRange           : left = begin, right = end (nullptr means open end)
+//   kCall            : left = callee, args = argument list, type_args = explicit type args
+//   kField           : left = base, text = field name
+//   kDerefField      : left = base, text = field name
+//   kIndex           : left = base, right = index
+//   kSlice           : left = base, right = begin, extra = end
+//   kAggregateInit   : text = type name (may be empty for inferred), field_inits = fields
+//   kParen           : left = inner expression
+//
+// Optional pointer fields: nullptr means the field is absent for that Kind.
+//   left, right, extra, type_target are all optional.
+//
+// secondary_text meanings by Kind:
+//   kQualifiedName   : member name after the dot
+//   kLiteral         : type suffix following the numeric literal
+//   (all other Kinds leave secondary_text empty)
 struct Expr : Node {
     enum class Kind {
         kName,
@@ -132,6 +161,11 @@ struct Stmt : Node {
     enum class Kind {
         kBlock,
         kBinding,
+        // kBindingOrAssign: parser-deferred disambiguation.
+        // At parse time, "name = expr" is ambiguous between a new binding
+        // and an assignment to an existing variable.  The parser emits this
+        // synthetic kind and sema resolves it to kBinding or kAssign once
+        // the symbol table is populated.
         kBindingOrAssign,
         kVar,
         kConst,

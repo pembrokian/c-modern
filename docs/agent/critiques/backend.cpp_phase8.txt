@@ -1,0 +1,415 @@
+ARCHITECTURAL REVIEW: compiler/codegen_llvm/backend.cpp
+Phase 8 — Senior Compiler Systems Engineering Critique
+=======================================================
+
+FILE SUMMARY
+------------
+backend.cpp is the LLVM text IR code generator for the Modern C bootstrap compiler.
+It converts a mir::Module to LLVM IR text, which is then written to a .ll file and fed
+to the LLVM toolchain (opt / llc / ld). At ~5200 lines it is the largest file in the
+compiler. It contains two independent lowering stages, type and value resolution
+infrastructure, checked-operation helper emission, string constant handling, arena
+allocation lowering, and variant/struct/slice/buffer instruction lowering. The file
+does NOT use the LLVM C API; all LLVM IR is produced via std::ostringstream.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DESIGN & ARCHITECTURE
+------------------------
+
+CRITICAL ISSUE — Two completely independent instruction dispatch paths exist in
+  the same file, both switching over mir::Instruction::Kind:
+    1. LowerInstruction (+ LowerTerminator, LowerFunction, LowerGlobal)
+       Produces a BackendModule / BackendFunction / BackendBlock with pseudo-IR
+       string instructions such as `"binary add i32 %t0_0_0, %t0_0_1"` or
+       `"load i32 %local.x"`. This is a symbolic debug/dump format that is
+       human-readable but not valid LLVM IR.
+    2. RenderExecutableInstruction (+ RenderExecutableTerminator,
+       RenderExecutableFunction)
+       Produces actual LLVM IR text by building strings and pushing to
+       std::vector<std::string> output_lines, which are then streamed to
+       std::ostringstream.
+
+  Both paths are driven from the same MIR module and cover the same instruction set.
+  Any new MIR instruction kind must be implemented in BOTH dispatch switches to remain
+  correct. The `LowerInstruction` switch has one set of cases; the
+  `RenderExecutableInstruction` switch has a matching but independently maintained set.
+  Omitting a case in either switch causes the unhandled default to fire, which emits
+  a backend error for instructions that the compiler successfully produces.
+
+  ACTUAL BUG RISK: The two switches do not cover identical case sets. LowerInstruction
+  handles kConvert, kConvertNumeric, kConvertDistinct, kPointerToInt, kIntToPointer as
+  independent cases. RenderExecutableInstruction groups some of them and handles
+  kConvertDistinct differently (as a no-op). Discrepancies between the two switches
+  are guaranteed to grow over time.
+
+  RECOMMENDATION: Unify on a single dispatch path. The BackendModule / BackendBlock
+  pseudo-IR representation should either be removed (if it is only used for debugging)
+  or used explicitly as a documented first-pass intermediate. If BackendModule is the
+  debugging dump format (analogous to mir::DumpModule), it should be clearly labeled
+  as such and the dump path should not be confused with the executable emission path.
+  The executable emission path (RenderExecutableInstruction) is the real codegen
+  machinery; the BackendModule path should be reduced to a stub or eliminated.
+
+ISSUE — LowerInstructionType is called redundantly.
+  In RenderExecutableFunction, LowerInstructionType is called:
+    - Once for each return type
+    - Once for each parameter type
+    - Once for each local variable
+    - Once for each instruction result type (inside RenderExecutableInstruction)
+    - Often multiple times per instruction for operand types (e.g., in
+      kStoreLocal: both the destination local type and operand value type)
+    - Once per field in EmitAggregateInitInstruction
+  There is no per-function or per-module type cache. LowerInstructionType does a
+  recursive sema::Type → BackendTypeInfo conversion every time it is called.
+  For a function with 50 instructions operating on 3 distinct types, this results in
+  150+ redundant type conversions. A small (function-scoped or module-scoped)
+  type cache keyed on sema::Type would eliminate the duplication.
+
+ISSUE — FindFunction, FindMirLocal, FindMirGlobal, FindTypeDecl (from mir module)
+  all use O(N) linear scans. These are called inside instruction lowering loops:
+    - FindFunction is called in EmitCallInstruction for every call instruction
+    - FindMirLocal is called in kStoreLocal for every store instruction
+    - FindTypeDecl is called in EmitAggregateInitInstruction, EmitVariantInitInstruction,
+      kField, and type-resolution helpers for every matching instruction
+  This is O(N) per instruction. For a module with M instructions and K callees/types,
+  this is O(M*K) total lookups. For large modules this compounds with LowerInstructionType
+  redundancy. The module should maintain string-keyed lookup maps for functions and
+  types, built once at the start of lowering.
+
+ISSUE — EmitCallInstruction has vestigial first-operand detection logic:
+    if (IsProcedureSourceType(maybe_callee.type.source_name)) { argument_start = 1; }
+  This tests whether the first operand is a procedure type to skip it as a function
+  pointer. However, the function then uses instruction.target_name (a direct call)
+  and looks up the callee by name using FindFunction. There is no indirect call
+  via the procedure-typed first operand. This logic was either written for future
+  indirect-call support that never landed, or it is a holdover from an older dispatch
+  model. It is currently dead code for all cases where `instruction.target_kind ==
+  kFunction` (the only kind admitted). This should either be completed (add indirect
+  call support) or removed.
+
+ISSUE — kSliceFromBuffer is handled in RenderExecutableInstruction as a hard error:
+    "slice_from_buffer should lower before executable emission"
+  This is a precondition: some earlier pass must have lowered slice_from_buffer before
+  the backend runs. But there is no assertion in ValidateModule (mir.cpp) that
+  slice_from_buffer does not appear at executable-emission time, and there is no
+  lowering pass in driver.cpp that explicitly performs this transformation.
+  The error is latent — if any code path produces a kSliceFromBuffer that reaches
+  the backend, the error fires at emission time rather than at an earlier, more
+  informative stage. Either:
+    (a) Add a mir::ValidateModule check that errors if kSliceFromBuffer is present
+        before codegen, or
+    (b) Actually lower kSliceFromBuffer to buffer_to_slice + slice in the backend
+        (which is trivial, as the two instructions already exist).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. CORRECTNESS & SOUNDNESS
+--------------------------
+
+ISSUE — `kBootstrapTriple = "arm64-apple-darwin25.4.0"` is hardcoded with
+  an OS version.
+  The Darwin version (25.4.0) is the macOS 15.x (Sequoia) kernel version.
+  This version appears in the LLVM module triple, which tells LLVM what platform
+  features and OS ABIs are available. On a machine running a different macOS version
+  (e.g., macOS 14.x, kernel version 23.x), the version mismatch can affect:
+    - Which compiler_rt builtins are linked
+    - Stack alignment requirements for ABI compatibility on Darwin
+    - TLS model selection
+  The triple "arm64-apple-macosx15.0" (without a patch version) is more stable across
+  minor OS updates. But more importantly, there should be a single canonical source
+  for this triple (currently it is also in driver.cpp's BootstrapTargetIdentity());
+  the two values must be kept in sync.
+
+ISSUE — EmitArenaNewInstruction returns a null pointer if the arena has insufficient
+  capacity:
+    "%result_ptr = select i1 %fits, ptr %raw_ptr, ptr null"
+  This is correct per the documented arena_new semantics (null on OOM), but it is
+  not enforced that every call site checks for null before using the result. There
+  is no generated null check or bounds check after arena_new. In a language with
+  memory safety goals, the arena_new caller in generated code must be responsible
+  for this check. If any code path fails to check and dereferences null, the program
+  crashes silently. The language runtime and sema lowering should enforce that
+  arena_new results are checked before use; the backend should not silently allow
+  null dereferences from arena allocation failures.
+
+ISSUE — EmitAggregateStackSlot (called by kArrayToSlice, kSlice, kIndex on arrays,
+  and EmitAggregateInitInstruction) emits alloca instructions inside basic blocks that
+  follow the entry alloca block:
+    stream << "  " << slot << " = alloca " << type;
+  LLVM's mem2reg pass only lifts alloca'd values to registers if the alloca is in the
+  entry block and not in a loop. Alloca inside instruction emission (which can occur
+  in any block including loop bodies) is valid LLVM IR but defeats mem2reg, causing
+  the alloca to remain as a stack slot in the final code. This is a performance issue,
+  not a correctness issue — but it can also cause subtle issues where alloca in a loop
+  body infinitely grows the stack frame. Aggregate stack slots should be hoisted to
+  the entry.alloca block (which is already generated for parameter stores).
+
+ISSUE — `kConvert` (RenderExecutableInstruction case) only passes through if the
+  backend type is identical to the operand type:
+    if (operand.type.backend_name != result_type.backend_name) { error }
+  This is stricter than the sema definition of kConvert (which allows alias/distinct
+  type conversions that have the same representation). However, the check uses
+  BackendTypeInfo::backend_name (LLVM IR type name) for equality, which would fail for
+  e.g. two distinct named types that both lower to `i32`. The check is doing C-string
+  comparison on LLVM IR type strings rather than comparing the underlying sema or
+  layout types. A distinct integer type and its base integer would both lower to `i32`
+  and both pass this check, which is correct. But a struct typedef lowering to the
+  same struct type as another typedef would have the same `backend_name` and also
+  pass — which is also correct. The check seems right in practice, but is implicitly
+  relying on a property (same LLVM type name ↔ same representation) that holds now
+  but is fragile if structural types are later treated differently in LowerInstructionType.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. SIMPLICITY & ELEGANCE
+------------------------
+
+ISSUE — The file has a massive amount of structural repetition across instruction
+  handlers. Every handler that takes a single result operand performs the same four-
+  step sequence:
+    1. RequireInstructionResult
+    2. ResolveSingleExecutableOperand (or similar)
+    3. LowerInstructionType
+    4. RecordExecutableValue / output_lines.push_back
+
+  Most of the 100+ instruction handler case branches are structural variations on
+  this pattern with different opcode strings and argument counts. The per-instruction
+  variation is small (opcode name, operand count, type resolution strategy), but each
+  is written out in full. This makes the file long and hard to audit for correctness:
+  a reviewer comparing two similar handlers (e.g., kPointerToInt vs kIntToPointer)
+  must read them in full to spot any difference.
+
+  This is not a suggestion to eliminate all cases — some instructions (EmitArenaNewInstruction,
+  EmitSliceInstruction, EmitVariantInitInstruction) have genuinely complex lowering that
+  warrants a dedicated helper function and already has one. The simple unary/binary/convert
+  cases could be unified with a table-driven approach.
+
+ISSUE — Temporary name generation uses the same tri-part scheme
+  (LLVMTempName(fi, bi, ii)) across every instruction, but many instructions need
+  multiple temporaries (e.g., kVariantInit generates tag_temp + variant_temp,
+  kSlice generates data_ptr + len + init + result, kArenaNew generates 12+
+  temporaries). The solution is to append a string suffix (e.g., ".tag", ".slice_ptr",
+  ".init"). Suffixes are hand-chosen per instruction, and the same suffix is
+  sometimes used for semantically different things across different instructions.
+  A per-instruction counter variable that produces ".0", ".1", ".2" sub-temporaries
+  would be more systematic and less error-prone.
+
+MINOR — `DecodeStringLiteral` handles `\0` (null byte escape) but the null byte
+  is then encoded by `EncodeLLVMStringBytes` as `\00`, which terminates the string.
+  If a string literal in source contains `\0` in the middle (e.g., for binary data),
+  the resulting LLVM IR string will be null-terminated mid-way through, and the length
+  will be the full decoded length including bytes after the null. This is a subtle
+  correctness issue for binary-data string constants but is unlikely to affect normal
+  text strings. The existing test coverage probably doesn't include embedded nulls.
+
+MINOR — `IsSignedSourceType` and `IsUnsignedSourceType` are parallel functions that
+  enumerate sign-qualified integer source type names. They are both O(N) for N source
+  type names. A lookup set (`unordered_set<string_view>`) would be cleaner and
+  faster, though the N is small (~5-7 entries).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. SAFETY & ROBUSTNESS
+-----------------------
+
+ISSUE — On instruction lowering failure (any ResolveSingle/ResolveTwoOperands/
+  LowerInstructionType returning false), RenderExecutableInstruction returns false.
+  The caller (RenderExecutableFunction) returns false immediately. The partial output
+  written to `stream` up to that point is discarded only if the caller discards it.
+  Based on the driver code, failed codegen causes the driver to report an error and
+  bail before writing the .ll file. But: partial string writes to `stream` before
+  the first failure are still in the ostringstream buffer. If the caller
+  has already begun writing function declarations or string constant global lines,
+  those partial lines exist in the stream even though the function body could not be
+  lowered. The stream is accumulated per-module and written at the end; a failure
+  in function N would leave function 0...N-1 valid and function N partially written.
+  This is fine if the stream is discarded on error, but there is no explicit discard
+  point — the driver would need to not write the stream to disk on any lowering error.
+  This should be verified: find the call site where `stream.str()` is written to disk.
+
+ISSUE — EmitCallInstruction validates argument count:
+    if (argument_count != callee_params.size()) { error }
+  This check fires at codegen time, not at MIR validation time. By the time codegen
+  runs, the MIR has already passed ValidateModule. A mismatch here means ValidateModule
+  missed a call-site arity check. The argument count mismatch should be explicitly
+  checked in ValidateModule's kCall case, so it fires earlier with better context
+  (function name, source location) rather than as a backend error.
+
+ISSUE — kVariantExtract reads the payload index from either `instruction.target_index`
+  (if ≥ 0) or `instruction.op` (parsed via std::stoul):
+    if (instruction.target_index < 0 && !instruction.op.empty()) {
+        payload_index = static_cast<std::size_t>(std::stoul(instruction.op));
+    }
+  `std::stoul` on an empty or malformed `instruction.op` would throw `std::invalid_argument`
+  or `std::out_of_range`. These are uncaught exceptions. Since the compiler
+  doesn't propagate exceptions (they would abort), a malformed variant_extract
+  instruction produced by a bug in MIR lowering would terminate the process with an
+  uncaught exception rather than a clean diagnostic. The stoul call should have a
+  try/catch or a pre-check that validates instruction.op is numeric.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. PERFORMANCE & SCALABILITY
+----------------------------
+
+ISSUE — All locals are unconditionally alloca'd and stored/loaded through the stack.
+  The entry alloca block allocates every local (including loop counters, temporaries
+  that are only used in one block, and single-assignment values), then stores
+  parameters, and then branches to the first user block. LLVM's mem2reg pass will
+  promote these alloca slots to SSA registers at -O1+, but at -O0 the generated code
+  is all memory operations. For bootstrap purposes this is fine, but documenting the
+  dependency on LLVM optimization to produce reasonable code would help future
+  contributors understand why performance-sensitive generated code needs -O1 minimum.
+
+ISSUE — The string constant pre-pass in RenderExecutableFunction iterates all blocks
+  and all instructions twice for string constants:
+    for (const auto& block : function.blocks) {
+        for (const auto& instruction : block.instructions) {
+            if (instruction.kind == kConst && /* is string */ ...) { ... }
+    }
+  Then the instruction loop runs again in the main lowering pass. For large functions
+  this doubles the instruction-level iteration. The string constants could be
+  discovered in a first single pre-pass that also collects any other function-level
+  information needed before emission (e.g., which checked helpers are needed for
+  this function), but the current two-scan approach is simple and likely not a
+  practical bottleneck.
+
+ISSUE — `state.globals` in `ExecutableFunctionState` is populated at the start of
+  every function lowering call (in RenderExecutableFunction):
+    for (const auto& global : module.globals) { state.globals.emplace(name, ...); }
+  For a module with G globals and F functions, this builds the same global map F times.
+  The global map is read-only within each function (no globals are added during
+  lowering). This map should be built once at module lowering time and passed to
+  every RenderExecutableFunction call as a const reference.
+
+ISSUE — `LowerEnumLayout` is called inside ResolveEnumInstructionLayout, which is
+  called for every kVariantInit, kVariantMatch, and kVariantExtract instruction.
+  LowerEnumLayout does a full enum type analysis (field layout computation) on each
+  call. For a function with many variant operations on the same enum type, this
+  redundantly re-computes the layout. The layout for each enum type should be memoized
+  in a per-module cache keyed by type name.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. SYSTEM-LEVEL CONCERNS
+------------------------
+
+CONCERN — The backend emits LLVM IR as raw text strings rather than via the LLVM C API
+  or LLVM MLIR infrastructure. This is a well-known and valid choice for bootstrap
+  purposes: it avoids the LLVM dependency at compile time, is straightforward to debug
+  (the output is human-readable), and is correct as long as the text IR produced is
+  valid LLVM IR. The trade-off is that the backend cannot use LLVM's type system to
+  catch mismatches, cannot use LLVM's optimization pipeline directly, and must manually
+  format every type name, opcode, and operand. This is appropriate for bootstrap but
+  should be documented as a deliberate architectural choice and as a known limiter for
+  future optimization infrastructure.
+
+CONCERN — `kBootstrapTriple` in backend.cpp and `BootstrapTargetIdentity()` in
+  driver.cpp reference the same platform, but the strings must be kept synchronized
+  manually. The target identity string ("arm64-apple-darwin") used for incremental
+  build state keying should match the triple used for IR emission. There is no
+  compile-time or test-time assertion that these two strings are consistent.
+  A single `kBootstrapTargetTriple` constant in a shared support or target header,
+  used by both driver.cpp and backend.cpp, would eliminate the synchronization risk.
+
+CONCERN — The linker is invoked via a shell command assembled from strings (via
+  RunExecutableCommand in driver.cpp with string arguments from the backend's linker
+  argument building). The runtime support file is referenced via a relative path
+  assumption. If the compiler binary moves relative to the runtime C support file,
+  the linker step fails. See driver.cpp critique for details.
+
+CONCERN — There is no opt / llc invocation pass visible in the backend emission
+  path. LLVM IR text is written to a .ll file, and then presumably clang/llc is
+  used to compile it. The decision of which LLVM optimizer settings to use (if any)
+  lives in the driver, not the backend. The backends output is therefore unoptimized
+  LLVM IR. This is documented implicitly by the bootstrap intent but not commented.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. DOCUMENTATION & REASONING
+-----------------------------
+
+GAP — The two-stage lowering (BackendModule pseudo-IR + RenderExecutableInstruction)
+  is not explained anywhere in the file. A reader will encounter LowerFunction and
+  RenderExecutableFunction and not understand which path is used for actual Code
+  generation. There is no top-of-file comment explaining:
+    (a) that LowerFunction / BackendModule is a dump/debug format (if true), or
+    (b) that both paths are used for different output modes
+
+GAP — The arena_new lowering in EmitArenaNewInstruction is the most sophisticated
+  piece of code in the backend (inline alignment, GEP into arena.data, conditional
+  used update). It is also the most likely to have subtle correctness issues.
+  It should have a comment explaining the expected Arena struct layout
+  ({ptr, i64, i64, ptr} = data, cap, used, allocator) and the alignment algorithm.
+
+GAP — The "checked helper requirement" system (CheckedHelperRequirements,
+  CollectCheckedHelperRequirements) is a separate pass that scans the MIR module
+  for which division/shift/bounds-check runtime helpers are needed, then emits
+  declare lines for them at the top of the .ll file. This is correct (you can't call
+  a function that's not declared). But the logic is entirely separate from the
+  instruction emission and is not documented. A comment explaining that checked
+  helpers are declared up-front (not defined in the .ll file — they're in the
+  runtime C code compiled separately) would help.
+
+STRENGTH — The `EmitNumericConversion` function correctly handles all four numeric
+  conversion cases (int→int, float→float, int→float, float→int) by selecting the
+  appropriate LLVM opcode (sext, zext, trunc, fpext, fptrunc, sitofp, uitofp, fptosi,
+  fptoui) based on source and target type properties. The sign-detection logic
+  (IsSignedSourceType / IsUnsignedSourceType) is explicit and readable.
+
+STRENGTH — String literal constants are emitted as LLVM private unnamed_addr constants
+  with proper C-style NUL termination and hex-encoded non-printable bytes. The
+  `EncodeLLVMStringBytes` function is correct and handles the special cases (printable
+  ASCII except `\` and `"`, everything else hex-encoded). The `DecodeStringLiteral`
+  function handles the full source escape set including `\n, \r, \t, \\, \", \0`.
+
+STRENGTH — `EmitAggregateInitInstruction` correctly handles the aggregate construction
+  pattern using insertvalue chains with incrementally-named temporaries. This produces
+  correct LLVM IR for struct initialization without requiring a stack slot for
+  construction (the value is built in registers via insertvalue, then stored only once
+  if needed).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRIORITIZED RECOMMENDATIONS
+----------------------------
+
+CRITICAL / CORRECTNESS:
+  1. Add try/catch or a numeric pre-check around the std::stoul call in
+     kVariantExtract to prevent uncaught exceptions from malformed instruction.op.
+  2. Confirm (or enforce) that when any RenderExecutableFunction call returns false,
+     the accumulated ostringstream output is NOT written to disk. Add an assertion
+     or test that demonstrates clean error handling for lowering failures.
+  3. Add a ValidateModule check in mir.cpp for kSliceFromBuffer, or lower it in the
+     backend — do not silently convert it to an error at emission time.
+
+ARCHITECTURAL:
+  4. Document the BackendModule / LowerInstruction path explicitly: is it a debug dump
+     format, or a real intermediate representation? If it is a dump format, label it
+     clearly and remove the confusion with the RenderExecutableInstruction path.
+     If both paths are meant to coexist, audit and synchronize their instruction case
+     coverage.
+  5. Introduce a single `kBootstrapTargetTriple` constant shared by backend.cpp and
+     driver.cpp to remove the manual synchronization requirement.
+  6. Memoize LowerTypeInfo / LowerEnumLayout at module scope during the emission pass
+     to eliminate redundant recomputation of the same type layouts across instructions.
+
+CORRECTNESS (MINOR):
+  7. Replace O(N) FindFunction, FindMirLocal, FindMirGlobal scans with maps built once
+     at function lowering startup, similar to how state.locals / state.block_labels are
+     built in LowerFunction.
+  8. Remove or complete the argument_start / IsProcedureSourceType logic in
+     EmitCallInstruction — it is dead code for direct calls.
+  9. Hoist EmitAggregateStackSlot alloca emissions to the entry.alloca block to
+     allow LLVM's mem2reg to promote the slots on all optimization levels.
+
+SIMPLIFICATION (OPTIONAL):
+  10. Move state.globals construction out of every RenderExecutableFunction call and
+      into a once-per-module setup in EmitLLVMIRForModule (or equivalent entry point).
+  11. Use a systematic sub-temporary naming scheme (e.g., base + "." + counter) instead
+      of hand-chosen suffixes, to reduce the risk of naming collisions across complex
+      instructions.
+  12. Add a top-of-file architecture comment explaining the backend's two-stage
+      structure, the text-IR approach (vs. LLVM C API), and the dependency on the
+      LLVM toolchain for compilation and linking.

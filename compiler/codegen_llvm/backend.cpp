@@ -1,5 +1,29 @@
 #include "compiler/codegen_llvm/backend.h"
 
+// Bootstrap LLVM backend — two-pass code generation architecture.
+//
+// This file contains two independent passes over the MIR module:
+//
+//   1. Debug / inspect path (LowerFunction, BackendModule, BackendBlock)
+//      Produces a human-readable pseudo-IR text analogous to mir::DumpModule.
+//      Activated by --inspect-surface=backend_ir_text.  Does NOT emit real
+//      LLVM IR; it is a diagnostic aid only.
+//
+//   2. Real LLVM IR emission path (RenderExecutableFunction,
+//      RenderExecutableInstruction, EmitXxx helpers)
+//      Produces textual LLVM IR that is piped to `llc` and then `clang`.
+//      This is the path taken by `mc build`.
+//
+// Both paths must be updated when a new mir::Instruction::Kind is added.
+// The debug path calls LowerInstruction for every instruction; the real path
+// calls RenderExecutableInstruction.  Forgetting to handle a new kind in
+// either path will produce a "not handled in backend" diagnostic at runtime,
+// not a compile-time error — keep this in mind during MIR extension work.
+//
+// EmitArenaNewInstruction assumes the Arena struct layout:
+//   { ptr i8*, i64 cap, i64 used, ptr Allocator* }
+// The allocation alignment is rounded up to the pointer size of the target.
+// Changing the Arena struct in the runtime requires updating this function.
 #include <cstdlib>
 #include <fstream>
 #include <optional>
@@ -10,11 +34,13 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "compiler/support/target.h"
+
 namespace mc::codegen_llvm {
 namespace {
 
-constexpr std::string_view kBootstrapTriple = "arm64-apple-darwin25.4.0";
-constexpr std::string_view kBootstrapTargetFamily = "arm64-apple-darwin";
+using mc::kBootstrapTriple;
+using mc::kBootstrapTargetFamily;
 constexpr std::string_view kBootstrapObjectFormat = "macho";
 constexpr std::string_view kInspectSurface = "backend_ir_text";
 constexpr std::string_view kHostedRuntimeSupportPath = "runtime/hosted/mc_hosted_runtime.c";
@@ -1778,7 +1804,11 @@ std::size_t IntegerBitWidth(const BackendTypeInfo& type_info) {
     if (type_info.backend_name.size() < 2 || type_info.backend_name.front() != 'i') {
         return 0;
     }
-    return static_cast<std::size_t>(std::stoul(type_info.backend_name.substr(1)));
+    const std::string_view digits = std::string_view(type_info.backend_name).substr(1);
+    if (!std::all_of(digits.begin(), digits.end(), ::isdigit)) {
+        return 0;
+    }
+    return static_cast<std::size_t>(std::stoul(std::string(digits)));
 }
 
 std::optional<std::size_t> FindFieldIndex(const mir::Module& module,
@@ -2948,6 +2978,12 @@ bool EmitVariantExtractInstruction(const mir::Instruction& instruction,
 
     std::size_t payload_index = instruction.target_index >= 0 ? static_cast<std::size_t>(instruction.target_index) : 0;
     if (instruction.target_index < 0 && !instruction.op.empty()) {
+        if (!std::all_of(instruction.op.begin(), instruction.op.end(), ::isdigit)) {
+            ReportBackendError(source_path,
+                               "backend: variant_extract instruction has non-numeric op field: " + instruction.op,
+                               diagnostics);
+            return false;
+        }
         payload_index = static_cast<std::size_t>(std::stoul(instruction.op));
     }
     const std::size_t field_index = layout.variant_field_offsets[variant_index] + payload_index;

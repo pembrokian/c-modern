@@ -1,0 +1,314 @@
+ARCHITECTURAL REVIEW: compiler/ast/ast.cpp (+ ast.h)
+Phase 8 — Senior Compiler Systems Engineering Critique
+=======================================================
+
+FILE SUMMARY
+------------
+ast.h defines the AST node types for the Modern C bootstrap compiler (490-line .cpp,
+209-line .h). The header declares the full AST structure: Node, TypeExpr, Expr, Stmt,
+Decl, SourceFile, and supporting types (FieldDecl, ParamDecl, CasePattern, etc.).
+ast.cpp implements a single public function, DumpSourceFile(), via a family of
+recursive helpers (DumpType, DumpExpr, DumpStmt, DumpDecl). There is no AST visitor
+pattern, no source-location range attachment beyond the base Node::span, and no
+separate allocation strategy (all nodes are heap-allocated via unique_ptr). The layer
+is correctly scoped: it owns syntax representation and dump/debug output only.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DESIGN & ARCHITECTURE
+------------------------
+
+ISSUE — The `Expr`, `Stmt`, and `Decl` node types are fat structs: each carries
+  every field used by any variant of that kind.
+
+  `Expr` carries:
+    text, secondary_text, type_args, type_target, args, field_inits, left, right, extra
+  `Stmt` carries:
+    statements, pattern, type_ann, exprs, assign_targets, assign_values,
+    has_initializer, switch_cases, has_default_case, default_case,
+    loop_name, loop_second_name, then_branch, else_branch
+  `Decl` carries:
+    attributes, name, extern_abi, type_params, params, return_types, body,
+    fields, variants, pattern, type_ann, values, has_initializer, aliased_type
+
+  For bootstrap this is acceptable: no union, no tagged pointer, no separate
+  node subclasses means zero vtable cost and trivially movable nodes. The trade-off
+  is that the semantic meaning of any given field depends on the `kind` enum, which
+  is not enforced by the type system. A `kLiteral` Expr should never have populated
+  `args`, but nothing prevents it. This creates a class of latent bugs: parser or
+  sema code that reads `args` on the wrong `kind` will silently see an empty vector
+  rather than a type error.
+
+  The main cost is memory: a `BindingStmt` allocates memory for switch_cases,
+  then_branch, else_branch, etc., which are always empty/null for bindings. For a
+  file with thousands of expressions, this padding is not free. A tagged union or
+  per-kind subtype would reduce object size and make invalid-field access a
+  compile-time error, at the cost of more complex node construction.
+
+  For a bootstrap compiler that is not yet self-hosting, the fat-struct approach
+  is a pragmatic and correct choice. The design should be documented as deliberate
+  rather than as an oversight.
+
+ISSUE — `Stmt::kind` defaults to `Kind::kExpr`. A default-constructed `Stmt` is
+  silently treated as an expression statement, which is almost never the intended
+  state. Similarly, `Decl::kind` defaults to `Kind::kFunc`. Default construction of
+  these types produces silently valid-looking nodes with an incorrect kind. Since the
+  parser constructs nodes in-place and fills in kind explicitly, this is unlikely to
+  produce bugs today, but it creates a trap for future code that might
+  default-construct these types and forget to set kind.
+
+  An `= delete` on the default constructor (requiring an explicit Kind argument) would
+  catch this at compile time. Alternatively, a sentinel value `Kind::kUnknown = 0`
+  that is distinct from any real kind, combined with assertions in downstream consumers
+  that check for kUnknown, would make uninitialized kind values visible quickly.
+
+ISSUE — `Expr` uses field names `left`, `right`, `extra` for binary/unary operands,
+  and separately uses `args` for call arguments and `field_inits` for aggregate
+  initializers. But `left`/`right`/`extra` also serve double-duty for slice bounds
+  (kSlice uses left=base, right=lower, extra=upper). Readers of sema or MIR code
+  must remember the per-kind field assignment conventions, which are not documented
+  in the header. The ambiguity between "extra as upper bound" and "extra as some
+  other third operand" is a readability hazard.
+
+  Naming the fields semantically per kind (e.g., as a union alternative, or with
+  documented aliases) would reduce this ambiguity.
+
+ISSUE — `CasePattern` has both an `expr` (for `kExpr` patterns) and `variant_name`
+  + `bindings` (for `kVariant` patterns), but no explicit `kOther` or catch-all
+  variant for future pattern types (tuple patterns, struct patterns, guard
+  expressions). Adding a new pattern kind later requires extending the struct and
+  updating all consumers. Since MC's pattern matching may grow, documenting the
+  planned future extent of patterns (or adding a comment in the header that these
+  are the currently supported kinds) would help.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. CORRECTNESS & SOUNDNESS
+--------------------------
+
+ISSUE — `DumpExpr` prints `expr.secondary_text` with the label "extra=", but the
+  field is named `secondary_text` in the struct. Compare with `DumpStmt` which uses
+  `loop_second_name` also labeled without a semantic description. The dump label
+  "extra=" tells the reader nothing about what value is stored there for a given
+  expression kind. If `secondary_text` is used to store the field name in a
+  `kField` expression, the dump label "extra=" is misleading. Dump output labels
+  should match semantic meaning ("field_name=", "method=", etc.) differentiated by
+  expression kind.
+
+ISSUE — All four `ToString` functions (for TypeExpr::Kind, Expr::Kind, Stmt::Kind,
+  Decl::Kind) have a fallback `return "Type"` / `return "Expr"` / etc. after their
+  switch statements. Because the switches are non-exhaustive by default (no
+  `[[likely]]` annotation, no static_assert), the compiler may or may not warn about
+  unhandled enumerators depending on flags. If a new Kind enumerator is added to any
+  of these enums without adding a case to the corresponding ToString, the function
+  silently returns the base-class name (e.g., "Expr" instead of
+  "NewExprKindExpr"). This is a silent regression that only manifests in dump output,
+  not in a compiler error.
+
+  RECOMMENDATION: Add `[[noreturn]]` unreachable/assert_unreachable after the switch
+  (or mark the switch with a static_assert that it covers all enum values) so that
+  missing cases produce a compile-time warning or a fast runtime abort during
+  development.
+
+ISSUE — `DumpStmt` prints `switch_cases` only when `!stmt.switch_cases.empty()`, and
+  `default_case` only when `stmt.has_default_case`. But `has_default_case = false`
+  does not prevent `default_case.statements` from being non-empty (e.g., if the
+  parser sets the statements but forgets to set the flag). The flag and the data can
+  diverge, and the dump would silently omit the statements. The flag is redundant
+  with `!default_case.statements.empty()`:
+
+    if (stmt.has_default_case) { ... dump default ... }
+    // versus:
+    if (!stmt.default_case.statements.empty()) { ... dump default ... }
+
+  They should agree. Using the flag to gate the dump while the statements may
+  independently exist is an inconsistency. Either remove `has_default_case` and use
+  the emptiness check, or assert that `has_default_case == !default_case.statements.empty()`.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. SIMPLICITY & ELEGANCE
+------------------------
+
+STRENGTH — The dump functions are clean, non-recursive in any problematic sense,
+  and produce readable tree output. The indent-based WriteIndent + WriteLine helpers
+  minimize boilerplate. The output format (name=value pairs on a single line, with
+  child sections on indented lines below) is consistent across all node types and
+  produces output that is easy to grep and diff.
+
+STRENGTH — The file correctly uses the anonymous namespace for all helpers, keeping
+  only `DumpSourceFile` in the public `mc::ast` namespace. There is no unnecessary
+  exposure of dump internals.
+
+ISSUE — `DumpDecl` handles the `kExternFunc` case via `extern_abi` being non-empty,
+  which it streams inline. But `kStruct`, `kEnum`, `kDistinct`, `kTypeAlias`,
+  `kConst`, `kVar` are all handled by the same DumpDecl function via field presence
+  checks. There is no per-kind dump branch. This means that:
+    - A `ConstDecl` would also print a "fields:" section if `fields` were somehow
+      non-empty (shouldn't happen from the parser, but the struct doesn't prevent it)
+    - A `FuncDecl` that happens to have a non-empty `aliases_type` (shouldn't happen)
+      would print an aliasedType section
+  The dump is as correct as the parser's discipline in populating these fields.
+  For a debug dump tool that is primarily read by developers, this is acceptable.
+
+ISSUE — `TypeExpr` has a `kParen` kind (parenthesized type expression). It appears
+  in the Kind enum and has a ToString case. However, `TypeExpr` has no inner
+  structure beyond `inner` (single child). A parenthesized type is semantically
+  identical to its inner type after parsing. There is no reason to preserve kParen
+  in the AST beyond the printing stage: sema should strip it. Similarly, `Expr::kParen`
+  is preserved in the AST. If sema does not eagerly strip these paren wrappers,
+  every pass that examines type or expression kinds must handle kParen as an
+  "unwrap first" case. This is a recurring maintenance cost.
+
+  RECOMMENDATION: Either strip kParen nodes in the parser before returning the AST
+  (produce the inner node directly), or document explicitly that all sema and MIR
+  consumers must call a StripParen() helper before examining kind.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. SAFETY & ROBUSTNESS
+-----------------------
+
+ISSUE — All child node references in `Expr`, `Stmt`, and `TypeExpr` are
+  `std::unique_ptr`. The dump functions access them via raw pointer dereference
+  after a null check:
+    if (expr.left != nullptr) { DumpExpr(*expr.left, ...) }
+  This is correct. But sema and MIR code that dereferences these pointers without a
+  null check would silently produce undefined behavior. Since the struct design uses
+  optional children (pointer = nullptr means "absent"), every caller must remember
+  which fields are optional for which kind. There is no type-level distinction between
+  "always-present child" and "optional child" — both are `unique_ptr`.
+
+  Adding `assert(ptr != nullptr)` guards in the dump functions (rather than the
+  current silent-skip on null) would catch cases where a required child is missing
+  from a node kind that should always have it (e.g., a kBinary Expr should always
+  have both `left` and `right`).
+
+ISSUE — `DumpExpr` silently skips null args:
+    for (const auto& arg : expr.args) { DumpExpr(*arg, ...) }
+  If any `expr.args[i]` is a null unique_ptr (which shouldn't happen from the parser
+  but is not statically prevented), this dereferences null. The `args` vector stores
+  non-owning `unique_ptr` values that should always be non-null, but there is no
+  assertion. A precondition assert before dereferencing would make the invariant
+  explicit.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. PERFORMANCE & SCALABILITY
+----------------------------
+
+ISSUE — All node types inherit from `Node` (which carries a `SourceSpan`). Spans are
+  stored inline in every node. `SourceSpan` contains two source positions (start/end),
+  each likely a line + column or byte-offset pair. This is the right approach:
+  spans are pervasively needed for diagnostics and are small enough to store inline.
+  No concern here.
+
+ISSUE — `DumpSourceFile` builds the entire dump as a single `std::ostringstream`
+  that is then returned as a `std::string`. For a large source file with thousands
+  of declarations, this builds a potentially large string in memory before it is
+  printed or written. This is only called for `--dump-ast` debugging scenarios and
+  is not on any hot path, so this is not a practical concern. It is noted for
+  completeness.
+
+ISSUE — Node vector fields (`args`, `statements`, `fields`, `variants`, etc.) use
+  `std::vector<std::unique_ptr<T>>` or `std::vector<T>`. Each parse of a function
+  body will produce hundreds of heap-allocated `unique_ptr<Expr>` and
+  `unique_ptr<Stmt>` objects, each individually heap-allocated. An arena allocator
+  (one contiguous allocation per source file parse) would reduce allocation overhead
+  significantly for large files. This is a known cost of the current approach and
+  is consistent with other bootstrap compilers at this stage. It would be worth
+  noting in the docs as a known scalability limitation for large source files.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. SYSTEM-LEVEL CONCERNS
+------------------------
+
+CONCERN — The AST layer has no position in the compiler's module identity system.
+  The `SourceFile` node carries `ImportDecl` vector and `ExportBlock`, which represent
+  the module interface boundary at the syntax level. These are consumed by sema to
+  build the module surface, but the AST itself has no awareness of whether it
+  represents a main module or an imported dependency. This is correct separation of
+  concerns: the AST is syntax-only; module identity belongs to sema.
+
+CONCERN — There is no AST serialization (beyond the debug dump). The incremental
+  build system uses `.mci` artifacts derived from the sema module surface, not from
+  the AST. If the compiler ever moves to caching parsed ASTs (to avoid re-parsing
+  unchanged files in the project path), a binary AST serialization format would be
+  needed. This is out of scope for the bootstrap but worth noting as a future
+  requirement for compilation speed on large projects.
+
+CONCERN — The `Stmt::kBindingOrAssign` kind represents a disambiguation deferral:
+  the parser could not determine at parse-time whether `x, y = ...` is a multi-
+  binding or a multi-assignment, so it creates a `kBindingOrAssign` node to be
+  resolved by sema. This is a parser-to-sema coupling: sema must handle this AST
+  node kind and resolve it before further analysis. The design is documented
+  implicitly by the kind name, but the resolution contract (when and how sema
+  converts kBindingOrAssign to kBinding or kAssign) is not visible from the AST
+  header alone.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. DOCUMENTATION & REASONING
+-----------------------------
+
+GAP — Neither ast.h nor ast.cpp has a top-level comment describing the design
+  choices:
+    - Why fat structs over tagged subclasses
+    - What unique_ptr null means for each pointer field (absent child vs. parse error)
+    - The per-kind field assignment convention for Expr left/right/extra
+    - Which fields are kind-specific vs. shared across all kinds
+  For a codebase that will eventually be self-hosted, these design rationale
+  comments are essential for contributors working from the MC language itself.
+
+GAP — `Expr::secondary_text` is undocumented. From context in the parser and sema,
+  it appears to store the "extra" name component of a `kQualifiedName` (e.g., the
+  member in `module.member`) or a label/tag in specific binary ops. Without a comment
+  clarifying what this field stores for each Expr kind that uses it, readers must
+  grep through parser.cpp to understand its usage.
+
+GAP — `Stmt::kBindingOrAssign` is the only deferred-disambiguation kind in the AST.
+  Its semantics and the sema-side resolution contract deserve a comment in the header.
+
+STRENGTH — The `ToString` functions in the anonymous namespace produce clean,
+  human-readable node-kind names ("BinaryExpr", "IfStmt", "FuncDecl") that match
+  the conceptual names a language user would recognize. Dump output is immediately
+  parseable by humans without referring to the Kind enum values.
+
+STRENGTH — The `DumpAttributes` helper is reused for both `Decl` and `ParamDecl`
+  attribute lists, correctly avoiding duplication.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRIORITIZED RECOMMENDATIONS
+----------------------------
+
+CORRECTNESS:
+  1. Replace the ToString fallback `return "Expr"` / `return "Stmt"` / etc. with
+     `assert(false)` or `std::unreachable()` to make unhandled Kind enumerators
+     immediately visible during development rather than silently producing wrong
+     dump output.
+  2. Resolve the `has_default_case` / `default_case.statements` redundancy: either
+     remove the bool flag and use emptiness checks throughout, or add an assertion
+     that they are always consistent.
+
+DESIGN CLARITY:
+  3. Document the fat-struct design choice in ast.h with a brief comment explaining
+     the trade-off vs. subclassing, so future contributors understand it is deliberate.
+  4. Document or rename `Expr::secondary_text` to clarify what it stores for each
+     Expr::Kind that uses it. A comment mapping each Kind to its field usage
+     ("for kField: text=owner, secondary_text=field_name; for kQualifiedName:
+     text=module, secondary_text=member; ...") would reduce sema/MIR reader friction.
+  5. Document `Stmt::kBindingOrAssign` in the header: what it is, when the parser
+     produces it, and which sema pass resolves it.
+
+MINOR / OPTIONAL:
+  6. Add null-dereference asserts in DumpExpr, DumpStmt, DumpDecl, DumpType for
+     child pointers that should always be non-null for a given Kind (e.g., kBinary
+     Expr must have non-null `left` and `right`).
+  7. Consider stripping kParen TypeExpr and Expr nodes in the parser before returning
+     the AST, or document the required StripParen() pattern for all downstream
+     consumers.
+  8. Give `Stmt::kind` and `Decl::kind` no well-defined default, or use a sentinel
+     `kUnknown` kind value, to make default-constructed nodes distinguishable from
+     deliberately constructed ones.

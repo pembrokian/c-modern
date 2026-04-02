@@ -415,15 +415,25 @@ class Checker {
             module_->imports.push_back(import_decl.module_name);
         }
 
-        // Checker phase ordering matters: imported symbols must be seeded before top-level
-        // declaration collection, and function/type lookup tables are incomplete until
-        // CollectTopLevelDecls has finished.
+        // Checker phase ordering matters:
+        //   1. SeedImportedSymbols  — must run first; populates value_symbols_
+        //      and type_symbols_ from imported modules so that CollectTopLevelDecls
+        //      can detect conflicts with exported names.
+        //   2. CollectTopLevelDecls — builds function_map_ and type_map_.  Both
+        //      tables are incomplete until this phase finishes; no other phase
+        //      may query them before this point.
+        //   3. ValidateTypeDecls   — validates struct/enum/distinct/alias fields
+        //      and triggers ComputeTypeLayouts.
+        //   4. ValidateGlobals     — checks global const/var declarations.
+        //   5. ValidateFunctions   — type-checks function bodies using the fully
+        //      populated function_map_ and type_map_.
         SeedImportedSymbols();
         CollectTopLevelDecls();
         ValidateExportBlock();
         ValidateTypeDecls();
         ValidateGlobals();
         ValidateFunctions();
+        BuildModuleLookupMaps(*module);
 
         return {
             .module = std::move(module),
@@ -1002,7 +1012,10 @@ class Checker {
             return nullptr;
         }
 
-        const std::size_t separator = variant_name.find('.');
+        // Split on the last '.' so both Foo.Bar and mod.Foo.Bar work:
+        //   "Foo.Bar"     → qualified_type="Foo",     leaf_name="Bar"
+        //   "mod.Foo.Bar" → qualified_type="mod.Foo", leaf_name="Bar"
+        const std::size_t separator = variant_name.rfind('.');
         const std::string qualified_type = separator == std::string_view::npos ? selector_type.name : std::string(variant_name.substr(0, separator));
         const std::string leaf_name = separator == std::string_view::npos ? std::string(variant_name) : std::string(variant_name.substr(separator + 1));
         if (!qualified_type.empty() && qualified_type != selector_type.name) {
@@ -1075,12 +1088,15 @@ class Checker {
                 return conversion_target;
             }
             const Type actual = arg_types.front();
-            conversion_target = InferExplicitConversionTarget(conversion_target, actual, *module_);
-            if (!IsExplicitlyConvertible(conversion_target, actual, *module_)) {
+            // Infer missing type parameters (e.g. bare `Slice` → `Slice<T>`) before
+            // validating. The error message uses the original written target so the
+            // user sees what they wrote, not the inferred form.
+            const Type inferred = InferExplicitConversionTarget(conversion_target, actual, *module_);
+            if (!IsExplicitlyConvertible(inferred, actual, *module_)) {
                 Report(expr.args.front()->span,
                        "explicit conversion to " + FormatType(conversion_target) + " is not allowed from " + FormatType(actual));
             }
-            return conversion_target;
+            return inferred;
         }
 
         if (expr.left == nullptr) {
@@ -1825,6 +1841,7 @@ Module BuildExportedModuleSurfaceInternal(const Module& module, const ast::Sourc
             exported.globals.push_back(std::move(filtered));
         }
     }
+    BuildModuleLookupMaps(exported);
     return exported;
 }
 
@@ -1951,6 +1968,13 @@ CheckResult CheckSourceFile(const ast::SourceFile& source_file,
 }
 
 const FunctionSignature* FindFunctionSignature(const Module& module, std::string_view name) {
+    if (!module.function_lookup.empty()) {
+        const auto it = module.function_lookup.find(std::string(name));
+        if (it == module.function_lookup.end()) {
+            return nullptr;
+        }
+        return &module.functions[it->second];
+    }
     for (const auto& function : module.functions) {
         if (function.name == name) {
             return &function;
@@ -1960,6 +1984,13 @@ const FunctionSignature* FindFunctionSignature(const Module& module, std::string
 }
 
 const TypeDeclSummary* FindTypeDecl(const Module& module, std::string_view name) {
+    if (!module.type_decl_lookup.empty()) {
+        const auto it = module.type_decl_lookup.find(std::string(name));
+        if (it == module.type_decl_lookup.end()) {
+            return nullptr;
+        }
+        return &module.type_decls[it->second];
+    }
     for (const auto& type_decl : module.type_decls) {
         if (type_decl.name == name) {
             return &type_decl;
@@ -1993,6 +2024,19 @@ const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const a
         return &module.binding_or_assign_facts[found->second];
     }
     return nullptr;
+}
+
+void BuildModuleLookupMaps(Module& module) {
+    module.function_lookup.clear();
+    module.function_lookup.reserve(module.functions.size());
+    for (std::size_t i = 0; i < module.functions.size(); ++i) {
+        module.function_lookup.emplace(module.functions[i].name, i);
+    }
+    module.type_decl_lookup.clear();
+    module.type_decl_lookup.reserve(module.type_decls.size());
+    for (std::size_t i = 0; i < module.type_decls.size(); ++i) {
+        module.type_decl_lookup.emplace(module.type_decls[i].name, i);
+    }
 }
 
 std::string DumpModule(const Module& module) {

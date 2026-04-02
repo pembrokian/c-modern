@@ -169,6 +169,15 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
                             const std::filesystem::path& file_path,
                             support::DiagnosticSink& diagnostics);
 
+// Lower a single sema-checked function declaration into a MIR Function.
+// This is the unit-testable entry point for the function lowerer.
+// Returns an empty Function on hard failure; diagnostics are reported to sink.
+Function LowerFunctionDecl(const ast::Decl& decl,
+                            const Module& module,
+                            const std::filesystem::path& file_path,
+                            const sema::Module& sema_module,
+                            support::DiagnosticSink& diagnostics);
+
 bool ValidateModule(const Module& module,
                     const std::filesystem::path& file_path,
                     support::DiagnosticSink& diagnostics);

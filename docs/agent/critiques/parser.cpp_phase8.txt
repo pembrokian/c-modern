@@ -1,0 +1,319 @@
+ARCHITECTURAL REVIEW: compiler/parse/parser.cpp
+Phase 8 — Senior Compiler Systems Engineering Critique
+=======================================================
+
+FILE SUMMARY
+------------
+parser.cpp implements a recursive-descent parser (~1500 lines) for the Modern C
+language. It contains a single Parser class plus the public Parse() entry point.
+The parser accepts a flat token vector (LexResult), never backtracking far, and
+produces an AST SourceFile via unique_ptr chains. Error recovery is handled via
+SynchronizeTopLevel() and SynchronizeStatement(). A lookahead disambiguation layer
+(SkipTypeExprLookahead, LooksLikePostfixTypeArgs, etc.) disambiguates grammar
+ambiguities without requiring full backtracking.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DESIGN & ARCHITECTURE
+------------------------
+
+STRENGTH — Classic recursive descent with clean layering.
+  The expression grammar is stratified correctly: ParseExpr → ParseRangeExpr →
+  ParseLogicalOrExpr → ... → ParseUnaryExpr → ParsePostfixExpr → ParsePrimaryExpr.
+  ParseBinaryChain abstracts the repetitive left-associative operator chains cleanly.
+  There are no precedence-climbing hacks or Pratt-parser hybrids unnecessarily mixed
+  in — the grammar is small enough that pure stratification is correct and readable.
+
+STRENGTH — Token consumption model is straightforward.
+  Current()/Previous()/Peek(offset)/Match()/Consume() are the standard four-method
+  interface of a clean recursive-descent token cursor. The `tokens_[index_]` bound
+  is respected by AtEnd()/Peek()'s clamping. This eliminates one class of buffer
+  overread bugs found in hand-rolled parsers.
+
+ISSUE — ParseAssignOrExprStmt is too long and attempts too many disambiguation duties.
+  ParseAssignOrExprStmt (~80 lines) handles:
+    (a) bare name = value  (BindingOrAssign, single)
+    (b) name, name, ... = value, value, ... (BindingOrAssign, multi)
+    (c) target = value (Assign)
+    (d) target, target = value, value (Assign, multi)
+    (e) expression statement
+  All five cases share the same parse-first-expression entry point. The handling of
+  (b) is particularly fragile: it calls IsBareNameExpr(), then LooksLikeBareNameListAssignment()
+  which is a three-token lookahead into a comma-separated identifier list. Any future
+  addition to the assignment grammar (e.g., += compound assignment) would require
+  modifying this already-crowded function.
+
+  The correct fix is to add compound assignment operators to the lexer/parser as
+  first-class tokens, then dispatch on them explicitly before falling through to the
+  expression case. Alternatively, extract the multi-name-assign disambiguation into
+  its own ParseMultiAssignOrExprStmt() helper with a single-responsibility boundary.
+
+ISSUE — ParseForStmt uses fixed token-offset lookahead (Peek(1).kind, Peek(2).kind,
+  Peek(3).kind) rather than the SkipTypeExprLookahead infrastructure.
+  The for-loop disambiguation tests for exactly:
+    - Peek(1) == kIn   (simple foreach)
+    - Peek(1) == kComma && Peek(2) == kIdentifier && Peek(3) == kIn (foreach-with-index)
+  This breaks if any future extension adds annotations or attributes between the loop
+  variable and `in`. Contrast with SkipTypeExprLookahead which is designed for
+  lookahead over variable-length sub-sequences. Using SkipTypeExprLookahead-style
+  matching for the `in` keyword would be more extensible.
+
+ISSUE — allow_aggregate_init_ is a mutable member of the Parser, not a function
+  parameter. ParseExpr(bool) saves and restores it around sub-expression parses, but
+  this depends on every expression parse path restoring the bit before returning.
+  If any new expression kind is added and calls ParseExpr recursively without
+  properly scoping the flag, aggregate-init parsing will silently break in that
+  context. The flag exists because aggregate literals like `Foo { x = 1 }` are
+  ambiguous with blocks in certain syntactic positions (if conditions, for
+  conditions). A better pattern is to pass this as a parameter down the grammar, or
+  to use a RAII guard:
+
+    struct AggInitGuard {
+        Parser& p; bool saved;
+        AggInitGuard(Parser& p, bool allow) : p(p), saved(p.allow_aggregate_init_) {
+            p.allow_aggregate_init_ = allow; }
+        ~AggInitGuard() { p.allow_aggregate_init_ = saved; }
+    };
+
+ISSUE — PrintError / ok_ flag: once ok_ is set to false via ReportError(), the
+  Parser continues parsing without any fast-exit mechanism. This is correct behavior
+  for maximum error coverage, but it means that partially-parsed nodes (null child
+  pointers from failed Consume() calls) propagate into the AST. Callers like
+  ParseFuncLikeTail, ParseParameter, etc. do not check whether sub-parses returned
+  null. When mir.cpp or sema traverses these nodes, it must null-check every child,
+  and some paths (especially in RenderExprInline and type-format helpers in mir.cpp)
+  do not.
+
+  Best practice: treat `ok_` flag as "diagnostics were emitted" and guarantee that
+  every function returns a structurally valid (though possibly incomplete) node even
+  on error, so downstream traversal is safer.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. CORRECTNESS & SOUNDNESS
+--------------------------
+
+ISSUE — Previous() is called without bounds checking.
+  Previous() returns tokens_[index_ - 1]. It is called after every Advance(), but
+  also after Match() which calls Advance() only on success. If the parser is at
+  index 0 and Match() fails (returns false, does not advance), any caller that then
+  unconditionally reads Previous() would access tokens_[-1], undefined behavior.
+  Currently the code reaches Previous() only after a successful Match(), but this is
+  an implicit invariant. A debug assertion `assert(index_ > 0)` in Previous() would
+  catch any future violation immediately.
+
+ISSUE — ParseCasePattern for variant patterns uses a fixed 3-token lookahead:
+    Check(kIdentifier) && Peek(1).kind == kDot && Peek(2).kind == kIdentifier
+  This successfully handles `Foo.Bar`, but it does not handle qualified enum types
+  from imported modules that would appear as `mod.Foo.Bar`. The current implementation
+  would treat the first identifier as the base name and the second dot as the field
+  separator, misclassifying a three-segment qualified case. The grammar should either
+  prohibit `mod.Foo.Bar` in case patterns (and document the limitation) or extend the
+  lookahead to consume the full qualification.
+
+ISSUE — ParseBindingDecl for `const` allows `const name` without an explicit
+  initializer only if allow_storage_without_initializer is false. But wait —
+  ParseBindingDecl(kConst, ..., false) is called, meaning allow=false. The check:
+    else if (!allow_storage_without_initializer || stmt->type_ann == nullptr)
+  evaluates to (true || ...) = true when allow=false, so it always requires an
+  initializer for const, which is correct. However the error message for a `const`
+  declaration without initializer is "const declaration requires initializer" —
+  but for a `var` called at the decl level with allow=true and no type annotation
+  and no initializer, the message is "var declaration requires either a type or
+  initializer". The logic produces correct behavior but is difficult to audit because
+  it conflates two different cases via the boolean flag.
+
+ISSUE — ParseTypeExpr handles qualified type names (Foo.Bar) via a dot-consuming
+  loop:
+    while (Match(kDot)) { type->name += "." + *member; }
+  This is fine for module-qualified types. However it will also silently consume
+  `Foo.Bar.Baz` as a triply-qualified name if the grammar happens to have three
+  consecutive identifiers with dots. No validation is done on the resulting
+  multi-segment name to check whether it is a known type. That validation is deferred
+  to sema (ValidateTypeExpr). This is the correct parser/sema separation, but it
+  means parse-time errors for obviously bogus types like `a.b.c.d.e` are deferred,
+  and users see sema errors instead of parse errors.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. SIMPLICITY & ELEGANCE
+------------------------
+
+STRENGTH — ParseBinaryChain is clean and elegant.
+  Using a member-function pointer as the operand-parser argument is idiomatic for
+  this pattern in C++ and avoids virtual dispatch or std::function overhead.
+  ParseBinaryChain is used consistently for all binary operator precedence levels.
+
+ISSUE — SynchronizeTopLevel and SynchronizeStatement are subtly different in their
+  stopping tokens, but this is not commented. SynchronizeTopLevel stops on top-level
+  declaration keywords, while SynchronizeStatement stops on statement terminators.
+  These functions should have a brief comment explaining the recovery strategy and
+  which tokens they consider "safe landing points." Without this, a future developer
+  may incorrectly add a new top-level keyword and forget to add it to
+  SynchronizeTopLevel.
+
+ISSUE — SkipTypeExprLookahead is recursive and has no depth limit. A deeply nested
+  type expression `const const const const * * * * [10][10][10] T` would recurse
+  proportionally to depth. This is not a stack safety concern at current grammar
+  complexity, but the function imposes no bound. Adding a `max_depth` parameter with
+  a sentinel return of `std::nullopt` when the depth limit is reached would make the
+  safeguard explicit.
+
+MINOR — LooksLikePostfixTypeArgs is a forward-lookahead predicate that peeks into
+  the token stream to determine if a `<` starts a generic type argument list. It is
+  called from ParsePostfixExpr before consuming. The logic is correct (checking that
+  the `<` can be parsed as a complete type-arg list followed by `(` or `{`), but it
+  re-implements part of ParseCallTypeArgs' logic. Any time ParseCallTypeArgs changes
+  its grammar, LooksLikePostfixTypeArgs must be synchronized manually.
+
+MINOR — ConsumeMemberSeparator is called at the end of every struct field and
+  enum variant. It consumes optional newlines or commas. This function's behavior
+  on missing separators (it reports an error but continues) is correct for
+  error-resilient parsing but the error message could be more specific about what
+  context it is in.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. SAFETY & ROBUSTNESS
+-----------------------
+
+CONCERN — Null forwarding through Consume().
+  Consume(kind, message) returns `nullptr` on failure after reporting an error.
+  All callers that use the returned pointer for span tracking check `!= nullptr`
+  before using it. However callers of ParseTypeExpr, ParseExpr, and ParseBlockStmt
+  do not always check for null returns before dereferencing. For example:
+    decl.aliased_type = ParseTypeExpr();
+    decl.span.end = decl.aliased_type != nullptr ? decl.aliased_type->span.end : ...;
+  This pattern is used consistently in ParseDistinctDecl, ParseTypeAliasDecl, etc.
+  However ParseFuncLikeTail calls `ParseBlockStmt()` and assigns the result to
+  `decl.body` without a null check:
+    auto body = ParseBlockStmt();
+    if (body != nullptr) { decl.body = ...; }  // OK — this one does check
+  Other sites should be audited to confirm no unconditional dereferences exist after
+  any failing parse call.
+
+CONCERN — ParseStatement does not check null for sub-statements.
+  ParseStatement returns a unique_ptr<Stmt>. Its caller in ParseBlockStmt:
+    if (auto statement = ParseStatement(); statement != nullptr) {
+        block->statements.push_back(std::move(statement));
+    } else {
+        SynchronizeStatement();
+    }
+  This is correct. But ParseForStmt, ParseWhileStmt, etc. call ParseBlockStmt()
+  for the body and assign directly to stmt->then_branch without null-checking:
+    stmt->then_branch = ParseBlockStmt();
+  If ParseBlockStmt returns nullptr (can it? — it returns a block Stmt whose body
+  may be empty, so it always returns non-null), this is safe. But that invariant
+  (ParseBlockStmt always returns non-null) is not enforced by the type system and
+  is only true as long as the function never returns nullptr, which depends on
+  ParseBlockStmt's first check:
+    if (!Match(kLBrace)) { ReportError(...); return nullptr; }
+  So ParseBlockStmt CAN return nullptr. All callers that use stmt->then_branch
+  without null-checking it expose a potential null-dereference in downstream
+  traversal.
+
+CONCERN — ParseDeferStmt stores the expression in stmt->exprs without checking
+  that the expression is a call expression at the parse level. Validation that
+  deferred expressions must be calls is deferred to MIR lowering. No parse-level
+  error prevents `defer some_value` from being parsed as a valid AST node. This is
+  a deliberate choice (grammar simplicity), but the parse phase could add a
+  structural check here with a clearer error message.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. PERFORMANCE & SCALABILITY
+----------------------------
+
+MINOR — Token vector access is by index into a std::vector<Token>. This is cache-
+  friendly and correct. Peeking ahead uses Peek(offset) which clamps to the last
+  token. The only minor concern is that Peek() in SkipTypeExprLookahead and
+  LooksLikePostfixTypeArgs may read many tokens speculatively for ambiguous syntax.
+  For well-formed code this is bounded by grammar structure, but for adversarial
+  inputs (a sequence of identifiers separated by `<`s alternating with `>` tokens),
+  LooksLikePostfixTypeArgs could scan forward a significant distance. This is a
+  known trade-off of lookahead-based disambiguation.
+
+MINOR — ParseAttributes iterates attributes and each attribute iterates its args.
+  This is a nested loop but with typically O(1) depth in both dimensions. Not a
+  performance concern at current scale.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. SYSTEM-LEVEL CONCERNS
+------------------------
+
+The parser is correctly isolated from sema and MIR. It produces AST nodes and
+communicates via the ParseResult struct. It imports only lexer and support headers,
+respecting the layered architecture. This is commendable and must be preserved.
+
+One systemic concern: the parser owns the token vector by reference
+(tokens_ is a const std::vector<Token>&). The LexResult passed to Run() must
+outlive the Parser. The constructor copies ok_ from lexed_module but not the tokens
+(it stores a reference). If a caller moves or destroys the LexResult before the
+Parser finishes, this is undefined behavior. This is an implicit lifetime contract
+that is nowhere documented and violates the rule of keeping raw references when
+ownership is uncertain.
+
+RECOMMENDATION: Accept `const std::vector<Token>&` directly or take ownership via
+move. Adding a static_assert or a raw pointer with a lifetime assertion comment
+would make the contract visible.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. DOCUMENTATION & REASONING
+-----------------------------
+
+STRENGTH — The grammar structure is self-documenting through function names. The
+  expression precedence chain (ParseRangeExpr → ParseLogicalOrExpr → ...) reads
+  like a grammar specification.
+
+GAP — There are no comments explaining the disambiguation rules in ParseAssignOrExprStmt,
+  LooksLikeBareNameListAssignment, or LooksLikePostfixTypeArgs. These encode
+  grammar context-sensitivity that is not obvious from token-level rules. A
+  brief prose comment explaining why these lookaheads are necessary (and what
+  grammar ambiguity they resolve) would be invaluable for maintainers.
+
+GAP — The SkipTypeExprLookahead function header has no comment explaining its
+  semantics: "given a token offset, try to skip a type expression and return the
+  offset past the last token consumed, or nullopt if the tokens do not form a valid
+  type expression." This contract should be written above the function.
+
+GAP — The allow_aggregate_init_ member flag has no comment explaining which grammar
+  positions prohibit aggregate initialization. Should document: "false in condition
+  positions (if, for, while) where '{' would be ambiguous with a block statement."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRIORITIZED RECOMMENDATIONS
+----------------------------
+
+CRITICAL / CORRECTNESS:
+  1. ParseBlockStmt can return nullptr, but many callers (ParseForStmt, ParseIfStmt,
+     ParseWhileStmt) assign its result to stmt->then_branch without null-checking.
+     Any null then_branch will cause a null-dereference when sema or MIR traverses
+     the tree. Audit all ParseBlockStmt call sites and add null guards or change
+     ParseBlockStmt to always return a structurally valid (possibly empty) Stmt.
+  2. Previous() has no bounds assertion. Add `assert(index_ > 0)` to catch future
+     violation immediately.
+  3. ParseCasePattern does not handle `mod.Foo.Bar` qualified enum variants. Document
+     this limitation explicitly or extend the lookahead logic.
+
+ARCHITECTURAL:
+  4. Refactor ParseAssignOrExprStmt by extracting the multi-target assignment path
+     into a dedicated helper to reduce the single-function cognitive complexity.
+  5. Replace the allow_aggregate_init_ mutable member with a RAII guard or a
+     parameter-threaded approach to eliminate the "restore-on-all-paths" footgun.
+  6. Document the lifetime contract of the token vector reference in the Parser
+     constructor or convert to taking ownership.
+
+SIMPLIFICATION:
+  7. Add a prose comment to SkipTypeExprLookahead, LooksLikePostfixTypeArgs, and
+     ParseAssignOrExprStmt explaining the disambiguation rationale.
+  8. Add SynchronizeTopLevel stopping tokens comment listing which keywords are
+     "safe recovery points" and why.
+  9. Defer-expression parse-time structural check: emit a parse-level error if
+     defer is followed by a non-call expression (reduces sema/MIR error confusion).
+
+PERFORMANCE (OPTIONAL):
+  10. Add a max-depth guard to SkipTypeExprLookahead to prevent adversarial
+      deep-nesting scans from becoming O(n^2) in token lookahead.

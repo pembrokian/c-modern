@@ -1,0 +1,431 @@
+Phase 8 Critique Action Plan
+=============================
+
+Source documents
+----------------
+  docs/agent/critiques/ast.cpp_phase8.txt
+  docs/agent/critiques/backend.cpp_phase8.txt
+  docs/agent/critiques/check.cpp_phase8.txt
+  docs/agent/critiques/driver.cpp_phase8.txt
+  docs/agent/critiques/mir.cpp_phase8.txt
+  docs/agent/critiques/parser.cpp_phase8.txt
+
+Scope
+-----
+This plan covers only actionable findings that require code changes:
+confirmed bugs, safety hazards, and clear correctness gaps with a
+well-defined mechanical fix.  Architecture-only findings (unifying
+pipeline paths, extracting FunctionLowerer, module-level lookup maps,
+SSA dominance enforcement) are deferred per the repository working rule:
+"prefer minimal, targeted changes."
+
+Pre-work cross-check
+--------------------
+Before planning each item, the actual source was checked against the
+critique to avoid replanning work already done.
+
+  - kSliceFromBuffer / ValidateModule: Already fixed. ValidateModule
+    (mir.cpp line ~3380) already emits a report error if kSliceFromBuffer
+    appears, consistent with the critique's option (a). No change needed.
+
+  - kHostedRuntimeSupportPath relative path: Confirmed already fixed in
+    the phase 6 plan (backend uses DiscoverRepositoryRoot resolution).
+
+  - Incremental mtime fast-filter (driver): Real at scale, not a
+    blocking correctness issue at bootstrap scale. Deferred.
+
+  - SSA dominance checking (mir): Real gap, but requires dominance
+    analysis infrastructure. Tracked as a known gap only; deferred.
+
+  - FunctionLowerer extraction (mir): Valid design goal but ~2000-line
+    structural change. Deferred.
+
+  - Module O(1) lookup maps (check/mir/driver): Performance, not
+    correctness, at bootstrap scale. Deferred.
+
+  - Unify compilation pipelines (driver): The largest architectural
+    rework in the codebase. Deferred.
+
+  - allow_aggregate_init_ RAII guard (parser): No correctness bug exists
+    in current code; existing save/restore pattern works.  Deferred.
+
+Findings reviewed but NOT planned (already correct)
+----------------------------------------------------
+  - kSliceFromBuffer: already has ValidateModule check -- confirmed.
+  - DiscoverRepositoryRoot runtime path resolution: already correct.
+
+------------------------------------------------------------------------
+TIER 1 — Safety Bugs (process-terminating or silent data corruption)
+------------------------------------------------------------------------
+
+Item S1: backend.cpp — uncaught std::stoul exception in kVariantExtract
+  Severity : HIGH — process abort on malformed instruction.op
+  File     : compiler/codegen_llvm/backend.cpp  line ~2951
+  Problem  : `std::stoul(instruction.op)` is called with no guard.
+             A MIR lowering bug that produces a non-numeric op field
+             terminates the process via std::invalid_argument rather
+             than emitting a clean diagnostic.
+  Fix      : Validate that instruction.op is a non-empty digit-only
+             string before calling stoul; emit a backend error and return
+             false on failure:
+
+               if (instruction.op.empty() ||
+                   !std::all_of(instruction.op.begin(), instruction.op.end(),
+                                ::isdigit)) {
+                   return ReportBackendError(...);
+               }
+               payload_index = static_cast<std::size_t>(
+                   std::stoul(instruction.op));
+
+  Note     : Also check line ~1781 where stoul is called on
+             type_info.backend_name.substr(1) for integer-type width
+             extraction.  Same defensive pattern applies.
+  Tests    : No new golden test needed; this is a crash-prevention guard.
+
+Item S2: parser.cpp — Previous() called without index bounds check
+  Severity : HIGH — undefined behaviour on index underflow if invariant
+             breaks in future code
+  File     : compiler/parse/parser.cpp  line ~81
+  Problem  : `Previous()` returns `tokens_[index_ - 1]` with no assert.
+             All current call sites are guarded by a prior Advance() or
+             Match() success, but this invariant is implicit.
+  Fix      : Add `assert(index_ > 0)` as the first line of Previous():
+
+               const Token& Previous() const {
+                   assert(index_ > 0);
+                   return tokens_[index_ - 1];
+               }
+
+  Tests    : No golden changes. The assert fires only on programmer
+             error, not on user input.
+
+Item S3: parser.cpp — ParseBlockStmt callers do not null-check result
+  Severity : HIGH — null dereference in sema/MIR if { is missing in
+             for/if/while body
+  File     : compiler/parse/parser.cpp
+  Problem  : ParseBlockStmt returns nullptr when the opening { is
+             missing ("if (!Match(kLBrace)) { ... return nullptr; }").
+             ParseForStmt, ParseIfStmt, ParseWhileStmt (and others)
+             assign the result to stmt->then_branch / body fields
+             without a null check.  A downstream traversal that
+             dereferences those fields unconditionally will crash.
+  Fix      : Audit ParseBlockStmt call sites.  For each one that
+             assigns the result to a stmt field without a null check,
+             add a guard:
+
+               stmt->body = ParseBlockStmt();
+               if (stmt->body == nullptr) {
+                   // ParseBlockStmt already reported the diagnostic.
+                   return nullptr;   // or return the partial stmt if
+               }                     // recovery is preferred
+
+             Alternatively, make ParseBlockStmt return a valid but empty
+             block Stmt on missing {, so callers never receive nullptr.
+             The empty-block path is simpler and keeps AST traversal
+             null-free; adopt it.
+  Tests    : Add parser fail-fixture covering `for x in arr` with no
+             body brace, `if cond` with no body brace, etc., and verify
+             the parser emits one clear diagnostic without a crash or
+             cascading nulls reaching sema.
+
+------------------------------------------------------------------------
+TIER 2 — Correctness Issues (wrong output or silent bad behaviour)
+------------------------------------------------------------------------
+
+Item C1: ast.cpp — ToString fallback returns base class name silently
+  Severity : MEDIUM — new Kind enumerator silently produces wrong dump
+             output ("Expr" instead of the new kind name)
+  File     : compiler/ast/ast.cpp  lines 25, 58, 101, 124
+  Problem  : All four ToString functions (TypeExpr::Kind, Expr::Kind,
+             Stmt::Kind, Decl::Kind) fall through their switch with a
+             plain `return "Type"` / `return "Expr"` / etc.  A newly
+             added Kind that is missing a case compiles cleanly but
+             produces misleading dump output and silently fails --dump-ast.
+  Fix      : Replace each fallback `return "..."` with
+             `MC_UNREACHABLE("unhandled kind in ToString")` or the
+             repository's existing unreachable / assert macro.  Use
+             whatever unreachable idiom is already used elsewhere in the
+             codebase (grep for __builtin_unreachable or MC_UNREACHABLE).
+             If no such macro exists, add one in support/:
+
+               #define MC_UNREACHABLE(msg) \
+                   do { assert(false && msg); __builtin_unreachable(); } while (0)
+
+  Tests    : No golden changes expected.  The unreachable path is
+             never hit by valid AST nodes; it only fires when a new
+             enumerator is added without a ToString case, at which point
+             the debug build will abort immediately on first dump.
+
+Item C2: ast.cpp — has_default_case flag and default_case.statements can diverge
+  Severity : LOW-MEDIUM — dump silently omits default case if the flag
+             is false but statements were set
+  File     : compiler/ast/ast.cpp  (DumpStmt) + ast.h (Stmt)
+  Problem  : DumpStmt gates the default-case dump on `has_default_case`.
+             Nothing enforces that `has_default_case == true` iff
+             `!default_case.statements.empty()`.  A parser or sema bug
+             that sets statements without setting the flag produces
+             silently incomplete AST dumps.
+  Fix      : Add a consistency assert in DumpStmt before using the flag:
+
+               assert(stmt.has_default_case ==
+                      !stmt.default_case.statements.empty());
+
+             In a debug build this fires immediately for any diverged
+             state; in release it is compiled away.
+  Tests    : No golden changes.
+
+Item C3: check.cpp — double diagnostics for unknown parameter types
+  Severity : LOW-MEDIUM — duplicate error messages confuse users
+  File     : compiler/sema/check.cpp
+  Problem  : CollectTopLevelDecls calls TypeFromAst / ValidateTypeExpr
+             on parameter types during BuildFunctionSignature.
+             ValidateFunctions then calls ValidateTypeExpr on the same
+             nodes again.  Unknown-type errors are emitted twice for
+             the same parameter.
+  Fix      : In ValidateFunctions, skip re-validating parameter type
+             expressions if the function signature was already built
+             without errors.  The simplest path: track which function
+             signatures had type errors during collection (a bool on
+             FunctionSignature or a set of function names) and skip the
+             per-parameter ValidateTypeExpr rerun for those functions.
+  Tests    : Confirm that existing sema fail fixtures with unknown param
+             types emit exactly one error per unknown type, not two.
+             Adjust any fixture that currently expects duplicates.
+
+Item C4: mir.cpp — LowerExpr unsupported-node fallback emits VoidType
+  Severity : LOW — cascading type errors after legitimate "not yet
+             supported" error
+  File     : compiler/mir/mir.cpp  (LowerExpr fallthrough)
+  Problem  : The unrecognised-expression path emits:
+               Report(expr.span, "not yet supported in MIR: ...");
+               return EmitLiteralValue("0", sema::VoidType());
+             VoidType() as an error-propagation type is misleading; it
+             produces "expected non-void" errors downstream rather than
+             simply silencing further type errors.
+  Fix      : Return `EmitLiteralValue("0", sema::UnknownType())` instead.
+             UnknownType() is already the convention for error-propagation
+             throughout sema and the rest of the lowerer.
+  Tests    : No golden changes expected (the path fires only for
+             unimplemented nodes, which shouldn't appear in passing tests).
+
+Item C5: mir.cpp — dead fallthrough cases in EmitSpecialCallInstruction
+  Severity : LOW — confusing dead code in a hot dispatch switch
+  File     : compiler/mir/mir.cpp  (EmitSpecialCallInstruction switch)
+  Problem  : The bottom of EmitSpecialCallInstruction's switch has:
+               case SpecialCallKind::kArenaNew:
+               case SpecialCallKind::kSliceFromBuffer:
+               case SpecialCallKind::kNone:
+               case SpecialCallKind::kMmioPtr:
+                   return false;
+             These cases are stated to be handled earlier in the function
+             before reaching the switch.  Their presence as explicit
+             fall-through-to-false cases implies they can be reached,
+             but they cannot.  A future reader could misinterpret the
+             return false as intentional early exit rather than dead code.
+  Fix      : Remove the dead cases.  Replace with a default clause that
+             calls MC_UNREACHABLE (from C1 fix above):
+
+               default:
+                   MC_UNREACHABLE("unhandled SpecialCallKind");
+
+  Tests    : No golden changes.
+
+Item C6: driver.cpp — imported_interface_hashes order-sensitive equality
+  Severity : LOW-MEDIUM — spurious cache miss if import resolution order
+             changes between builds on the same inputs
+  File     : compiler/driver/driver.cpp  line ~563
+  Problem  : ShouldReuseModuleObject compares
+             `state.imported_interface_hashes == current.imported_interface_hashes`
+             which is a vector<pair<string,string>> comparison.
+             If imports are processed in a different order on a second
+             build (e.g. iterator order change), the module is needlessly
+             recompiled.
+  Fix      : Sort both vectors before comparing, or use a sorted_equal
+             helper that sorts copies:
+
+               auto sorted = [](auto v) {
+                   std::sort(v.begin(), v.end()); return v; };
+               return state.source_hash == current.source_hash &&
+                      state.target_identity == current.target_identity &&
+                      sorted(state.imported_interface_hashes) ==
+                      sorted(current.imported_interface_hashes);
+
+  Tests    : No golden changes.  Exercise with two back-to-back builds of
+             a multi-module project (existing phase8 tests are sufficient).
+
+Item C7: driver.cpp — MergeBuildUnits redundant double conditional
+  Severity : LOW — dead code, reader confusion
+  File     : compiler/driver/driver.cpp  lines ~1193-1197
+  Problem  : The loop checks `unit.source_path == entry` (continue), then
+             immediately checks `unit.source_path != entry` (namespace).
+             The second condition is always true because the first already
+             skipped equal entries.  Dead code and confusing to read.
+  Fix      : Remove the inner if-condition. Make it unconditional:
+
+               for (const auto& unit : units) {
+                   if (unit.source_path == entry_path) continue;
+                   mc::mir::Module namespaced_module = *unit.mir_result.module;
+                   NamespaceImportedBuildUnit(namespaced_module,
+                                             unit.source_path.stem().string());
+                   // ... merge
+               }
+
+  Tests    : No golden changes.  Existing multi-module build tests cover
+             the affected path.
+
+Item C8: mir.cpp — EnsureLocal silently ignores type mismatch on re-bind
+  Severity : LOW — lowering-level type inconsistency masked; wrong type
+             stored for a local if called twice with different types
+  File     : compiler/mir/mir.cpp  line ~1315
+  Problem  : If EnsureLocal is called twice for the same name with a
+             different concrete type the second time, the original type
+             is silently kept.  In a debug build this should fire
+             immediately as a programmer error, not propagate silently.
+  Fix      : After finding an existing local with a known (non-Unknown)
+             type, add:
+
+               assert(IsUnknown(found->second) ||
+                      found->second == local_type &&
+                      "EnsureLocal: type conflict for previously-bound local");
+
+  Tests    : No golden changes.
+
+------------------------------------------------------------------------
+TIER 3 — Infrastructure / Shared Constants
+------------------------------------------------------------------------
+
+Item I1: backend.cpp + driver.cpp — duplicate bootstrap triple string
+  Severity : LOW — manual synchronisation required; triple mismatch
+             would produce mismatched LLVM IR and incremental keys
+  Files    : compiler/codegen_llvm/backend.cpp  line 16
+             compiler/driver/driver.cpp  (BootstrapTargetIdentity)
+  Problem  : `kBootstrapTriple = "arm64-apple-darwin25.4.0"` in the
+             backend and the same string inside BootstrapTargetIdentity()
+             in the driver are independent.  Changing the OS version
+             requires editing two files.
+  Fix      : Introduce a single shared constant.  The best home is a new
+             small header `compiler/support/target.h`:
+
+               namespace mc {
+               constexpr std::string_view kBootstrapTriple =
+                   "arm64-apple-darwin25.4.0";
+               constexpr std::string_view kBootstrapTargetFamily = "hosted";
+               }
+
+             Both backend.cpp and driver.cpp include this header and
+             reference mc::kBootstrapTriple.  Delete the local
+             `constexpr` definition in backend.cpp and the hard-coded
+             string in BootstrapTargetIdentity().
+  Tests    : No golden changes.  Verify build succeeds with no duplicate
+             definition errors.
+
+------------------------------------------------------------------------
+TIER 4 — Documentation (no functional change, no test impact)
+------------------------------------------------------------------------
+
+Item D1: ast.h — document fat-struct design and field-per-kind conventions
+  File     : compiler/ast/ast.h
+  Add      : A block comment above the `Expr` struct explaining:
+               (a) fat-struct approach is deliberate for bootstrap; no vtable
+               (b) which fields are used by which Expr::Kind values
+                   (text/secondary_text, left/right/extra, args, field_inits)
+               (c) what nullptr means for optional pointer fields
+  Add      : A comment above `secondary_text` mapping each Kind to its
+             semantic meaning for that field.
+  Add      : A comment above `Stmt::kBindingOrAssign` explaining that
+             this is a parser-deferred disambiguation resolved by sema.
+
+Item D2: backend.cpp — document two-path architecture at file top
+  File     : compiler/codegen_llvm/backend.cpp
+  Add      : A file-level comment explaining:
+               - LowerFunction / BackendModule / BackendBlock is the
+                 debug-dump / pseudo-IR path (analogous to mir::DumpModule)
+               - RenderExecutableFunction / RenderExecutableInstruction
+                 is the real LLVM IR emission path
+               - A new MIR instruction kind must be added to both paths
+                 (and why)
+  Also     : Document EmitArenaNewInstruction with the expected Arena
+             struct layout ({ptr, i64, i64, ptr} = data, cap, used,
+             allocator) and the alignment algorithm.
+
+Item D3: mir.cpp — document FunctionLowerer class contract
+  File     : compiler/mir/mir.cpp
+  Add      : A class-level comment above FunctionLowerer explaining:
+               - Call sequence: construct, Run(), take result
+               - Invariants: EnsureCurrentBlock, dead-block pattern,
+                 DeferScope stack discipline
+  Also     : Add a CFG shape comment to LowerForEach describing the
+             8-block structure (incoming → cond → body/exit, step → cond).
+
+Item D4: driver.cpp — document NamespaceImportedBuildUnit invariant
+  File     : compiler/driver/driver.cpp
+  Add      : A comment above NamespaceImportedBuildUnit stating:
+               "All name-bearing fields in mir::Instruction must be
+               updated here. When adding a new Instruction field that
+               carries a symbol name, add a rewrite case in this function."
+
+Item D5: parser.cpp — document disambiguation helpers
+  File     : compiler/parse/parser.cpp
+  Add      : A prose comment above SkipTypeExprLookahead explaining its
+             contract ("given a token offset, skip a type expression and
+             return the offset past the last consumed token, or nullopt
+             if the tokens do not form a valid type expression").
+  Add      : A comment above allow_aggregate_init_ explaining which
+             grammar positions require it to be false and why:
+               "false in condition positions (if/for/while) where '{'
+               would be ambiguous with a block statement."
+  Add      : A comment in SynchronizeTopLevel listing the safe recovery
+             token set and the recovery strategy.
+
+------------------------------------------------------------------------
+DEFERRED (architectural — not in this plan)
+------------------------------------------------------------------------
+
+These findings were reviewed and are real, but require changes too large
+to land as targeted fixes:
+
+  - Unify CollectBuildUnits + CompileTargetUnits into a single
+    graph-and-compile abstraction (driver.cpp CRITICAL ISSUE)
+  - SSA dominance checking in ValidateModule (mir.cpp CRITICAL)
+  - Extract FunctionLowerer to separate translation unit (mir.cpp)
+  - Build Module-level O(1) lookup maps for functions/types/globals and
+    expose them to MIR and driver (check.cpp ARCH)
+  - Remove TypeFromAst from mir.cpp and driver.cpp; surface results
+    only via Module (check.cpp ARCH)
+  - Replace allow_aggregate_init_ with RAII guard (parser.cpp ARCH)
+  - ParseCasePattern qualified enum variants mod.Foo.Bar support
+    (parser.cpp — document limitation for now; extend when needed)
+  - InferExplicitConversionTarget mutation-before-check (check.cpp)
+    — well-contained today; revisit when conversion rules expand
+
+------------------------------------------------------------------------
+Implementation order
+------------------------------------------------------------------------
+
+The items are independent; they can be implemented in any order.
+Suggested sequence to minimise golden-test churn:
+
+  1. I1  (shared triple constant — touches two files, no goldens)
+  2. S1  (stoul guards — safety, no goldens)
+  3. S2  (Previous assert — one line, no goldens)
+  4. C1  (ToString unreachable — four sites, no goldens)
+  5. C2  (has_default_case assert — one site, no goldens)
+  6. C5  (dead switch cases — one site, no goldens)
+  7. C4  (VoidType → UnknownType — one line, no goldens)
+  8. C8  (EnsureLocal assert — one line, no goldens)
+  9. C7  (MergeBuildUnits dead conditional — three lines, no goldens)
+  10. C6 (sorted import hashes — one helper call, no goldens)
+  11. S3 (ParseBlockStmt null safety — requires audit + possible goldens)
+  12. C3 (double diagnostics — requires sema test fixtures update)
+  13. D1-D5 (documentation — no code, no goldens)
+
+------------------------------------------------------------------------
+Exit criteria
+------------------------------------------------------------------------
+
+This plan is complete when:
+
+  a. All Tier 1 and Tier 2 items are implemented and committed.
+  b. All Tier 3 items (I1) are implemented.
+  c. `ctest --test-dir build/debug --output-on-failure` passes clean.
+  d. Tier 4 documentation items are written into the relevant headers.

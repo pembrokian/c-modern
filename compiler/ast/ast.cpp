@@ -3,6 +3,8 @@
 #include <sstream>
 #include <string_view>
 
+#include "compiler/support/assert.h"
+
 namespace mc::ast {
 namespace {
 
@@ -22,7 +24,7 @@ std::string_view ToString(TypeExpr::Kind kind) {
             return "ParenType";
     }
 
-    return "Type";
+    MC_UNREACHABLE("unhandled TypeExpr::Kind in ToString");
 }
 
 std::string_view ToString(Expr::Kind kind) {
@@ -55,7 +57,7 @@ std::string_view ToString(Expr::Kind kind) {
             return "ParenExpr";
     }
 
-    return "Expr";
+    MC_UNREACHABLE("unhandled Expr::Kind in ToString");
 }
 
 std::string_view ToString(Stmt::Kind kind) {
@@ -98,7 +100,7 @@ std::string_view ToString(Stmt::Kind kind) {
             return "DeferStmt";
     }
 
-    return "Stmt";
+    MC_UNREACHABLE("unhandled Stmt::Kind in ToString");
 }
 
 std::string_view ToString(Decl::Kind kind) {
@@ -121,7 +123,7 @@ std::string_view ToString(Decl::Kind kind) {
             return "VarDecl";
     }
 
-    return "Decl";
+    MC_UNREACHABLE("unhandled Decl::Kind in ToString");
 }
 
 void WriteIndent(std::ostringstream& stream, Indent indent) {
@@ -363,6 +365,7 @@ void DumpStmt(const Stmt& stmt, std::ostringstream& stream, Indent indent) {
         }
     }
 
+    assert(stmt.has_default_case == !stmt.default_case.statements.empty());
     if (stmt.has_default_case) {
         WriteLine(stream, indent + 1, "default:");
         for (const auto& item : stmt.default_case.statements) {

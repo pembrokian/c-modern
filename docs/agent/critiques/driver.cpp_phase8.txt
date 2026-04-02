@@ -1,0 +1,344 @@
+ARCHITECTURAL REVIEW: compiler/driver/driver.cpp
+Phase 8 — Senior Compiler Systems Engineering Critique
+=======================================================
+
+FILE SUMMARY
+------------
+driver.cpp is the pipeline orchestrator for the Modern C bootstrap compiler,
+handling CLI parsing, project loading, multi-module graph discovery, incremental
+compilation (per-module build state caching), MIR merging, backend invocation,
+test discovery, and test execution. At ~2450 lines it is the most functionally
+diverse file in the compiler. It defines two parallel compilation paths:
+  - Direct source path: CompileToMir + CollectBuildUnits + MergeBuildUnits
+  - Project-based path: BuildTargetGraph + CompileTargetUnits
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DESIGN & ARCHITECTURE
+------------------------
+
+CRITICAL ISSUE — Two parallel compilation pipelines with divergent logic.
+  The driver contains two separate module-graph resolution systems:
+    1. CollectBuildUnits (recursive, for direct `mc check/build <source>`)
+    2. DiscoverProjectModuleGraphRecursive + CompileTargetUnits (for `mc build --project`)
+
+  These two pipelines both perform cycle detection, import resolution, parsing, sema,
+  MIR lowering, and interface artifact writing — but they are implemented completely
+  independently with different code paths. They have different behaviors:
+    - CollectBuildUnits uses `built_indices` (path → vector index) to deduplicate
+    - DiscoverProjectModuleGraphRecursive uses `visited` (path set) to deduplicate
+    - CompileTargetUnits handles incremental reuse of object files; CollectBuildUnits does not
+    - NamespaceImportedBuildUnit is called inline in CompileTargetUnits but via MergeBuildUnits
+      in the direct-source path
+
+  This duplication is the dominant maintainability hazard in the entire codebase.
+  Any bug fix, new compilation step, or new diagnostic in one pipeline must be
+  manually mirrored in the other. Experience shows these diverge over time.
+
+  RECOMMENDATION: Unify on a single graph-discovery + per-node compilation function
+  that returns BuildUnit values. Pass a policy struct or set of feature flags to
+  control incremental reuse, object emission, and namespacing. The project path
+  should be the canonical one, as it supports incremental builds; the direct-source
+  path should be a thin wrapper that builds an ephemeral TargetBuildGraph from the
+  source path and import roots.
+
+ISSUE — NamespaceImportedBuildUnit mutates the MIR module in-place by string-
+  prefixing all type/function/global names.
+  This is a post-hoc text-rewriting approach to module namespacing: every name
+  gets a "modulename." prefix applied by exhaustively walking all instructions in
+  all blocks in all functions. The walk must visit instruction.target,
+  instruction.target_name, instruction.target_display, instruction.type, and
+  instruction.target_base_type. It is easy to miss a new field if the Instruction
+  struct is extended. There is no compile-time guarantee that all name-bearing
+  fields are rewritten.
+
+  A safer design: establish a module identity string at MIR construction time and
+  require all cross-module symbol references to be qualified at their use site.
+  Or: embed the module name in the mir::Module and have DumpModule / codegen qualify
+  names at emission time if the module name is set.
+
+ISSUE — AddImportedExternDeclarations also duplicates type and function injection
+  logic already done by sema's SeedImportedSymbols. The driver in effect re-does
+  import resolution at the MIR level. A cleaner design would lower the sema-level
+  imported types and function signatures directly to MIR in LowerSourceFile, so
+  drivers do not need to perform post-hoc MIR surgery.
+
+ISSUE — The driver performs TypeDecl conversion from sema to MIR in
+  ConvertImportedTypeDecl (in the project path) and in LowerTypeDeclSummary
+  (in mir.cpp). These are nearly identical functions. One should call the other,
+  or both should call a shared utility.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. CORRECTNESS & SOUNDNESS
+--------------------------
+
+ISSUE — Import cycle detection in CollectBuildUnits uses path strings as keys.
+  `visiting.insert(path_key)` where path_key is `normalized_path.generic_string()`.
+  If two paths that refer to the same file differ only in case on a case-insensitive
+  filesystem (macOS default HFS+), they would be treated as distinct entries.
+  The driver uses lexically_normal() which resolves symlinks and removes redundant
+  separators, but does not canonicalize case. On a case-insensitive filesystem,
+  `import Foo` and `import foo` would be treated as different modules.
+  std::filesystem::canonical() would be more correct than lexically_normal() for
+  cycle detection: it resolves actual symlinks and (on macOS) produces the
+  filesystem-canonical case.
+
+ISSUE — MergeBuildUnits contains a check:
+    if (unit.source_path == std::filesystem::absolute(entry_source_path).lexically_normal()) {
+        continue;  // skip entry module
+    }
+  followed by:
+    if (unit.source_path != std::filesystem::absolute(entry_source_path).lexically_normal()) {
+        NamespaceImportedBuildUnit(namespaced_module, ...);
+    }
+  The second condition is always true in this path (the entry module was skipped
+  in the first check). This creates dead code and confusion about whether the entry
+  module is ever namespaced. The logic would be clearer as:
+    for every non-entry unit: namespace it and merge it
+    then unconditionally merge entry module at the end (without namespacing)
+  The current double-conditional structure is error-prone if the first check is
+  ever removed.
+
+ISSUE — ShouldReuseModuleObject compares state.imported_interface_hashes ==
+  current.imported_interface_hashes. This is a vector<pair<string,string>>
+  comparison, which is order-sensitive. If imports are resolved in different orders
+  across two compilation runs (e.g., filesystem ordering changes), two semantically
+  identical states could be considered unequal, causing unnecessary recompilation.
+  A canonical sort before comparison would make the rebuild check order-independent.
+
+ISSUE — The incremental build assumes that `interface_hash` fully captures the
+  observable interface surface. This is a strong assumption: the hash is computed
+  from ComputeInterfaceHash(artifact), which should hash the exported sema module.
+  If any part of the sema module that affects downstream compilation is not included
+  in the hash (e.g., layout information, resolved constants), the incremental build
+  could produce stale object files. This assumption should be explicitly documented
+  and the hash computation should be reviewed for completeness.
+
+ISSUE — WriteTextArtifact opens the file with `std::ios::binary` but writes
+  std::string_view content which may contain newlines in platform-native format (\r\n
+  on Windows). On a cross-compilation tool chain targeting non-Windows from Windows
+  (or vice versa), binary mode vs. text mode matters. Since this is currently a
+  macOS-arm64 bootstrap, this is latent. Document the binary-vs-text rationale.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. SIMPLICITY & ELEGANCE
+------------------------
+
+ISSUE — QuoteShellArg manually implements shell argument quoting:
+    for each char: if it's not alphanumeric or [-_./:@=], prefix with backslash
+  This is a hand-rolled sanitizer. It is used to construct command lines that are
+  then passed to fork/exec via RunExecutableCommand. If QuoteShellArg has a case
+  gap (e.g., tilde `~` should sometimes be unquoted, or shell metacharacters in
+  filenames on unusual filesystems), it could produce incorrect quoting or even
+  injection vulnerabilities if any path component comes from user-controlled data.
+
+  RECOMMENDATION: Use execv-family syscalls with argv[] arrays directly (no shell
+  involvement) instead of string-concatenated command lines. The current
+  RunExecutableCommand uses posix_spawn or fork/exec-like syntax — if it passes
+  the command through a shell (e.g., system()), quoting is needed; if it uses
+  execv directly, quoting is unnecessary and QuoteShellArg can be removed entirely.
+  Review RunExecutableCommand to confirm whether it bypasses the shell or not.
+
+ISSUE — BootstrapTargetIdentity() and BootstrapTargetConfig() return hardcoded
+  "arm64-apple-darwin25.4.0" values. This string is the bootstrap-only target triple.
+  It appears in ModuleBuildState as target_identity, used for incremental cache
+  keying. If this string changes (e.g., OS upgrade), all cached object files will be
+  invalidated. This is correct behavior, but the version number being hardcoded in
+  backend.cpp's `kBootstrapTriple` and in the driver's identity function creates a
+  single-point-of-maintenance risk. The version should come from one authoritative
+  source.
+
+ISSUE — CommandOptions is parsed in ParseCommandOptions (110 lines), which builds
+  the options struct by mutating it as arguments are consumed. The function returns
+  std::optional<CommandOptions>, which requires the entire options struct to be
+  constructed before any validation. If an early option conflicts with a later one,
+  the conflict is detected post-hoc rather than at parse time. A streaming
+  argument-parser that validates incrementally would produce better error messages
+  (e.g., "argument --mode is only valid for project builds, not direct source builds").
+
+MINOR — TrimWhitespace and StripComment are local free functions used only for
+  reading test expectation files. These utility functions are fine but could live in
+  support/ with the other support utilities (source_manager, diagnostics).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. SAFETY & ROBUSTNESS
+-----------------------
+
+ISSUE — RunExecutableCommand uses system-level process creation (fork/exec-like
+  pattern, using sys/wait.h). The implementation is not visible in the summarized
+  code, but error handling of the child process exit code should be checked. If the
+  child process is interrupted by a signal (WIFSIGNALED), the driver should propagate
+  a meaningful error rather than returning the raw signal number as an "exit code."
+  The CapturedCommandResult struct has `signaled` and `signal_number` fields, which
+  suggests signal handling is done, but it should be verified that compiler test
+  harness and linker invocation both check for signals, not just exit codes.
+
+ISSUE — LoadModuleBuildState and WriteModuleBuildState read/write line-structured
+  text files. The parser in LoadModuleBuildState must handle malformed files from
+  previous compiler versions or corrupted writes. The current code returns
+  std::nullopt on parse failure (causing a full recompile), which is correct fallback
+  behavior. But there is no explicit format version in the state files, so a state
+  file written by future compiler version N might be silently misread by version N-1.
+  Adding a format version field to the state file (analogous to the interface
+  artifact's format_version field) would make forward/backward incompatibility
+  explicit.
+
+ISSUE — IsOutputOlderThan uses std::filesystem::last_write_time() which has ~1
+  second granularity on some filesystems. On fast compile cycles (sub-second), a
+  rebuilt file may appear to have the same timestamp as the output, causing the link
+  step to be skipped when it should not be. This is a well-known filesystem timestamp
+  granularity problem. The driver should also compare file sizes or a stored hash
+  as a secondary staleness indicator, or use a content-hash only approach (which is
+  already used for the object reuse check via ShouldReuseModuleObject).
+
+ISSUE — DiscoverFilesRecursive uses std::filesystem::recursive_directory_iterator
+  without any depth limit. A project with a symlink cycle in the tests directory
+  would loop indefinitely. On Linux/macOS, recursive_directory_iterator follows
+  symlinks (follow_directory_symlink is the default — actually it does NOT follow
+  directory symlinks in the standard, but check the platform behavior). This should
+  be confirmed and a guard added if necessary.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. PERFORMANCE & SCALABILITY
+----------------------------
+
+ISSUE — CompileToMir (direct-source path) calls MergeBuildUnits which deep-copies
+  all MIR modules into a new merged module. For a project with 20 modules each
+  having 50 functions, the merge produces a new module with 1000 functions copied
+  from 20 separate modules. The copy is O(total instruction count). This is
+  necessary for single-output codegen but could be avoided by:
+    (a) having the codegen backend accept multiple Module* inputs and link them
+    (b) merging only function declarations (extern shims) rather than full bodies
+        for non-entry modules
+
+  The project-based path (CompileTargetUnits) avoids the merge entirely by
+  compiling each unit to an object file separately. For large projects, the project
+  path is substantially more scalable.
+
+ISSUE — In CompileTargetUnits, each module is sema-checked even when the object
+  file is reused. The source text is read for hashing (ReadSourceText) even when
+  the file has not changed. Reading and hashing a source file just to skip sema
+  and codegen is wasteful. The state file should include a filesystem mtime check
+  as a fast pre-filter: if mtime has not changed since the last build, skip reading
+  the file entirely and check only whether the object and mci exist.
+
+ISSUE — BuildTargetGraph calls DiscoverProjectModuleGraphRecursive, which parses
+  every source file in the module graph during graph discovery. This means every
+  source file is parsed twice: once during discovery and again during CompileTargetUnits.
+  The parse result from discovery is stored in ProjectModuleNode.parse_result, which
+  is then moved into CompileTargetUnits via `auto& node : graph.nodes` access.
+  Actually, looking at the code more carefully, `parse_result` IS moved into
+  ProjectModuleNode and then moved again into the BuildUnit in CompileTargetUnits —
+  so parsing happens only once. This is correct! But it is non-obvious and the
+  moving chain should be commented.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. SYSTEM-LEVEL CONCERNS
+------------------------
+
+CONCERN — driver.cpp is too wide in responsibility. It handles:
+  - CLI parsing
+  - Project file loading and target selection
+  - Module graph discovery
+  - Per-module compilation (sema + MIR + codegen)
+  - Incremental build state management
+  - MIR module merging and namespacing
+  - Runtime object compilation
+  - Linking via subprocess
+  - Test discovery and classification
+  - Test execution and result comparison
+  - Regression test driving (CompilerRegressionCase)
+
+  These are at least 8 distinct responsibilities. For a bootstrap compiler this
+  concentration is understandable, but as the compiler grows, this file will become
+  a maintenance bottleneck. The most natural splits would be:
+    - cli.cpp: ParseCommandOptions, Run()
+    - project.cpp: project graph discovery and compilation (already partially in
+      driver/project.h/cpp — continue this split)
+    - test_runner.cpp: test discovery, execution, and regression testing
+    - link.cpp: linker invocation and runtime object compilation
+
+CONCERN — The driver uses hardcoded paths:
+    `kHostedRuntimeSupportPath = "runtime/hosted/mc_hosted_runtime.c"` (in backend.cpp)
+  and compiles the runtime C file as part of the link step. If the compiler is
+  invoked from a different working directory, this relative path breaks. The driver
+  should resolve this path relative to the compiler executable's location
+  (via argv[0] or a compiler-installed directory), not the working directory.
+
+CONCERN — ReadSourceText is called in CompileTargetUnits for hashing purposes
+  after parsing is already done (parse was done in DiscoverProjectModuleGraphRecursive).
+  The parse in discovery did not preserve the raw source text. This forces a second
+  file read just for hashing. Either preserve the source text in ProjectModuleNode
+  at discovery time, or compute the hash during discovery.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. DOCUMENTATION & REASONING
+-----------------------------
+
+GAP — The two compilation pipelines (direct-source vs. project-based) are not
+  documented at the top of the file. A reader encountering CompileToMir and
+  CompileTargetUnits for the first time cannot immediately understand why both
+  exist, which one is preferred, and what the key behavioral differences are.
+  A top-of-file architecture comment describing the two paths and their trade-offs
+  would reduce cognitive overhead significantly.
+
+GAP — NamespaceImportedBuildUnit's requirement to walk all instruction fields is
+  not documented. Anyone adding a new field to mir::Instruction must also update
+  NamespaceImportedBuildUnit and RewriteImportedSymbolReference — this invariant
+  is entirely implicit.
+
+GAP — ShouldReuseModuleObject's inputs (ModuleBuildState fields and their meaning)
+  are not documented. The function is a strict equality comparison on multiple
+  state fields; the comment should explain what each field captures and why its
+  change invalidates the cached object.
+
+STRENGTH — The incremental build state file format (tab-separated "key\tvalue\n"
+  lines) is simple and human-readable. Loading it with istream line parsing is
+  straightforward. The use_of a text format rather than binary is good for
+  debuggability.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRIORITIZED RECOMMENDATIONS
+----------------------------
+
+CRITICAL / CORRECTNESS:
+  1. Use std::filesystem::canonical() instead of lexically_normal() for import
+     path deduplication in cycle detection, to handle case-insensitive filesystems
+     and symlink aliasing correctly.
+  2. Verify RunExecutableCommand does not invoke via a shell. If it does, replace
+     QuoteShellArg with execv/posix_spawn-based subprocess creation to eliminate
+     quoting concerns.
+  3. Sort imported_interface_hashes before comparison in ShouldReuseModuleObject
+     to prevent order-dependent false cache misses.
+
+ARCHITECTURAL:
+  4. Unify the two compilation pipelines (CollectBuildUnits and CompileTargetUnits)
+     behind a single graph-and-compile abstraction. The direct-source path should
+     be a thin adaptor over the project-based path.
+  5. Add a format version field to the ModuleBuildState file format to detect
+     and handle forward/backward incompatibility explicitly.
+  6. Document the NamespaceImportedBuildUnit invariant: all name-bearing fields
+     in Instruction must be kept in sync.
+
+SIMPLIFICATION:
+  7. Remove the double-conditional in MergeBuildUnits (skip-entry then namespace-
+     non-entry) and replace with a single-pass that clearly separates entry module
+     handling from non-entry module handling.
+  8. Add a top-of-file architecture comment describing the two compilation paths.
+  9. Move ReadSourceText for hashing into ProjectModuleNode population at graph-
+     discovery time to avoid the second file read in CompileTargetUnits.
+
+PERFORMANCE (OPTIONAL):
+  10. Add mtime pre-filtering before ReadSourceText in CompileTargetUnits: if the
+      source file mtime matches the recorded state mtime, skip the read and hash.
+  11. Investigate whether ValidateModule needs to run on the merged module in the
+      direct-source path if per-module validation already passed; merged-module
+      validation may be redundant for correctness (though it catches cross-module
+      symbol references).

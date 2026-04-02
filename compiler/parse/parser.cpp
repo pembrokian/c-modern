@@ -1,5 +1,6 @@
 #include "compiler/parse/parser.h"
 
+#include <cassert>
 #include <optional>
 #include <utility>
 
@@ -79,6 +80,7 @@ class Parser {
     }
 
     const Token& Previous() const {
+        assert(index_ > 0 && "Previous() called before any Advance()");
         return tokens_[index_ - 1];
     }
 
@@ -139,6 +141,14 @@ class Parser {
         return false;
     }
 
+    // SynchronizeTopLevel — error-recovery anchor after a bad top-level
+    // declaration.
+    //
+    // Recovery strategy: skip tokens until a newline is consumed or until
+    // a token that can start a top-level declaration is found.  The safe token
+    // set is: func, struct, enum, distinct, type, var, const, extern, @.
+    // After synchronisation the parser resumes from the next declaration;
+    // partial nodes from the failed declaration are discarded.
     void SynchronizeTopLevel() {
         while (!AtEnd()) {
             if (Match(TokenKind::kNewline)) {
@@ -629,7 +639,13 @@ class Parser {
     std::unique_ptr<Stmt> ParseBlockStmt() {
         if (!Match(TokenKind::kLBrace)) {
             ReportError(Current(), "expected '{' to start block");
-            return nullptr;
+            // Return an empty block rather than nullptr so that callers that
+            // assign the result to a branch/body field are never left with a
+            // null pointer that a downstream AST traversal might dereference.
+            auto empty = std::make_unique<Stmt>();
+            empty->kind = Stmt::Kind::kBlock;
+            empty->span = Current().span;
+            return empty;
         }
 
         auto block = std::make_unique<Stmt>();
@@ -775,10 +791,17 @@ class Parser {
         pattern.span.begin = Current().span.begin;
         if (Check(TokenKind::kIdentifier) && Peek(1).kind == TokenKind::kDot && Peek(2).kind == TokenKind::kIdentifier) {
             pattern.kind = CasePattern::Kind::kVariant;
-            pattern.variant_name = Current().lexeme + std::string(".") + Peek(2).lexeme;
-            Advance();
-            Advance();
-            Advance();
+            // Check for qualified mod.Type.Variant (5-token) before falling through to
+            // the simpler Type.Variant (3-token) form.
+            if (Peek(3).kind == TokenKind::kDot && Peek(4).kind == TokenKind::kIdentifier) {
+                pattern.variant_name = Current().lexeme + "." + Peek(2).lexeme + "." + Peek(4).lexeme;
+                Advance(); Advance(); Advance(); Advance(); Advance();
+            } else {
+                pattern.variant_name = Current().lexeme + std::string(".") + Peek(2).lexeme;
+                Advance();
+                Advance();
+                Advance();
+            }
             if (Match(TokenKind::kLParen)) {
                 if (!Check(TokenKind::kRParen)) {
                     do {
@@ -1001,11 +1024,8 @@ class Parser {
     }
 
     std::unique_ptr<Expr> ParseExpr(bool allow_aggregate_init = true) {
-        const bool previous = allow_aggregate_init_;
-        allow_aggregate_init_ = allow_aggregate_init;
-        auto expr = ParseRangeExpr();
-        allow_aggregate_init_ = previous;
-        return expr;
+        const AggInitGuard guard(*this, allow_aggregate_init);
+        return ParseRangeExpr();
     }
 
     std::unique_ptr<Expr> ParseRangeExpr() {
@@ -1094,6 +1114,15 @@ class Parser {
         }
     }
 
+    // SkipTypeExprLookahead — lookahead-only type-expression scanner used to
+    // disambiguate binding syntax from assignment/expression syntax.
+    //
+    // Contract: given a token offset relative to the current position, scan
+    // forward over the tokens that form a valid type expression and return the
+    // offset of the first token past the last consumed token.  Returns
+    // std::nullopt if the tokens at `offset` do not form a valid type
+    // expression in the grammar.  Never consumes tokens; safe to call at any
+    // lookahead depth.
     std::optional<std::size_t> SkipTypeExprLookahead(std::size_t offset, bool allow_bare_identifier) const {
         switch (Peek(offset).kind) {
             case TokenKind::kConst:
@@ -1500,7 +1529,33 @@ class Parser {
     support::DiagnosticSink& diagnostics_;
     std::size_t index_ = 0;
     bool ok_ = true;
+    // allow_aggregate_init_ controls whether `{` in an expression position is
+    // parsed as the start of an aggregate initialiser.
+    //
+    // Must be false in condition positions (the test expressions of if, for,
+    // and while statements) because `{` in those positions is syntactically
+    // ambiguous with the opening brace of the following block statement.
+    // For example, `if Foo { ... }` would misparse the block as an aggregate
+    // init for `Foo` if this flag were true.
+    //
+    // Always true at the top level of expression statements and binding
+    // initialisers where the grammar unambiguously allows aggregate init.
+    //
+    // Use AggInitGuard (below) to set/restore this flag instead of manual
+    // save-and-restore.
     bool allow_aggregate_init_ = true;
+
+    // RAII guard that sets allow_aggregate_init_ for the duration of its
+    // lifetime and restores the previous value on destruction.
+    struct AggInitGuard {
+        Parser& parser_;
+        bool saved_;
+        AggInitGuard(Parser& p, bool allow)
+            : parser_(p), saved_(p.allow_aggregate_init_) {
+            parser_.allow_aggregate_init_ = allow;
+        }
+        ~AggInitGuard() { parser_.allow_aggregate_init_ = saved_; }
+    };
 };
 
 }  // namespace

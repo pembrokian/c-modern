@@ -1,5 +1,6 @@
 #include "compiler/mir/mir.h"
 
+#include <cassert>
 #include <cstddef>
 #include <optional>
 #include <sstream>
@@ -7,6 +8,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+
+#include "compiler/support/assert.h"
 
 namespace mc::mir {
 namespace {
@@ -768,6 +771,26 @@ bool MatchesTargetDisplay(std::string_view target, const sema::Type& type) {
     return false;
 }
 
+// FunctionLowerer lowers a single sema-checked function declaration into a
+// mir::Function by walking the AST and emitting MIR instructions into basic
+// blocks.
+//
+// Call sequence:
+//   FunctionLowerer lowerer(decl, module, file_path, sema_module, diagnostics);
+//   Function result = lowerer.Run();
+//
+// Invariants:
+//   - After construction, function_.name and parameter locals are filled in.
+//   - EnsureCurrentBlock() must be called before any Emit() that is not
+//     allowed to be in a dead block.  Dead-block instructions are lowered
+//     into the current block; the reachability pass in ValidateModule will
+//     surface them.
+//   - DeferScope stack: scopes are pushed by PushDeferScope and must be
+//     popped via PopDeferScope before any non-fallthrough control transfer.
+//     A scope pushed in a loop body is popped on break/continue/return.
+//
+// After Run() the FunctionLowerer is consumed; no further methods may be
+// called on it.
 class FunctionLowerer {
   public:
     FunctionLowerer(const Decl& decl,
@@ -778,22 +801,33 @@ class FunctionLowerer {
         : decl_(decl), module_(module), file_path_(file_path), sema_module_(sema_module), diagnostics_(diagnostics) {
         function_.name = decl.name;
         function_.type_params = decl.type_params;
-        function_.return_types.reserve(decl.return_types.size());
-        for (const auto& return_type : decl.return_types) {
-            function_.return_types.push_back(sema::TypeFromAst(return_type.get()));
+        // Prefer sema-computed return types over re-deriving from AST TypeExprs.
+        // TypeFromAst is a fallback for extern functions absent from the module.
+        const sema::FunctionSignature* signature = sema::FindFunctionSignature(sema_module_, decl.name);
+        if (signature != nullptr && !signature->return_types.empty()) {
+            function_.return_types = signature->return_types;
+        } else {
+            function_.return_types.reserve(decl.return_types.size());
+            for (const auto& return_type : decl.return_types) {
+                function_.return_types.push_back(sema::TypeFromAst(return_type.get()));
+            }
         }
     }
 
     Function Run() {
-        for (const auto& param : decl_.params) {
-            const sema::Type type = sema::TypeFromAst(param.type.get());
+        const sema::FunctionSignature* signature = sema::FindFunctionSignature(sema_module_, decl_.name);
+        for (std::size_t index = 0; index < decl_.params.size(); ++index) {
+            const sema::Type type =
+                (signature != nullptr && index < signature->param_types.size())
+                    ? signature->param_types[index]
+                    : sema::TypeFromAst(decl_.params[index].type.get());
             function_.locals.push_back({
-                .name = param.name,
+                .name = decl_.params[index].name,
                 .type = type,
                 .is_parameter = true,
                 .is_mutable = false,
             });
-            local_types_[param.name] = type;
+            local_types_[decl_.params[index].name] = type;
         }
 
         current_block_ = CreateBlock("entry");
@@ -1114,11 +1148,10 @@ class FunctionLowerer {
             case SpecialCallKind::kAtomicFetchAdd:
                 instruction.kind = Instruction::Kind::kAtomicFetchAdd;
                 break;
-            case SpecialCallKind::kArenaNew:
-            case SpecialCallKind::kNone:
-            case SpecialCallKind::kMmioPtr:
-            case SpecialCallKind::kSliceFromBuffer:
-                return false;
+            default:
+                // kArenaNew, kMmioPtr, kSliceFromBuffer, and kNone are handled
+                // before the switch above and cannot reach this point.
+                MC_UNREACHABLE("unhandled SpecialCallKind in EmitSpecialCallInstruction");
         }
 
         Emit(std::move(instruction));
@@ -1325,6 +1358,9 @@ class FunctionLowerer {
                         break;
                     }
                 }
+            } else {
+                assert((sema::IsUnknown(local_type) || found->second == local_type) &&
+                       "EnsureLocal: type conflict for previously-bound local");
             }
             return found->second;
         }
@@ -1855,7 +1891,7 @@ class FunctionLowerer {
         }
 
         Report(expr.span, "not yet supported in MIR: " + std::string(ToString(expr.kind)) + " expression");
-        return EmitLiteralValue("0", sema::VoidType());
+        return EmitLiteralValue("0", sema::UnknownType());
     }
 
     void BindLocal(const std::string& name,
@@ -2362,6 +2398,16 @@ class FunctionLowerer {
         current_block_ = exit_block;
     }
 
+    // LowerForEach emits a 5-block CFG for `for name in iterable { body }`:
+    //
+    //   incoming ──branch──► foreach_cond
+    //   foreach_cond: index < len  ──true──► foreach_body
+    //                              ──false──► foreach_exit
+    //   foreach_body: body stmts   ──(fallthrough/break/continue)──► foreach_step
+    //   foreach_step: index += 1   ──branch──► foreach_cond
+    //   foreach_exit: (continuation)
+    //
+    // break targets foreach_exit; continue targets foreach_step.
     void LowerForEach(const Stmt& stmt) {
         if (stmt.exprs.empty()) {
             Report(stmt.span, "foreach statement is missing iterable expression");
@@ -2640,6 +2686,14 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
         .module = std::move(module),
         .ok = !diagnostics.HasErrors(),
     };
+}
+
+Function LowerFunctionDecl(const ast::Decl& decl,
+                            const Module& module,
+                            const std::filesystem::path& file_path,
+                            const sema::Module& sema_module,
+                            support::DiagnosticSink& diagnostics) {
+    return FunctionLowerer(decl, module, file_path, sema_module, diagnostics).Run();
 }
 
 // Bootstrap MIR validation checks structural integrity and use-def shape, but it does

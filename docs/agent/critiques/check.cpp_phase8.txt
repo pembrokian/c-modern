@@ -1,0 +1,312 @@
+ARCHITECTURAL REVIEW: compiler/sema/check.cpp
+Phase 8 — Senior Compiler Systems Engineering Critique
+=======================================================
+
+FILE SUMMARY
+------------
+check.cpp is the semantic analysis pass for the Modern C bootstrap compiler. It
+implements a single-class Checker (~1760 lines) plus supporting free functions for
+type utilities, import rewriting, module surface export, and the public CheckProgram /
+CheckSourceFile entry points. Total file length: ~2000 lines.
+
+The file is divided into two conceptual halves: a suite of module-level helpers
+(type predicates, alias rewriting, layout computation) and the Checker class itself,
+which owns the analysis phases invoked in a fixed order from Run().
+
+NOTE: asp.cpp was listed in the review request but does not exist in the workspace.
+This review covers check.cpp only.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DESIGN & ARCHITECTURE
+------------------------
+
+STRENGTH — Phase ordering is explicit and documented.
+  Run() calls SeedImportedSymbols → CollectTopLevelDecls → ValidateExportBlock →
+  ValidateTypeDecls → ValidateGlobals → ValidateFunctions in a clearly commented
+  sequence. This is the right idiom for a bootstrap sema: multi-pass within a single
+  file, rather than hidden sequencing buried inside Visit() recursion.
+
+STRENGTH — Checker is stateful but not globally mutable.
+  All state is scoped to a single Checker instance. There is no global mutable
+  singleton, no thread-local stash, and no hidden side channels into other compiler
+  phases. This makes the analysis easily testable in isolation.
+
+ISSUE — Duplication of lookup logic between Checker internals and free functions.
+  The Checker class builds function_map_ and type_map_ (unordered_map) during
+  CollectTopLevelDecls for fast internal use. However the public free functions
+  FindFunctionSignature(), FindTypeDecl(), and FindGlobalSummary() that downstream
+  consumers call (MIR lowering, driver) do not use any cached map — they linearly
+  scan module.functions, module.type_decls, and module.globals respectively:
+
+    const FunctionSignature* FindFunctionSignature(const Module& module, std::string_view name) {
+        for (const auto& function : module.functions) { ... }
+
+  The result: every MIR-lowering call to FindFunctionSignature is O(n) even though
+  the Checker internal lookup was O(1). The module data structure does not carry the
+  maps it built. This is a direct consequence of the Checker owning the maps but the
+  Module not. For a bootstrap compiler with small files this is acceptable, but it is
+  an architectural inconsistency that will silently degrade as codebases grow.
+
+  RECOMMENDATION: Either embed lookup maps in Module and populate them once during
+  sema (so callers get O(1)), or document explicitly that Module consumers own the
+  cost of building their own indices and that sema's maps are internal-only.
+
+ISSUE — RewriteImportedTypeNames is called in multiple places with subtly different
+  semantics: once to rewrite the module surface (RewriteImportedModuleSurfaceTypesInternal),
+  once to qualify names during SeedImportedSymbols, and once at the driver level
+  (RewriteImportedModuleSurfaceTypes public entry). Each layer passes slightly
+  different local_type_names sets. The contract — "what counts as a local type
+  name?" — is implicit and spread across three call sites. A bug in one (e.g., a
+  type added after the seed call) would silently produce unqualified type names that
+  fail at link time.
+
+ISSUE — SeedImportedSymbols and CollectTopLevelDecls both push type_decls into
+  module_->type_decls with no deduplication guard between the two phases. If an
+  imported type name collides with a locally declared type name, the collision is
+  detected via type_symbols_.emplace but the CollectTopLevelDecls push still adds the
+  local duplicate to the vector. This means module_->type_decls can contain two
+  entries with the same name in an error path, which downstream consumers do not
+  expect.
+
+ISSUE — TypeFromAst is called at multiple layers (sema/check.cpp, mir/mir.cpp,
+  driver.cpp). It is effectively a shared utility that converts AST TypeExpr nodes to
+  sema::Type values. Its presence in multiple callers creates coupling: if the
+  conversion rules change, all sites must be synchronized. Consider localizing
+  TypeFromAst to the sema layer and exposing the results through Module, so MIR and
+  the driver never need to re-derive types from AST tokens.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. CORRECTNESS & SOUNDNESS
+--------------------------
+
+ISSUE — ValidateFunctions re-validates parameter type expressions.
+  For every function decl, ValidateFunctions calls ValidateTypeExpr on each param's
+  type and each return type (lines ~910–925). These same type expressions were
+  already validated during CollectTopLevelDecls → BuildFunctionSignature, which calls
+  TypeFromAst on them. The double validation is harmless in the non-error path but
+  means that unknown-type errors are reported twice: once during collection and again
+  during validation. Users see duplicate diagnostics for function parameter types,
+  which is confusing.
+
+ISSUE — StripAliasOrDistinct cycle detection uses std::unordered_set<std::string>
+  per call, but in ComputeTypeLayout, ComputeTypeLayout itself is called recursively
+  without passing the outer cycle-detection set for nested alias/distinct types. A
+  chain of mutual aliases that winds through struct fields (A → B's field has type C
+  → C is distinct A) could silently compute an incorrect layout rather than being
+  caught as a cycle. The `active_types` set in ComputeTypeLayouts tracks struct-level
+  layout cycles, but the alias stripping inside ComputeTypeLayout uses a fresh visited
+  set per call, so it re-enters the cycle detection on every subfield.
+
+ISSUE — AnalyzeExpr for QualifiedName has cascading fallback logic.
+  The kQualifiedName handler in AnalyzeExpr tries in order:
+    1. Local value lookup on expr.text
+    2. Global summary lookup on expr.text
+    3. Imported module member lookup
+    4. Qualified function lookup (module_->functions with "text.secondary_text")
+    5. Enum variant lookup on FindTypeDecl(expr.text)
+  Each subsequent case returns UnknownType() silently on mismatch except for case 3
+  which emits a diagnostic. Cases 1 and 2 inspect only the base name (expr.text),
+  not the full qualified name. This means a local named "foo" shadows any "foo.bar"
+  imported symbol, even if "foo.bar" is a function in the imported module named "foo"
+  — the lookup resolves to the local's field access path instead, which will almost
+  certainly produce a wrong type. This is a known bootstrap limitation but should be
+  explicitly documented in a comment near the switch() handler.
+
+ISSUE — AnalyzeExpr for kUnary: the logical-not case returns `BoolType()` even if
+  the operand is Unknown. The dereference case returns `UnknownType()` correctly.
+  But the `!` operator with a non-bool, non-unknown operand emits a diagnostic and
+  then returns BoolType() regardless (since the unary return at the bottom of the
+  case uses `expr.text == "!" ? BoolType() : operand`). This means downstream type
+  checking will see `bool` as the result even after an error, which is better than
+  Unknown for error suppression but should be noted.
+
+ISSUE — Variant constructor dispatch in AnalyzeCall assumes callee_type is the
+  parent enum type. AnalyzeVariantConstructorCall checks `callee_type.kind == kNamed`
+  and then calls LookupVariant. If sema has not yet resolved the enum type (e.g., an
+  ordering dependency where the enum is used before it is defined in the same file),
+  LookupVariant returns nullptr and the function returns UnknownType(), suppressing
+  the call-site error. The correct behavior depends on type ordering, which for
+  single-file compilation is guaranteed by CollectTopLevelDecls running first — so in
+  practice this is safe, but the assumption is implicit.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. SIMPLICITY & ELEGANCE
+------------------------
+
+ISSUE — SpanKey string construction on every expression type-annotation access.
+  SpanKey(span) produces a heap-allocated string of the form "L:C-L:C". This string
+  is used as the key into module_->expr_type_indices (unordered_map<string, size_t>).
+  For a function with N expressions, this means N string allocations during RecordExprType
+  and N more during each FindExprType call in MIR lowering. At high expression counts
+  (large functions) this becomes a significant allocation pressure.
+
+  A struct-based hash over {begin.line, begin.column, end.line, end.column} with a
+  custom hasher would eliminate the allocation entirely. Even a packed uint64_t
+  encoding would suffice for files under 65535 lines and 65535 columns.
+
+  The same pattern applies to binding_or_assign_indices.
+
+ISSUE — IsBuiltinNamedType, IsIntegerTypeName, IsFloatTypeName are free functions
+  but IsNumericType, IsBoolType, etc. duplicate their logic with string comparison
+  rather than calling IsIntegerTypeName/IsFloatTypeName. The duplication is small but
+  means any new numeric type must be added in multiple places.
+
+MINOR — QualifyImportedName constructs a std::string from two string_views and
+  concatenates them. This is called in a loop during SeedImportedSymbols. Prefer
+  std::string result; result.reserve(module_name.size() + 1 + name.size()) to
+  avoid re-allocation.
+
+MINOR — The CombineQualifiedName free function in check.cpp is structurally
+  identical to the one in mir.cpp. This is the third or fourth copy of the same
+  string-concatenation logic appearing across the file hierarchy. A shared utility in
+  support/ or ast/ would be appropriate.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. SAFETY & ROBUSTNESS
+----------------------
+
+ISSUE — InferExplicitConversionTarget returns a mutated copy of the `target` type
+  by adding subtypes to it. The function is called before IsExplicitlyConvertible,
+  and the result of InferExplicitConversionTarget is passed as the `expected` type
+  to IsExplicitlyConvertible. If InferExplicitConversionTarget adds a wrong subtype
+  (e.g. from an array element type mismatch), IsExplicitlyConvertible may then
+  produce a false-positive and the type mismatch error is not reported.
+
+  The issue specifically arises when target is `Slice` (no subtype) and actual is
+  an array: InferExplicitConversionTarget adds the array's element type to the slice.
+  This is correct for coercing [10]i32 → Slice<i32> but would fail to report an error
+  for [10]i32 → Slice<u64>, because after inference the target becomes Slice<i32>,
+  and IsAssignable(Slice<i32>, [10]i32) would then succeed. The test in
+  IsExplicitlyConvertible does check element types via IsAssignable, so this specific
+  case is caught. But the pattern of mutating-before-checking is fragile and should
+  use a dedicated validation path rather than this two-step inference.
+
+ISSUE — RecordExprType silently overwrites existing entries.
+  RecordExprType checks if the key already exists (found != module_->expr_type_indices.end())
+  and updates the type if so. This means an expression that appears in two branches
+  of analysis (e.g., AnalyzeExpr called multiple times on the same expression during
+  different passes) will have its type silently overwritten. If the two analyses
+  produce different types (e.g., once in ValidateGlobals and once in ValidateFunctions),
+  only the latter survives. This is currently correct because the same expression
+  nodes are not analyzed twice, but the silent-overwrite pattern hides the assumption.
+  An assertion (or debug-mode check) that the new type matches the existing type
+  would make double-analysis bugs visible.
+
+ISSUE — PopScope called without PushScope check: if an internal error causes
+  ValidateFunctions to return before PopScope, the scopes_ vector would have a
+  dangling scope. Since scopes_ is a vector<unordered_map>, this does not cause
+  undefined behavior immediately, but subsequent uses of LookupValue would walk
+  the stale scope. A RAII scope guard pattern would be safer.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. PERFORMANCE & SCALABILITY
+----------------------------
+
+CRITICAL PATH — RewriteImportedTypeNames is fully recursive (each call traverses
+  subtypes before returning). For a type with k subtypes nested d levels deep, the
+  recursion depth is d. Modern C types are unlikely to be deeply nested, but
+  higher-order generic types (e.g., Slice<Result<Slice<T>>>) could reach depth 4–5
+  easily. With enough nested types in large programs this could become a concern.
+  Iterative bottom-up traversal using an explicit stack would be more robust.
+
+ISSUE — FindFunctionSignature, FindTypeDecl, FindGlobalSummary are all O(n) linear
+  scans on the module vector. For a module with 100 functions and 1000 expressions
+  (very modest by real compiler standards), this is 100,000 linear-scan iterations
+  just for expression type annotation in MIR lowering. These should be built once
+  from sorted vectors or hash maps at Module construction time and indexed for access.
+
+MINOR — ComputeTypeLayouts iterates all type_decls looking for structs, then calls
+  ComputeTypeLayout on each. ComputeTypeLayout itself calls FindMutableTypeDecl
+  (another linear scan). For a module with T type declarations, nested struct layout
+  computation is O(T^2) in the worst case. At bootstrap scale this is fine; for
+  production scale with hundreds of types it would become visible.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. SYSTEM-LEVEL CONCERNS
+------------------------
+
+CONCERN — The Checker::module_ raw pointer is set to the address of a local
+  unique_ptr-managed object (module.get()) at the start of Run(). This pointer is
+  used throughout the entire analysis. If anything throws (which the code currently
+  does not, but future modifications could), or if ownership of `module` is
+  transferred (moved) before analysis completes, module_ becomes a dangling pointer.
+  This is a latent hazard. Changing module_ to be a reference to the Module value
+  (not a pointer into a unique_ptr) would eliminate the concern.
+
+CONCERN — CheckProgramInternal (not shown in full, summarized at lines 1837–1918)
+  manages exported_cache and visit_state maps that track cross-file compilation state.
+  These maps are passed by reference and persist across recursive calls. A broken
+  circular import that returns `true` from visit_state (kDone) before all exports are
+  built could leave the cache with incomplete module data. The kVisiting/kDone enum
+  is correct for cycle detection but does not distinguish "partially built" from
+  "fully built." Adding a kError state would make incomplete-on-error cache entries
+  more explicit.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. DOCUMENTATION & REASONING
+-----------------------------
+
+STRENGTH — The phase ordering comment in Run() is clear and accurate. The "Checker
+  phase ordering matters" note is exactly the kind of invariant documentation that
+  prevents future regressions from moving phases around.
+
+GAP — The SpanKey string format ("L:C-L:C") is used as a map key but never
+  documented. Someone reading FindExprType for the first time must reverse-engineer
+  from SpanKey() that this is the canonical expression identity for type annotation
+  retrieval. A comment explaining why span is used (rather than pointer identity) and
+  the key format would reduce confusion.
+
+GAP — IsBuiltinNamedType lists "Slice", "Buffer", and "Result" as builtin named types.
+  These are library types, not language primitives. The comment or function name
+  should distinguish between "truly builtin" (bool, void, numeric primitives) and
+  "recognized stdlib aggregate types that the sema treats specially" — the current
+  grouping in the name IsBuiltinNamedType is misleading.
+
+GAP — The `allow_aggregate_init_` member pattern in the Parser (visible in adjacent
+  context) has an analogous counterpart in sema's type-checking of aggregate
+  initializers. Neither site documents why this context bit exists, making it hard to
+  audit future changes to aggregate init rules.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRIORITIZED RECOMMENDATIONS
+----------------------------
+
+CRITICAL / CORRECTNESS:
+  1. Struct layout cycle detection in ComputeTypeLayout does not thread the
+     `active_types` set through StripAliasOrDistinct → so multi-hop alias cycles
+     embedded inside struct fields may fail to be detected. Audit and fix.
+  2. QualifiedName lookup in AnalyzeExpr applies local-variable lookup on
+     `expr.text` (the base name alone) before module lookup, silently shadowing
+     imported module names with same-named locals. Document the limitation explicitly
+     with a TODO and the known correct fix.
+  3. ValidateFunctions emits double diagnostics for unknown parameter types because
+     CollectTopLevelDecls already built the signature. Suppress or deduplicate.
+
+ARCHITECTURAL:
+  4. Move expr_type lookup index (currently span-keyed string-map in Module) to a
+     struct-key or compacted u64 key to remove per-expression heap allocation.
+  5. Expose Module lookup maps (for functions, types, globals) via the Module data
+     structure so MIR and driver callers get O(1) lookups instead of O(n) scans.
+  6. Remove TypeFromAst from mir.cpp and driver.cpp — only sema should own AST-to-
+     type conversion. The results should be surfaced through Module.
+
+SIMPLIFICATION:
+  7. Merge IsIntegerTypeName/IsFloatTypeName/IsBuiltinNamedType into a single lookup
+     table to eliminate multi-site maintenance risk.
+  8. Replace RecordExprType silent overwrite with a debug assertion that the new type
+     matches the existing type.
+  9. Use a RAII scope guard for PushScope/PopScope to make error-path correctness
+     unconditional.
+
+PERFORMANCE (OPTIONAL):
+  10. Replace SpanKey string with a 4-word struct hash for expr_type_indices.
+  11. Replace linear scans in FindFunctionSignature/FindTypeDecl with index maps
+      embedded in Module, built once after check completes.

@@ -162,6 +162,8 @@ int main(int argc, char** argv) {
         {"call_arity_bad.mc", "call_arity_bad.errors.txt", {}, false},
         {"bare_conversion_syntax_bad.mc", "bare_conversion_syntax_bad.errors.txt", {}, false},
         {"layout_cycle_bad.mc", "layout_cycle_bad.errors.txt", {}, false},
+        {"unknown_param_type_bad.mc", "unknown_param_type_bad.errors.txt", {}, false},
+        {"qualified_variant_ok.mc", "qualified_variant_ok.sema.txt", {}, true},
     };
 
     for (const auto& fixture : fixtures) {
