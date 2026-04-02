@@ -1,0 +1,21 @@
+schema = 1
+project = "file-walker"
+default = "walker"
+
+[targets.walker]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.walker.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.walker.runtime]
+startup = "default"
+
+[targets.walker.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

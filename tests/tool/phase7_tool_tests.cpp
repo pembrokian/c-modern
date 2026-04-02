@@ -644,6 +644,60 @@ void TestRealGrepLiteProject(const std::filesystem::path& source_root,
                          "phase8 grep-lite test summary should be deterministic");
 }
 
+void TestRealFileWalkerProject(const std::filesystem::path& source_root,
+                               const std::filesystem::path& binary_root,
+                               const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_path = source_root / "examples/real/file_walker/build.toml";
+    const std::filesystem::path sample_root = source_root / "examples/real/file_walker/tests/sample_tree";
+    const std::filesystem::path build_dir = binary_root / "phase8_file_walker_build";
+
+    const std::string alpha_path = (sample_root / "alpha.txt").generic_string() + "\n";
+    const std::string beta_path = (sample_root / "nested/beta.txt").generic_string() + "\n";
+    const std::string gamma_path = (sample_root / "nested/deeper/gamma.txt").generic_string() + "\n";
+    const std::string directory_line = (sample_root / "nested").generic_string() + "\n";
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string(),
+                                                              "--",
+                                                              sample_root.generic_string()},
+                                                             build_dir / "phase8_file_walker_run_output.txt",
+                                                             "phase8 file walker run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("phase8 file walker run should succeed:\n" + run_output);
+    }
+    ExpectOutputContains(run_output, alpha_path, "phase8 file walker should print top-level files");
+    ExpectOutputContains(run_output, beta_path, "phase8 file walker should recurse into nested directories");
+    ExpectOutputContains(run_output, gamma_path, "phase8 file walker should recurse through deeper directories");
+    if (run_output.find(directory_line) != std::string::npos) {
+        Fail("phase8 file walker should print files only, got:\n" + run_output);
+    }
+
+    const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                "test",
+                                                                "--project",
+                                                                project_path.generic_string(),
+                                                                "--build-dir",
+                                                                build_dir.generic_string()},
+                                                               build_dir / "phase8_file_walker_test_output.txt",
+                                                               "phase8 file walker test");
+    if (!test_outcome.exited || test_outcome.exit_code != 0) {
+        Fail("phase8 file walker tests should pass:\n" + test_output);
+    }
+    ExpectOutputContains(test_output,
+                         "PASS entry_name_test.test_entry_name",
+                         "phase8 file walker ordinary tests should include entry-name coverage");
+    ExpectOutputContains(test_output,
+                         "PASS path_join_test.test_path_join",
+                         "phase8 file walker ordinary tests should include path-join coverage");
+    ExpectOutputContains(test_output,
+                         "3 tests, 3 passed, 0 failed",
+                         "phase8 file walker test summary should be deterministic");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -665,5 +719,6 @@ int main(int argc, char** argv) {
     TestProjectMissingImportRootFails(source_root, binary_root, mc_path);
     TestProjectAmbiguousImportFails(source_root, binary_root, mc_path);
     TestRealGrepLiteProject(source_root, binary_root, mc_path);
+    TestRealFileWalkerProject(source_root, binary_root, mc_path);
     return 0;
 }

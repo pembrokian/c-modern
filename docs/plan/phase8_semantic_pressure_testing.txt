@@ -4,7 +4,7 @@ Phase 8 -- Semantic Pressure Testing
 Status
 ------
 - Repository posture is ready for Phase 8 entry: project-driven mc check, mc build, mc run, mc test, deterministic .mci, and incremental rebuild reuse are already admitted in phase7_implementation_summary.txt.
-- Pressure-program posture is not ready yet: canonical_programs.txt defines the real acceptance targets, but current checked-in examples do not yet provide complete proof.
+- Pressure-program posture is advancing through repository-owned proofs: the first-pass canonical slice is landed, and real project pressure now includes grep-lite plus file walker.
 - Phase 8 should therefore focus on closing the gap between the normative pressure set in canonical_programs.txt and the current repository-owned examples and tests.
 
 Purpose
@@ -23,7 +23,7 @@ Current repository posture
 --------------------------
 - canonical_programs.txt is the normative program list Phase 8 must pressure.
 - canonical contains partial canonical coverage, including eval.mc, memory_poll.mc, and window_stats.mc, but not the full admitted set.
-- real is currently empty and should become a core Phase 8 proof area.
+- real now contains bounded project-style pressure programs and should continue to grow one utility family at a time.
 - small contains direct-source smoke examples and should remain separate from larger project-style pressure programs.
 - stdlib contains useful executable smoke programs, but most are still too small to count as semantic pressure.
 - phase7_tool_tests.cpp already proves the project workflow and should be reused for Phase 8 workflow validation instead of bypassed.
@@ -216,7 +216,7 @@ Ordered Implementation Steps
 8. Convert blocked canonical programs into named backlog or enabling-gap entries rather than implicit omissions.
 9. Add the first real utility project, preferably a small grep-like tool. Status: implemented as examples/real/grep_lite with project-level mc run and mc test proof.
    - Follow-up resolved: project-mode imported interface qualification now preserves named exported types across stdlib module boundaries well enough for grep-lite to import fs and mem directly.
-10. Expand into file-walking, hashing, and arena-backed utilities one pressure dimension at a time.
+10. Expand from grep-lite and file walker into hashing and arena-backed utilities one pressure dimension at a time.
 11. Add a bounded threaded example only if it fits the admitted runtime honestly.
 12. Convert all discovered issues into stable tests or documented blocked items.
 13. Close documentation, findings capture, and acceptance proof.

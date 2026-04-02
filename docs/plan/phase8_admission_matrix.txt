@@ -130,10 +130,12 @@ grep-lite
 
 file walker
 ~~~~~~~~~~~
-- Status: deferred
+- Status: implemented
 - Packaging: dedicated build.toml project
 - Intended proof: project build plus deterministic output tests
-- Reason: depends on directory traversal APIs not yet admitted
+- Pressure focus: directory traversal, path joining, nested recursion, and deterministic output ordering under the explicit project workflow
+- Proof artifact: examples/real/file_walker/build.toml plus tool-level mc run/mc test coverage in tests/tool/phase7_tool_tests.cpp
+- Resolution note: admitted a narrow hosted fs.is_dir and sorted fs.list_dir surface so the walker can recurse without inventing a richer directory-entry library API
 
 hashing tool
 ~~~~~~~~~~~~

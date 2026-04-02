@@ -74,3 +74,7 @@ Real utility candidates
 - grep-lite finding: project-mode imported interface qualification originally drifted on named exported types across stdlib module boundaries in the fs->mem path
 - Resolution: driver-loaded interface modules are now rewritten through the same imported-surface qualification path used by recursive semantic imports, and a sema regression covers the options.imported_modules path directly
 - Result: real projects can compose stdlib fs and mem directly under project mode again
+- Status: file walker implemented as the next explicit Phase 8 real-program project
+- file walker finding: the hosted bootstrap slice had whole-file loading but no admitted directory traversal surface, which made honest recursive utilities impossible
+- Classification: stdlib or runtime gap closed
+- Resolution: admitted a narrow hosted fs.is_dir plus newline-delimited, sorted fs.list_dir surface; the file walker now proves recursive traversal and path handling without inventing a richer directory-entry API too early

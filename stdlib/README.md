@@ -31,6 +31,10 @@ Current repository-specific notes:
 - the preferred admitted file-loading path is now `fs.read_all(path,
 	mem.default_allocator())`; `fs.read_all_default` remains as a narrow hosted
 	convenience wrapper
+- the hosted `fs` surface now also includes `fs.is_dir(...)` and
+	`fs.list_dir(...)`, where directory listings are returned as newline-delimited
+	entry names with directories marked by a trailing `/`; this remains a narrow
+	bootstrap surface for deterministic utilities rather than a final richer API
 
 Still deferred in this repository:
 

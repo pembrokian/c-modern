@@ -1,4 +1,6 @@
 #include <alloca.h>
+#include <dirent.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +39,12 @@ extern int32_t __mc_hosted_entry(struct mc_slice_cstr args);
 
 static struct mc_allocator k_default_allocator = {0};
 
+struct mc_dir_entry {
+    char* name;
+    size_t len;
+    int is_dir;
+};
+
 static void mc_zero_buffer_u8(struct mc_buffer_u8* out, struct mc_allocator* alloc) {
     if (out == NULL) {
         return;
@@ -64,6 +72,52 @@ static char* mc_copy_string_to_cstr(struct mc_string text) {
     }
     buffer[size] = '\0';
     return buffer;
+}
+
+static void mc_free_dir_entries(struct mc_dir_entry* entries, size_t count) {
+    if (entries == NULL) {
+        return;
+    }
+
+    for (size_t index = 0; index < count; ++index) {
+        free(entries[index].name);
+    }
+    free(entries);
+}
+
+static char* mc_join_path(const char* base, size_t base_len, const char* name, size_t name_len) {
+    const int needs_separator = base_len > 0 && base[base_len - 1] != '/';
+    const size_t total_len = base_len + (needs_separator ? 1u : 0u) + name_len;
+    char* joined = (char*) malloc(total_len + 1);
+    if (joined == NULL) {
+        return NULL;
+    }
+
+    size_t cursor = 0;
+    if (base_len > 0) {
+        memcpy(joined + cursor, base, base_len);
+        cursor += base_len;
+    }
+    if (needs_separator) {
+        joined[cursor] = '/';
+        ++cursor;
+    }
+    if (name_len > 0) {
+        memcpy(joined + cursor, name, name_len);
+        cursor += name_len;
+    }
+    joined[cursor] = '\0';
+    return joined;
+}
+
+static int mc_compare_dir_entries(const void* lhs, const void* rhs) {
+    const struct mc_dir_entry* left = (const struct mc_dir_entry*) lhs;
+    const struct mc_dir_entry* right = (const struct mc_dir_entry*) rhs;
+    const int name_cmp = strcmp(left->name, right->name);
+    if (name_cmp != 0) {
+        return name_cmp;
+    }
+    return right->is_dir - left->is_dir;
 }
 
 struct mc_allocator* __mc_mem_default_allocator(void) {
@@ -228,6 +282,145 @@ int64_t __mc_fs_file_size(struct mc_string path) {
 
     free(c_path);
     return size;
+}
+
+int32_t __mc_fs_is_dir(struct mc_string path) {
+    int32_t is_dir = 0;
+    char* c_path = mc_copy_string_to_cstr(path);
+    if (c_path == NULL) {
+        return 0;
+    }
+
+    struct stat file_stat;
+    if (stat(c_path, &file_stat) == 0 && S_ISDIR(file_stat.st_mode)) {
+        is_dir = 1;
+    }
+
+    free(c_path);
+    return is_dir;
+}
+
+struct mc_buffer_u8* __mc_fs_list_dir(struct mc_string path, struct mc_allocator* alloc) {
+    struct mc_allocator* actual_alloc = alloc != NULL ? alloc : &k_default_allocator;
+
+    char* c_path = mc_copy_string_to_cstr(path);
+    if (c_path == NULL) {
+        return NULL;
+    }
+
+    DIR* dir = opendir(c_path);
+    if (dir == NULL) {
+        free(c_path);
+        return NULL;
+    }
+
+    struct mc_dir_entry* entries = NULL;
+    size_t count = 0;
+    size_t capacity = 0;
+    int failed = 0;
+    const size_t base_len = strlen(c_path);
+
+    for (;;) {
+        errno = 0;
+        struct dirent* dir_entry = readdir(dir);
+        if (dir_entry == NULL) {
+            if (errno != 0) {
+                failed = 1;
+            }
+            break;
+        }
+
+        if (strcmp(dir_entry->d_name, ".") == 0 || strcmp(dir_entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        if (count == capacity) {
+            const size_t next_capacity = capacity == 0 ? 8u : capacity * 2u;
+            struct mc_dir_entry* next_entries =
+                (struct mc_dir_entry*) realloc(entries, next_capacity * sizeof(struct mc_dir_entry));
+            if (next_entries == NULL) {
+                failed = 1;
+                break;
+            }
+            entries = next_entries;
+            capacity = next_capacity;
+        }
+
+        const size_t name_len = strlen(dir_entry->d_name);
+        char* name_copy = (char*) malloc(name_len + 1);
+        if (name_copy == NULL) {
+            failed = 1;
+            break;
+        }
+        memcpy(name_copy, dir_entry->d_name, name_len + 1);
+
+        char* joined_path = mc_join_path(c_path, base_len, dir_entry->d_name, name_len);
+        if (joined_path == NULL) {
+            free(name_copy);
+            failed = 1;
+            break;
+        }
+
+        struct stat entry_stat;
+        const int stat_ok = lstat(joined_path, &entry_stat) == 0;
+        free(joined_path);
+        if (!stat_ok) {
+            free(name_copy);
+            failed = 1;
+            break;
+        }
+
+        entries[count].name = name_copy;
+        entries[count].len = name_len;
+        entries[count].is_dir = S_ISDIR(entry_stat.st_mode) ? 1 : 0;
+        ++count;
+    }
+
+    closedir(dir);
+    free(c_path);
+
+    if (failed) {
+        mc_free_dir_entries(entries, count);
+        return NULL;
+    }
+
+    if (count > 1) {
+        qsort(entries, count, sizeof(struct mc_dir_entry), mc_compare_dir_entries);
+    }
+
+    size_t total_len = 0;
+    for (size_t index = 0; index < count; ++index) {
+        total_len += entries[index].len + 1u;
+        if (entries[index].is_dir) {
+            total_len += 1u;
+        }
+    }
+
+    struct mc_buffer_u8* out = __mc_mem_buffer_new_u8(actual_alloc, (int64_t) total_len);
+    if (out == NULL) {
+        mc_free_dir_entries(entries, count);
+        return NULL;
+    }
+
+    size_t cursor = 0;
+    for (size_t index = 0; index < count; ++index) {
+        if (entries[index].len > 0) {
+            memcpy(out->ptr + cursor, entries[index].name, entries[index].len);
+            cursor += entries[index].len;
+        }
+        if (entries[index].is_dir) {
+            out->ptr[cursor] = '/';
+            ++cursor;
+        }
+        out->ptr[cursor] = '\n';
+        ++cursor;
+    }
+
+    out->len = (int64_t) cursor;
+    out->cap = (int64_t) cursor;
+    out->alloc = actual_alloc;
+    mc_free_dir_entries(entries, count);
+    return out;
 }
 
 struct mc_buffer_u8* __mc_fs_read_all(struct mc_string path, struct mc_allocator* alloc) {
