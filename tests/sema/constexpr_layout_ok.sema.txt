@@ -1,0 +1,16 @@
+SemanticModule
+  TypeDecl name=ByteCount kind=alias
+    AliasedType=usize
+  TypeDecl name=Header kind=struct
+    attributes=[abi(c)]
+    Field name=magic type=u32
+    Field name=bytes type=[4]u8
+    Layout size=8 align=4 offsets=[0, 4]
+  TypeDecl name=Envelope kind=struct
+    Field name=header type=Header
+    Field name=extra type=[2]u8
+    Layout size=12 align=4 offsets=[0, 8]
+  Const names=[WIDTH] type=usize values=[2]
+  Const names=[HEIGHT] type=usize values=[4]
+  Var names=[TOTAL] type=usize values=[6]
+  Function name=main params=[] returns=[i32]

@@ -1,0 +1,6 @@
+SemanticModule
+  Import name=helper_consts
+  TypeDecl name=Packet kind=struct
+    Field name=bytes type=[3]u8
+    Layout size=3 align=1 offsets=[0]
+  Function name=main params=[] returns=[i32]

@@ -52,6 +52,7 @@ struct GlobalSummary {
     bool is_const = false;
     std::vector<std::string> names;
     Type type;
+    std::vector<std::string> constant_values;
 };
 
 struct ExprTypeFact {
