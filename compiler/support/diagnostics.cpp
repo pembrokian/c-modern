@@ -1,8 +1,62 @@
 #include "compiler/support/diagnostics.h"
 
 #include <sstream>
+#include <unordered_set>
+
+namespace {
+
+std::string JoinPaths(const std::vector<std::filesystem::path>& paths) {
+    std::ostringstream stream;
+    for (std::size_t index = 0; index < paths.size(); ++index) {
+        if (index > 0) {
+            stream << ", ";
+        }
+        stream << paths[index].generic_string();
+    }
+    return stream.str();
+}
+
+}  // namespace
 
 namespace mc::support {
+
+std::optional<std::filesystem::path> ResolveImportPathFromRoots(const std::filesystem::path& diagnostic_path,
+                                                                std::string_view module_name,
+                                                                const std::vector<std::filesystem::path>& search_roots,
+                                                                DiagnosticSink& diagnostics,
+                                                                const SourceSpan& span) {
+    std::vector<std::filesystem::path> matches;
+    matches.reserve(search_roots.size());
+    std::unordered_set<std::string> seen_matches;
+    for (const auto& root : search_roots) {
+        const std::filesystem::path candidate = std::filesystem::absolute(root / (std::string(module_name) + ".mc")).lexically_normal();
+        if (std::filesystem::exists(candidate) && seen_matches.insert(candidate.generic_string()).second) {
+            matches.push_back(candidate);
+        }
+    }
+
+    if (matches.size() == 1) {
+        return matches.front();
+    }
+
+    if (matches.empty()) {
+        diagnostics.Report({
+            .file_path = diagnostic_path,
+            .span = span,
+            .severity = DiagnosticSeverity::kError,
+            .message = "unable to resolve import module: " + std::string(module_name),
+        });
+        return std::nullopt;
+    }
+
+    diagnostics.Report({
+        .file_path = diagnostic_path,
+        .span = span,
+        .severity = DiagnosticSeverity::kError,
+        .message = "ambiguous import module '" + std::string(module_name) + "' matched multiple roots: " + JoinPaths(matches),
+    });
+    return std::nullopt;
+}
 
 std::string_view ToString(DiagnosticSeverity severity) {
     switch (severity) {
@@ -44,21 +98,7 @@ std::optional<std::filesystem::path> ResolveImportPath(const std::filesystem::pa
         search_roots.push_back(root);
     }
 
-    for (const auto& root : search_roots) {
-        const std::filesystem::path candidate =
-            std::filesystem::absolute(root / (std::string(module_name) + ".mc")).lexically_normal();
-        if (std::filesystem::exists(candidate)) {
-            return candidate;
-        }
-    }
-
-    diagnostics.Report({
-        .file_path = importer_path,
-        .span = span,
-        .severity = DiagnosticSeverity::kError,
-        .message = "unable to resolve import module: " + std::string(module_name),
-    });
-    return std::nullopt;
+    return ResolveImportPathFromRoots(importer_path, module_name, search_roots, diagnostics, span);
 }
 
 std::string FormatDiagnostic(const Diagnostic& diagnostic) {

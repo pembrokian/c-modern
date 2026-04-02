@@ -1,0 +1,16 @@
+schema = 1
+project = "phase7-project"
+default = "app"
+build_dir = "build/phase7_project"
+
+[targets.app]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.app.search_paths]
+modules = ["src"]
+
+[targets.app.runtime]
+startup = "default"

@@ -87,6 +87,7 @@ struct CheckResult {
 
 struct CheckOptions {
     std::vector<std::filesystem::path> import_roots;
+    const std::unordered_map<std::string, Module>* imported_modules = nullptr;
 };
 
 CheckResult CheckProgram(const ast::SourceFile& source_file,
@@ -101,6 +102,9 @@ CheckResult CheckProgram(const ast::SourceFile& source_file,
 CheckResult CheckSourceFile(const ast::SourceFile& source_file,
                             const std::filesystem::path& file_path,
                             support::DiagnosticSink& diagnostics);
+
+Module BuildExportedModuleSurface(const Module& module,
+                                  const ast::SourceFile& source_file);
 
 const FunctionSignature* FindFunctionSignature(const Module& module, std::string_view name);
 const TypeDeclSummary* FindTypeDecl(const Module& module, std::string_view name);

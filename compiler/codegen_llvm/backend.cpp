@@ -361,6 +361,8 @@ std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
         }
         case sema::Type::Kind::kProcedure:
             return use_backend_type("ptr", 8, 8);
+        case sema::Type::Kind::kNil:
+            return use_backend_type("ptr", 8, 8);
         default:
             return std::nullopt;
     }
@@ -4062,20 +4064,20 @@ bool RenderHostedEntryWrapper(const mir::Module& module,
     return true;
 }
 
-bool RenderExecutableModule(const mir::Module& module,
-                            const TargetConfig& target,
-                            const std::filesystem::path& source_path,
-                            support::DiagnosticSink& diagnostics,
-                            std::string& llvm_ir) {
+bool RenderLlvmModule(const mir::Module& module,
+                      const TargetConfig& target,
+                      const std::filesystem::path& source_path,
+                      bool wrap_hosted_main,
+                      support::DiagnosticSink& diagnostics,
+                      std::string& llvm_ir) {
     const mir::Function* main_function = FindFunction(module, "main");
-    if (main_function == nullptr) {
+    if (wrap_hosted_main && main_function == nullptr) {
         ReportBackendError(source_path,
                            "LLVM bootstrap executable emission requires a root 'main' function",
                            diagnostics);
         return false;
     }
 
-    const bool wrap_hosted_main = true;
     std::unordered_map<std::string, std::string> function_symbols;
     function_symbols.reserve(module.functions.size());
     for (const auto& function : module.functions) {
@@ -4191,7 +4193,7 @@ bool RenderExecutableModule(const mir::Module& module,
         }
     }
 
-    if (!RenderHostedEntryWrapper(module, *main_function, wrap_hosted_main, source_path, diagnostics, stream)) {
+    if (wrap_hosted_main && !RenderHostedEntryWrapper(module, *main_function, wrap_hosted_main, source_path, diagnostics, stream)) {
         return false;
     }
 
@@ -4336,34 +4338,22 @@ LowerResult LowerModule(const mir::Module& module,
     };
 }
 
-BuildResult BuildExecutable(const mir::Module& module,
-                            const std::filesystem::path& source_path,
-                            const BuildOptions& options,
-                            support::DiagnosticSink& diagnostics) {
+ObjectBuildResult BuildObjectFile(const mir::Module& module,
+                                  const std::filesystem::path& source_path,
+                                  const ObjectBuildOptions& options,
+                                  support::DiagnosticSink& diagnostics) {
     const auto lowered = LowerModule(module, source_path, {.target = options.target}, diagnostics);
     if (!lowered.ok) {
         return {};
     }
 
     std::string llvm_ir;
-    if (!RenderExecutableModule(module, options.target, source_path, diagnostics, llvm_ir)) {
+    if (!RenderLlvmModule(module, options.target, source_path, options.wrap_hosted_main, diagnostics, llvm_ir)) {
         return {};
     }
 
     std::filesystem::create_directories(options.artifacts.llvm_ir_path.parent_path());
     std::filesystem::create_directories(options.artifacts.object_path.parent_path());
-    std::filesystem::create_directories(options.artifacts.executable_path.parent_path());
-
-    const auto runtime_support_source = DiscoverHostedRuntimeSupportSource(source_path);
-    if (!runtime_support_source.has_value()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend could not locate hosted runtime support source '" +
-                               std::string(kHostedRuntimeSupportPath) + "'",
-                           diagnostics);
-        return {};
-    }
-    const std::filesystem::path runtime_object_path = options.artifacts.object_path.parent_path() /
-                                                      (options.artifacts.object_path.stem().generic_string() + ".runtime.o");
 
     {
         std::ofstream output(options.artifacts.llvm_ir_path, std::ios::binary);
@@ -4393,31 +4383,104 @@ BuildResult BuildExecutable(const mir::Module& module,
         return {};
     }
 
-    if (!RunHostCommand({"xcrun",
-                         "clang",
-                         "-target",
-                         options.target.triple,
-                         "-c",
-                         runtime_support_source->generic_string(),
-                         "-o",
-                         runtime_object_path.generic_string()},
-                        source_path,
-                        diagnostics,
-                        "compile hosted runtime support")) {
+    return {
+        .artifacts = options.artifacts,
+        .ok = true,
+    };
+}
+
+LinkResult LinkExecutable(const std::filesystem::path& source_path,
+                          const LinkOptions& options,
+                          support::DiagnosticSink& diagnostics) {
+    std::filesystem::create_directories(options.executable_path.parent_path());
+    std::filesystem::create_directories(options.runtime_object_path.parent_path());
+
+    const auto runtime_support_source = DiscoverHostedRuntimeSupportSource(source_path);
+    if (!runtime_support_source.has_value()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend could not locate hosted runtime support source '" +
+                               std::string(kHostedRuntimeSupportPath) + "'",
+                           diagnostics);
         return {};
     }
 
-    if (!RunHostCommand({"xcrun",
-                         "clang",
-                         "-target",
-                         options.target.triple,
-                         options.artifacts.object_path.generic_string(),
-                         runtime_object_path.generic_string(),
-                         "-o",
-                         options.artifacts.executable_path.generic_string()},
+    const bool runtime_object_missing = !std::filesystem::exists(options.runtime_object_path);
+    const bool runtime_source_is_newer = !runtime_object_missing &&
+                                         std::filesystem::last_write_time(*runtime_support_source) >
+                                             std::filesystem::last_write_time(options.runtime_object_path);
+    if (runtime_object_missing || runtime_source_is_newer) {
+        if (!RunHostCommand({"xcrun",
+                             "clang",
+                             "-target",
+                             options.target.triple,
+                             "-c",
+                             runtime_support_source->generic_string(),
+                             "-o",
+                             options.runtime_object_path.generic_string()},
+                            source_path,
+                            diagnostics,
+                            "compile hosted runtime support")) {
+            return {};
+        }
+    }
+
+    std::vector<std::string> link_command = {
+        "xcrun",
+        "clang",
+        "-target",
+        options.target.triple,
+    };
+    for (const auto& object_path : options.object_paths) {
+        link_command.push_back(object_path.generic_string());
+    }
+    link_command.push_back(options.runtime_object_path.generic_string());
+    link_command.push_back("-o");
+    link_command.push_back(options.executable_path.generic_string());
+
+    if (!RunHostCommand(link_command,
                         source_path,
                         diagnostics,
                         "link a hosted executable")) {
+        return {};
+    }
+
+    return {
+        .runtime_object_path = options.runtime_object_path,
+        .executable_path = options.executable_path,
+        .ok = true,
+    };
+}
+
+BuildResult BuildExecutable(const mir::Module& module,
+                            const std::filesystem::path& source_path,
+                            const BuildOptions& options,
+                            support::DiagnosticSink& diagnostics) {
+    const auto object_result = BuildObjectFile(module,
+                                               source_path,
+                                               {
+                                                   .target = options.target,
+                                                   .artifacts = {
+                                                       .llvm_ir_path = options.artifacts.llvm_ir_path,
+                                                       .object_path = options.artifacts.object_path,
+                                                   },
+                                                   .wrap_hosted_main = true,
+                                               },
+                                               diagnostics);
+    if (!object_result.ok) {
+        return {};
+    }
+    const std::filesystem::path runtime_object_path = options.artifacts.object_path.parent_path() /
+                                                      (options.artifacts.object_path.stem().generic_string() + ".runtime.o");
+
+    const auto link_result = LinkExecutable(source_path,
+                                            {
+                                                .target = options.target,
+                                                .object_paths = {options.artifacts.object_path},
+                                                .runtime_object_path = runtime_object_path,
+                                                .executable_path = options.artifacts.executable_path,
+                                            },
+                                            diagnostics);
+    if (!link_result.ok) {
         return {};
     }
 

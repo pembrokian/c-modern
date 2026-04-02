@@ -6,6 +6,7 @@
 
 #include "compiler/ast/ast.h"
 #include "compiler/lex/lexer.h"
+#include "compiler/mci/mci.h"
 #include "compiler/parse/parser.h"
 #include "compiler/support/diagnostics.h"
 #include "compiler/support/dump_paths.h"
@@ -80,6 +81,54 @@ void TestDumpPaths() {
         "object path should be deterministic");
     Expect(build_targets.executable.generic_string() == "build/debug/bin/tests_cases_hello.mc",
         "executable path should be deterministic");
+}
+
+void TestMciRoundTrip() {
+    mc::sema::Module module;
+    module.imports.push_back("helper_dep");
+    module.functions.push_back({
+        .name = "answer",
+        .return_types = {mc::sema::NamedType("i32")},
+    });
+
+    mc::sema::TypeDeclSummary type_decl;
+    type_decl.kind = mc::ast::Decl::Kind::kStruct;
+    type_decl.name = "Pair";
+    type_decl.fields = {{"left", mc::sema::NamedType("i32")}, {"right", mc::sema::NamedType("i32")}};
+    type_decl.layout = {
+        .valid = true,
+        .size = 8,
+        .alignment = 4,
+        .field_offsets = {0, 4},
+    };
+    module.type_decls.push_back(type_decl);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto temp_path = std::filesystem::temp_directory_path() / "c_modern_phase7_roundtrip.mci";
+    const mc::mci::InterfaceArtifact artifact {
+        .target_identity = "arm64-apple-darwin25.4.0",
+        .module_name = "helper",
+        .source_path = "tests/tool/phase7_project/src/helper.mc",
+        .module = module,
+    };
+
+    Expect(mc::mci::WriteInterfaceArtifact(temp_path, artifact, diagnostics),
+           "mci writer should emit deterministic interface artifacts");
+    Expect(!diagnostics.HasErrors(), "mci writer should not report errors for valid interface artifacts");
+
+    const auto loaded = mc::mci::LoadInterfaceArtifact(temp_path, diagnostics);
+    Expect(loaded.has_value(), "mci loader should read interface artifacts back");
+    Expect(!diagnostics.HasErrors(), "mci loader should accept its own canonical encoding");
+    Expect(loaded->module_name == "helper", "mci loader should preserve the module name");
+    Expect(loaded->module.imports.size() == 1 && loaded->module.imports[0] == "helper_dep",
+           "mci loader should preserve import lists");
+    Expect(loaded->module.functions.size() == 1 && loaded->module.functions[0].name == "answer",
+           "mci loader should preserve exported function signatures");
+    Expect(loaded->module.type_decls.size() == 1 && loaded->module.type_decls[0].name == "Pair",
+           "mci loader should preserve exported type declarations");
+    Expect(!loaded->interface_hash.empty(), "mci loader should preserve interface hashes");
+
+    std::filesystem::remove(temp_path);
 }
 
 void TestLexerTracksKeywordsAndSeparators() {
@@ -230,6 +279,7 @@ int main() {
     TestDiagnosticFormatting();
     TestSourceManagerLoad();
     TestDumpPaths();
+    TestMciRoundTrip();
     TestLexerTracksKeywordsAndSeparators();
     TestParserBuildsDeterministicAstDump();
     TestParserHandlesTypesAndLoopForms();

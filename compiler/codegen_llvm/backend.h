@@ -83,6 +83,35 @@ struct BuildArtifacts {
     std::filesystem::path executable_path;
 };
 
+struct ObjectArtifacts {
+    std::filesystem::path llvm_ir_path;
+    std::filesystem::path object_path;
+};
+
+struct ObjectBuildOptions {
+    TargetConfig target;
+    ObjectArtifacts artifacts;
+    bool wrap_hosted_main = false;
+};
+
+struct ObjectBuildResult {
+    ObjectArtifacts artifacts;
+    bool ok = false;
+};
+
+struct LinkOptions {
+    TargetConfig target;
+    std::vector<std::filesystem::path> object_paths;
+    std::filesystem::path runtime_object_path;
+    std::filesystem::path executable_path;
+};
+
+struct LinkResult {
+    std::filesystem::path runtime_object_path;
+    std::filesystem::path executable_path;
+    bool ok = false;
+};
+
 struct BuildOptions {
     TargetConfig target;
     BuildArtifacts artifacts;
@@ -99,6 +128,15 @@ LowerResult LowerModule(const mir::Module& module,
                         const std::filesystem::path& source_path,
                         const LowerOptions& options,
                         support::DiagnosticSink& diagnostics);
+
+ObjectBuildResult BuildObjectFile(const mir::Module& module,
+                                  const std::filesystem::path& source_path,
+                                  const ObjectBuildOptions& options,
+                                  support::DiagnosticSink& diagnostics);
+
+LinkResult LinkExecutable(const std::filesystem::path& source_path,
+                          const LinkOptions& options,
+                          support::DiagnosticSink& diagnostics);
 
 BuildResult BuildExecutable(const mir::Module& module,
                             const std::filesystem::path& source_path,

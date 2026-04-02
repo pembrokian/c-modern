@@ -1757,7 +1757,7 @@ std::unique_ptr<ast::SourceFile> ParseFile(const std::filesystem::path& path, su
     return std::move(parsed.source_file);
 }
 
-Module BuildExportedModule(const Module& module, const ast::SourceFile& source_file) {
+Module BuildExportedModuleSurfaceInternal(const Module& module, const ast::SourceFile& source_file) {
     Module exported;
     exported.imports = module.imports;
     if (!source_file.has_export_block) {
@@ -1822,53 +1822,63 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
     visit_state[normalized_path] = VisitState::kVisiting;
 
     ImportedModules imported_modules;
-    for (const auto& import_decl : source_file.imports) {
-        const auto import_path = mc::support::ResolveImportPath(normalized_path,
-                                    import_decl.module_name,
-                                    options.import_roots,
-                                    diagnostics,
-                                    import_decl.span);
-        if (!import_path.has_value()) {
-            continue;
-        }
-
-        const auto import_state = visit_state.find(*import_path);
-        if (import_state != visit_state.end() && import_state->second == VisitState::kVisiting) {
-            diagnostics.Report({
-                .file_path = normalized_path,
-                .span = import_decl.span,
-                .severity = DiagnosticSeverity::kError,
-                .message = "import cycle detected involving module: " + import_decl.module_name,
-            });
-            continue;
-        }
-
-        Module exported_module;
-        const auto found_exported = exported_cache.find(*import_path);
-        if (found_exported != exported_cache.end()) {
-            exported_module = found_exported->second;
-        } else {
-            auto parsed_import = ParseFile(*import_path, diagnostics);
-            if (parsed_import == nullptr) {
+    if (options.imported_modules != nullptr) {
+        imported_modules = *options.imported_modules;
+    } else {
+        for (const auto& import_decl : source_file.imports) {
+            const auto import_path = mc::support::ResolveImportPath(normalized_path,
+                                        import_decl.module_name,
+                                        options.import_roots,
+                                        diagnostics,
+                                        import_decl.span);
+            if (!import_path.has_value()) {
                 continue;
             }
-            const auto checked_import = CheckProgramInternal(*parsed_import, *import_path, options, diagnostics, exported_cache, visit_state);
-            if (checked_import.module != nullptr) {
-                exported_module = BuildExportedModule(*checked_import.module, *parsed_import);
-            }
-        }
 
-        imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(exported_module, import_decl.module_name);
+            const auto import_state = visit_state.find(*import_path);
+            if (import_state != visit_state.end() && import_state->second == VisitState::kVisiting) {
+                diagnostics.Report({
+                    .file_path = normalized_path,
+                    .span = import_decl.span,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "import cycle detected involving module: " + import_decl.module_name,
+                });
+                continue;
+            }
+
+            Module exported_module;
+            const auto found_exported = exported_cache.find(*import_path);
+            if (found_exported != exported_cache.end()) {
+                exported_module = found_exported->second;
+            } else {
+                auto parsed_import = ParseFile(*import_path, diagnostics);
+                if (parsed_import == nullptr) {
+                    continue;
+                }
+                const auto checked_import = CheckProgramInternal(*parsed_import, *import_path, options, diagnostics, exported_cache, visit_state);
+                if (checked_import.module != nullptr) {
+                    exported_module = BuildExportedModuleSurfaceInternal(*checked_import.module, *parsed_import);
+                }
+            }
+
+            imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(exported_module, import_decl.module_name);
+        }
     }
 
-    auto checked = Checker(source_file, normalized_path, &imported_modules, diagnostics).Run();
-    Module exported_module = checked.module != nullptr ? BuildExportedModule(*checked.module, source_file) : Module {};
+    const ImportedModules* imported_modules_ptr = imported_modules.empty() ? nullptr : &imported_modules;
+    auto checked = Checker(source_file, normalized_path, imported_modules_ptr, diagnostics).Run();
+    Module exported_module = checked.module != nullptr ? BuildExportedModuleSurfaceInternal(*checked.module, source_file) : Module {};
     exported_cache[normalized_path] = exported_module;
     visit_state[normalized_path] = VisitState::kDone;
     return checked;
 }
 
 }  // namespace
+
+Module BuildExportedModuleSurface(const Module& module,
+                                  const ast::SourceFile& source_file) {
+    return BuildExportedModuleSurfaceInternal(module, source_file);
+}
 
 CheckResult CheckProgram(const ast::SourceFile& source_file,
                          const std::filesystem::path& file_path,

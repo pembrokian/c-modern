@@ -1,31 +1,41 @@
-## Plan: Phase 7 Build Tool And Test Harness
+Phase 7 -- Build Tool And Test Harness
+======================================
 
-Phase 7 should turn the current bootstrap compiler into a usable local toolchain without widening into package management, remote dependency fetching, speculative parallel scheduling, or a second module system. The recommended approach is to keep the existing direct-source compiler path working for fixtures and smoke coverage, then layer a narrow build.toml-driven project path on top for target selection, separate compilation, .mci emission and consumption, mc run, and mc test. The most important design closure is the import model: Phase 7 must decide exactly how target-local search paths, repository stdlib discovery, vendored roots, and .mci lookup interact so the build graph and compiler resolve modules the same way.
+Status
+------
+Implemented for the admitted bootstrap slice
 
-**Status**
-- Planned
+Repository status note
+----------------------
+- Workstreams 7A through 7H are implemented in the current tree for the admitted repository bootstrap slice.
+- The current tree still does not satisfy every broader long-term Phase 7 expectation from the architecture texts, especially outside hosted executable targets and the repository-owned bootstrap testing contract.
+- Do not describe Phase 7 as fully complete beyond this admitted repository slice unless the remaining broader acceptance criteria in this file and the architecture docs are satisfied.
 
-**Dependency note**
+Dependency note
+---------------
 - Phase 7 depends on the executable bootstrap boundary completed by Phase 5 and the repository-specific Phase 6 hosted stdlib/runtime boundary already present in the tree.
 - Phase 7 also consumes current repository posture from:
-- /Users/ro/dev/c_modern/docs/plan/plan.txt
-- /Users/ro/dev/c_modern/docs/plan/phase5_bootstrap_finish.txt
-- /Users/ro/dev/c_modern/docs/plan/phase6_minimal_standard_library_and_runtime_boundary.txt
-- /Users/ro/dev/c_modern/docs/plan/phase6_implementation_summary.txt
-- /Users/ro/dev/c_modern/docs/arch/build_spec.txt
-- /Users/ro/dev/c_modern/docs/arch/test_spec.txt
-- /Users/ro/dev/c_modern/docs/arch/runtime_spec.txt
-- the current driver, sema, MIR, backend, dump-path, and stdlib/runtime integration entrypoints under /Users/ro/dev/c_modern/compiler/
-- the current executable and stdlib smoke coverage already wired through /Users/ro/dev/c_modern/CMakeLists.txt
+  - /Users/ro/dev/c_modern/docs/plan/plan.txt
+  - /Users/ro/dev/c_modern/docs/plan/phase5_bootstrap_finish.txt
+  - /Users/ro/dev/c_modern/docs/plan/phase6_minimal_standard_library_and_runtime_boundary.txt
+  - /Users/ro/dev/c_modern/docs/plan/phase6_implementation_summary.txt
+  - /Users/ro/dev/c_modern/docs/arch/build_spec.txt
+  - /Users/ro/dev/c_modern/docs/arch/test_spec.txt
+  - /Users/ro/dev/c_modern/docs/arch/runtime_spec.txt
+  - the current driver, sema, MIR, backend, dump-path, and stdlib/runtime integration entrypoints under /Users/ro/dev/c_modern/compiler/
+  - the current executable and stdlib smoke coverage already wired through /Users/ro/dev/c_modern/CMakeLists.txt
 
-**Repository-specific scope note**
+Repository-specific scope note
+-----------------------------
 - The architecture docs define the long-term canonical tool surface around build.toml, separate compilation, .mci artifacts, and mc test discovery.
-- The repository does not yet implement build.toml parsing, mc run, mc test, .mci emission, .mci consumption, or interface-hash-driven rebuilds.
+- The repository now implements the admitted bootstrap mc test slice, including ordinary project tests and a narrow compiler-regression manifest path.
 - The repository does already implement thin direct-source mc check and mc build flows, deterministic artifact path computation including reserved .mci paths, automatic repository-local stdlib discovery, and CTest-based regression coverage.
 - This repository-specific Phase 7 plan therefore focuses on converting that thin bootstrap command layer into an explicit project and test workflow while preserving the existing direct-source path for compiler fixtures, smoke tests, and bring-up ergonomics.
 
-**Purpose**
-- Execute the next bring-up phase by turning the repository from a compiler binary with a narrow build command into a usable local toolchain with:
+Purpose
+-------
+Execute the next bring-up phase by turning the repository from a compiler binary with a narrow build command into a usable local toolchain with:
+
 - a declarative build.toml project model
 - explicit target selection and build-mode selection
 - deterministic separate compilation through .mci interface artifacts
@@ -33,44 +43,52 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - one ordinary mc test flow for project tests and compiler regression classes
 - a simple, inspectable build graph whose rebuild behavior follows interface hashes rather than reparsing the whole source tree every time
 
-**Problem being solved**
+Problem being solved
+--------------------
 - The repository can now parse, type-check, lower, emit LLVM IR, link, and run a bounded executable slice, and it has a minimal hosted stdlib/runtime boundary.
 - It still lacks the ordinary developer workflow boundary described in plan.txt and the build/test specs.
 - Without a bounded Phase 7 closure pass:
-- mc build remains a single-source bootstrap command rather than a project tool
-- developers cannot describe targets, search paths, build modes, test roots, runtime selection, or link libraries declaratively
-- import resolution can drift between direct compiler invocations, future project builds, and future .mci consumption because no single Phase 7 import policy has been frozen
-- downstream modules cannot consume stable interface artifacts, so every build still trends toward whole-source recompilation
-- test discovery and runner generation remain architecture text only, leaving no single tool entrypoint for project tests and compiler regression classes
-- CTest stays the only orchestration layer, which is sufficient for repository bring-up but not sufficient evidence for the language-owned tool surface
+  - mc build remains a single-source bootstrap command rather than a project tool
+  - developers cannot describe targets, search paths, build modes, test roots, runtime selection, or link libraries declaratively
+  - import resolution can drift between direct compiler invocations, future project builds, and future .mci consumption because no single Phase 7 import policy has been frozen
+  - downstream modules cannot consume stable interface artifacts, so every build still trends toward whole-source recompilation
+  - test discovery and runner generation remain architecture text only, leaving no single tool entrypoint for project tests and compiler regression classes
+  - CTest stays the only orchestration layer, which is sufficient for repository bring-up but not sufficient evidence for the language-owned tool surface
 
-**Core rule**
+Core rule
+---------
 - The compiler owns parsing, sema, MIR, codegen, and interface-artifact truth.
 - The build tool owns target description, dependency ordering, rebuild decisions, runner generation, and process orchestration.
 - Phase 7 may add project configuration, dependency scanning, .mci I/O, and generated test runners, but it must not hide imports, hide package resolution, or create a second module system distinct from the language import rules.
 
-**Summary**
-- After Phase 7:
+Summary
+-------
+After Phase 7:
+
 - build.toml schema version 1 is implemented for the admitted repository slice
 - mc build supports target selection, build mode selection, hosted selection, source-root search paths, and ordinary link inputs through build.toml
 - mc run builds and executes executable targets through the same artifact graph used by mc build
-- mc test discovers ordinary test files ending in _test.mc, discovers ordinary test_* functions with signature func() Error, generates one deterministic runner executable per enabled target, and executes tests serially in deterministic lexical order
+- mc test discovers ordinary test files ending in _test.mc, discovers exported ordinary test_* functions using the current bootstrap repository contract `func() *T` or `func() Error`, generates one deterministic runner executable per enabled target, and executes tests serially in deterministic lexical order
+- mc test also admits a narrow file-based compiler-regression manifest path for compile-pass, compile-fail, run-output, and MIR-oriented cases while the existing C++ fixture binaries remain in CTest
 - the compiler emits deterministic text .mci artifacts and consumes them during dependent compilation
 - rebuild decisions use interface hashes so implementation-only upstream changes do not force unnecessary downstream recompilation
 - the direct-source bootstrap command path remains available for compiler fixtures and smoke commands instead of being broken or hidden behind build.toml-only behavior
 
-**Current repository posture**
-- The current driver already dispatches thin direct-source mc check, mc build, and mc dump-paths flows through /Users/ro/dev/c_modern/compiler/driver/driver.cpp.
-- Command parsing currently assumes a direct source path plus a small flag set and has no target model, no build.toml parser, no run command, and no test command.
+Current repository posture
+--------------------------
+- The current driver now dispatches direct-source and project-driven mc check, mc build, mc run, mc test, and mc dump-paths flows through /Users/ro/dev/c_modern/compiler/driver/driver.cpp.
+- Command parsing now supports direct source paths, build.toml target selection, mode and env overrides, ordinary test discovery, and a narrow regression-manifest path.
 - Deterministic dump and build artifact paths already exist, including a reserved .mci output path, through /Users/ro/dev/c_modern/compiler/support/dump_paths.cpp.
-- The compiler tree contains a reserved /Users/ro/dev/c_modern/compiler/mci/ directory but no actual interface serialization or loading implementation.
+- The compiler tree now contains actual /Users/ro/dev/c_modern/compiler/mci/ serialization and loading support for deterministic text interface artifacts.
 - Repository-local stdlib discovery already works by walking upward from the source path and adding stdlib/ as an import root.
-- The current executable build path still behaves like a bootstrap whole-build merge path rather than a separate-compilation graph.
+- The current executable build path now emits per-module objects plus a final linked executable for admitted project builds.
 - CMake and CTest currently own test orchestration for parser, sema, MIR, codegen, stdlib smoke, and tool smoke coverage under /Users/ro/dev/c_modern/CMakeLists.txt.
-- There are no ordinary Modern C _test.mc project tests yet and no generated test runner path.
+- There are still no repository-owned checked-in ordinary Modern C _test.mc project fixtures, but the generated runner path and bootstrap testing support are now implemented and proven through tool coverage.
 
-**Canonical posture**
-- The target posture is:
+Canonical posture
+-----------------
+The target posture is:
+
 - one declarative project file at the repository root using build.toml schema version 1
 - one explicit target graph with simple file-level dependency ordering
 - one import policy shared across direct-source commands, build.toml target builds, and .mci consumption
@@ -83,34 +101,48 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - zero hidden build scripting language
 - zero divergence between source import resolution and interface import resolution
 
-**Import design decisions and trade-offs that require explicit closure**
-- Search-path precedence:
+Import design decisions and trade-offs that require explicit closure
+-------------------------------------------------------------------
+Search-path precedence:
+
 - Decision: choose one order among command-line overrides, build.toml target search_paths.modules, repository-local stdlib discovery, and any fallback source-relative root.
 - Recommendation: CLI overrides first, build.toml target roots second, repository stdlib discovery last as a bootstrap fallback for direct-source commands only.
 - Trade-off: preserving automatic stdlib discovery everywhere is convenient for the repository, but if it outranks target-declared roots it will make project builds less explicit and harder to reason about.
-- Module identity versus file-path lookup:
+
+Module identity versus file-path lookup:
+
 - Decision: freeze whether an import name resolves by searching ordered roots for module.mc only, or whether additional package-like path rewriting is allowed.
 - Recommendation: keep the current simple ordered-root lookup model with no package aliases, no hidden module renaming, and crisp duplicate-match diagnostics.
 - Trade-off: ordered search roots are simple and fit the repository, but they require an explicit ambiguity policy when two roots export the same module name.
-- Direct-source commands versus project commands:
+
+Direct-source commands versus project commands:
+
 - Decision: decide whether mc check and mc build continue to accept raw source paths alongside build.toml targets.
 - Recommendation: keep both. Direct-source mode remains the bootstrap and fixture path; target mode becomes the canonical project workflow.
 - Trade-off: dual entrypoints add some driver complexity, but removing direct-source mode would force repository fixtures, focused diagnostics, and narrow bring-up tests through unnecessary project scaffolding.
-- .mci lookup model:
+
+.mci lookup model:
+
 - Decision: decide whether dependent compilation should consult source files, .mci files, or both when resolving imports inside a target build.
 - Recommendation: use source files for graph discovery and owning compilation units, then use emitted .mci files for downstream semantic import consumption within the build graph.
 - Trade-off: reading only .mci files improves separate compilation discipline, but graph discovery still needs a clear source-root walk unless build.toml enumerates every module.
-- Vendored dependency roots:
+
+Vendored dependency roots:
+
 - Decision: decide whether vendor/ is purely conventional or implicitly searched.
 - Recommendation: keep vendor/ conventional only; require it to be named in search_paths.modules.
 - Trade-off: implicit vendor support is convenient, but it becomes hidden package behavior and conflicts with the explicitness bias in build_spec.txt.
-- Compiler regression tests under mc test:
+
+Compiler regression tests under mc test:
+
 - Decision: decide how much of the existing repository CTest fixture system should also be surfaced through mc test in Phase 7.
 - Recommendation: Phase 7 should add a narrow compiler-regression manifest path under tests/tool/ that lets mc test drive compile-pass, compile-fail, run-output, and MIR-oriented classes without trying to replace all C++ fixture tests immediately.
 - Trade-off: folding every existing C++ test into mc test would over-expand the phase; keeping mc test limited to ordinary project tests only would under-deliver on the plan.txt exit criteria.
 
-**Canonical implementation requirements**
-- Phase 7 must define and enforce:
+Canonical implementation requirements
+-------------------------------------
+Phase 7 must define and enforce:
+
 - one explicit build.toml schema version 1 implementation for the admitted bootstrap slice
 - one explicit rule that target builds and test runs share the same import-resolution policy and artifact graph
 - one explicit rule that direct-source commands remain supported for bootstrap repository workflows
@@ -122,8 +154,10 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - one explicit rule that Phase 7 does not add remote fetching, general package management, hidden vendor search, or a programmable build DSL
 - one explicit rule that compiler-regression classes surfaced through mc test stay deterministic and file-based rather than turning into ad hoc driver special cases
 
-**Bootstrap command and graph admission matrix**
-- Tier 1 required foundation:
+Bootstrap command and graph admission matrix
+-------------------------------------------
+Tier 1 required foundation:
+
 - build.toml parsing for schema version 1
 - target graph construction for one target kind at a time with explicit roots
 - mc run command
@@ -131,12 +165,16 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - deterministic .mci consumption for downstream compilation
 - interface-hash-driven rebuild decisions
 - ordinary project-test discovery and generated runner execution
-- Tier 2 required when concrete repository consumers are wired:
+
+Tier 2 required when concrete repository consumers are wired:
+
 - staticlib and sharedlib target kinds
 - explicit non-default startup selection
 - compiler-regression manifest support through mc test
 - test timeout overrides and richer reporting flags
-- Tier 3 explicitly deferred unless pressure proves otherwise:
+
+Tier 3 explicitly deferred unless pressure proves otherwise:
+
 - remote dependencies or registries
 - hidden vendor discovery
 - parallel build scheduling
@@ -144,8 +182,10 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - generalized plugin hooks or scripted build steps
 - binary .mci sidecars or user-authored interface files
 
-**Canonical artifacts**
-- Phase 7 should produce or update the following canonical surfaces:
+Canonical artifacts
+-------------------
+Phase 7 should produce or update the following canonical surfaces:
+
 - /Users/ro/dev/c_modern/docs/plan/phase7_build_tool_and_test_harness.txt
 - /Users/ro/dev/c_modern/docs/plan/phase7_implementation_summary.txt
 - bounded updates to /Users/ro/dev/c_modern/README.md
@@ -159,7 +199,8 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - CMake wiring updates under /Users/ro/dev/c_modern/CMakeLists.txt
 - a repository-root build.toml fixture or focused build.toml test inputs where needed for tool validation
 
-**Allowed edit surface**
+Allowed edit surface
+--------------------
 - /Users/ro/dev/c_modern/docs/plan/
 - /Users/ro/dev/c_modern/README.md
 - /Users/ro/dev/c_modern/compiler/driver/
@@ -174,7 +215,8 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - /Users/ro/dev/c_modern/examples/ if a focused project-build or test-discovery example materially improves proof coverage
 - /Users/ro/dev/c_modern/CMakeLists.txt
 
-**Out of scope**
+Out of scope
+------------
 - full package management or remote dependency fetching
 - workspace-level dependency version solving
 - hidden vendor search rules
@@ -187,97 +229,130 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - broad IDE or daemonized build-cache infrastructure
 - Phase 8 real-program pressure work beyond the minimal project examples needed to prove Phase 7
 
-**Workstream 7A -- Authority and project-model closure**
-- Objective:
-- Freeze the repository-specific Phase 7 ownership split so build.toml, target graphs, direct-source flows, and .mci artifacts stop being architectural intent only and become executable repository truth.
-- Tasks:
-- Re-audit plan.txt, build_spec.txt, and test_spec.txt against the current repository posture.
-- Freeze the admitted Phase 7 target kinds and command surface for the first implementation slice.
-- Decide and document the Phase 7 import precedence rules covering CLI flags, build.toml search roots, repository stdlib discovery, and fallback behavior.
-- Decide and document whether compiler-regression classes under mc test are manifest-driven, directory-driven, or deferred past the first ordinary project-test slice.
-- Identify which current driver behaviors remain valid direct-source bootstrap truth versus which must move behind target-graph orchestration.
+Workstream 7A -- Authority and project-model closure
+---------------------------------------------------
+Objective
+~~~~~~~~~
+Freeze the repository-specific Phase 7 ownership split so build.toml, target graphs, direct-source flows, and .mci artifacts stop being architectural intent only and become executable repository truth.
 
-**Workstream 7B -- Import graph and build.toml closure**
-- Objective:
-- Implement one explicit, repository-controlled project model that can build multi-module targets through the same import rules the compiler already understands.
-- Tasks:
-- Implement a narrow build.toml parser for schema version 1 fields actually required by the repository slice: schema, project, default, build_dir, target kind, root, mode, env, target, links, search_paths.modules, runtime.startup, and tests.*.
-- Build a target description layer in the driver or support code that normalizes relative paths, validates schema version, validates target references, and reports direct diagnostics for malformed project files.
-- Implement import-root computation for target builds using the frozen precedence rules.
-- Add graph discovery that starts from the root module, walks explicit imports through ordered search roots, and records the owning source file for each module.
-- Add duplicate-module and missing-module diagnostics that surface root ordering and ambiguity clearly.
-- Preserve current direct-source mc check and mc build behavior for fixture workflows.
-- Add focused tool tests proving that explicit imports resolve through build.toml-declared roots and that undeclared vendored roots fail narrowly.
+Tasks
+~~~~~
+1. Re-audit plan.txt, build_spec.txt, and test_spec.txt against the current repository posture.
+2. Freeze the admitted Phase 7 target kinds and command surface for the first implementation slice.
+3. Decide and document the Phase 7 import precedence rules covering CLI flags, build.toml search roots, repository stdlib discovery, and fallback behavior.
+4. Decide and document whether compiler-regression classes under mc test are manifest-driven, directory-driven, or deferred past the first ordinary project-test slice.
+5. Identify which current driver behaviors remain valid direct-source bootstrap truth versus which must move behind target-graph orchestration.
 
-**Workstream 7C -- Interface artifact emission and consumption**
-- Objective:
-- Land deterministic text .mci artifacts as the separate-compilation contract and wire them into downstream semantic import consumption.
-- Tasks:
-- Implement a canonical repository .mci text encoding with deterministic field order, compiler format version, target identity, module identity, imported module list, exported declarations, layout-relevant type facts, and interface hash.
-- Reuse semantic-module truth from /Users/ro/dev/c_modern/compiler/sema/check.h and checked declarations rather than reconstructing exports ad hoc from MIR.
-- Add interface-hash computation that changes on exported semantic surface changes and stays stable across implementation-only changes.
-- Write .mci artifacts to the deterministic paths already computed in /Users/ro/dev/c_modern/compiler/support/dump_paths.cpp.
-- Implement .mci loading and validation under /Users/ro/dev/c_modern/compiler/mci/.
-- Integrate sema import handling so downstream modules can consume prior .mci exports instead of reparsing upstream source during target builds.
-- Add targeted tests proving that implementation-only upstream edits preserve dependent reuse while export-surface edits force downstream rebuild.
+Workstream 7B -- Import graph and build.toml closure
+----------------------------------------------------
+Objective
+~~~~~~~~~
+Implement one explicit, repository-controlled project model that can build multi-module targets through the same import rules the compiler already understands.
 
-**Workstream 7D -- Build execution graph and artifact reuse**
-- Objective:
-- Turn the current single-source bootstrap build path into a simple explicit build graph that emits objects, interfaces, and final linked artifacts deterministically.
-- Tasks:
-- Build a per-target dependency graph from discovered modules and topologically order compilation.
-- Define the first incremental state model using visible files under the build directory rather than hidden caches.
-- Compare existing .mci interface hashes and object timestamps to decide whether a module needs recompilation.
-- Keep the first scheduler sequential and deterministic.
-- Emit one object plus one .mci per compiled module and link only after all required module objects exist.
-- Preserve existing deterministic object, LLVM IR, backend dump, and executable paths.
-- Add tool tests covering no-op rebuild, implementation-only change, and interface-changing rebuild behavior.
+Tasks
+~~~~~
+1. Implement a narrow build.toml parser for schema version 1 fields actually required by the repository slice: schema, project, default, build_dir, target kind, root, mode, env, target, links, search_paths.modules, runtime.startup, and tests.*.
+2. Build a target description layer in the driver or support code that normalizes relative paths, validates schema version, validates target references, and reports direct diagnostics for malformed project files.
+3. Implement import-root computation for target builds using the frozen precedence rules.
+4. Add graph discovery that starts from the root module, walks explicit imports through ordered search roots, and records the owning source file for each module.
+5. Add duplicate-module and missing-module diagnostics that surface root ordering and ambiguity clearly.
+6. Preserve current direct-source mc check and mc build behavior for fixture workflows.
+7. Add focused tool tests proving that explicit imports resolve through build.toml-declared roots and that undeclared vendored roots fail narrowly.
 
-**Workstream 7E -- Command-surface completion**
-- Objective:
-- Complete the ordinary mc command surface around the new project and build graph without widening into unrelated workflow design.
-- Tasks:
-- Extend command parsing and usage text in /Users/ro/dev/c_modern/compiler/driver/driver.cpp to support target-driven mc check, mc build, mc run, and mc test while preserving existing direct-source invocations.
-- Implement target selection by explicit target name or project default target.
-- Implement build-mode selection and hosted-selection flow from build.toml with explicit command-line override rules.
-- Implement mc run by building the selected executable target and then executing the produced binary with an explicit argv passthrough boundary.
-- Keep process execution ordinary and narrow: return executable exit code, do not add hidden sandboxing, and do not invent a daemonized runner.
-- Add tool tests for usage text, target selection, missing default target, and mc run exit-code behavior.
+Workstream 7C -- Interface artifact emission and consumption
+-----------------------------------------------------------
+Objective
+~~~~~~~~~
+Land deterministic text .mci artifacts as the separate-compilation contract and wire them into downstream semantic import consumption.
 
-**Workstream 7F -- Ordinary project test harness**
-- Objective:
-- Implement the ordinary project-test path described in test_spec.txt with deterministic discovery, runner generation, and serial execution.
-- Tasks:
-- Discover _test.mc files under target-configured tests.roots.
-- Discover test_* functions with signature func() Error and reject mismatched shapes with direct diagnostics.
-- Generate one runner module per enabled target that imports or references discovered tests in deterministic lexical order.
-- Build the runner in checked mode by default unless target or CLI overrides it.
-- Execute tests serially, surface plain PASS and FAIL output, and fail the overall target on first crashing runner or nonzero exit.
-- Implement timeout handling at the runner-executable level only if it is needed to satisfy repository proof; otherwise document it as the next narrow extension inside Phase 7.
-- Add ordinary Modern C test fixtures that prove project-test discovery, deterministic ordering, and failing Error propagation.
+Tasks
+~~~~~
+1. Implement a canonical repository .mci text encoding with deterministic field order, compiler format version, target identity, module identity, imported module list, exported declarations, layout-relevant type facts, and interface hash.
+2. Reuse semantic-module truth from /Users/ro/dev/c_modern/compiler/sema/check.h and checked declarations rather than reconstructing exports ad hoc from MIR.
+3. Add interface-hash computation that changes on exported semantic surface changes and stays stable across implementation-only changes.
+4. Write .mci artifacts to the deterministic paths already computed in /Users/ro/dev/c_modern/compiler/support/dump_paths.cpp.
+5. Implement .mci loading and validation under /Users/ro/dev/c_modern/compiler/mci/.
+6. Integrate sema import handling so downstream modules can consume prior .mci exports instead of reparsing upstream source during target builds.
+7. Add targeted tests proving that implementation-only upstream edits preserve dependent reuse while export-surface edits force downstream rebuild.
 
-**Workstream 7G -- Compiler-regression harness unification**
-- Objective:
-- Expose the plan.txt compiler-regression classes through a consistent Phase 7 tool path without trying to replace every existing C++ repository test in one pass.
-- Tasks:
-- Choose one narrow repository format for mc test compiler-regression inputs, likely manifest-backed directories under tests/tool/ describing compile-pass, compile-fail, run-output, and MIR-oriented cases.
-- Reuse existing fixture conventions where possible, especially adjacent expected-diagnostic substring files and deterministic dump comparisons.
-- Keep compile-fail matching substring-based rather than full-render matching.
-- Keep MIR-oriented classes inspectable by comparing deterministic MIR dumps or narrow lowering properties rather than machine code only.
-- Wire those regression classes through mc test as a repository-owned proof path while keeping the existing C++ fixture executables in CTest until the new path proves stable.
-- Add clear scope boundaries so Phase 7 does not imply wholesale retirement of the current repository test binaries.
+Workstream 7D -- Build execution graph and artifact reuse
+---------------------------------------------------------
+Objective
+~~~~~~~~~
+Turn the current single-source bootstrap build path into a simple explicit build graph that emits objects, interfaces, and final linked artifacts deterministically.
 
-**Workstream 7H -- Documentation and proof closure**
-- Objective:
-- Make the Phase 7 workflow explicit, reviewable, and hard to regress.
-- Tasks:
-- Publish the repository-specific Phase 7 plan and implementation summary under docs/plan/.
-- Update README.md with the admitted command shapes, build.toml expectations, and the distinction between direct-source and target-driven usage.
-- Document the repository-specific import-precedence and .mci rebuild rules if they are narrower than the architecture docs.
-- Add focused tool and codegen tests for build graph behavior, mc run, mc test, and .mci invalidation.
-- Keep all artifact and runner outputs deterministic and build-dir scoped.
+Tasks
+~~~~~
+1. Build a per-target dependency graph from discovered modules and topologically order compilation.
+2. Define the first incremental state model using visible files under the build directory rather than hidden caches.
+3. Compare existing .mci interface hashes and object timestamps to decide whether a module needs recompilation.
+4. Keep the first scheduler sequential and deterministic.
+5. Emit one object plus one .mci per compiled module and link only after all required module objects exist.
+6. Preserve existing deterministic object, LLVM IR, backend dump, and executable paths.
+7. Add tool tests covering no-op rebuild, implementation-only change, and interface-changing rebuild behavior.
 
-**Ordered implementation steps**
+Workstream 7E -- Command-surface completion
+-------------------------------------------
+Objective
+~~~~~~~~~
+Complete the ordinary mc command surface around the new project and build graph without widening into unrelated workflow design.
+
+Tasks
+~~~~~
+1. Extend command parsing and usage text in /Users/ro/dev/c_modern/compiler/driver/driver.cpp to support target-driven mc check, mc build, mc run, and mc test while preserving existing direct-source invocations.
+2. Implement target selection by explicit target name or project default target.
+3. Implement build-mode selection and hosted-selection flow from build.toml with explicit command-line override rules.
+4. Implement mc run by building the selected executable target and then executing the produced binary with an explicit argv passthrough boundary.
+5. Keep process execution ordinary and narrow: return executable exit code, do not add hidden sandboxing, and do not invent a daemonized runner.
+6. Add tool tests for usage text, target selection, missing default target, and mc run exit-code behavior.
+
+Workstream 7F -- Ordinary project test harness
+----------------------------------------------
+Objective
+~~~~~~~~~
+Implement the ordinary project-test path described in test_spec.txt with deterministic discovery, runner generation, and serial execution.
+
+Tasks
+~~~~~
+1. Discover _test.mc files under target-configured tests.roots.
+2. Discover test_* functions with signature func() Error and reject mismatched shapes with direct diagnostics.
+3. Generate one runner module per enabled target that imports or references discovered tests in deterministic lexical order.
+4. Build the runner in checked mode by default unless target or CLI overrides it.
+5. Execute tests serially, surface plain PASS and FAIL output, and fail the overall target on first crashing runner or nonzero exit.
+6. Implement timeout handling at the runner-executable level only if it is needed to satisfy repository proof; otherwise document it as the next narrow extension inside Phase 7.
+7. Add ordinary Modern C test fixtures that prove project-test discovery, deterministic ordering, and failing Error propagation.
+
+Workstream 7G -- Compiler-regression harness unification
+--------------------------------------------------------
+Objective
+~~~~~~~~~
+Expose the plan.txt compiler-regression classes through a consistent Phase 7 tool path without trying to replace every existing C++ repository test in one pass.
+
+Tasks
+~~~~~
+1. Choose one narrow repository format for mc test compiler-regression inputs, likely manifest-backed directories under tests/tool/ describing compile-pass, compile-fail, run-output, and MIR-oriented cases.
+2. Reuse existing fixture conventions where possible, especially adjacent expected-diagnostic substring files and deterministic dump comparisons.
+3. Keep compile-fail matching substring-based rather than full-render matching.
+4. Keep MIR-oriented classes inspectable by comparing deterministic MIR dumps or narrow lowering properties rather than machine code only.
+5. Wire those regression classes through mc test as a repository-owned proof path while keeping the existing C++ fixture executables in CTest until the new path proves stable.
+6. Add clear scope boundaries so Phase 7 does not imply wholesale retirement of the current repository test binaries.
+
+Workstream 7H -- Documentation and proof closure
+-------------------------------------------------
+Objective
+~~~~~~~~~
+Make the Phase 7 workflow explicit, reviewable, and hard to regress.
+
+Tasks
+~~~~~
+1. Publish the repository-specific Phase 7 plan and implementation summary under docs/plan/.
+2. Update README.md with the admitted command shapes, build.toml expectations, and the distinction between direct-source and target-driven usage.
+3. Document the repository-specific import-precedence and .mci rebuild rules if they are narrower than the architecture docs.
+4. Add focused tool and codegen tests for build graph behavior, mc run, mc test, and .mci invalidation.
+5. Keep all artifact and runner outputs deterministic and build-dir scoped.
+
+Ordered implementation steps
+----------------------------
 1. Publish the repository-specific Phase 7 plan and freeze the import and project-model decisions before coding.
 2. Implement narrow build.toml parsing plus target normalization and diagnostics.
 3. Freeze and implement the target import-resolution policy, including duplicate-root ambiguity behavior.
@@ -291,93 +366,108 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 11. Add the narrow compiler-regression harness path under mc test for compile-pass, compile-fail, run-output, and MIR-oriented classes.
 12. Close documentation and deterministic proof coverage, then run the canonical local workflow plus focused Phase 7 command cases.
 
-**Execution slices used for implementation**
+Execution slices used for implementation
+----------------------------------------
 1. Project-model and import-closure slice
-- implement build.toml schema version 1 parsing for the admitted subset
-- decide and prove search-path precedence, duplicate resolution, and direct-source compatibility
-- validate that target-driven mc check resolves imports through the chosen mechanism
+   - implement build.toml schema version 1 parsing for the admitted subset
+   - decide and prove search-path precedence, duplicate resolution, and direct-source compatibility
+   - validate that target-driven mc check resolves imports through the chosen mechanism
+
 2. Interface-artifact slice
-- emit deterministic text .mci files from semantic export truth
-- load .mci files for downstream semantic imports
-- validate stable interface hashes and dependency invalidation behavior
+   - emit deterministic text .mci files from semantic export truth
+   - load .mci files for downstream semantic imports
+   - validate stable interface hashes and dependency invalidation behavior
+
 3. Incremental build and run slice
-- compile one target as a module graph to objects plus .mci files
-- reuse prior outputs when interface hashes remain unchanged
-- implement mc run on top of the same graph
+   - compile one target as a module graph to objects plus .mci files
+   - reuse prior outputs when interface hashes remain unchanged
+   - implement mc run on top of the same graph
+
 4. Ordinary test harness slice
-- discover _test.mc files and test_* functions
-- generate one serial runner executable per enabled target
-- validate PASS, FAIL, and checked-mode defaults
+   - discover _test.mc files and test_* functions
+   - generate one serial runner executable per enabled target
+   - validate PASS, FAIL, and checked-mode defaults
+
 5. Compiler-regression unification slice
-- add the first mc test support for compile-pass, compile-fail, run-output, and MIR-oriented repository cases
-- keep the slice file-based, deterministic, and clearly narrower than the full existing CTest matrix
+   - add the first mc test support for compile-pass, compile-fail, run-output, and MIR-oriented repository cases
+   - keep the slice file-based, deterministic, and clearly narrower than the full existing CTest matrix
 
-**Implementation task breakdown**
+Implementation task breakdown
+-----------------------------
 1. Planning and authority closure
-- publish this plan under docs/plan/
-- publish one implementation summary under docs/plan/
-- freeze the import precedence rules, target model, and compiler-regression surface admitted in Phase 7
-- record the exact direct-source versus target-driven command split carried forward from the current repository
+   - publish this plan under docs/plan/
+   - publish one implementation summary under docs/plan/
+   - freeze the import precedence rules, target model, and compiler-regression surface admitted in Phase 7
+   - record the exact direct-source versus target-driven command split carried forward from the current repository
+
 2. Driver and project integration
-- add build.toml reading, target selection, and command dispatch expansion
-- keep driver ownership focused on orchestration rather than semantic import meaning
-- preserve direct-source check and build flows for repository fixtures and smoke coverage
+   - add build.toml reading, target selection, and command dispatch expansion
+   - keep driver ownership focused on orchestration rather than semantic import meaning
+   - preserve direct-source check and build flows for repository fixtures and smoke coverage
+
 3. Interface artifact subsystem
-- add real source files under compiler/mci/
-- serialize and deserialize deterministic .mci artifacts
-- wire sema import consumption to use interface artifacts during graph builds
+   - add real source files under compiler/mci/
+   - serialize and deserialize deterministic .mci artifacts
+   - wire sema import consumption to use interface artifacts during graph builds
+
 4. Build graph and reuse
-- discover modules, topologically order them, compile per module, and link final artifacts
-- track interface hashes and visible timestamps to avoid unnecessary downstream recompilation
-- keep the first scheduler sequential and inspectable
+   - discover modules, topologically order them, compile per module, and link final artifacts
+   - track interface hashes and visible timestamps to avoid unnecessary downstream recompilation
+   - keep the first scheduler sequential and inspectable
+
 5. Test harness and regression classes
-- implement ordinary project-test discovery and runner generation first
-- admit compiler-regression classes under mc test only through a narrow manifest or directory contract
-- prefer reuse of existing expectation-file conventions over inventing new fixture languages
+   - implement ordinary project-test discovery and runner generation first
+   - admit compiler-regression classes under mc test only through a narrow manifest or directory contract
+   - prefer reuse of existing expectation-file conventions over inventing new fixture languages
+
 6. Documentation and proof closure
-- update README and repository notes to describe the admitted Phase 7 workflow accurately
-- add focused tool tests, project-test fixtures, and rebuild-behavior proofs
-- keep artifact paths, diagnostic matching, and test ordering deterministic
+   - update README and repository notes to describe the admitted Phase 7 workflow accurately
+   - add focused tool tests, project-test fixtures, and rebuild-behavior proofs
+   - keep artifact paths, diagnostic matching, and test ordering deterministic
 
-**Key implementation surfaces to reuse or modify**
-- /Users/ro/dev/c_modern/compiler/driver/driver.cpp — extend driver::Run, ParseCommandOptions, RunCheck, and RunBuild into a dual direct-source and target-driven command surface.
-- /Users/ro/dev/c_modern/compiler/support/dump_paths.cpp — keep existing deterministic paths and begin actually writing and reading the reserved .mci artifact path.
-- /Users/ro/dev/c_modern/compiler/sema/check.h — reuse semantic export truth as the source of interface serialization rather than reconstructing it after MIR lowering.
-- /Users/ro/dev/c_modern/compiler/mci/ — add the real interface-artifact encoding, decoding, validation, and hash support here instead of spreading it across the driver.
-- /Users/ro/dev/c_modern/CMakeLists.txt — wire any new tool tests and project-test fixtures into the canonical repository workflow.
-- /Users/ro/dev/c_modern/tests/tool/bootstrap_tests.cpp — extend deterministic artifact and command-behavior expectations from the existing path conventions.
-- /Users/ro/dev/c_modern/docs/arch/build_spec.txt — use as the normative source for schema version 1 field names, .mci artifact posture, and target model scope.
-- /Users/ro/dev/c_modern/docs/arch/test_spec.txt — use as the normative source for _test.mc discovery, test_* signature rules, runner behavior, and checked-mode defaults.
+Key implementation surfaces to reuse or modify
+----------------------------------------------
+- /Users/ro/dev/c_modern/compiler/driver/driver.cpp - extend driver::Run, ParseCommandOptions, RunCheck, and RunBuild into a dual direct-source and target-driven command surface.
+- /Users/ro/dev/c_modern/compiler/support/dump_paths.cpp - keep existing deterministic paths and begin actually writing and reading the reserved .mci artifact path.
+- /Users/ro/dev/c_modern/compiler/sema/check.h - reuse semantic export truth as the source of interface serialization rather than reconstructing it after MIR lowering.
+- /Users/ro/dev/c_modern/compiler/mci/ - add the real interface-artifact encoding, decoding, validation, and hash support here instead of spreading it across the driver.
+- /Users/ro/dev/c_modern/CMakeLists.txt - wire any new tool tests and project-test fixtures into the canonical repository workflow.
+- /Users/ro/dev/c_modern/tests/tool/bootstrap_tests.cpp - extend deterministic artifact and command-behavior expectations from the existing path conventions.
+- /Users/ro/dev/c_modern/docs/arch/build_spec.txt - use as the normative source for schema version 1 field names, .mci artifact posture, and target model scope.
+- /Users/ro/dev/c_modern/docs/arch/test_spec.txt - use as the normative source for _test.mc discovery, test_* signature rules, runner behavior, and checked-mode defaults.
 
-**Verification**
+Verification
+------------
 1. Run the canonical local workflow:
-- cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
-- cmake --build build/debug -j4
-- ctest --test-dir build/debug --output-on-failure
+   - cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
+   - cmake --build build/debug -j4
+   - ctest --test-dir build/debug --output-on-failure
 2. Add focused repository command proofs:
-- direct-source mc check still works on existing smoke fixtures
-- direct-source mc build still works on existing executable smoke fixtures
-- target-driven mc check resolves imports through build.toml-declared roots
-- target-driven mc build emits objects, .mci artifacts, and linked executable outputs deterministically
-- mc run returns the executable exit code and forwards argv deterministically
-- mc test discovers project tests, prints deterministic PASS and FAIL output, and runs in checked mode by default
+   - direct-source mc check still works on existing smoke fixtures
+   - direct-source mc build still works on existing executable smoke fixtures
+   - target-driven mc check resolves imports through build.toml-declared roots
+   - target-driven mc build emits objects, .mci artifacts, and linked executable outputs deterministically
+   - mc run returns the executable exit code and forwards argv deterministically
+   - mc test discovers project tests, prints deterministic PASS and FAIL output, and runs in checked mode by default
 3. Add focused incremental-build proofs:
-- no-op rebuild reuses existing module outputs
-- implementation-only upstream change does not rebuild unaffected dependents
-- exported-signature or exported-layout change forces dependent recompilation
+   - no-op rebuild reuses existing module outputs
+   - implementation-only upstream change does not rebuild unaffected dependents
+   - exported-signature or exported-layout change forces dependent recompilation
 4. Add focused compiler-regression proofs surfaced through mc test:
-- compile-pass case
-- compile-fail case using expected diagnostic substrings
-- run-output case with expected stdout and exit code
-- MIR-oriented case with deterministic MIR comparison or targeted lowering property check
+   - compile-pass case
+   - compile-fail case using expected diagnostic substrings
+   - run-output case with expected stdout and exit code
+   - MIR-oriented case with deterministic MIR comparison or targeted lowering property check
 
-**Validation guidance**
+Validation guidance
+-------------------
 - Validate this phase with the canonical repository workflow plus focused Phase 7 command cases.
 - Keep all new proofs deterministic and build-dir scoped.
 - Prefer repository-local fixtures over invented transient test data.
 - Validate import-policy behavior against real build.toml and source-root layouts rather than only unit-level parser tests.
 
-**Validation rules**
+Validation rules
+----------------
 - do not claim Phase 7 completion if mc test only covers ordinary project tests but not the admitted compiler-regression classes
 - do not claim separate compilation from timestamp-based rebuilds alone; dependent rebuild decisions must follow interface-hash changes
 - do not widen build.toml into scripting, remote fetching, or hidden workspace logic during this phase
@@ -385,7 +475,8 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - do not break the current direct-source command path merely to force build.toml usage
 - do not overclaim full package or workspace maturity from a repository-local Phase 7 slice
 
-**Acceptance criteria**
+Acceptance criteria
+-------------------
 - the repository contains a real build.toml-driven project path for the admitted Phase 7 slice
 - mc build, mc run, and mc test work for admitted target builds while direct-source mc check and mc build remain available for repository workflows
 - deterministic text .mci artifacts are emitted and consumed as the separate-compilation contract
@@ -395,19 +486,22 @@ Phase 7 should turn the current bootstrap compiler into a usable local toolchain
 - the repository exposes compile-pass, compile-fail, run-output, and MIR-oriented regression classes through one consistent Phase 7 mc test entry path for the admitted slice
 - the canonical local build and test workflow stays green with the new Phase 7 coverage in place
 
-**Implementation status target**
-- Phase 7 should be considered implemented only when:
+Implementation status target
+----------------------------
+Phase 7 should be considered implemented only when:
+
 - the admitted target-driven build workflow works end to end from build.toml through linked output reuse
 - startup, target selection, imports, interface reuse, and test discovery are owned by the documented build-tool layer rather than by incidental bootstrap driver behavior
 - the repository has a narrow finish note that records the supported bootstrap Phase 7 slice without overstating full package-management, workspace, or test-framework maturity
 
-**Further considerations**
+Further considerations
+----------------------
 1. Search-path fallback recommendation:
-- Option A: keep repository stdlib discovery as a direct-source-only fallback and require build.toml targets to declare non-stdlib roots explicitly. Recommended because it preserves repository ergonomics without hiding project imports.
-- Option B: keep repository stdlib discovery active for all project builds. Simpler short term, but less explicit and harder to carry into non-repository use.
+   - Option A: keep repository stdlib discovery as a direct-source-only fallback and require build.toml targets to declare non-stdlib roots explicitly. Recommended because it preserves repository ergonomics without hiding project imports.
+   - Option B: keep repository stdlib discovery active for all project builds. Simpler short term, but less explicit and harder to carry into non-repository use.
 2. Compiler-regression surfacing recommendation:
-- Option A: add a narrow mc test manifest format for repository regression classes. Recommended because it avoids parsing every existing C++ fixture convention into the tool immediately.
-- Option B: teach mc test to infer all compiler-regression classes directly from existing repository directories. Less up-front spec work, but higher risk of accidental policy drift.
+   - Option A: add a narrow mc test manifest format for repository regression classes. Recommended because it avoids parsing every existing C++ fixture convention into the tool immediately.
+   - Option B: teach mc test to infer all compiler-regression classes directly from existing repository directories. Less up-front spec work, but higher risk of accidental policy drift.
 3. .mci discovery recommendation:
-- Option A: source graph discovery plus .mci-based downstream semantic consumption. Recommended because it separates ownership of source roots from reuse of compiled interface truth.
-- Option B: pure source reparsing with optional .mci caching. Easier first implementation, but weaker Phase 7 closure and weaker evidence for separate compilation.
+   - Option A: source graph discovery plus .mci-based downstream semantic consumption. Recommended because it separates ownership of source roots from reuse of compiled interface truth.
+   - Option B: pure source reparsing with optional .mci caching. Easier first implementation, but weaker Phase 7 closure and weaker evidence for separate compilation.

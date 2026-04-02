@@ -35,6 +35,12 @@ std::optional<std::filesystem::path> ResolveImportPath(const std::filesystem::pa
                                                        DiagnosticSink& diagnostics,
                                                        const SourceSpan& span);
 
+std::optional<std::filesystem::path> ResolveImportPathFromRoots(const std::filesystem::path& diagnostic_path,
+                                                                std::string_view module_name,
+                                                                const std::vector<std::filesystem::path>& search_roots,
+                                                                DiagnosticSink& diagnostics,
+                                                                const SourceSpan& span);
+
 class DiagnosticSink {
   public:
     void Report(Diagnostic diagnostic);
