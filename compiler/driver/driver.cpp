@@ -306,7 +306,7 @@ void PrintArtifactTargets(const support::DumpTargets& dump_targets,
 }
 
 struct CheckedProgram {
-    const support::SourceFile* source_file = nullptr;
+    std::filesystem::path source_path;
     mc::parse::ParseResult parse_result;
     mc::sema::CheckResult sema_result;
     mc::mir::LowerResult mir_result;
@@ -338,22 +338,27 @@ struct ModuleBuildState {
     std::vector<std::pair<std::string, std::string>> imported_interface_hashes;
 };
 
-struct ProjectModuleNode {
+struct CompileNode {
     std::string module_name;
     std::filesystem::path source_path;
     mc::parse::ParseResult parse_result;
     std::vector<std::pair<std::string, std::filesystem::path>> imports;
 };
 
+struct CompileGraph {
+    std::filesystem::path entry_source_path;
+    std::vector<std::filesystem::path> import_roots;
+    std::filesystem::path build_dir;
+    std::string mode;
+    std::string env;
+    mc::codegen_llvm::TargetConfig target_config;
+    std::vector<CompileNode> nodes;
+};
+
 struct TargetBuildGraph {
     ProjectFile project;
     ProjectTarget target;
-    std::vector<std::filesystem::path> import_roots;
-    std::vector<ProjectModuleNode> nodes;
-    std::string mode;
-    std::string env;
-    std::filesystem::path build_dir;
-    mc::codegen_llvm::TargetConfig target_config;
+    CompileGraph compile_graph;
 };
 
 std::filesystem::path DefaultProjectPath() {
@@ -600,13 +605,13 @@ bool SupportsBootstrapTarget(const ProjectTarget& target,
     return false;
 }
 
-bool DiscoverProjectModuleGraphRecursive(const std::string& module_name,
-                                         const std::filesystem::path& source_path,
-                                         const std::vector<std::filesystem::path>& import_roots,
-                                         support::DiagnosticSink& diagnostics,
-                                         std::unordered_set<std::string>& visiting,
-                                         std::unordered_set<std::string>& visited,
-                                         std::vector<ProjectModuleNode>& nodes) {
+bool DiscoverModuleGraphRecursive(const std::string& module_name,
+                                  const std::filesystem::path& source_path,
+                                  const std::vector<std::filesystem::path>& import_roots,
+                                  support::DiagnosticSink& diagnostics,
+                                  std::unordered_set<std::string>& visiting,
+                                  std::unordered_set<std::string>& visited,
+                                  std::vector<CompileNode>& nodes) {
     const std::filesystem::path normalized_path = std::filesystem::absolute(source_path).lexically_normal();
     const std::string path_key = normalized_path.generic_string();
     if (visited.contains(path_key)) {
@@ -628,7 +633,7 @@ bool DiscoverProjectModuleGraphRecursive(const std::string& module_name,
         return false;
     }
 
-    ProjectModuleNode node {
+    CompileNode node {
         .module_name = module_name,
         .source_path = normalized_path,
         .parse_result = std::move(*parse_result),
@@ -645,13 +650,13 @@ bool DiscoverProjectModuleGraphRecursive(const std::string& module_name,
             return false;
         }
         node.imports.push_back({import_decl.module_name, *import_path});
-        if (!DiscoverProjectModuleGraphRecursive(import_decl.module_name,
-                                                 *import_path,
-                                                 import_roots,
-                                                 diagnostics,
-                                                 visiting,
-                                                 visited,
-                                                 nodes)) {
+        if (!DiscoverModuleGraphRecursive(import_decl.module_name,
+                                          *import_path,
+                                          import_roots,
+                                          diagnostics,
+                                          visiting,
+                                          visited,
+                                          nodes)) {
             visiting.erase(path_key);
             return false;
         }
@@ -661,6 +666,38 @@ bool DiscoverProjectModuleGraphRecursive(const std::string& module_name,
     visiting.erase(path_key);
     nodes.push_back(std::move(node));
     return true;
+}
+
+std::optional<CompileGraph> DiscoverModuleGraph(
+    const std::filesystem::path& entry_source_path,
+    const std::vector<std::filesystem::path>& import_roots,
+    const std::filesystem::path& build_dir,
+    const mc::codegen_llvm::TargetConfig& target_config,
+    std::string mode,
+    std::string env,
+    support::DiagnosticSink& diagnostics) {
+    const std::filesystem::path normalized_entry =
+        std::filesystem::absolute(entry_source_path).lexically_normal();
+    CompileGraph graph {
+        .entry_source_path = normalized_entry,
+        .import_roots = import_roots,
+        .build_dir = build_dir,
+        .mode = std::move(mode),
+        .env = std::move(env),
+        .target_config = target_config,
+    };
+    std::unordered_set<std::string> visiting;
+    std::unordered_set<std::string> visited;
+    if (!DiscoverModuleGraphRecursive(normalized_entry.stem().string(),
+                                      normalized_entry,
+                                      import_roots,
+                                      diagnostics,
+                                      visiting,
+                                      visited,
+                                      graph.nodes)) {
+        return std::nullopt;
+    }
+    return graph;
 }
 
 std::optional<TargetBuildGraph> BuildTargetGraph(const CommandOptions& options,
@@ -678,61 +715,55 @@ std::optional<TargetBuildGraph> BuildTargetGraph(const CommandOptions& options,
         return std::nullopt;
     }
 
-    TargetBuildGraph graph {
-        .project = *project,
-        .target = *target,
-        .import_roots = ComputeProjectImportRoots(*project, *target, options.import_roots),
-        .mode = options.mode_override.value_or(target->mode),
-        .env = options.env_override.value_or(target->env),
-        .build_dir = {},
-        .target_config = mc::codegen_llvm::BootstrapTargetConfig(),
+    const std::string mode = options.mode_override.value_or(target->mode);
+    const std::string env = options.env_override.value_or(target->env);
+
+    if (!IsSupportedMode(mode)) {
+        diagnostics.Report({
+            .file_path = project->path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "unsupported build mode for target build: " + mode,
+        });
+        return std::nullopt;
+    }
+    if (!IsSupportedEnv(env)) {
+        diagnostics.Report({
+            .file_path = project->path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "unsupported environment for target build: " + env,
+        });
+        return std::nullopt;
+    }
+
+    const std::filesystem::path build_dir = options.build_dir_explicit
+        ? std::filesystem::absolute(options.build_dir).lexically_normal()
+        : std::filesystem::absolute(project->build_dir / mode).lexically_normal();
+
+    mc::codegen_llvm::TargetConfig target_config = mc::codegen_llvm::BootstrapTargetConfig();
+    target_config.hosted = env == "hosted";
+    if (!target->target.empty() && target->target == target_config.triple) {
+        target_config.triple = target->target;
+    }
+
+    const auto import_roots = ComputeProjectImportRoots(*project, *target, options.import_roots);
+    auto compile_graph = DiscoverModuleGraph(
+        target->root, import_roots, build_dir, target_config, mode, env, diagnostics);
+    if (!compile_graph.has_value()) {
+        return std::nullopt;
+    }
+
+    ProjectFile resolved_project = *project;
+    resolved_project.build_dir = build_dir;
+    ProjectTarget resolved_target = *target;
+    resolved_target.mode = mode;
+    resolved_target.env = env;
+    return TargetBuildGraph {
+        .project = std::move(resolved_project),
+        .target = std::move(resolved_target),
+        .compile_graph = std::move(*compile_graph),
     };
-
-    if (!IsSupportedMode(graph.mode)) {
-        diagnostics.Report({
-            .file_path = project->path,
-            .span = support::kDefaultSourceSpan,
-            .severity = support::DiagnosticSeverity::kError,
-            .message = "unsupported build mode for target build: " + graph.mode,
-        });
-        return std::nullopt;
-    }
-    if (!IsSupportedEnv(graph.env)) {
-        diagnostics.Report({
-            .file_path = project->path,
-            .span = support::kDefaultSourceSpan,
-            .severity = support::DiagnosticSeverity::kError,
-            .message = "unsupported environment for target build: " + graph.env,
-        });
-        return std::nullopt;
-    }
-
-    if (options.build_dir_explicit) {
-        graph.build_dir = std::filesystem::absolute(options.build_dir).lexically_normal();
-    } else {
-        graph.build_dir = std::filesystem::absolute(project->build_dir / graph.mode).lexically_normal();
-    }
-    graph.project.build_dir = graph.build_dir;
-    graph.target.mode = graph.mode;
-    graph.target.env = graph.env;
-    graph.target_config.hosted = graph.env == "hosted";
-    if (!target->target.empty() && target->target == graph.target_config.triple) {
-        graph.target_config.triple = target->target;
-    }
-
-    std::unordered_set<std::string> visiting;
-    std::unordered_set<std::string> visited;
-    if (!DiscoverProjectModuleGraphRecursive(target->root.stem().string(),
-                                             target->root,
-                                             graph.import_roots,
-                                             diagnostics,
-                                             visiting,
-                                             visited,
-                                             graph.nodes)) {
-        return std::nullopt;
-    }
-
-    return graph;
 }
 
 mc::mci::InterfaceArtifact MakeModuleInterfaceArtifact(const std::filesystem::path& source_path,
@@ -757,7 +788,7 @@ bool WriteModuleInterface(const std::filesystem::path& source_path,
 }
 
 std::optional<ImportedInterfaceData> LoadImportedInterfaces(
-    const ProjectModuleNode& node,
+    const CompileNode& node,
     const std::filesystem::path& build_dir,
     support::DiagnosticSink& diagnostics) {
     ImportedInterfaceData imported;
@@ -779,9 +810,9 @@ void AddImportedExternDeclarations(mc::mir::Module& module,
 void NamespaceImportedBuildUnit(mc::mir::Module& module,
                                 std::string_view module_name);
 
-std::optional<std::vector<BuildUnit>> CompileTargetUnits(TargetBuildGraph& graph,
-                                                         support::DiagnosticSink& diagnostics,
-                                                         bool emit_objects) {
+std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
+                                                        support::DiagnosticSink& diagnostics,
+                                                        bool emit_objects) {
     std::vector<BuildUnit> units;
     units.reserve(graph.nodes.size());
 
@@ -823,7 +854,7 @@ std::optional<std::vector<BuildUnit>> CompileTargetUnits(TargetBuildGraph& graph
             .env = graph.env,
             .source_hash = HashText(*source_text),
             .interface_hash = interface_hash,
-            .wrap_hosted_main = node.source_path == std::filesystem::absolute(graph.target.root).lexically_normal(),
+            .wrap_hosted_main = node.source_path == graph.entry_source_path,
             .imported_interface_hashes = imported_data->interface_hashes,
         };
 
@@ -847,10 +878,10 @@ std::optional<std::vector<BuildUnit>> CompileTargetUnits(TargetBuildGraph& graph
                                                    *sema_result.module,
                                                    node.source_path,
                                                    diagnostics);
-        if (mir_result.ok && !imported_data->modules.empty()) {
+        if (emit_objects && mir_result.ok && !imported_data->modules.empty()) {
             AddImportedExternDeclarations(*mir_result.module, imported_data->modules);
         }
-        if (mir_result.ok && node.source_path != std::filesystem::absolute(graph.target.root).lexically_normal()) {
+        if (mir_result.ok && node.source_path != graph.entry_source_path) {
             NamespaceImportedBuildUnit(*mir_result.module, node.source_path.stem().string());
         }
         if (!mir_result.ok || !mc::mir::ValidateModule(*mir_result.module, node.source_path, diagnostics)) {
@@ -1117,114 +1148,35 @@ void NamespaceImportedBuildUnit(mc::mir::Module& module,
     }
 }
 
-bool CollectBuildUnits(const std::filesystem::path& source_path,
-                       const CommandOptions& options,
-                       support::DiagnosticSink& diagnostics,
-                       std::unordered_set<std::string>& visiting,
-                       std::unordered_map<std::string, std::size_t>& built_indices,
-                       std::vector<BuildUnit>& units) {
-    const std::filesystem::path normalized_path = std::filesystem::absolute(source_path).lexically_normal();
-    const std::string path_key = normalized_path.generic_string();
-    if (built_indices.contains(path_key)) {
-        return true;
-    }
-    if (!visiting.insert(path_key).second) {
-        diagnostics.Report({
-            .file_path = normalized_path,
-            .span = support::kDefaultSourceSpan,
-            .severity = support::DiagnosticSeverity::kError,
-            .message = "import cycle detected involving module: " + normalized_path.stem().string(),
-        });
-        return false;
-    }
-
-    auto parse_result = ParseSourcePath(normalized_path, diagnostics);
-    if (!parse_result.has_value()) {
-        visiting.erase(path_key);
-        return false;
-    }
-
-    const auto effective_import_roots = ComputeEffectiveImportRoots(normalized_path, options.import_roots);
-    for (const auto& import_decl : parse_result->source_file->imports) {
-        const auto import_path = mc::support::ResolveImportPath(normalized_path,
-                                                                import_decl.module_name,
-                                                                effective_import_roots,
-                                                                diagnostics,
-                                                                import_decl.span);
-        if (!import_path.has_value()) {
-            visiting.erase(path_key);
-            return false;
-        }
-        if (!CollectBuildUnits(*import_path, options, diagnostics, visiting, built_indices, units)) {
-            visiting.erase(path_key);
-            return false;
-        }
-    }
-
-    auto sema_result = mc::sema::CheckProgram(*parse_result->source_file,
-                                              normalized_path,
-                                              BuildSemaOptions(normalized_path, options),
-                                              diagnostics);
-    if (!sema_result.ok) {
-        visiting.erase(path_key);
-        return false;
-    }
-    if (!WriteModuleInterface(normalized_path,
-                              MakeModuleInterfaceArtifact(normalized_path,
-                                                          *parse_result->source_file,
-                                                          *sema_result.module,
-                                                          BootstrapTargetIdentity()),
-                              options.build_dir,
-                              diagnostics)) {
-        visiting.erase(path_key);
-        return false;
-    }
-
-    auto mir_result = mc::mir::LowerSourceFile(*parse_result->source_file,
-                                               *sema_result.module,
-                                               normalized_path,
-                                               diagnostics);
-    if (!mir_result.ok || !mc::mir::ValidateModule(*mir_result.module, normalized_path, diagnostics)) {
-        visiting.erase(path_key);
-        return false;
-    }
-
-    built_indices.emplace(path_key, units.size());
-    units.push_back(BuildUnit {
-        .source_path = normalized_path,
-        .parse_result = std::move(*parse_result),
-        .sema_result = std::move(sema_result),
-        .mir_result = std::move(mir_result),
-    });
-    visiting.erase(path_key);
-    return true;
-}
 
 std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& units,
                                                  const mc::mir::Module& entry_module,
                                                  const std::filesystem::path& entry_source_path) {
     auto merged = std::make_unique<mc::mir::Module>();
     std::unordered_set<std::string> seen_imports;
+    std::unordered_set<std::string> defined_by_deps;
     for (const auto& unit : units) {
         if (unit.source_path == std::filesystem::absolute(entry_source_path).lexically_normal()) {
             continue;
         }
-        mc::mir::Module namespaced_module = *unit.mir_result.module;
-        NamespaceImportedBuildUnit(namespaced_module, unit.source_path.stem().string());
-        for (const auto& import_name : unit.mir_result.module->imports) {
+        mc::mir::Module& unit_module = *unit.mir_result.module;
+        for (const auto& import_name : unit_module.imports) {
             if (seen_imports.insert(import_name).second) {
                 merged->imports.push_back(import_name);
             }
         }
         merged->type_decls.insert(merged->type_decls.end(),
-                                  namespaced_module.type_decls.begin(),
-                                  namespaced_module.type_decls.end());
+                                  unit_module.type_decls.begin(),
+                                  unit_module.type_decls.end());
         merged->globals.insert(merged->globals.end(),
-                               namespaced_module.globals.begin(),
-                               namespaced_module.globals.end());
-        merged->functions.insert(merged->functions.end(),
-                                 namespaced_module.functions.begin(),
-                                 namespaced_module.functions.end());
+                               unit_module.globals.begin(),
+                               unit_module.globals.end());
+        for (const auto& function : unit_module.functions) {
+            if (!function.is_extern) {
+                defined_by_deps.insert(function.name);
+            }
+            merged->functions.push_back(function);
+        }
     }
 
     for (const auto& import_name : entry_module.imports) {
@@ -1238,89 +1190,45 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
     merged->globals.insert(merged->globals.end(),
                            entry_module.globals.begin(),
                            entry_module.globals.end());
-    merged->functions.insert(merged->functions.end(),
-                             entry_module.functions.begin(),
-                             entry_module.functions.end());
+    for (const auto& function : entry_module.functions) {
+        if (!defined_by_deps.count(function.name)) {
+            merged->functions.push_back(function);
+        }
+    }
     return merged;
 }
 
 std::optional<CheckedProgram> CompileToMir(const CommandOptions& options,
-                                           support::SourceManager& source_manager,
                                            support::DiagnosticSink& diagnostics,
                                            bool include_imports_for_build) {
-    const auto file_id = source_manager.LoadFile(options.source_path, diagnostics);
-    if (!file_id.has_value()) {
+    const auto entry_path = std::filesystem::absolute(options.source_path).lexically_normal();
+    const auto import_roots = ComputeEffectiveImportRoots(entry_path, options.import_roots);
+    const auto bootstrap_config = mc::codegen_llvm::BootstrapTargetConfig();
+    auto graph = DiscoverModuleGraph(
+        entry_path, import_roots, options.build_dir, bootstrap_config, "debug", "hosted", diagnostics);
+    if (!graph.has_value()) {
         return std::nullopt;
     }
 
-    const support::SourceFile* source_file = source_manager.GetFile(*file_id);
-    const auto lex_result = mc::lex::Lex(source_file->contents, source_file->path.generic_string(), diagnostics);
-    auto parse_result = mc::parse::Parse(lex_result, source_file->path, diagnostics);
-    if (!parse_result.ok) {
+    auto units = CompileModuleGraph(*graph, diagnostics, false);
+    if (!units.has_value() || units->empty()) {
         return std::nullopt;
     }
 
-    auto sema_result = mc::sema::CheckProgram(*parse_result.source_file,
-                                              source_file->path,
-                                              BuildSemaOptions(source_file->path, options),
-                                              diagnostics);
-    if (!sema_result.ok) {
-        return std::nullopt;
-    }
-    if (!WriteModuleInterface(source_file->path,
-                              MakeModuleInterfaceArtifact(source_file->path,
-                                                          *parse_result.source_file,
-                                                          *sema_result.module,
-                                                          BootstrapTargetIdentity()),
-                              options.build_dir,
-                              diagnostics)) {
-        return std::nullopt;
-    }
-
-    auto mir_result = mc::mir::LowerSourceFile(*parse_result.source_file, *sema_result.module, source_file->path, diagnostics);
-    if (!mir_result.ok) {
-        return std::nullopt;
-    }
-
-    if (!mc::mir::ValidateModule(*mir_result.module, source_file->path, diagnostics)) {
-        return std::nullopt;
-    }
-
-    if (include_imports_for_build) {
-        const std::filesystem::path normalized_entry_path = std::filesystem::absolute(source_file->path).lexically_normal();
-        const std::string entry_key = normalized_entry_path.generic_string();
-        std::unordered_set<std::string> visiting {entry_key};
-        std::unordered_map<std::string, std::size_t> built_indices;
-        std::vector<BuildUnit> units;
-
-        const auto effective_import_roots = ComputeEffectiveImportRoots(normalized_entry_path, options.import_roots);
-        for (const auto& import_decl : parse_result.source_file->imports) {
-            const auto import_path = mc::support::ResolveImportPath(normalized_entry_path,
-                                                                    import_decl.module_name,
-                                                                    effective_import_roots,
-                                                                    diagnostics,
-                                                                    import_decl.span);
-            if (!import_path.has_value()) {
-                return std::nullopt;
-            }
-            if (!CollectBuildUnits(*import_path, options, diagnostics, visiting, built_indices, units)) {
-                return std::nullopt;
-            }
-        }
-        visiting.erase(entry_key);
-
-        auto merged_module = MergeBuildUnits(units, *mir_result.module, normalized_entry_path);
-        if (!mc::mir::ValidateModule(*merged_module, source_file->path, diagnostics)) {
+    BuildUnit& entry_unit = units->back();
+    if (include_imports_for_build && units->size() > 1) {
+        auto merged_module = MergeBuildUnits(*units, *entry_unit.mir_result.module, entry_unit.source_path);
+        if (!mc::mir::ValidateModule(*merged_module, entry_unit.source_path, diagnostics)) {
             return std::nullopt;
         }
-        mir_result.module = std::move(merged_module);
+        entry_unit.mir_result.module = std::move(merged_module);
     }
 
     return CheckedProgram {
-        .source_file = source_file,
-        .parse_result = std::move(parse_result),
-        .sema_result = std::move(sema_result),
-        .mir_result = std::move(mir_result),
+        .source_path = entry_unit.source_path,
+        .parse_result = std::move(entry_unit.parse_result),
+        .sema_result = std::move(entry_unit.sema_result),
+        .mir_result = std::move(entry_unit.mir_result),
     };
 }
 
@@ -1812,14 +1720,13 @@ bool EvaluateCheckPassCase(const CompilerRegressionCase& regression_case,
                            const std::vector<std::filesystem::path>& import_roots,
                            const std::filesystem::path& build_dir,
                            std::string& failure_detail) {
-    support::SourceManager source_manager;
     support::DiagnosticSink diagnostics;
     CommandOptions options;
     options.source_path = regression_case.source_path;
     options.build_dir = build_dir;
     options.build_dir_explicit = true;
     options.import_roots = import_roots;
-    if (!CompileToMir(options, source_manager, diagnostics, false).has_value()) {
+    if (!CompileToMir(options, diagnostics, false).has_value()) {
         failure_detail = diagnostics.Render();
         return false;
     }
@@ -1830,14 +1737,13 @@ bool EvaluateCheckFailCase(const CompilerRegressionCase& regression_case,
                            const std::vector<std::filesystem::path>& import_roots,
                            const std::filesystem::path& build_dir,
                            std::string& failure_detail) {
-    support::SourceManager source_manager;
     support::DiagnosticSink diagnostics;
     CommandOptions options;
     options.source_path = regression_case.source_path;
     options.build_dir = build_dir;
     options.build_dir_explicit = true;
     options.import_roots = import_roots;
-    if (CompileToMir(options, source_manager, diagnostics, false).has_value()) {
+    if (CompileToMir(options, diagnostics, false).has_value()) {
         failure_detail = "compiler regression should fail semantic checking";
         return false;
     }
@@ -1857,14 +1763,13 @@ bool EvaluateMirCase(const CompilerRegressionCase& regression_case,
                      const std::vector<std::filesystem::path>& import_roots,
                      const std::filesystem::path& build_dir,
                      std::string& failure_detail) {
-    support::SourceManager source_manager;
     support::DiagnosticSink diagnostics;
     CommandOptions options;
     options.source_path = regression_case.source_path;
     options.build_dir = build_dir;
     options.build_dir_explicit = true;
     options.import_roots = import_roots;
-    const auto checked = CompileToMir(options, source_manager, diagnostics, false);
+    const auto checked = CompileToMir(options, diagnostics, false);
     if (!checked.has_value()) {
         failure_detail = diagnostics.Render();
         return false;
@@ -1887,14 +1792,13 @@ bool EvaluateRunOutputCase(const CompilerRegressionCase& regression_case,
                            const std::vector<std::filesystem::path>& import_roots,
                            const std::filesystem::path& build_dir,
                            std::string& failure_detail) {
-    support::SourceManager source_manager;
     support::DiagnosticSink diagnostics;
     CommandOptions options;
     options.source_path = regression_case.source_path;
     options.build_dir = build_dir;
     options.build_dir_explicit = true;
     options.import_roots = import_roots;
-    const auto checked = CompileToMir(options, source_manager, diagnostics, true);
+    const auto checked = CompileToMir(options, diagnostics, true);
     if (!checked.has_value()) {
         failure_detail = diagnostics.Render();
         return false;
@@ -2017,14 +1921,14 @@ std::vector<const ProjectTarget*> SelectTestTargets(const ProjectFile& project,
 
 std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
                                                      support::DiagnosticSink& diagnostics) {
-    auto units = CompileTargetUnits(graph, diagnostics, true);
+    auto units = CompileModuleGraph(graph.compile_graph, diagnostics, true);
     if (!units.has_value() || units->empty()) {
         return std::nullopt;
     }
 
     const BuildUnit& entry_unit = units->back();
-    const auto build_targets = support::ComputeBuildArtifactTargets(entry_unit.source_path, graph.build_dir);
-    const auto runtime_object_path = ComputeRuntimeObjectPath(entry_unit.source_path, graph.build_dir);
+    const auto build_targets = support::ComputeBuildArtifactTargets(entry_unit.source_path, graph.compile_graph.build_dir);
+    const auto runtime_object_path = ComputeRuntimeObjectPath(entry_unit.source_path, graph.compile_graph.build_dir);
     const auto repo_root = DiscoverRepositoryRoot(entry_unit.source_path);
     const auto runtime_source_path = repo_root.has_value()
                                          ? std::optional<std::filesystem::path> {*repo_root / "runtime/hosted/mc_hosted_runtime.c"}
@@ -2039,7 +1943,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
 
         const auto link_result = mc::codegen_llvm::LinkExecutable(entry_unit.source_path,
                                                                   {
-                                                                      .target = graph.target_config,
+                                                                      .target = graph.compile_graph.target_config,
                                                                       .object_paths = object_paths,
                                                                       .runtime_object_path = runtime_object_path,
                                                                       .executable_path = build_targets.executable,
@@ -2059,14 +1963,13 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
 int RunCheck(const CommandOptions& options) {
     support::DiagnosticSink diagnostics;
     if (ClassifyInvocation(options) == InvocationKind::kDirectSource) {
-        support::SourceManager source_manager;
-        const auto checked = CompileToMir(options, source_manager, diagnostics, false);
+        const auto checked = CompileToMir(options, diagnostics, false);
         if (!checked.has_value()) {
             std::cerr << diagnostics.Render() << '\n';
             return 1;
         }
 
-        const auto targets = support::ComputeDumpTargets(checked->source_file->path, options.build_dir);
+        const auto targets = support::ComputeDumpTargets(checked->source_path, options.build_dir);
 
         if (options.dump_ast &&
             !WriteTextArtifact(targets.ast,
@@ -2088,7 +1991,7 @@ int RunCheck(const CommandOptions& options) {
 
         if (options.dump_backend) {
             const auto backend_result = mc::codegen_llvm::LowerModule(*checked->mir_result.module,
-                                                                      checked->source_file->path,
+                                                                      checked->source_path,
                                                                       {.target = mc::codegen_llvm::BootstrapTargetConfig()},
                                                                       diagnostics);
             if (!backend_result.ok ||
@@ -2101,7 +2004,7 @@ int RunCheck(const CommandOptions& options) {
             }
         }
 
-        std::cout << "checked " << checked->source_file->path.generic_string()
+        std::cout << "checked " << checked->source_path.generic_string()
                   << " (bootstrap phase 3 sema, phase 4 MIR)" << '\n';
 
         if (options.emit_dump_paths) {
@@ -2116,14 +2019,14 @@ int RunCheck(const CommandOptions& options) {
         std::cerr << diagnostics.Render() << '\n';
         return 1;
     }
-    auto units = CompileTargetUnits(*graph, diagnostics, false);
+    auto units = CompileModuleGraph(graph->compile_graph, diagnostics, false);
     if (!units.has_value() || units->empty()) {
         std::cerr << diagnostics.Render() << '\n';
         return 1;
     }
 
     const BuildUnit& entry_unit = units->back();
-    const auto dump_targets = support::ComputeDumpTargets(entry_unit.source_path, graph->build_dir);
+    const auto dump_targets = support::ComputeDumpTargets(entry_unit.source_path, graph->compile_graph.build_dir);
 
     if (options.dump_ast &&
         !WriteTextArtifact(dump_targets.ast,
@@ -2146,7 +2049,7 @@ int RunCheck(const CommandOptions& options) {
     if (options.dump_backend) {
         const auto backend_result = mc::codegen_llvm::LowerModule(*entry_unit.mir_result.module,
                                       entry_unit.source_path,
-                                      {.target = graph->target_config},
+                                      {.target = graph->compile_graph.target_config},
                                                                   diagnostics);
         if (!backend_result.ok ||
             !WriteTextArtifact(dump_targets.backend,
@@ -2169,15 +2072,14 @@ int RunCheck(const CommandOptions& options) {
 int RunBuild(const CommandOptions& options) {
     support::DiagnosticSink diagnostics;
     if (ClassifyInvocation(options) == InvocationKind::kDirectSource) {
-        support::SourceManager source_manager;
-        const auto checked = CompileToMir(options, source_manager, diagnostics, true);
+        const auto checked = CompileToMir(options, diagnostics, true);
         if (!checked.has_value()) {
             std::cerr << diagnostics.Render() << '\n';
             return 1;
         }
 
-        const auto dump_targets = support::ComputeDumpTargets(checked->source_file->path, options.build_dir);
-        const auto build_targets = support::ComputeBuildArtifactTargets(checked->source_file->path, options.build_dir);
+        const auto dump_targets = support::ComputeDumpTargets(checked->source_path, options.build_dir);
+        const auto build_targets = support::ComputeBuildArtifactTargets(checked->source_path, options.build_dir);
 
         if (options.dump_ast &&
             !WriteTextArtifact(dump_targets.ast,
@@ -2199,7 +2101,7 @@ int RunBuild(const CommandOptions& options) {
 
         if (options.dump_backend) {
             const auto backend_result = mc::codegen_llvm::LowerModule(*checked->mir_result.module,
-                                                                      checked->source_file->path,
+                                                                      checked->source_path,
                                                                       {.target = mc::codegen_llvm::BootstrapTargetConfig()},
                                                                       diagnostics);
             if (!backend_result.ok ||
@@ -2214,7 +2116,7 @@ int RunBuild(const CommandOptions& options) {
 
         const auto build_result = mc::codegen_llvm::BuildExecutable(
             *checked->mir_result.module,
-            checked->source_file->path,
+            checked->source_path,
             {
                 .target = mc::codegen_llvm::BootstrapTargetConfig(),
                 .artifacts = {
@@ -2229,7 +2131,7 @@ int RunBuild(const CommandOptions& options) {
             return 1;
         }
 
-        std::cout << "built " << checked->source_file->path.generic_string() << " -> "
+        std::cout << "built " << checked->source_path.generic_string() << " -> "
                   << build_result.artifacts.executable_path.generic_string()
                   << " (bootstrap phase 5 executable path)" << '\n';
 
@@ -2258,8 +2160,8 @@ int RunBuild(const CommandOptions& options) {
         return 1;
     }
 
-    const auto dump_targets = support::ComputeDumpTargets(entry_unit.source_path, graph->build_dir);
-    const auto build_targets = support::ComputeBuildArtifactTargets(entry_unit.source_path, graph->build_dir);
+    const auto dump_targets = support::ComputeDumpTargets(entry_unit.source_path, graph->compile_graph.build_dir);
+    const auto build_targets = support::ComputeBuildArtifactTargets(entry_unit.source_path, graph->compile_graph.build_dir);
 
     if (options.dump_ast &&
         !WriteTextArtifact(dump_targets.ast,
@@ -2282,7 +2184,7 @@ int RunBuild(const CommandOptions& options) {
     if (options.dump_backend) {
         const auto backend_result = mc::codegen_llvm::LowerModule(*merged_module,
                                       entry_unit.source_path,
-                                      {.target = graph->target_config},
+                                      {.target = graph->compile_graph.target_config},
                                                                   diagnostics);
         if (!backend_result.ok ||
             !WriteTextArtifact(dump_targets.backend,
@@ -2373,13 +2275,13 @@ int RunTest(const CommandOptions& options) {
                                                  target_options,
                                                  discovered->roots,
                                                  discovered->ordinary_tests,
-                                                 graph->build_dir) && target_ok;
+                                                 graph->compile_graph.build_dir) && target_ok;
         }
         if (!discovered->regression_cases.empty()) {
             const auto import_roots = ComputeProjectImportRoots(*project, *target, options.import_roots);
             target_ok = RunCompilerRegressionCases(discovered->regression_cases,
                                                   import_roots,
-                                                  graph->build_dir) && target_ok;
+                                                  graph->compile_graph.build_dir) && target_ok;
         }
         if (discovered->ordinary_tests.empty() && discovered->regression_cases.empty()) {
             std::cout << "no tests discovered for target " << target->name << '\n';
