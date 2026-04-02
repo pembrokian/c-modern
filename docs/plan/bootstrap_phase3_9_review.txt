@@ -567,6 +567,9 @@ Recommended first follow-up documents:
 
 - `/Users/ro/dev/c_modern/docs/plan/phase9_phase3_semantic_authority_expansion.txt`
   as the repository-specific execution plan for unfinished Phase 3 closure work
+- `/Users/ro/dev/c_modern/docs/plan/phase9_phase4_mir_authority_expansion.txt`
+  as the repository-specific execution plan for unfinished Phase 4 MIR closure
+  work
 - a Phase 5 backend deepening plan for the first hosted target
 - a Phase 6 library-surface critique and closure plan
 - a Phase 7 toolchain maturity plan focused on .mci and mc test correctness

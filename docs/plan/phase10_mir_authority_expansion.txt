@@ -1,0 +1,336 @@
+Phase 10 -- Phase 4 MIR Authority Expansion
+==========================================
+
+Status
+------
+PLANNED
+
+Repository status note
+----------------------
+- The repository already has a real bootstrap Phase 4 boundary recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase4_bootstrap_finish.txt`, plus a more
+  detailed posture note in
+  `/Users/ro/dev/c_modern/docs/plan/phase4_bootstrap_status.txt`.
+- The broader non-bootstrap expansion path is currently recorded in
+  `/Users/ro/dev/c_modern/docs/plan/bootstrap_phase3_9_review.txt`.
+- This file does not introduce a new architecture phase after Phase 8.
+  It is a repository-specific execution label for the unfinished MIR work that
+  still belongs to Phase 4 ownership.
+- Do not describe Phase 10 as a new compiler layer.
+  It is the concrete closure plan for making MIR authoritative enough that
+  Phase 5 backend work, Phase 7 workflow work, and Phase 8 pressure findings
+  can consume typed lowered truth without reconstructing or compensating for
+  missing MIR structure.
+
+Dependency note
+---------------
+- Phase 10 depends on the current repository posture described in:
+  - `/Users/ro/dev/c_modern/docs/plan/plan.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase4_bootstrap_finish.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase4_bootstrap_status.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/bootstrap_phase3_9_review.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase10_phase3_semantic_authority_expansion.txt`
+  - the current MIR entrypoints under `/Users/ro/dev/c_modern/compiler/mir/`
+  - the current MIR fixture and validator harness under
+    `/Users/ro/dev/c_modern/tests/mir/`
+- Phase 10 must preserve the existing ownership split:
+  - sema owns language meaning
+  - MIR owns typed lowered semantic truth
+  - the backend consumes MIR rather than redefining language policy
+  - the driver emits dumps and orchestrates workflow rather than repairing
+    missing semantic or MIR facts
+- If a requested MIR expansion depends on semantic facts that Phase 3 does not
+  yet provide authoritatively, route that gap back to Phase 3 ownership or land
+  the sema and MIR changes together without moving semantic policy into MIR.
+
+Repository-specific scope note
+------------------------------
+- The architecture texts stop at Phase 8 and already state that later pressure
+  findings must route back to the smallest correct owner.
+- This repository uses the Phase 10 label only to package the next execution
+  wave as a concrete plan document under `docs/plan/`.
+- In substance, Phase 10 is the implementation plan for Workstreams 4A through
+  4D from the non-bootstrap roadmap, with the first execution wave explicitly
+  prioritizing MIR surface closure and validator hardening before broader
+  backend deepening.
+
+Purpose
+-------
+Turn the broad non-bootstrap Phase 4 roadmap into an execution-ready plan that
+can be implemented in reviewable waves without blurring the boundary between
+sema-owned meaning, MIR-owned lowered truth, and backend-owned realization.
+
+After Phase 10:
+
+- the admitted non-bootstrap semantic surface lowers to MIR through explicit,
+  typed, deterministic representations rather than bootstrap fallbacks
+- semantic-boundary operations required by the admitted language surface are
+  represented directly in MIR instead of being left to backend defaults,
+  runtime accidents, or library-shaped call conventions
+- MIR validation is strong enough to reject malformed or semantically
+  impossible typed MIR before backend work begins
+- the deterministic fixture layer under `/Users/ro/dev/c_modern/tests/mir/`
+  acts as the main stable proof surface for MIR behavior rather than only a
+  bootstrap smoke check
+
+Problem being solved
+--------------------
+- The repository already has a real typed MIR layer, deterministic MIR dumps,
+  a growing validator, and representative MIR fixtures for the currently
+  supported bootstrap slice.
+- That MIR layer is still incomplete relative to the long-term Phase 4
+  contract in `plan.txt` and the repository's own non-bootstrap roadmap.
+- The main remaining risk is not absence of MIR, but partial authority:
+  some lowering paths are still bounded by bootstrap coverage, some semantic-
+  boundary forms are only covered for the current admitted subset, validator
+  legality is stronger than before but not yet fully instruction-complete, and
+  dump/debug quality still carries bootstrap-oriented compromises.
+- Without an explicit execution plan:
+  - backend work can harden around a narrower MIR subset than the admitted sema
+    surface really needs
+  - unsupported or partially explicit boundaries can drift back toward generic
+    call shaping, display-string recovery, or backend-local policy
+  - validator coverage can remain strongest only on the currently emitted
+    subset instead of the full admitted MIR contract
+  - Phase 8 findings that should become MIR regressions can remain anecdotal
+    or get routed directly into backend fixes
+
+Core rule
+---------
+- Fix lowered semantic-boundary gaps in MIR, not in the backend, the driver,
+  or the stdlib.
+- Do not force MIR to invent meaning that sema does not yet own.
+- Prefer a narrower honest MIR contract over a broader bootstrap convenience
+  encoding.
+- Keep MIR dumps, validation failures, and fixture outputs deterministic so the
+  MIR test layer remains authoritative.
+
+Current repository posture
+--------------------------
+- The main MIR data-model, lowering, validation, and dump entrypoints currently
+  live in `/Users/ro/dev/c_modern/compiler/mir/mir.h` and
+  `/Users/ro/dev/c_modern/compiler/mir/mir.cpp`.
+- The CMake target `mc_mir` is already a dedicated repository layer between
+  sema and backend work, and the main driver path links that target before
+  invoking backend lowering.
+- The repository already has two MIR-focused test binaries registered through
+  CTest:
+  - `mc_mir_unit` from `/Users/ro/dev/c_modern/tests/mir/mir_tests.cpp`
+  - `mc_mir_fixture_unit` from
+    `/Users/ro/dev/c_modern/tests/mir/mir_fixture_tests.cpp`
+- The fixture layer already includes deterministic MIR dumps for explicit
+  conversions, checked bounds and arithmetic faults, aggregates, slices,
+  loops, `defer`, variants, low-level memory operations, and canonical-style
+  programs such as `canonical_eval`, `canonical_memory_poll`, and
+  `canonical_window_stats`.
+- The bootstrap Phase 4 status note already records meaningful progress:
+  explicit MIR forms exist for checked bounds/divide/shift faults, pointer-int
+  conversion boundaries, array-to-slice and buffer-to-slice conversions,
+  `mmio_ptr`, and the current volatile/atomic subset; validator coverage has
+  also expanded well beyond simple control-flow checks.
+- The remaining gaps are now mainly closure problems:
+  coverage of the full admitted sema surface, completion of remaining semantic-
+  boundary forms, stronger legality checks across all admitted instruction
+  families, and reduction of the remaining bootstrap-shaped recovery or lookup
+  conventions.
+
+Phase 10 execution waves
+-----------------------
+Phase 10A -- Lowering Surface Closure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Freeze and complete the MIR lowering matrix for the admitted semantic surface
+so supported constructs lower through explicit, typed MIR without backend-
+shaped fallback behavior.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 4A -- MIR surface completion
+
+Tasks
+~~~~~
+1. Build and maintain a concrete lowering-coverage matrix from the admitted
+   sema surface, the current bootstrap status note, and the current MIR
+   fixtures.
+2. Separate true MIR gaps from upstream sema gaps so lowering work does not
+   accidentally absorb semantic ownership.
+3. Complete lowering for the remaining admitted aggregates, conversions,
+   address-sensitive operations, imported symbol/type-sensitive accesses, and
+   other non-bootstrap forms that Phase 3 already makes meaningful.
+4. Remove any remaining supported-path dependence on generic call shaping,
+   display-string identity recovery, or bootstrap-only fallback encodings.
+5. Ensure unsupported constructs fail crisply at the MIR boundary when the
+   repository is still intentionally narrower than the long-term architecture.
+6. Add representative fixtures proving that widened lowering paths stay typed,
+   deterministic, and free of bootstrap recovery artifacts on success.
+
+Phase 10B -- Semantic-Boundary Instruction Completion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Finish the explicit MIR instruction and metadata surface for semantic-boundary
+operations that the admitted language already requires.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 4B -- Semantic-boundary instruction completion
+
+Tasks
+~~~~~
+1. Audit the admitted language surface for every operation whose semantics must
+   be explicit in MIR rather than inherited from LLVM, the host ABI, or a
+   library call convention.
+2. Complete any remaining checked-fault, pointer-int, array/slice, buffer/
+   slice, volatile, atomic, or other low-level boundary forms that are already
+   semantically admitted but not yet fully explicit in MIR.
+3. Make sure each dedicated instruction family carries enough structured
+   metadata that validation and backend lowering can reason from MIR directly
+   rather than reparsing dump text.
+4. Reject fallback encodings for instruction families that now have a dedicated
+   MIR representation.
+5. Keep boundaries honest where repository support is still intentionally
+   incomplete: unsupported low-level forms should fail narrowly instead of
+   silently lowering through generic mechanisms.
+
+Phase 10C -- Validator Legality Completion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Make MIR validation a full legality check for the admitted typed MIR surface,
+not only a guardrail around the currently emitted bootstrap subset.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 4C -- Validation hardening
+
+Tasks
+~~~~~
+1. Re-audit the validator against every admitted instruction and terminator
+   family instead of only the currently common emitted paths.
+2. Strengthen type-consistency, operand-shape, result/effect-shape, aggregate,
+   target-metadata, block-termination, and control-flow legality checks so the
+   validator describes the MIR contract explicitly.
+3. Validate cross-instruction invariants wherever MIR requires structured
+   relationships between instructions, metadata, or checked-operation helpers.
+4. Preserve legitimate imported or sema-backed references without weakening the
+   legality rules for locally materialized MIR facts.
+5. Expand negative coverage so each major MIR family has direct invalid-module
+   or mutation-based tests proving the validator rejects malformed input.
+
+Phase 10D -- Dump, Fixture, and Debugging Quality
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Keep MIR inspectable enough that lowering bugs and contract regressions can be
+localized at the MIR layer before they spread into backend or executable tests.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 4D -- MIR debugging quality
+
+Tasks
+~~~~~
+1. Preserve deterministic dump ordering and formatting as the MIR surface
+   widens.
+2. Prefer structured, reviewable MIR dump content over lookup schemes that only
+   work because human-readable display strings happen to be stable.
+3. Expand fixture coverage with representative semantic cases, imported-module
+   cases, and pressure-derived cases rather than only narrow synthetic inputs.
+4. Keep the fixture harness auditing key MIR-quality properties such as stable
+   re-lowering behavior and absence of placeholder typing on supported paths.
+5. Promote repeated Phase 8 findings into MIR fixtures or MIR validator tests
+   when MIR is the clearest stable contract for the bug.
+
+Canonical artifacts
+-------------------
+Phase 10 should produce or update the following canonical surfaces:
+
+- `/Users/ro/dev/c_modern/docs/plan/phase9_phase4_mir_authority_expansion.txt`
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/bootstrap_phase3_9_review.txt` where the
+  roadmap should reference the concrete Phase 9 follow-up plan
+- MIR implementation updates under `/Users/ro/dev/c_modern/compiler/mir/`
+- deterministic MIR regression coverage under
+  `/Users/ro/dev/c_modern/tests/mir/`
+- downstream backend or driver updates only when Phase 9 intentionally changes
+  the MIR contract those layers consume
+
+Allowed edit surface
+--------------------
+- `/Users/ro/dev/c_modern/docs/plan/`
+- `/Users/ro/dev/c_modern/compiler/mir/`
+- `/Users/ro/dev/c_modern/tests/mir/`
+- `/Users/ro/dev/c_modern/CMakeLists.txt` only if MIR tests require wiring
+- `/Users/ro/dev/c_modern/compiler/codegen_llvm/` only for narrow downstream
+  adjustments after the MIR contract is intentionally widened or tightened
+- `/Users/ro/dev/c_modern/compiler/driver/` only when dump or validation
+  plumbing must expose already-existing MIR behavior rather than defining it
+- `/Users/ro/dev/c_modern/compiler/sema/` only for lockstep changes where a
+  required MIR input fact is missing and the semantic owner is being updated at
+  the same time
+
+Out of scope
+------------
+- inventing new language meaning that belongs to Phase 3 semantic authority
+- broad backend deepening that belongs to Phase 5 executable closure
+- broad stdlib or runtime redesign that belongs to Phase 6 ownership
+- project-graph, `.mci`, or test-harness maturity beyond what is required to
+  keep MIR dumps, validation, and debug workflows usable
+- widening the target matrix or using target-specific behavior to hide MIR gaps
+- adding speculative MIR instruction families that are not justified by the
+  admitted semantic surface or repeated repository pressure
+
+Suggested proof and artifacts
+-----------------------------
+- expand `/Users/ro/dev/c_modern/tests/mir/` with fixture goldens for each new
+  admitted semantic construct or MIR instruction family claimed by Phase 9
+- add validator-negative tests for every major instruction and terminator
+  family the validator claims to cover
+- keep representative canonical-style fixtures in sync with the widened MIR
+  surface so realistic lowering paths stay under direct review
+- promote repeated Phase 8 findings into MIR-level regressions when MIR, not
+  sema or backend lowering, is the clearest stable contract
+- add narrow backend regressions only after the MIR contract itself is stable
+  enough that a backend mismatch is the real bug
+
+Exit criteria
+-------------
+- the admitted non-bootstrap sema surface lowers completely and
+  deterministically to MIR without backend-shaped fallback encodings for
+  supported constructs
+- semantic-boundary operations required by the admitted language surface are
+  explicit in MIR rather than implicit in backend defaults or runtime accident
+- validators reject malformed or semantically impossible MIR across the
+  admitted typed surface before backend work begins
+- MIR dumps and fixtures are rich enough to act as the compiler's main
+  implementation contract independent of LLVM
+- MIR test coverage exists for every major instruction family and legality rule
+  that Phase 9 claims to have completed
+
+Ordered implementation steps
+----------------------------
+1. Freeze the repository meaning of the Phase 9 label so it cannot drift into a
+   post-Phase-8 architecture claim.
+2. Build a Phase 4 closure matrix from `plan.txt`, the non-bootstrap roadmap,
+   the bootstrap Phase 4 status note, the current MIR implementation, and the
+   current MIR fixtures.
+3. Execute Phase 9A lowering-surface completion work and fixture expansion.
+4. Execute Phase 9B semantic-boundary instruction completion work.
+5. Execute Phase 9C validator legality expansion and negative-test growth.
+6. Execute Phase 9D dump and fixture quality work so the widened MIR contract
+   stays inspectable.
+7. Re-run the MIR unit and fixture suites after each wave and update only the
+   narrowest relevant proof artifacts.
+8. Re-audit any remaining gaps and route non-MIR leftovers back to Phase 3,
+   Phase 5, or Phase 7 ownership rather than stretching Phase 9.
+
+Acceptance criteria for this plan document
+------------------------------------------
+- The repository has one explicit execution plan for the unfinished MIR closure
+  work that still belongs to Phase 4 ownership.
+- The plan preserves the existing phase-boundary rules and does not recast MIR
+  gaps as backend, driver, or library workarounds.
+- The plan gives the repository a reviewable order of operations with lowering
+  surface completion first, semantic-boundary instruction completion second,
+  validator hardening third, and dump-plus-fixture quality fourth.

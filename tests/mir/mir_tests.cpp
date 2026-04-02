@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 #include "compiler/lex/lexer.h"
@@ -16,17 +17,23 @@ void Fail(const std::string& message) {
     std::exit(1);
 }
 
-mc::mir::LowerResult Lower(const std::string& source, mc::support::DiagnosticSink& diagnostics) {
+mc::mir::LowerResult Lower(const std::string& source,
+                          const mc::sema::CheckOptions& options,
+                          mc::support::DiagnosticSink& diagnostics) {
     const auto lexed = mc::lex::Lex(source, "<mir-test>", diagnostics);
     const auto parsed = mc::parse::Parse(lexed, "<mir-test>", diagnostics);
     if (!parsed.ok) {
         Fail("source should parse before MIR lowering:\n" + diagnostics.Render());
     }
-    const auto checked = mc::sema::CheckSourceFile(*parsed.source_file, "<mir-test>", diagnostics);
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<mir-test>", options, diagnostics);
     if (!checked.ok) {
         Fail("source should pass semantic checking before MIR lowering:\n" + diagnostics.Render());
     }
     return mc::mir::LowerSourceFile(*parsed.source_file, *checked.module, "<mir-test>", diagnostics);
+}
+
+mc::mir::LowerResult Lower(const std::string& source, mc::support::DiagnosticSink& diagnostics) {
+    return Lower(source, mc::sema::CheckOptions {}, diagnostics);
 }
 
 mc::mir::Module LowerAndValidateModule(const std::string& source) {
@@ -274,6 +281,158 @@ void TestKnownSymbolRefsAreTyped() {
     }
     if (dump.find("unknown") != std::string::npos) {
         Fail("supported symbol reference lowering should not emit unknown MIR types");
+    }
+}
+
+void TestImportedModuleSurfaceLowersQualifiedTypesAndTargets() {
+    mc::support::DiagnosticSink diagnostics;
+
+    mc::sema::Module imported_mem;
+    mc::sema::TypeDeclSummary allocator_type;
+    allocator_type.kind = mc::ast::Decl::Kind::kStruct;
+    allocator_type.name = "Allocator";
+    allocator_type.fields.push_back({"raw", mc::sema::NamedType("uintptr")});
+    imported_mem.type_decls.push_back(std::move(allocator_type));
+    imported_mem.functions.push_back({
+        .name = "default_allocator",
+        .return_types = {mc::sema::PointerType(mc::sema::NamedType("Allocator"))},
+    });
+
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    imported_modules.emplace("mem", std::move(imported_mem));
+
+    mc::sema::CheckOptions options;
+    options.imported_modules = &imported_modules;
+
+    const auto lowered = Lower(
+        "import mem\n"
+        "\n"
+        "func expect_alloc(alloc: *mem.Allocator) i32 {\n"
+        "    return 0\n"
+        "}\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return expect_alloc(mem.default_allocator())\n"
+        "}\n",
+        options,
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("imported module surface lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("proc()->*mem.Allocator target=mem.default_allocator target_kind=function target_name=mem.default_allocator") ==
+            std::string::npos ||
+        dump.find("call %v") == std::string::npos ||
+        dump.find("target=expect_alloc target_kind=function target_name=expect_alloc") == std::string::npos ||
+        dump.find("*mem.Allocator") == std::string::npos) {
+        Fail("imported module surface lowering should preserve qualified types and function targets in MIR dumps");
+    }
+    if (dump.find("unknown") != std::string::npos) {
+        Fail("imported module surface lowering should not emit unknown MIR types");
+    }
+}
+
+void TestImportedModuleVariantMatchLowersQualifiedVariants() {
+    mc::support::DiagnosticSink diagnostics;
+
+    mc::sema::Module imported_color;
+    mc::sema::TypeDeclSummary color_type;
+    color_type.kind = mc::ast::Decl::Kind::kEnum;
+    color_type.name = "Color";
+    color_type.variants.push_back({.name = "Red", .payload_fields = {}});
+    color_type.variants.push_back({.name = "Green", .payload_fields = {}});
+    color_type.variants.push_back({.name = "Blue", .payload_fields = {}});
+    imported_color.type_decls.push_back(std::move(color_type));
+    mc::sema::BuildModuleLookupMaps(imported_color);
+
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    imported_modules.emplace("color_module", std::move(imported_color));
+
+    mc::sema::CheckOptions options;
+    options.imported_modules = &imported_modules;
+
+    const auto lowered = Lower(
+        "import color_module\n"
+        "\n"
+        "func get_value(c: color_module.Color) i32 {\n"
+        "    switch c {\n"
+        "    case color_module.Color.Red:\n"
+        "        return 1\n"
+        "    case color_module.Color.Green:\n"
+        "        return 2\n"
+        "    case color_module.Color.Blue:\n"
+        "        return 3\n"
+        "    }\n"
+        "    return 0\n"
+        "}\n",
+        options,
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("imported qualified enum variant matching should lower successfully:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("variant_match") == std::string::npos ||
+        dump.find("target=color_module.Color.Red") == std::string::npos ||
+        dump.find("target=color_module.Color.Green") == std::string::npos ||
+        dump.find("target=color_module.Color.Blue") == std::string::npos) {
+        Fail("imported qualified enum variant matching should preserve qualified variant names in MIR");
+    }
+}
+
+void TestGlobalAddressLoweringUsesExplicitLocalAddr() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "const LIMIT: i32 = 3\n"
+        "\n"
+        "func expose(ptr: *i32) uintptr {\n"
+        "    return (uintptr)(ptr)\n"
+        "}\n"
+        "\n"
+        "func use() uintptr {\n"
+        "    return expose(&LIMIT)\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("global address lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("local_addr %v0:*i32 target=LIMIT target_kind=global target_name=LIMIT") == std::string::npos &&
+        dump.find("local_addr %v1:*i32 target=LIMIT target_kind=global target_name=LIMIT") == std::string::npos) {
+        Fail("global address lowering should use explicit local_addr metadata for globals");
+    }
+    if (dump.find("unary ") != std::string::npos && dump.find(" op=&") != std::string::npos) {
+        Fail("global address lowering should not fall back to generic unary '&'");
+    }
+}
+
+void TestAddressOfFieldFailsCrisplyInMir() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "struct Pair {\n"
+        "    left: i32,\n"
+        "    right: i32,\n"
+        "}\n"
+        "\n"
+        "func expose(ptr: *i32) uintptr {\n"
+        "    return (uintptr)(ptr)\n"
+        "}\n"
+        "\n"
+        "func use(pair: Pair) uintptr {\n"
+        "    return expose(&pair.left)\n"
+        "}\n",
+        diagnostics);
+
+    if (lowered.ok) {
+        Fail("address-of field lowering should fail crisply until MIR grows an address-producing field form");
+    }
+    if (diagnostics.Render().find("not yet supported in MIR: address-of") == std::string::npos) {
+        Fail("address-of field lowering should explain the unsupported MIR boundary");
     }
 }
 
@@ -2410,6 +2569,10 @@ int main() {
     TestForEachAndDeferLoweringSucceed();
     TestForRangeUsesSemaRangeElementType();
     TestKnownSymbolRefsAreTyped();
+    TestImportedModuleSurfaceLowersQualifiedTypesAndTargets();
+    TestImportedModuleVariantMatchLowersQualifiedVariants();
+    TestGlobalAddressLoweringUsesExplicitLocalAddr();
+    TestAddressOfFieldFailsCrisplyInMir();
     TestMixedBindingOrAssignmentUsesSemanticClassification();
     TestExplicitConversionLowersToConvert();
     TestNumericConversionLowersToConvertNumeric();

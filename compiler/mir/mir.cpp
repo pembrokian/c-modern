@@ -122,6 +122,20 @@ std::string_view ToString(Instruction::Kind kind) {
     return "instr";
 }
 
+bool IsAddressOfLvalueKind(Expr::Kind kind) {
+    switch (kind) {
+        case Expr::Kind::kName:
+        case Expr::Kind::kQualifiedName:
+        case Expr::Kind::kField:
+        case Expr::Kind::kDerefField:
+        case Expr::Kind::kIndex:
+        case Expr::Kind::kParen:
+            return true;
+        default:
+            return false;
+    }
+}
+
 std::string_view ToString(Instruction::TargetKind kind) {
     switch (kind) {
         case Instruction::TargetKind::kNone:
@@ -188,7 +202,7 @@ std::string_view ToString(Expr::Kind kind) {
 }
 
 std::string VariantTypeName(std::string_view variant_name) {
-    const std::size_t separator = variant_name.find('.');
+    const std::size_t separator = variant_name.rfind('.');
     if (separator == std::string_view::npos) {
         return std::string(variant_name);
     }
@@ -196,7 +210,7 @@ std::string VariantTypeName(std::string_view variant_name) {
 }
 
 std::string VariantLeafName(std::string_view variant_name) {
-    const std::size_t separator = variant_name.find('.');
+    const std::size_t separator = variant_name.rfind('.');
     if (separator == std::string_view::npos) {
         return std::string(variant_name);
     }
@@ -716,7 +730,7 @@ sema::Type FunctionProcedureType(const Function& function) {
 }
 
 const VariantDecl* FindMirVariantDecl(const TypeDecl& type_decl, std::string_view variant_name) {
-    const std::size_t separator = variant_name.find('.');
+    const std::size_t separator = variant_name.rfind('.');
     const std::string qualified_type = separator == std::string_view::npos ? type_decl.name : std::string(variant_name.substr(0, separator));
     const std::string leaf_name = separator == std::string_view::npos ? std::string(variant_name) : std::string(variant_name.substr(separator + 1));
     if (!qualified_type.empty() && qualified_type != type_decl.name) {
@@ -1622,18 +1636,22 @@ class FunctionLowerer {
     }
 
     sema::Type InferVariantPayloadType(const sema::Type& selector_type, std::string_view variant_name, std::size_t payload_index) const {
-        if (selector_type.kind != sema::Type::Kind::kNamed) {
+        const sema::Type stripped_selector = StripMirAliasOrDistinct(module_, selector_type);
+        if (stripped_selector.kind != sema::Type::Kind::kNamed) {
             return sema::UnknownType();
         }
 
-        const auto* type_decl = sema::FindTypeDecl(sema_module_, selector_type.name);
+        const auto* type_decl = sema::FindTypeDecl(sema_module_, stripped_selector.name);
         if (type_decl == nullptr) {
             return sema::UnknownType();
         }
 
-        const std::string qualified_name = VariantTypeName(variant_name);
-        const std::string leaf_name = VariantLeafName(variant_name);
-        if (!qualified_name.empty() && qualified_name != selector_type.name) {
+        const std::size_t separator = variant_name.rfind('.');
+        const std::string qualified_name = separator == std::string_view::npos ? stripped_selector.name
+                                                                                : std::string(variant_name.substr(0, separator));
+        const std::string leaf_name = separator == std::string_view::npos ? std::string(variant_name)
+                                                                           : std::string(variant_name.substr(separator + 1));
+        if (!qualified_name.empty() && qualified_name != stripped_selector.name) {
             return sema::UnknownType();
         }
 
@@ -1718,16 +1736,44 @@ class FunctionLowerer {
             case Expr::Kind::kLiteral:
                 return EmitLiteralValue(expr.text, KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "literal expression type"));
             case Expr::Kind::kUnary: {
-                if (expr.text == "&" && expr.left != nullptr && expr.left->kind == Expr::Kind::kName && local_types_.contains(expr.left->text)) {
+                if (expr.text == "&" && expr.left != nullptr) {
                     const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "address-of expression type");
-                    const std::string value = NewValue();
-                    Emit({
-                        .kind = Instruction::Kind::kLocalAddr,
-                        .result = value,
-                        .type = type,
-                        .target = expr.left->text,
-                    });
-                    return {value, type};
+                    if (expr.left->kind == Expr::Kind::kName && local_types_.contains(expr.left->text)) {
+                        const std::string value = NewValue();
+                        Emit({
+                            .kind = Instruction::Kind::kLocalAddr,
+                            .result = value,
+                            .type = type,
+                            .target = expr.left->text,
+                        });
+                        return {value, type};
+                    }
+
+                    const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
+                    if (target_metadata.kind == Instruction::TargetKind::kGlobal) {
+                        const std::string value = NewValue();
+                        Emit({
+                            .kind = Instruction::Kind::kLocalAddr,
+                            .result = value,
+                            .type = type,
+                            .target = target_metadata.target,
+                            .target_kind = target_metadata.kind,
+                            .target_name = target_metadata.name,
+                            .target_display = target_metadata.display,
+                        });
+                        return {value, type};
+                    }
+
+                    if (expr.left->kind == Expr::Kind::kParen && expr.left->left != nullptr) {
+                        Report(expr.span,
+                               "not yet supported in MIR: address-of " + std::string(ToString(expr.left->left->kind)) + " expression");
+                        return EmitLiteralValue("0", sema::UnknownType());
+                    }
+                    if (IsAddressOfLvalueKind(expr.left->kind)) {
+                        Report(expr.span,
+                               "not yet supported in MIR: address-of " + std::string(ToString(expr.left->kind)) + " expression");
+                        return EmitLiteralValue("0", sema::UnknownType());
+                    }
                 }
                 const auto operand = LowerExpr(*expr.left);
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "unary expression type");
@@ -2840,16 +2886,38 @@ bool ValidateModule(const Module& module,
                             report("local_addr must not take operands in function " + function.name);
                         }
                         if (instruction.target.empty()) {
-                            report("local_addr must name a local target in function " + function.name);
+                            report("local_addr must name a target in function " + function.name);
+                            break;
+                        }
+                        if (instruction.type.kind != sema::Type::Kind::kPointer || instruction.type.subtypes.empty()) {
+                            report("local_addr must produce a pointer type in function " + function.name);
+                            break;
+                        }
+                        if (instruction.target_kind == Instruction::TargetKind::kGlobal) {
+                            const std::string_view global_name = PrimaryTargetName(instruction);
+                            if (global_name.empty()) {
+                                report("local_addr global target must record target_name metadata in function " + function.name);
+                                break;
+                            }
+                            const GlobalDecl* global = FindMirGlobalDecl(module, global_name);
+                            if (global == nullptr) {
+                                report("local_addr references unknown global in function " + function.name + ": " + std::string(global_name));
+                                break;
+                            }
+                            if (instruction.type.subtypes.front() != global->type) {
+                                report("local_addr type mismatch in function " + function.name + " for " + std::string(global_name) + ": expected *" +
+                                       sema::FormatType(global->type) + ", got " + sema::FormatType(instruction.type));
+                            }
+                            break;
+                        }
+                        if (instruction.target_kind != Instruction::TargetKind::kNone) {
+                            report("local_addr uses unsupported target kind in function " + function.name + ": " +
+                                   std::string(ToString(instruction.target_kind)));
                             break;
                         }
                         const auto found_local = local_types.find(instruction.target);
                         if (found_local == local_types.end()) {
                             report("local_addr references unknown local in function " + function.name + ": " + instruction.target);
-                            break;
-                        }
-                        if (instruction.type.kind != sema::Type::Kind::kPointer || instruction.type.subtypes.empty()) {
-                            report("local_addr must produce a pointer type in function " + function.name);
                             break;
                         }
                         if (instruction.type.subtypes.front() != found_local->second) {

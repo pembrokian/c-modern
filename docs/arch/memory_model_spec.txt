@@ -1,0 +1,182 @@
+Modern C - Memory Model
+
+Purpose
+
+This document freezes the storage, aliasing, lifetime, and pointer model for v0.2.
+It exists to keep the compiler, MIR, backend, and standard library aligned on what memory operations are allowed to mean.
+
+Authority and scope:
+- `language_spec.txt` remains the semantic authority for the language.
+- `types_spec.txt` remains the authority for semantic type forms.
+- `allocation_spec.txt` remains the allocation-convention note.
+- this document freezes the memory model, pointer provenance rules, aliasing rules, lifetime rules, and checked-invalid-operation boundaries for v0.2.
+- this document does not define a hidden runtime, GC, or ownership-tracking system.
+
+1. Core Position
+
+Modern C memory rules should be:
+- explicit
+- small
+- deterministic for defined behavior
+- honest about invalid behavior
+
+Rules:
+- the compiler must not invent non-aliasing facts not stated by the program
+- the language must not require a garbage collector or hidden lifetime extension
+- byte-wise access should remain available for inspection and interop
+- the memory model should preserve the machine-level reality of storage without exposing undefined convenience
+
+2. Storage And Lifetime
+
+Storage kinds:
+- locals
+- globals
+- heap allocations
+- array elements
+- aggregate fields
+- string literal storage
+- imported or externally provided storage
+
+Rules:
+- every storage object has a lifetime
+- a value stored in memory is valid only while its storage is live
+- storage that outlives a scope must be returned or stored in an owning form
+- borrowed views do not extend lifetime
+
+Consequences:
+- `Slice<T>` and the canonical string type are non-owning views
+- `Buffer<T>` owns its storage
+- returning a view into temporary internal storage is invalid design
+
+3. Pointer Model
+
+Pointer validity:
+- a pointer is valid only while it still refers to live storage under the program rules
+- dereferencing an invalid pointer is invalid behavior
+- nil is the null pointer value
+
+Pointer arithmetic:
+- pointer arithmetic is valid only within a single live allocation, array, or one-past the end of that object
+- pointer arithmetic may not cross into unrelated allocations
+
+Pointer comparison:
+- pointer comparison is defined only for pointers into the same allocation or against nil
+- comparisons across unrelated allocations are not meaningful enough to rely on
+
+Integer and pointer conversion:
+- pointer-to-integer and integer-to-pointer conversions are explicit and unsafe
+- a round trip preserves usability only if the numeric value is unchanged and the source allocation remains live
+- these conversions are intended for FFI, MMIO, and low-level runtime code
+
+4. Aliasing Rules
+
+No strict-aliasing UB:
+- Modern C does not adopt C-style strict-aliasing undefined behavior
+- different pointer types may alias the same storage
+- byte-wise inspection through `ui8` pointers or byte slices is always allowed
+
+Explicit non-aliasing:
+- non-aliasing assumptions must be stated explicitly by the program
+- `@noalias` is the semantic escape hatch for parameters that promise non-aliasing
+- the compiler may rely on `@noalias` only where the semantic checker has accepted it
+
+Rules:
+- aliasing facts come from the program, not from backend folklore
+- the backend must not strengthen aliasing beyond the semantic contract
+
+5. Constness And Mutability
+
+Const model:
+- `const` is part of the type
+- const on aggregates is deep for the reachable value through that binding
+- pointer constness must be written at the pointer layer
+
+Rules:
+- `const` controls mutation through a binding
+- `const` does not magically change storage ownership
+- `const` does not imply noalias
+- `const` does not create a separate lifetime class
+
+6. Allocation And Ownership
+
+Allocation boundary:
+- allocation is a library feature, not a language primitive
+- allocation failure is explicit
+- memory must be freed through the same allocator family that produced it
+
+Rules:
+- `Buffer<T>` owns heap-backed contiguous storage
+- `Slice<T>` and string views borrow storage
+- fixed arrays are values, not heap owners
+- freeing storage invalidates all pointers and views into it
+
+Consequences:
+- ownership transfers must be explicit in APIs
+- callers must not keep using a pointer, slice, or view after the underlying storage is released
+- allocator APIs should remain separate from ordinary value semantics
+
+7. Checked And Invalid Behavior
+
+Defined arithmetic behavior:
+- integer overflow wraps
+- signed and unsigned integer arithmetic use modular wrap
+
+Checked faults:
+- division by zero
+- shift counts outside the bit width
+- checked bounds violations where the compiler inserts explicit checks
+
+Invalid behavior:
+- use-after-free
+- out-of-bounds access
+- invalid pointer dereference
+- use of a slice after its underlying storage becomes invalid
+
+Rules:
+- checked builds may trap additional invalid operations
+- checked behavior does not redefine release semantics
+- the compiler should preserve explicit faults instead of silently recovering
+
+8. Volatile And Atomics
+
+Volatile:
+- volatile access is an explicit low-level access boundary
+- volatile is not a substitute for ownership, aliasing, or synchronization rules
+
+Atomics:
+- atomics are explicit synchronization primitives
+- atomics are not interchangeable with ordinary loads and stores
+- atomics are not interchangeable with volatile operations
+
+Rules:
+- volatile and atomic behavior should remain distinct in sema and MIR
+- memory ordering should be carried explicitly where the language and library expose it
+- backend lowering must preserve the explicit boundary recorded by the front end
+
+9. View Types And Lifetime Guidance
+
+Borrowed views:
+- slices and strings are borrowed views
+- views are cheap to copy but do not own storage
+
+Guidance:
+- functions that return storage whose lifetime outlives the callee should return `Buffer<T>` or another owning type
+- functions that return views should return `Slice<T>` or the canonical string type as appropriate
+- libraries should not return borrowed views into temporary internal allocations
+
+10. Non-Goals
+
+This document does not add:
+- GC
+- reference counting as a language rule
+- automatic lifetime extension
+- hidden borrow checking
+- a strict-aliasing model copied from C
+- a second ownership system layered on top of the language
+
+Bottom line:
+- storage is explicit
+- aliasing is explicit
+- lifetimes matter
+- views do not own
+- the compiler must preserve the memory behavior the program actually states

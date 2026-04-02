@@ -1,0 +1,7 @@
+Module
+  Import name=helper_root
+  Function name=main returns=[i32]
+    Block label=entry0
+      symbol_ref %v0:proc()->i32 target=helper_root.helper_value target_kind=function target_name=helper_root.helper_value
+      call %v1:i32 target=helper_root.helper_value target_kind=function target_name=helper_root.helper_value operands=[%v0]
+      terminator return values=[%v1]

@@ -1,0 +1,179 @@
+Modern C - Type System
+
+Purpose
+
+This document freezes the semantic type model for v0.2.
+It exists so the parser, semantic checker, MIR lowering, and interface-artifact layer all talk about the same canonical type forms.
+
+Authority and scope:
+- `language_spec.txt` remains the semantic authority for the language.
+- `grammar_spec.txt` remains the concrete syntax authority for type expressions.
+- this document freezes the canonical semantic type forms, identity rules, conversion boundaries, and builtin aggregate shapes for v0.2.
+- this document does not define memory safety by itself; the memory model document owns storage and lifetime rules.
+
+1. Core Rules
+
+Type model rules:
+- types are semantic objects, not parser artifacts
+- semantic identity may differ from source spelling when the language admits aliases or builtin normalization
+- structural type forms should compare structurally
+- named types should compare by identity, not by spelling alone
+- aliases should be transparent after resolution
+- distinct types should preserve representation while remaining non-interchangeable
+
+Rules:
+- sema owns type meaning
+- MIR and backend lowering may consume type facts, but they must not redefine them
+- the compiler must not invent a richer type system than the language admits
+
+2. Canonical Type Forms
+
+The admitted v0.2 semantic type forms are:
+- builtin scalar types
+- the semantic string type
+- nil
+- pointer types
+- const-qualified types
+- fixed arrays
+- tuples
+- ranges
+- procedure types
+- named nominal types
+
+Builtin scalar types:
+- `bool`
+- integer types such as `ui8`, `ui16`, `ui32`, `ui64`, `i8`, `i16`, `i32`, `i64`, `usize`, `isize`, and `uintptr`
+- floating-point types such as `f32` and `f64`
+- `utf`
+
+Semantic string type:
+- the semantic string type is a borrowed UTF-8 byte sequence
+- the current bootstrap surface may normalize spellings such as `str`, `string`, and `cstr` into that semantic type
+- the type behaves as a non-owning view, not as an owning buffer
+
+Nil:
+- `nil` is the null-pointer value form
+- `nil` is not a general replacement for arbitrary missing values
+- `nil` participates in pointer and pointer-like conversions only where the language explicitly allows it
+
+3. Named Types And Identity
+
+Named types:
+- named types represent nominally declared entities such as structs, enums, distinct types, aliases, and imported declarations
+- imported names preserve their module qualification in semantic identity
+- named type arguments participate in identity for generic nominal types
+
+Rules:
+- `mem.Allocator` and `helper_types.Pair` are distinct semantic names from unqualified `Allocator` and `Pair`
+- qualified imported names should remain visible in diagnostics and interface artifacts
+- a named type is not interchangeable with another named type just because their layouts happen to match
+
+Aliases:
+- aliases are transparent after resolution
+- aliases do not create a new representation
+- aliases exist to name a type expression, not to introduce a new runtime category
+
+Distinct types:
+- distinct types preserve the representation of their base type
+- distinct types are not implicitly interchangeable with the base type or with unrelated distinct types
+- v0.2 restricts distinct types to scalar base types
+- explicit conversion is required to move between a distinct type and its base type
+
+4. Structural Type Forms
+
+Pointer types:
+- pointer types are prefix forms
+- pointer identity includes the pointee type
+- pointer constness is part of the type, not a separate annotation
+
+Const-qualified types:
+- `const` is part of the type
+- `const` applies at the layer where it appears in the type expression
+- const on aggregates is deep for the reachable value through that binding
+- pointer constness must be written at the pointer layer
+- ambiguous C-style const forms should be rejected
+
+Array types:
+- fixed arrays are value types
+- array length is part of the type
+- array length must be a compile-time integer constant
+- arrays do not decay implicitly to pointers or slices
+
+Tuple types:
+- tuples model grouped semantic values such as multi-result returns
+- tuple identity depends on element order and element types
+- tuples are semantic grouping, not hidden parser sugar
+
+Range types:
+- ranges model the semantic result of range expressions
+- a range type is not a general-purpose container unless the language later says so explicitly
+
+Procedure types:
+- procedure types carry ordered parameter types and ordered result types
+- procedure identity depends on parameter and result structure
+- procedure return lists may be empty, single-valued, or multi-valued
+- procedure types are the semantic home for callable signatures, not a backend convenience
+
+5. Builtin Aggregate Shapes
+
+The semantic type layer owns builtin aggregate shape facts.
+
+Canonical builtin aggregates:
+- `Slice<T>`
+- `Buffer<T>`
+- the semantic string type
+
+Canonical fields:
+- `Slice<T>` has `ptr: *T` and `len: usize`
+- `Buffer<T>` has `ptr: *T`, `len: usize`, `cap: usize`, and `alloc: *Allocator`
+- the semantic string type behaves like a borrowed slice of UTF-8 bytes
+
+Rules:
+- these builtin shapes must be queried from sema, not reconstructed independently in MIR or code generation
+- if a builtin aggregate shape changes, downstream consumers must see the change through the semantic type layer
+- builtin aggregate identity is nominal at the surface but canonicalized semantically
+
+6. Type Relations
+
+Equality:
+- structural types compare structurally after builtin canonicalization
+- named types compare by resolved identity
+- aliases compare as the type they alias
+- distinct types compare by distinct identity, not by representation alone
+
+Compatibility:
+- explicit conversions are the normal way to cross type boundaries in v0.2
+- there are no implicit numeric conversions
+- signed and unsigned integer types do not silently coerce
+- top-level semantic checking should reject missing or ambiguous conversions instead of deferring them to MIR
+
+Special cases:
+- `nil` may convert to pointer-like types where the language explicitly permits it
+- literal integer and floating-point expressions may be accepted where a specific target type is expected, subject to the explicit semantic conversion rules
+
+7. Generic And Imported Types
+
+Generic nominal types:
+- named types may carry type arguments
+- type argument lists are part of the nominal identity of the instantiated form
+- semantic resolution should preserve the argument structure for downstream artifacts
+
+Imported types:
+- module-qualified imported type names are first-class semantic identities
+- import resolution should not erase the module prefix from a type that needs it for disambiguation
+- interface artifacts should record imported type information precisely enough for downstream checking
+
+8. Non-Goals
+
+This document does not add:
+- subtyping
+- traits or interfaces
+- type classes
+- algebraic data type inference
+- hidden coercion chains
+- ownership qualifiers as a separate type-system layer
+
+Bottom line:
+- sema owns the canonical type model
+- type identity should be explicit, stable, and deterministic
+- any future type feature should extend these rules, not bypass them

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "compiler/lex/lexer.h"
@@ -19,6 +20,8 @@ struct FixtureCase {
     std::string expected_output_name;
     bool should_lower = true;
     std::string canonical_example_name;
+    std::vector<std::string> import_roots;
+    std::vector<std::pair<std::string, std::string>> imported_modules;
 };
 
 const std::vector<std::string> kForbiddenSemanticBoundaryCallTargets = {
@@ -49,7 +52,8 @@ std::string ReadTextFile(const std::filesystem::path& path) {
 }
 
 std::string LowerToValidatedDump(const std::string& source_text,
-                                 const std::filesystem::path& source_path) {
+                                 const std::filesystem::path& source_path,
+                                 const mc::sema::CheckOptions& options) {
     mc::support::DiagnosticSink diagnostics;
     const auto lexed = mc::lex::Lex(source_text, source_path.generic_string(), diagnostics);
     const auto parsed = mc::parse::Parse(lexed, source_path, diagnostics);
@@ -57,7 +61,7 @@ std::string LowerToValidatedDump(const std::string& source_text,
         Fail("fixture should parse successfully: " + source_path.generic_string() + "\n" + diagnostics.Render());
     }
 
-    const auto checked = mc::sema::CheckProgram(*parsed.source_file, source_path, diagnostics);
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, source_path, options, diagnostics);
     if (!checked.ok) {
         Fail("fixture should pass semantic checking: " + source_path.generic_string() + "\n" + diagnostics.Render());
     }
@@ -110,9 +114,32 @@ void RunFixture(const std::filesystem::path& source_root,
 
     VerifyCanonicalExampleSync(source_root, fixture, source_text);
 
+    mc::sema::CheckOptions options;
+    for (const auto& import_root : fixture.import_roots) {
+        options.import_roots.push_back(source_root / import_root);
+    }
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    for (const auto& imported_fixture : fixture.imported_modules) {
+        const auto imported_path = fixture_dir / imported_fixture.second;
+        const auto imported_text = ReadTextFile(imported_path);
+        const auto imported_lexed = mc::lex::Lex(imported_text, imported_path.generic_string(), diagnostics);
+        const auto imported_parsed = mc::parse::Parse(imported_lexed, imported_path, diagnostics);
+        if (!imported_parsed.ok) {
+            Fail("imported module fixture should parse successfully: " + imported_path.generic_string() + "\n" + diagnostics.Render());
+        }
+        const auto imported_checked = mc::sema::CheckProgram(*imported_parsed.source_file, imported_path, diagnostics);
+        if (!imported_checked.ok) {
+            Fail("imported module fixture should pass semantic checking: " + imported_path.generic_string() + "\n" + diagnostics.Render());
+        }
+        imported_modules[imported_fixture.first] = mc::sema::BuildExportedModuleSurface(*imported_checked.module, *imported_parsed.source_file);
+    }
+    if (!imported_modules.empty()) {
+        options.imported_modules = &imported_modules;
+    }
+
     if (fixture.should_lower) {
-        const auto actual_dump = LowerToValidatedDump(source_text, source_path);
-        const auto second_dump = LowerToValidatedDump(source_text, source_path);
+        const auto actual_dump = LowerToValidatedDump(source_text, source_path, options);
+        const auto second_dump = LowerToValidatedDump(source_text, source_path, options);
         if (actual_dump.find("unknown") != std::string::npos) {
             Fail("supported fixture should not emit unknown MIR types: " + source_path.generic_string() + "\n" + actual_dump);
         }
@@ -135,7 +162,7 @@ void RunFixture(const std::filesystem::path& source_root,
         Fail("fixture should parse successfully: " + source_path.generic_string() + "\n" + diagnostics.Render());
     }
 
-    const auto checked = mc::sema::CheckProgram(*parsed.source_file, source_path, diagnostics);
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, source_path, options, diagnostics);
     if (!checked.ok) {
         Fail("fixture should pass semantic checking: " + source_path.generic_string() + "\n" + diagnostics.Render());
     }
@@ -172,25 +199,27 @@ int main(int argc, char** argv) {
     const std::filesystem::path source_root = argv[1];
     const std::filesystem::path fixture_dir = source_root / "tests/mir";
     const std::vector<FixtureCase> fixtures = {
-        {"array_to_slice_conversion.mc", "array_to_slice_conversion.mir.txt", true, ""},
-        {"bounds_check.mc", "bounds_check.mir.txt", true, ""},
-        {"buffer_to_slice_conversion.mc", "buffer_to_slice_conversion.mir.txt", true, ""},
-        {"canonical_eval.mc", "canonical_eval.mir.txt", true, "eval.mc"},
-        {"canonical_memory_poll.mc", "canonical_memory_poll.mir.txt", true, "memory_poll.mc"},
-        {"canonical_window_stats.mc", "canonical_window_stats.mir.txt", true, "window_stats.mc"},
-        {"defer_immediate_args.mc", "defer_immediate_args.mir.txt", true, ""},
-        {"switch_expr.mc", "switch_expr.mir.txt", true, ""},
-        {"switch_case_defer.mc", "switch_case_defer.mir.txt", true, ""},
-        {"foreach_range_defer.mc", "foreach_range_defer.mir.txt", true, ""},
-        {"foreach_non_iterable_fail.mc", "foreach_non_iterable_fail.errors.txt", false, ""},
-        {"explicit_conversion.mc", "explicit_conversion.mir.txt", true, ""},
-        {"pointer_int_conversion.mc", "pointer_int_conversion.mir.txt", true, ""},
-        {"semantic_boundary_intrinsics.mc", "semantic_boundary_intrinsics.mir.txt", true, ""},
-        {"loop_iteration_defer.mc", "loop_iteration_defer.mir.txt", true, ""},
-        {"packed_struct.mc", "packed_struct.mir.txt", true, ""},
-        {"scoped_defer.mc", "scoped_defer.mir.txt", true, ""},
-        {"switch_variant.mc", "switch_variant.mir.txt", true, ""},
-        {"variant_binding_shadow_fail.mc", "variant_binding_shadow_fail.errors.txt", false, ""},
+        {"array_to_slice_conversion.mc", "array_to_slice_conversion.mir.txt", true, "", {}, {}},
+        {"bounds_check.mc", "bounds_check.mir.txt", true, "", {}, {}},
+        {"buffer_to_slice_conversion.mc", "buffer_to_slice_conversion.mir.txt", true, "", {}, {}},
+        {"canonical_eval.mc", "canonical_eval.mir.txt", true, "eval.mc", {}, {}},
+        {"canonical_memory_poll.mc", "canonical_memory_poll.mir.txt", true, "memory_poll.mc", {}, {}},
+        {"canonical_window_stats.mc", "canonical_window_stats.mir.txt", true, "window_stats.mc", {}, {}},
+        {"defer_immediate_args.mc", "defer_immediate_args.mir.txt", true, "", {}, {}},
+        {"switch_expr.mc", "switch_expr.mir.txt", true, "", {}, {}},
+        {"switch_case_defer.mc", "switch_case_defer.mir.txt", true, "", {}, {}},
+        {"foreach_range_defer.mc", "foreach_range_defer.mir.txt", true, "", {}, {}},
+        {"foreach_non_iterable_fail.mc", "foreach_non_iterable_fail.errors.txt", false, "", {}, {}},
+        {"explicit_conversion.mc", "explicit_conversion.mir.txt", true, "", {}, {}},
+        {"import_root_ok_main.mc", "import_root_ok_main.mir.txt", true, "", {"tests/mir/import_roots"}, {}},
+        {"pointer_int_conversion.mc", "pointer_int_conversion.mir.txt", true, "", {}, {}},
+        {"semantic_boundary_intrinsics.mc", "semantic_boundary_intrinsics.mir.txt", true, "", {}, {}},
+        {"loop_iteration_defer.mc", "loop_iteration_defer.mir.txt", true, "", {}, {}},
+        {"packed_struct.mc", "packed_struct.mir.txt", true, "", {}, {}},
+        {"qualified_variant_import_root_ok.mc", "qualified_variant_import_root_ok.mir.txt", true, "", {}, {{"color_module", "import_roots/color_module.mc"}}},
+        {"scoped_defer.mc", "scoped_defer.mir.txt", true, "", {}, {}},
+        {"switch_variant.mc", "switch_variant.mir.txt", true, "", {}, {}},
+        {"variant_binding_shadow_fail.mc", "variant_binding_shadow_fail.errors.txt", false, "", {}, {}},
     };
 
     for (const auto& fixture : fixtures) {

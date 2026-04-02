@@ -1,0 +1,31 @@
+Module
+  Import name=color_module
+  TypeDecl kind=enum name=color_module.Color
+    Variant name=Red
+    Variant name=Green
+    Variant name=Blue
+  Function name=get_value returns=[i32]
+    Local name=c type=color_module.Color param readonly
+    Block label=entry0
+      load_local %v0:color_module.Color target=c
+      variant_match %v1:bool target=color_module.Color.Red target_name=Red target_base=color_module.Color operands=[%v0]
+      terminator cond value=%v1 true=switch_case4 false=switch_test2
+    Block label=switch_merge1
+      const %v7:int_literal op=0
+      terminator return values=[%v7]
+    Block label=switch_test2
+      variant_match %v3:bool target=color_module.Color.Green target_name=Green target_base=color_module.Color operands=[%v0]
+      terminator cond value=%v3 true=switch_case5 false=switch_test3
+    Block label=switch_test3
+      variant_match %v5:bool target=color_module.Color.Blue target_name=Blue target_base=color_module.Color operands=[%v0]
+      terminator cond value=%v5 true=switch_case6 false=switch_merge1
+    Block label=switch_case4
+      const %v2:int_literal op=1
+      terminator return values=[%v2]
+    Block label=switch_case5
+      const %v4:int_literal op=2
+      terminator return values=[%v4]
+    Block label=switch_case6
+      const %v6:int_literal op=3
+      terminator return values=[%v6]
+

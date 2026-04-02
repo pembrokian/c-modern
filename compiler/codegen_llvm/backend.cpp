@@ -879,10 +879,6 @@ bool LowerInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
-            const BackendLocal* local = nullptr;
-            if (!ResolveLocal(state, instruction.target, function, block, source_path, diagnostics, local)) {
-                return false;
-            }
             BackendTypeInfo type_info;
             if (!LowerInstructionType(*state.module,
                                       instruction.type,
@@ -894,6 +890,22 @@ bool LowerInstruction(const mir::Instruction& instruction,
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
             RecordLoweredValue(state, instruction.result, backend_name, type_info);
+            if (instruction.target_kind == mir::Instruction::TargetKind::kGlobal) {
+                if (instruction.target_name.empty()) {
+                    ReportBackendError(source_path,
+                                       "local_addr global target is missing target_name metadata in function '" + function.name +
+                                           "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                backend_block.instructions.push_back(backend_name + " = local_addr " + FormatTypeInfo(type_info) + " " +
+                                                     BackendGlobalName(instruction.target_name));
+                return true;
+            }
+            const BackendLocal* local = nullptr;
+            if (!ResolveLocal(state, instruction.target, function, block, source_path, diagnostics, local)) {
+                return false;
+            }
             backend_block.instructions.push_back(backend_name + " = local_addr " + FormatTypeInfo(type_info) + " " +
                                                  local->backend_name);
             return true;
@@ -3398,6 +3410,35 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
         case mir::Instruction::Kind::kLocalAddr: {
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
+            }
+            if (instruction.target_kind == mir::Instruction::TargetKind::kGlobal) {
+                if (instruction.target_name.empty()) {
+                    ReportBackendError(source_path,
+                                       "local_addr global target is missing target_name metadata in function '" + state.function->name +
+                                           "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                const auto global_it = state.globals.find(instruction.target_name);
+                if (global_it == state.globals.end()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission references unknown global address target '" +
+                                           instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                                           block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                BackendTypeInfo type_info;
+                if (!LowerInstructionType(*state.module,
+                                          instruction.type,
+                                          source_path,
+                                          diagnostics,
+                                          ExecutableFunctionBlockContext("local_addr", state, block),
+                                          type_info)) {
+                    return false;
+                }
+                RecordExecutableValue(state, instruction.result, global_it->second.backend_name, type_info);
+                return true;
             }
             std::string local_slot;
             if (!ResolveExecutableLocal(state, instruction.target, block, source_path, diagnostics, local_slot)) {

@@ -1,0 +1,163 @@
+Modern C - Modules and Package Model
+
+Purpose
+
+This document freezes the module and package model for v0.2.
+It exists to keep source organization, import resolution, exports, and interface artifacts explicit without introducing a second language-level namespace system.
+
+Authority and scope:
+- `language_spec.txt` remains the semantic authority for the language.
+- `grammar_spec.txt` remains the concrete syntax authority for import and export syntax.
+- `stdlib_spec.txt` remains the canonical standard-library packaging note.
+- `build_spec.txt` remains the canonical build and source-root authority.
+- this document freezes the module/package boundary, import resolution rules, export surface rules, and interface-artifact expectations for v0.2.
+- this document does not define package management, vendoring policy, or remote dependency fetching.
+
+1. Core Terms
+
+Module:
+- a module is the compilation unit represented by one source file in v0.2
+- a module is the unit of import, export, separate compilation, and interface-artifact emission
+- a module name is the public identity used by import statements and module-qualified names
+
+Package:
+- a package is a build-time grouping of modules under an explicit project or target configuration
+- a package is not a language construct in v0.2
+- package boundaries do not create extra visibility rules, hidden imports, or alternate name resolution
+
+Project:
+- a project is a build configuration root that names targets, source roots, and output locations
+- the build system may organize one or more packages inside a project, but the source language does not gain package syntax from that fact
+
+Rules:
+- one source file equals one module in v0.2
+- the language must not require a hidden prelude or ambient module set
+- packages may help the build tool organize sources, but they must not become a second module system
+
+2. Module Identity And Naming
+
+Module name rules:
+- module names are explicit and are compared by exact spelling
+- module names in v0.2 are single identifiers, not hierarchical package paths
+- module identity is not inferred from directory structure alone
+- a build tool may map file paths to module names, but that mapping must remain explicit and stable within the project model
+
+Qualified access:
+- `module.name` refers to a member exported by module `module`
+- `module.Type` refers to an exported type from module `module`
+- dotted member access does not imply nested modules or package inheritance
+
+Rules:
+- `mem.Allocator` means exported member `Allocator` of module `mem`
+- `helper_types.Pair` means exported member `Pair` of module `helper_types`
+- dotted names are member qualification, not package paths
+
+3. Imports
+
+Import model:
+- imports are explicit
+- imports are acyclic
+- imports are resolved before later semantic and MIR stages consume the program
+- importing a module does not automatically import its imports
+- imported names are only the names exported by the imported module
+
+Resolution rules:
+- each import must resolve to exactly one source module
+- missing matches are errors
+- duplicate matches are errors
+- the build system should search only the explicit module roots configured for the target or project
+
+Visibility rules:
+- imported modules expose only their exported surface
+- private top-level names remain private to the defining module
+- import statements do not create reexports
+
+Non-goals:
+- wildcard imports
+- implicit transitive imports
+- import aliases that rewrite the canonical module identity
+- hidden vendor search rules
+
+4. Exports
+
+Export block:
+- source files use an explicit export block to declare the public top-level names of the module
+- the export block is the source-level declaration of module visibility in v0.2
+- declarations not named in the export block remain module-private
+
+Rules:
+- the export surface is explicit and deterministic
+- export lists should be treated as the source of truth for interface generation
+- module-private declarations may still participate in internal checking, layout, and lowering
+
+Interface expectations:
+- exported names appear in interface artifacts
+- unexported names do not
+- downstream compilation should depend on the exported semantic surface, not on reparsing upstream implementation details
+
+5. Standard Library And Toolchain Modules
+
+Standard library modules:
+- `mem`, `utf8`, `strings`, `io`, `fs`, `net`, `sync`, and `time` are ordinary modules from the language point of view
+- `os` and `hal` remain explicit platform-facing modules
+- `testing` is a toolchain companion module for tests
+- `startup` is a special non-import layer and is not an ordinary application module
+
+Rules:
+- standard-library modules obey the same module rules as user code
+- the standard library does not get hidden import privileges
+- the build tool may discover standard-library roots automatically, but that discovery is a build concern, not a language feature
+
+Package direction:
+- the standard library is packaged as a repository-local module set, not as a registry-backed ecosystem
+- the build tool may distinguish portable, platform-facing, and toolchain companion modules
+- that distinction must not change source syntax or module identity rules
+
+6. Interface Artifacts
+
+Canonical artifact:
+- each compiled module should emit one interface artifact with the canonical extension `.mci`
+- `.mci` is for compiler consumption, not hand authoring
+- `.mci` must be deterministic so incremental rebuilds and tests can rely on stable output
+
+Minimum contents:
+- module name
+- source identity or path information needed for diagnostics
+- imported module list
+- exported declarations
+- resolved exported types
+- distinct-type identities needed by importers
+- layout-relevant facts for exported aggregates
+- calling-convention or ABI facts needed by importers
+
+Rules:
+- interface artifacts are serialized module contracts
+- interface artifacts must not become a second source language
+- if an exported semantic fact changes, dependent modules should rebuild
+- if only implementation details change, dependents should not need to rebuild
+
+7. Build-Tool Responsibilities
+
+The build tool may:
+- choose source roots explicitly
+- map source files to module names
+- resolve imports through ordered roots
+- emit object files and interface artifacts
+- track module-level dependency ordering
+
+The build tool must not:
+- invent package aliases
+- rewrite module identities implicitly
+- inject hidden prelude imports
+- add repository-global namespace rules that source code cannot see
+
+8. Bottom Line
+
+Modern C v0.2 should have:
+- one source file per module
+- explicit, acyclic imports
+- explicit export lists
+- deterministic interface artifacts
+- build-time packages only, not language-level packages
+
+If a future feature wants package-style behavior, it must be introduced as a build or distribution concern without changing the core module model.
