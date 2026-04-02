@@ -10,14 +10,13 @@ BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_fam
     Local source=raw backend=%local.raw type=uintptr [repr=i64, size=8, align=8]
     Local source=ptr backend=%local.ptr type=*i32 [repr=ptr, size=8, align=8]
     Block source=entry0 backend=bb1_0.entry0
-      %t1_0_0 = load i32 [repr=i32, size=4, align=4] %local.value
-      %t1_0_1 = unary & *i32 [repr=ptr, size=8, align=8] %t1_0_0
-      %t1_0_2 = symbol_ref proc(*i32)->uintptr [repr=ptr, size=8, align=8] @expose
-      %t1_0_3 = call uintptr [repr=i64, size=8, align=8] @expose(%t1_0_2, %t1_0_1)
-      store uintptr %t1_0_3 -> %local.raw as uintptr [repr=i64, size=8, align=8]
-      %t1_0_5 = load uintptr [repr=i64, size=8, align=8] %local.raw
-      %t1_0_6 = inttoptr *i32 [repr=ptr, size=8, align=8] %t1_0_5
-      store *i32 %t1_0_6 -> %local.ptr as *i32 [repr=ptr, size=8, align=8]
-      %t1_0_8 = load *i32 [repr=ptr, size=8, align=8] %local.ptr
-      %t1_0_9 = unary * i32 [repr=i32, size=4, align=4] %t1_0_8
-      ret i32 [repr=i32, size=4, align=4] %t1_0_9
+      %t1_0_0 = local_addr *i32 [repr=ptr, size=8, align=8] %local.value
+      %t1_0_1 = symbol_ref proc(*i32)->uintptr [repr=ptr, size=8, align=8] @expose
+      %t1_0_2 = call uintptr [repr=i64, size=8, align=8] @expose(%t1_0_1, %t1_0_0)
+      store uintptr %t1_0_2 -> %local.raw as uintptr [repr=i64, size=8, align=8]
+      %t1_0_4 = load uintptr [repr=i64, size=8, align=8] %local.raw
+      %t1_0_5 = inttoptr *i32 [repr=ptr, size=8, align=8] %t1_0_4
+      store *i32 %t1_0_5 -> %local.ptr as *i32 [repr=ptr, size=8, align=8]
+      %t1_0_7 = load *i32 [repr=ptr, size=8, align=8] %local.ptr
+      %t1_0_8 = unary * i32 [repr=i32, size=4, align=4] %t1_0_7
+      ret i32 [repr=i32, size=4, align=4] %t1_0_8
