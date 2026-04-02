@@ -35,6 +35,13 @@ std::string ReadTextFile(const std::filesystem::path& path) {
     return buffer.str();
 }
 
+mc::parse::ParseResult ParseText(const std::string& source,
+                                 const std::filesystem::path& path,
+                                 mc::support::DiagnosticSink& diagnostics) {
+    const auto lexed = mc::lex::Lex(source, path.generic_string(), diagnostics);
+    return mc::parse::Parse(lexed, path, diagnostics);
+}
+
 void RunFixture(const std::filesystem::path& source_root, const std::filesystem::path& fixture_dir, const FixtureCase& fixture) {
     const auto source_path = fixture_dir / fixture.source_name;
     const auto expected_path = fixture_dir / fixture.expected_output_name;
@@ -90,6 +97,46 @@ void RunFixture(const std::filesystem::path& source_root, const std::filesystem:
     }
 }
 
+void TestImportedModuleSurfaceQualifiesNamedTypes() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "import mem\n"
+        "\n"
+        "func expect_alloc(alloc: *mem.Allocator) i32 {\n"
+        "    return 0\n"
+        "}\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return expect_alloc(mem.default_allocator())\n"
+        "}\n",
+        "<imported-module-surface>",
+        diagnostics);
+    if (!parsed.ok) {
+        Fail("imported-module-surface fixture should parse successfully:\n" + diagnostics.Render());
+    }
+
+    mc::sema::Module imported_mem;
+    mc::sema::TypeDeclSummary allocator_type;
+    allocator_type.kind = mc::ast::Decl::Kind::kStruct;
+    allocator_type.name = "Allocator";
+    allocator_type.fields.push_back({"raw", mc::sema::NamedType("uintptr")});
+    imported_mem.type_decls.push_back(std::move(allocator_type));
+    imported_mem.functions.push_back({
+        .name = "default_allocator",
+        .return_types = {mc::sema::PointerType(mc::sema::NamedType("Allocator"))},
+    });
+
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    imported_modules.emplace("mem", std::move(imported_mem));
+
+    mc::sema::CheckOptions options;
+    options.imported_modules = &imported_modules;
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<imported-module-surface>", options, diagnostics);
+    if (!checked.ok) {
+        Fail("imported module surfaces should qualify named types in options.imported_modules path:\n" + diagnostics.Render());
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -120,6 +167,8 @@ int main(int argc, char** argv) {
     for (const auto& fixture : fixtures) {
         RunFixture(source_root, fixture_dir, fixture);
     }
+
+    TestImportedModuleSurfaceQualifiesNamedTypes();
 
     return 0;
 }

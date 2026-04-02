@@ -68,6 +68,8 @@ struct Instruction {
 
     enum class Kind {
         kConst,
+        kLocalAddr,
+        kArenaNew,
         kLoadLocal,
         kStoreLocal,
         kStoreTarget,
@@ -99,6 +101,7 @@ struct Instruction {
         kIndex,
         kSlice,
         kAggregateInit,
+        kVariantInit,
         kVariantMatch,
         kVariantExtract,
     };

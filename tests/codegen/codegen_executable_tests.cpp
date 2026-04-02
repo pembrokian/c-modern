@@ -686,6 +686,52 @@ int main(int argc, char** argv) {
                     0,
                     {});
 
+    RunBuiltOutputFixture(mc_path,
+                          source_root / "examples/canonical/hello_stdout.mc",
+                          work_root / "phase8_hello_stdout_build",
+                          {},
+                          0,
+                          "hello, phase8\n");
+
+    const std::filesystem::path phase8_file_input = work_root / "phase8_file_input.txt";
+    WriteFile(phase8_file_input, "phase8\n");
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/read_entire_file.mc",
+                    work_root / "phase8_read_entire_file_build",
+                    7,
+                    {phase8_file_input.generic_string()});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/scoped_temp_buffer.mc",
+                    work_root / "phase8_scoped_temp_buffer_build",
+                    6,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/c_abi_boundary.mc",
+                    work_root / "phase8_c_abi_boundary_build",
+                    0,
+                    {"phase8"});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/config_parser.mc",
+                    work_root / "phase8_config_parser_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/arena_ast_build.mc",
+                    work_root / "phase8_arena_ast_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/recursive_evaluator.mc",
+                    work_root / "phase8_recursive_evaluator_build",
+                    0,
+                    {});
+
     const std::filesystem::path hosted_bad_return_source = work_root / "hosted_main_bad_return.mc";
     WriteFile(hosted_bad_return_source,
               "func main() u64 {\n"

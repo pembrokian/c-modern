@@ -108,7 +108,7 @@ TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,
     return qualified;
 }
 
-Module RewriteImportedModuleSurfaceTypes(const Module& module, std::string_view module_name) {
+Module RewriteImportedModuleSurfaceTypesInternal(const Module& module, std::string_view module_name) {
     Module rewritten = module;
     std::unordered_set<std::string> local_type_names;
     for (const auto& type_decl : module.type_decls) {
@@ -1018,6 +1018,39 @@ class Checker {
         return nullptr;
     }
 
+    Type AnalyzeVariantConstructorCall(const Expr& expr,
+                                       const Type& callee_type,
+                                       const std::vector<Type>& arg_types) {
+        if (expr.left == nullptr || expr.left->kind != Expr::Kind::kQualifiedName || callee_type.kind != Type::Kind::kNamed) {
+            return UnknownType();
+        }
+
+        const VariantSummary* variant = LookupVariant(callee_type, expr.left->secondary_text);
+        if (variant == nullptr) {
+            return UnknownType();
+        }
+
+        const std::string callee_name = CombineQualifiedName(*expr.left);
+        if (variant->payload_fields.size() != expr.args.size()) {
+            Report(expr.span,
+                   "call to " + callee_name + " expects " + std::to_string(variant->payload_fields.size()) +
+                       " arguments but got " + std::to_string(expr.args.size()));
+            return callee_type;
+        }
+
+        for (std::size_t index = 0; index < arg_types.size(); ++index) {
+            const Type& expected = variant->payload_fields[index].second;
+            const Type& actual = arg_types[index];
+            if (!IsAssignable(expected, actual)) {
+                Report(expr.args[index]->span,
+                       "argument type mismatch for parameter " + std::to_string(index + 1) + " of " + callee_name +
+                           ": expected " + FormatType(expected) + ", got " + FormatType(actual));
+            }
+        }
+
+        return callee_type;
+    }
+
     Type AnalyzeCall(const Expr& expr) {
         if (expr.left == nullptr && expr.type_target == nullptr) {
             return UnknownType();
@@ -1061,6 +1094,11 @@ class Checker {
                 Report(expr.span, "explicit conversions require parenthesized type-expression syntax");
             }
             return UnknownType();
+        }
+
+        const Type variant_ctor_type = AnalyzeVariantConstructorCall(expr, callee_type, arg_types);
+        if (!IsUnknown(variant_ctor_type)) {
+            return variant_ctor_type;
         }
 
         const Type stripped_callee = StripAliasOrDistinct(callee_type, *module_);
@@ -1823,7 +1861,13 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
 
     ImportedModules imported_modules;
     if (options.imported_modules != nullptr) {
-        imported_modules = *options.imported_modules;
+        for (const auto& import_decl : source_file.imports) {
+            const auto found = options.imported_modules->find(import_decl.module_name);
+            if (found == options.imported_modules->end()) {
+                continue;
+            }
+            imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypesInternal(found->second, import_decl.module_name);
+        }
     } else {
         for (const auto& import_decl : source_file.imports) {
             const auto import_path = mc::support::ResolveImportPath(normalized_path,
@@ -1861,7 +1905,7 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
                 }
             }
 
-            imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(exported_module, import_decl.module_name);
+            imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypesInternal(exported_module, import_decl.module_name);
         }
     }
 
@@ -1878,6 +1922,11 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
 Module BuildExportedModuleSurface(const Module& module,
                                   const ast::SourceFile& source_file) {
     return BuildExportedModuleSurfaceInternal(module, source_file);
+}
+
+Module RewriteImportedModuleSurfaceTypes(const Module& module,
+                                         std::string_view module_name) {
+    return RewriteImportedModuleSurfaceTypesInternal(module, module_name);
 }
 
 CheckResult CheckProgram(const ast::SourceFile& source_file,

@@ -1,0 +1,150 @@
+Phase 8 -- Admission Matrix
+===========================
+
+Purpose
+-------
+- Turn Phase 8 program admission into repository truth instead of prose inference.
+- Record, per pressure program, what is being stressed, how it is proven, and whether it is implemented, blocked, or deferred.
+
+Status model
+------------
+- implemented: the repository contains the program and deterministic proof.
+- in-progress: the repository contains part of the program or proof, but the pressure artifact is not yet complete.
+- blocked: the program is admitted, but a named enabling gap prevents honest proof inside the admitted bootstrap slice.
+- deferred: the program remains part of the long-term pressure set, but it is outside the first-pass Phase 8 closure for this repository.
+
+Proof path defaults
+-------------------
+- Use direct-source proof for single-file canonical programs whose pressure value does not depend on explicit project layout.
+- Use dedicated build.toml fixtures for multi-module programs and for any proof that is meant to validate the explicit Phase 7 project workflow.
+- Ordinary tests for project-style pressure programs must import the real project modules through configured roots.
+
+Slice 1 -- Immediate canonical proofs
+-------------------------------------
+
+hello-stdout
+~~~~~~~~~~~~
+- Status: implemented target for first pass
+- Packaging: direct-source
+- Intended proof: executable stdout check plus zero exit status
+- Pressure focus: import syntax, string literals, explicit stdlib I/O, hosted entry convention
+- Library surface: io.write_line
+- Observable behavior: prints one line to stdout and exits successfully
+- Known exclusions: no richer Error surface; status remains i32 from stdlib I/O
+
+recursive evaluator
+~~~~~~~~~~~~~~~~~~~
+- Status: implemented
+- Packaging: direct-source executable proof in examples/canonical/recursive_evaluator.mc
+- Intended proof: executable exit-code check over a small recursive tree
+- Pressure focus: enum payloads, variant switch, recursion, branching, divide-by-zero handling policy in the current bootstrap slice
+- Library surface: none required
+- Proof artifact: tests/codegen/codegen_executable_tests.cpp builds and runs the recursive evaluator against the bootstrap executable path
+- Enabling work landed: compiler sema and MIR now lower source-level enum variant constructors, and the executable backend lowers enum values plus local-address materialization for stack-built recursive nodes
+
+line-oriented config parser
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: implemented
+- Packaging: direct-source executable in the current first-pass canonical slice
+- Intended proof: executable exit-code or ordinary test proof against borrowed substrings and parse failures
+- Pressure focus: borrowed strings, UTF-8-preserving string slicing, explicit parse failures, line splitting, key-value scanning
+- Library surface: self-contained runtime-backed helper routines plus the now-fixed executable string-slice lowering path
+- Proof status: direct-source executable proof is wired in the canonical executable suite
+- Remaining follow-up: helper packaging can still be cleaned up later so the example consumes repository-owned helper modules instead of local helper wrappers
+
+Slice 2 -- Allocator and fs pressure
+------------------------------------
+
+read-entire-file
+~~~~~~~~~~~~~~~~
+- Status: implemented target for first pass
+- Packaging: direct-source
+- Intended proof: executable exit-code check against a small repository-owned input file
+- Pressure focus: explicit allocator use, file I/O, owned buffers, cleanup, fallible file handling within the current bootstrap fs surface
+- Library surface: fs.read_all, mem.default_allocator, mem.buffer_len, mem.buffer_free
+- Observable behavior: reads a file, validates deterministic byte length, frees the buffer, and returns a known exit code
+- Known exclusions: current fs surface returns buffers directly rather than the long-term richer (Buffer, Error) contract
+
+scoped temporary buffer
+~~~~~~~~~~~~~~~~~~~~~~~
+- Status: implemented target for first pass
+- Packaging: direct-source
+- Intended proof: executable exit-code check
+- Pressure focus: scoped defer, per-iteration cleanup, allocator discipline without hidden lifetime extension
+- Library surface: mem.buffer_new, mem.buffer_free, possibly mem.buffer_len
+- Observable behavior: allocates short-lived buffers in a loop, unwinds cleanup deterministically, and returns a known sum
+- Known exclusions: first-pass proof stresses defer and allocation discipline more than full string-copy or hashing helpers because the bootstrap mem surface is intentionally thin
+
+arena-backed AST build
+~~~~~~~~~~~~~~~~~~~~~~
+- Status: implemented
+- Packaging: direct-source executable proof in examples/canonical/arena_ast_build.mc
+- Intended proof: executable exit-code or ordinary test proof against stable tree allocation and traversal
+- Pressure focus: typed allocation helpers, pointer stability, allocator pairing, short-lived graph construction
+- Library surface: mem.Arena, mem.arena_init, mem.arena_deinit, mem.arena_new
+- Proof artifact: tests/codegen/codegen_executable_tests.cpp builds and runs the canonical arena AST example
+- Known limitation: this lands the concrete arena helper path, not the fuller allocator-protocol variant sketched for later pressure work
+
+C ABI boundary
+~~~~~~~~~~~~~~
+- Status: implemented target for first pass
+- Packaging: direct-source
+- Intended proof: executable exit-code check
+- Pressure focus: @abi(c), extern(c), cstr, explicit boundary between Modern C and the host C ABI
+- Library surface: none required beyond libc symbol access
+- Observable behavior: calls one narrow host C function and returns a deterministic result through Modern C code
+- Known exclusions: no header parsing, no broad C binding generation
+
+Deferred later canonical entries
+--------------------------------
+
+single-threaded evented echo server
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred
+- Packaging: dedicated project fixture once portable poller and networking surface are admitted
+- Reason: outside the first-pass A/B/C closure; requires a larger hosted I/O and net boundary than the current repository admits
+
+partial-write response state machine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred
+- Packaging: dedicated project fixture once writable readiness and interest updates exist
+- Reason: depends on the same poller and socket surface as the evented server
+
+evented TCP client request-response
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred
+- Packaging: dedicated project fixture once client-side networking and poller updates exist
+- Reason: depends on the same portable network and poller layer as the server-side entries
+
+Real utility candidates for later Phase 8 work
+----------------------------------------------
+
+grep-lite
+~~~~~~~~~
+- Status: implemented
+- Packaging: dedicated build.toml project
+- Intended proof: project build plus run-output and ordinary tests
+- Pressure focus: explicit project roots, file I/O, line scanning, substring matching, stdout behavior, and project-owned ordinary tests
+- Proof artifact: examples/real/grep_lite/build.toml plus tool-level mc run/mc test coverage in tests/tool/phase7_tool_tests.cpp
+- Resolution note: grep-lite now imports stdlib fs and mem directly after fixing project-mode imported interface qualification for named exported types
+
+file walker
+~~~~~~~~~~~
+- Status: deferred
+- Packaging: dedicated build.toml project
+- Intended proof: project build plus deterministic output tests
+- Reason: depends on directory traversal APIs not yet admitted
+
+hashing tool
+~~~~~~~~~~~~
+- Status: deferred
+- Packaging: dedicated build.toml project
+- Intended proof: project build plus deterministic output tests
+- Reason: depends on streaming reads and richer buffer helpers than the current bootstrap slice admits
+
+bounded threaded example
+~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred
+- Packaging: dedicated build.toml project
+- Intended proof: project build plus deterministic behavior checks
+- Reason: only admit once the current runtime and sync surface can support it honestly

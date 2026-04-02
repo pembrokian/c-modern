@@ -106,6 +106,9 @@ CheckResult CheckSourceFile(const ast::SourceFile& source_file,
 Module BuildExportedModuleSurface(const Module& module,
                                   const ast::SourceFile& source_file);
 
+Module RewriteImportedModuleSurfaceTypes(const Module& module,
+                                         std::string_view module_name);
+
 const FunctionSignature* FindFunctionSignature(const Module& module, std::string_view name);
 const TypeDeclSummary* FindTypeDecl(const Module& module, std::string_view name);
 const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view name);

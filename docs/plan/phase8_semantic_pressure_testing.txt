@@ -1,0 +1,270 @@
+Phase 8 -- Semantic Pressure Testing
+====================================
+
+Status
+------
+- Repository posture is ready for Phase 8 entry: project-driven mc check, mc build, mc run, mc test, deterministic .mci, and incremental rebuild reuse are already admitted in phase7_implementation_summary.txt.
+- Pressure-program posture is not ready yet: canonical_programs.txt defines the real acceptance targets, but current checked-in examples do not yet provide complete proof.
+- Phase 8 should therefore focus on closing the gap between the normative pressure set in canonical_programs.txt and the current repository-owned examples and tests.
+
+Purpose
+-------
+- Validate that the admitted hosted toolchain slice is sufficient for real programs, not just compiler fixtures.
+- Expose friction in semantics, stdlib boundaries, allocator APIs, string and file APIs, runtime behavior, and project workflow.
+- Convert that friction into explicit outcomes: bug fix, bounded library or runtime growth, tooling fix, or documented post-v0.2 follow-up.
+
+Problem being solved
+--------------------
+- plan.txt defines Phase 8 as semantic pressure testing through canonical and real programs.
+- The repository currently proves narrow slices of compiler behavior well, but it does not yet prove that ordinary programs built on the admitted Phase 7 workflow feel coherent.
+- Without a bounded Phase 8 pass, the repository risks mistaking good fixture coverage for actual language and toolchain sufficiency.
+
+Current repository posture
+--------------------------
+- canonical_programs.txt is the normative program list Phase 8 must pressure.
+- canonical contains partial canonical coverage, including eval.mc, memory_poll.mc, and window_stats.mc, but not the full admitted set.
+- real is currently empty and should become a core Phase 8 proof area.
+- small contains direct-source smoke examples and should remain separate from larger project-style pressure programs.
+- stdlib contains useful executable smoke programs, but most are still too small to count as semantic pressure.
+- phase7_tool_tests.cpp already proves the project workflow and should be reused for Phase 8 workflow validation instead of bypassed.
+
+Repository-specific first-pass closure decisions
+------------------------------------------------
+- Workstreams 8A, 8B, and 8C are admitted for the first Phase 8 landing sequence in this repository.
+- The first-pass admitted canonical set is:
+   - hello-stdout
+   - read-entire-file
+   - scoped temporary buffer
+   - line-oriented config parser
+   - arena-backed AST build
+   - recursive evaluator
+   - C ABI boundary proof
+- Later evented-networking examples listed in canonical_programs.txt remain part of the long-term pressure set, but they are not part of the first-pass Phase 8 closure in this repository. They must appear in the admission matrix as deferred or blocked rather than being silently omitted.
+- Direct-source proof remains the default for single-file canonical programs whose pressure value does not depend on project layout.
+- Dedicated build.toml fixtures remain the default for multi-module pressure programs or any proof that is intended to validate the explicit Phase 7 project workflow.
+- Multi-module pressure proofs must declare search_paths.modules explicitly. Repository-local stdlib discovery remains a direct-source convenience path only.
+- Ordinary tests for pressure programs must import the real project modules through configured roots rather than duplicated test-only copies.
+- Pressure findings must be routed to the owning implementation layer first. Reopening language or build-model design is allowed only after repeated multi-program pressure.
+
+Repository-specific first-pass status snapshot
+---------------------------------------------
+- hello-stdout is immediately implementable and should be proven as a direct-source executable.
+- read-entire-file is immediately implementable against the current fs and mem bootstrap surface and should be proven as a direct-source executable.
+- scoped temporary buffer is implementable as a defer-and-allocation pressure example using the current mem bootstrap surface, but it will validate defer discipline more than library richness.
+- recursive evaluator is now implementable and proven as a direct-source executable after adding source-level enum variant construction, executable enum lowering, and local-address materialization for stack-built recursive trees.
+- C ABI boundary proof is implementable with the current @abi(c), extern(c), and cstr support and should be proven as a direct-source executable unless project packaging adds meaningful pressure.
+- line-oriented config parser is now implementable as a direct-source executable after fixing bootstrap executable string-slice lowering for the helper-heavy borrowed-string scanning shape.
+- arena-backed AST build is now implementable and proven as a direct-source executable after adding a concrete arena helper surface and typed arena allocation in the bootstrap executable path.
+
+Import design decisions and trade-offs that need explicit closure
+-----------------------------------------------------------------
+Pressure-program packaging:
+
+- Decision: whether substantial Phase 8 programs live under one shared repo project or under dedicated per-program project fixtures.
+- Recommendation: use dedicated build.toml-driven project fixtures for substantial multi-module programs.
+- Trade-off: a shared project reduces duplication, but it couples unrelated programs and hides per-program import assumptions; dedicated projects are noisier but make the import and build graph explicit.
+
+Explicit roots versus convenience fallback:
+
+- Decision: whether multi-module Phase 8 proofs may rely on repository-local stdlib or source-root fallback behavior.
+- Recommendation: multi-module pressure programs should declare their roots explicitly through search_paths.modules; automatic repository-local stdlib discovery should remain a direct-source convenience only.
+- Trade-off: convenience fallback is easier short term, but it weakens the Phase 8 goal of validating the explicit Phase 7 build and import model.
+
+Cross-example helper reuse:
+
+- Decision: whether programs may import shared helper modules outside their own project root.
+- Recommendation: keep programs self-contained by default; only share helpers when the helper is itself intended as reusable library surface.
+- Trade-off: shared helpers reduce duplication, but they blur which program is proving which language or tooling property.
+
+Vendored roots:
+
+- Decision: whether any Phase 8 program may rely on implicit vendor/ behavior.
+- Recommendation: do not admit implicit vendored search; if a pressure program needs vendored modules, they must be named explicitly in search_paths.modules.
+- Trade-off: implicit vendoring is convenient, but it drifts toward hidden package behavior and weakens the explicitness bias frozen in build_spec.txt.
+
+Test imports:
+
+- Decision: whether ordinary tests import the real program modules or use duplicated test-only copies.
+- Recommendation: tests should import the real project modules through configured roots so the actual build graph is exercised.
+- Trade-off: duplicated test copies simplify fixtures, but they stop proving the real project and import workflow.
+
+Module identity and naming:
+
+- Decision: whether to change the current ordered-root one-file-one-module lookup if Phase 8 programs feel awkward.
+- Recommendation: preserve the current model first and capture friction as a pressure finding before changing the import design.
+- Trade-off: changing the model early may smooth a few examples, but it can also bend the architecture to the first awkward case instead of validating the existing design honestly.
+
+Workstream 8A -- Authority And Pressure-Program Closure
+-------------------------------------------------------
+Objective
+~~~~~~~~~
+Freeze the repository-specific Phase 8 objective as pressure-testing the admitted hosted Phase 7 slice plus the minimum stdlib and runtime growth required by real programs.
+
+Tasks
+~~~~~
+1. Re-audit plan.txt, canonical_programs.txt, build_spec.txt, and test_spec.txt against the current posture in README.md and phase7_implementation_summary.txt.
+2. Freeze the repository-specific Phase 8 objective as pressure-testing the admitted hosted Phase 7 slice plus the minimum stdlib and runtime growth required by real programs.
+3. Publish a repository-specific Phase 8 plan and an admitted first-pass program set.
+4. Define a findings taxonomy: implementation bug, bootstrap capability gap, stdlib or runtime gap, tooling gap, or spec-level follow-up.
+5. Freeze the decision rule: fix implementation, library, or runtime problems first; only reopen language or build-model questions after repeated pressure from multiple programs.
+6. Publish one explicit admission matrix and one explicit findings log so admitted, blocked, and deferred programs stop being implied by prose alone.
+
+Workstream 8B -- Program Admission Matrix And Execution Slices
+--------------------------------------------------------------
+Objective
+~~~~~~~~~
+Build a matrix mapping each admitted canonical and real program to the semantic features, stdlib and runtime surfaces, import and build workflow, and proof mechanism it is meant to stress.
+
+Tasks
+~~~~~
+1. Build a matrix mapping each admitted canonical and real program to the semantic features, stdlib and runtime surfaces, import and build workflow, and proof mechanism it is meant to stress.
+2. Split the work into cumulative slices:
+   - Slice 1: easier canonical programs such as hello-stdout, recursive evaluator, and config parser.
+   - Slice 2: allocator, fs, and string-heavy canonical programs such as read-entire-file, scoped temporary buffer, and arena-backed AST build.
+   - Slice 3: real utilities such as grep-lite, file walker, hashing tool, and one bounded threaded example if the current runtime can support it honestly.
+3. Decide per program whether the proof path is direct-source, dedicated project fixture, or project plus ordinary tests.
+4. Record expected outputs, failure modes, and known bootstrap exclusions for every admitted program.
+5. Mark later canonical evented-networking entries explicitly as deferred or blocked in the matrix until the repository chooses to pressure that surface honestly.
+
+Workstream 8C -- Canonical Program Closure
+-----------------------------------------
+Objective
+~~~~~~~~~
+Compare canonical to the full canonical set in canonical_programs.txt.
+
+Tasks
+~~~~~
+1. Compare canonical to the full canonical set in canonical_programs.txt.
+2. Add or expand repository-owned canonical programs for hello-stdout, read-entire-file, scoped temporary buffer, line-oriented config parser, arena-backed AST build, recursive evaluator, and C ABI boundary proof as far as the admitted hosted slice supports.
+3. Implement the minimum missing compiler, sema, MIR, codegen, stdlib, or runtime capability each canonical program needs to become a real pressure artifact.
+4. Record all friction encountered while writing each program rather than normalizing awkwardness into the examples.
+5. Add matching executable or project tests so canonical programs become proof artifacts, not just reference samples.
+6. When an admitted canonical program cannot yet become a real pressure artifact without widening the repository beyond the admitted bootstrap slice, record it as blocked in the findings log with the named enabling gap instead of replacing it with a weaker surrogate.
+
+Workstream 8D -- Real Utility Bring-Up
+--------------------------------------
+Objective
+~~~~~~~~~
+Add bounded real utilities that pressure the admitted toolchain honestly.
+
+Tasks
+~~~~~
+1. Add one bounded text-processing utility under real; grep-lite is now the first landed candidate because build_spec.txt already uses it as a build-model example.
+2. Add one bounded file-walking utility that pressures directory traversal, path handling, and nested error propagation.
+3. Add one bounded hashing or checksum utility that pressures buffers, streaming reads, integer operations, and deterministic output.
+4. Add one bounded arena-using parser or tool that pressures allocator pairing, pointer stability, and large short-lived graphs.
+5. Add one bounded threaded example only if it fits the current runtime and sync surface naturally; otherwise keep it in the admitted matrix as explicitly blocked work rather than silently dropping it.
+6. Keep each utility reviewable and deterministic; the goal is pressure, not breadth for its own sake.
+
+Workstream 8E -- Pressure-Driven Implementation Work
+----------------------------------------------------
+Objective
+~~~~~~~~~
+Route each finding to the smallest correct layer.
+
+Tasks
+~~~~~
+1. Route each finding to the smallest correct layer:
+   - Parser and AST only for syntax gaps.
+   - Sema for language meaning and type, layout, and import issues.
+   - MIR for lowered semantic truth.
+   - Codegen and runtime for executable behavior.
+   - Stdlib for library-surface gaps.
+   - Driver, build, and test only for workflow issues.
+2. Add missing stdlib or runtime surface only when an admitted program requires it.
+3. Preserve the Phase 7 ownership split; do not hide library or semantic gaps in driver logic or special-case fixtures.
+4. If multiple programs expose the same awkwardness around error propagation, borrowing, allocator APIs, or project layout, escalate it as a documented Phase 8 design signal.
+5. Keep the hosted target matrix and build model narrow; Phase 8 is not the time to widen into portability or package management.
+
+Workstream 8F -- Proof Harness, Regression Coverage, And Findings Capture
+-------------------------------------------------------------------------
+Objective
+~~~~~~~~~
+Reproduce every admitted Phase 8 program through the repository workflow and capture findings explicitly.
+
+Tasks
+~~~~~
+1. Reuse phase7_tool_tests.cpp, stdlib, and executable or codegen proof patterns to make every admitted Phase 8 program reproducible through the repository workflow.
+2. Keep user-facing programs in canonical and real, but add narrow proof fixtures in tests for runtime output, checked-mode behavior, and failure cases.
+3. Add compile-fail or MIR-oriented regressions for bugs discovered by pressure programs when the stable contract is lower-level than the full program.
+4. Create a Phase 8 findings log under plan that records, per admitted program, what worked, what had to change, and what remains as implementation backlog versus post-v0.2 design follow-up.
+5. Ensure the canonical workflow remains green while Phase 8 grows: build, focused tests, then full CTest.
+
+Workstream 8G -- Documentation And Closure
+------------------------------------------
+Objective
+~~~~~~~~~
+Publish a repository-specific Phase 8 plan and finish note in the same style as the Phase 7 plan.
+
+Tasks
+~~~~~
+1. Publish a repository-specific Phase 8 plan in the same style as phase7_build_tool_harness.txt.
+2. Publish a Phase 8 implementation summary or finish note once the admitted slice is real.
+3. Update README.md with the new example and project workflows after the admitted programs stabilize.
+4. If repeated pressure findings require a narrower repository interpretation of build, test, allocator, string, fs, or runtime behavior, update the smallest appropriate spec or plan document instead of leaving the examples as the only truth.
+5. Define explicit closure criteria so the repository does not overclaim Phase 8 from a few manually run examples.
+
+Ordered Implementation Steps
+----------------------------
+1. Freeze the repository-specific Phase 8 scope, finding taxonomy, and admitted first-pass program set.
+2. Build the admission matrix for all canonical programs and the initial real-utility candidates.
+3. Freeze the import and project-layout decisions for multi-module pressure programs.
+4. Publish the first-pass findings log template so every admitted program has a place to record friction and blocked status.
+5. Land Slice 1 canonical programs and the minimum fixes they require.
+6. Land Slice 2 canonical programs and the deeper allocator, fs, string, and runtime fixes they require.
+7. Add the C ABI boundary example and its narrow proof path.
+8. Convert blocked canonical programs into named backlog or enabling-gap entries rather than implicit omissions.
+9. Add the first real utility project, preferably a small grep-like tool. Status: implemented as examples/real/grep_lite with project-level mc run and mc test proof.
+   - Follow-up resolved: project-mode imported interface qualification now preserves named exported types across stdlib module boundaries well enough for grep-lite to import fs and mem directly.
+10. Expand into file-walking, hashing, and arena-backed utilities one pressure dimension at a time.
+11. Add a bounded threaded example only if it fits the admitted runtime honestly.
+12. Convert all discovered issues into stable tests or documented blocked items.
+13. Close documentation, findings capture, and acceptance proof.
+
+Relevant Files
+--------------
+- plan.txt for the authoritative Phase 8 objective and milestone context.
+- canonical_programs.txt for the canonical pressure-program set.
+- build_spec.txt for the import, build, and project rules pressure programs must validate.
+- test_spec.txt for ordinary test discovery and execution rules.
+- README.md for current workflow posture.
+- phase7_build_tool_harness.txt as the structural model for the new plan.
+- phase7_implementation_summary.txt for the admitted current build, test, and tool boundary.
+- canonical, real, and small for the pressure-program surfaces.
+- stdlib and phase7_tool_tests.cpp for proof reuse.
+- driver.cpp, check.cpp, codegen_llvm, stdlib, hosted, and CMakeLists.txt as the likely implementation surfaces pressure findings will touch.
+
+Verification
+------------
+1. Maintain a Phase 8 admission matrix listing every canonical program and real utility, its intended proof path, and its current status.
+2. Validate each execution slice with the canonical workflow: build debug, run focused tests, then run full CTest.
+3. Add focused mc build, mc run, and mc test proofs for every project-style pressure program.
+4. Add deterministic output or exit-code checks for every pressure program whose observable runtime behavior is part of the contract.
+5. For each discovered bug, add the narrowest stable regression test: full-program proof when practical, lower-layer fixture when that is the clearer contract.
+6. Re-run earlier slices after each new utility family so later growth does not silently regress already-admitted programs.
+7. Treat blocked threaded or platform-heavy cases as explicit proof failures until enabling runtime work exists; do not silently remove them from the matrix.
+
+Validation Rules
+----------------
+- Do not claim Phase 8 implemented merely because examples compile manually; the admitted program set must be wired into deterministic repository proof.
+- Do not treat convenience import fallback as sufficient proof for multi-module programs that are meant to validate the explicit project model.
+- Do not widen Phase 8 into package management, target-matrix growth, or speculative language redesign.
+- Do not hide stdlib, runtime, or semantic gaps in driver special cases or one-off fixtures.
+- Do not discard repeated pressure findings without classifying them explicitly as implementation work or design follow-up.
+
+Acceptance Criteria
+-------------------
+- Every admitted canonical program from canonical_programs.txt is either implemented and proven in-repo or explicitly documented as blocked by a named enabling gap.
+- The repository contains a bounded set of real utilities under real that exercise text processing, file traversal, hashing, allocator pressure, and, if honestly supported, basic threading.
+- The admitted Phase 7 project workflow is exercised by real pressure programs, not just narrow tool fixtures.
+- Pressure-discovered bugs are converted into stable regression tests.
+- Remaining friction is documented as implementation backlog or explicit post-v0.2 design follow-up.
+- Documentation records the admitted Phase 8 slice without overstating language or ecosystem maturity.
+
+Further Considerations
+----------------------
+1. Packaging strategy: per-program build.toml fixtures are the recommended default because they keep import roots and artifact graphs explicit.
+2. Threaded example scope: keep one bounded threaded example in the admitted matrix only if current runtime and sync support can carry it naturally; otherwise keep it as explicit blocked work rather than pretending concurrency was pressure-tested.
+3. Findings log shape: one cumulative Phase 8 findings document with per-program sections is preferable to scattered notes because Phase 8’s value is in aggregating repeated design signals.
+
+The full plan has also been saved into session memory for handoff and refinement. If you want, the next pass can turn this into a repository-style draft document matching the exact prose and layout conventions of phase7_build_tool_harness.txt.

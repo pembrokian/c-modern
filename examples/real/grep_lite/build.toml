@@ -1,0 +1,21 @@
+schema = 1
+project = "grep-lite"
+default = "grep"
+
+[targets.grep]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.grep.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.grep.runtime]
+startup = "default"
+
+[targets.grep.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

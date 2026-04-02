@@ -42,6 +42,10 @@ std::string_view ToString(Instruction::Kind kind) {
     switch (kind) {
         case Instruction::Kind::kConst:
             return "const";
+        case Instruction::Kind::kLocalAddr:
+            return "local_addr";
+        case Instruction::Kind::kArenaNew:
+            return "arena_new";
         case Instruction::Kind::kLoadLocal:
             return "load_local";
         case Instruction::Kind::kStoreLocal:
@@ -104,6 +108,8 @@ std::string_view ToString(Instruction::Kind kind) {
             return "slice";
         case Instruction::Kind::kAggregateInit:
             return "aggregate_init";
+        case Instruction::Kind::kVariantInit:
+            return "variant_init";
         case Instruction::Kind::kVariantMatch:
             return "variant_match";
         case Instruction::Kind::kVariantExtract:
@@ -512,6 +518,7 @@ enum class SpecialCallKind {
     kMmioPtr,
     kBufferNew,
     kBufferFree,
+    kArenaNew,
     kSliceFromBuffer,
     kVolatileLoad,
     kVolatileStore,
@@ -532,6 +539,9 @@ SpecialCallKind ClassifySpecialCall(std::string_view callee_name) {
     if (callee_name == "buffer_free" || callee_name == "mem.buffer_free") {
         return SpecialCallKind::kBufferFree;
     }
+        if (callee_name == "arena_new" || callee_name == "mem.arena_new") {
+            return SpecialCallKind::kArenaNew;
+        }
     if (callee_name == "slice_from_buffer" || callee_name == "mem.slice_from_buffer") {
         return SpecialCallKind::kSliceFromBuffer;
     }
@@ -744,6 +754,20 @@ std::string CanonicalVariantDisplayName(const sema::Type& selector_type, std::st
     return std::string(variant_name);
 }
 
+bool MatchesTargetDisplay(std::string_view target, const sema::Type& type) {
+    const std::string canonical = sema::FormatType(type);
+    if (target == canonical) {
+        return true;
+    }
+    if (type.kind == sema::Type::Kind::kNamed && !type.name.empty()) {
+        const std::size_t separator = type.name.rfind('.');
+        if (separator != std::string::npos && target == type.name.substr(separator + 1)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 class FunctionLowerer {
   public:
     FunctionLowerer(const Decl& decl,
@@ -937,7 +961,7 @@ class FunctionLowerer {
     }
 
     bool SpecialCallProducesValue(SpecialCallKind kind) const {
-         return kind == SpecialCallKind::kMmioPtr || kind == SpecialCallKind::kBufferNew || kind == SpecialCallKind::kSliceFromBuffer ||
+            return kind == SpecialCallKind::kMmioPtr || kind == SpecialCallKind::kBufferNew || kind == SpecialCallKind::kArenaNew || kind == SpecialCallKind::kSliceFromBuffer ||
              kind == SpecialCallKind::kVolatileLoad || kind == SpecialCallKind::kAtomicLoad ||
                kind == SpecialCallKind::kAtomicExchange || kind == SpecialCallKind::kAtomicCompareExchange ||
                kind == SpecialCallKind::kAtomicFetchAdd;
@@ -955,6 +979,7 @@ class FunctionLowerer {
                 return RenderCompareExchangeOrderMetadata(expr);
             case SpecialCallKind::kBufferNew:
             case SpecialCallKind::kBufferFree:
+                case SpecialCallKind::kArenaNew:
             case SpecialCallKind::kSliceFromBuffer:
             case SpecialCallKind::kNone:
             case SpecialCallKind::kMmioPtr:
@@ -975,6 +1000,26 @@ class FunctionLowerer {
                                     ValueInfo* result) {
         if (kind == SpecialCallKind::kNone) {
             return false;
+        }
+
+        if (kind == SpecialCallKind::kArenaNew) {
+            if (args.size() != 1) {
+                Report({}, "arena_new expects exactly one argument during MIR lowering");
+                return false;
+            }
+            const std::string value = NewValue();
+            Emit({
+                .kind = Instruction::Kind::kArenaNew,
+                .result = value,
+                .type = result_type,
+                .target = sema::FormatType(result_type),
+                .target_display = sema::FormatType(result_type),
+                .operands = {args.front().value},
+            });
+            if (wants_result && result != nullptr) {
+                *result = {value, result_type};
+            }
+            return true;
         }
 
         if (kind == SpecialCallKind::kMmioPtr) {
@@ -1069,6 +1114,7 @@ class FunctionLowerer {
             case SpecialCallKind::kAtomicFetchAdd:
                 instruction.kind = Instruction::Kind::kAtomicFetchAdd;
                 break;
+            case SpecialCallKind::kArenaNew:
             case SpecialCallKind::kNone:
             case SpecialCallKind::kMmioPtr:
             case SpecialCallKind::kSliceFromBuffer:
@@ -1119,6 +1165,9 @@ class FunctionLowerer {
         }
 
         const sema::Type call_type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "statement call result type");
+        if (TryEmitVariantInit(expr, args, call_type, false, nullptr)) {
+            return;
+        }
         if (TryEmitSpecialCall(expr, args, call_type, false, nullptr)) {
             return;
         }
@@ -1476,6 +1525,52 @@ class FunctionLowerer {
         return {value, payload_type};
     }
 
+    bool TryEmitVariantInit(const Expr& expr,
+                           const std::vector<ValueInfo>& args,
+                           const sema::Type& result_type,
+                           bool wants_result,
+                           ValueInfo* result) {
+        if (expr.left == nullptr || expr.left->kind != Expr::Kind::kQualifiedName || result_type.kind != sema::Type::Kind::kNamed) {
+            return false;
+        }
+
+        const auto* type_decl = sema::FindTypeDecl(sema_module_, result_type.name);
+        if (type_decl == nullptr || type_decl->kind != Decl::Kind::kEnum || expr.left->text != result_type.name) {
+            return false;
+        }
+
+        std::size_t variant_index = 0;
+        for (; variant_index < type_decl->variants.size(); ++variant_index) {
+            if (type_decl->variants[variant_index].name == expr.left->secondary_text) {
+                break;
+            }
+        }
+        if (variant_index >= type_decl->variants.size()) {
+            return false;
+        }
+
+        const std::string value = wants_result ? NewValue() : std::string();
+        const std::string canonical_variant_name = CanonicalVariantDisplayName(result_type, expr.left->secondary_text);
+        Instruction instruction {
+            .kind = Instruction::Kind::kVariantInit,
+            .result = value,
+            .type = result_type,
+            .target = canonical_variant_name,
+            .target_name = VariantLeafName(expr.left->secondary_text),
+            .target_display = canonical_variant_name,
+            .target_base_type = result_type,
+            .target_index = static_cast<std::int64_t>(variant_index),
+        };
+        for (const auto& arg : args) {
+            instruction.operands.push_back(arg.value);
+        }
+        Emit(std::move(instruction));
+        if (wants_result && result != nullptr) {
+            *result = {value, result_type};
+        }
+        return true;
+    }
+
     Instruction::TargetKind InferSymbolRefKind(std::string_view name) const {
         if (sema::FindGlobalSummary(sema_module_, name) != nullptr) {
             return Instruction::TargetKind::kGlobal;
@@ -1587,6 +1682,17 @@ class FunctionLowerer {
             case Expr::Kind::kLiteral:
                 return EmitLiteralValue(expr.text, KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "literal expression type"));
             case Expr::Kind::kUnary: {
+                if (expr.text == "&" && expr.left != nullptr && expr.left->kind == Expr::Kind::kName && local_types_.contains(expr.left->text)) {
+                    const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "address-of expression type");
+                    const std::string value = NewValue();
+                    Emit({
+                        .kind = Instruction::Kind::kLocalAddr,
+                        .result = value,
+                        .type = type,
+                        .target = expr.left->text,
+                    });
+                    return {value, type};
+                }
                 const auto operand = LowerExpr(*expr.left);
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "unary expression type");
                 const std::string value = NewValue();
@@ -1628,6 +1734,10 @@ class FunctionLowerer {
                 args.reserve(expr.args.size());
                 for (const auto& arg : expr.args) {
                     args.push_back(LowerExpr(*arg));
+                }
+                ValueInfo variant_init_result;
+                if (TryEmitVariantInit(expr, args, type, true, &variant_init_result)) {
+                    return variant_init_result;
                 }
                 ValueInfo special_result;
                 if (TryEmitSpecialCall(expr, args, type, true, &special_result)) {
@@ -1802,6 +1912,8 @@ class FunctionLowerer {
             target_operands.push_back(base.value);
             target_operands.push_back(index.value);
         } else if ((target.kind == Expr::Kind::kField || target.kind == Expr::Kind::kDerefField) && target.left != nullptr) {
+            target_operands.push_back(LowerExpr(*target.left).value);
+        } else if (target.kind == Expr::Kind::kUnary && target.text == "*" && target.left != nullptr) {
             target_operands.push_back(LowerExpr(*target.left).value);
         }
         Emit({
@@ -2667,6 +2779,32 @@ bool ValidateModule(const Module& module,
                 }
 
                 switch (instruction.kind) {
+                    case Instruction::Kind::kLocalAddr: {
+                        if (instruction.result.empty()) {
+                            report("local_addr must produce a result in function " + function.name);
+                        }
+                        if (!instruction.operands.empty()) {
+                            report("local_addr must not take operands in function " + function.name);
+                        }
+                        if (instruction.target.empty()) {
+                            report("local_addr must name a local target in function " + function.name);
+                            break;
+                        }
+                        const auto found_local = local_types.find(instruction.target);
+                        if (found_local == local_types.end()) {
+                            report("local_addr references unknown local in function " + function.name + ": " + instruction.target);
+                            break;
+                        }
+                        if (instruction.type.kind != sema::Type::Kind::kPointer || instruction.type.subtypes.empty()) {
+                            report("local_addr must produce a pointer type in function " + function.name);
+                            break;
+                        }
+                        if (instruction.type.subtypes.front() != found_local->second) {
+                            report("local_addr type mismatch in function " + function.name + " for " + instruction.target + ": expected *" +
+                                   sema::FormatType(found_local->second) + ", got " + sema::FormatType(instruction.type));
+                        }
+                        break;
+                    }
                     case Instruction::Kind::kLoadLocal: {
                         if (instruction.result.empty()) {
                             report("load_local must produce a result in function " + function.name);
@@ -2832,6 +2970,17 @@ bool ValidateModule(const Module& module,
                             case Instruction::TargetKind::kNone:
                             case Instruction::TargetKind::kFunction:
                             case Instruction::TargetKind::kOther:
+                                if (instruction.operands.size() == 2 && instruction.target_base_type.kind == sema::Type::Kind::kPointer &&
+                                    !instruction.target_base_type.subtypes.empty()) {
+                                    if (!operand_types.empty() && !IsAssignableType(instruction.target_base_type.subtypes.front(), operand_types.front())) {
+                                        report("store_target pointer target type mismatch in function " + function.name + ": expected " +
+                                               sema::FormatType(instruction.target_base_type.subtypes.front()) + ", got " +
+                                               sema::FormatType(operand_types.front()));
+                                    }
+                                    if (operand_types.size() >= 2 && operand_types[1] != instruction.target_base_type) {
+                                        report("store_target pointer base metadata mismatch in function " + function.name);
+                                    }
+                                }
                                 break;
                         }
                         break;
@@ -3020,7 +3169,7 @@ bool ValidateModule(const Module& module,
                         if (instruction.target.empty()) {
                             report("convert must name a target type in function " + function.name);
                         }
-                        if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                        if (!sema::IsUnknown(instruction.type) && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                             report("convert target metadata must match result type in function " + function.name);
                         }
                         if (operand_types.size() == 1 &&
@@ -3038,14 +3187,16 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.target.empty()) {
                             report("convert_numeric must name a target type in function " + function.name);
-                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                        } else if (!sema::IsUnknown(instruction.type) && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                             report("convert_numeric target metadata must match result type in function " + function.name);
                         }
                         if (operand_types.size() == 1 &&
                             ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kNumeric) {
                             report("convert_numeric must encode a numeric conversion family in function " + function.name);
                         }
-                        if (operand_types.size() == 1 && (!IsNumericType(operand_types.front()) || !IsNumericType(instruction.type))) {
+                        if (operand_types.size() == 1 &&
+                            (!IsNumericType(StripMirAliasOrDistinct(module, operand_types.front())) ||
+                             !IsNumericType(StripMirAliasOrDistinct(module, instruction.type)))) {
                             report("convert_numeric requires numeric source and target types in function " + function.name);
                         }
                         break;
@@ -3059,7 +3210,7 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.target.empty()) {
                             report("convert_distinct must name a target type in function " + function.name);
-                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                        } else if (!sema::IsUnknown(instruction.type) && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                             report("convert_distinct target metadata must match result type in function " + function.name);
                         }
                         if (operand_types.size() == 1 &&
@@ -3086,7 +3237,7 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.target.empty()) {
                             report("pointer_to_int must name a target type in function " + function.name);
-                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                        } else if (!sema::IsUnknown(instruction.type) && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                             report("pointer_to_int target metadata must match result type in function " + function.name);
                         }
                         if (operand_types.size() == 1 &&
@@ -3108,7 +3259,7 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.target.empty()) {
                             report("int_to_pointer must name a target type in function " + function.name);
-                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                        } else if (!sema::IsUnknown(instruction.type) && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                             report("int_to_pointer target metadata must match result type in function " + function.name);
                         }
                         if (operand_types.size() == 1 &&
@@ -3130,7 +3281,7 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.target.empty()) {
                             report("array_to_slice must name a target type in function " + function.name);
-                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                        } else if (!sema::IsUnknown(instruction.type) && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                             report("array_to_slice target metadata must match result type in function " + function.name);
                         }
                         if (operand_types.size() == 1 &&
@@ -3157,7 +3308,7 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.target.empty()) {
                             report("buffer_to_slice must name a target type in function " + function.name);
-                        } else if (!sema::IsUnknown(instruction.type) && instruction.target != sema::FormatType(instruction.type)) {
+                        } else if (!sema::IsUnknown(instruction.type) && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                             report("buffer_to_slice target metadata must match result type in function " + function.name);
                         }
                         if (operand_types.size() == 1 &&
@@ -3209,6 +3360,20 @@ bool ValidateModule(const Module& module,
                             if (operand_types.front().kind != sema::Type::Kind::kPointer || pointee.kind != sema::Type::Kind::kNamed || pointee.name != "Buffer") {
                                 report("buffer_free requires *Buffer<T> operand in function " + function.name);
                             }
+                        }
+                        break;
+                    }
+                    case Instruction::Kind::kArenaNew: {
+                        if (instruction.result.empty()) {
+                            report("arena_new must produce a result in function " + function.name);
+                        }
+                        if (instruction.operands.size() != 1) {
+                            report("arena_new must use exactly one arena operand in function " + function.name);
+                            break;
+                        }
+                        const sema::Type pointee = PointerPointeeType(instruction.type).value_or(sema::UnknownType());
+                        if (instruction.type.kind != sema::Type::Kind::kPointer || sema::IsUnknown(pointee)) {
+                            report("arena_new must produce *T in function " + function.name);
                         }
                         break;
                     }
@@ -3587,7 +3752,7 @@ bool ValidateModule(const Module& module,
                         if (type_decl == nullptr && builtin_fields.empty()) {
                             report("aggregate_init references unknown type in function " + function.name + ": " + instruction.type.name);
                         } else {
-                            if (!instruction.target.empty() && instruction.target != sema::FormatType(instruction.type)) {
+                            if (!instruction.target.empty() && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                                 report("aggregate_init target metadata must match result type in function " + function.name);
                             }
                             std::unordered_set<std::string> seen_named_fields;
@@ -3622,6 +3787,54 @@ bool ValidateModule(const Module& module,
                                     report("aggregate_init field type mismatch in function " + function.name + " for " + field_name + ": expected " +
                                            sema::FormatType(expected_type) + ", got " + sema::FormatType(operand_types[index]));
                                 }
+                            }
+                        }
+                        break;
+                    }
+                    case Instruction::Kind::kVariantInit: {
+                        if (instruction.result.empty()) {
+                            report("variant_init must produce a result in function " + function.name);
+                        }
+                        const std::string_view variant_name = PrimaryTargetName(instruction);
+                        if (variant_name.empty()) {
+                            report("variant_init must name a target variant in function " + function.name);
+                        }
+                        if (instruction.type.kind != sema::Type::Kind::kNamed) {
+                            report("variant_init must produce a named enum type in function " + function.name);
+                            break;
+                        }
+                        if (!sema::IsUnknown(instruction.target_base_type) && instruction.target_base_type != instruction.type) {
+                            report("variant_init target metadata must match result type in function " + function.name);
+                        }
+                        const TypeDecl* type_decl = FindMirTypeDecl(module, instruction.type.name);
+                        if (type_decl == nullptr) {
+                            report("variant_init references unknown type in function " + function.name + ": " + instruction.type.name);
+                            break;
+                        }
+                        if (type_decl->kind != TypeDecl::Kind::kEnum) {
+                            report("variant_init requires enum result type in function " + function.name);
+                            break;
+                        }
+                        const VariantDecl* variant_decl = FindMirVariantDecl(*type_decl, variant_name);
+                        if (variant_decl == nullptr) {
+                            report("variant_init references unknown variant in function " + function.name + ": " + std::string(variant_name));
+                            break;
+                        }
+                        if (instruction.target_index >= 0) {
+                            const std::size_t variant_index = static_cast<std::size_t>(instruction.target_index);
+                            if (variant_index >= type_decl->variants.size() || type_decl->variants[variant_index].name != variant_decl->name) {
+                                report("variant_init variant metadata mismatch in function " + function.name);
+                            }
+                        }
+                        if (instruction.operands.size() != variant_decl->payload_fields.size()) {
+                            report("variant_init operand count mismatch in function " + function.name);
+                            break;
+                        }
+                        for (std::size_t index = 0; index < operand_types.size() && index < variant_decl->payload_fields.size(); ++index) {
+                            if (!IsAssignableType(variant_decl->payload_fields[index].second, operand_types[index])) {
+                                report("variant_init operand type mismatch in function " + function.name + " for " + variant_decl->name +
+                                       ": expected " + sema::FormatType(variant_decl->payload_fields[index].second) + ", got " +
+                                       sema::FormatType(operand_types[index]));
                             }
                         }
                         break;

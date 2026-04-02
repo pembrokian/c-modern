@@ -21,6 +21,13 @@ struct mc_buffer_u8 {
     struct mc_allocator* alloc;
 };
 
+struct mc_arena {
+    uint8_t* ptr;
+    int64_t cap;
+    int64_t used;
+    struct mc_allocator* alloc;
+};
+
 struct mc_slice_cstr {
     struct mc_string* ptr;
     int64_t len;
@@ -107,6 +114,41 @@ int64_t __mc_mem_buffer_len_u8(struct mc_buffer_u8* buf) {
     return buf->len;
 }
 
+struct mc_arena* __mc_mem_arena_init(struct mc_allocator* alloc, int64_t cap) {
+    struct mc_allocator* actual_alloc = alloc != NULL ? alloc : &k_default_allocator;
+    if (cap < 0) {
+        return NULL;
+    }
+
+    struct mc_arena* arena = (struct mc_arena*) malloc(sizeof(struct mc_arena));
+    if (arena == NULL) {
+        return NULL;
+    }
+
+    const size_t requested = (size_t) cap;
+    const size_t allocation_size = requested == 0 ? 1 : requested;
+    uint8_t* data = (uint8_t*) malloc(allocation_size);
+    if (data == NULL) {
+        free(arena);
+        return NULL;
+    }
+
+    arena->ptr = data;
+    arena->cap = cap;
+    arena->used = 0;
+    arena->alloc = actual_alloc;
+    return arena;
+}
+
+void __mc_mem_arena_deinit(struct mc_arena* arena) {
+    if (arena == NULL) {
+        return;
+    }
+
+    free(arena->ptr);
+    free(arena);
+}
+
 int32_t __mc_io_write(struct mc_string text) {
     const size_t size = text.len < 0 ? 0 : (size_t) text.len;
     const size_t written = fwrite(text.ptr, 1, size, stdout);
@@ -124,6 +166,52 @@ int32_t __mc_io_write_line(struct mc_string text) {
         return 1;
     }
     return 0;
+}
+
+int32_t __mc_strings_eq(struct mc_string left, struct mc_string right) {
+    if (left.len != right.len) {
+        return 0;
+    }
+    if (left.len <= 0) {
+        return 1;
+    }
+    return memcmp(left.ptr, right.ptr, (size_t) left.len) == 0 ? 1 : 0;
+}
+
+int64_t __mc_strings_find_byte(struct mc_string text, uint8_t needle) {
+    if (text.len <= 0) {
+        return 0;
+    }
+    for (int64_t index = 0; index < text.len; ++index) {
+        if ((uint8_t) text.ptr[index] == needle) {
+            return index;
+        }
+    }
+    return text.len;
+}
+
+int64_t __mc_strings_trim_space_start(struct mc_string text) {
+    int64_t index = 0;
+    while (index < text.len) {
+        const unsigned char ch = (unsigned char) text.ptr[index];
+        if (ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r') {
+            break;
+        }
+        ++index;
+    }
+    return index;
+}
+
+int64_t __mc_strings_trim_space_end(struct mc_string text) {
+    int64_t index = text.len;
+    while (index > 0) {
+        const unsigned char ch = (unsigned char) text.ptr[index - 1];
+        if (ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r') {
+            break;
+        }
+        --index;
+    }
+    return index;
 }
 
 int64_t __mc_fs_file_size(struct mc_string path) {

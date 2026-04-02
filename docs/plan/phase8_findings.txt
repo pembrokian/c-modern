@@ -1,0 +1,76 @@
+Phase 8 -- Findings Log
+=======================
+
+Purpose
+-------
+- Record what each admitted pressure program exposed while it was being implemented.
+- Keep implementation fixes, bootstrap gaps, and post-v0.2 design questions separate.
+
+Taxonomy
+--------
+- implementation bug: the intended repository-owned capability exists, but the compiler, stdlib, runtime, or proof harness behaves incorrectly.
+- bootstrap capability gap: the admitted repository slice does not yet contain a needed capability, but the gap is still within the current bootstrap direction.
+- stdlib or runtime gap: the compiler works, but the library or hosted runtime boundary is too thin for the admitted pressure program.
+- tooling gap: build, run, test, project, or artifact wiring is insufficient even though language and library support are otherwise adequate.
+- spec-level follow-up: repeated pressure exposed a language or build-model awkwardness that should not be reopened until multiple programs point at the same problem.
+
+Decision rule
+-------------
+- Fix implementation, stdlib, runtime, or tooling truth first.
+- Reopen language or build-model questions only after repeated multi-program pressure.
+
+Per-program findings template
+-----------------------------
+
+hello-stdout
+~~~~~~~~~~~~
+- Status: no findings recorded yet
+- Expected owner if problems appear: stdlib io or executable proof wiring
+
+read-entire-file
+~~~~~~~~~~~~~~~~
+- Status: no findings recorded yet
+- Expected owner if problems appear: stdlib fs or mem, or executable proof wiring
+
+scoped temporary buffer
+~~~~~~~~~~~~~~~~~~~~~~~
+- Status: no findings recorded yet
+- Expected owner if problems appear: defer lowering, mem helpers, or executable proof wiring
+
+line-oriented config parser
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: implemented
+- Classification: executable backend gap closed
+- Resolution: executable string-slice lowering now handles string results, which was the concrete backend blocker in the local trim-and-scan helper path
+- Remaining cleanup: the example still carries local helper wrappers instead of importing a final settled repository helper module surface
+
+arena-backed AST build
+~~~~~~~~~~~~~~~~~~~~~~
+- Status: resolved
+- Classification: stdlib/runtime/compiler integration landed
+- Resolution: added a concrete arena helper surface in mem, lowered typed arena_new allocation through the executable backend, and added pointer-store support needed to initialize arena-allocated nodes in place
+- Proof: examples/canonical/arena_ast_build.mc now builds and runs in mc_codegen_executable_unit
+
+recursive evaluator
+~~~~~~~~~~~~~~~~~~~
+- Status: resolved
+- Classification: compiler/runtime integration landed
+- Resolution: added semantic and MIR support for source-level enum variant constructors, lowered executable enum values as tagged aggregates, and added local-address materialization so recursive trees can be built on the stack and executed honestly in a canonical program
+- Proof: examples/canonical/recursive_evaluator.mc now builds and runs in mc_codegen_executable_unit
+
+C ABI boundary
+~~~~~~~~~~~~~~
+- Status: no findings recorded yet
+- Expected owner if problems appear: C ABI layout, extern(c) lowering, or linker/runtime integration
+
+Deferred canonical networking entries
+-------------------------------------
+- Status: deferred beyond first-pass A/B/C closure
+- Reason: portable poller and network boundary not yet admitted for this repository slice
+
+Real utility candidates
+-----------------------
+- Status: grep-lite implemented as the first explicit Phase 8 real-program project
+- grep-lite finding: project-mode imported interface qualification originally drifted on named exported types across stdlib module boundaries in the fs->mem path
+- Resolution: driver-loaded interface modules are now rewritten through the same imported-surface qualification path used by recursive semantic imports, and a sema regression covers the options.imported_modules path directly
+- Result: real projects can compose stdlib fs and mem directly under project mode again

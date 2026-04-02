@@ -759,7 +759,7 @@ std::optional<ImportedInterfaceData> LoadImportedInterfaces(
         if (!artifact.has_value()) {
             return std::nullopt;
         }
-        imported.modules.emplace(import_name, artifact->module);
+        imported.modules.emplace(import_name, mc::sema::RewriteImportedModuleSurfaceTypes(artifact->module, import_name));
         imported.interface_hashes.push_back({import_name, artifact->interface_hash});
     }
     return imported;
@@ -905,8 +905,49 @@ std::string QualifyImportedSymbol(std::string_view module_name,
     return std::string(module_name) + "." + std::string(symbol_name);
 }
 
+mc::mir::TypeDecl ConvertImportedTypeDecl(const mc::sema::TypeDeclSummary& type_decl) {
+    mc::mir::TypeDecl mir_type_decl;
+    switch (type_decl.kind) {
+        case mc::ast::Decl::Kind::kStruct:
+            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kStruct;
+            break;
+        case mc::ast::Decl::Kind::kEnum:
+            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kEnum;
+            break;
+        case mc::ast::Decl::Kind::kDistinct:
+            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kDistinct;
+            break;
+        case mc::ast::Decl::Kind::kTypeAlias:
+            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kAlias;
+            break;
+        case mc::ast::Decl::Kind::kFunc:
+        case mc::ast::Decl::Kind::kExternFunc:
+        case mc::ast::Decl::Kind::kConst:
+        case mc::ast::Decl::Kind::kVar:
+            break;
+    }
+    mir_type_decl.name = type_decl.name;
+    mir_type_decl.type_params = type_decl.type_params;
+    mir_type_decl.is_packed = type_decl.is_packed;
+    mir_type_decl.fields = type_decl.fields;
+    mir_type_decl.aliased_type = type_decl.aliased_type;
+    for (const auto& variant : type_decl.variants) {
+        mc::mir::VariantDecl mir_variant;
+        mir_variant.name = variant.name;
+        mir_variant.payload_fields = variant.payload_fields;
+        mir_type_decl.variants.push_back(std::move(mir_variant));
+    }
+    return mir_type_decl;
+}
+
 void AddImportedExternDeclarations(mc::mir::Module& module,
                                    const std::unordered_map<std::string, mc::sema::Module>& imported_modules) {
+    std::unordered_set<std::string> existing_types;
+    existing_types.reserve(module.type_decls.size());
+    for (const auto& type_decl : module.type_decls) {
+        existing_types.insert(type_decl.name);
+    }
+
     std::unordered_set<std::string> existing_functions;
     existing_functions.reserve(module.functions.size());
     for (const auto& function : module.functions) {
@@ -914,6 +955,13 @@ void AddImportedExternDeclarations(mc::mir::Module& module,
     }
 
     for (const auto& [module_name, imported_module] : imported_modules) {
+        for (const auto& type_decl : imported_module.type_decls) {
+            if (!existing_types.insert(type_decl.name).second) {
+                continue;
+            }
+            module.type_decls.push_back(ConvertImportedTypeDecl(type_decl));
+        }
+
         for (const auto& function : imported_module.functions) {
             const std::string qualified_name = QualifyImportedSymbol(module_name, function.name);
             if (!existing_functions.insert(qualified_name).second) {
@@ -999,12 +1047,10 @@ void NamespaceImportedBuildUnit(mc::mir::Module& module,
     std::unordered_map<std::string, std::string> renamed_functions;
     std::unordered_map<std::string, std::string> renamed_globals;
 
-    module.type_decls.erase(std::remove_if(module.type_decls.begin(),
-                                           module.type_decls.end(),
-                                           [](const mc::mir::TypeDecl& type_decl) { return type_decl.name.find('.') != std::string::npos; }),
-                           module.type_decls.end());
-
     for (auto& type_decl : module.type_decls) {
+        if (type_decl.name.find('.') != std::string::npos) {
+            continue;
+        }
         const std::string qualified_name = QualifyImportedSymbol(module_name, type_decl.name);
         renamed_types.emplace(type_decl.name, qualified_name);
         type_decl.name = qualified_name;

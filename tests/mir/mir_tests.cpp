@@ -148,6 +148,32 @@ void TestVariantSwitchLoweringSucceeds() {
     }
 }
 
+void TestVariantConstructorLoweringSucceeds() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "enum Expr {\n"
+        "    Int(value: i32),\n"
+        "    Add(left: *Expr, right: *Expr),\n"
+        "}\n"
+        "\n"
+        "func build(left: *Expr, right: *Expr) Expr {\n"
+        "    return Expr.Add(left, right)\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("variant constructor lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("variant_init") == std::string::npos) {
+        Fail("variant constructor lowering should emit variant_init instructions");
+    }
+    if (dump.find("target=Expr.Add target_name=Add target_base=Expr target_index=1") == std::string::npos) {
+        Fail("variant constructor lowering should preserve variant metadata in MIR dumps");
+    }
+}
+
 void TestForEachAndDeferLoweringSucceed() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
@@ -2215,6 +2241,7 @@ int main() {
     TestLoweringProducesDeterministicDump();
     TestIfElseLoweringBranchesToMerge();
     TestVariantSwitchLoweringSucceeds();
+    TestVariantConstructorLoweringSucceeds();
     TestForEachAndDeferLoweringSucceed();
     TestForRangeUsesSemaRangeElementType();
     TestKnownSymbolRefsAreTyped();
