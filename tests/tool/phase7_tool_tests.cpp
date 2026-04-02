@@ -747,6 +747,54 @@ void TestRealHashToolProject(const std::filesystem::path& source_root,
                          "phase8 hash tool test summary should be deterministic");
 }
 
+void TestRealArenaExprToolProject(const std::filesystem::path& source_root,
+                                  const std::filesystem::path& binary_root,
+                                  const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_path = source_root / "examples/real/arena_expr/build.toml";
+    const std::filesystem::path sample_path = source_root / "examples/real/arena_expr/tests/sample.expr";
+    const std::filesystem::path build_dir = binary_root / "phase8_arena_expr_build";
+
+    const std::string expected_line = "((1+2)+(3+4))\n";
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string(),
+                                                              "--",
+                                                              sample_path.generic_string()},
+                                                             build_dir / "phase8_arena_expr_run_output.txt",
+                                                             "phase8 arena expr run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("phase8 arena expr run should succeed:\n" + run_output);
+    }
+    ExpectOutputContains(run_output,
+                         expected_line,
+                         "phase8 arena expr should print the deterministic normalized form");
+
+    const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                "test",
+                                                                "--project",
+                                                                project_path.generic_string(),
+                                                                "--build-dir",
+                                                                build_dir.generic_string()},
+                                                               build_dir / "phase8_arena_expr_test_output.txt",
+                                                               "phase8 arena expr test");
+    if (!test_outcome.exited || test_outcome.exit_code != 0) {
+        Fail("phase8 arena expr tests should pass:\n" + test_output);
+    }
+    ExpectOutputContains(test_output,
+                         "PASS normalize_text_test.test_normalize_text",
+                         "phase8 arena expr ordinary tests should include normalization coverage");
+    ExpectOutputContains(test_output,
+                         "PASS parse_tree_test.test_parse_tree",
+                         "phase8 arena expr ordinary tests should include tree-shape coverage");
+    ExpectOutputContains(test_output,
+                         "3 tests, 3 passed, 0 failed",
+                         "phase8 arena expr test summary should be deterministic");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -770,5 +818,6 @@ int main(int argc, char** argv) {
     TestRealGrepLiteProject(source_root, binary_root, mc_path);
     TestRealFileWalkerProject(source_root, binary_root, mc_path);
     TestRealHashToolProject(source_root, binary_root, mc_path);
+    TestRealArenaExprToolProject(source_root, binary_root, mc_path);
     return 0;
 }

@@ -1,0 +1,21 @@
+schema = 1
+project = "arena-expr"
+default = "expr"
+
+[targets.expr]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.expr.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.expr.runtime]
+startup = "default"
+
+[targets.expr.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

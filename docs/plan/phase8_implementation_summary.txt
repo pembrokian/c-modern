@@ -1,0 +1,46 @@
+Phase 8 -- Implementation Summary
+=================================
+
+Status
+------
+Implemented for the admitted repository-specific first-pass slice
+
+Implemented slice
+-----------------
+The current repository implements the admitted first-pass Phase 8 slice for canonical pressure programs and bounded real utilities on top of the admitted hosted Phase 7 workflow.
+
+What landed
+-----------
+- Repository-owned canonical proofs for the admitted first-pass set: hello-stdout, read-entire-file, scoped temporary buffer, line-oriented config parser, arena-backed AST build, recursive evaluator, and C ABI boundary proof.
+- Deterministic executable proof wiring for the admitted canonical set through the existing executable/codegen suites, so the programs are repository proof artifacts rather than hand-run samples.
+- An explicit Phase 8 admission matrix, findings log, and repository-specific plan documents under `docs/plan/` so implemented, deferred, and blocked pressure programs are recorded as repository truth.
+- A first real utility project under `examples/real/grep_lite/` proving the explicit Phase 7 project workflow through `mc run` and `mc test`.
+- Project-mode imported interface qualification fixes required by real stdlib composition, including driver-loaded interface rewriting through the semantic imported-surface path and preservation of imported named types across MIR/build-unit namespacing.
+- A narrow hosted directory traversal surface through `fs.is_dir(...)` and sorted `fs.list_dir(...)`, plus the real file walker project under `examples/real/file_walker/`.
+- A bounded whole-file checksum utility under `examples/real/hash_tool/` proving `fs.read_all`, byte-wise integer processing, explicit fixed-width hex formatting, and deterministic project-owned tests without widening into streaming I/O.
+- A bounded arena-backed parser utility under `examples/real/arena_expr/` proving arena allocator pairing, pointer-stable AST nodes, borrowed token slices from an owned file buffer, recursive descent parsing, and deterministic normalized output.
+- Tool-level Phase 8 workflow proof in `tests/tool/phase7_tool_tests.cpp` covering `mc run` and `mc test` for grep-lite, file walker, hash tool, and the arena-backed parser utility.
+- Documentation updates in the top-level README and `examples/README.md` so the admitted Phase 8 slice and its example workflows are discoverable without reading the implementation history.
+
+What did not land in this slice
+-------------------------------
+- The bounded threaded example remains deferred because the current runtime and `sync` surface do not yet support honest pressure-testing in this repository slice.
+- Later canonical evented-networking entries remain deferred because the repository still does not admit the required poller and networking boundary.
+- Streaming file reads, richer buffer helpers, richer arena string helpers, and broader formatting/diagnostic library surface remain later follow-up work; the admitted Phase 8 slice proves bounded utilities without widening into those areas prematurely.
+- Phase 8 closure here does not claim the full long-term architecture-level canonical program set from `docs/arch/canonical_programs.txt`; it records the admitted repository-specific first-pass closure only.
+
+Repository proof added
+----------------------
+- `tests/codegen/codegen_executable_tests.cpp` covers the admitted canonical executable proofs, including the arena-backed AST example and recursive evaluator.
+- `tests/tool/phase7_tool_tests.cpp` now exercises the real utility project workflows for grep-lite, file walker, the bounded hash tool, and the arena-backed parser utility.
+- The canonical CMake/CTest workflow remains the validation surface for the admitted slice instead of ad hoc shell scripts.
+
+Validation run
+--------------
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build/debug -R mc_phase7_tool_unit --output-on-failure`
+- `ctest --test-dir build/debug --output-on-failure`
+
+Scope reminder
+--------------
+This summary records the admitted repository-specific first-pass Phase 8 slice only. It is not evidence that the broader long-term architecture-specified Phase 8 pressure set, especially threaded and evented-networking entries, is fully complete.

@@ -146,6 +146,15 @@ hashing tool
 - Proof artifact: examples/real/hash_tool/build.toml plus tool-level mc run/mc test coverage in tests/tool/phase7_tool_tests.cpp
 - Resolution note: the admitted first pass uses whole-file fs.read_all rather than streaming reads; streaming and richer buffer helpers remain later follow-up work instead of a blocker for a bounded checksum utility
 
+arena-backed parser utility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: implemented
+- Packaging: dedicated build.toml project
+- Intended proof: project build plus deterministic output tests
+- Pressure focus: arena allocator pairing, pointer-stable AST nodes, borrowed token slices into owned file buffers, recursive descent parsing, and deterministic pretty-printing under the explicit project workflow
+- Proof artifact: examples/real/arena_expr/build.toml plus tool-level mc run/mc test coverage in tests/tool/phase7_tool_tests.cpp
+- Resolution note: the admitted first pass uses a narrow expression normalizer so the pressure stays on arena-backed graph construction and parser ownership rather than on richer diagnostics or final formatting libraries
+
 bounded threaded example
 ~~~~~~~~~~~~~~~~~~~~~~~~
 - Status: deferred

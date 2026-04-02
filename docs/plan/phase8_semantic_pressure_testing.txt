@@ -4,8 +4,8 @@ Phase 8 -- Semantic Pressure Testing
 Status
 ------
 - Repository posture is ready for Phase 8 entry: project-driven mc check, mc build, mc run, mc test, deterministic .mci, and incremental rebuild reuse are already admitted in phase7_implementation_summary.txt.
-- Pressure-program posture is advancing through repository-owned proofs: the first-pass canonical slice is landed, and real project pressure now includes grep-lite, file walker, and a bounded hashing tool.
-- Phase 8 should therefore focus on closing the gap between the normative pressure set in canonical_programs.txt and the current repository-owned examples and tests.
+- Pressure-program posture for the admitted repository-specific first pass is now implemented: the canonical first-pass slice is landed, and real project pressure now includes grep-lite, file walker, a bounded hashing tool, and an arena-backed parser utility.
+- Closure record now lives in phase8_implementation_summary.txt; this document remains the repository-specific Phase 8 plan and decision log.
 
 Purpose
 -------
@@ -216,10 +216,10 @@ Ordered Implementation Steps
 8. Convert blocked canonical programs into named backlog or enabling-gap entries rather than implicit omissions.
 9. Add the first real utility project, preferably a small grep-like tool. Status: implemented as examples/real/grep_lite with project-level mc run and mc test proof.
    - Follow-up resolved: project-mode imported interface qualification now preserves named exported types across stdlib module boundaries well enough for grep-lite to import fs and mem directly.
-10. Expand from grep-lite, file walker, and the bounded hashing tool into arena-backed utilities one pressure dimension at a time.
+10. Expand from grep-lite, file walker, and the bounded hashing tool into arena-backed utilities one pressure dimension at a time. Status: implemented with examples/real/arena_expr as a bounded expression-normalizer utility.
 11. Add a bounded threaded example only if it fits the admitted runtime honestly.
 12. Convert all discovered issues into stable tests or documented blocked items.
-13. Close documentation, findings capture, and acceptance proof.
+13. Close documentation, findings capture, and acceptance proof. Status: implemented for the admitted first-pass slice via phase8_implementation_summary.txt, updated README/example workflows, and deterministic repository proof.
 
 Relevant Files
 --------------

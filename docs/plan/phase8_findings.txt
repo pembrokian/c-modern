@@ -82,3 +82,7 @@ Real utility candidates
 - hashing tool finding: the original matrix assumed streaming reads were mandatory, but the current admitted slice can still prove a bounded checksum utility honestly with whole-file reads and explicit hex formatting
 - Classification: bootstrap capability expectation corrected
 - Resolution: landed a narrow whole-file checksum utility over fs.read_all with explicit fixed-width hex formatting; streaming reads and richer buffer helpers stay deferred as later pressure work rather than blocking first-pass hashing proof
+- Status: arena-backed parser utility implemented as the next explicit Phase 8 real-program project
+- arena-backed utility finding: the admitted arena surface is sufficient for pointer-stable AST construction, but the real utility still needs to keep token text borrowed from the original file buffer because the bootstrap slice does not yet expose richer arena string helpers
+- Classification: stdlib surface limitation documented, not blocking
+- Resolution: landed a narrow expression normalizer that stores AST nodes in an arena while borrowing token slices from the owned file buffer; this keeps allocator pairing and tree construction honest without widening mem prematurely
