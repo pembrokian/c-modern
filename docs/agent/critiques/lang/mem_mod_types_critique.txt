@@ -1,0 +1,258 @@
+ARCHITECTURAL REVIEW: docs/arch/modules_spec.txt, docs/arch/types_spec.txt, docs/arch/memory_model_spec.txt
+Critique of reference quality and missing ideas
+================================================
+
+OVERALL VERDICT
+---------------
+These three docs are good architecture notes, but they are not yet full
+reference-quality specifications.
+
+Best summary:
+- `modules_spec.txt` is the closest to reference quality.
+- `types_spec.txt` is useful and directionally strong, but still reads like a
+  semantic policy note rather than a complete type reference.
+- `memory_model_spec.txt` has the most important gaps; it is the least
+  reference-complete of the three.
+
+If “reference quality” means a careful implementer could build the feature
+without consulting the source tree or implied tribal knowledge, these docs are
+not quite there yet. They are coherent, conservative, and internally aligned,
+but they still leave too many edge cases to inference.
+
+If the bar is “reference-quality for a simple, Ken-Thompson-style systems
+language,” the bar is even a little higher: the docs need to stay extremely
+plain, avoid theory-heavy machinery, and keep any borrowed ideas visibly small.
+
+1. MODULES / PACKAGES
+---------------------
+
+Reference-quality assessment:
+- Strong architecture note, but not yet a complete module reference.
+- The doc is clear about the one-file-per-module rule, acyclic imports, export
+  blocks, and the fact that packages are build-time only.
+- It is weaker where a real implementation needs unambiguous resolution rules
+  and visibility rules for awkward cases.
+
+What is already good:
+- It cleanly rejects a hidden prelude and a second module system.
+- It treats import resolution, interface artifacts, and build roots as explicit.
+- It captures the right instinct that source modules, build packages, and
+  standard-library packaging are related but not the same thing.
+
+What is still missing:
+- A canonical import resolution algorithm.
+  The doc says imports resolve through explicit roots, but it does not specify
+  exact precedence when multiple roots match, how duplicate names are reported,
+  or whether source file names map to module names mechanically or through a
+  build manifest.
+- A visibility lattice.
+  “Exported” versus “module-private” is a good v0.2 starting point, but it is
+  not quite enough if the language later needs package-private, file-private,
+  or friend-style visibility.
+- Re-export semantics.
+  The doc says imports do not create reexports, which is good, but it does not
+  spell out whether a future explicit re-export mechanism would be allowed and
+  how it would interact with interface artifacts.
+- Canonical treatment of generated sources and multi-root projects.
+  If the build tool emits source or interface artifacts into generated roots,
+  the module spec should say whether those roots are equivalent to ordinary
+  source roots or merely implementation details.
+
+Good ideas from other languages worth borrowing, if they stay tiny:
+- Go’s simplicity around import resolution is worth preserving, especially its
+  bias toward a single obvious module identity rather than import alias games.
+- Rust’s `MaybeUninit` is a useful concept only if it is expressed as a very
+  small explicit uninitialized-storage rule, not as a new ownership system.
+- C++ / C11 atomic ordering names are useful as vocabulary, provided the model
+  stays a thin explicit ordering table.
+
+Probably too much for this language unless there is a strong pressure case:
+- Rust’s full visibility lattice.
+- Swift’s `public` / `internal` / `fileprivate` / `private` split.
+- Any model that starts looking like borrow checking, region typing, or deep
+  ownership inference.
+
+Recommendation:
+- Keep the current simple model, add a precise resolution algorithm and a short
+  visibility section, and avoid importing heavier mechanisms unless real
+  implementation pressure proves they are worth the complexity.
+
+2. TYPES
+--------
+
+Reference-quality assessment:
+- Good semantic summary, but still short of a full type reference.
+- The type doc already has the right philosophical shape: nominal identity,
+  explicit conversions, no implicit numeric coercions, and builtin aggregate
+  shapes owned by sema.
+- What it lacks is exactness around equivalence, normalization, and the full
+  boundary between type identity and representation.
+
+What is already good:
+- Distinct types are clearly representation-preserving but non-interchangeable.
+- Builtin aggregates are owned by sema rather than re-derived downstream.
+- The doc correctly distinguishes structural forms from named nominal forms.
+- The canonical string type is treated as a borrowed view, which matches the
+  memory model direction.
+
+What is still missing:
+- A formal equivalence story.
+  The doc says structural types compare structurally and named types compare by
+  identity, but it does not spell out all normalization steps. For example:
+  - are aliases normalized before every comparison?
+  - is `const` stripped or preserved in equality?
+  - do tuple and procedure result types compare structurally even when one came
+    from syntax and one came from a lowered semantic path?
+- Copy / move / ownership semantics for values.
+  The type doc talks about representation and interchangeability, but not about
+  whether all types are trivially copyable, whether some are move-only, or
+  whether `Buffer<T>` is semantically special beyond being an aggregate.
+  Even if the language is intentionally simpler than Rust, the spec should say
+  whether “value semantics” are universal or merely common.
+- A sharper split between `str`, `string`, and `cstr`.
+  The current canonical string story is directionally right, but a reference
+  doc should state whether `cstr` is a distinct semantic type, a library alias,
+  or only an interop spelling.
+- A formal rule for generic nominal identity.
+  The doc says type arguments are part of identity, which is good, but a
+  reference spec should define whether type aliases normalize before generic
+  instantiation and whether imported generic names remain distinct after
+  qualification.
+- Representation clauses or explicit layout overrides.
+  The language already has `@packed` and `@abi(c)` elsewhere, but a type
+  reference benefits from a simple statement of how representation-directed
+  annotations affect identity versus layout.
+
+Good ideas from other languages worth borrowing, if they stay tiny:
+- Rust’s “newtype” pattern is a good model for distinct types if it remains a
+  plain zero-cost wrapper rule.
+- C++’s `std::span` is a good conceptual model for a non-owning slice type
+  distinct from owning buffers.
+- Ada’s representation clauses are a useful reference only if the language
+  wants a very small explicit layout hook.
+
+Probably too much for this language unless there is a strong pressure case:
+- Rust-style transparent wrapper rules beyond a simple distinct-type story.
+- Any ownership system that starts to encode move-only semantics or borrow
+  checking.
+- A broad representation system with many special cases.
+
+Recommendation:
+- Add a formal normalization and equality section, plus a small ownership/value
+  semantics section, but keep the rules plain enough that a C programmer can
+  read them without learning a new theory vocabulary.
+
+3. MEMORY MODEL
+---------------
+
+Reference-quality assessment:
+- Not yet reference-quality.
+- The document is strong on intent, but it is still under-specified in the
+  places that matter most for compiler correctness: uninitialized storage,
+  object representation, temporaries, provenance, and concurrency ordering.
+
+What is already good:
+- It correctly rejects hidden lifetime extension, strict aliasing UB, and
+  garbage-collected semantics.
+- It cleanly separates storage, lifetime, aliasing, constness, and checked
+  invalid behavior.
+- It correctly insists that views do not own storage.
+
+What is still missing:
+- Uninitialized storage.
+  The doc never says what happens for locals, heap allocations, or aggregate
+  fields before initialization. That is a major gap. A reference memory model
+  should state whether uninitialized reads are invalid behavior, checked traps,
+  or impossible by construction.
+- Padding and object representation.
+  The doc talks about storage, but not about whether padding bytes are part of
+  the observable model, whether they may contain indeterminate values, or whether
+  bytewise copying of a struct preserves all semantics.
+- Temporary lifetimes.
+  The doc says borrowed views do not extend lifetime, but it does not define the
+  lifetime of expression temporaries or when a temporary ends inside a complex
+  expression.
+- Provenance in enough detail for low-level code.
+  The current wording is directionally correct, but it is still not precise
+  enough for backend implementers or FFI-heavy users to know which pointer
+  round-trips are allowed and which are merely tolerated by the backend.
+- Concurrency semantics.
+  Atomics are mentioned, but the doc does not define a happens-before model or
+  say which memory orderings are admitted in v0.2. This matters for anything
+  beyond single-threaded reasoning.
+- Distinction between undefined behavior and checked traps.
+  The document says checked builds may trap additional invalid operations, but
+  it does not define the exact boundary between “invalid in release,” “trap in
+  checked,” and “diagnosable in sema.”
+
+Good ideas from other languages worth borrowing, if they stay tiny:
+- Rust’s provenance discussions are the best modern reference for pointer
+  identity and integer round-trips through pointers.
+- C++ and C11’s atomic memory-order vocabulary are useful as a small explicit
+  ordering table.
+- Rust’s `MaybeUninit` is useful only as a name for explicit uninitialized
+  storage, not as a larger ownership feature.
+- C++’s object-representation vocabulary is useful for explaining padding and
+  bytewise copying without importing C++’s full object model.
+
+Probably too much for this language unless there is a strong pressure case:
+- A full provenance theory with many compiler-visible states.
+- A memory model that starts to require users to reason about layered object
+  lifetimes or ownership categories.
+- A concurrency model that drifts toward a large synchronization framework.
+
+Recommendation:
+- Add a small formal section for uninitialized storage, temporaries, padding,
+  and atomic ordering, but keep the rules intentionally boring and C-like.
+
+4. WHAT THESE DOCS GET RIGHT AS A SET
+-------------------------------------
+
+These are the strongest parts of the trio:
+- They are internally consistent with the rest of the architecture docs.
+- They avoid scope creep and do not smuggle in a hidden runtime or package
+  manager.
+- They keep sema, MIR, and the backend in the correct ownership order.
+- They are written in plain language, so future contributors can actually read
+  them.
+
+That last point matters. A reference document that is too formal to use is not
+really a good reference. These docs are readable, and that is a real strength.
+
+5. PRIORITIZED RECOMMENDATIONS
+------------------------------
+
+Critical gaps to fix first:
+- Define uninitialized storage and temporary lifetime behavior in the memory
+  model.
+- Define padding/object-representation behavior in the memory model.
+- Define a precise concurrency ordering vocabulary for atomics.
+
+High-value clarity improvements:
+- Add a module-resolution algorithm and collision rules to `modules_spec.txt`.
+- Add a formal equality/normalization section to `types_spec.txt`.
+- Add a small ownership/value-semantics section to `types_spec.txt`.
+
+Safe borrowings from other languages:
+- Borrow Go’s simple import-resolution mindset.
+- Borrow C++ / C11 atomic ordering terminology, but only as a small explicit
+  table.
+- Borrow C++ `std::span` as a conceptual reference for slices.
+
+Borrow only with caution:
+- Rust’s `MaybeUninit`.
+- Rust’s newtype idea for distinct types.
+- Ada-style representation clauses.
+
+Probably too much for this language:
+- Rust’s full visibility lattice.
+- Swift-style multi-level access control.
+- Any provenance or lifetime model that starts to look like borrow checking.
+
+Bottom line:
+- `modules_spec.txt` is close to reference quality for a bootstrap module
+  model.
+- `types_spec.txt` is a good semantic contract, but still needs a few formal
+  sections before it can serve as a full reference.
+- `memory_model_spec.txt` needs the most work before it can be treated as a
+  reference-grade document.

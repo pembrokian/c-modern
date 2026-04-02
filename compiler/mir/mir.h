@@ -110,6 +110,9 @@ struct Instruction {
     std::string result;
     sema::Type type;
     std::string op;
+    std::string atomic_order;
+    std::string atomic_success_order;
+    std::string atomic_failure_order;
     std::string target;
     TargetKind target_kind = TargetKind::kNone;
     std::string target_name;

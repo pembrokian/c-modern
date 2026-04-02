@@ -3,7 +3,24 @@ Phase 10 -- Phase 4 MIR Authority Expansion
 
 Status
 ------
-PLANNED
+COMPLETED
+
+Completion note
+---------------
+- Phase 10A through Phase 10D are complete in the repository-specific Phase 4
+  closure sense used by this document.
+- Implemented outcomes include:
+  - widened lowering coverage for imported qualified surfaces and explicit
+    address-sensitive globals
+  - explicit semantic-boundary MIR metadata for atomic order semantics
+  - broader validator legality coverage for imported qualified low-level types
+    and the buffer/arena instruction families
+  - stronger MIR fixture auditing for deterministic structured dump metadata,
+    plus imported-module fixture coverage for qualified enum and atomic cases
+- Focused verification for closeout ran through:
+  - `ctest --test-dir build/debug --output-on-failure -R 'mc_mir_unit|mc_mir_fixture_unit'`
+- Remaining non-MIR deepening work should route back to the owning later phase
+  instead of reopening Phase 10 under a broader mandate.
 
 Repository status note
 ----------------------
@@ -247,13 +264,14 @@ Canonical artifacts
 Phase 10 should produce or update the following canonical surfaces:
 
 - `/Users/ro/dev/c_modern/docs/plan/phase9_phase4_mir_authority_expansion.txt`
+- `/Users/ro/dev/c_modern/docs/plan/phase10_mir_authority_expansion.txt`
 - bounded updates to
   `/Users/ro/dev/c_modern/docs/plan/bootstrap_phase3_9_review.txt` where the
-  roadmap should reference the concrete Phase 9 follow-up plan
+  roadmap should reference the concrete Phase 10 follow-up plan
 - MIR implementation updates under `/Users/ro/dev/c_modern/compiler/mir/`
 - deterministic MIR regression coverage under
   `/Users/ro/dev/c_modern/tests/mir/`
-- downstream backend or driver updates only when Phase 9 intentionally changes
+- downstream backend or driver updates only when Phase 10 intentionally changes
   the MIR contract those layers consume
 
 Allowed edit surface
@@ -284,7 +302,7 @@ Out of scope
 Suggested proof and artifacts
 -----------------------------
 - expand `/Users/ro/dev/c_modern/tests/mir/` with fixture goldens for each new
-  admitted semantic construct or MIR instruction family claimed by Phase 9
+  admitted semantic construct or MIR instruction family claimed by Phase 10
 - add validator-negative tests for every major instruction and terminator
   family the validator claims to cover
 - keep representative canonical-style fixtures in sync with the widened MIR
@@ -306,24 +324,24 @@ Exit criteria
 - MIR dumps and fixtures are rich enough to act as the compiler's main
   implementation contract independent of LLVM
 - MIR test coverage exists for every major instruction family and legality rule
-  that Phase 9 claims to have completed
+  that Phase 10 claims to have completed
 
 Ordered implementation steps
 ----------------------------
-1. Freeze the repository meaning of the Phase 9 label so it cannot drift into a
+1. Freeze the repository meaning of the Phase 10 label so it cannot drift into a
    post-Phase-8 architecture claim.
 2. Build a Phase 4 closure matrix from `plan.txt`, the non-bootstrap roadmap,
    the bootstrap Phase 4 status note, the current MIR implementation, and the
    current MIR fixtures.
-3. Execute Phase 9A lowering-surface completion work and fixture expansion.
-4. Execute Phase 9B semantic-boundary instruction completion work.
-5. Execute Phase 9C validator legality expansion and negative-test growth.
-6. Execute Phase 9D dump and fixture quality work so the widened MIR contract
+3. Execute Phase 10A lowering-surface completion work and fixture expansion.
+4. Execute Phase 10B semantic-boundary instruction completion work.
+5. Execute Phase 10C validator legality expansion and negative-test growth.
+6. Execute Phase 10D dump and fixture quality work so the widened MIR contract
    stays inspectable.
 7. Re-run the MIR unit and fixture suites after each wave and update only the
    narrowest relevant proof artifacts.
 8. Re-audit any remaining gaps and route non-MIR leftovers back to Phase 3,
-   Phase 5, or Phase 7 ownership rather than stretching Phase 9.
+  Phase 5, or Phase 7 ownership rather than stretching Phase 10.
 
 Acceptance criteria for this plan document
 ------------------------------------------

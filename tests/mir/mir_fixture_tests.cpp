@@ -88,6 +88,37 @@ void VerifyNoSemanticBoundaryFallbackCalls(const std::string& dump,
     }
 }
 
+void VerifyStructuredDumpMetadata(const std::string& dump,
+                                  const std::filesystem::path& source_path) {
+    std::istringstream lines(dump);
+    std::string line;
+    while (std::getline(lines, line)) {
+        const auto require_token = [&](std::string_view token, std::string_view description) {
+            if (line.find(token) == std::string::npos) {
+                Fail("supported fixture must preserve structured MIR " + std::string(description) + ": " +
+                     source_path.generic_string() + "\nline: " + line + "\nfull dump:\n" + dump);
+            }
+        };
+
+        if (line.find(" target_kind=function") != std::string::npos || line.find(" target_kind=global") != std::string::npos ||
+            line.find(" target_kind=field") != std::string::npos || line.find(" target_kind=deref_field") != std::string::npos) {
+            require_token(" target_name=", "target name metadata");
+        }
+        if (line.rfind("      variant_match ", 0) == 0 || line.rfind("      variant_extract ", 0) == 0) {
+            require_token(" target_name=", "variant target metadata");
+            require_token(" target_base=", "variant base metadata");
+        }
+        if (line.rfind("      index ", 0) == 0) {
+            require_token(" target_base=", "index base metadata");
+            require_token(" target_types=", "index type metadata");
+        }
+        if (line.rfind("      slice ", 0) == 0) {
+            require_token(" target_base=", "slice base metadata");
+            require_token(" target_types=", "slice bound metadata");
+        }
+    }
+}
+
 void VerifyCanonicalExampleSync(const std::filesystem::path& source_root,
                                 const FixtureCase& fixture,
                                 const std::string& source_text) {
@@ -147,6 +178,7 @@ void RunFixture(const std::filesystem::path& source_root,
             Fail("supported fixture should lower deterministically across repeated runs: " + source_path.generic_string());
         }
         VerifyNoSemanticBoundaryFallbackCalls(actual_dump, source_path);
+        VerifyStructuredDumpMetadata(actual_dump, source_path);
         if (actual_dump != expected_text) {
             std::cerr << "fixture mismatch for " << source_path.generic_string() << "\n";
             std::cerr << "expected:\n" << expected_text << "\n";
@@ -212,6 +244,7 @@ int main(int argc, char** argv) {
         {"foreach_non_iterable_fail.mc", "foreach_non_iterable_fail.errors.txt", false, "", {}, {}},
         {"explicit_conversion.mc", "explicit_conversion.mir.txt", true, "", {}, {}},
         {"import_root_ok_main.mc", "import_root_ok_main.mir.txt", true, "", {"tests/mir/import_roots"}, {}},
+        {"imported_atomic_ok.mc", "imported_atomic_ok.mir.txt", true, "", {}, {{"sync", "import_roots/sync_module.mc"}}},
         {"pointer_int_conversion.mc", "pointer_int_conversion.mir.txt", true, "", {}, {}},
         {"semantic_boundary_intrinsics.mc", "semantic_boundary_intrinsics.mir.txt", true, "", {}, {}},
         {"loop_iteration_defer.mc", "loop_iteration_defer.mir.txt", true, "", {}, {}},

@@ -383,6 +383,62 @@ void TestImportedModuleVariantMatchLowersQualifiedVariants() {
     }
 }
 
+void TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes() {
+    mc::support::DiagnosticSink diagnostics;
+
+    mc::sema::Module imported_sync;
+    mc::sema::TypeDeclSummary order_type;
+    order_type.kind = mc::ast::Decl::Kind::kEnum;
+    order_type.name = "MemoryOrder";
+    order_type.variants.push_back({.name = "Relaxed", .payload_fields = {}});
+    order_type.variants.push_back({.name = "Acquire", .payload_fields = {}});
+    order_type.variants.push_back({.name = "Release", .payload_fields = {}});
+    imported_sync.type_decls.push_back(std::move(order_type));
+
+    mc::sema::TypeDeclSummary atomic_type;
+    atomic_type.kind = mc::ast::Decl::Kind::kStruct;
+    atomic_type.name = "Atomic";
+    atomic_type.type_params.push_back("T");
+    imported_sync.type_decls.push_back(std::move(atomic_type));
+
+    mc::sema::Type atomic_i32 = mc::sema::NamedType("Atomic");
+    atomic_i32.subtypes.push_back(mc::sema::NamedType("i32"));
+    imported_sync.functions.push_back({
+        .name = "atomic_load",
+        .param_types = {mc::sema::PointerType(atomic_i32), mc::sema::NamedType("MemoryOrder")},
+        .return_types = {mc::sema::NamedType("i32")},
+    });
+    mc::sema::BuildModuleLookupMaps(imported_sync);
+
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    imported_modules.emplace("sync", std::move(imported_sync));
+
+    mc::sema::CheckOptions options;
+    options.imported_modules = &imported_modules;
+
+    const auto lowered = Lower(
+        "import sync\n"
+        "\n"
+        "func read(atom: *sync.Atomic<i32>, order: sync.MemoryOrder) i32 {\n"
+        "    return sync.atomic_load(atom, order)\n"
+        "}\n",
+        options,
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("imported atomic boundary lowering should succeed:\n" + diagnostics.Render());
+    }
+    if (!mc::mir::ValidateModule(*lowered.module, "<mir-test>", diagnostics)) {
+        Fail("validator should accept qualified imported atomic boundary types:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("*sync.Atomic<i32>") == std::string::npos || dump.find("Local name=order type=sync.MemoryOrder param readonly") == std::string::npos ||
+        dump.find("op=order=order") == std::string::npos) {
+        Fail("imported atomic MIR should preserve qualified imported types and order names");
+    }
+}
+
 void TestGlobalAddressLoweringUsesExplicitLocalAddr() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
@@ -929,6 +985,33 @@ void TestVolatileAndAtomicCallsLowerExplicitly() {
     }
     if (dump.find("call target=volatile_load") != std::string::npos || dump.find("call target=atomic_load") != std::string::npos) {
         Fail("dedicated volatile and atomic operations must not lower as generic calls");
+    }
+
+    bool saw_atomic_load = false;
+    bool saw_atomic_compare_exchange = false;
+    for (const auto& function : lowered.module->functions) {
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                if (instruction.kind == mc::mir::Instruction::Kind::kAtomicLoad) {
+                    saw_atomic_load = true;
+                    if (instruction.atomic_order != "MemoryOrder.Acquire" || !instruction.atomic_success_order.empty() ||
+                        !instruction.atomic_failure_order.empty() || !instruction.op.empty()) {
+                        Fail("atomic_load should carry structured order metadata instead of generic op text");
+                    }
+                }
+                if (instruction.kind == mc::mir::Instruction::Kind::kAtomicCompareExchange) {
+                    saw_atomic_compare_exchange = true;
+                    if (instruction.atomic_success_order != "MemoryOrder.Acquire" ||
+                        instruction.atomic_failure_order != "MemoryOrder.Relaxed" || !instruction.atomic_order.empty() ||
+                        !instruction.op.empty()) {
+                        Fail("atomic_compare_exchange should carry structured success/failure metadata instead of generic op text");
+                    }
+                }
+            }
+        }
+    }
+    if (!saw_atomic_load || !saw_atomic_compare_exchange) {
+        Fail("expected lowered MIR to contain atomic instructions for structured metadata checks");
     }
 }
 
@@ -2182,6 +2265,162 @@ void TestValidatorRejectsAtomicCompareExchangeMissingOrderMetadata() {
     }
 }
 
+void TestValidatorRejectsBufferNewNonAllocatorOperand() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_buffer_new_allocator";
+    mc::sema::Type buffer_i32 = mc::sema::NamedType("Buffer");
+    buffer_i32.subtypes.push_back(mc::sema::NamedType("i32"));
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::PointerType(mc::sema::NamedType("i32")),
+                .target = "not_alloc",
+                .target_kind = mc::mir::Instruction::TargetKind::kOther,
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("usize"),
+                .op = "4",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBufferNew,
+                .result = "%v2",
+                .type = mc::sema::PointerType(buffer_i32),
+                .operands = {"%v0", "%v1"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject buffer_new with non-Allocator operand");
+    }
+    if (diagnostics.Render().find("buffer_new allocator operand must be *Allocator") == std::string::npos) {
+        Fail("validator should explain invalid buffer_new allocator operands");
+    }
+}
+
+void TestValidatorRejectsBufferFreeNonBufferOperand() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_buffer_free_operand";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::PointerType(mc::sema::NamedType("i32")),
+                .target = "value_ptr",
+                .target_kind = mc::mir::Instruction::TargetKind::kOther,
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kBufferFree,
+                .operands = {"%v0"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject buffer_free with non-Buffer operand");
+    }
+    if (diagnostics.Render().find("buffer_free requires *Buffer<T> operand") == std::string::npos) {
+        Fail("validator should explain invalid buffer_free operands");
+    }
+}
+
+void TestValidatorRejectsArenaNewNonArenaOperand() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_arena_new_operand";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::PointerType(mc::sema::NamedType("i32")),
+                .target = "value_ptr",
+                .target_kind = mc::mir::Instruction::TargetKind::kOther,
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kArenaNew,
+                .result = "%v1",
+                .type = mc::sema::PointerType(mc::sema::NamedType("i32")),
+                .operands = {"%v0"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject arena_new with non-Arena operand");
+    }
+    if (diagnostics.Render().find("arena_new requires *Arena operand") == std::string::npos) {
+        Fail("validator should explain invalid arena_new operands");
+    }
+}
+
+void TestValidatorRejectsSliceFromBufferAfterLoweringBoundary() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_slice_from_buffer";
+    mc::sema::Type buffer_i32 = mc::sema::NamedType("Buffer");
+    buffer_i32.subtypes.push_back(mc::sema::NamedType("i32"));
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::PointerType(buffer_i32),
+                .target = "buf",
+                .target_kind = mc::mir::Instruction::TargetKind::kOther,
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kSliceFromBuffer,
+                .result = "%v1",
+                .type = mc::sema::NamedType("Slice"),
+                .operands = {"%v0"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject slice_from_buffer after the lowering boundary");
+    }
+    if (diagnostics.Render().find("slice_from_buffer should lower") == std::string::npos) {
+        Fail("validator should explain the slice_from_buffer boundary requirement");
+    }
+}
+
 void TestValidatorRejectsStoreTargetIndexMissingAuxType() {
     mc::support::DiagnosticSink diagnostics;
     mc::mir::Module module;
@@ -2571,6 +2810,7 @@ int main() {
     TestKnownSymbolRefsAreTyped();
     TestImportedModuleSurfaceLowersQualifiedTypesAndTargets();
     TestImportedModuleVariantMatchLowersQualifiedVariants();
+    TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes();
     TestGlobalAddressLoweringUsesExplicitLocalAddr();
     TestAddressOfFieldFailsCrisplyInMir();
     TestMixedBindingOrAssignmentUsesSemanticClassification();
@@ -2621,6 +2861,10 @@ int main() {
     TestValidatorRejectsShiftWithoutShiftCheck();
     TestValidatorRejectsConvertNumericBadTargetMetadata();
     TestValidatorRejectsAtomicCompareExchangeMissingOrderMetadata();
+    TestValidatorRejectsBufferNewNonAllocatorOperand();
+    TestValidatorRejectsBufferFreeNonBufferOperand();
+    TestValidatorRejectsArenaNewNonArenaOperand();
+    TestValidatorRejectsSliceFromBufferAfterLoweringBoundary();
     TestValidatorRejectsStoreTargetIndexMissingAuxType();
     TestValidatorRejectsKnownFunctionSymbolRefMissingTargetName();
     TestValidatorRejectsDirectCallMissingTargetName();

@@ -1,0 +1,16 @@
+Module
+  Import name=sync
+  TypeDecl kind=enum name=sync.MemoryOrder
+    Variant name=Relaxed
+    Variant name=Acquire
+    Variant name=Release
+  TypeDecl kind=struct name=sync.Atomic
+    typeParams=[T]
+  Function name=read returns=[i32]
+    Local name=atom type=*sync.Atomic<i32> param readonly
+    Local name=order type=sync.MemoryOrder param readonly
+    Block label=entry0
+      load_local %v0:*sync.Atomic<i32> target=atom
+      load_local %v1:sync.MemoryOrder target=order
+      atomic_load %v2:i32 op=order=order target=sync.atomic_load target_kind=function target_name=sync.atomic_load operands=[%v0, %v1]
+      terminator return values=[%v2]

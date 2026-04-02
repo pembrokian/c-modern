@@ -403,8 +403,20 @@ bool IsBoolType(const sema::Type& type) {
     return type == sema::BoolType() || (type.kind == sema::Type::Kind::kNamed && type.name == "bool");
 }
 
+std::string_view LeafTypeName(std::string_view name) {
+    const std::size_t separator = name.rfind('.');
+    if (separator == std::string_view::npos) {
+        return name;
+    }
+    return name.substr(separator + 1);
+}
+
+bool IsNamedTypeFamily(const sema::Type& type, std::string_view family_name) {
+    return type.kind == sema::Type::Kind::kNamed && LeafTypeName(type.name) == family_name;
+}
+
 bool IsMemoryOrderType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kNamed && type.name == "MemoryOrder";
+    return IsNamedTypeFamily(type, "MemoryOrder");
 }
 
 bool IsPointerLikeType(const sema::Type& type) {
@@ -490,7 +502,8 @@ sema::Type IterableElementType(const sema::Type& iterable_type) {
     if (iterable_type.kind == sema::Type::Kind::kArray && !iterable_type.subtypes.empty()) {
         return iterable_type.subtypes.front();
     }
-    if (iterable_type.kind == sema::Type::Kind::kNamed && (iterable_type.name == "Slice" || iterable_type.name == "Buffer") &&
+    if (iterable_type.kind == sema::Type::Kind::kNamed &&
+        (IsNamedTypeFamily(iterable_type, "Slice") || IsNamedTypeFamily(iterable_type, "Buffer")) &&
         !iterable_type.subtypes.empty()) {
         return iterable_type.subtypes.front();
     }
@@ -524,7 +537,8 @@ std::optional<sema::Type> AtomicElementType(const Module& module, const sema::Ty
         return std::nullopt;
     }
     const sema::Type stripped_pointee = StripMirAliasOrDistinct(module, *pointee);
-    if (stripped_pointee.kind != sema::Type::Kind::kNamed || stripped_pointee.name != "Atomic" || stripped_pointee.subtypes.empty()) {
+    if (stripped_pointee.kind != sema::Type::Kind::kNamed || !IsNamedTypeFamily(stripped_pointee, "Atomic") ||
+        stripped_pointee.subtypes.empty()) {
         return std::nullopt;
     }
     return stripped_pointee.subtypes.front();
@@ -590,20 +604,25 @@ bool IsDedicatedCallSurface(std::string_view callee_name) {
     return ClassifySpecialCall(callee_name) != SpecialCallKind::kNone;
 }
 
-bool HasAtomicOrderMetadata(std::string_view metadata) {
-    return metadata.starts_with("order=") && metadata.size() > std::string_view("order=").size();
+bool HasAtomicOrderMetadata(const Instruction& instruction) {
+    return !instruction.atomic_order.empty();
 }
 
-bool HasCompareExchangeOrderMetadata(std::string_view metadata) {
-    if (!metadata.starts_with("success=")) {
-        return false;
+bool HasCompareExchangeOrderMetadata(const Instruction& instruction) {
+    return !instruction.atomic_success_order.empty() && !instruction.atomic_failure_order.empty();
+}
+
+std::string AtomicMetadataText(const Instruction& instruction) {
+    if (!instruction.atomic_success_order.empty() || !instruction.atomic_failure_order.empty()) {
+        if (instruction.atomic_success_order.empty() || instruction.atomic_failure_order.empty()) {
+            return {};
+        }
+        return "success=" + instruction.atomic_success_order + ",failure=" + instruction.atomic_failure_order;
     }
-    const std::size_t separator = metadata.find(",failure=");
-    if (separator == std::string_view::npos) {
-        return false;
+    if (!instruction.atomic_order.empty()) {
+        return "order=" + instruction.atomic_order;
     }
-    return separator > std::string_view("success=").size() &&
-           separator + std::string_view(",failure=").size() < metadata.size();
+    return {};
 }
 
 enum class ExplicitConversionKind {
@@ -617,11 +636,11 @@ enum class ExplicitConversionKind {
 };
 
 ExplicitConversionKind ClassifyMirConversion(const Module& module, const sema::Type& source_type, const sema::Type& target_type) {
-    if (target_type.kind == sema::Type::Kind::kNamed && target_type.name == "Slice") {
+    if (target_type.kind == sema::Type::Kind::kNamed && IsNamedTypeFamily(target_type, "Slice")) {
         if (source_type.kind == sema::Type::Kind::kArray) {
             return ExplicitConversionKind::kArrayToSlice;
         }
-        if (source_type.kind == sema::Type::Kind::kNamed && source_type.name == "Buffer") {
+        if (source_type.kind == sema::Type::Kind::kNamed && IsNamedTypeFamily(source_type, "Buffer")) {
             return ExplicitConversionKind::kBufferToSlice;
         }
     }
@@ -876,6 +895,9 @@ class FunctionLowerer {
         SpecialCallKind special_kind = SpecialCallKind::kNone;
         sema::Type type;
         std::string op;
+        std::string atomic_order;
+        std::string atomic_success_order;
+        std::string atomic_failure_order;
         std::string callee_local;
         std::vector<std::string> arg_locals;
     };
@@ -994,18 +1016,25 @@ class FunctionLowerer {
         return !metadata.name.empty() ? metadata.name : metadata.display;
     }
 
-    std::string RenderOrderMetadata(const Expr& expr, std::size_t order_index) const {
+    std::string RenderOrderName(const Expr& expr, std::size_t order_index) const {
         if (expr.args.size() <= order_index) {
             return {};
         }
-        return "order=" + StableExprMetadataText(*expr.args[order_index]);
+        return StableExprMetadataText(*expr.args[order_index]);
     }
 
-    std::string RenderCompareExchangeOrderMetadata(const Expr& expr) const {
+    std::string RenderCompareExchangeSuccessOrder(const Expr& expr) const {
         if (expr.args.size() <= 4) {
             return {};
         }
-        return "success=" + StableExprMetadataText(*expr.args[3]) + ",failure=" + StableExprMetadataText(*expr.args[4]);
+        return StableExprMetadataText(*expr.args[3]);
+    }
+
+    std::string RenderCompareExchangeFailureOrder(const Expr& expr) const {
+        if (expr.args.size() <= 4) {
+            return {};
+        }
+        return StableExprMetadataText(*expr.args[4]);
     }
 
     bool SpecialCallProducesValue(SpecialCallKind kind) const {
@@ -1015,20 +1044,19 @@ class FunctionLowerer {
                kind == SpecialCallKind::kAtomicFetchAdd;
     }
 
-    std::string SpecialCallMetadata(const Expr& expr, SpecialCallKind kind) const {
+    std::string SpecialCallAtomicOrder(const Expr& expr, SpecialCallKind kind) const {
         switch (kind) {
             case SpecialCallKind::kAtomicLoad:
-                return RenderOrderMetadata(expr, 1);
+                return RenderOrderName(expr, 1);
             case SpecialCallKind::kAtomicStore:
             case SpecialCallKind::kAtomicExchange:
             case SpecialCallKind::kAtomicFetchAdd:
-                return RenderOrderMetadata(expr, 2);
-            case SpecialCallKind::kAtomicCompareExchange:
-                return RenderCompareExchangeOrderMetadata(expr);
+                return RenderOrderName(expr, 2);
             case SpecialCallKind::kBufferNew:
             case SpecialCallKind::kBufferFree:
                 case SpecialCallKind::kArenaNew:
             case SpecialCallKind::kSliceFromBuffer:
+            case SpecialCallKind::kAtomicCompareExchange:
             case SpecialCallKind::kNone:
             case SpecialCallKind::kMmioPtr:
             case SpecialCallKind::kVolatileLoad:
@@ -1039,11 +1067,27 @@ class FunctionLowerer {
         return {};
     }
 
+    std::string SpecialCallAtomicSuccessOrder(const Expr& expr, SpecialCallKind kind) const {
+        if (kind != SpecialCallKind::kAtomicCompareExchange) {
+            return {};
+        }
+        return RenderCompareExchangeSuccessOrder(expr);
+    }
+
+    std::string SpecialCallAtomicFailureOrder(const Expr& expr, SpecialCallKind kind) const {
+        if (kind != SpecialCallKind::kAtomicCompareExchange) {
+            return {};
+        }
+        return RenderCompareExchangeFailureOrder(expr);
+    }
+
     bool EmitSpecialCallInstruction(const TargetMetadata& target_metadata,
                                     SpecialCallKind kind,
                                     const std::vector<ValueInfo>& args,
                                     const sema::Type& result_type,
-                                    const std::string& metadata,
+                                    const std::string& atomic_order,
+                                    const std::string& atomic_success_order,
+                                    const std::string& atomic_failure_order,
                                     bool wants_result,
                                     ValueInfo* result) {
         if (kind == SpecialCallKind::kNone) {
@@ -1121,7 +1165,9 @@ class FunctionLowerer {
 
         Instruction instruction {
             .type = result_type,
-            .op = metadata,
+            .atomic_order = atomic_order,
+            .atomic_success_order = atomic_success_order,
+            .atomic_failure_order = atomic_failure_order,
             .target = target_metadata.target,
             .target_kind = target_metadata.kind,
             .target_name = target_metadata.name,
@@ -1192,7 +1238,15 @@ class FunctionLowerer {
 
         const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
         return EmitSpecialCallInstruction(
-            target_metadata, kind, args, result_type, SpecialCallMetadata(expr, kind), wants_result, result);
+            target_metadata,
+            kind,
+            args,
+            result_type,
+            SpecialCallAtomicOrder(expr, kind),
+            SpecialCallAtomicSuccessOrder(expr, kind),
+            SpecialCallAtomicFailureOrder(expr, kind),
+            wants_result,
+            result);
     }
 
     void LowerCallStmt(const Expr& expr) {
@@ -1290,7 +1344,9 @@ class FunctionLowerer {
             .target_display = target_metadata.display,
             .special_kind = special_kind,
             .type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "deferred call result type"),
-            .op = SpecialCallMetadata(expr, special_kind),
+            .atomic_order = SpecialCallAtomicOrder(expr, special_kind),
+            .atomic_success_order = SpecialCallAtomicSuccessOrder(expr, special_kind),
+            .atomic_failure_order = SpecialCallAtomicFailureOrder(expr, special_kind),
         };
         if (special_kind == SpecialCallKind::kNone) {
             call.callee_local = NewHiddenLocal("defer_callee");
@@ -1317,7 +1373,15 @@ class FunctionLowerer {
                 .name = call.target_name,
                 .display = call.target_display,
             };
-            static_cast<void>(EmitSpecialCallInstruction(target_metadata, call.special_kind, args, call.type, call.op, false, nullptr));
+            static_cast<void>(EmitSpecialCallInstruction(target_metadata,
+                                                         call.special_kind,
+                                                         args,
+                                                         call.type,
+                                                         call.atomic_order,
+                                                         call.atomic_success_order,
+                                                         call.atomic_failure_order,
+                                                         false,
+                                                         nullptr));
             return;
         }
 
@@ -1444,8 +1508,9 @@ class FunctionLowerer {
             }
             return EmitLiteralValue(std::to_string(*length), sema::NamedType("usize"));
         }
-        if ((stripped_base.kind == sema::Type::Kind::kNamed &&
-             (stripped_base.name == "Slice" || stripped_base.name == "Buffer" || stripped_base.name == "str" || stripped_base.name == "string")) ||
+           if ((stripped_base.kind == sema::Type::Kind::kNamed &&
+               (IsNamedTypeFamily(stripped_base, "Slice") || IsNamedTypeFamily(stripped_base, "Buffer") ||
+                stripped_base.name == "str" || stripped_base.name == "string")) ||
             stripped_base.kind == sema::Type::Kind::kString) {
             const std::string value = NewValue();
             Emit({
@@ -3055,7 +3120,8 @@ bool ValidateModule(const Module& module,
                                     element_type = instruction.target_base_type.subtypes.front();
                                 }
                                 if (instruction.target_base_type.kind == sema::Type::Kind::kNamed &&
-                                    (instruction.target_base_type.name == "Slice" || instruction.target_base_type.name == "Buffer") &&
+                                    (IsNamedTypeFamily(instruction.target_base_type, "Slice") ||
+                                     IsNamedTypeFamily(instruction.target_base_type, "Buffer")) &&
                                     !instruction.target_base_type.subtypes.empty()) {
                                     element_type = instruction.target_base_type.subtypes.front();
                                 }
@@ -3437,8 +3503,8 @@ bool ValidateModule(const Module& module,
                             report("buffer_to_slice must encode a buffer-to-slice conversion family in function " + function.name);
                         }
                         if (operand_types.size() == 1) {
-                            if (operand_types.front().kind != sema::Type::Kind::kNamed || operand_types.front().name != "Buffer" ||
-                                instruction.type.kind != sema::Type::Kind::kNamed || instruction.type.name != "Slice") {
+                            if (operand_types.front().kind != sema::Type::Kind::kNamed || !IsNamedTypeFamily(operand_types.front(), "Buffer") ||
+                                instruction.type.kind != sema::Type::Kind::kNamed || !IsNamedTypeFamily(instruction.type, "Slice")) {
                                 report("buffer_to_slice requires Buffer source and Slice target in function " + function.name);
                             } else if (!operand_types.front().subtypes.empty() && !instruction.type.subtypes.empty() &&
                                        !IsAssignableType(instruction.type.subtypes.front(), operand_types.front().subtypes.front())) {
@@ -3455,12 +3521,14 @@ bool ValidateModule(const Module& module,
                             break;
                         }
                         const sema::Type pointee = PointerPointeeType(instruction.type).value_or(sema::UnknownType());
-                        if (instruction.type.kind != sema::Type::Kind::kPointer || pointee.kind != sema::Type::Kind::kNamed || pointee.name != "Buffer") {
+                        if (instruction.type.kind != sema::Type::Kind::kPointer || pointee.kind != sema::Type::Kind::kNamed ||
+                            !IsNamedTypeFamily(pointee, "Buffer")) {
                             report("buffer_new must produce *Buffer<T> in function " + function.name);
                         }
                         if (operand_types.size() == 2) {
-                            if (operand_types[0].kind != sema::Type::Kind::kPointer) {
-                                report("buffer_new allocator operand must be a pointer in function " + function.name);
+                            const auto allocator_pointee = PointerPointeeType(StripMirAliasOrDistinct(module, operand_types[0]));
+                            if (!allocator_pointee.has_value() || !IsNamedTypeFamily(*allocator_pointee, "Allocator")) {
+                                report("buffer_new allocator operand must be *Allocator in function " + function.name);
                             }
                             if (!IsIntegerLikeType(operand_types[1])) {
                                 report("buffer_new capacity operand must be an integer type in function " + function.name);
@@ -3478,7 +3546,8 @@ bool ValidateModule(const Module& module,
                         }
                         if (operand_types.size() == 1) {
                             const sema::Type pointee = PointerPointeeType(operand_types.front()).value_or(sema::UnknownType());
-                            if (operand_types.front().kind != sema::Type::Kind::kPointer || pointee.kind != sema::Type::Kind::kNamed || pointee.name != "Buffer") {
+                            if (operand_types.front().kind != sema::Type::Kind::kPointer || pointee.kind != sema::Type::Kind::kNamed ||
+                                !IsNamedTypeFamily(pointee, "Buffer")) {
                                 report("buffer_free requires *Buffer<T> operand in function " + function.name);
                             }
                         }
@@ -3495,6 +3564,12 @@ bool ValidateModule(const Module& module,
                         const sema::Type pointee = PointerPointeeType(instruction.type).value_or(sema::UnknownType());
                         if (instruction.type.kind != sema::Type::Kind::kPointer || sema::IsUnknown(pointee)) {
                             report("arena_new must produce *T in function " + function.name);
+                        }
+                        if (operand_types.size() == 1) {
+                            const auto arena_pointee = PointerPointeeType(StripMirAliasOrDistinct(module, operand_types.front()));
+                            if (!arena_pointee.has_value() || !IsNamedTypeFamily(*arena_pointee, "Arena")) {
+                                report("arena_new requires *Arena operand in function " + function.name);
+                            }
                         }
                         break;
                     }
@@ -3615,11 +3690,14 @@ bool ValidateModule(const Module& module,
                             report(std::string(ToString(instruction.kind)) + " operand count mismatch in function " + function.name);
                             break;
                         }
-                        if ((is_load || is_store || is_exchange || is_fetch_add) && !HasAtomicOrderMetadata(instruction.op)) {
+                        if ((is_load || is_store || is_exchange || is_fetch_add) && !HasAtomicOrderMetadata(instruction)) {
                             report(std::string(ToString(instruction.kind)) + " must record order metadata in function " + function.name);
                         }
-                        if (is_compare_exchange && !HasCompareExchangeOrderMetadata(instruction.op)) {
+                        if (is_compare_exchange && !HasCompareExchangeOrderMetadata(instruction)) {
                             report("atomic_compare_exchange must record success/failure order metadata in function " + function.name);
+                        }
+                        if (!instruction.op.empty()) {
+                            report(std::string(ToString(instruction.kind)) + " must not encode atomic order metadata in generic op text in function " + function.name);
                         }
                         if ((is_load || is_exchange || is_fetch_add) && instruction.result.empty()) {
                             report(std::string(ToString(instruction.kind)) + " must produce a result in function " + function.name);
@@ -3785,7 +3863,8 @@ bool ValidateModule(const Module& module,
                         if (base_type.kind == sema::Type::Kind::kArray && !base_type.subtypes.empty()) {
                             expected_type = base_type.subtypes.front();
                         }
-                        if (base_type.kind == sema::Type::Kind::kNamed && (base_type.name == "Slice" || base_type.name == "Buffer") &&
+                        if (base_type.kind == sema::Type::Kind::kNamed &&
+                            (IsNamedTypeFamily(base_type, "Slice") || IsNamedTypeFamily(base_type, "Buffer")) &&
                             !base_type.subtypes.empty()) {
                             expected_type = base_type.subtypes.front();
                         }
@@ -3820,10 +3899,10 @@ bool ValidateModule(const Module& module,
                             expected_type = sema::NamedType("Slice");
                             expected_type.subtypes.push_back(base_type.subtypes.front());
                         }
-                        if (base_type.kind == sema::Type::Kind::kNamed && base_type.name == "Slice") {
+                        if (base_type.kind == sema::Type::Kind::kNamed && IsNamedTypeFamily(base_type, "Slice")) {
                             expected_type = base_type;
                         }
-                        if (base_type.kind == sema::Type::Kind::kNamed && base_type.name == "Buffer") {
+                        if (base_type.kind == sema::Type::Kind::kNamed && IsNamedTypeFamily(base_type, "Buffer")) {
                             expected_type = sema::NamedType("Slice");
                             expected_type.subtypes = base_type.subtypes;
                         }
@@ -4432,7 +4511,10 @@ std::string DumpModule(const Module& module) {
                 if (!instruction.result.empty()) {
                     line << ' ' << instruction.result << ':' << sema::FormatType(instruction.type);
                 }
-                if (!instruction.op.empty()) {
+                const std::string atomic_metadata = AtomicMetadataText(instruction);
+                if (!atomic_metadata.empty()) {
+                    line << " op=" << atomic_metadata;
+                } else if (!instruction.op.empty()) {
                     line << " op=" << instruction.op;
                 }
                 if (instruction.arithmetic_semantics != Instruction::ArithmeticSemantics::kNone) {

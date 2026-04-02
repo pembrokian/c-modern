@@ -28,4 +28,3 @@ Module
     Block label=switch_case6
       const %v6:int_literal op=3
       terminator return values=[%v6]
-
