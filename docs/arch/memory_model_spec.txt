@@ -11,6 +11,7 @@ Authority and scope:
 - `allocation_spec.txt` remains the allocation-convention note.
 - this document freezes the memory model, pointer provenance rules, aliasing rules, lifetime rules, and checked-invalid-operation boundaries for v0.2.
 - this document does not define a hidden runtime, GC, or ownership-tracking system.
+- this document defines the language contract for admitted behavior; the current bootstrap compiler may diagnose or dynamically trap only a subset of these rules.
 
 1. Core Position
 
@@ -48,7 +49,26 @@ Consequences:
 - `Buffer<T>` owns its storage
 - returning a view into temporary internal storage is invalid design
 
-3. Pointer Model
+3. Initialization And Temporary Values
+
+Initialization rules:
+- top-level `var` declarations without an initializer are zero-initialized
+- local storage declarations without an initializer create live storage with indeterminate contents until the program writes a value
+- reading local or heap-backed storage before it has been initialized is invalid behavior
+- aggregate fields and array elements follow the same rule: any part not yet initialized is indeterminate until written
+- checked builds may trap some obvious uninitialized uses, but v0.2 does not require a full definite-assignment proof in the bootstrap checker
+
+String literal and static storage:
+- string literals reside in static read-only storage for the lifetime of the program
+- imported or external storage follows the lifetime contract of the defining runtime or FFI boundary, not a hidden language-owned extension rule
+
+Temporary values:
+- v0.2 does not introduce a separate temporary-storage ownership category
+- unnamed temporary values produced during expression evaluation live only for the enclosing full expression unless materialized into named or returned storage by ordinary language rules
+- taking a pointer or borrowed view into a temporary does not extend that temporary's lifetime
+- using a pointer, slice, or string view after the temporary storage it referred to has ended is invalid behavior
+
+4. Pointer Model
 
 Pointer validity:
 - a pointer is valid only while it still refers to live storage under the program rules
@@ -68,7 +88,19 @@ Integer and pointer conversion:
 - a round trip preserves usability only if the numeric value is unchanged and the source allocation remains live
 - these conversions are intended for FFI, MMIO, and low-level runtime code
 
-4. Aliasing Rules
+Provenance guidance:
+- pointers derived from a live object remain tied to that allocation for arithmetic, comparison, and dereference purposes
+- forming a pointer from an unrelated integer does not create valid ownership or lifetime facts by itself
+- outside explicit low-level APIs such as MMIO and FFI, forged pointers should be treated as unsafe and invalid to dereference unless they designate live storage established by the program or runtime contract
+
+5. Object Representation And Aliasing Rules
+
+Object representation:
+- the object representation of a live value consists of its declared field or element bytes plus any target-defined padding bytes required by layout
+- field order is the declared order; size, alignment, and padding follow the target ABI unless an admitted representation attribute says otherwise
+- padding bytes may contain unspecified contents unless the program has explicitly written them through byte-wise operations
+- byte-wise copy of a live object's storage copies its full representation, including padding
+- semantic value equality and type identity are not defined by raw-byte equality alone
 
 No strict-aliasing UB:
 - Modern C does not adopt C-style strict-aliasing undefined behavior
@@ -84,7 +116,7 @@ Rules:
 - aliasing facts come from the program, not from backend folklore
 - the backend must not strengthen aliasing beyond the semantic contract
 
-5. Constness And Mutability
+6. Constness And Mutability
 
 Const model:
 - `const` is part of the type
@@ -97,7 +129,7 @@ Rules:
 - `const` does not imply noalias
 - `const` does not create a separate lifetime class
 
-6. Allocation And Ownership
+7. Allocation And Ownership
 
 Allocation boundary:
 - allocation is a library feature, not a language primitive
@@ -115,7 +147,7 @@ Consequences:
 - callers must not keep using a pointer, slice, or view after the underlying storage is released
 - allocator APIs should remain separate from ordinary value semantics
 
-7. Checked And Invalid Behavior
+8. Checked, Invalid, And Diagnosable Behavior
 
 Defined arithmetic behavior:
 - integer overflow wraps
@@ -127,17 +159,20 @@ Checked faults:
 - checked bounds violations where the compiler inserts explicit checks
 
 Invalid behavior:
+- read of uninitialized storage
 - use-after-free
 - out-of-bounds access
 - invalid pointer dereference
 - use of a slice after its underlying storage becomes invalid
+- conflicting unsynchronized non-atomic accesses from multiple threads
 
 Rules:
+- semantic analysis should diagnose statically provable violations where feasible
 - checked builds may trap additional invalid operations
 - checked behavior does not redefine release semantics
 - the compiler should preserve explicit faults instead of silently recovering
 
-8. Volatile And Atomics
+9. Volatile And Atomics
 
 Volatile:
 - volatile access is an explicit low-level access boundary
@@ -148,12 +183,26 @@ Atomics:
 - atomics are not interchangeable with ordinary loads and stores
 - atomics are not interchangeable with volatile operations
 
+Admitted ordering vocabulary for v0.2:
+- `Relaxed`
+- `Acquire`
+- `Release`
+- `AcqRel`
+- `SeqCst`
+
+Ordering model:
+- relaxed atomic operations guarantee atomicity on the addressed atomic object, but do not by themselves establish ordering for unrelated ordinary memory accesses
+- a release operation on an atomic object synchronizes with an acquire operation that reads the value written by that release, establishing a happens-before edge for ordinary memory effects ordered around those operations
+- acqrel operations provide both acquire and release behavior on read-modify-write operations
+- seqcst operations additionally participate in one global sequentially consistent order for seqcst atomic operations
+- volatile operations preserve observable device or boundary accesses but do not by themselves establish synchronization between threads
+
 Rules:
 - volatile and atomic behavior should remain distinct in sema and MIR
 - memory ordering should be carried explicitly where the language and library expose it
 - backend lowering must preserve the explicit boundary recorded by the front end
 
-9. View Types And Lifetime Guidance
+10. View Types And Lifetime Guidance
 
 Borrowed views:
 - slices and strings are borrowed views
@@ -164,7 +213,7 @@ Guidance:
 - functions that return views should return `Slice<T>` or the canonical string type as appropriate
 - libraries should not return borrowed views into temporary internal allocations
 
-10. Non-Goals
+11. Non-Goals
 
 This document does not add:
 - GC

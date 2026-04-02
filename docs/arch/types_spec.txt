@@ -32,6 +32,7 @@ The admitted v0.2 semantic type forms are:
 - builtin scalar types
 - the semantic string type
 - nil
+- literal pseudo-types used during semantic checking for unresolved numeric literals
 - pointer types
 - const-qualified types
 - fixed arrays
@@ -50,6 +51,11 @@ Semantic string type:
 - the semantic string type is a borrowed UTF-8 byte sequence
 - the current bootstrap surface may normalize spellings such as `str`, `string`, and `cstr` into that semantic type
 - the type behaves as a non-owning view, not as an owning buffer
+
+Literal pseudo-types:
+- integer and floating-point literals may carry semantic placeholder types during checking before a concrete target type is chosen
+- these pseudo-types are checker-internal semantic forms, not user-declarable named types
+- they exist to support explicit conversion and target-driven literal acceptance without inventing implicit numeric coercion chains
 
 Nil:
 - `nil` is the null-pointer value form
@@ -78,6 +84,11 @@ Distinct types:
 - distinct types are not implicitly interchangeable with the base type or with unrelated distinct types
 - v0.2 restricts distinct types to scalar base types
 - explicit conversion is required to move between a distinct type and its base type
+
+Identity versus representation:
+- representation-directed attributes such as `@packed` and `@abi(c)` affect layout commitments for a named declaration, not whether the declaration is a distinct nominal identity
+- layout equality is not type equality
+- two named declarations do not become interchangeable merely because they lower to the same size, alignment, field offsets, or calling convention
 
 4. Structural Type Forms
 
@@ -132,16 +143,29 @@ Rules:
 - these builtin shapes must be queried from sema, not reconstructed independently in MIR or code generation
 - if a builtin aggregate shape changes, downstream consumers must see the change through the semantic type layer
 - builtin aggregate identity is nominal at the surface but canonicalized semantically
+- compiler-known builtin aggregate names are semantic contracts, not a promise that user code may redefine those names and still keep builtin behavior
 
-6. Type Relations
+6. Normalization, Equality, And Identity
 
-Equality:
-- structural types compare structurally after builtin canonicalization
-- named types compare by resolved identity
-- aliases compare as the type they alias
+Normalization rules:
+- type comparison proceeds on semantic types after recursive builtin canonicalization and alias stripping where the relation calls for transparent aliases
+- the current bootstrap semantic layer canonicalizes builtin spellings `str`, `string`, and `cstr` to the same semantic string type
+- imported named types keep their module qualification in the normalized identity when that qualification is semantically relevant
+- generic type arguments are normalized before nominal instantiated identity is compared
+
+Equality rules:
+- structural forms compare structurally after normalization
+- array equality includes both normalized element type and array length text after compile-time validation
+- pointer equality includes normalized pointee type
+- `const` is preserved in equality; it is not stripped as decoration
+- tuple equality depends on ordered element types
+- range equality depends on its normalized element type
+- procedure equality depends on ordered parameter types and ordered result types after normalization
+- named types compare by resolved nominal identity, including qualifying module name and normalized type arguments
+- aliases compare as the types they alias
 - distinct types compare by distinct identity, not by representation alone
 
-Compatibility:
+Compatibility rules:
 - explicit conversions are the normal way to cross type boundaries in v0.2
 - there are no implicit numeric conversions
 - signed and unsigned integer types do not silently coerce
@@ -151,19 +175,33 @@ Special cases:
 - `nil` may convert to pointer-like types where the language explicitly permits it
 - literal integer and floating-point expressions may be accepted where a specific target type is expected, subject to the explicit semantic conversion rules
 
-7. Generic And Imported Types
+7. Value Semantics And Ownership Meaning
+
+Value model:
+- v0.2 does not add a move-only or borrow-checked type category
+- ordinary user-visible types are value-semantic language entities; any ownership discipline comes from the specific type meaning and API contract rather than a second ownership qualifier system
+- fixed arrays, tuples, structs, enums, aliases, and distinct scalar wrappers are ordinary value forms
+
+Ownership-bearing conventions:
+- `Slice<T>` and the semantic string type are borrowed non-owning views
+- `Buffer<T>` is the canonical owning contiguous aggregate shape, but that ownership meaning is a semantic/library contract rather than a special extra type qualifier
+- `const` constrains mutation through an access path; it does not create ownership, move-only behavior, or a separate lifetime class
+- the current bootstrap compiler does not infer ownership transfer from arbitrary aggregate shape alone
+
+8. Generic And Imported Types
 
 Generic nominal types:
 - named types may carry type arguments
 - type argument lists are part of the nominal identity of the instantiated form
 - semantic resolution should preserve the argument structure for downstream artifacts
+- aliases inside generic arguments normalize before instantiated equality is compared
 
 Imported types:
 - module-qualified imported type names are first-class semantic identities
 - import resolution should not erase the module prefix from a type that needs it for disambiguation
 - interface artifacts should record imported type information precisely enough for downstream checking
 
-8. Non-Goals
+9. Non-Goals
 
 This document does not add:
 - subtyping

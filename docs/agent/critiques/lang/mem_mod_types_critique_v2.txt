@@ -1,0 +1,254 @@
+ARCHITECTURAL REVIEW V2: docs/arch/modules_spec.txt, docs/arch/types_spec.txt, docs/arch/memory_model_spec.txt
+What still appears potentially missing after spec revision
+==========================================================================
+
+Purpose
+-------
+This document is a second-pass critique of:
+- `docs/arch/modules_spec.txt`
+- `docs/arch/types_spec.txt`
+- `docs/arch/memory_model_spec.txt`
+
+It differs from the first critique in two ways:
+- it explicitly records which original concerns were correct and are still worth keeping in mind
+- it separates already-addressed issues from gaps that still look potentially missing after the latest revision
+
+The goal is not to reopen settled design without pressure.
+The goal is to keep one concrete note of what may still be underspecified for a careful implementer.
+
+CURRENT SUMMARY
+---------------
+After the latest revision, these three docs are materially stronger.
+
+Best short summary now:
+- `modules_spec.txt` is now close to reference quality for the admitted bootstrap module model.
+- `types_spec.txt` is now much closer to a usable semantic reference and no longer reads only as a policy note.
+- `memory_model_spec.txt` improved the most and now covers the biggest missing areas from the first critique.
+
+That said, there are still some real gaps, mostly of these kinds:
+- places where the language contract is clearer than the current bootstrap enforcement
+- places where the docs are now directionally correct but still not exhaustive enough for all low-level edge cases
+- places where the implementation reality should probably be made more explicit in the architecture text
+
+1. WHAT THE FIRST CRITIQUE GOT RIGHT
+------------------------------------
+
+These were strong points in the original critique and were worth acting on:
+
+- The memory model was the least reference-complete of the three docs.
+  This was correct. The original document was missing uninitialized storage,
+  temporary lifetimes, object representation, and atomic ordering.
+
+- The types document needed a formal normalization and equality section.
+  This was correct. The previous text relied too much on reader inference.
+
+- The types document needed a plain ownership/value-semantics note.
+  This was correct. Without it, readers could not tell whether the language
+  intended universal value semantics, move-only categories, or something else.
+
+- The modules document needed a canonical import-resolution algorithm.
+  This was correct. The implementation already had one, but the old spec did
+  not state it explicitly enough.
+
+- The modules document needed a clearer visibility statement.
+  This was correct, though the right answer for v0.2 is a simple one.
+
+- The critique's preference for small borrowings rather than importing whole
+  Rust/Swift/C++ subsystems was correct.
+  That matches the architecture of this repository.
+
+2. WHAT WAS ADDRESSED BY THE SPEC REVISION
+------------------------------------------
+
+These earlier concerns are now substantially addressed in the docs themselves:
+
+Modules:
+- canonical import-resolution algorithm
+- ambiguity and duplicate-match handling
+- explicit statement that v0.2 visibility is only exported vs module-private
+- clearer treatment of generated roots as a build concern unless explicitly configured
+- better description of current `.mci` contract shape
+
+Types:
+- normalization and equality rules
+- explicit preservation of `const` in equality
+- generic nominal identity after normalization
+- clearer split between identity and representation
+- explicit value-semantics / ownership-meaning section
+- explicit note that builtin literal placeholder types exist in sema
+
+Memory:
+- uninitialized storage rules
+- temporary lifetime rules
+- object representation and padding rules
+- clearer distinction between diagnosable, checked, and invalid behavior
+- admitted atomic ordering vocabulary and a minimal happens-before story
+- explicit note that the language contract is broader than current bootstrap enforcement
+
+3. WHERE I DISAGREE WITH THE FIRST CRITIQUE
+-------------------------------------------
+
+Some parts of the original critique were reasonable as future-looking prompts,
+but too strong for the current repo and phase boundary.
+
+- The critique pushed a bit too hard toward a future visibility lattice.
+  For this language and compiler stage, exported versus module-private is not
+  just a temporary simplification; it is the right frozen v0.2 rule.
+  The missing piece was precision, not more tiers.
+
+- The critique suggested a sharper split between `str`, `string`, and `cstr`
+  in the type reference.
+  I do not think that is correct for the current implementation. The bootstrap
+  semantic layer canonicalizes those spellings into one semantic string type,
+  so the reference document should not pretend they are already three distinct
+  semantic categories.
+
+- The critique slightly understated how much the current implementation already
+  knows about modules and interfaces.
+  Import ambiguity, qualified imported type identity, deterministic `.mci`
+  output, extern ABI strings, noalias parameter flags, and layout facts are not
+  hypothetical future ideas; they already exist in the implementation.
+
+4. IMPLEMENTATION REALITIES THE FIRST CRITIQUE MISSED
+-----------------------------------------------------
+
+These facts matter when evaluating what is still missing:
+
+- The semantic type layer already has checker-internal literal pseudo-types for
+  unresolved integer and floating-point literals.
+
+- The current import algorithm is concrete, not merely aspirational:
+  importer directory first, then explicit roots, with hard ambiguity rejection.
+
+- Imported type identities are preserved with module qualification in semantic
+  output and downstream artifacts.
+
+- Current `.mci` artifacts already serialize more than the first critique gave
+  credit for, including:
+  - target identity
+  - imports
+  - extern ABI strings
+  - parameter `@noalias` flags
+  - type kind, type parameters, alias base type, and layout facts
+  - globals and interface hash material
+
+- `Buffer<T>` ownership is partly a semantic/library contract rather than a
+  property the compiler proves from shape alone.
+  That distinction matters, because it means the docs should be explicit about
+  contract versus current enforcement.
+
+5. WHAT STILL LOOKS POTENTIALLY MISSING
+---------------------------------------
+
+This is the main reason for keeping a v2 critique.
+These are the areas that still look potentially under-specified.
+
+5.1 Modules / Interfaces
+
+- The module spec still does not fully define source-file-to-module-name policy
+  beyond saying the build tool may map paths explicitly.
+  That is acceptable for v0.2, but a careful implementer may still want one
+  short statement about whether direct-source mode uses filename-derived module
+  identity by convention or only by the import path search result.
+
+- The `.mci` section is now much better, but it still describes a minimum
+  contract more than a versioned schema policy.
+  It may still be worth documenting:
+  - how format-version evolution should behave
+  - which changes are hash-relevant by policy versus by current serializer
+  - whether text format stability is required across compiler revisions or only
+    determinism within one admitted bootstrap slice
+
+- Re-export semantics are now correctly excluded for v0.2, but the docs still
+  do not say whether a future re-export feature would be a source-language
+  feature, an interface-artifact feature, or intentionally out of scope.
+  This is not an immediate gap, but it remains an open edge.
+
+5.2 Types
+
+- The type spec still does not explicitly state whether procedure types include
+  ABI or calling-convention identity.
+  The current implementation records extern ABI strings on functions and in
+  interface artifacts, but the type document itself still treats procedure type
+  identity only in terms of parameter and result structure.
+  If ABI is intentionally not part of procedure type identity, that should be
+  said plainly.
+
+- Builtin aggregate treatment is clearer, but the line between:
+  - compiler-known builtin names
+  - standard-library declarations
+  - user redeclarations that should be rejected
+  could still be sharper.
+  In other words: is `Buffer<T>` just a conventional name the stdlib must own,
+  or a reserved semantic contract name that user modules must not redefine?
+
+- The type spec now says the bootstrap compiler does not infer ownership from
+  arbitrary aggregate shape, which is good.
+  It may still benefit from one explicit statement that there is no implicit
+  copy elision, move elision, or destructor model in the language contract.
+
+- The handling of `cstr` is now described honestly as current canonicalization,
+  but the architecture set still lacks one final authoritative statement about
+  whether that is a long-term language rule or only a bootstrap compatibility
+  rule.
+
+5.3 Memory Model
+
+- The memory document now has a minimal provenance story, but low-level users
+  may still want one more explicit rule about byte reinterpretation and typed
+  reads after byte-wise writes.
+  The spec rejects strict-aliasing UB, but it still does not completely spell
+  out how far representation reinterpretation is intended to go.
+
+- The memory document now names unsynchronized non-atomic races as invalid, but
+  it still does not define whether all ordinary non-atomic accesses participate
+  in the same race model for hosted and freestanding targets alike.
+  That is probably the intended rule, but it could be stated more plainly.
+
+- Initialization rules are better, but heap allocation results are still only
+  described as invalid to read before initialization rather than whether any
+  allocator family may guarantee zeroed memory by API contract.
+  That may belong mostly in allocation docs, but the memory doc could cross-
+  reference that boundary more explicitly.
+
+- The document now defines temporary lifetime in broad terms, but it still does
+  not define full-expression boundaries in a highly operational way.
+  For v0.2 this may be acceptable, but it remains a place where implementers
+  could still want more examples.
+
+6. RECOMMENDED NEXT CLARIFICATIONS
+----------------------------------
+
+If these docs are revised again, the highest-value remaining additions are:
+
+- In `types_spec.txt`, say explicitly whether ABI / extern convention is or is
+  not part of procedure type identity.
+
+- In `types_spec.txt` or `stdlib_spec.txt`, make the ownership of compiler-known
+  builtin aggregate names explicit: reserved semantic names, stdlib-owned names,
+  or conventional names with rejection rules.
+
+- In `modules_spec.txt`, add one short schema-evolution note for `.mci`
+  artifacts so implementers know what determinism and compatibility mean.
+
+- In `memory_model_spec.txt`, add one concise rule or example block for:
+  - byte reinterpretation through `ui8`
+  - typed re-read after byte writes
+  - ordinary data-race invalidity in the presence of atomics
+
+7. BOTTOM LINE
+--------------
+
+The first critique was mostly right about the direction of the missing pieces.
+After the spec revision, many of its best recommendations have already been
+landed.
+
+What remains is not “these docs are still far from usable.”
+What remains is a smaller set of cleanup items where the architecture contract
+is now strong, but not yet maximally explicit for every low-level edge case.
+
+If we want one simple final verdict:
+- modules: largely in good shape for v0.2
+- types: much stronger, with a few remaining contract-boundary clarifications
+- memory: no longer obviously incomplete, but still the likeliest place for
+  future edge-case tightening

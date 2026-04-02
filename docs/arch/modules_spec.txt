@@ -67,10 +67,25 @@ Resolution rules:
 - duplicate matches are errors
 - the build system should search only the explicit module roots configured for the target or project
 
+Canonical resolution algorithm for v0.2:
+- for direct-source checking, the compiler first considers the importing file's directory and then each explicit import root in configured order
+- for project-driven builds, the ordinary explicit roots are the configured `search_paths.modules` entries for the target; any repository-local stdlib discovery remains a tool-mode convenience rather than a language rule
+- each candidate module path is formed mechanically as `<root>/<module-name>.mc`
+- candidate paths are normalized before duplicate suppression so the same file found through two equivalent roots is still one match
+- if exactly one distinct candidate exists, the import resolves to that module
+- if zero distinct candidates exist, the import is unresolved
+- if more than one distinct candidate exists, the import is ambiguous and must be rejected; there is no first-match-wins rule
+
 Visibility rules:
 - imported modules expose only their exported surface
 - private top-level names remain private to the defining module
 - import statements do not create reexports
+
+Visibility lattice for v0.2:
+- the only source-level visibility split is exported versus module-private
+- packages, directories, build targets, and source roots do not create additional visibility classes
+- imported exported names become available for internal use in the importing module, but they do not become exported again unless a future explicit re-export feature is introduced
+- v0.2 has no package-private, file-private, or friend-style visibility tier
 
 Non-goals:
 - wildcard imports
@@ -89,6 +104,7 @@ Rules:
 - the export surface is explicit and deterministic
 - export lists should be treated as the source of truth for interface generation
 - module-private declarations may still participate in internal checking, layout, and lowering
+- export filtering happens after the module has been fully parsed and semantically checked; exports do not create a partial-checking mode
 
 Interface expectations:
 - exported names appear in interface artifacts
@@ -122,19 +138,22 @@ Canonical artifact:
 
 Minimum contents:
 - module name
+- target identity for the build configuration that produced the artifact
 - source identity or path information needed for diagnostics
 - imported module list
 - exported declarations
-- resolved exported types
-- distinct-type identities needed by importers
+- resolved exported function signatures, including extern ABI strings and any accepted per-parameter semantic flags such as `@noalias`
+- resolved exported types, including declared kind, type parameters, alias base type when applicable, and layout-relevant facts already admitted by sema
 - layout-relevant facts for exported aggregates
-- calling-convention or ABI facts needed by importers
+- exported globals and constant payloads needed by importers
+- deterministic artifact hash or equivalent change-detection material
 
 Rules:
 - interface artifacts are serialized module contracts
 - interface artifacts must not become a second source language
 - if an exported semantic fact changes, dependent modules should rebuild
 - if only implementation details change, dependents should not need to rebuild
+- the current bootstrap `.mci` format is a deterministic textual serialization of exported semantic facts; it is allowed to stay narrower than a future fuller interface schema as long as it remains sufficient for admitted separate-compilation checking
 
 7. Build-Tool Responsibilities
 
@@ -144,6 +163,7 @@ The build tool may:
 - resolve imports through ordered roots
 - emit object files and interface artifacts
 - track module-level dependency ordering
+- treat generated source roots and generated interface roots as ordinary roots only when they are configured explicitly or are part of a separately documented tool workflow
 
 The build tool must not:
 - invent package aliases

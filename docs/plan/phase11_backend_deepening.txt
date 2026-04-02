@@ -1,0 +1,388 @@
+Phase 11 -- Phase 5 Backend Deepening
+=====================================
+
+Status
+------
+PLANNED
+
+Repository status note
+----------------------
+- The repository already has a real bootstrap Phase 5 boundary recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase5_bootstrap_finish.txt`.
+- The broader non-bootstrap expansion path is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`.
+- This file does not introduce a new architecture phase after Phase 8.
+  It is a repository-specific execution label for the unfinished backend work
+  that still belongs to Phase 5 ownership.
+- Do not describe Phase 11 as a new compiler layer.
+  It is the concrete closure plan for making the first hosted backend target
+  deep enough that the admitted non-bootstrap MIR surface builds and runs
+  without backend-local semantic repair or bootstrap-shaped exclusions being
+  treated as the normal path.
+
+Dependency note
+---------------
+- Phase 11 depends on the current repository posture described in:
+  - `/Users/ro/dev/c_modern/docs/plan/plan.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase5_bootstrap_finish.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/post_phase5_checked_operation_widening.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase9_semantic_authority_expansion.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase10_mir_authority_expansion.txt`
+  - the current backend entrypoints under
+    `/Users/ro/dev/c_modern/compiler/codegen_llvm/`
+  - the current executable and backend fixture harness under
+    `/Users/ro/dev/c_modern/tests/codegen/`
+- Phase 11 must preserve the existing ownership split:
+  - sema owns language meaning
+  - MIR owns typed lowered semantic truth
+  - the backend realizes MIR on the current hosted target without redefining
+    language policy
+  - the driver, build, and runtime layers orchestrate workflow and hosted
+    entry rather than repairing missing backend, MIR, or sema facts
+- If backend deepening appears to require new semantic policy or new MIR
+  meaning, route that gap back to the owning earlier phase or land the owner
+  change first.
+
+Repository-specific scope note
+------------------------------
+- The architecture texts stop at Phase 8 and already require later pressure
+  findings to route back to the smallest correct owner.
+- This repository uses the Phase 11 label only to package the next execution
+  wave as a concrete plan document under `docs/plan/`.
+- In substance, Phase 11 is the implementation plan for Workstreams 5A through
+  5E from the non-bootstrap roadmap, with the first execution wave explicitly
+  prioritizing executable surface widening, checked-operation completion, and
+  representation-sensitive lowering on the first hosted target before broader
+  low-level support or any target-matrix widening.
+
+Purpose
+-------
+Turn the broad non-bootstrap Phase 5 roadmap into an execution-ready plan that
+can be implemented in reviewable waves without blurring the boundary between
+sema-owned meaning, MIR-owned lowered truth, backend-owned realization, and
+runtime-owned hosted entry support.
+
+After Phase 11:
+
+- most sema-admitted, MIR-valid programs in the current repository-owned
+  non-bootstrap Phase 5 scope build and run on the first hosted target instead
+  of stopping at a narrower bootstrap executable slice
+- checked executable behavior is explicit, deterministic, and testable across
+  a broader admitted set rather than concentrated in the current integer-width
+  bootstrap subset
+- representation-sensitive lowering for globals, locals, aggregates,
+  conversions, imported layout-sensitive types, and address-taken values uses
+  sema-owned and MIR-carried truth directly instead of backend-local policy
+- deterministic backend dumps and executable regressions under
+  `/Users/ro/dev/c_modern/tests/codegen/` become the authoritative proof layer
+  for supported backend behavior on the first hosted target
+
+Problem being solved
+--------------------
+- The repository already has a real LLVM backend path, deterministic backend
+  dumps, object emission, hosted linking, and executable evidence for the
+  admitted bootstrap slice on Darwin arm64.
+- That backend layer is still incomplete relative to the long-term Phase 5
+  contract in `plan.txt` and the repository's own non-bootstrap roadmap.
+- The main remaining risk is not absence of code generation, but partial
+  executable authority: some admitted MIR forms still stop at crisp rejection,
+  checked behavior remains narrower than the broader admitted surface,
+  representation-sensitive lowering is deeper than bootstrap but not yet broad
+  enough for honest non-bootstrap coverage, and low-level operations remain
+  intentionally incomplete.
+- Without an explicit execution plan:
+  - backend support can remain frozen around the current examples instead of
+    deepening to the admitted non-bootstrap contract
+  - backend-local convenience shaping can slowly turn into a second semantic
+    engine
+  - checked or representation-sensitive behavior can drift toward host-default
+    accidents rather than explicit MIR-driven realization
+  - Phase 8 findings that should become narrow backend regressions can remain
+    anecdotal or get misrouted into stdlib, driver, or example workarounds
+
+Core rule
+---------
+- Fix semantic gaps in sema and lowered-semantic gaps in MIR, not in the
+  backend.
+- Deepen one hosted target before widening the target matrix.
+- Prefer a narrower honest executable contract over a broader bootstrap
+  convenience fallback.
+- Keep unsupported forms failing narrowly and intentionally.
+- Keep backend dumps, linked executable behavior, and fixture outputs
+  deterministic so the backend proof layer remains reviewable.
+
+Current repository posture
+--------------------------
+- The main backend entrypoints currently live in
+  `/Users/ro/dev/c_modern/compiler/codegen_llvm/backend.h` and
+  `/Users/ro/dev/c_modern/compiler/codegen_llvm/backend.cpp`, centered on
+  `BootstrapTargetConfig()` and `LowerModule(...)`.
+- The current driver already exposes `mc check` and `mc build` flows with
+  `--dump-backend`, and those flows route typed MIR into backend lowering
+  before object emission and hosted linking.
+- The first hosted target remains a frozen bootstrap target configuration for
+  Darwin arm64 rather than a general backend matrix.
+- The repository already has backend-focused test layers wired through CTest:
+  - `mc_codegen_llvm_unit`
+  - `mc_codegen_fixture_unit`
+  - `mc_codegen_executable_unit`
+- The current fixture and executable coverage under
+  `/Users/ro/dev/c_modern/tests/codegen/` already proves representative
+  backend behavior for direct calls, branches, explicit conversions,
+  pointer-int conversion boundaries, scalar globals, and the current checked
+  divide and shift subset.
+- The bootstrap Phase 5 finish note already records admitted executable proof
+  for direct calls, locals, branches, returns, scalar globals,
+  aggregate-sensitive field access, and the current checked divide, shift, and
+  bounds slice.
+- The current tree still does not claim exhaustive lowering for the broader MIR
+  surface, broad checked-operation completion, full volatile or atomic
+  lowering, or representation-sensitive executable support across the wider
+  non-bootstrap surface.
+
+Phase 11 execution waves
+------------------------
+Phase 11A -- Executable Surface Closure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Build and maintain a concrete executable-support matrix for the admitted MIR
+surface, then widen backend realization so supported MIR forms build and run on
+the first hosted target without backend-shaped fallback behavior.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 5A -- Executable surface widening on the first target
+- 5E -- Backend hygiene and inspectability
+
+Tasks
+~~~~~
+1. Build a backend coverage matrix from the admitted semantic surface, the
+   current MIR instruction set, the bootstrap Phase 5 finish note, and the
+   current codegen fixtures.
+2. Separate true backend gaps from upstream sema or MIR gaps so executable
+   widening does not absorb semantic or lowered-semantic ownership.
+3. Complete executable lowering for admitted procedures, locals, globals,
+   branches, returns, conversions, imported callable or value references, and
+   aggregate-sensitive operations that Phase 9 and Phase 10 already make
+   meaningful.
+4. Remove supported-path dependence on backend-local convenience shaping where
+   the typed MIR contract is already explicit.
+5. Keep unsupported forms failing crisply at the backend boundary with stable,
+   reviewable diagnostics instead of linker, runtime, or host-tool accidents.
+6. Add representative backend and executable fixtures proving that widened
+   supported paths stay deterministic and reviewable.
+
+Phase 11B -- Checked Operation Completion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Broaden explicit checked executable behavior beyond the current bootstrap slice
+without weakening determinism or allowing host-default behavior to define the
+language contract.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 5B -- Checked-operation completion
+
+Tasks
+~~~~~
+1. Audit the currently explicit MIR checked-operation families against the
+   backend helpers and executable tests already admitted in the tree.
+2. Generalize helper selection and lowering across the broader admitted width,
+   signedness, and operand-shape combinations that MIR already represents.
+3. Keep checked divide, shift, bounds, and related fault behavior explicit in
+   backend lowering rather than inherited from LLVM defaults or target-host
+   accidents.
+4. Add executable pass and fail coverage for each newly admitted checked form,
+   including success behavior and expected trap or fault behavior where the
+   repository contract already defines it.
+5. Preserve crisp rejection for checked forms that remain intentionally outside
+   the current admitted executable slice.
+6. Treat `/Users/ro/dev/c_modern/docs/plan/post_phase5_checked_operation_widening.txt`
+   as an input note to Phase 11B rather than as a competing plan track.
+
+Phase 11C -- Representation-Sensitive Lowering
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Deepen executable realization for layout-sensitive and address-sensitive MIR so
+backend behavior follows sema-owned representation truth rather than silently
+recomputing policy.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 5C -- Representation-sensitive lowering
+
+Tasks
+~~~~~
+1. Re-audit backend handling for globals, locals, aggregates, address-taken
+   values, returns, loads, stores, and explicit conversions that depend on
+   sema-computed layout or imported type identity.
+2. Ensure the backend consumes sema-owned and MIR-carried layout truth for
+   size, alignment, field offsets, padding, and imported layout-sensitive
+   types instead of recreating language policy ad hoc.
+3. Complete executable lowering for the broader admitted aggregate and
+   conversion surface that the current repository already intends to support on
+   the first hosted target.
+4. Add focused fixture coverage for padded and packed aggregates, imported
+   layout-sensitive values, representation-preserving distinct-type cases, and
+   address-sensitive value flows.
+5. Keep still-unsupported aggregate or representation forms narrow and
+   explicit instead of widening them through backend-local special cases.
+
+Phase 11D -- Low-Level Operation Support
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Add honest executable lowering for the admitted low-level MIR surface only
+where sema and MIR already carry explicit meaning, while keeping intentionally
+unsupported low-level forms crisp.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 5D -- Low-level operation support
+
+Tasks
+~~~~~
+1. Audit the admitted volatile and atomic MIR families plus any related
+   pointer-sensitive boundary forms that are already explicit in MIR.
+2. Implement backend lowering only for the admitted low-level forms whose
+   semantics are already owned upstream and whose first-target behavior can be
+   made explicit and deterministic.
+3. Keep target assumptions explicit for Darwin arm64 rather than letting LLVM
+   or host ABI defaults stand in for missing repository policy.
+4. Add executable or backend-level proof for each newly admitted low-level
+   family, depending on whether full executable coverage is already practical.
+5. Reject unsupported orderings, widths, or low-level operation shapes
+   narrowly and intentionally instead of allowing partial generic lowering.
+
+Phase 11E -- Backend Hygiene And Inspectability
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Keep the backend small, inspectable, and subordinate to MIR while the
+executable surface deepens.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 5E -- Backend hygiene and inspectability
+
+Tasks
+~~~~~
+1. Preserve deterministic backend dump ordering and formatting as the emitted
+   surface widens.
+2. Keep unsupported executable cases failing through explicit backend checks
+   instead of host-linker or runtime accidents.
+3. Avoid moving semantic policy, type reconstruction, or layout invention into
+   the backend when that truth should come from sema or MIR.
+4. Prefer focused helper routines and explicit lowering tables over scattered
+   target-specific branching that obscures the supported executable contract.
+5. Promote repeated Phase 8 executable findings into narrow backend dump,
+   backend unit, or executable regression coverage where the backend is the
+   clearest stable owner.
+
+Canonical artifacts
+-------------------
+Phase 11 should produce or update the following canonical surfaces:
+
+- `/Users/ro/dev/c_modern/docs/plan/phase11_backend_deepening.txt`
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  so the roadmap points to this concrete Phase 11 follow-up plan
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/post_phase5_checked_operation_widening.txt`
+  if that note is retired, absorbed, or narrowed after Phase 11 starts landing
+- backend implementation updates under
+  `/Users/ro/dev/c_modern/compiler/codegen_llvm/`
+- narrow driver or runtime updates only when already-owned backend behavior
+  must be wired through existing flows rather than defined there
+- deterministic regression coverage under
+  `/Users/ro/dev/c_modern/tests/codegen/`
+- bounded CMake updates only if new backend test targets or fixtures require
+  wiring
+
+Allowed edit surface
+--------------------
+- `/Users/ro/dev/c_modern/docs/plan/`
+- `/Users/ro/dev/c_modern/compiler/codegen_llvm/`
+- `/Users/ro/dev/c_modern/tests/codegen/`
+- `/Users/ro/dev/c_modern/compiler/driver/` only for command plumbing,
+  artifact wiring, or deterministic diagnostics that expose already-defined
+  backend behavior
+- `/Users/ro/dev/c_modern/runtime/` only if an already-owned hosted-entry or
+  checked-fault support boundary genuinely needs adjustment
+- `/Users/ro/dev/c_modern/compiler/mir/` only for narrow downstream updates if
+  existing MIR structure needs a factual backend-consumption fix rather than a
+  new semantic policy
+- `/Users/ro/dev/c_modern/CMakeLists.txt` only if new backend tests require
+  wiring
+
+Out of scope
+------------
+- new semantic policy that belongs to Phase 3 ownership
+- new lowered-semantic instruction meaning that belongs to Phase 4 ownership
+- broad stdlib or runtime API redesign that belongs to Phase 6 ownership
+- project-model or `.mci` workflow maturity that belongs to Phase 7 ownership
+- target-matrix widening, cross-compilation, or multi-backend bring-up
+- optimization-oriented backend work that does not change the admitted
+  executable contract
+- speculative executable surface expansion not justified by the current
+  roadmap, admitted MIR surface, or repeated Phase 8 pressure
+
+Suggested proof and artifacts
+-----------------------------
+- expand `/Users/ro/dev/c_modern/tests/codegen/` with backend dump fixtures and
+  executable proofs for each newly admitted checked, aggregate,
+  representation-sensitive, imported-layout-sensitive, or low-level family
+- keep deterministic `.backend.txt` coverage when a backend IR-level proof is
+  the clearest contract and executable tests would add noise rather than
+  clarity
+- add executable coverage when the real contract is user-visible runtime
+  behavior rather than only emitted backend structure
+- convert repeated pressure-program backend failures into the narrowest stable
+  backend regression layer rather than carrying them only in examples
+- keep crisp unsupported-case tests for intentionally deferred executable forms
+
+Execution order
+---------------
+Recommended landing order inside Phase 11:
+
+1. Phase 11A -- executable surface closure matrix and first widening pass
+2. Phase 11B -- checked-operation completion
+3. Phase 11C -- representation-sensitive lowering
+4. Phase 11E -- backend hygiene tightening as widening lands
+5. Phase 11D -- low-level operation support once upstream sema and MIR truth is
+   explicit enough
+
+The order is intentional:
+
+- checked and representation-sensitive widening carry the highest leverage for
+  honest first-target executable depth
+- hygiene work should accompany each widening step rather than wait until the
+  end
+- low-level volatile and atomic support should not become a forcing function
+  for semantic or MIR policy that is still moving upstream
+
+Exit criteria
+-------------
+- most sema-admitted, MIR-valid programs in the current repository-owned
+  non-bootstrap Phase 5 scope build and run on the first hosted target
+- checked behavior is explicit and tested across the broadened admitted
+  executable forms rather than concentrated in the bootstrap subset
+- representation-sensitive lowering follows sema-owned and MIR-carried truth
+  for the admitted executable surface without backend-local semantic repair
+- newly admitted low-level forms are either executable and tested or still
+  rejected through explicit, deterministic backend diagnostics
+- backend dumps, executable evidence, and unsupported-form failures remain
+  deterministic and reviewable
+
+Acceptance criteria for this plan document
+------------------------------------------
+- The repository has one explicit written execution plan for the unfinished
+  backend deepening work that still belongs to Phase 5 ownership.
+- The plan preserves the current ownership model and does not collapse missing
+  sema or MIR truth into backend-local workarounds.
+- The plan keeps the first hosted target narrow while making that target
+  materially deeper.
