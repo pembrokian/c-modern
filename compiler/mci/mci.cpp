@@ -1010,4 +1010,46 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
     return artifact;
 }
 
+bool ValidateInterfaceArtifactMetadata(const InterfaceArtifact& artifact,
+                                       const std::filesystem::path& artifact_path,
+                                       std::string_view expected_target_identity,
+                                       std::string_view expected_module_name,
+                                       const std::filesystem::path& expected_source_path,
+                                       support::DiagnosticSink& diagnostics) {
+    auto report_error = [&](const std::string& message) {
+        diagnostics.Report({
+            .file_path = artifact_path,
+            .span = mc::support::kDefaultSourceSpan,
+            .severity = DiagnosticSeverity::kError,
+            .message = message,
+        });
+        return false;
+    };
+
+    if (artifact.target_identity.empty()) {
+        return report_error("interface artifact is missing target identity");
+    }
+    if (artifact.module_name.empty()) {
+        return report_error("interface artifact is missing module name");
+    }
+    if (artifact.source_path.empty()) {
+        return report_error("interface artifact is missing source path");
+    }
+    if (!expected_target_identity.empty() && artifact.target_identity != expected_target_identity) {
+        return report_error("interface artifact target mismatch");
+    }
+    if (!expected_module_name.empty() && artifact.module_name != expected_module_name) {
+        return report_error("interface artifact module mismatch");
+    }
+    if (!expected_source_path.empty()) {
+        const auto actual_source = artifact.source_path.lexically_normal();
+        const auto expected_source = expected_source_path.lexically_normal();
+        if (actual_source != expected_source) {
+            return report_error("interface artifact source path mismatch");
+        }
+    }
+
+    return true;
+}
+
 }  // namespace mc::mci

@@ -13,6 +13,8 @@ Source documents
 - /Users/ro/dev/c_modern/docs/plan/phase5_bootstrap_finish.txt
 - /Users/ro/dev/c_modern/docs/plan/phase6_implementation_summary.txt
 - /Users/ro/dev/c_modern/docs/plan/phase7_implementation_summary.txt
+- /Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt
+- /Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_closeout.txt
 - /Users/ro/dev/c_modern/docs/plan/phase8_implementation_summary.txt
 - /Users/ro/dev/c_modern/docs/arch/canonical_programs.txt
 - /Users/ro/dev/c_modern/docs/arch/build_spec.txt
@@ -402,8 +404,11 @@ Current bootstrap boundary
 - build.toml schema v1, project check and build, run, test, deterministic .mci,
   and incremental rebuild reuse are implemented for the admitted hosted slice
 - the current summary explicitly does not claim non-default startup selection,
-  non-hosted targets, non-executable target kinds, full spec-level ordinary
-  test ergonomics, or timeout enforcement
+  non-hosted targets, static-library or shared-library target maturity, or
+  full spec-level ordinary test ergonomics
+- the current repository-bounded follow-up for this phase is now recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_closeout.txt`
 
 Non-bootstrap expansion scope
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

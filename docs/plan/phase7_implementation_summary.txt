@@ -14,7 +14,7 @@ What landed
 - A narrow `build.toml` schema v1 parser under `compiler/driver/` covering `schema`, `project`, `default`, `build_dir`, target `kind`, `root`, `mode`, `env`, `target`, `links`, `search_paths.modules`, `runtime.startup`, and `tests.*`.
 - Target-driven `mc check` and `mc build` entry paths that accept `--project <build.toml>` and optional `--target <name>` while preserving the existing direct-source command flow.
 - Explicit project-target selection rules: use `--target` when provided, otherwise use the project `default`, otherwise admit the only defined target.
-- Repository-specific target validation for the admitted bootstrap slice: hosted executable targets only, default startup only, and bootstrap-target-only code generation.
+- Repository-specific target validation for the admitted bootstrap slice: hosted `exe` and `test` targets only, default startup only, and bootstrap-target-only code generation.
 - Project import-root ordering frozen in code as CLI `--import-root` entries first, target `search_paths.modules` entries second, and implicit `root.parent_path()` only when the target declares no module roots.
 - Direct-source import-root ordering preserved as importer-relative lookup plus explicit `--import-root` entries plus repository-local stdlib fallback.
 - Project graph discovery from the selected root module through ordered roots, with deterministic cycle, missing-module, and duplicate-match diagnostics.
@@ -23,22 +23,25 @@ What landed
 - Target-build sema import consumption from emitted `.mci` artifacts instead of recursive reparsing of already-built upstream modules.
 - Per-module object emission for project builds, with imported module objects namespaced to match project-qualified symbol references at link time.
 - Interface-hash-driven project rebuild reuse across invocations: no-op rebuilds reuse `.mci`, object, and executable artifacts; implementation-only upstream edits rebuild only the changed module object and relink; interface-changing upstream edits rebuild affected dependents.
+- Existing `.mci` artifacts now form a stricter trust boundary: malformed or metadata-mismatched interface files fail project builds instead of being silently rewritten or tolerated.
+- Per-module build-state artifacts are now versioned and serialize imported interface hashes in deterministic sorted order.
 - `mc run` for direct-source and project-driven executable targets, using the same artifact graph as `mc build` and returning the hosted executable exit code.
+- Hosted project targets with `kind = "test"` now reuse the executable artifact path honestly in the current bootstrap slice instead of being rejected up front.
 - Command-surface coverage for `--mode` and `--env` in help/usage alongside project-target execution.
-- `mc test` for project-driven hosted executable targets, including deterministic `_test.mc` discovery, deterministic generated runner emission, serial PASS/FAIL reporting, and nonzero overall exit on ordinary test failure.
+- `mc test` for project-driven hosted executable targets, including deterministic `_test.mc` discovery, deterministic generated runner emission, serial PASS/FAIL reporting, timeout enforcement from `tests.timeout_ms`, and nonzero overall exit on ordinary test failure.
 - A narrow compiler-regression manifest path under `mc test` supporting `check-pass`, `check-fail`, `run-output`, and `mir` cases while reusing existing `.errors.txt` and `.mir.txt` conventions.
 - A repository-owned bootstrap ordinary-test contract that currently accepts `func() *T` or `func() Error`, plus `stdlib/testing.mc` with a minimal `testing.fail()` helper for failure propagation.
 - Backend and runner fixes required by the ordinary-test slice: MIR `nil` now lowers through the LLVM bootstrap backend as a pointer-width value, and generated test runners explicitly consume `io.write_line(...)` results to satisfy the current non-void call rules.
+- Project-file validation now rejects duplicate module search roots and duplicate target root modules early instead of silently collapsing ambiguous workflow state.
 
 What did not land in this slice
 -------------------------------
 - Non-default startup selection, non-hosted targets, or non-executable target kinds.
 - Full spec-level ordinary test `func() Error` ergonomics independent of the bootstrap pointer-shaped helper contract.
-- Runner timeout enforcement from `tests.timeout_ms`; the field is parsed but not yet enforced because repository proof did not require it in this slice.
 
 Repository proof added
 ----------------------
-- `tests/tool/phase7_tool_tests.cpp` exercises successful target-driven project builds, deterministic `.mci` emission, missing declared module roots, ambiguous duplicate module matches, no-op incremental rebuild reuse, implementation-only upstream rebuild behavior, interface-changing downstream invalidation, `mc run`, default-target diagnostics, successful `mc test` ordinary project-test execution, failing ordinary project-test propagation, and manifest-driven compiler-regression classes.
+- `tests/tool/phase7_tool_tests.cpp` exercises successful target-driven project builds, admitted hosted `test` target builds and runs, deterministic `.mci` emission, malformed `.mci` trust-boundary failures, foreign `.mci` contamination failures across build directories, stale invalid state-file rebuild fallback, versioned deterministic module state output, missing declared module roots, ambiguous duplicate module matches, duplicate configured module roots, duplicate target roots, no-op incremental rebuild reuse, implementation-only upstream rebuild behavior, interface-changing downstream invalidation, `mc run`, default-target diagnostics, successful `mc test` ordinary project-test execution, ordinary test timeout reporting, failing ordinary project-test propagation, and manifest-driven compiler-regression classes.
 - `tests/tool/bootstrap_tests.cpp` now includes an `.mci` round-trip unit test.
 
 Validation run

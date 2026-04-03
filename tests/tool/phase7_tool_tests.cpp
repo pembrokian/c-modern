@@ -357,6 +357,65 @@ void TestProjectBuildAndMciEmission(const std::filesystem::path& binary_root,
     }
 }
 
+void TestProjectTestTargetBuildsAndRuns(const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase13_test_kind_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase13-test-kind\"\n"
+              "default = \"unit\"\n"
+              "\n"
+              "[targets.unit]\n"
+              "kind = \"test\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.unit.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.unit.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(project_root / "src/main.mc",
+              "func main() i32 {\n"
+              "    return 6\n"
+              "}\n");
+
+    const std::filesystem::path build_dir = binary_root / "phase13_test_kind_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  (project_root / "build.toml").generic_string(),
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string()},
+                                                                 build_dir / "build_output.txt",
+                                                                 "phase13 test-kind build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase13 test target build should succeed:\n" + build_output);
+    }
+
+    const auto executable = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir).executable;
+    if (!std::filesystem::exists(executable)) {
+        Fail("phase13 test target build should emit an executable artifact");
+    }
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              (project_root / "build.toml").generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "run_output.txt",
+                                                             "phase13 test-kind run");
+    if (!run_outcome.exited || run_outcome.exit_code != 6) {
+        Fail("phase13 test target run should return 6, got:\n" + run_output);
+    }
+}
+
 void TestProjectImportedGlobalMirDeclarations(const std::filesystem::path& binary_root,
                                               const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "phase7_imported_globals_project";
@@ -405,6 +464,250 @@ void TestProjectImportedGlobalMirDeclarations(const std::filesystem::path& binar
     ExpectOutputContains(main_mir_text,
                          "store_target target=helper.counter target_kind=global target_name=helper.counter",
                          "dependent MIR should lower imported mutable global stores as global targets");
+}
+
+void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binary_root,
+                                              const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase13_corrupt_mci_project";
+    const std::filesystem::path project_path = WriteBasicProject(
+        project_root,
+        "export { answer }\n"
+        "\n"
+        "func answer() i32 {\n"
+        "    return 7\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return helper.answer()\n"
+        "}\n");
+    const std::filesystem::path build_dir = binary_root / "phase13_corrupt_mci_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [initial_outcome, initial_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                      "build",
+                                                                      "--project",
+                                                                      project_path.generic_string(),
+                                                                      "--build-dir",
+                                                                      build_dir.generic_string()},
+                                                                     build_dir / "initial_build_output.txt",
+                                                                     "phase13 initial build");
+    if (!initial_outcome.exited || initial_outcome.exit_code != 0) {
+        Fail("phase13 initial build should succeed:\n" + initial_output);
+    }
+
+    const auto helper_mci = mc::support::ComputeDumpTargets(project_root / "src/helper.mc", build_dir).mci;
+    WriteFile(helper_mci,
+              "format\t2\n"
+              "target\tarm64-apple-darwin25.4.0\n"
+              "module\thelper\n"
+              "source\t" + (project_root / "src/helper.mc").generic_string() + "\n"
+              "interface_hash\tdeadbeef\n");
+
+    const auto [corrupt_outcome, corrupt_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                      "build",
+                                                                      "--project",
+                                                                      project_path.generic_string(),
+                                                                      "--build-dir",
+                                                                      build_dir.generic_string()},
+                                                                     build_dir / "corrupt_build_output.txt",
+                                                                     "phase13 corrupt mci build");
+    if (!corrupt_outcome.exited || corrupt_outcome.exit_code == 0) {
+        Fail("build with corrupted existing .mci should fail");
+    }
+    ExpectOutputContains(corrupt_output,
+                         "interface artifact hash mismatch",
+                         "corrupted .mci should fail with a trust-boundary diagnostic");
+}
+
+void TestModuleBuildStateIsVersionedAndDeterministic(const std::filesystem::path& binary_root,
+                                                     const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase13_state_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase13-state\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(project_root / "src/alpha.mc",
+              "export { answer_alpha }\n"
+              "\n"
+              "func answer_alpha() i32 {\n"
+              "    return 2\n"
+              "}\n");
+    WriteFile(project_root / "src/zeta.mc",
+              "export { answer_zeta }\n"
+              "\n"
+              "func answer_zeta() i32 {\n"
+              "    return 5\n"
+              "}\n");
+    WriteFile(project_root / "src/main.mc",
+              "import zeta\n"
+              "import alpha\n"
+              "\n"
+              "func main() i32 {\n"
+              "    return zeta.answer_zeta() + alpha.answer_alpha()\n"
+              "}\n");
+
+    const std::filesystem::path build_dir = binary_root / "phase13_state_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      (project_root / "build.toml").generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string()},
+                                                     build_dir / "state_build_output.txt",
+                                                     "phase13 deterministic state build");
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail("phase13 deterministic state build should succeed:\n" + output);
+    }
+
+    const auto state_path = build_dir / "state" /
+                            (mc::support::SanitizeArtifactStem(project_root / "src/main.mc") + ".state.txt");
+    const std::string state_text = ReadFile(state_path);
+    ExpectOutputContains(state_text, "format\t1\n", "module build state should record its format version");
+
+    const std::size_t alpha_hash = state_text.find("import_hash\talpha=");
+    const std::size_t zeta_hash = state_text.find("import_hash\tzeta=");
+    if (alpha_hash == std::string::npos || zeta_hash == std::string::npos) {
+        Fail("module build state should record imported interface hashes for all imports");
+    }
+    if (!(alpha_hash < zeta_hash)) {
+        Fail("module build state should serialize import hashes in deterministic sorted order");
+    }
+}
+
+void TestForeignInterfaceArtifactFailsBuild(const std::filesystem::path& binary_root,
+                                            const std::filesystem::path& mc_path) {
+    const std::filesystem::path source_project_root = binary_root / "phase13_foreign_artifact_source_project";
+    const std::filesystem::path source_project_path = WriteBasicProject(
+        source_project_root,
+        "export { answer }\n"
+        "\n"
+        "func answer() i32 {\n"
+        "    return 7\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return helper.answer()\n"
+        "}\n");
+    const std::filesystem::path source_build_dir = binary_root / "phase13_foreign_artifact_source_build";
+    std::filesystem::remove_all(source_build_dir);
+    std::filesystem::create_directories(source_build_dir);
+
+    const auto [source_outcome, source_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                    "build",
+                                                                    "--project",
+                                                                    source_project_path.generic_string(),
+                                                                    "--build-dir",
+                                                                    source_build_dir.generic_string()},
+                                                                   source_build_dir / "build_output.txt",
+                                                                   "phase13 foreign artifact source build");
+    if (!source_outcome.exited || source_outcome.exit_code != 0) {
+        Fail("phase13 foreign artifact source build should succeed:\n" + source_output);
+    }
+
+    const std::filesystem::path contaminated_project_root = binary_root / "phase13_foreign_artifact_target_project";
+    const std::filesystem::path contaminated_project_path = WriteBasicProject(
+        contaminated_project_root,
+        "export { answer }\n"
+        "\n"
+        "func answer() i32 {\n"
+        "    return 11\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return helper.answer()\n"
+        "}\n");
+    const std::filesystem::path contaminated_build_dir = binary_root / "phase13_foreign_artifact_target_build";
+    std::filesystem::remove_all(contaminated_build_dir);
+    std::filesystem::create_directories(contaminated_build_dir / "mci");
+
+    const auto source_helper_mci = mc::support::ComputeDumpTargets(source_project_root / "src/helper.mc", source_build_dir).mci;
+    const auto target_helper_mci = mc::support::ComputeDumpTargets(contaminated_project_root / "src/helper.mc", contaminated_build_dir).mci;
+    WriteFile(target_helper_mci, ReadFile(source_helper_mci));
+
+    const auto [contaminated_outcome, contaminated_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                                "build",
+                                                                                "--project",
+                                                                                contaminated_project_path.generic_string(),
+                                                                                "--build-dir",
+                                                                                contaminated_build_dir.generic_string()},
+                                                                               contaminated_build_dir / "contaminated_output.txt",
+                                                                               "phase13 foreign artifact contaminated build");
+    if (!contaminated_outcome.exited || contaminated_outcome.exit_code == 0) {
+        Fail("build with foreign .mci contamination should fail");
+    }
+    ExpectOutputContains(contaminated_output,
+                         "interface artifact source path mismatch",
+                         "foreign .mci contamination should fail with metadata mismatch");
+}
+
+void TestInvalidStateFileForcesRebuild(const std::filesystem::path& binary_root,
+                                       const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase13_invalid_state_project";
+    const std::filesystem::path project_path = WriteBasicProject(
+        project_root,
+        "export { answer }\n"
+        "\n"
+        "func answer() i32 {\n"
+        "    return 7\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return helper.answer()\n"
+        "}\n");
+    const std::filesystem::path build_dir = binary_root / "phase13_invalid_state_build";
+
+    const auto run_build = [&](const std::string& context) {
+        const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                          "build",
+                                                          "--project",
+                                                          project_path.generic_string(),
+                                                          "--build-dir",
+                                                          build_dir.generic_string()},
+                                                         build_dir / (context + ".txt"),
+                                                         context);
+        if (!outcome.exited || outcome.exit_code != 0) {
+            Fail(context + " should succeed:\n" + output);
+        }
+    };
+
+    std::filesystem::remove_all(build_dir);
+    run_build("phase13_invalid_state_initial_build");
+
+    const auto helper_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/helper.mc", build_dir).object;
+    const auto helper_state = build_dir / "state" /
+                              (mc::support::SanitizeArtifactStem(project_root / "src/helper.mc") + ".state.txt");
+    const auto helper_object_time_1 = RequireWriteTime(helper_object);
+
+    SleepForTimestampTick();
+    WriteFile(helper_state,
+              "format\t999\n"
+              "target\tarm64-apple-darwin25.4.0\n");
+    run_build("phase13_invalid_state_rebuild");
+
+    if (!(RequireWriteTime(helper_object) > helper_object_time_1)) {
+        Fail("invalid stale state file should force rebuilding the affected module object");
+    }
 }
 
 void TestIncrementalRebuildBehavior(const std::filesystem::path& binary_root,
@@ -644,6 +947,146 @@ void TestProjectAmbiguousImportFails(const std::filesystem::path& source_root,
     ExpectOutputContains(output, "ambiguous import module 'helper' matched multiple roots", "ambiguous import diagnostic");
 }
 
+void TestDuplicateModuleRootFailsEarly(const std::filesystem::path& binary_root,
+                                       const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase13_duplicate_root_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase13-duplicate-root\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\", \"./src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(project_root / "src/main.mc", "func main() i32 { return 0 }\n");
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      (project_root / "build.toml").generic_string()},
+                                                     binary_root / "phase13_duplicate_root_output.txt",
+                                                     "phase13 duplicate module root build");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("project with duplicate module roots should fail during project validation");
+    }
+    ExpectOutputContains(output,
+                         "target 'app' declares duplicate module search path:",
+                         "duplicate module roots should produce a strict project diagnostic");
+}
+
+void TestProjectTestTimeoutFailsDeterministically(const std::filesystem::path& binary_root,
+                                                  const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase13_test_timeout_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase13-test-timeout\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n"
+              "\n"
+              "[targets.app.tests]\n"
+              "enabled = true\n"
+              "roots = [\"tests\"]\n"
+              "mode = \"checked\"\n"
+              "timeout_ms = 100\n");
+    WriteFile(project_root / "src/main.mc", "func main() i32 { return 0 }\n");
+    WriteFile(project_root / "tests/hang_test.mc",
+              "export { test_hang }\n"
+              "\n"
+              "func test_hang() *i32 {\n"
+              "    while true {\n"
+              "    }\n"
+              "    return nil\n"
+              "}\n");
+
+    const std::filesystem::path build_dir = binary_root / "phase13_test_timeout_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "test",
+                                                      "--project",
+                                                      (project_root / "build.toml").generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string()},
+                                                     build_dir / "timeout_test_output.txt",
+                                                     "phase13 timeout test command");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("mc test with a hanging ordinary test should fail");
+    }
+    ExpectOutputContains(output,
+                         "TIMEOUT ordinary tests for target app after 100 ms",
+                         "ordinary test timeout should be reported deterministically");
+}
+
+void TestDuplicateTargetRootsFailEarly(const std::filesystem::path& binary_root,
+                                       const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase13_duplicate_target_root_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase13-duplicate-target-root\"\n"
+              "default = \"first\"\n"
+              "\n"
+              "[targets.first]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.first.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.first.runtime]\n"
+              "startup = \"default\"\n"
+              "\n"
+              "[targets.second]\n"
+              "kind = \"exe\"\n"
+              "root = \"./src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.second.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.second.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(project_root / "src/main.mc", "func main() i32 { return 0 }\n");
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      (project_root / "build.toml").generic_string()},
+                                                     binary_root / "phase13_duplicate_target_root_output.txt",
+                                                     "phase13 duplicate target roots build");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("project with duplicate target roots should fail during target validation");
+    }
+    ExpectOutputContains(output,
+                         "declare the same root module:",
+                         "duplicate target roots should produce a deterministic graph diagnostic");
+}
+
 void TestRealGrepLiteProject(const std::filesystem::path& source_root,
                              const std::filesystem::path& binary_root,
                              const std::filesystem::path& mc_path) {
@@ -858,7 +1301,12 @@ int main(int argc, char** argv) {
 
     TestHelpMentionsRun(binary_root, mc_path);
     TestProjectBuildAndMciEmission(binary_root, mc_path);
+    TestProjectTestTargetBuildsAndRuns(binary_root, mc_path);
     TestProjectImportedGlobalMirDeclarations(binary_root, mc_path);
+    TestCorruptedInterfaceArtifactFailsBuild(binary_root, mc_path);
+    TestModuleBuildStateIsVersionedAndDeterministic(binary_root, mc_path);
+    TestForeignInterfaceArtifactFailsBuild(binary_root, mc_path);
+    TestInvalidStateFileForcesRebuild(binary_root, mc_path);
     TestIncrementalRebuildBehavior(binary_root, mc_path);
     TestRunExitCodeAndArgs(binary_root, mc_path);
     TestProjectTestCommandSucceeds(binary_root, mc_path);
@@ -866,6 +1314,9 @@ int main(int argc, char** argv) {
     TestMissingDefaultTargetFails(binary_root, mc_path);
     TestProjectMissingImportRootFails(source_root, binary_root, mc_path);
     TestProjectAmbiguousImportFails(source_root, binary_root, mc_path);
+    TestDuplicateModuleRootFailsEarly(binary_root, mc_path);
+    TestProjectTestTimeoutFailsDeterministically(binary_root, mc_path);
+    TestDuplicateTargetRootsFailEarly(binary_root, mc_path);
     TestRealGrepLiteProject(source_root, binary_root, mc_path);
     TestRealFileWalkerProject(source_root, binary_root, mc_path);
     TestRealHashToolProject(source_root, binary_root, mc_path);

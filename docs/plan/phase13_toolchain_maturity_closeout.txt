@@ -1,0 +1,76 @@
+Phase 13 -- Toolchain Maturity Closeout
+=======================================
+
+Status
+------
+COMPLETED (repository-bounded first wave)
+
+Purpose
+-------
+Record the concrete Phase 13 slice now admitted in this repository so toolchain
+truth lives in a closeout note rather than being inferred from the planning
+document alone.
+
+This is a repository closeout note, not a new architecture phase.
+It closes the bounded first wave described in
+`/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt` without
+claiming that the full long-term Phase 7 contract from `plan.txt` is complete.
+
+What landed
+-----------
+- Phase 13A: existing `.mci` artifacts now form a stricter trust boundary.
+  Project builds fail when interface artifacts are malformed, hash-mismatched,
+  target-mismatched, module-mismatched, or copied from a different source path.
+- Phase 13A: imported interface metadata is validated before sema import
+  consumption rather than being accepted on hash presence alone.
+- Phase 13B: project validation now admits hosted `kind = "test"` targets as
+  executable-like bootstrap artifacts while keeping broader target kinds
+  explicitly deferred.
+- Phase 13B: duplicate target root modules now fail during project validation
+  instead of collapsing into ambiguous graph or artifact behavior later.
+- Phase 13C: `mc test` now enforces `tests.timeout_ms` for ordinary test
+  runners and run-output regression executables, with deterministic timeout
+  reporting in the command surface.
+- Phase 13D: per-module build-state artifacts are now versioned and serialize
+  imported interface hashes deterministically.
+- Phase 13D: stale invalid module state no longer risks unsound object reuse;
+  invalid state falls back to rebuild behavior.
+- Phase 13E: duplicate configured module search roots and duplicate test roots
+  now fail during project validation rather than being silently deduplicated.
+
+Key supporting regressions
+--------------------------
+- `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` now proves:
+  - admitted hosted `test` target build and run behavior
+  - malformed `.mci` rejection
+  - foreign `.mci` contamination rejection across build directories
+  - versioned deterministic module state output
+  - rebuild fallback from invalid stale module state
+  - duplicate configured module roots, duplicate target roots, and timeout
+    reporting for ordinary tests
+- the broader repository CTest suite remained green after the Phase 13 first
+  wave changes, so the maturity tightening did not regress earlier bootstrap
+  proofs outside the tool path
+
+Bounded exclusions kept explicit
+--------------------------------
+- this closeout does not claim static-library or shared-library target maturity
+- this closeout does not claim non-hosted workflow maturity
+- this closeout does not claim full spec-level `func() Error` ordinary-test
+  ergonomics independent of the current repository-owned helper contract
+- this closeout does not claim every long-term Phase 7 exit criterion from the
+  architecture texts is fully closed; it records the repository-bounded first
+  wave actually landed here
+
+Validation
+----------
+- focused tool regression proof via `mc_phase7_tool_unit`
+- broader repository regression proof via the full current CTest suite
+
+Closeout statement
+------------------
+The repository-bounded first Phase 13 wave is complete. The ordinary project
+workflow is materially stricter and more trustworthy than the earlier bootstrap
+Phase 7 slice: interface artifacts fail more honestly, rebuild metadata is more
+deterministic, project configuration errors fail earlier, and `mc test` better
+matches the repository-owned contract through real timeout handling.

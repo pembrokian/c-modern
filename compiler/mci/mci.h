@@ -28,6 +28,13 @@ bool WriteInterfaceArtifact(const std::filesystem::path& path,
 std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::path& path,
                                                        support::DiagnosticSink& diagnostics);
 
+bool ValidateInterfaceArtifactMetadata(const InterfaceArtifact& artifact,
+                                       const std::filesystem::path& artifact_path,
+                                       std::string_view expected_target_identity,
+                                       std::string_view expected_module_name,
+                                       const std::filesystem::path& expected_source_path,
+                                       support::DiagnosticSink& diagnostics);
+
 }  // namespace mc::mci
 
 #endif  // C_MODERN_COMPILER_MCI_MCI_H_

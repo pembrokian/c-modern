@@ -13,6 +13,10 @@ namespace {
 
 using mc::support::DiagnosticSeverity;
 
+bool IsSupportedBootstrapTargetKind(std::string_view kind) {
+    return kind == "exe" || kind == "test";
+}
+
 struct ParsedValue {
     enum class Kind {
         kString,
@@ -61,6 +65,27 @@ void ReportProjectError(const std::filesystem::path& path,
         .severity = DiagnosticSeverity::kError,
         .message = std::move(message),
     });
+}
+
+bool ReportDuplicateConfiguredPaths(const std::filesystem::path& project_path,
+                                   std::string_view target_name,
+                                   std::string_view label,
+                                   const std::vector<std::filesystem::path>& paths,
+                                   support::DiagnosticSink& diagnostics) {
+    std::unordered_set<std::string> seen;
+    for (const auto& path : paths) {
+        const std::string normalized = path.lexically_normal().generic_string();
+        if (!seen.insert(normalized).second) {
+            diagnostics.Report({
+                .file_path = project_path,
+                .span = mc::support::kDefaultSourceSpan,
+                .severity = DiagnosticSeverity::kError,
+                .message = "target '" + std::string(target_name) + "' declares duplicate " + std::string(label) + ": " + normalized,
+            });
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string StripComment(std::string_view line) {
@@ -578,7 +603,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
     }
 
     for (auto& [name, target] : project.targets) {
-        if (target.kind != "exe") {
+        if (!IsSupportedBootstrapTargetKind(target.kind)) {
             diagnostics.Report({
                 .file_path = project.path,
                 .span = mc::support::kDefaultSourceSpan,
@@ -626,12 +651,39 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         for (auto& test_root : target.tests.roots) {
             test_root = std::filesystem::absolute(project.root_dir / test_root).lexically_normal();
         }
+        ReportDuplicateConfiguredPaths(project.path,
+                                       name,
+                                       "module search path",
+                                       target.module_search_paths,
+                                       diagnostics);
+        ReportDuplicateConfiguredPaths(project.path,
+                                       name,
+                                       "test root",
+                                       target.tests.roots,
+                                       diagnostics);
         if (!IsSupportedMode(target.tests.mode)) {
             diagnostics.Report({
                 .file_path = project.path,
                 .span = mc::support::kDefaultSourceSpan,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' tests use unsupported build mode: " + target.tests.mode,
+            });
+        }
+    }
+
+    std::unordered_map<std::string, std::string> root_to_target;
+    for (const auto& [name, target] : project.targets) {
+        if (target.root.empty()) {
+            continue;
+        }
+        const std::string normalized_root = target.root.lexically_normal().generic_string();
+        const auto [it, inserted] = root_to_target.emplace(normalized_root, name);
+        if (!inserted) {
+            diagnostics.Report({
+                .file_path = project.path,
+                .span = mc::support::kDefaultSourceSpan,
+                .severity = DiagnosticSeverity::kError,
+                .message = "targets '" + it->second + "' and '" + name + "' declare the same root module: " + normalized_root,
             });
         }
     }

@@ -3,7 +3,27 @@ Phase 13 -- Phase 7 Toolchain Maturity
 
 Status
 ------
-PLANNED
+COMPLETED (repository-bounded first wave)
+
+Current execution note
+----------------------
+- The current repository now includes a repository-bounded closeout slice
+  across all five workstreams. See
+  `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_closeout.txt`
+  for the admitted implementation truth.
+- That landed slice covers:
+  - 13A: project builds fail on malformed or metadata-mismatched existing
+    `.mci` artifacts instead of silently repairing them
+  - 13D: per-module build-state artifacts are versioned and serialize imported
+    interface hashes deterministically
+  - 13E: duplicate configured module roots now fail during project validation
+  - 13C: `mc test` enforces `tests.timeout_ms` for ordinary test runners and
+    run-output regression executables, with deterministic timeout reporting
+  - 13B: duplicate target root modules now fail during target validation, and
+    hosted `kind = "test"` targets are now admitted as executable-like
+    bootstrap artifacts
+- This closeout is repository-bounded, not evidence that every long-term Phase
+  7 architecture obligation is fully closed.
 
 Repository status note
 ----------------------
@@ -132,8 +152,8 @@ Current repository posture
   target selection rules, a narrow manifest-driven compiler-regression path,
   and generated ordinary test runners.
 - The current tree still does not claim non-hosted workflow maturity,
-  broader target kinds, full spec-level ordinary test ergonomics, or timeout
-  enforcement.
+  static-library or shared-library target maturity, or full spec-level
+  ordinary test ergonomics.
 - Some project and test behavior remains intentionally bootstrap-shaped rather
   than fully trusted as the ordinary long-term toolchain boundary.
 
@@ -264,6 +284,7 @@ Canonical artifacts
 Phase 13 should produce or update the following canonical surfaces:
 
 - `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt`
+- `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_closeout.txt`
 - bounded updates to
   `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
   so the roadmap points to this concrete Phase 13 follow-up plan

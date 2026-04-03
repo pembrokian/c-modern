@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -10,10 +11,15 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <sys/wait.h>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "compiler/ast/ast.h"
 #include "compiler/codegen_llvm/backend.h"
@@ -353,6 +359,16 @@ struct ModuleBuildState {
     std::vector<std::pair<std::string, std::string>> imported_interface_hashes;
 };
 
+constexpr int kModuleBuildStateFormatVersion = 1;
+
+struct ProcessExecutionResult {
+    bool exited = false;
+    int exit_code = -1;
+    bool signaled = false;
+    int signal_number = -1;
+    bool timed_out = false;
+};
+
 struct CompileNode {
     std::string module_name;
     std::filesystem::path source_path;
@@ -450,26 +466,61 @@ std::string JoinCommand(const std::vector<std::string>& args) {
 }
 
 int RunExecutableCommand(const std::filesystem::path& executable_path,
-                         const std::vector<std::string>& arguments) {
+                         const std::vector<std::string>& arguments,
+                         const std::optional<int>& timeout_ms = std::nullopt) {
     std::vector<std::string> command;
     command.reserve(arguments.size() + 1);
     command.push_back(executable_path.generic_string());
     command.insert(command.end(), arguments.begin(), arguments.end());
-    const int raw_status = std::system(JoinCommand(command).c_str());
-    if (raw_status == 0) {
-        return 0;
+
+    std::vector<char*> argv;
+    argv.reserve(command.size() + 1);
+    for (auto& arg : command) {
+        argv.push_back(arg.data());
     }
+    argv.push_back(nullptr);
+
+    const pid_t pid = fork();
+    if (pid < 0) {
+        return 127;
+    }
+    if (pid == 0) {
+        execv(executable_path.c_str(), argv.data());
+        _exit(127);
+    }
+
+    const auto start = std::chrono::steady_clock::now();
+    while (true) {
+        int status = 0;
+        const pid_t wait_result = waitpid(pid, &status, WNOHANG);
+        if (wait_result == pid) {
 #ifdef WIFEXITED
-    if (WIFEXITED(raw_status)) {
-        return WEXITSTATUS(raw_status);
-    }
+            if (WIFEXITED(status)) {
+                return WEXITSTATUS(status);
+            }
 #endif
 #ifdef WIFSIGNALED
-    if (WIFSIGNALED(raw_status)) {
-        return 128 + WTERMSIG(raw_status);
-    }
+            if (WIFSIGNALED(status)) {
+                return 128 + WTERMSIG(status);
+            }
 #endif
-    return raw_status;
+            return status;
+        }
+        if (wait_result < 0) {
+            return 127;
+        }
+
+        if (timeout_ms.has_value() && *timeout_ms > 0) {
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+            if (elapsed >= *timeout_ms) {
+                kill(pid, SIGKILL);
+                waitpid(pid, nullptr, 0);
+                return 124;
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 }
 
 std::optional<ModuleBuildState> LoadModuleBuildState(const std::filesystem::path& path,
@@ -480,6 +531,7 @@ std::optional<ModuleBuildState> LoadModuleBuildState(const std::filesystem::path
     }
 
     ModuleBuildState state;
+    int format_version = 0;
     std::string line;
     while (std::getline(input, line)) {
         if (line.empty()) {
@@ -499,6 +551,20 @@ std::optional<ModuleBuildState> LoadModuleBuildState(const std::filesystem::path
 
         const std::string key = line.substr(0, tab);
         const std::string value = line.substr(tab + 1);
+        if (key == "format") {
+            const auto parsed = support::ParseArrayLength(value);
+            if (!parsed.has_value()) {
+                diagnostics.Report({
+                    .file_path = path,
+                    .span = support::kDefaultSourceSpan,
+                    .severity = support::DiagnosticSeverity::kError,
+                    .message = "invalid module build state format entry",
+                });
+                return std::nullopt;
+            }
+            format_version = static_cast<int>(*parsed);
+            continue;
+        }
         if (key == "target") {
             state.target_identity = value;
             continue;
@@ -539,6 +605,9 @@ std::optional<ModuleBuildState> LoadModuleBuildState(const std::filesystem::path
         }
     }
 
+    if (format_version != kModuleBuildStateFormatVersion) {
+        return std::nullopt;
+    }
     if (state.target_identity.empty() || state.mode.empty() || state.env.empty() || state.source_hash.empty() || state.interface_hash.empty()) {
         return std::nullopt;
     }
@@ -560,13 +629,16 @@ bool WriteModuleBuildState(const std::filesystem::path& path,
         return false;
     }
 
+    output << "format\t" << kModuleBuildStateFormatVersion << '\n';
     output << "target\t" << state.target_identity << '\n';
     output << "mode\t" << state.mode << '\n';
     output << "env\t" << state.env << '\n';
     output << "source_hash\t" << state.source_hash << '\n';
     output << "interface_hash\t" << state.interface_hash << '\n';
     output << "wrap_hosted_main\t" << (state.wrap_hosted_main ? "1" : "0") << '\n';
-    for (const auto& [import_name, hash] : state.imported_interface_hashes) {
+    auto sorted_import_hashes = state.imported_interface_hashes;
+    std::sort(sorted_import_hashes.begin(), sorted_import_hashes.end());
+    for (const auto& [import_name, hash] : sorted_import_hashes) {
         output << "import_hash\t" << import_name << '=' << hash << '\n';
     }
     return static_cast<bool>(output);
@@ -804,6 +876,7 @@ bool WriteModuleInterface(const std::filesystem::path& source_path,
 
 std::optional<ImportedInterfaceData> LoadImportedInterfaces(
     const CompileNode& node,
+    std::string_view target_identity,
     const std::filesystem::path& build_dir,
     support::DiagnosticSink& diagnostics) {
     ImportedInterfaceData imported;
@@ -811,6 +884,14 @@ std::optional<ImportedInterfaceData> LoadImportedInterfaces(
         const auto dump_targets = support::ComputeDumpTargets(import_path, build_dir);
         const auto artifact = mc::mci::LoadInterfaceArtifact(dump_targets.mci, diagnostics);
         if (!artifact.has_value()) {
+            return std::nullopt;
+        }
+        if (!mc::mci::ValidateInterfaceArtifactMetadata(*artifact,
+                                                        dump_targets.mci,
+                                                        target_identity,
+                                                        import_path.stem().string(),
+                                                        import_path,
+                                                        diagnostics)) {
             return std::nullopt;
         }
         imported.modules.emplace(import_name, mc::sema::RewriteImportedModuleSurfaceTypes(artifact->module, import_name));
@@ -833,7 +914,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
 
     for (auto& node : graph.nodes) {
         sema::CheckOptions sema_options;
-        const auto imported_data = LoadImportedInterfaces(node, graph.build_dir, diagnostics);
+        const auto imported_data = LoadImportedInterfaces(node, graph.target_config.triple, graph.build_dir, diagnostics);
         if (!imported_data.has_value()) {
             return std::nullopt;
         }
@@ -878,9 +959,21 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
                                   ShouldReuseModuleObject(*previous_state, current_state, build_targets.object, dump_targets.mci);
 
         bool interface_written = false;
-        const auto previous_interface = std::filesystem::exists(dump_targets.mci)
-                                            ? mc::mci::LoadInterfaceArtifact(dump_targets.mci, diagnostics)
-                                            : std::optional<mc::mci::InterfaceArtifact> {};
+        std::optional<mc::mci::InterfaceArtifact> previous_interface;
+        if (std::filesystem::exists(dump_targets.mci)) {
+            previous_interface = mc::mci::LoadInterfaceArtifact(dump_targets.mci, diagnostics);
+            if (!previous_interface.has_value()) {
+                return std::nullopt;
+            }
+            if (!mc::mci::ValidateInterfaceArtifactMetadata(*previous_interface,
+                                                            dump_targets.mci,
+                                                            graph.target_config.triple,
+                                                            node.source_path.stem().string(),
+                                                            node.source_path,
+                                                            diagnostics)) {
+                return std::nullopt;
+            }
+        }
         const bool interface_changed = !previous_interface.has_value() || previous_interface->interface_hash != interface_hash;
         if (interface_changed) {
             if (!WriteModuleInterface(node.source_path, interface_artifact, graph.build_dir, diagnostics)) {
@@ -1356,8 +1449,14 @@ struct CapturedCommandResult {
     int exit_code = -1;
     bool signaled = false;
     int signal_number = -1;
+    bool timed_out = false;
     std::string output;
 };
+
+CapturedCommandResult RunExecutableCapture(const std::filesystem::path& executable_path,
+                                          const std::vector<std::string>& arguments,
+                                          const std::filesystem::path& output_path,
+                                          const std::optional<int>& timeout_ms);
 
 int RunBuild(const CommandOptions& options);
 
@@ -1724,34 +1823,102 @@ bool RunOrdinaryTestsForTarget(const ProjectFile& project,
     }
 
     const auto artifacts = support::ComputeBuildArtifactTargets(runner_path, build_dir);
-    return RunExecutableCommand(artifacts.executable, {}) == 0;
+    const auto output_path = generated_root / "runner.stdout.txt";
+    const auto run_result = RunExecutableCapture(artifacts.executable, {}, output_path, target.tests.timeout_ms);
+    if (!run_result.output.empty()) {
+        std::cout << run_result.output;
+        if (run_result.output.back() != '\n') {
+            std::cout << '\n';
+        }
+    }
+    if (run_result.timed_out) {
+        std::cout << "TIMEOUT ordinary tests for target " << target.name << " after " << target.tests.timeout_ms.value_or(0) << " ms" << '\n';
+        return false;
+    }
+    return run_result.exited && run_result.exit_code == 0;
 }
 
 CapturedCommandResult RunExecutableCapture(const std::filesystem::path& executable_path,
                                           const std::vector<std::string>& arguments,
-                                          const std::filesystem::path& output_path) {
+                                          const std::filesystem::path& output_path,
+                                          const std::optional<int>& timeout_ms = std::nullopt) {
     std::filesystem::create_directories(output_path.parent_path());
     std::vector<std::string> command;
     command.reserve(arguments.size() + 1);
     command.push_back(executable_path.generic_string());
     command.insert(command.end(), arguments.begin(), arguments.end());
-    const std::string shell = JoinCommand(command) + " >" + QuoteShellArg(output_path.generic_string()) + " 2>&1";
-    const int raw_status = std::system(shell.c_str());
-    CapturedCommandResult result;
-    support::DiagnosticSink diagnostics;
-    result.output = ReadSourceText(output_path, diagnostics).value_or("");
-#ifdef WIFEXITED
-    if (WIFEXITED(raw_status)) {
-        result.exited = true;
-        result.exit_code = WEXITSTATUS(raw_status);
+
+    std::vector<char*> argv;
+    argv.reserve(command.size() + 1);
+    for (auto& arg : command) {
+        argv.push_back(arg.data());
     }
+    argv.push_back(nullptr);
+
+    CapturedCommandResult result;
+
+    const pid_t pid = fork();
+    if (pid < 0) {
+        result.exited = true;
+        result.exit_code = 127;
+        return result;
+    }
+    if (pid == 0) {
+        const int fd = ::open(output_path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
+        if (fd < 0) {
+            _exit(127);
+        }
+        if (dup2(fd, STDOUT_FILENO) < 0 || dup2(fd, STDERR_FILENO) < 0) {
+            close(fd);
+            _exit(127);
+        }
+        close(fd);
+        execv(executable_path.c_str(), argv.data());
+        _exit(127);
+    }
+
+    const auto start = std::chrono::steady_clock::now();
+    while (true) {
+        int status = 0;
+        const pid_t wait_result = waitpid(pid, &status, WNOHANG);
+        if (wait_result == pid) {
+#ifdef WIFEXITED
+            if (WIFEXITED(status)) {
+                result.exited = true;
+                result.exit_code = WEXITSTATUS(status);
+            }
 #endif
 #ifdef WIFSIGNALED
-    if (WIFSIGNALED(raw_status)) {
-        result.signaled = true;
-        result.signal_number = WTERMSIG(raw_status);
-    }
+            if (WIFSIGNALED(status)) {
+                result.signaled = true;
+                result.signal_number = WTERMSIG(status);
+            }
 #endif
+            break;
+        }
+        if (wait_result < 0) {
+            result.exited = true;
+            result.exit_code = 127;
+            break;
+        }
+
+        if (timeout_ms.has_value() && *timeout_ms > 0) {
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+            if (elapsed >= *timeout_ms) {
+                kill(pid, SIGKILL);
+                waitpid(pid, nullptr, 0);
+                result.timed_out = true;
+                result.signaled = true;
+                result.signal_number = SIGKILL;
+                break;
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    support::DiagnosticSink diagnostics;
+    result.output = ReadSourceText(output_path, diagnostics).value_or("");
     return result;
 }
 
@@ -1830,6 +1997,7 @@ bool EvaluateMirCase(const CompilerRegressionCase& regression_case,
 bool EvaluateRunOutputCase(const CompilerRegressionCase& regression_case,
                            const std::vector<std::filesystem::path>& import_roots,
                            const std::filesystem::path& build_dir,
+                           const std::optional<int>& timeout_ms,
                            std::string& failure_detail) {
     support::DiagnosticSink diagnostics;
     CommandOptions options;
@@ -1871,7 +2039,12 @@ bool EvaluateRunOutputCase(const CompilerRegressionCase& regression_case,
     }
     const CapturedCommandResult run_result = RunExecutableCapture(build_targets.executable,
                                                                   {},
-                                                                  build_dir / (support::SanitizeArtifactStem(regression_case.source_path) + ".stdout.txt"));
+                                                                  build_dir / (support::SanitizeArtifactStem(regression_case.source_path) + ".stdout.txt"),
+                                                                  timeout_ms);
+    if (run_result.timed_out) {
+        failure_detail = "test executable timed out after " + std::to_string(timeout_ms.value_or(0)) + " ms";
+        return false;
+    }
     if (!run_result.exited || run_result.exit_code != regression_case.expected_exit_code || run_result.output != *expected) {
         failure_detail = "expected exit code " + std::to_string(regression_case.expected_exit_code) + " and stdout '" + *expected +
                          "', got exit=" + std::to_string(run_result.exit_code) + " stdout='" + run_result.output + "'";
@@ -1882,7 +2055,8 @@ bool EvaluateRunOutputCase(const CompilerRegressionCase& regression_case,
 
 bool RunCompilerRegressionCases(const std::vector<CompilerRegressionCase>& regression_cases,
                                 const std::vector<std::filesystem::path>& import_roots,
-                                const std::filesystem::path& build_dir) {
+                                const std::filesystem::path& build_dir,
+                                const std::optional<int>& timeout_ms) {
     bool ok = true;
     for (std::size_t index = 0; index < regression_cases.size(); ++index) {
         const auto& regression_case = regression_cases[index];
@@ -1901,7 +2075,7 @@ bool RunCompilerRegressionCases(const std::vector<CompilerRegressionCase>& regre
                 break;
             case CompilerRegressionKind::kRunOutput:
                 label = "run-output ";
-                case_ok = EvaluateRunOutputCase(regression_case, import_roots, case_build_dir, failure_detail);
+                case_ok = EvaluateRunOutputCase(regression_case, import_roots, case_build_dir, timeout_ms, failure_detail);
                 break;
             case CompilerRegressionKind::kMir:
                 label = "mir ";
@@ -2321,7 +2495,8 @@ int RunTest(const CommandOptions& options) {
             const auto import_roots = ComputeProjectImportRoots(*project, *target, options.import_roots);
             target_ok = RunCompilerRegressionCases(discovered->regression_cases,
                                                   import_roots,
-                                                  graph->compile_graph.build_dir) && target_ok;
+                                                  graph->compile_graph.build_dir,
+                                                  target->tests.timeout_ms) && target_ok;
         }
         if (discovered->ordinary_tests.empty() && discovered->regression_cases.empty()) {
             std::cout << "no tests discovered for target " << target->name << '\n';
