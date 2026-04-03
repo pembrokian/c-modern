@@ -1437,6 +1437,8 @@ class Parser {
             expr->span = Current().span;
             expr->text = Current().lexeme;
             expr->secondary_text = std::string(mc::lex::ToString(Current().kind));
+            expr->integer_literal_value = Current().integer_value;
+            expr->float_literal_value = Current().float_value;
             Advance();
             return expr;
         }

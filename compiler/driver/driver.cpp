@@ -912,7 +912,6 @@ mc::mci::InterfaceArtifact MakeModuleInterfaceArtifact(const std::filesystem::pa
                                                        const sema::Module& checked_module,
                                                        std::string target_identity) {
     return {
-        .format_version = 2,
         .target_identity = std::move(target_identity),
         .module_name = source_path.stem().string(),
         .source_path = source_path,

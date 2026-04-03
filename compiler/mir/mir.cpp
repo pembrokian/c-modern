@@ -418,6 +418,10 @@ bool HasCompatibleComparisonTypes(const Module& module, const sema::Type& left, 
     return HasCompatibleNumericTypes(module, left, right) || IsAssignableType(module, left, right) || IsAssignableType(module, right, left);
 }
 
+bool AreEquivalentTypes(const Module& module, const sema::Type& left, const sema::Type& right) {
+    return IsAssignableType(module, left, right) && IsAssignableType(module, right, left);
+}
+
 sema::Type RangeElementType(const sema::Type& range_type) {
     if (range_type.kind == sema::Type::Kind::kRange && !range_type.subtypes.empty()) {
         return range_type.subtypes.front();
@@ -2090,7 +2094,7 @@ class FunctionLowerer {
             if (value.type.kind == sema::Type::Kind::kTuple) {
                 for (std::size_t index = 0; index < value.type.subtypes.size(); ++index) {
                     flattened.push_back({
-                        .value = EmitTupleExtractValue(value, index, expr->span),
+                        .value = EmitTupleExtractValue(value , index, expr->span),
                         .span = expr->span,
                     });
                 }
@@ -3962,7 +3966,7 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.target_kind == Instruction::TargetKind::kFunction && !instruction.target_name.empty()) {
                             if (const Function* direct_callee = FindMirFunction(module, instruction.target_name); direct_callee != nullptr &&
-                                !sema::IsUnknown(callee_type) && callee_type != FunctionProcedureType(*direct_callee)) {
+                                !sema::IsUnknown(callee_type) && !AreEquivalentTypes(module, callee_type, FunctionProcedureType(*direct_callee))) {
                                 report("call target metadata type mismatch in function " + function.name + " for " + direct_callee->name);
                             }
                         }
@@ -3980,7 +3984,7 @@ bool ValidateModule(const Module& module,
                                            sema::FormatType(expected) + ", got " + sema::FormatType(actual));
                                 }
                             }
-                            if (instruction.type != ProcedureResultType(callee_type)) {
+                            if (!AreEquivalentTypes(module, instruction.type, ProcedureResultType(callee_type))) {
                                 report("call result type mismatch in function " + function.name + ": expected " +
                                        sema::FormatType(ProcedureResultType(callee_type)) + ", got " + sema::FormatType(instruction.type));
                             }
@@ -4442,7 +4446,7 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.target_kind == Instruction::TargetKind::kFunction) {
                             const Function* callee = FindMirFunction(module, symbol_name);
-                            if (callee != nullptr && instruction.type != FunctionProcedureType(*callee)) {
+                            if (callee != nullptr && !AreEquivalentTypes(module, instruction.type, FunctionProcedureType(*callee))) {
                                 report("symbol_ref function type mismatch in function " + function.name + " for " + callee->name + ": expected " +
                                        sema::FormatType(FunctionProcedureType(*callee)) + ", got " + sema::FormatType(instruction.type));
                             }

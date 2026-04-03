@@ -2,7 +2,9 @@
 #define C_MODERN_COMPILER_SEMA_CHECK_H_
 
 #include <filesystem>
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -49,11 +51,27 @@ struct TypeDeclSummary {
     LayoutInfo layout;
 };
 
+struct ConstValue {
+    enum class Kind {
+        kBool,
+        kInteger,
+        kFloat,
+        kString,
+        kNil,
+    };
+
+    Kind kind = Kind::kInteger;
+    std::int64_t integer_value = 0;
+    double float_value = 0.0;
+    bool bool_value = false;
+    std::string text;
+};
+
 struct GlobalSummary {
     bool is_const = false;
     std::vector<std::string> names;
     Type type;
-    std::vector<std::string> constant_values;
+    std::vector<std::optional<ConstValue>> constant_values;
 };
 
 struct ExprTypeFact {
@@ -71,15 +89,34 @@ struct BindingOrAssignFact {
     std::vector<BindingOrAssignResolution> resolutions;
 };
 
+struct SourceSpanHash {
+    std::size_t operator()(const support::SourceSpan& span) const noexcept {
+        std::size_t hash = 1469598103934665603ull;
+        const auto mix = [&](std::size_t value) {
+            hash ^= value + 0x9e3779b97f4a7c15ull + (hash << 6) + (hash >> 2);
+        };
+        mix(span.begin.line);
+        mix(span.begin.column);
+        mix(span.end.line);
+        mix(span.end.column);
+        return hash;
+    }
+};
+
+struct SourceSpanEqual {
+    bool operator()(const support::SourceSpan& left, const support::SourceSpan& right) const noexcept {
+        return left.begin.line == right.begin.line && left.begin.column == right.begin.column && left.end.line == right.end.line &&
+               left.end.column == right.end.column;
+    }
+};
+
 struct Module {
     std::vector<std::string> imports;
     std::vector<TypeDeclSummary> type_decls;
     std::vector<GlobalSummary> globals;
     std::vector<FunctionSignature> functions;
-    std::vector<ExprTypeFact> expr_types;
-    std::vector<BindingOrAssignFact> binding_or_assign_facts;
-    std::unordered_map<std::string, std::size_t> expr_type_indices;
-    std::unordered_map<std::string, std::size_t> binding_or_assign_indices;
+    std::unordered_map<support::SourceSpan, Type, SourceSpanHash, SourceSpanEqual> expr_types;
+    std::unordered_map<support::SourceSpan, BindingOrAssignFact, SourceSpanHash, SourceSpanEqual> binding_or_assign_facts;
     // Optional name -> index caches for functions and type declarations.
     // BuildModuleLookupMaps() refreshes them after bulk population, but
     // semantic lookups remain correct even if callers mutate the vectors

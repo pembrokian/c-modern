@@ -1,7 +1,10 @@
 #include "compiler/lex/lexer.h"
 
 #include <cctype>
+#include <cstdint>
+#include <limits>
 #include <optional>
+#include <sstream>
 #include <unordered_map>
 
 namespace mc::lex {
@@ -23,6 +26,73 @@ const std::unordered_map<std::string_view, TokenKind> kKeywords = {
     {"const", TokenKind::kConst},       {"nil", TokenKind::kNil},         {"true", TokenKind::kTrue},
     {"false", TokenKind::kFalse},
 };
+
+int DigitValue(char ch) {
+    if (ch >= '0' && ch <= '9') {
+        return ch - '0';
+    }
+    if (ch >= 'a' && ch <= 'f') {
+        return 10 + (ch - 'a');
+    }
+    if (ch >= 'A' && ch <= 'F') {
+        return 10 + (ch - 'A');
+    }
+    return -1;
+}
+
+std::optional<std::int64_t> ParseIntegerLiteralValue(std::string_view text) {
+    if (text.empty()) {
+        return std::nullopt;
+    }
+
+    int base = 10;
+    if (text.size() >= 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) {
+        base = 16;
+        text.remove_prefix(2);
+    }
+    if (text.empty()) {
+        return std::nullopt;
+    }
+
+    std::uint64_t value = 0;
+    bool saw_digit = false;
+    for (const char ch : text) {
+        if (ch == '_') {
+            continue;
+        }
+        const int digit = DigitValue(ch);
+        if (digit < 0 || digit >= base) {
+            return std::nullopt;
+        }
+        saw_digit = true;
+        if (value > (static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - static_cast<std::uint64_t>(digit)) /
+                        static_cast<std::uint64_t>(base)) {
+            return std::nullopt;
+        }
+        value = (value * static_cast<std::uint64_t>(base)) + static_cast<std::uint64_t>(digit);
+    }
+    if (!saw_digit) {
+        return std::nullopt;
+    }
+    return static_cast<std::int64_t>(value);
+}
+
+std::optional<double> ParseFloatLiteralValue(std::string_view text) {
+    std::string normalized;
+    normalized.reserve(text.size());
+    for (const char ch : text) {
+        if (ch != '_') {
+            normalized.push_back(ch);
+        }
+    }
+    std::istringstream stream {normalized};
+    double value = 0.0;
+    stream >> value;
+    if (!stream || !stream.eof()) {
+        return std::nullopt;
+    }
+    return value;
+}
 
 class Lexer {
   public:
@@ -223,11 +293,18 @@ class Lexer {
             }
         }
 
-        return {
+        const std::string lexeme = std::string(source_text_.substr(start_index, index_ - start_index));
+        Token token {
             .kind = is_float ? TokenKind::kFloatLiteral : TokenKind::kIntLiteral,
-            .lexeme = std::string(source_text_.substr(start_index, index_ - start_index)),
+            .lexeme = lexeme,
             .span = {start_position, CurrentPosition()},
         };
+        if (is_float) {
+            token.float_value = ParseFloatLiteralValue(lexeme);
+        } else {
+            token.integer_value = ParseIntegerLiteralValue(lexeme);
+        }
+        return token;
     }
 
     void ConsumeDigitSequence(bool& ok,

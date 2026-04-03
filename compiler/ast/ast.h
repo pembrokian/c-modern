@@ -1,7 +1,9 @@
 #ifndef C_MODERN_COMPILER_AST_AST_H_
 #define C_MODERN_COMPILER_AST_AST_H_
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -109,7 +111,8 @@ struct DefaultCase : Node {
 // Field usage by Kind:
 //   kName            : text = identifier name
 //   kQualifiedName   : text = module name, secondary_text = member name
-//   kLiteral         : text = literal token text, secondary_text = literal token kind name
+//   kLiteral         : text = literal token text, secondary_text = literal token kind name,
+//                      integer_literal_value/float_literal_value = decoded numeric payload when present
 //   kUnary           : text = operator, left = operand
 //   kBinary          : text = operator, left = lhs, right = rhs
 //   kRange           : left = begin, right = end (nullptr means open end)
@@ -148,6 +151,8 @@ struct Expr : Node {
     Kind kind = Kind::kName;
     std::string text;
     std::string secondary_text;
+    std::optional<std::int64_t> integer_literal_value;
+    std::optional<double> float_literal_value;
     std::vector<std::unique_ptr<TypeExpr>> type_args;
     std::unique_ptr<TypeExpr> type_target;
     std::vector<std::unique_ptr<Expr>> args;

@@ -1,6 +1,9 @@
 #include "compiler/mci/mci.h"
 
+#include "compiler/sema/type_predicates.h"
+
 #include <algorithm>
+#include <charconv>
 #include <cctype>
 #include <cstdint>
 #include <fstream>
@@ -13,7 +16,7 @@ namespace {
 
 using mc::support::DiagnosticSeverity;
 
-constexpr int kFormatVersion = 2;
+constexpr int kFormatVersion = 3;
 
 bool ParseBoolField(std::string_view text, bool& value);
 
@@ -92,6 +95,34 @@ std::string JoinEscaped(const std::vector<std::string>& values) {
     return stream.str();
 }
 
+std::string SerializeConstValue(const std::optional<sema::ConstValue>& value) {
+    if (!value.has_value()) {
+        return {};
+    }
+    switch (value->kind) {
+        case sema::ConstValue::Kind::kBool:
+            return std::string("b:") + (value->bool_value ? "1" : "0");
+        case sema::ConstValue::Kind::kInteger:
+            return "i:" + std::to_string(value->integer_value);
+        case sema::ConstValue::Kind::kFloat:
+            return "f:" + value->text;
+        case sema::ConstValue::Kind::kString:
+            return "s:" + value->text;
+        case sema::ConstValue::Kind::kNil:
+            return "n:";
+    }
+    return {};
+}
+
+std::string JoinConstValues(const std::vector<std::optional<sema::ConstValue>>& values) {
+    std::vector<std::string> encoded;
+    encoded.reserve(values.size());
+    for (const auto& value : values) {
+        encoded.push_back(SerializeConstValue(value));
+    }
+    return JoinEscaped(encoded);
+}
+
 std::string JoinBoolFlags(const std::vector<bool>& values) {
     std::ostringstream stream;
     for (std::size_t index = 0; index < values.size(); ++index) {
@@ -163,6 +194,170 @@ std::optional<std::vector<std::string>> SplitEscaped(std::string_view text) {
         values.push_back(current);
     }
     return values;
+}
+
+std::optional<std::int64_t> ParseInt64(std::string_view text) {
+    std::int64_t value = 0;
+    const char* begin = text.data();
+    const char* end = text.data() + text.size();
+    const auto [ptr, ec] = std::from_chars(begin, end, value);
+    if (ec != std::errc {} || ptr != end) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::optional<double> ParseFloat64(std::string_view text) {
+    std::istringstream stream {std::string(text)};
+    double value = 0.0;
+    stream >> value;
+    if (!stream || !stream.eof()) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::optional<sema::ConstValue> ParseConstValue(std::string_view text) {
+    if (text.empty()) {
+        return std::nullopt;
+    }
+    if (text.size() < 2 || text[1] != ':') {
+        return std::nullopt;
+    }
+    sema::ConstValue value;
+    switch (text[0]) {
+        case 'b':
+            if (text.substr(2) != "0" && text.substr(2) != "1") {
+                return std::nullopt;
+            }
+            value.kind = sema::ConstValue::Kind::kBool;
+            value.bool_value = text.substr(2) == "1";
+            value.text = value.bool_value ? "true" : "false";
+            return value;
+        case 'i': {
+            const auto parsed = ParseInt64(text.substr(2));
+            if (!parsed.has_value()) {
+                return std::nullopt;
+            }
+            value.kind = sema::ConstValue::Kind::kInteger;
+            value.integer_value = *parsed;
+            value.text = std::to_string(*parsed);
+            return value;
+        }
+        case 'f': {
+            const auto parsed = ParseFloat64(text.substr(2));
+            if (!parsed.has_value()) {
+                return std::nullopt;
+            }
+            value.kind = sema::ConstValue::Kind::kFloat;
+            value.float_value = *parsed;
+            value.text = std::string(text.substr(2));
+            return value;
+        }
+        case 's':
+            value.kind = sema::ConstValue::Kind::kString;
+            value.text = std::string(text.substr(2));
+            return value;
+        case 'n':
+            if (text.size() != 2) {
+                return std::nullopt;
+            }
+            value.kind = sema::ConstValue::Kind::kNil;
+            value.text = "nil";
+            return value;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::vector<std::optional<sema::ConstValue>>> ParseConstValues(std::string_view text) {
+    const auto values = SplitEscaped(text);
+    if (!values.has_value()) {
+        return std::nullopt;
+    }
+    std::vector<std::optional<sema::ConstValue>> parsed;
+    parsed.reserve(values->size());
+    for (const auto& value : *values) {
+        if (value.empty()) {
+            parsed.push_back(std::nullopt);
+            continue;
+        }
+        const auto decoded = ParseConstValue(value);
+        if (!decoded.has_value()) {
+            return std::nullopt;
+        }
+        parsed.push_back(*decoded);
+    }
+    return parsed;
+}
+
+std::optional<sema::ConstValue> ParseLegacyConstValue(const sema::Type& type, std::string_view text) {
+    sema::ConstValue value;
+    const sema::Type canonical = sema::CanonicalizeBuiltinType(type);
+    if (canonical.kind == sema::Type::Kind::kBool) {
+        if (text != "true" && text != "false") {
+            return std::nullopt;
+        }
+        value.kind = sema::ConstValue::Kind::kBool;
+        value.bool_value = text == "true";
+        value.text = std::string(text);
+        return value;
+    }
+    if (canonical.kind == sema::Type::Kind::kString) {
+        value.kind = sema::ConstValue::Kind::kString;
+        value.text = std::string(text);
+        return value;
+    }
+    if (canonical.kind == sema::Type::Kind::kNil) {
+        if (text != "nil") {
+            return std::nullopt;
+        }
+        value.kind = sema::ConstValue::Kind::kNil;
+        value.text = "nil";
+        return value;
+    }
+    if (canonical.kind == sema::Type::Kind::kNamed && sema::IsIntegerTypeName(canonical.name)) {
+        const auto parsed = ParseInt64(text);
+        if (!parsed.has_value()) {
+            return std::nullopt;
+        }
+        value.kind = sema::ConstValue::Kind::kInteger;
+        value.integer_value = *parsed;
+        value.text = std::to_string(*parsed);
+        return value;
+    }
+    if (canonical.kind == sema::Type::Kind::kNamed && sema::IsFloatTypeName(canonical.name)) {
+        const auto parsed = ParseFloat64(text);
+        if (!parsed.has_value()) {
+            return std::nullopt;
+        }
+        value.kind = sema::ConstValue::Kind::kFloat;
+        value.float_value = *parsed;
+        value.text = std::string(text);
+        return value;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::vector<std::optional<sema::ConstValue>>> ParseLegacyConstValues(const sema::Type& type, std::string_view text) {
+    const auto values = SplitEscaped(text);
+    if (!values.has_value()) {
+        return std::nullopt;
+    }
+    std::vector<std::optional<sema::ConstValue>> parsed;
+    parsed.reserve(values->size());
+    for (const auto& value : *values) {
+        if (value.empty()) {
+            parsed.push_back(std::nullopt);
+            continue;
+        }
+        const auto decoded = ParseLegacyConstValue(type, value);
+        if (!decoded.has_value()) {
+            return std::nullopt;
+        }
+        parsed.push_back(*decoded);
+    }
+    return parsed;
 }
 
 std::optional<std::vector<bool>> SplitBoolFlags(std::string_view text) {
@@ -626,7 +821,7 @@ std::string SerializeArtifactWithoutHash(const InterfaceArtifact& artifact) {
         output << "global\t" << (global.is_const ? "1" : "0")
                << '\t' << JoinEscaped(global.names)
                << '\t' << EscapeText(sema::FormatType(global.type))
-               << '\t' << JoinEscaped(global.constant_values)
+               << '\t' << JoinConstValues(global.constant_values)
                << '\n';
     }
 
@@ -948,7 +1143,11 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
             const auto names = SplitEscaped(fields[2]);
             const auto type_text = UnescapeText(fields[3]);
             const auto type = type_text.has_value() ? ParseTypeText(*type_text) : std::nullopt;
-            const auto constant_values = fields.size() == 5 ? SplitEscaped(fields[4]) : std::optional<std::vector<std::string>> {std::vector<std::string> {}};
+            const auto constant_values = fields.size() == 5
+                                             ? (artifact.format_version == 2 ? ParseLegacyConstValues(*type, fields[4]) : ParseConstValues(fields[4]))
+                                             : std::optional<std::vector<std::optional<sema::ConstValue>>> {
+                                                   std::vector<std::optional<sema::ConstValue>> {}
+                                               };
             if (!names.has_value() || !type.has_value() || !constant_values.has_value() || !ParseBoolField(fields[1], global.is_const)) {
                 ReportMciError(path, line_number, "invalid global payload in interface artifact", diagnostics);
                 return std::nullopt;
@@ -976,7 +1175,7 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
         return std::nullopt;
     }
 
-    if (artifact.format_version != 1 && artifact.format_version != kFormatVersion) {
+    if (artifact.format_version != 1 && artifact.format_version != 2 && artifact.format_version != kFormatVersion) {
         diagnostics.Report({
             .file_path = path,
             .span = mc::support::kDefaultSourceSpan,

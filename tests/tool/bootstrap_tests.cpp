@@ -110,7 +110,11 @@ void TestMciRoundTrip() {
     global.is_const = true;
     global.names = {"answer_seed"};
     global.type = mc::sema::NamedType("i32");
-    global.constant_values = {"42"};
+    global.constant_values = {mc::sema::ConstValue {
+        .kind = mc::sema::ConstValue::Kind::kInteger,
+        .integer_value = 42,
+        .text = "42",
+    }};
     module.globals.push_back(std::move(global));
 
     mc::support::DiagnosticSink diagnostics;
@@ -138,8 +142,10 @@ void TestMciRoundTrip() {
             "mci loader should preserve exported function parameter attributes");
     Expect(loaded->module.type_decls.size() == 1 && loaded->module.type_decls[0].name == "Pair",
            "mci loader should preserve exported type declarations");
-        Expect(loaded->module.globals.size() == 1 && loaded->module.globals[0].constant_values.size() == 1 &&
-             loaded->module.globals[0].constant_values[0] == "42",
+           Expect(loaded->module.globals.size() == 1 && loaded->module.globals[0].constant_values.size() == 1 &&
+               loaded->module.globals[0].constant_values[0].has_value() &&
+               loaded->module.globals[0].constant_values[0]->kind == mc::sema::ConstValue::Kind::kInteger &&
+               loaded->module.globals[0].constant_values[0]->integer_value == 42,
             "mci loader should preserve exported compile-time constant values");
     Expect(!loaded->interface_hash.empty(), "mci loader should preserve interface hashes");
 

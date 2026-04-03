@@ -1,6 +1,8 @@
 #ifndef C_MODERN_COMPILER_LEX_TOKEN_H_
 #define C_MODERN_COMPILER_LEX_TOKEN_H_
 
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -76,6 +78,8 @@ enum class TokenKind {
 struct Token {
     TokenKind kind = TokenKind::kEof;
     std::string lexeme;
+    std::optional<std::int64_t> integer_value;
+    std::optional<double> float_value;
     support::SourceSpan span {};
 };
 

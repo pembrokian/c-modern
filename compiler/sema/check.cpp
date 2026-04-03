@@ -40,22 +40,6 @@ enum class VisitState {
     kDone,
 };
 
-struct ConstValue {
-    enum class Kind {
-        kBool,
-        kInteger,
-        kFloat,
-        kString,
-        kNil,
-    };
-
-    Kind kind = Kind::kInteger;
-    std::int64_t integer_value = 0;
-    double float_value = 0.0;
-    bool bool_value = false;
-    std::string text;
-};
-
 using ImportedModules = std::unordered_map<std::string, Module>;
 
 std::optional<std::int64_t> CheckedAddInt64(std::int64_t lhs, std::int64_t rhs) {
@@ -118,73 +102,6 @@ std::optional<std::int64_t> CheckedShiftRightInt64(std::int64_t lhs, std::int64_
     return lhs >> rhs;
 }
 
-int DigitValue(char ch) {
-    if (ch >= '0' && ch <= '9') {
-        return ch - '0';
-    }
-    if (ch >= 'a' && ch <= 'f') {
-        return 10 + (ch - 'a');
-    }
-    if (ch >= 'A' && ch <= 'F') {
-        return 10 + (ch - 'A');
-    }
-    return -1;
-}
-
-std::optional<std::int64_t> ParseIntegerLiteral(std::string_view text) {
-    if (text.empty()) {
-        return std::nullopt;
-    }
-
-    int base = 10;
-    if (text.size() >= 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) {
-        base = 16;
-        text.remove_prefix(2);
-    }
-    if (text.empty()) {
-        return std::nullopt;
-    }
-
-    std::uint64_t value = 0;
-    bool saw_digit = false;
-    for (const char ch : text) {
-        if (ch == '_') {
-            continue;
-        }
-        const int digit = DigitValue(ch);
-        if (digit < 0 || digit >= base) {
-            return std::nullopt;
-        }
-        saw_digit = true;
-        if (value > (static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) - static_cast<std::uint64_t>(digit)) /
-                        static_cast<std::uint64_t>(base)) {
-            return std::nullopt;
-        }
-        value = (value * static_cast<std::uint64_t>(base)) + static_cast<std::uint64_t>(digit);
-    }
-    if (!saw_digit) {
-        return std::nullopt;
-    }
-    return static_cast<std::int64_t>(value);
-}
-
-std::optional<double> ParseFloatLiteral(std::string_view text) {
-    std::string normalized;
-    normalized.reserve(text.size());
-    for (const char ch : text) {
-        if (ch != '_') {
-            normalized.push_back(ch);
-        }
-    }
-    std::istringstream stream {normalized};
-    double value = 0.0;
-    stream >> value;
-    if (!stream || !stream.eof()) {
-        return std::nullopt;
-    }
-    return value;
-}
-
 std::string RenderConstValue(const ConstValue& value) {
     switch (value.kind) {
         case ConstValue::Kind::kBool:
@@ -205,51 +122,221 @@ std::string RenderConstValue(const ConstValue& value) {
     return "?";
 }
 
+ConstValue MakeConstValue(bool value) {
+    ConstValue result;
+    result.kind = ConstValue::Kind::kBool;
+    result.bool_value = value;
+    result.text = RenderConstValue(result);
+    return result;
+}
+
+ConstValue MakeConstValue(std::int64_t value) {
+    ConstValue result;
+    result.kind = ConstValue::Kind::kInteger;
+    result.integer_value = value;
+    result.text = RenderConstValue(result);
+    return result;
+}
+
+ConstValue MakeConstValue(double value) {
+    ConstValue result;
+    result.kind = ConstValue::Kind::kFloat;
+    result.float_value = value;
+    result.text = RenderConstValue(result);
+    return result;
+}
+
+std::optional<ConstValue> ParseLiteralConstValue(const Expr& expr) {
+    if (expr.text == "true") {
+        return MakeConstValue(true);
+    }
+    if (expr.text == "false") {
+        return MakeConstValue(false);
+    }
+    if (expr.text == "nil") {
+        ConstValue value;
+        value.kind = ConstValue::Kind::kNil;
+        value.text = "nil";
+        return value;
+    }
+    if (!expr.text.empty() && expr.text.front() == '"') {
+        ConstValue value;
+        value.kind = ConstValue::Kind::kString;
+        value.text = expr.text;
+        return value;
+    }
+    if (expr.float_literal_value.has_value()) {
+        return MakeConstValue(*expr.float_literal_value);
+    }
+    if (expr.integer_literal_value.has_value()) {
+        return MakeConstValue(*expr.integer_literal_value);
+    }
+    return std::nullopt;
+}
+
+using CheckedIntBinaryOp = std::optional<std::int64_t> (*)(std::int64_t, std::int64_t);
+
+struct IntBinaryOpEntry {
+    std::string_view op;
+    CheckedIntBinaryOp evaluate;
+};
+
+constexpr IntBinaryOpEntry kConstIntegerBinaryOps[] = {
+    {"+", CheckedAddInt64},
+    {"-", CheckedSubInt64},
+    {"*", CheckedMulInt64},
+    {"/", CheckedDivideInt64},
+    {"%", CheckedRemainderInt64},
+    {"<<", CheckedShiftLeftInt64},
+    {">>", CheckedShiftRightInt64},
+};
+
+CheckedIntBinaryOp FindConstIntegerBinaryOp(std::string_view op) {
+    for (const auto& entry : kConstIntegerBinaryOps) {
+        if (entry.op == op) {
+            return entry.evaluate;
+        }
+    }
+    return nullptr;
+}
+
+std::optional<ConstValue> EvaluateConstUnaryOp(std::string_view op, ConstValue value) {
+    if (op == "+") {
+        return value.kind == ConstValue::Kind::kInteger || value.kind == ConstValue::Kind::kFloat ? std::optional<ConstValue>(value)
+                                                                                                    : std::nullopt;
+    }
+    if (op == "-") {
+        if (value.kind == ConstValue::Kind::kInteger) {
+            const auto negated = CheckedNegateInt64(value.integer_value);
+            return negated.has_value() ? std::optional<ConstValue>(MakeConstValue(*negated)) : std::nullopt;
+        }
+        if (value.kind == ConstValue::Kind::kFloat) {
+            return MakeConstValue(-value.float_value);
+        }
+        return std::nullopt;
+    }
+    if (op == "!") {
+        return value.kind == ConstValue::Kind::kBool ? std::optional<ConstValue>(MakeConstValue(!value.bool_value)) : std::nullopt;
+    }
+    return std::nullopt;
+}
+
+bool IsConstComparisonOp(std::string_view op) {
+    return op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=";
+}
+
+bool EvaluateOrderedComparison(std::string_view op, double lhs, double rhs) {
+    if (op == "==") {
+        return lhs == rhs;
+    }
+    if (op == "!=") {
+        return lhs != rhs;
+    }
+    if (op == "<") {
+        return lhs < rhs;
+    }
+    if (op == ">") {
+        return lhs > rhs;
+    }
+    if (op == "<=") {
+        return lhs <= rhs;
+    }
+    return lhs >= rhs;
+}
+
+bool EvaluateOrderedComparison(std::string_view op, std::int64_t lhs, std::int64_t rhs) {
+    if (op == "==") {
+        return lhs == rhs;
+    }
+    if (op == "!=") {
+        return lhs != rhs;
+    }
+    if (op == "<") {
+        return lhs < rhs;
+    }
+    if (op == ">") {
+        return lhs > rhs;
+    }
+    if (op == "<=") {
+        return lhs <= rhs;
+    }
+    return lhs >= rhs;
+}
+
+std::optional<ConstValue> EvaluateConstComparison(std::string_view op, const ConstValue& left, const ConstValue& right) {
+    if (!IsConstComparisonOp(op)) {
+        return std::nullopt;
+    }
+    if (left.kind == ConstValue::Kind::kFloat || right.kind == ConstValue::Kind::kFloat) {
+        const double lhs = left.kind == ConstValue::Kind::kFloat ? left.float_value : left.integer_value;
+        const double rhs = right.kind == ConstValue::Kind::kFloat ? right.float_value : right.integer_value;
+        return MakeConstValue(EvaluateOrderedComparison(op, lhs, rhs));
+    }
+    if (left.kind != ConstValue::Kind::kInteger || right.kind != ConstValue::Kind::kInteger) {
+        return std::nullopt;
+    }
+    return MakeConstValue(EvaluateOrderedComparison(op, left.integer_value, right.integer_value));
+}
+
+std::optional<ConstValue> EvaluateConstLogicalBinary(std::string_view op, const ConstValue& left, const ConstValue& right) {
+    if ((op != "&&" && op != "||") || left.kind != ConstValue::Kind::kBool || right.kind != ConstValue::Kind::kBool) {
+        return std::nullopt;
+    }
+    return MakeConstValue(op == "&&" ? (left.bool_value && right.bool_value) : (left.bool_value || right.bool_value));
+}
+
+std::optional<ConstValue> EvaluateConstFloatBinary(std::string_view op, double lhs, double rhs) {
+    if (op == "/" && rhs == 0.0) {
+        return std::nullopt;
+    }
+    if (op == "+") {
+        return MakeConstValue(lhs + rhs);
+    }
+    if (op == "-") {
+        return MakeConstValue(lhs - rhs);
+    }
+    if (op == "*") {
+        return MakeConstValue(lhs * rhs);
+    }
+    if (op == "/") {
+        return MakeConstValue(lhs / rhs);
+    }
+    return std::nullopt;
+}
+
+std::optional<ConstValue> EvaluateConstBinaryOp(std::string_view op, const ConstValue& left, const ConstValue& right) {
+    if (const auto logical = EvaluateConstLogicalBinary(op, left, right); logical.has_value()) {
+        return logical;
+    }
+    if (const auto comparison = EvaluateConstComparison(op, left, right); comparison.has_value()) {
+        return comparison;
+    }
+    if (left.kind == ConstValue::Kind::kFloat || right.kind == ConstValue::Kind::kFloat) {
+        const double lhs = left.kind == ConstValue::Kind::kFloat ? left.float_value : left.integer_value;
+        const double rhs = right.kind == ConstValue::Kind::kFloat ? right.float_value : right.integer_value;
+        return EvaluateConstFloatBinary(op, lhs, rhs);
+    }
+    if (left.kind != ConstValue::Kind::kInteger || right.kind != ConstValue::Kind::kInteger) {
+        return std::nullopt;
+    }
+    const CheckedIntBinaryOp evaluate = FindConstIntegerBinaryOp(op);
+    if (evaluate == nullptr) {
+        return std::nullopt;
+    }
+    const auto value = evaluate(left.integer_value, right.integer_value);
+    return value.has_value() ? std::optional<ConstValue>(MakeConstValue(*value)) : std::nullopt;
+}
+
 std::optional<ConstValue> ParseGlobalConstValue(const GlobalSummary& global, std::string_view name) {
     auto it = std::find(global.names.begin(), global.names.end(), name);
     if (it == global.names.end()) {
         return std::nullopt;
     }
     const std::size_t index = static_cast<std::size_t>(std::distance(global.names.begin(), it));
-    if (index >= global.constant_values.size() || global.constant_values[index].empty()) {
+    if (index >= global.constant_values.size() || !global.constant_values[index].has_value()) {
         return std::nullopt;
     }
-
-    ConstValue value;
-    value.text = global.constant_values[index];
-    const Type type = CanonicalizeBuiltinType(global.type);
-    if (type.kind == Type::Kind::kBool) {
-        value.kind = ConstValue::Kind::kBool;
-        value.bool_value = value.text == "true";
-        return value;
-    }
-    if (type.kind == Type::Kind::kString) {
-        value.kind = ConstValue::Kind::kString;
-        return value;
-    }
-    if (type.kind == Type::Kind::kNil) {
-        value.kind = ConstValue::Kind::kNil;
-        return value;
-    }
-    if (type.kind == Type::Kind::kNamed && mc::sema::IsIntegerTypeName(type.name)) {
-        const auto parsed = ParseIntegerLiteral(value.text);
-        if (!parsed.has_value()) {
-            return std::nullopt;
-        }
-        value.kind = ConstValue::Kind::kInteger;
-        value.integer_value = *parsed;
-        return value;
-    }
-    if (type.kind == Type::Kind::kNamed && mc::sema::IsFloatTypeName(type.name)) {
-        const auto parsed = ParseFloatLiteral(value.text);
-        if (!parsed.has_value()) {
-            return std::nullopt;
-        }
-        value.kind = ConstValue::Kind::kFloat;
-        value.float_value = *parsed;
-        return value;
-    }
-    return std::nullopt;
+    return global.constant_values[index];
 }
 
 std::optional<Type> InferSliceElementType(const Type& type) {
@@ -313,9 +400,18 @@ Type SubstituteTypeParams(Type type, const std::vector<std::string>& type_params
     return type;
 }
 
-Type StripTypeAliasesInternal(Type type, const Module& module, std::unordered_set<std::string>& active_aliases) {
+enum class TypeStripMode {
+    kAliasesOnly,
+    kAliasesAndDistinct,
+};
+
+bool ShouldStripTypeDeclKind(Decl::Kind kind, TypeStripMode mode) {
+    return kind == Decl::Kind::kTypeAlias || (mode == TypeStripMode::kAliasesAndDistinct && kind == Decl::Kind::kDistinct);
+}
+
+Type StripTypeInternal(Type type, const Module& module, TypeStripMode mode, std::unordered_set<std::string>& active_names) {
     for (auto& subtype : type.subtypes) {
-        subtype = StripTypeAliasesInternal(std::move(subtype), module, active_aliases);
+        subtype = StripTypeInternal(std::move(subtype), module, mode, active_names);
     }
 
     if (type.kind != Type::Kind::kNamed) {
@@ -323,11 +419,11 @@ Type StripTypeAliasesInternal(Type type, const Module& module, std::unordered_se
     }
 
     const TypeDeclSummary* type_decl = FindTypeDecl(module, type.name);
-    if (type_decl == nullptr || type_decl->kind != Decl::Kind::kTypeAlias) {
+    if (type_decl == nullptr || !ShouldStripTypeDeclKind(type_decl->kind, mode)) {
         return type;
     }
 
-    if (!active_aliases.insert(type.name).second) {
+    if (!active_names.insert(type.name).second) {
         return type;
     }
 
@@ -335,14 +431,14 @@ Type StripTypeAliasesInternal(Type type, const Module& module, std::unordered_se
     if (!type_decl->type_params.empty()) {
         expanded = SubstituteTypeParams(std::move(expanded), type_decl->type_params, type.subtypes);
     }
-    expanded = StripTypeAliasesInternal(std::move(expanded), module, active_aliases);
-    active_aliases.erase(type.name);
+    expanded = StripTypeInternal(std::move(expanded), module, mode, active_names);
+    active_names.erase(type.name);
     return expanded;
 }
 
-Type StripTypeAliases(Type type, const Module& module) {
-    std::unordered_set<std::string> active_aliases;
-    return StripTypeAliasesInternal(std::move(type), module, active_aliases);
+Type StripType(Type type, const Module& module, TypeStripMode mode) {
+    std::unordered_set<std::string> active_names;
+    return StripTypeInternal(std::move(type), module, mode, active_names);
 }
 
 TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,
@@ -409,41 +505,39 @@ std::size_t AlignTo(std::size_t value, std::size_t alignment) {
 }
 
 bool IsNumericType(const Type& type, const Module& module) {
-    const Type stripped = CanonicalizeBuiltinType(StripTypeAliases(type, module));
+    const Type stripped = CanonicalizeBuiltinType(StripType(type, module, TypeStripMode::kAliasesOnly));
     return mc::sema::IsNumericType(stripped);
 }
 
 bool IsIntegerLikeType(const Type& type, const Module& module) {
-    const Type stripped = CanonicalizeBuiltinType(StripTypeAliases(type, module));
+    const Type stripped = CanonicalizeBuiltinType(StripType(type, module, TypeStripMode::kAliasesOnly));
     return mc::sema::IsIntegerLikeType(stripped);
 }
 
 bool IsBoolType(const Type& type, const Module& module) {
-    const Type stripped = CanonicalizeBuiltinType(StripTypeAliases(type, module));
+    const Type stripped = CanonicalizeBuiltinType(StripType(type, module, TypeStripMode::kAliasesOnly));
     return mc::sema::IsBoolType(stripped);
 }
 
 bool IsPointerLikeType(const Type& type, const Module& module) {
-    return mc::sema::IsPointerLikeType(StripTypeAliases(type, module));
+    return mc::sema::IsPointerLikeType(StripType(type, module, TypeStripMode::kAliasesOnly));
 }
 
 bool IsUintPtrType(const Type& type, const Module& module) {
-    const Type stripped = StripTypeAliases(type, module);
+    const Type stripped = StripType(type, module, TypeStripMode::kAliasesOnly);
     return mc::sema::IsUintPtrType(stripped);
 }
 
-Type StripAliasOrDistinct(Type type, const Module& module);
-
 bool IsNoAliasEligibleType(Type type, const Module& module) {
-    type = StripTypeAliases(std::move(type), module);
+    type = StripType(std::move(type), module, TypeStripMode::kAliasesOnly);
     while (type.kind == Type::Kind::kConst && !type.subtypes.empty()) {
-        type = StripTypeAliases(std::move(type.subtypes.front()), module);
+        type = StripType(std::move(type.subtypes.front()), module, TypeStripMode::kAliasesOnly);
     }
     return mc::sema::IsPointerLikeType(type);
 }
 
 bool IsErrorType(Type type, const Module& module) {
-    type = StripAliasOrDistinct(std::move(type), module);
+    type = StripType(std::move(type), module, TypeStripMode::kAliasesAndDistinct);
     type = CanonicalizeBuiltinType(std::move(type));
     return type.kind == Type::Kind::kNamed && (type.name == "Error" || HasSuffix(type.name, ".Error"));
 }
@@ -466,33 +560,8 @@ bool IsAddressableExpr(const Expr& expr) {
 bool IsAssignable(const Type& expected, const Type& actual, const Module& module);
 bool IsExplicitlyConvertible(const Type& expected, const Type& actual, const Module& module);
 
-Type StripAliasOrDistinct(Type type, const Module& module) {
-    std::unordered_set<std::string> visited;
-    while (type.kind == Type::Kind::kNamed) {
-        type = StripTypeAliases(std::move(type), module);
-        if (type.kind != Type::Kind::kNamed) {
-            break;
-        }
-        if (!visited.insert(type.name).second) {
-            break;
-        }
-
-        const TypeDeclSummary* type_decl = FindTypeDecl(module, type.name);
-        if (type_decl == nullptr) {
-            break;
-        }
-        if (type_decl->kind != Decl::Kind::kDistinct && type_decl->kind != Decl::Kind::kTypeAlias) {
-            break;
-        }
-
-        type = type_decl->aliased_type;
-    }
-
-    return type;
-}
-
 bool IsValidDistinctBaseType(const Type& type, const Module& module) {
-    const Type stripped = CanonicalizeBuiltinType(StripTypeAliases(type, module));
+    const Type stripped = CanonicalizeBuiltinType(StripType(type, module, TypeStripMode::kAliasesOnly));
     if (stripped.kind == Type::Kind::kBool || stripped.kind == Type::Kind::kPointer) {
         return true;
     }
@@ -510,7 +579,7 @@ Type InferExplicitConversionTarget(Type target, const Type& actual, const Module
         }
     }
 
-    const Type stripped_target = StripAliasOrDistinct(target, module);
+    const Type stripped_target = StripType(target, module, TypeStripMode::kAliasesAndDistinct);
     if (stripped_target.kind == Type::Kind::kNamed && stripped_target.name == "Slice" && stripped_target.subtypes.empty()) {
         Type inferred = stripped_target;
         if (const auto element_type = InferSliceElementType(actual); element_type.has_value()) {
@@ -533,8 +602,8 @@ bool IsExplicitlyConvertible(const Type& expected, const Type& actual, const Mod
         }
     }
 
-    const Type stripped_expected = StripAliasOrDistinct(expected, module);
-    const Type stripped_actual = StripAliasOrDistinct(actual, module);
+    const Type stripped_expected = StripType(expected, module, TypeStripMode::kAliasesAndDistinct);
+    const Type stripped_actual = StripType(actual, module, TypeStripMode::kAliasesAndDistinct);
     if (IsAssignable(stripped_expected, stripped_actual, module)) {
         return true;
     }
@@ -570,8 +639,8 @@ Type InferLiteralType(const Expr& expr) {
 }
 
 Type MergeNumericTypes(const Type& left, const Type& right, const Module& module) {
-    const Type stripped_left = CanonicalizeBuiltinType(StripTypeAliases(left, module));
-    const Type stripped_right = CanonicalizeBuiltinType(StripTypeAliases(right, module));
+    const Type stripped_left = CanonicalizeBuiltinType(StripType(left, module, TypeStripMode::kAliasesOnly));
+    const Type stripped_right = CanonicalizeBuiltinType(StripType(right, module, TypeStripMode::kAliasesOnly));
     if (IsUnknown(stripped_left) || IsUnknown(stripped_right)) {
         return UnknownType();
     }
@@ -604,8 +673,8 @@ Type MergeNumericTypes(const Type& left, const Type& right, const Module& module
 }
 
 bool IsAssignable(const Type& expected, const Type& actual, const Module& module) {
-    const Type canonical_expected = CanonicalizeBuiltinType(StripTypeAliases(expected, module));
-    const Type canonical_actual = CanonicalizeBuiltinType(StripTypeAliases(actual, module));
+    const Type canonical_expected = CanonicalizeBuiltinType(StripType(expected, module, TypeStripMode::kAliasesOnly));
+    const Type canonical_actual = CanonicalizeBuiltinType(StripType(actual, module, TypeStripMode::kAliasesOnly));
     if (IsUnknown(canonical_expected) || IsUnknown(canonical_actual)) {
         return true;
     }
@@ -660,16 +729,6 @@ void WriteLine(std::ostringstream& stream, int indent, const std::string& text) 
     stream << text << '\n';
 }
 
-bool SameSpan(const mc::support::SourceSpan& left, const mc::support::SourceSpan& right) {
-    return left.begin.line == right.begin.line && left.begin.column == right.begin.column && left.end.line == right.end.line &&
-           left.end.column == right.end.column;
-}
-
-std::string SpanKey(const mc::support::SourceSpan& span) {
-    return std::to_string(span.begin.line) + ":" + std::to_string(span.begin.column) + "-" + std::to_string(span.end.line) + ":" +
-           std::to_string(span.end.column);
-}
-
 class Checker {
   public:
     Checker(const ast::SourceFile& source_file,
@@ -690,14 +749,13 @@ class Checker {
         //   1. SeedImportedSymbols  — must run first; populates value_symbols_
         //      and type_symbols_ from imported modules so that CollectTopLevelDecls
         //      can detect conflicts with exported names.
-        //   2. CollectTopLevelDecls — builds function_map_ and type_map_.  Both
-        //      tables are incomplete until this phase finishes; no other phase
-        //      may query them before this point.
+        //   2. CollectTopLevelDecls — populates the module's top-level summaries.
+        //      Type and function lookup before this point is incomplete.
         //   3. ValidateTypeDecls   — validates struct/enum/distinct/alias fields
         //      and triggers ComputeTypeLayouts.
         //   4. ValidateGlobals     — checks global const/var declarations.
         //   5. ValidateFunctions   — type-checks function bodies using the fully
-        //      populated function_map_ and type_map_.
+        //      populated module summary.
         SeedImportedSymbols();
         CollectTopLevelDecls();
         ValidateExportBlock();
@@ -816,39 +874,8 @@ class Checker {
                     }
                 }
                 return std::nullopt;
-            case Expr::Kind::kLiteral: {
-                ConstValue value;
-                value.text = expr.text;
-                if (expr.text == "true" || expr.text == "false") {
-                    value.kind = ConstValue::Kind::kBool;
-                    value.bool_value = expr.text == "true";
-                    return value;
-                }
-                if (expr.text == "nil") {
-                    value.kind = ConstValue::Kind::kNil;
-                    return value;
-                }
-                if (!expr.text.empty() && expr.text.front() == '"') {
-                    value.kind = ConstValue::Kind::kString;
-                    return value;
-                }
-                if (expr.text.find_first_of(".eE") != std::string::npos) {
-                    const auto parsed = ParseFloatLiteral(expr.text);
-                    if (!parsed.has_value()) {
-                        return std::nullopt;
-                    }
-                    value.kind = ConstValue::Kind::kFloat;
-                    value.float_value = *parsed;
-                    return value;
-                }
-                const auto parsed = ParseIntegerLiteral(expr.text);
-                if (!parsed.has_value()) {
-                    return std::nullopt;
-                }
-                value.kind = ConstValue::Kind::kInteger;
-                value.integer_value = *parsed;
-                return value;
-            }
+            case Expr::Kind::kLiteral:
+                return ParseLiteralConstValue(expr);
             case Expr::Kind::kUnary: {
                 if (expr.left == nullptr) {
                     return std::nullopt;
@@ -857,39 +884,7 @@ class Checker {
                 if (!operand.has_value()) {
                     return std::nullopt;
                 }
-                ConstValue value = *operand;
-                if (expr.text == "+") {
-                    if (value.kind == ConstValue::Kind::kInteger || value.kind == ConstValue::Kind::kFloat) {
-                        return value;
-                    }
-                    return std::nullopt;
-                }
-                if (expr.text == "-") {
-                    if (value.kind == ConstValue::Kind::kInteger) {
-                        const auto negated = CheckedNegateInt64(value.integer_value);
-                        if (!negated.has_value()) {
-                            return std::nullopt;
-                        }
-                        value.integer_value = *negated;
-                        value.text = RenderConstValue(value);
-                        return value;
-                    }
-                    if (value.kind == ConstValue::Kind::kFloat) {
-                        value.float_value = -value.float_value;
-                        value.text = RenderConstValue(value);
-                        return value;
-                    }
-                    return std::nullopt;
-                }
-                if (expr.text == "!") {
-                    if (value.kind != ConstValue::Kind::kBool) {
-                        return std::nullopt;
-                    }
-                    value.bool_value = !value.bool_value;
-                    value.text = RenderConstValue(value);
-                    return value;
-                }
-                return std::nullopt;
+                return EvaluateConstUnaryOp(expr.text, *operand);
             }
             case Expr::Kind::kBinary: {
                 if (expr.left == nullptr || expr.right == nullptr) {
@@ -900,121 +895,7 @@ class Checker {
                 if (!left.has_value() || !right.has_value()) {
                     return std::nullopt;
                 }
-
-                ConstValue result;
-                if (expr.text == "&&" || expr.text == "||") {
-                    if (left->kind != ConstValue::Kind::kBool || right->kind != ConstValue::Kind::kBool) {
-                        return std::nullopt;
-                    }
-                    result.kind = ConstValue::Kind::kBool;
-                    result.bool_value = expr.text == "&&" ? (left->bool_value && right->bool_value)
-                                                            : (left->bool_value || right->bool_value);
-                    result.text = RenderConstValue(result);
-                    return result;
-                }
-
-                const bool floating = left->kind == ConstValue::Kind::kFloat || right->kind == ConstValue::Kind::kFloat;
-                if (expr.text == "==" || expr.text == "!=" || expr.text == "<" || expr.text == ">" || expr.text == "<=" ||
-                    expr.text == ">=") {
-                    result.kind = ConstValue::Kind::kBool;
-                    if (floating) {
-                        const double lhs = left->kind == ConstValue::Kind::kFloat ? left->float_value : left->integer_value;
-                        const double rhs = right->kind == ConstValue::Kind::kFloat ? right->float_value : right->integer_value;
-                        result.bool_value = expr.text == "=="   ? lhs == rhs
-                                            : expr.text == "!=" ? lhs != rhs
-                                            : expr.text == "<"  ? lhs < rhs
-                                            : expr.text == ">"  ? lhs > rhs
-                                            : expr.text == "<=" ? lhs <= rhs
-                                                                 : lhs >= rhs;
-                        result.text = RenderConstValue(result);
-                        return result;
-                    }
-                    if (left->kind == ConstValue::Kind::kInteger && right->kind == ConstValue::Kind::kInteger) {
-                        const std::int64_t lhs = left->integer_value;
-                        const std::int64_t rhs = right->integer_value;
-                        result.bool_value = expr.text == "=="   ? lhs == rhs
-                                            : expr.text == "!=" ? lhs != rhs
-                                            : expr.text == "<"  ? lhs < rhs
-                                            : expr.text == ">"  ? lhs > rhs
-                                            : expr.text == "<=" ? lhs <= rhs
-                                                                 : lhs >= rhs;
-                        result.text = RenderConstValue(result);
-                        return result;
-                    }
-                    return std::nullopt;
-                }
-
-                if (floating) {
-                    const double lhs = left->kind == ConstValue::Kind::kFloat ? left->float_value : left->integer_value;
-                    const double rhs = right->kind == ConstValue::Kind::kFloat ? right->float_value : right->integer_value;
-                    if (expr.text != "+" && expr.text != "-" && expr.text != "*" && expr.text != "/") {
-                        return std::nullopt;
-                    }
-                    if (expr.text == "/" && rhs == 0.0) {
-                        return std::nullopt;
-                    }
-                    result.kind = ConstValue::Kind::kFloat;
-                    result.float_value = expr.text == "+" ? lhs + rhs
-                                       : expr.text == "-" ? lhs - rhs
-                                       : expr.text == "*" ? lhs * rhs
-                                       : lhs / rhs;
-                    result.text = RenderConstValue(result);
-                    return result;
-                }
-
-                if (left->kind != ConstValue::Kind::kInteger || right->kind != ConstValue::Kind::kInteger) {
-                    return std::nullopt;
-                }
-                const std::int64_t lhs = left->integer_value;
-                const std::int64_t rhs = right->integer_value;
-                result.kind = ConstValue::Kind::kInteger;
-                if (expr.text == "+") {
-                    const auto sum = CheckedAddInt64(lhs, rhs);
-                    if (!sum.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.integer_value = *sum;
-                } else if (expr.text == "-") {
-                    const auto difference = CheckedSubInt64(lhs, rhs);
-                    if (!difference.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.integer_value = *difference;
-                } else if (expr.text == "*") {
-                    const auto product = CheckedMulInt64(lhs, rhs);
-                    if (!product.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.integer_value = *product;
-                } else if (expr.text == "/") {
-                    const auto quotient = CheckedDivideInt64(lhs, rhs);
-                    if (!quotient.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.integer_value = *quotient;
-                } else if (expr.text == "%") {
-                    const auto remainder = CheckedRemainderInt64(lhs, rhs);
-                    if (!remainder.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.integer_value = *remainder;
-                } else if (expr.text == "<<") {
-                    const auto shifted = CheckedShiftLeftInt64(lhs, rhs);
-                    if (!shifted.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.integer_value = *shifted;
-                } else if (expr.text == ">>") {
-                    const auto shifted = CheckedShiftRightInt64(lhs, rhs);
-                    if (!shifted.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.integer_value = *shifted;
-                } else {
-                    return std::nullopt;
-                }
-                result.text = RenderConstValue(result);
-                return result;
+                return EvaluateConstBinaryOp(expr.text, *left, *right);
             }
             case Expr::Kind::kParen:
                 return expr.left != nullptr ? EvaluateConstExpr(*expr.left, report_errors, active_names) : std::nullopt;
@@ -1122,13 +1003,6 @@ class Checker {
                 }
             }
         }
-
-        for (const auto& function : module_->functions) {
-            function_map_[function.name] = &function;
-        }
-        for (const auto& type_decl : module_->type_decls) {
-            type_map_[type_decl.name] = &type_decl;
-        }
     }
 
     void ValidateExportBlock() {
@@ -1192,7 +1066,7 @@ class Checker {
     }
 
     bool IsKnownTypeName(const std::string& name, const std::vector<std::string>& type_params) const {
-        return IsBuiltinNamedType(name) || type_map_.contains(name) ||
+        return IsBuiltinNamedType(name) || FindTypeDecl(*module_, name) != nullptr ||
                std::find(type_params.begin(), type_params.end(), name) != type_params.end();
     }
 
@@ -1502,7 +1376,7 @@ class Checker {
             const Type declared_type = SemanticTypeFromAst(decl.type_ann.get(), {});
             if (global_index < module_->globals.size()) {
                 module_->globals[global_index].type = declared_type;
-                module_->globals[global_index].constant_values.assign(module_->globals[global_index].names.size(), "");
+                module_->globals[global_index].constant_values.assign(module_->globals[global_index].names.size(), std::nullopt);
             }
             if (decl.has_initializer && decl.pattern.names.size() != decl.values.size()) {
                 Report(decl.span, "binding requires one initializer per bound name");
@@ -1529,7 +1403,7 @@ class Checker {
                     continue;
                 }
                 if (global_index < module_->globals.size() && index < module_->globals[global_index].constant_values.size()) {
-                    module_->globals[global_index].constant_values[index] = RenderConstValue(*const_value);
+                    module_->globals[global_index].constant_values[index] = *const_value;
                 }
             }
             ++global_index;
@@ -1687,35 +1561,18 @@ class Checker {
     }
 
     void RecordExprType(const Expr& expr, const Type& type) {
-        const std::string key = SpanKey(expr.span);
-        const auto found = module_->expr_type_indices.find(key);
-        if (found != module_->expr_type_indices.end()) {
-            module_->expr_types[found->second].type = type;
-            return;
-        }
-        module_->expr_types.push_back({
-            .span = expr.span,
-            .type = type,
-        });
-        module_->expr_type_indices[key] = module_->expr_types.size() - 1;
+        module_->expr_types[expr.span] = type;
     }
 
     void RecordBindingOrAssignFact(const Stmt& stmt, std::vector<BindingOrAssignResolution> resolutions) {
-        const std::string key = SpanKey(stmt.span);
-        const auto found = module_->binding_or_assign_indices.find(key);
-        if (found != module_->binding_or_assign_indices.end()) {
-            module_->binding_or_assign_facts[found->second].resolutions = std::move(resolutions);
-            return;
-        }
-        module_->binding_or_assign_facts.push_back({
+        module_->binding_or_assign_facts[stmt.span] = {
             .span = stmt.span,
             .resolutions = std::move(resolutions),
-        });
-        module_->binding_or_assign_indices[key] = module_->binding_or_assign_facts.size() - 1;
+        };
     }
 
     const TypeDeclSummary* LookupStructType(const Type& type) const {
-        const Type stripped = StripTypeAliases(type, *module_);
+        const Type stripped = StripType(type, *module_, TypeStripMode::kAliasesOnly);
         if (stripped.kind != Type::Kind::kNamed) {
             return nullptr;
         }
@@ -1723,7 +1580,7 @@ class Checker {
     }
 
     std::optional<Type> LookupBuiltinMemberType(const Type& raw_base, std::string_view member_name) const {
-        const Type base = CanonicalizeBuiltinType(StripTypeAliases(raw_base, *module_));
+        const Type base = CanonicalizeBuiltinType(StripType(raw_base, *module_, TypeStripMode::kAliasesOnly));
         if (base.kind == Type::Kind::kNamed && (base.name == "Slice" || base.name == "Buffer")) {
             if (member_name == "ptr" && !base.subtypes.empty()) {
                 return PointerType(base.subtypes.front());
@@ -1814,7 +1671,7 @@ class Checker {
     }
 
     const VariantSummary* LookupVariant(const Type& selector_type, std::string_view variant_name) const {
-        const Type stripped_selector = StripTypeAliases(selector_type, *module_);
+        const Type stripped_selector = StripType(selector_type, *module_, TypeStripMode::kAliasesOnly);
         if (stripped_selector.kind != Type::Kind::kNamed) {
             return nullptr;
         }
@@ -1930,7 +1787,7 @@ class Checker {
             return variant_ctor_type;
         }
 
-        const Type stripped_callee = StripAliasOrDistinct(callee_type, *module_);
+        const Type stripped_callee = StripType(callee_type, *module_, TypeStripMode::kAliasesAndDistinct);
         if (stripped_callee.kind != Type::Kind::kProcedure) {
             Report(expr.left->span, "call target must have procedure type");
             return UnknownType();
@@ -2032,7 +1889,7 @@ class Checker {
                     return record(IsUnknown(operand) ? UnknownType() : PointerType(operand));
                 }
                 if (expr.text == "*") {
-                    const Type deref_operand = StripAliasOrDistinct(operand, *module_);
+                    const Type deref_operand = StripType(operand, *module_, TypeStripMode::kAliasesAndDistinct);
                     if (!IsUnknown(deref_operand) && deref_operand.kind != Type::Kind::kPointer) {
                         Report(expr.span, "pointer dereference requires pointer operand");
                     }
@@ -2100,7 +1957,7 @@ class Checker {
                 return record(AnalyzeFieldSelection(base, expr.text, expr.span));
             }
             case Expr::Kind::kIndex: {
-                const Type base = StripTypeAliases(AnalyzeExpr(*expr.left), *module_);
+                const Type base = StripType(AnalyzeExpr(*expr.left), *module_, TypeStripMode::kAliasesOnly);
                 (void)AnalyzeExpr(*expr.right);
                 if (base.kind == Type::Kind::kArray && !base.subtypes.empty()) {
                     return record(base.subtypes.front());
@@ -2112,7 +1969,7 @@ class Checker {
             }
             case Expr::Kind::kSlice:
             {
-                const Type base = StripTypeAliases(AnalyzeExpr(*expr.left), *module_);
+                const Type base = StripType(AnalyzeExpr(*expr.left), *module_, TypeStripMode::kAliasesOnly);
                 if (expr.right != nullptr) {
                     (void)AnalyzeExpr(*expr.right);
                 }
@@ -2146,7 +2003,7 @@ class Checker {
                         aggregate_type.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
                     }
                 }
-                const Type resolved_aggregate = StripTypeAliases(aggregate_type, *module_);
+                const Type resolved_aggregate = StripType(aggregate_type, *module_, TypeStripMode::kAliasesOnly);
                 const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
                 const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
                 if (type_decl != nullptr || !builtin_fields.empty()) {
@@ -2551,8 +2408,6 @@ class Checker {
     std::unordered_map<std::string, Decl::Kind> value_symbols_;
     std::unordered_map<std::string, Decl::Kind> type_symbols_;
     std::unordered_map<std::string, ValueBinding> global_symbols_;
-    std::unordered_map<std::string, const FunctionSignature*> function_map_;
-    std::unordered_map<std::string, const TypeDeclSummary*> type_map_;
     std::unordered_map<std::string, ConstValue> const_eval_cache_;
     std::vector<std::unordered_map<std::string, ValueBinding>> scopes_;
     const FunctionSignature* current_function_ = nullptr;
@@ -2771,17 +2626,17 @@ const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view na
 }
 
 const Type* FindExprType(const Module& module, const ast::Expr& expr) {
-    const auto found = module.expr_type_indices.find(SpanKey(expr.span));
-    if (found != module.expr_type_indices.end() && found->second < module.expr_types.size()) {
-        return &module.expr_types[found->second].type;
+    const auto found = module.expr_types.find(expr.span);
+    if (found != module.expr_types.end()) {
+        return &found->second;
     }
     return nullptr;
 }
 
 const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const ast::Stmt& stmt) {
-    const auto found = module.binding_or_assign_indices.find(SpanKey(stmt.span));
-    if (found != module.binding_or_assign_indices.end() && found->second < module.binding_or_assign_facts.size()) {
-        return &module.binding_or_assign_facts[found->second];
+    const auto found = module.binding_or_assign_facts.find(stmt.span);
+    if (found != module.binding_or_assign_facts.end()) {
+        return &found->second;
     }
     return nullptr;
 }
@@ -2879,7 +2734,7 @@ std::string DumpModule(const Module& module) {
         if (!global.constant_values.empty()) {
             bool has_any_value = false;
             for (const auto& value : global.constant_values) {
-                if (!value.empty()) {
+                if (value.has_value()) {
                     has_any_value = true;
                     break;
                 }
@@ -2890,8 +2745,8 @@ std::string DumpModule(const Module& module) {
                     if (index > 0) {
                         line << ", ";
                     }
-                    if (index < global.constant_values.size()) {
-                        line << global.constant_values[index];
+                    if (index < global.constant_values.size() && global.constant_values[index].has_value()) {
+                        line << RenderConstValue(*global.constant_values[index]);
                     } else {
                         line << "?";
                     }
