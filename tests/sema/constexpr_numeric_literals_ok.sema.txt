@@ -1,0 +1,9 @@
+SemanticModule
+  TypeDecl name=Table kind=struct
+    Field name=bytes type=[16]u8
+    Layout size=16 align=1 offsets=[0]
+  Const names=[HEX_VALUE] type=i32 values=[42]
+  Const names=[DECIMAL_GROUPED] type=usize values=[1024]
+  Const names=[FLOAT_GROUPED] type=f64 values=[1024.5]
+  Const names=[LEN] type=usize values=[16]
+  Function name=main params=[] returns=[i32]

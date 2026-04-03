@@ -8,6 +8,7 @@
 #include "compiler/lex/lexer.h"
 #include "compiler/mci/mci.h"
 #include "compiler/parse/parser.h"
+#include "compiler/sema/check.h"
 #include "compiler/support/diagnostics.h"
 #include "compiler/support/dump_paths.h"
 #include "compiler/support/source_manager.h"
@@ -143,6 +144,21 @@ void TestMciRoundTrip() {
     Expect(!loaded->interface_hash.empty(), "mci loader should preserve interface hashes");
 
     std::filesystem::remove(temp_path);
+}
+
+void TestSemaLookupFallsBackToModuleContents() {
+    mc::sema::Module module;
+    module.functions.push_back({.name = "first"});
+    module.type_decls.push_back({.kind = mc::ast::Decl::Kind::kStruct, .name = "First"});
+    mc::sema::BuildModuleLookupMaps(module);
+
+    module.functions.push_back({.name = "late_add"});
+    module.type_decls.push_back({.kind = mc::ast::Decl::Kind::kStruct, .name = "LateAdd"});
+
+    Expect(mc::sema::FindFunctionSignature(module, "late_add") != nullptr,
+           "function lookup should stay correct when declaration vectors grow after cache rebuild");
+    Expect(mc::sema::FindTypeDecl(module, "LateAdd") != nullptr,
+           "type lookup should stay correct when declaration vectors grow after cache rebuild");
 }
 
 void TestLexerTracksKeywordsAndSeparators() {
@@ -294,6 +310,7 @@ int main() {
     TestSourceManagerLoad();
     TestDumpPaths();
     TestMciRoundTrip();
+    TestSemaLookupFallsBackToModuleContents();
     TestLexerTracksKeywordsAndSeparators();
     TestParserBuildsDeterministicAstDump();
     TestParserHandlesTypesAndLoopForms();

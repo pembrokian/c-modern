@@ -80,9 +80,10 @@ struct Module {
     std::vector<BindingOrAssignFact> binding_or_assign_facts;
     std::unordered_map<std::string, std::size_t> expr_type_indices;
     std::unordered_map<std::string, std::size_t> binding_or_assign_indices;
-    // O(1) name → index maps for functions and type declarations. These are
-    // populated by BuildModuleLookupMaps() and queried by FindFunctionSignature
-    // and FindTypeDecl. Callers outside sema should treat these as read-only.
+    // Optional name -> index caches for functions and type declarations.
+    // BuildModuleLookupMaps() refreshes them after bulk population, but
+    // semantic lookups remain correct even if callers mutate the vectors
+    // without rebuilding the caches immediately.
     std::unordered_map<std::string, std::size_t> function_lookup;
     std::unordered_map<std::string, std::size_t> type_decl_lookup;
 };
@@ -122,9 +123,9 @@ const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view na
 const Type* FindExprType(const Module& module, const ast::Expr& expr);
 const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const ast::Stmt& stmt);
 std::string DumpModule(const Module& module);
-// Rebuild the O(1) name → index lookup maps (function_lookup, type_decl_lookup)
-// from the current contents of Module::functions and Module::type_decls.
-// Must be called after the module's declaration vectors are fully populated.
+// Rebuild the auxiliary name -> index lookup caches (function_lookup,
+// type_decl_lookup) from the current contents of Module::functions and
+// Module::type_decls.
 void BuildModuleLookupMaps(Module& module);
 
 }  // namespace mc::sema

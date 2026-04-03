@@ -1,5 +1,7 @@
 #include "compiler/mir/mir.h"
 
+#include "compiler/sema/type_predicates.h"
+
 #include <cassert>
 #include <cstddef>
 #include <functional>
@@ -383,59 +385,28 @@ void WriteLine(std::ostringstream& stream, int indent, const std::string& text) 
     stream << text << '\n';
 }
 
-bool IsIntegerTypeName(std::string_view name) {
-    static const std::unordered_set<std::string_view> names = {
-        "i8", "i16", "i32", "i64", "isize", "u8", "u16", "u32", "u64", "usize", "uintptr",
-    };
-    return names.find(name) != names.end();
-}
-
-bool IsFloatTypeName(std::string_view name) {
-    return name == "f32" || name == "f64";
-}
-
-bool IsIntegerType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kNamed && IsIntegerTypeName(type.name);
-}
-
-bool IsFloatType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kNamed && IsFloatTypeName(type.name);
-}
-
-bool IsNumericType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kIntLiteral || type.kind == sema::Type::Kind::kFloatLiteral || IsIntegerType(type) || IsFloatType(type);
-}
-
 bool IsIntegerType(const Module& module, const sema::Type& type) {
-    return IsIntegerType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsIntegerType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 bool IsFloatType(const Module& module, const sema::Type& type) {
-    return IsFloatType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsFloatType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 bool IsNumericType(const Module& module, const sema::Type& type) {
-    return IsNumericType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsNumericType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 bool IsWraparoundBinaryOp(std::string_view op) {
     return op == "+" || op == "-" || op == "*";
 }
 
-bool IsIntegerLikeType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kIntLiteral || IsIntegerType(type);
-}
-
 bool IsIntegerLikeType(const Module& module, const sema::Type& type) {
-    return IsIntegerLikeType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
-}
-
-bool IsBoolType(const sema::Type& type) {
-    return type == sema::BoolType() || (type.kind == sema::Type::Kind::kNamed && type.name == "bool");
+    return sema::IsIntegerLikeType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 bool IsBoolType(const Module& module, const sema::Type& type) {
-    return IsBoolType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsBoolType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 std::string_view LeafTypeName(std::string_view name) {
@@ -458,20 +429,12 @@ bool IsMemoryOrderType(const Module& module, const sema::Type& type) {
     return IsMemoryOrderType(StripMirAliasOrDistinct(module, type));
 }
 
-bool IsPointerLikeType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kPointer;
-}
-
 bool IsPointerLikeType(const Module& module, const sema::Type& type) {
-    return IsPointerLikeType(StripMirAliasOrDistinct(module, type));
-}
-
-bool IsUintPtrType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kNamed && type.name == "uintptr";
+    return sema::IsPointerLikeType(StripMirAliasOrDistinct(module, type));
 }
 
 bool IsUintPtrType(const Module& module, const sema::Type& type) {
-    return IsUintPtrType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsUintPtrType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 bool IsBuiltinNamedNonAggregate(const sema::Type& type) {
@@ -482,7 +445,7 @@ bool IsBuiltinNamedNonAggregate(const sema::Type& type) {
     if (canonical.kind != sema::Type::Kind::kNamed) {
         return false;
     }
-    return IsIntegerType(canonical) || IsFloatType(canonical) || canonical.name == "bool";
+    return sema::IsIntegerType(canonical) || sema::IsFloatType(canonical) || canonical.name == "bool";
 }
 
 bool IsBuiltinNamedNonAggregate(const Module& module, const sema::Type& type) {
@@ -512,7 +475,7 @@ bool IsAssignableType(const Module& module, const sema::Type& expected, const se
     if (IsFloatType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kFloatLiteral) {
         return true;
     }
-    if (IsPointerLikeType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kNil) {
+    if (sema::IsPointerLikeType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kNil) {
         return true;
     }
     return false;
@@ -525,13 +488,13 @@ bool IsAssignableType(const sema::Type& expected, const sema::Type& actual) {
     if (expected == actual) {
         return true;
     }
-    if (IsIntegerType(expected) && actual.kind == sema::Type::Kind::kIntLiteral) {
+    if (sema::IsIntegerType(expected) && actual.kind == sema::Type::Kind::kIntLiteral) {
         return true;
     }
-    if (IsFloatType(expected) && actual.kind == sema::Type::Kind::kFloatLiteral) {
+    if (sema::IsFloatType(expected) && actual.kind == sema::Type::Kind::kFloatLiteral) {
         return true;
     }
-    if (IsPointerLikeType(expected) && actual.kind == sema::Type::Kind::kNil) {
+    if (sema::IsPointerLikeType(expected) && actual.kind == sema::Type::Kind::kNil) {
         return true;
     }
     return false;
@@ -544,18 +507,18 @@ bool HasCompatibleNumericTypes(const Module& module, const sema::Type& left, con
         return true;
     }
     if (canonical_left == canonical_right) {
-        return IsNumericType(canonical_left);
+        return sema::IsNumericType(canonical_left);
     }
-    if (IsIntegerType(canonical_left) && canonical_right.kind == sema::Type::Kind::kIntLiteral) {
+    if (sema::IsIntegerType(canonical_left) && canonical_right.kind == sema::Type::Kind::kIntLiteral) {
         return true;
     }
-    if (IsIntegerType(canonical_right) && canonical_left.kind == sema::Type::Kind::kIntLiteral) {
+    if (sema::IsIntegerType(canonical_right) && canonical_left.kind == sema::Type::Kind::kIntLiteral) {
         return true;
     }
-    if (IsFloatType(canonical_left) && canonical_right.kind == sema::Type::Kind::kFloatLiteral) {
+    if (sema::IsFloatType(canonical_left) && canonical_right.kind == sema::Type::Kind::kFloatLiteral) {
         return true;
     }
-    if (IsFloatType(canonical_right) && canonical_left.kind == sema::Type::Kind::kFloatLiteral) {
+    if (sema::IsFloatType(canonical_right) && canonical_left.kind == sema::Type::Kind::kFloatLiteral) {
         return true;
     }
     if ((canonical_left.kind == sema::Type::Kind::kFloatLiteral && canonical_right.kind == sema::Type::Kind::kIntLiteral) ||
@@ -570,18 +533,18 @@ bool HasCompatibleNumericTypes(const sema::Type& left, const sema::Type& right) 
         return true;
     }
     if (left == right) {
-        return IsNumericType(left);
+        return sema::IsNumericType(left);
     }
-    if (IsIntegerType(left) && right.kind == sema::Type::Kind::kIntLiteral) {
+    if (sema::IsIntegerType(left) && right.kind == sema::Type::Kind::kIntLiteral) {
         return true;
     }
-    if (IsIntegerType(right) && left.kind == sema::Type::Kind::kIntLiteral) {
+    if (sema::IsIntegerType(right) && left.kind == sema::Type::Kind::kIntLiteral) {
         return true;
     }
-    if (IsFloatType(left) && right.kind == sema::Type::Kind::kFloatLiteral) {
+    if (sema::IsFloatType(left) && right.kind == sema::Type::Kind::kFloatLiteral) {
         return true;
     }
-    if (IsFloatType(right) && left.kind == sema::Type::Kind::kFloatLiteral) {
+    if (sema::IsFloatType(right) && left.kind == sema::Type::Kind::kFloatLiteral) {
         return true;
     }
     if ((left.kind == sema::Type::Kind::kFloatLiteral && right.kind == sema::Type::Kind::kIntLiteral) ||
@@ -759,10 +722,10 @@ ExplicitConversionKind ClassifyMirConversion(const Module& module, const sema::T
 
     const sema::Type stripped_source = StripMirAliasOrDistinct(module, source_type);
     const sema::Type stripped_target = StripMirAliasOrDistinct(module, target_type);
-    if (IsPointerLikeType(stripped_source) && IsUintPtrType(stripped_target)) {
+    if (sema::IsPointerLikeType(stripped_source) && sema::IsUintPtrType(stripped_target)) {
         return ExplicitConversionKind::kPointerToInt;
     }
-    if (IsUintPtrType(stripped_source) && IsPointerLikeType(stripped_target)) {
+    if (sema::IsUintPtrType(stripped_source) && sema::IsPointerLikeType(stripped_target)) {
         return ExplicitConversionKind::kIntToPointer;
     }
     const bool source_wrapped = stripped_source != source_type;
@@ -771,7 +734,7 @@ ExplicitConversionKind ClassifyMirConversion(const Module& module, const sema::T
         return ExplicitConversionKind::kDistinct;
     }
 
-    if (IsNumericType(stripped_source) && IsNumericType(stripped_target)) {
+    if (sema::IsNumericType(stripped_source) && sema::IsNumericType(stripped_target)) {
         return ExplicitConversionKind::kNumeric;
     }
 
@@ -786,7 +749,7 @@ Instruction::ArithmeticSemantics ClassifyBinaryArithmeticSemantics(const Module&
     }
 
     const sema::Type stripped_result = StripMirAliasOrDistinct(module, result_type);
-    if (IsIntegerType(stripped_result)) {
+    if (sema::IsIntegerType(stripped_result)) {
         return Instruction::ArithmeticSemantics::kWrap;
     }
     return Instruction::ArithmeticSemantics::kNone;
