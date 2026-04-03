@@ -1,4 +1,5 @@
 #include "compiler/codegen_llvm/backend.h"
+#include "compiler/codegen_llvm/backend_internal.h"
 
 // Bootstrap LLVM backend — two-pass code generation architecture.
 //
@@ -34,6 +35,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "compiler/support/assert.h"
 #include "compiler/support/target.h"
 
 namespace mc::codegen_llvm {
@@ -137,7 +139,7 @@ std::string_view ToString(mir::Instruction::Kind kind) {
             return "variant_extract";
     }
 
-    return "instruction";
+    MC_UNREACHABLE("unhandled mir::Instruction::Kind in codegen_llvm::ToString");
 }
 
 std::string_view ToString(mir::Instruction::TargetKind kind) {
@@ -158,7 +160,7 @@ std::string_view ToString(mir::Instruction::TargetKind kind) {
             return "other";
     }
 
-    return "target";
+    MC_UNREACHABLE("unhandled mir::Instruction::TargetKind in codegen_llvm::ToString");
 }
 
 std::string_view ToString(mir::Instruction::ArithmeticSemantics semantics) {
@@ -169,7 +171,7 @@ std::string_view ToString(mir::Instruction::ArithmeticSemantics semantics) {
             return "wrap";
     }
 
-    return "none";
+    MC_UNREACHABLE("unhandled mir::Instruction::ArithmeticSemantics in codegen_llvm::ToString");
 }
 
 std::string_view ToString(mir::Terminator::Kind kind) {
@@ -184,399 +186,12 @@ std::string_view ToString(mir::Terminator::Kind kind) {
             return "cond_branch";
     }
 
-    return "terminator";
-}
-
-void WriteIndent(std::ostringstream& stream, int indent) {
-    for (int count = 0; count < indent; ++count) {
-        stream << "  ";
-    }
-}
-
-void WriteLine(std::ostringstream& stream, int indent, const std::string& text) {
-    WriteIndent(stream, indent);
-    stream << text << '\n';
-}
-
-void ReportBackendError(const std::filesystem::path& source_path,
-                        const std::string& message,
-                        support::DiagnosticSink& diagnostics) {
-    diagnostics.Report({
-        .file_path = source_path,
-        .span = support::kDefaultSourceSpan,
-        .severity = support::DiagnosticSeverity::kError,
-        .message = message,
-    });
+    MC_UNREACHABLE("unhandled mir::Terminator::Kind in codegen_llvm::ToString");
 }
 
 bool IsBootstrapTarget(const TargetConfig& target) {
     return target.hosted && target.triple == kBootstrapTriple && target.target_family == kBootstrapTargetFamily &&
            target.object_format == kBootstrapObjectFormat;
-}
-
-const mir::TypeDecl* FindTypeDecl(const mir::Module& module,
-                                  std::string_view name) {
-    for (const auto& type_decl : module.type_decls) {
-        if (type_decl.name == name) {
-            return &type_decl;
-        }
-    }
-    return nullptr;
-}
-
-std::string VariantLeafName(std::string_view variant_name) {
-    const std::size_t separator = variant_name.rfind('.');
-    if (separator == std::string_view::npos) {
-        return std::string(variant_name);
-    }
-    return std::string(variant_name.substr(separator + 1));
-}
-
-const mir::VariantDecl* FindVariantDecl(const mir::TypeDecl& type_decl,
-                                        std::string_view variant_name,
-                                        std::size_t* variant_index = nullptr) {
-    const std::string leaf_name = VariantLeafName(variant_name);
-    for (std::size_t index = 0; index < type_decl.variants.size(); ++index) {
-        if (type_decl.variants[index].name == leaf_name) {
-            if (variant_index != nullptr) {
-                *variant_index = index;
-            }
-            return &type_decl.variants[index];
-        }
-    }
-    return nullptr;
-}
-
-struct EnumBackendLayout {
-    BackendTypeInfo aggregate_type;
-    std::vector<BackendTypeInfo> field_types;
-    std::vector<std::size_t> variant_field_offsets;
-};
-
-std::optional<std::size_t> ParseBackendArrayLength(std::string_view text) {
-    if (text.size() < 2 || text.front() != '[') {
-        return std::nullopt;
-    }
-
-    const std::size_t marker = text.find(" x ");
-    if (marker == std::string_view::npos || marker <= 1) {
-        return std::nullopt;
-    }
-
-    return mc::support::ParseArrayLength(text.substr(1, marker - 1));
-}
-
-std::size_t AlignTo(std::size_t value,
-                    std::size_t alignment) {
-    if (alignment == 0) {
-        return value;
-    }
-    const std::size_t remainder = value % alignment;
-    return remainder == 0 ? value : value + (alignment - remainder);
-}
-
-std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
-                                             const sema::Type& type);
-
-std::optional<BackendTypeInfo> LowerStructTypeInfo(const mir::Module& module,
-                                                   const mir::TypeDecl& type_decl,
-                                                   const sema::Type& original_type) {
-    BackendTypeInfo info {
-        .source_name = sema::FormatType(original_type),
-    };
-
-    if (type_decl.kind != mir::TypeDecl::Kind::kStruct) {
-        return std::nullopt;
-    }
-
-    std::ostringstream backend_name;
-    if (type_decl.is_packed) {
-        backend_name << "<{";
-    } else {
-        backend_name << '{';
-    }
-
-    std::size_t size = 0;
-    std::size_t alignment = 1;
-    for (std::size_t index = 0; index < type_decl.fields.size(); ++index) {
-        const auto lowered_field = LowerTypeInfo(module, type_decl.fields[index].second);
-        if (!lowered_field.has_value()) {
-            return std::nullopt;
-        }
-        const std::size_t field_alignment = type_decl.is_packed ? 1 : lowered_field->alignment;
-
-        if (index > 0) {
-            backend_name << ", ";
-        }
-        backend_name << lowered_field->backend_name;
-
-        if (!type_decl.is_packed) {
-            size = AlignTo(size, field_alignment);
-        }
-        size += lowered_field->size;
-        alignment = std::max(alignment, field_alignment);
-    }
-
-    if (type_decl.is_packed) {
-        backend_name << "}>";
-    } else {
-        backend_name << '}';
-    }
-    info.backend_name = backend_name.str();
-    info.alignment = alignment;
-    info.size = type_decl.is_packed ? size : AlignTo(size, alignment);
-    return info;
-}
-
-std::optional<EnumBackendLayout> LowerEnumLayout(const mir::Module& module,
-                                                 const mir::TypeDecl& type_decl,
-                                                 const sema::Type& original_type) {
-    if (type_decl.kind != mir::TypeDecl::Kind::kEnum) {
-        return std::nullopt;
-    }
-
-    EnumBackendLayout layout;
-    layout.aggregate_type.source_name = sema::FormatType(original_type);
-    layout.field_types.push_back({
-        .source_name = "i64",
-        .backend_name = "i64",
-        .size = 8,
-        .alignment = 8,
-    });
-
-    std::ostringstream backend_name;
-    backend_name << "{i64";
-
-    std::size_t size = 8;
-    std::size_t alignment = 8;
-    for (const auto& variant : type_decl.variants) {
-        layout.variant_field_offsets.push_back(layout.field_types.size());
-        for (const auto& field : variant.payload_fields) {
-            const auto lowered_field = LowerTypeInfo(module, field.second);
-            if (!lowered_field.has_value()) {
-                return std::nullopt;
-            }
-            backend_name << ", " << lowered_field->backend_name;
-            size = AlignTo(size, lowered_field->alignment);
-            size += lowered_field->size;
-            alignment = std::max(alignment, lowered_field->alignment);
-            layout.field_types.push_back(*lowered_field);
-        }
-    }
-
-    backend_name << '}';
-    layout.aggregate_type.backend_name = backend_name.str();
-    layout.aggregate_type.alignment = alignment;
-    layout.aggregate_type.size = AlignTo(size, alignment);
-    return layout;
-}
-
-std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
-                                             const sema::Type& type) {
-    BackendTypeInfo info {
-        .source_name = sema::FormatType(type),
-    };
-
-    const auto use_backend_type = [&](std::string backend_name,
-                                      std::size_t size,
-                                      std::size_t alignment) -> std::optional<BackendTypeInfo> {
-        info.backend_name = std::move(backend_name);
-        info.size = size;
-        info.alignment = alignment;
-        return info;
-    };
-
-    switch (type.kind) {
-        case sema::Type::Kind::kBool:
-            return use_backend_type("i1", 1, 1);
-        case sema::Type::Kind::kString:
-            return use_backend_type("{ptr, i64}", 16, 8);
-        case sema::Type::Kind::kIntLiteral:
-            return use_backend_type("i64", 8, 8);
-        case sema::Type::Kind::kFloatLiteral:
-            return use_backend_type("double", 8, 8);
-        case sema::Type::Kind::kNamed:
-            if (type.name == "bool") {
-                return use_backend_type("i1", 1, 1);
-            }
-            if (type.name == "i8" || type.name == "u8") {
-                return use_backend_type("i8", 1, 1);
-            }
-            if (type.name == "i16" || type.name == "u16") {
-                return use_backend_type("i16", 2, 2);
-            }
-            if (type.name == "i32" || type.name == "u32") {
-                return use_backend_type("i32", 4, 4);
-            }
-            if (type.name == "i64" || type.name == "u64" || type.name == "isize" || type.name == "usize" ||
-                type.name == "uintptr") {
-                return use_backend_type("i64", 8, 8);
-            }
-            if (type.name == "f32") {
-                return use_backend_type("float", 4, 4);
-            }
-            if (type.name == "f64") {
-                return use_backend_type("double", 8, 8);
-            }
-            if (type.name == "str" || type.name == "string" || type.name == "cstr") {
-                return use_backend_type("{ptr, i64}", 16, 8);
-            }
-            if (type.name == "Slice") {
-                return use_backend_type("{ptr, i64}", 16, 8);
-            }
-            if (type.name == "Buffer") {
-                return use_backend_type("{ptr, i64, i64, ptr}", 32, 8);
-            }
-            if (const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name)) {
-                if (type_decl->kind == mir::TypeDecl::Kind::kAlias || type_decl->kind == mir::TypeDecl::Kind::kDistinct) {
-                    auto lowered = LowerTypeInfo(module, type_decl->aliased_type);
-                    if (!lowered.has_value()) {
-                        return std::nullopt;
-                    }
-                    lowered->source_name = info.source_name;
-                    return lowered;
-                }
-                if (type_decl->kind == mir::TypeDecl::Kind::kStruct) {
-                    return LowerStructTypeInfo(module, *type_decl, type);
-                }
-                if (type_decl->kind == mir::TypeDecl::Kind::kEnum) {
-                    auto lowered = LowerEnumLayout(module, *type_decl, type);
-                    if (!lowered.has_value()) {
-                        return std::nullopt;
-                    }
-                    return lowered->aggregate_type;
-                }
-            }
-            return std::nullopt;
-        case sema::Type::Kind::kPointer:
-            return use_backend_type("ptr", 8, 8);
-        case sema::Type::Kind::kConst: {
-            if (type.subtypes.empty()) {
-                return std::nullopt;
-            }
-            auto lowered = LowerTypeInfo(module, type.subtypes.front());
-            if (!lowered.has_value()) {
-                return std::nullopt;
-            }
-            lowered->source_name = info.source_name;
-            return lowered;
-        }
-        case sema::Type::Kind::kArray: {
-            if (type.subtypes.empty()) {
-                return std::nullopt;
-            }
-            auto element = LowerTypeInfo(module, type.subtypes.front());
-            const auto length = mc::support::ParseArrayLength(type.metadata);
-            if (!element.has_value() || !length.has_value()) {
-                return std::nullopt;
-            }
-            return use_backend_type("[" + std::to_string(*length) + " x " + element->backend_name + "]",
-                                    element->size * *length,
-                                    element->alignment);
-        }
-        case sema::Type::Kind::kTuple: {
-            std::ostringstream backend_name;
-            backend_name << '{';
-            std::size_t size = 0;
-            std::size_t alignment = 1;
-            for (std::size_t index = 0; index < type.subtypes.size(); ++index) {
-                auto lowered_field = LowerTypeInfo(module, type.subtypes[index]);
-                if (!lowered_field.has_value()) {
-                    return std::nullopt;
-                }
-                if (index > 0) {
-                    backend_name << ", ";
-                }
-                backend_name << lowered_field->backend_name;
-                size = AlignTo(size, lowered_field->alignment);
-                size += lowered_field->size;
-                alignment = std::max(alignment, lowered_field->alignment);
-            }
-            backend_name << '}';
-            return use_backend_type(backend_name.str(), AlignTo(size, alignment), alignment);
-        }
-        case sema::Type::Kind::kProcedure:
-            return use_backend_type("ptr", 8, 8);
-        case sema::Type::Kind::kNil:
-            return use_backend_type("ptr", 8, 8);
-        default:
-            return std::nullopt;
-    }
-}
-
-std::string FormatTypeInfo(const BackendTypeInfo& type_info) {
-    std::ostringstream stream;
-    stream << type_info.source_name << " [repr=" << type_info.backend_name << ", size=" << type_info.size
-           << ", align=" << type_info.alignment << ']';
-    return stream.str();
-}
-
-bool LowerInstructionType(const mir::Module& module,
-                         const sema::Type& type,
-                         const std::filesystem::path& source_path,
-                         support::DiagnosticSink& diagnostics,
-                         const std::string& context,
-                         BackendTypeInfo& type_info) {
-    auto lowered = LowerTypeInfo(module, type);
-    if (lowered.has_value()) {
-        type_info = std::move(*lowered);
-        return true;
-    }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap backend cannot map MIR type '" + sema::FormatType(type) +
-                           "' to a Darwin arm64 representation in " + context,
-                       diagnostics);
-    return false;
-}
-
-std::string BackendFunctionName(const std::string& source_name) {
-    return "@" + source_name;
-}
-
-std::string BackendGlobalName(const std::string& source_name) {
-    return "@global." + source_name;
-}
-
-std::string BackendLocalName(const std::string& source_name) {
-    return "%local." + source_name;
-}
-
-std::string BackendBlockName(std::size_t function_index,
-                             std::size_t block_index,
-                             const std::string& source_name) {
-    return "bb" + std::to_string(function_index) + "_" + std::to_string(block_index) + "." + source_name;
-}
-
-std::string BackendTempName(std::size_t function_index,
-                            std::size_t block_index,
-                            std::size_t instruction_index) {
-    return "%t" + std::to_string(function_index) + "_" + std::to_string(block_index) + "_" +
-           std::to_string(instruction_index);
-}
-
-std::string FormatReturnTypes(const std::vector<BackendTypeInfo>& types) {
-    std::ostringstream stream;
-    stream << '[';
-    for (std::size_t index = 0; index < types.size(); ++index) {
-        if (index > 0) {
-            stream << ", ";
-        }
-        stream << FormatTypeInfo(types[index]);
-    }
-    stream << ']';
-    return stream.str();
-}
-
-std::optional<BackendTypeInfo> LowerFunctionReturnType(const mir::Module& module,
-                                                       const std::vector<sema::Type>& return_types) {
-    if (return_types.empty()) {
-        return std::nullopt;
-    }
-    if (return_types.size() == 1) {
-        return LowerTypeInfo(module, return_types.front());
-    }
-    return LowerTypeInfo(module, sema::TupleType(return_types));
 }
 
 std::string JoinOperands(const std::vector<std::string>& operands) {
@@ -640,6 +255,21 @@ const std::string* FindBlock(const FunctionLoweringState& state,
     return it == state.blocks.end() ? nullptr : &it->second;
 }
 
+template <typename T>
+const T* ResolveNamedEntry(const std::unordered_map<std::string, T>& entries,
+                          const std::string& entry_name,
+                          const std::filesystem::path& source_path,
+                          support::DiagnosticSink& diagnostics,
+                          const std::string& error_message) {
+    const auto it = entries.find(entry_name);
+    if (it != entries.end()) {
+        return &it->second;
+    }
+
+    ReportBackendError(source_path, error_message, diagnostics);
+    return nullptr;
+}
+
 bool ResolveValue(const FunctionLoweringState& state,
                   const std::string& value_name,
                   const mir::Function& function,
@@ -647,17 +277,17 @@ bool ResolveValue(const FunctionLoweringState& state,
                   const std::filesystem::path& source_path,
                   support::DiagnosticSink& diagnostics,
                   std::string& resolved) {
-    const std::string* value = FindValue(state, value_name);
-    if (value != nullptr) {
-        resolved = *value;
-        return true;
+    const std::string* value = ResolveNamedEntry(state.values,
+                                                 value_name,
+                                                 source_path,
+                                                 diagnostics,
+                                                 "LLVM bootstrap backend references unknown MIR value '" + value_name +
+                                                     "' in function '" + function.name + "' block '" + block.label + "'");
+    if (value == nullptr) {
+        return false;
     }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap backend references unknown MIR value '" + value_name + "' in function '" +
-                           function.name + "' block '" + block.label + "'",
-                       diagnostics);
-    return false;
+    resolved = *value;
+    return true;
 }
 
 bool ResolveTypedValue(const FunctionLoweringState& state,
@@ -692,16 +322,13 @@ bool ResolveLocal(const FunctionLoweringState& state,
                   const std::filesystem::path& source_path,
                   support::DiagnosticSink& diagnostics,
                   const BackendLocal*& local) {
-    local = FindLocal(state, local_name);
-    if (local != nullptr) {
-        return true;
-    }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap backend references unknown local '" + local_name + "' in function '" +
-                           function.name + "' block '" + block.label + "'",
-                       diagnostics);
-    return false;
+    local = ResolveNamedEntry(state.locals,
+                              local_name,
+                              source_path,
+                              diagnostics,
+                              "LLVM bootstrap backend references unknown local '" + local_name + "' in function '" +
+                                  function.name + "' block '" + block.label + "'");
+    return local != nullptr;
 }
 
 bool ResolveBlock(const FunctionLoweringState& state,
@@ -711,17 +338,17 @@ bool ResolveBlock(const FunctionLoweringState& state,
                   const std::filesystem::path& source_path,
                   support::DiagnosticSink& diagnostics,
                   std::string& resolved) {
-    const std::string* value = FindBlock(state, block_name);
-    if (value != nullptr) {
-        resolved = *value;
-        return true;
+    const std::string* value = ResolveNamedEntry(state.blocks,
+                                                 block_name,
+                                                 source_path,
+                                                 diagnostics,
+                                                 "LLVM bootstrap backend references unknown branch target '" + block_name +
+                                                     "' in function '" + function.name + "' block '" + block.label + "'");
+    if (value == nullptr) {
+        return false;
     }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap backend references unknown branch target '" + block_name + "' in function '" +
-                           function.name + "' block '" + block.label + "'",
-                       diagnostics);
-    return false;
+    resolved = *value;
+    return true;
 }
 
 bool RequireInstructionResult(const mir::Instruction& instruction,
@@ -894,1065 +521,6 @@ bool ResolveOperands(const FunctionLoweringState& state,
     return true;
 }
 
-bool LowerInstruction(const mir::Instruction& instruction,
-                      std::size_t block_index,
-                      std::size_t instruction_index,
-                      const std::filesystem::path& source_path,
-                      support::DiagnosticSink& diagnostics,
-                      FunctionLoweringState& state,
-                      BackendBlock& backend_block) {
-    const mir::Function& function = *state.function;
-    const mir::BasicBlock& block = function.blocks[block_index];
-
-    switch (instruction.kind) {
-        case mir::Instruction::Kind::kConst: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "const in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = const " + FormatTypeInfo(type_info) + " " +
-                                                 instruction.op);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kLocalAddr: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "local_addr in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            if (instruction.target_kind == mir::Instruction::TargetKind::kGlobal) {
-                if (instruction.target_name.empty()) {
-                    ReportBackendError(source_path,
-                                       "local_addr global target is missing target_name metadata in function '" + function.name +
-                                           "' block '" + block.label + "'",
-                                       diagnostics);
-                    return false;
-                }
-                backend_block.instructions.push_back(backend_name + " = local_addr " + FormatTypeInfo(type_info) + " " +
-                                                     BackendGlobalName(instruction.target_name));
-                return true;
-            }
-            const BackendLocal* local = nullptr;
-            if (!ResolveLocal(state, instruction.target, function, block, source_path, diagnostics, local)) {
-                return false;
-            }
-            backend_block.instructions.push_back(backend_name + " = local_addr " + FormatTypeInfo(type_info) + " " +
-                                                 local->backend_name);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kLoadLocal: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            const BackendLocal* local = nullptr;
-            if (!ResolveLocal(state, instruction.target, function, block, source_path, diagnostics, local)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, local->lowered_type);
-            backend_block.instructions.push_back(backend_name + " = load " + FormatTypeInfo(local->lowered_type) +
-                                                 " " + local->backend_name);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kStoreLocal: {
-            const BackendLocal* local = nullptr;
-            if (!ResolveLocal(state, instruction.target, function, block, source_path, diagnostics, local)) {
-                return false;
-            }
-            std::string operand;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "store_local",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      operand)) {
-                return false;
-            }
-            backend_block.instructions.push_back("store " + sema::FormatType(local->type) + " " + operand + " -> " +
-                                                 local->backend_name + " as " + FormatTypeInfo(local->lowered_type));
-            return true;
-        }
-
-        case mir::Instruction::Kind::kUnary: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::string operand;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "unary",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      operand)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "unary in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = unary " + instruction.op + " " +
-                                                 FormatTypeInfo(type_info) + " " + operand);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kBinary: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::string lhs;
-            std::string rhs;
-            if (!ResolveTwoOperands(state,
-                                    instruction,
-                                    "LLVM bootstrap backend",
-                                    "binary",
-                                    function,
-                                    block,
-                                    source_path,
-                                    diagnostics,
-                                    lhs,
-                                    rhs)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "binary in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-
-            std::ostringstream line;
-            line << backend_name << " = binary ";
-            if (instruction.arithmetic_semantics != mir::Instruction::ArithmeticSemantics::kNone) {
-                line << ToString(instruction.arithmetic_semantics) << ' ';
-            }
-            line << instruction.op << ' ' << FormatTypeInfo(type_info) << ' ' << lhs << ", " << rhs;
-            backend_block.instructions.push_back(line.str());
-            return true;
-        }
-
-        case mir::Instruction::Kind::kSymbolRef: {
-            const bool function_or_global = instruction.target_kind == mir::Instruction::TargetKind::kFunction ||
-                                            instruction.target_kind == mir::Instruction::TargetKind::kGlobal;
-            const bool enum_constant = instruction.target_kind == mir::Instruction::TargetKind::kOther &&
-                                       instruction.type.kind == sema::Type::Kind::kNamed &&
-                                       !instruction.target_name.empty();
-            if ((!function_or_global && !enum_constant) || instruction.target_name.empty()) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only admits function and global symbol_ref values in the current bootstrap slice; function '" +
-                                       function.name + "' block '" + block.label + "' uses target_kind='" +
-                                       std::string(ToString(instruction.target_kind)) + "'",
-                                   diagnostics);
-                return false;
-            }
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "symbol_ref in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            if (enum_constant) {
-                const mir::TypeDecl* type_decl = FindTypeDecl(*state.module, instruction.type.name);
-                if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kEnum) {
-                    ReportBackendError(source_path,
-                                       "LLVM bootstrap backend could not resolve enum symbol_ref type '" +
-                                           sema::FormatType(instruction.type) + "' in function '" + function.name +
-                                           "' block '" + block.label + "'",
-                                       diagnostics);
-                    return false;
-                }
-                std::size_t variant_index = 0;
-                const mir::VariantDecl* variant_decl = FindVariantDecl(*type_decl, instruction.target_name, &variant_index);
-                if (variant_decl == nullptr || !variant_decl->payload_fields.empty()) {
-                    ReportBackendError(source_path,
-                                       "LLVM bootstrap backend only supports payload-free enum symbol_ref values in function '" +
-                                           function.name + "' block '" + block.label + "'",
-                                       diagnostics);
-                    return false;
-                }
-                backend_block.instructions.push_back(backend_name + " = enum_const " + FormatTypeInfo(type_info) + " " +
-                                                     instruction.target_name + " tag=" + std::to_string(variant_index));
-                return true;
-            }
-            backend_block.instructions.push_back(backend_name + " = symbol_ref " + FormatTypeInfo(type_info) + " " +
-                                                 (instruction.target_kind == mir::Instruction::TargetKind::kFunction
-                                                      ? BackendFunctionName(instruction.target_name)
-                                                      : BackendGlobalName(instruction.target_name)));
-            return true;
-        }
-
-        case mir::Instruction::Kind::kCall: {
-            if (instruction.target_kind != mir::Instruction::TargetKind::kFunction || instruction.target_name.empty()) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only admits direct function calls in the current bootstrap slice; function '" +
-                                       function.name + "' block '" + block.label + "' is not a direct call",
-                                   diagnostics);
-                return false;
-            }
-            std::vector<std::string> operands;
-            if (!ResolveOperands(state,
-                                 instruction,
-                                 function,
-                                 block,
-                                 source_path,
-                                 diagnostics,
-                                 operands)) {
-                return false;
-            }
-
-            std::ostringstream line;
-            if (instruction.result.empty()) {
-                line << "call void " << BackendFunctionName(instruction.target_name) << '(' << JoinOperands(operands)
-                     << ')';
-            } else {
-                BackendTypeInfo type_info;
-                if (!LowerInstructionType(*state.module,
-                                          instruction.type,
-                                          source_path,
-                                          diagnostics,
-                                          "call result in function '" + function.name + "' block '" + block.label + "'",
-                                          type_info)) {
-                    return false;
-                }
-                const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-                RecordLoweredValue(state, instruction.result, backend_name, type_info);
-                line << backend_name << " = call " << FormatTypeInfo(type_info) << ' '
-                     << BackendFunctionName(instruction.target_name) << '(' << JoinOperands(operands) << ')';
-            }
-            backend_block.instructions.push_back(line.str());
-            return true;
-        }
-
-        case mir::Instruction::Kind::kBoundsCheck: {
-            std::vector<std::string> operands;
-            if (!ResolveOperands(state,
-                                 instruction,
-                                 function,
-                                 block,
-                                 source_path,
-                                 diagnostics,
-                                 operands)) {
-                return false;
-            }
-            backend_block.instructions.push_back("check.bounds " + instruction.op + " " + JoinOperands(operands));
-            return true;
-        }
-
-        case mir::Instruction::Kind::kDivCheck: {
-            std::string lhs;
-            std::string rhs;
-            BackendTypeInfo lhs_type;
-            BackendTypeInfo rhs_type;
-            if (!ResolveTwoTypedOperands(state,
-                                         instruction,
-                                         "LLVM bootstrap backend",
-                                         "div_check",
-                                         function,
-                                         block,
-                                         source_path,
-                                         diagnostics,
-                                         lhs,
-                                         lhs_type,
-                                         rhs,
-                                         rhs_type)) {
-                return false;
-            }
-            backend_block.instructions.push_back("check.div " + instruction.op + " lhs=" + lhs + " rhs=" + rhs +
-                                                 " type=" + FormatTypeInfo(lhs_type));
-            return true;
-        }
-
-        case mir::Instruction::Kind::kShiftCheck: {
-            std::string value;
-            std::string count;
-            BackendTypeInfo value_type;
-            BackendTypeInfo count_type;
-            if (!ResolveTwoTypedOperands(state,
-                                         instruction,
-                                         "LLVM bootstrap backend",
-                                         "shift_check",
-                                         function,
-                                         block,
-                                         source_path,
-                                         diagnostics,
-                                         value,
-                                         value_type,
-                                         count,
-                                         count_type)) {
-                return false;
-            }
-            backend_block.instructions.push_back("check.shift " + instruction.op + " value=" + value + " count=" + count +
-                                                 " type=" + FormatTypeInfo(value_type));
-            return true;
-        }
-
-        case mir::Instruction::Kind::kConvert: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::string operand;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "convert",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      operand)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "convert in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = convert " + FormatTypeInfo(type_info) + " " + operand);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kConvertNumeric: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::string operand;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "convert_numeric",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      operand)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "convert_numeric in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = convert_numeric " + FormatTypeInfo(type_info) + " " + operand);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kConvertDistinct: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::string operand;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "convert_distinct",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      operand)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "convert_distinct in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = convert_distinct " + FormatTypeInfo(type_info) +
-                                                 " " + operand);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kPointerToInt: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::string operand;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "pointer_to_int",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      operand)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "pointer_to_int in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = ptrtoint " + FormatTypeInfo(type_info) + " " +
-                                                 operand);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kIntToPointer: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::string operand;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "int_to_pointer",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      operand)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "int_to_pointer in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = inttoptr " + FormatTypeInfo(type_info) + " " +
-                                                 operand);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kStoreTarget: {
-            std::vector<std::string> operands;
-            if (!ResolveOperands(state,
-                                 instruction,
-                                 function,
-                                 block,
-                                 source_path,
-                                 diagnostics,
-                                 operands)) {
-                return false;
-            }
-            std::ostringstream rendered;
-            for (std::size_t index = 0; index < operands.size(); ++index) {
-                if (index > 0) {
-                    rendered << ", ";
-                }
-                rendered << operands[index];
-            }
-            backend_block.instructions.push_back("store_target " + instruction.target_display + " kind=" +
-                                                 std::string(ToString(instruction.target_kind)) + " operands=[" + rendered.str() + "]");
-            return true;
-        }
-
-        case mir::Instruction::Kind::kArrayToSlice:
-        case mir::Instruction::Kind::kBufferToSlice:
-        case mir::Instruction::Kind::kBufferNew:
-        case mir::Instruction::Kind::kArenaNew:
-        case mir::Instruction::Kind::kSliceFromBuffer:
-        case mir::Instruction::Kind::kField:
-        case mir::Instruction::Kind::kIndex:
-        case mir::Instruction::Kind::kSlice:
-        case mir::Instruction::Kind::kAggregateInit:
-        case mir::Instruction::Kind::kVariantInit:
-        case mir::Instruction::Kind::kVariantMatch:
-        case mir::Instruction::Kind::kVariantExtract: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::vector<std::string> operands;
-            if (!ResolveOperands(state,
-                                 instruction,
-                                 function,
-                                 block,
-                                 source_path,
-                                 diagnostics,
-                                 operands)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      std::string(ToString(instruction.kind)) + " in function '" + function.name +
-                                          "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-
-            std::ostringstream line;
-            line << backend_name << " = " << ToString(instruction.kind) << " " << FormatTypeInfo(type_info);
-            if (!instruction.target_display.empty()) {
-                line << " target_display=" << instruction.target_display;
-            } else if (!instruction.target.empty()) {
-                line << " target=" << instruction.target;
-            }
-            if (!instruction.field_names.empty()) {
-                line << " fields=[";
-                for (std::size_t index = 0; index < instruction.field_names.size(); ++index) {
-                    if (index > 0) {
-                        line << ", ";
-                    }
-                    line << instruction.field_names[index];
-                }
-                line << "]";
-            }
-            if (!operands.empty()) {
-                line << " operands=[" << JoinOperands(operands) << "]";
-            }
-            backend_block.instructions.push_back(line.str());
-            return true;
-        }
-
-        case mir::Instruction::Kind::kBufferFree: {
-            std::vector<std::string> operands;
-            if (!ResolveOperands(state,
-                                 instruction,
-                                 function,
-                                 block,
-                                 source_path,
-                                 diagnostics,
-                                 operands)) {
-                return false;
-            }
-            std::ostringstream line;
-            line << ToString(instruction.kind);
-            if (!operands.empty()) {
-                line << " operands=[" << JoinOperands(operands) << ']';
-            }
-            backend_block.instructions.push_back(line.str());
-            return true;
-        }
-
-        case mir::Instruction::Kind::kVolatileLoad: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            std::string ptr;
-            if (!ResolveSingleOperand(state,
-                                      instruction,
-                                      "LLVM bootstrap backend",
-                                      "volatile_load",
-                                      function,
-                                      block,
-                                      source_path,
-                                      diagnostics,
-                                      ptr)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "volatile_load in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = volatile_load " + FormatTypeInfo(type_info) + " " + ptr);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kVolatileStore: {
-            std::string ptr;
-            BackendTypeInfo ptr_type;
-            std::string value;
-            BackendTypeInfo value_type;
-            if (!ResolveTwoTypedOperands(state,
-                                         instruction,
-                                         "LLVM bootstrap backend",
-                                         "volatile_store",
-                                         function,
-                                         block,
-                                         source_path,
-                                         diagnostics,
-                                         ptr,
-                                         ptr_type,
-                                         value,
-                                         value_type)) {
-                return false;
-            }
-            backend_block.instructions.push_back("volatile_store " + FormatTypeInfo(value_type) + " " + value + " -> " + ptr);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kAtomicLoad: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            if (instruction.operands.empty()) {
-                return false;
-            }
-            std::string ptr;
-            BackendTypeInfo ptr_type;
-            if (!ResolveTypedValue(state,
-                                   instruction.operands[0],
-                                   function,
-                                   block,
-                                   source_path,
-                                   diagnostics,
-                                   ptr,
-                                   ptr_type)) {
-                return false;
-            }
-            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
-            if (!order.has_value()) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires constant MemoryOrder metadata for 'atomic_load' in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      "atomic_load in function '" + function.name + "' block '" + block.label + "'",
-                                      type_info)) {
-                return false;
-            }
-            if (!IsAtomicScalarType(type_info)) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only supports scalar atomic_load element types in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, type_info);
-            backend_block.instructions.push_back(backend_name + " = atomic_load order=" + instruction.atomic_order + " " +
-                                                 FormatTypeInfo(type_info) + " " + ptr);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kAtomicStore: {
-            if (instruction.operands.size() < 2) {
-                return false;
-            }
-            std::string ptr;
-            BackendTypeInfo ptr_type;
-            std::string value;
-            BackendTypeInfo value_type;
-            if (!ResolveTypedValue(state,
-                                   instruction.operands[0],
-                                   function,
-                                   block,
-                                   source_path,
-                                   diagnostics,
-                                   ptr,
-                                   ptr_type) ||
-                !ResolveTypedValue(state,
-                                   instruction.operands[1],
-                                   function,
-                                   block,
-                                   source_path,
-                                   diagnostics,
-                                   value,
-                                   value_type)) {
-                return false;
-            }
-            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
-            if (!order.has_value()) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires constant MemoryOrder metadata for 'atomic_store' in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-            if (!IsAtomicScalarType(value_type)) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only supports scalar atomic_store element types in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-            backend_block.instructions.push_back("atomic_store order=" + instruction.atomic_order + " " +
-                                                 FormatTypeInfo(value_type) + " " + value + " -> " + ptr);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kAtomicExchange:
-        case mir::Instruction::Kind::kAtomicFetchAdd: {
-            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
-                return false;
-            }
-            if (instruction.operands.size() < 2) {
-                return false;
-            }
-            std::string ptr;
-            BackendTypeInfo ptr_type;
-            std::string value;
-            BackendTypeInfo value_type;
-            if (!ResolveTypedValue(state,
-                                   instruction.operands[0],
-                                   function,
-                                   block,
-                                   source_path,
-                                   diagnostics,
-                                   ptr,
-                                   ptr_type) ||
-                !ResolveTypedValue(state,
-                                   instruction.operands[1],
-                                   function,
-                                   block,
-                                   source_path,
-                                   diagnostics,
-                                   value,
-                                   value_type)) {
-                return false;
-            }
-            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
-            if (!order.has_value()) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires constant MemoryOrder metadata for '" +
-                                       std::string(ToString(instruction.kind)) + "' in function '" + function.name +
-                                       "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-            if (!IsAtomicScalarType(value_type)) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only supports scalar " + std::string(ToString(instruction.kind)) +
-                                       " element types in function '" + function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
-            RecordLoweredValue(state, instruction.result, backend_name, value_type);
-            backend_block.instructions.push_back(backend_name + " = " + std::string(ToString(instruction.kind)) + " order=" +
-                                                 instruction.atomic_order + " " + FormatTypeInfo(value_type) + " " + ptr + ", " + value);
-            return true;
-        }
-
-        case mir::Instruction::Kind::kAtomicCompareExchange:
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend does not yet support MIR instruction 'atomic_compare_exchange' in Stage 3; function '" +
-                                   function.name + "' block '" + block.label + "'",
-                               diagnostics);
-            return false;
-    }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap backend does not support MIR instruction '" +
-                           std::string(ToString(instruction.kind)) + "' in Stage 3; function '" +
-                           function.name + "' block '" + block.label + "'",
-                       diagnostics);
-    return false;
-}
-
-bool LowerTerminator(const mir::BasicBlock& block,
-                     const std::filesystem::path& source_path,
-                     support::DiagnosticSink& diagnostics,
-                     const FunctionLoweringState& state,
-                     BackendBlock& backend_block) {
-    const mir::Function& function = *state.function;
-
-    switch (block.terminator.kind) {
-        case mir::Terminator::Kind::kReturn: {
-            if (block.terminator.values.empty()) {
-                if (!function.return_types.empty()) {
-                    ReportBackendError(source_path,
-                                       "LLVM bootstrap backend requires return values for non-void function '" +
-                                           function.name + "' block '" + block.label + "'",
-                                       diagnostics);
-                    return false;
-                }
-                backend_block.terminator = "ret void";
-                return true;
-            }
-
-            if (block.terminator.values.size() != function.return_types.size()) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend return value count does not match function signature in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-
-            std::vector<std::string> values;
-            values.reserve(block.terminator.values.size());
-            for (const auto& return_value : block.terminator.values) {
-                std::string value;
-                if (!ResolveValue(state,
-                                  return_value,
-                                  function,
-                                  block,
-                                  source_path,
-                                  diagnostics,
-                                  value)) {
-                    return false;
-                }
-                values.push_back(std::move(value));
-            }
-
-            const auto lowered_return_type = LowerFunctionReturnType(*state.module, function.return_types);
-            if (!lowered_return_type.has_value()) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend could not lower return type for function '" + function.name + "' block '" +
-                                       block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-
-            if (function.return_types.size() == 1) {
-                backend_block.terminator = "ret " + FormatTypeInfo(*lowered_return_type) + " " + values.front();
-            } else {
-                backend_block.terminator = "ret " + FormatTypeInfo(*lowered_return_type) + " (" + JoinOperands(values) + ")";
-            }
-            return true;
-        }
-
-        case mir::Terminator::Kind::kBranch: {
-            std::string target;
-            if (!ResolveBlock(state, block.terminator.true_target, function, block, source_path, diagnostics, target)) {
-                return false;
-            }
-            backend_block.terminator = "br " + target;
-            return true;
-        }
-
-        case mir::Terminator::Kind::kCondBranch: {
-            if (block.terminator.values.size() != 1) {
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap backend requires cond_branch to use exactly one condition value in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-
-            std::string condition;
-            std::string true_target;
-            std::string false_target;
-            if (!ResolveValue(state,
-                              block.terminator.values.front(),
-                              function,
-                              block,
-                              source_path,
-                              diagnostics,
-                              condition) ||
-                !ResolveBlock(state, block.terminator.true_target, function, block, source_path, diagnostics, true_target) ||
-                !ResolveBlock(state, block.terminator.false_target, function, block, source_path, diagnostics, false_target)) {
-                return false;
-            }
-
-            backend_block.terminator = "condbr " + condition + " true=" + true_target + " false=" + false_target;
-            return true;
-        }
-
-        case mir::Terminator::Kind::kNone:
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend requires explicit MIR terminators; function '" + function.name +
-                                   "' block '" + block.label + "' ends with terminator '" +
-                                   std::string(ToString(block.terminator.kind)) + "'",
-                               diagnostics);
-            return false;
-    }
-
-    return false;
-}
-
-bool LowerFunction(const mir::Module& module,
-                   const mir::Function& function,
-                   std::size_t function_index,
-                   const std::filesystem::path& source_path,
-                   support::DiagnosticSink& diagnostics,
-                   BackendModule& backend_module) {
-    if (function.is_extern || !function.type_params.empty()) {
-        return true;
-    }
-
-    BackendFunction backend_function;
-    backend_function.source_name = function.name;
-    backend_function.backend_name = BackendFunctionName(function.name);
-    backend_function.return_types = function.return_types;
-    backend_function.backend_return_types.reserve(function.return_types.size());
-    backend_function.locals.reserve(function.locals.size());
-    backend_function.blocks.reserve(function.blocks.size());
-
-    for (const auto& return_type : function.return_types) {
-        BackendTypeInfo lowered_return_type;
-        if (!LowerInstructionType(module,
-                                  return_type,
-                                  source_path,
-                                  diagnostics,
-                                  "function return types for '" + function.name + "'",
-                                  lowered_return_type)) {
-            return false;
-        }
-        backend_function.backend_return_types.push_back(std::move(lowered_return_type));
-    }
-
-    FunctionLoweringState state;
-    state.function_index = function_index;
-    state.module = &module;
-    state.function = &function;
-
-    for (const auto& local : function.locals) {
-        BackendTypeInfo lowered_type;
-        if (!LowerInstructionType(module,
-                                  local.type,
-                                  source_path,
-                                  diagnostics,
-                                  "local '" + local.name + "' in function '" + function.name + "'",
-                                  lowered_type)) {
-            return false;
-        }
-        BackendLocal backend_local {
-            .source_name = local.name,
-            .backend_name = BackendLocalName(local.name),
-            .type = local.type,
-            .lowered_type = lowered_type,
-            .is_parameter = local.is_parameter,
-            .is_mutable = local.is_mutable,
-        };
-        state.locals.emplace(local.name, backend_local);
-        backend_function.locals.push_back(std::move(backend_local));
-    }
-
-    for (std::size_t block_index = 0; block_index < function.blocks.size(); ++block_index) {
-        state.blocks.emplace(function.blocks[block_index].label,
-                             BackendBlockName(function_index, block_index, function.blocks[block_index].label));
-    }
-
-    for (std::size_t block_index = 0; block_index < function.blocks.size(); ++block_index) {
-        const auto& block = function.blocks[block_index];
-        BackendBlock backend_block;
-        backend_block.source_label = block.label;
-        backend_block.backend_label = BackendBlockName(function_index, block_index, block.label);
-        backend_block.instructions.reserve(block.instructions.size());
-
-        for (std::size_t instruction_index = 0; instruction_index < block.instructions.size(); ++instruction_index) {
-            if (!LowerInstruction(block.instructions[instruction_index],
-                                  block_index,
-                                  instruction_index,
-                                  source_path,
-                                  diagnostics,
-                                  state,
-                                  backend_block)) {
-                return false;
-            }
-        }
-
-        if (!LowerTerminator(block, source_path, diagnostics, state, backend_block)) {
-            return false;
-        }
-
-        backend_function.blocks.push_back(std::move(backend_block));
-    }
-
-    backend_module.functions.push_back(std::move(backend_function));
-    return true;
-}
-
-bool LowerGlobal(const mir::Module& module,
-                 const mir::GlobalDecl& global,
-                 const std::filesystem::path& source_path,
-                 support::DiagnosticSink& diagnostics,
-                 BackendModule& backend_module) {
-    if (global.names.empty()) {
-        ReportBackendError(source_path, "LLVM bootstrap backend requires each global declaration to name at least one global", diagnostics);
-        return false;
-    }
-
-    BackendTypeInfo lowered_type;
-    if (!LowerInstructionType(module,
-                              global.type,
-                              source_path,
-                              diagnostics,
-                              "global declaration",
-                              lowered_type)) {
-        return false;
-    }
-
-    for (const auto& name : global.names) {
-        backend_module.globals.push_back({
-            .is_const = global.is_const,
-            .is_extern = global.is_extern,
-            .source_name = name,
-            .backend_name = BackendGlobalName(name),
-            .type = global.type,
-            .lowered_type = lowered_type,
-            .initializers = global.initializers,
-        });
-    }
-    return true;
-}
-
 struct ExecutableValue {
     std::string text;
     BackendTypeInfo type;
@@ -2026,41 +594,8 @@ std::vector<const mir::Local*> ParameterLocals(const mir::Function& function) {
     return params;
 }
 
-std::string LLVMFunctionSymbol(std::string_view source_name,
-                               bool wrap_hosted_main) {
-    if (wrap_hosted_main && source_name == "main") {
-        return "@__mc_user_main";
-    }
-    return "@" + std::string(source_name);
-}
-
-std::string LLVMBlockLabel(std::size_t function_index,
-                           std::size_t block_index,
-                           const std::string& source_label) {
-    return "bb" + std::to_string(function_index) + "_" + std::to_string(block_index) + "." + source_label;
-}
-
-std::string LLVMLocalSlotName(std::string_view source_name) {
-    return "%local." + std::string(source_name);
-}
-
-std::string LLVMParamName(std::string_view source_name) {
-    return "%arg." + std::string(source_name);
-}
-
-std::string LLVMTempName(std::size_t function_index,
-                         std::size_t block_index,
-                         std::size_t instruction_index) {
-    return "%t" + std::to_string(function_index) + "_" + std::to_string(block_index) + "_" +
-           std::to_string(instruction_index);
-}
-
 std::string LLVMTypeName(const BackendTypeInfo& type_info) {
     return type_info.backend_name;
-}
-
-std::string LLVMGlobalName(std::string_view source_name) {
-    return BackendGlobalName(std::string(source_name));
 }
 
 std::string LLVMZeroValue(const BackendTypeInfo& type_info) {
@@ -3170,7 +1705,34 @@ bool ResolveEnumInstructionLayout(const mir::Instruction& instruction,
                            diagnostics);
         return false;
     }
+    if (variant_index >= layout.variant_field_types.size() || variant_index >= layout.variant_payload_offsets.size()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission produced inconsistent enum layout metadata for type '" +
+                               sema::FormatType(enum_type) + "' in " + context,
+                           diagnostics);
+        return false;
+    }
     return true;
+}
+
+std::string EmitEnumPayloadFieldPointer(const std::string& enum_slot,
+                                       const EnumBackendLayout& layout,
+                                       std::size_t payload_offset,
+                                       std::size_t function_index,
+                                       std::size_t block_index,
+                                       std::size_t instruction_index,
+                                       std::string_view suffix,
+                                       std::vector<std::string>& output_lines) {
+    const std::string payload_slot = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix) + ".payload";
+    output_lines.push_back(payload_slot + " = getelementptr inbounds " + layout.aggregate_type.backend_name + ", ptr " + enum_slot + ", i64 0, i32 1");
+    if (payload_offset == 0) {
+        return payload_slot;
+    }
+
+    const std::string field_slot = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix) + ".field";
+    output_lines.push_back(field_slot + " = getelementptr inbounds " + layout.payload_type.backend_name + ", ptr " + payload_slot + ", i64 0, i64 " +
+                           std::to_string(payload_offset));
+    return field_slot;
 }
 
 bool EmitVariantInitInstruction(const mir::Instruction& instruction,
@@ -3196,33 +1758,47 @@ bool EmitVariantInitInstruction(const mir::Instruction& instruction,
                                       variant_index)) {
         return false;
     }
+    if (instruction.operands.size() != layout.variant_field_types[variant_index].size()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission found enum payload operand mismatch in " +
+                               FunctionBlockContext("variant_init", state.function->name, block),
+                           diagnostics);
+        return false;
+    }
 
-    std::string current_value = LLVMStructInsertBase(layout.aggregate_type);
-    const std::string tag_temp = instruction.operands.empty()
-                                     ? LLVMTempName(function_index, block_index, instruction_index)
-                                     : LLVMTempName(function_index, block_index, instruction_index) + ".tag";
-    output_lines.push_back(tag_temp + " = insertvalue " + layout.aggregate_type.backend_name + " " + current_value + ", i64 " +
-                           std::to_string(variant_index) + ", 0");
-    current_value = tag_temp;
+    const std::string enum_slot = LLVMTempName(function_index, block_index, instruction_index) + ".variant.slot";
+    output_lines.push_back(enum_slot + " = alloca " + layout.aggregate_type.backend_name + ", align " +
+                           std::to_string(layout.aggregate_type.alignment));
+    output_lines.push_back("store " + layout.aggregate_type.backend_name + " zeroinitializer, ptr " + enum_slot + ", align " +
+                           std::to_string(layout.aggregate_type.alignment));
 
-    const std::size_t field_offset = layout.variant_field_offsets[variant_index];
+    const std::string tag_slot = LLVMTempName(function_index, block_index, instruction_index) + ".variant.tag";
+    output_lines.push_back(tag_slot + " = getelementptr inbounds " + layout.aggregate_type.backend_name + ", ptr " + enum_slot + ", i64 0, i32 0");
+    output_lines.push_back("store i64 " + std::to_string(variant_index) + ", ptr " + tag_slot + ", align 8");
+
     for (std::size_t index = 0; index < instruction.operands.size(); ++index) {
         ExecutableValue operand;
         if (!ResolveExecutableValue(state, instruction.operands[index], block, source_path, diagnostics, operand)) {
             return false;
         }
 
-        const std::size_t field_index = field_offset + index;
-        const std::string next_value = index + 1 == instruction.operands.size()
-                                           ? LLVMTempName(function_index, block_index, instruction_index)
-                                           : LLVMTempName(function_index, block_index, instruction_index) + ".variant" + std::to_string(index);
-        output_lines.push_back(next_value + " = insertvalue " + layout.aggregate_type.backend_name + " " + current_value + ", " +
-                               layout.field_types[field_index].backend_name + " " + operand.text + ", " +
-                               std::to_string(field_index));
-        current_value = next_value;
+        const std::string field_slot = EmitEnumPayloadFieldPointer(enum_slot,
+                                                                   layout,
+                                                                   layout.variant_payload_offsets[variant_index][index],
+                                                                   function_index,
+                                                                   block_index,
+                                                                   instruction_index,
+                                                                   "variant_init." + std::to_string(index),
+                                                                   output_lines);
+        output_lines.push_back("store " + layout.variant_field_types[variant_index][index].backend_name + " " + operand.text + ", ptr " +
+                               field_slot + ", align " +
+                               std::to_string(layout.variant_field_types[variant_index][index].alignment));
     }
 
-    RecordExecutableValue(state, instruction.result, current_value, layout.aggregate_type);
+    const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
+    output_lines.push_back(result_temp + " = load " + layout.aggregate_type.backend_name + ", ptr " + enum_slot + ", align " +
+                           std::to_string(layout.aggregate_type.alignment));
+    RecordExecutableValue(state, instruction.result, result_temp, layout.aggregate_type);
     return true;
 }
 
@@ -3312,7 +1888,14 @@ bool EmitVariantExtractInstruction(const mir::Instruction& instruction,
         }
         payload_index = static_cast<std::size_t>(std::stoul(instruction.op));
     }
-    const std::size_t field_index = layout.variant_field_offsets[variant_index] + payload_index;
+    if (payload_index >= layout.variant_field_types[variant_index].size() ||
+        payload_index >= layout.variant_payload_offsets[variant_index].size()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission references out-of-range enum payload index in " +
+                               FunctionBlockContext("variant_extract", state.function->name, block),
+                           diagnostics);
+        return false;
+    }
 
     BackendTypeInfo result_type;
     if (!LowerInstructionType(*state.module,
@@ -3324,9 +1907,23 @@ bool EmitVariantExtractInstruction(const mir::Instruction& instruction,
         return false;
     }
 
+    const std::string enum_slot = EmitAggregateStackSlot(selector,
+                                                         function_index,
+                                                         block_index,
+                                                         instruction_index,
+                                                         "variant_extract.enum",
+                                                         output_lines);
+    const std::string field_slot = EmitEnumPayloadFieldPointer(enum_slot,
+                                                               layout,
+                                                               layout.variant_payload_offsets[variant_index][payload_index],
+                                                               function_index,
+                                                               block_index,
+                                                               instruction_index,
+                                                               "variant_extract." + std::to_string(payload_index),
+                                                               output_lines);
     const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
-    output_lines.push_back(result_temp + " = extractvalue " + layout.aggregate_type.backend_name + " " + selector.text + ", " +
-                           std::to_string(field_index));
+    output_lines.push_back(result_temp + " = load " + result_type.backend_name + ", ptr " + field_slot + ", align " +
+                           std::to_string(result_type.alignment));
     RecordExecutableValue(state, instruction.result, result_temp, result_type);
     return true;
 }
@@ -4996,7 +3593,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
         }
     }
 
-    return false;
+    MC_UNREACHABLE("unhandled mir::Instruction::Kind in executable backend lowering");
 }
 
 bool RenderExecutableTerminator(const mir::BasicBlock& block,
@@ -5676,36 +4273,7 @@ LowerResult LowerModule(const mir::Module& module,
         return {};
     }
 
-    auto backend_module = std::make_unique<BackendModule>();
-    backend_module->target = options.target;
-    backend_module->inspect_surface = std::string(kInspectSurface);
-    backend_module->globals.reserve(module.globals.size());
-    backend_module->functions.reserve(module.functions.size());
-
-    for (const auto& global : module.globals) {
-        if (!LowerGlobal(module, global, source_path, diagnostics, *backend_module)) {
-            return {};
-        }
-    }
-
-    for (std::size_t function_index = 0; function_index < module.functions.size(); ++function_index) {
-        if (!module.functions[function_index].type_params.empty()) {
-            continue;
-        }
-        if (!LowerFunction(module,
-                   module.functions[function_index],
-                           function_index,
-                           source_path,
-                           diagnostics,
-                           *backend_module)) {
-            return {};
-        }
-    }
-
-    return {
-        .module = std::move(backend_module),
-        .ok = true,
-    };
+    return LowerInspectModule(module, source_path, options.target, diagnostics);
 }
 
 ObjectBuildResult BuildObjectFile(const mir::Module& module,
@@ -5866,68 +4434,6 @@ BuildResult BuildExecutable(const mir::Module& module,
         .artifacts = options.artifacts,
         .ok = true,
     };
-}
-
-std::string DumpModule(const BackendModule& module) {
-    std::ostringstream stream;
-    stream << "BackendModule surface=" << module.inspect_surface << " triple=" << module.target.triple
-           << " target_family=" << module.target.target_family << " object_format=" << module.target.object_format
-           << " hosted=" << (module.target.hosted ? "true" : "false") << '\n';
-
-    for (const auto& global : module.globals) {
-        std::ostringstream global_line;
-        global_line << "Global source=" << global.source_name << " backend=" << global.backend_name
-                    << " type=" << FormatTypeInfo(global.lowered_type);
-        if (global.is_const) {
-            global_line << " const";
-        }
-        if (global.is_extern) {
-            global_line << " extern";
-        }
-        if (!global.initializers.empty()) {
-            global_line << " init=[";
-            for (std::size_t index = 0; index < global.initializers.size(); ++index) {
-                if (index > 0) {
-                    global_line << ", ";
-                }
-                global_line << global.initializers[index];
-            }
-            global_line << "]";
-        }
-        WriteLine(stream, 1, global_line.str());
-    }
-
-    for (const auto& function : module.functions) {
-        std::ostringstream header;
-        header << "Function source=" << function.source_name << " backend=" << function.backend_name;
-        if (!function.backend_return_types.empty()) {
-            header << " returns=" << FormatReturnTypes(function.backend_return_types);
-        }
-        WriteLine(stream, 1, header.str());
-
-        for (const auto& local : function.locals) {
-            std::ostringstream local_line;
-            local_line << "Local source=" << local.source_name << " backend=" << local.backend_name
-                       << " type=" << FormatTypeInfo(local.lowered_type);
-            if (local.is_parameter) {
-                local_line << " param";
-            }
-            if (!local.is_mutable) {
-                local_line << " readonly";
-            }
-            WriteLine(stream, 2, local_line.str());
-        }
-
-        for (const auto& block : function.blocks) {
-            WriteLine(stream, 2, "Block source=" + block.source_label + " backend=" + block.backend_label);
-            for (const auto& instruction : block.instructions) {
-                WriteLine(stream, 3, instruction);
-            }
-            WriteLine(stream, 3, block.terminator);
-        }
-    }
-
-    return stream.str();
 }
 
 }  // namespace mc::codegen_llvm

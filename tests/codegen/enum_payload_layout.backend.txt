@@ -1,0 +1,24 @@
+BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
+  Function source=payload_roundtrip backend=@payload_roundtrip returns=[f64 [repr=double, size=8, align=8]]
+    Local source=value backend=%local.value type=Choice [repr={i64, [16 x i8]}, size=24, align=8]
+    Local source=tag backend=%local.tag type=i8 [repr=i8, size=1, align=1] readonly
+    Local source=payload backend=%local.payload type=f64 [repr=double, size=8, align=8] readonly
+    Block source=entry0 backend=bb0_0.entry0
+      %t0_0_0 = const int_literal [repr=i64, size=8, align=8] 7
+      %t0_0_1 = const float_literal [repr=double, size=8, align=8] 4.25
+      %t0_0_2 = variant_init Choice [repr={i64, [16 x i8]}, size=24, align=8] target_display=Choice.Small operands=[%t0_0_0, %t0_0_1]
+      store Choice %t0_0_2 -> %local.value as Choice [repr={i64, [16 x i8]}, size=24, align=8]
+      %t0_0_4 = load Choice [repr={i64, [16 x i8]}, size=24, align=8] %local.value
+      %t0_0_5 = variant_match bool [repr=i1, size=1, align=1] target_display=Choice.Small operands=[%t0_0_4]
+      condbr %t0_0_5 true=bb0_2.switch_case3 false=bb0_1.switch_default2
+    Block source=switch_default2 backend=bb0_1.switch_default2
+      %t0_1_0 = const float_literal [repr=double, size=8, align=8] 0.0
+      ret f64 [repr=double, size=8, align=8] %t0_1_0
+    Block source=switch_case3 backend=bb0_2.switch_case3
+      %t0_2_0 = variant_extract i8 [repr=i8, size=1, align=1] target_display=Choice.Small operands=[%t0_0_4]
+      store i8 %t0_2_0 -> %local.tag as i8 [repr=i8, size=1, align=1]
+      %t0_2_2 = variant_extract f64 [repr=double, size=8, align=8] target_display=Choice.Small operands=[%t0_0_4]
+      store f64 %t0_2_2 -> %local.payload as f64 [repr=double, size=8, align=8]
+      %t0_2_4 = load f64 [repr=double, size=8, align=8] %local.payload
+      ret f64 [repr=double, size=8, align=8] %t0_2_4
+

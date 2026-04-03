@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
         {"checked_division.mc", "checked_division.backend.txt"},
         {"checked_shift.mc", "checked_shift.backend.txt"},
         {"direct_call_add.mc", "direct_call_add.backend.txt"},
+        {"enum_payload_layout.mc", "enum_payload_layout.backend.txt"},
         {"explicit_conversion.mc", "explicit_conversion.backend.txt"},
         {"low_level_intrinsics.mc", "low_level_intrinsics.backend.txt"},
         {"pointer_int_conversion.mc", "pointer_int_conversion.backend.txt"},

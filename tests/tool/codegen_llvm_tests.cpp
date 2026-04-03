@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -425,6 +426,118 @@ void TestLowerModuleLowersRepresentationPreservingConversions() {
            "int-to-pointer conversions should lower through target pointer representation");
 }
 
+void TestEnumPayloadLayoutUsesSharedAlignedStorage() {
+    mc::mir::TypeDecl choice {
+        .kind = mc::mir::TypeDecl::Kind::kEnum,
+        .name = "Choice",
+        .variants = {
+            {.name = "Small",
+             .payload_fields = {{"tag", mc::sema::NamedType("i8")}, {"value", mc::sema::NamedType("f64")}}},
+            {.name = "Count", .payload_fields = {{"count", mc::sema::NamedType("i32")}}},
+        },
+    };
+
+    mc::mir::Instruction small_tag {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v0",
+        .type = mc::sema::NamedType("i8"),
+        .op = "7",
+    };
+
+    mc::mir::Instruction small_value {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v1",
+        .type = mc::sema::NamedType("f64"),
+        .op = "4.25",
+    };
+
+    mc::mir::Instruction make_small {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v2",
+        .type = mc::sema::NamedType("Choice"),
+        .target = "Choice.Small",
+        .target_name = "Small",
+        .operands = {"%v0", "%v1"},
+    };
+
+    mc::mir::Instruction match_small {
+        .kind = mc::mir::Instruction::Kind::kVariantMatch,
+        .result = "%v3",
+        .type = mc::sema::BoolType(),
+        .target = "Choice.Small",
+        .target_name = "Small",
+        .target_base_type = mc::sema::NamedType("Choice"),
+        .operands = {"%v2"},
+    };
+
+    mc::mir::Instruction extract_small_value {
+        .kind = mc::mir::Instruction::Kind::kVariantExtract,
+        .result = "%v4",
+        .type = mc::sema::NamedType("f64"),
+        .op = "1",
+        .target = "Choice.Small",
+        .target_name = "Small",
+        .target_base_type = mc::sema::NamedType("Choice"),
+        .target_index = 1,
+        .operands = {"%v2"},
+    };
+
+    mc::mir::BasicBlock entry {
+        .label = "entry0",
+        .instructions = {small_tag, small_value, make_small, match_small, extract_small_value},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v4"},
+        },
+    };
+
+    mc::mir::Function function {
+        .name = "enum_payload_roundtrip",
+        .return_types = {mc::sema::NamedType("f64")},
+        .blocks = {entry},
+    };
+
+    mc::mir::Module module {
+        .type_decls = {choice},
+        .functions = {function},
+    };
+
+    mc::support::DiagnosticSink diagnostics;
+    mc::codegen_llvm::LowerOptions options {
+        .target = mc::codegen_llvm::BootstrapTargetConfig(),
+    };
+
+    const auto lowered = mc::codegen_llvm::LowerModule(module, "tests/cases/hello.mc", options, diagnostics);
+    Expect(lowered.ok, "mixed-alignment enum payloads should lower successfully");
+    Expect(!diagnostics.HasErrors(), "mixed-alignment enum payload lowering should not emit backend diagnostics");
+
+    const auto dump = mc::codegen_llvm::DumpModule(*lowered.module);
+    Expect(dump.find("Choice [repr={i64, [16 x i8]}, size=24, align=8]") != std::string::npos,
+           "enum lowering should use a shared 16-byte payload region instead of flattening all variant fields");
+    Expect(dump.find("variant_extract f64 [repr=double, size=8, align=8]") != std::string::npos,
+           "variant_extract should preserve extracted payload type information");
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_enum_payload_layout";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink build_diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        module,
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "enum_payload.ll",
+                .object_path = artifact_dir / "enum_payload.o",
+            },
+        },
+        build_diagnostics);
+    Expect(object_result.ok, "mixed-alignment enum payloads should emit executable LLVM IR successfully");
+    Expect(!build_diagnostics.HasErrors(), "object emission for mixed-alignment enum payloads should not emit backend diagnostics");
+}
+
 }  // namespace
 
 int main() {
@@ -435,5 +548,6 @@ int main() {
     TestLowerModuleRejectsUnsupportedInstruction();
     TestLowerModuleLowersCheckedIntegerSemantics();
     TestLowerModuleLowersRepresentationPreservingConversions();
+    TestEnumPayloadLayoutUsesSharedAlignedStorage();
     return 0;
 }
