@@ -1094,6 +1094,30 @@ class FunctionLowerer {
         };
     }
 
+    struct StoreBaseMetadata {
+        Instruction::StorageBaseKind kind = Instruction::StorageBaseKind::kNone;
+        std::string name;
+    };
+
+    StoreBaseMetadata StoreBaseMetadataForExpr(const Expr& expr) const {
+        if (!expr.text.empty() && local_types_.contains(expr.text)) {
+            return {
+                .kind = Instruction::StorageBaseKind::kLocal,
+                .name = expr.text,
+            };
+        }
+
+        const std::string canonical_name = CalleeName(expr);
+        if (!canonical_name.empty() && InferTargetKindForExpr(expr) == Instruction::TargetKind::kGlobal) {
+            return {
+                .kind = Instruction::StorageBaseKind::kGlobal,
+                .name = canonical_name,
+            };
+        }
+
+        return {};
+    }
+
     std::string StableExprMetadataText(const Expr& expr) const {
         const TargetMetadata metadata = TargetMetadataForExpr(expr);
         return !metadata.name.empty() ? metadata.name : metadata.display;
@@ -2135,6 +2159,7 @@ class FunctionLowerer {
 
     void EmitStoreTarget(const Expr& target, const ValueInfo& value) {
         std::vector<std::string> target_operands = {value.value};
+        const StoreBaseMetadata base_storage = target.left != nullptr ? StoreBaseMetadataForExpr(*target.left) : StoreBaseMetadata{};
         if (target.kind == Expr::Kind::kIndex && target.left != nullptr && target.right != nullptr) {
             const auto base = LowerExpr(*target.left);
             const auto index = LowerExpr(*target.right);
@@ -2156,6 +2181,8 @@ class FunctionLowerer {
                                                               : Instruction::TargetKind::kOther,
             .target_name = (target.kind == Expr::Kind::kField || target.kind == Expr::Kind::kDerefField) ? target.text : std::string(),
             .target_display = RenderExprInline(target),
+            .target_base_storage = base_storage.kind,
+            .target_base_name = base_storage.name,
             .target_base_type = target.left != nullptr
                                     ? KnownTypeOrError(ExprTypeOrUnknown(*target.left), target.left->span, "assignment target base type")
                                     : sema::UnknownType(),
@@ -3433,6 +3460,10 @@ bool ValidateModule(const Module& module,
                                 if (instruction.operands.size() != 2) {
                                     report("store_target field access must use value and base operands in function " + function.name);
                                 }
+                                if (instruction.target_base_storage == Instruction::StorageBaseKind::kNone !=
+                                    instruction.target_base_name.empty()) {
+                                    report("store_target field access direct-base metadata must pair kind and name in function " + function.name);
+                                }
                                 if (!instruction.target_aux_types.empty()) {
                                     report("store_target field access must not carry index metadata in function " + function.name);
                                 }
@@ -3481,6 +3512,10 @@ bool ValidateModule(const Module& module,
                             case Instruction::TargetKind::kIndex: {
                                 if (instruction.operands.size() != 3) {
                                     report("store_target index access must use value, base, and index operands in function " + function.name);
+                                }
+                                if (instruction.target_base_storage == Instruction::StorageBaseKind::kNone !=
+                                    instruction.target_base_name.empty()) {
+                                    report("store_target index access direct-base metadata must pair kind and name in function " + function.name);
                                 }
                                 if (!instruction.target_name.empty()) {
                                     report("store_target index access must not name a field target in function " + function.name);

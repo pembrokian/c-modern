@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <sstream>
-#include <unordered_map>
 
 namespace mc::codegen_llvm {
 
@@ -82,34 +81,8 @@ void ReportBackendError(const std::filesystem::path& source_path,
 
 const mir::TypeDecl* FindTypeDecl(const mir::Module& module,
                                   std::string_view name) {
-    struct TypeDeclLookupCache {
-        const mir::Module* module = nullptr;
-        const void* type_decl_data = nullptr;
-        std::size_t type_decl_count = 0;
-        std::unordered_map<std::string, const mir::TypeDecl*> entries;
-    };
-
-    static thread_local TypeDeclLookupCache cache;
-    if (cache.module != &module || cache.type_decl_data != module.type_decls.data() ||
-        cache.type_decl_count != module.type_decls.size()) {
-        cache.module = &module;
-        cache.type_decl_data = module.type_decls.data();
-        cache.type_decl_count = module.type_decls.size();
-        cache.entries.clear();
-        cache.entries.reserve(module.type_decls.size());
-        for (const auto& type_decl : module.type_decls) {
-            cache.entries.emplace(type_decl.name, &type_decl);
-        }
-    }
-
-    const auto it = cache.entries.find(std::string(name));
-    if (it != cache.entries.end()) {
-        return it->second;
-    }
-
     for (const auto& type_decl : module.type_decls) {
         if (type_decl.name == name) {
-            cache.entries[type_decl.name] = &type_decl;
             return &type_decl;
         }
     }

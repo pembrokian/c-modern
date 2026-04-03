@@ -69,7 +69,7 @@ std::string LLVMFunctionSymbol(std::string_view source_name,
 std::string LLVMBlockLabel(std::size_t function_index,
                            std::size_t block_index,
                            const std::string& source_label) {
-    return "bb" + std::to_string(function_index) + "_" + std::to_string(block_index) + "." + source_label;
+    return BackendBlockName(function_index, block_index, source_label);
 }
 
 std::string LLVMLocalSlotName(std::string_view source_name) {
@@ -83,8 +83,7 @@ std::string LLVMParamName(std::string_view source_name) {
 std::string LLVMTempName(std::size_t function_index,
                          std::size_t block_index,
                          std::size_t instruction_index) {
-    return "%t" + std::to_string(function_index) + "_" + std::to_string(block_index) + "_" +
-           std::to_string(instruction_index);
+    return BackendTempName(function_index, block_index, instruction_index);
 }
 
 std::string LLVMGlobalName(std::string_view source_name) {

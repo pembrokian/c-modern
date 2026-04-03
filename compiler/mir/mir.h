@@ -67,6 +67,12 @@ struct Instruction {
         kWrap,
     };
 
+    enum class StorageBaseKind {
+        kNone,
+        kLocal,
+        kGlobal,
+    };
+
     enum class Kind {
         kConst,
         kLocalAddr,
@@ -118,6 +124,8 @@ struct Instruction {
     TargetKind target_kind = TargetKind::kNone;
     std::string target_name;
     std::string target_display;
+    StorageBaseKind target_base_storage = StorageBaseKind::kNone;
+    std::string target_base_name;
     sema::Type target_base_type;
     std::vector<sema::Type> target_aux_types;
     std::int64_t target_index = -1;

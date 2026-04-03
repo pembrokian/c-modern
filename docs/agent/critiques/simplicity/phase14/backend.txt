@@ -1,0 +1,156 @@
+Simplicity Critique: codegen_llvm
+
+1. Summary
+
+Too complex. Two passes do the same traversal independently, sharing no code. The debug/inspect path is fully executed on every real build and then discarded. Utilities are duplicated verbatim across files. Structural data is re-parsed from strings at the emit site.
+
+2. High-Impact Simplifications
+
+1. Delete the inspect pass or make it conditional. BuildObjectFile always runs LowerModule -> LowerInspectModule -> full MIR traversal into BackendModule, then throws the result away and runs RenderLlvmModule over the same MIR. Two full passes, one wasted on every build.
+
+2. Merge the duplicated helper bodies. backend.cpp and backend_inspect.cpp each define their own anonymous-namespace copies of ToString (4 switches), FunctionLoweringState, ResolveValue, ResolveTypedValue, ResolveLocal, ResolveBlock, RequireInstructionResult, RequireOperandCount, RecordLoweredValue, ResolveSingleOperand, ResolveTwoOperands, ResolveTwoTypedOperands, ResolveOperands, IsIntegerType, IsAtomicScalarType, LLVMAtomicOrderKeyword, JoinOperands. These are identical implementations in separate translation units.
+
+3. Delete one of the two naming schemes. backend_names.cpp exports both BackendTempName and LLVMTempName. Their bodies are character-for-character identical. Same for BackendBlockName/LLVMBlockLabel. The two name families exist only because the two passes were written separately.
+
+4. Eliminate ResolveSingle/Two/TwoTyped/Operands. These are RequireOperandCount + ResolveValue wired together. Every call site passes 6-8 arguments through a wrapper that adds no logic. Inline them.
+
+5. Store field/index metadata structurally in MIR. BaseStoreTargetName parses instruction.target_display by scanning for a .field_name suffix pattern. BaseIndexedTargetName scans for [...] suffixes. These are string re-interpretations of address + field/index data the MIR already knows.
+
+3. Specific Findings
+
+A. Inspect lowering runs unconditionally on every build
+
+What exists: BuildObjectFile calls LowerModule -> LowerInspectModule, which builds a full BackendModule tree (allocating BackendFunction, BackendBlock, BackendLocal, populating all instruction strings). Then it calls RenderLlvmModule, which walks the raw mir::Module again entirely independently. The BackendModule is only used if --inspect-surface=backend_ir_text is requested.
+
+Why harmful: every mc build pays for two full MIR traversals. The inspect pass allocates strings for every instruction, every block, every local, then immediately deallocates them.
+
+Simpler form: gate the inspect pass on the caller's intent. BuildObjectFile does not need LowerModule at all - its only purpose there is target validation. Extract the target check, call it directly, skip LowerInspectModule entirely unless the inspect surface was requested.
+
+B. FunctionLoweringState is defined twice, identically
+
+What exists: backend.cpp lines 46-55 and backend_inspect.cpp lines 16-24 define struct FunctionLoweringState with the same four unordered_map fields. Both files are in the same namespace; both declare the struct in anonymous namespace so there is no conflict, only silent redundancy.
+
+Why harmful: any change to the state (adding a field, changing a map key type) must be done in two places.
+
+Simpler form: one definition in backend_internal.h, used by both translation units.
+
+C. ToString switches duplicated verbatim
+
+What exists: four switch functions - ToString(mir::Instruction::Kind), ToString(mir::Instruction::TargetKind), ToString(mir::Instruction::ArithmeticSemantics), ToString(mir::Terminator::Kind) - appear identically in both backend.cpp (lines 62-196) and backend_inspect.cpp (lines 27-137). 35 cases in the first switch alone, duplicated exactly.
+
+Why harmful: when a new MIR instruction kind is added, the comment in backend.cpp already warns forgetting to handle a new kind will produce a runtime diagnostic. That warning applies twice without warning.
+
+Simpler form: these belong in backend_internal.h or a shared .cpp. They are pure data mappings.
+
+D. BackendTempName and LLVMTempName are the same function
+
+What exists:
+
+backend_names.cpp
+std::string BackendTempName(std::size_t fi, std::size_t bi, std::size_t ii) {
+    return "%t" + std::to_string(fi) + "_" + std::to_string(bi) + "_" + std::to_string(ii);
+}
+std::string LLVMTempName(std::size_t fi, std::size_t bi, std::size_t ii) {
+    return "%t" + std::to_string(fi) + "_" + std::to_string(bi) + "_" + std::to_string(ii);
+}
+
+Same body. The distinction is fiction created by having two separate passes.
+
+Simpler form: one function.
+
+E. ResolveSingle/TwoOperands family wraps two obvious lines
+
+What exists: ResolveSingleOperand (both files, about 25 lines each) calls RequireOperandCount(1) then ResolveValue. ResolveTwoOperands calls RequireOperandCount(2) and two ResolveValue calls. ResolveTwoTypedOperands does the same with ResolveTypedValue. There are also ResolveSingleExecutableOperand and ResolveTwoExecutableOperands variants in backend.cpp. Six near-identical wrapper functions, each passing 6-8 arguments through to two other functions that are used directly elsewhere anyway.
+
+Why harmful: they add a call level without reducing argument count at the call site (every call still passes state, instruction, function, block, source_path, diagnostics, plus the output variables). The wrappers exist only to bundle two lines, and they multiplied because the two pass paths share no code.
+
+Simpler form: call RequireOperandCount and ResolveValue directly wherever they appear.
+
+F. CheckedHelperRequirementsPass is a class wrapping a plain scan
+
+What exists: a struct CheckedHelperRequirementsPass with one public method Run(), two private helpers SeedFunctionValueTypes and CollectFunctionRequirements, and three data members that are just references to the call-site arguments. CollectCheckedHelperRequirements instantiates it and calls Run().
+
+Why harmful: the class buys nothing. Its private methods are closures around the same data a free function would take as arguments. The struct wrapper adds a layer of naming and structure that obscures a simple two-pass scan.
+
+Simpler form: one free function that iterates functions, then blocks, then instructions. No class, no Run().
+
+G. FindTypeDecl has three search strategies
+
+What exists in backend_types.cpp:
+
+static thread_local TypeDeclLookupCache cache;
+1. Check if module pointer + size match; if not, repopulate hash map
+2. Hash map lookup
+3. If hash map misses, linear scan + insert into hash map
+
+Why harmful: the cache invalidation checks pointer address and vector size but not content - if type_decls is replaced with same-size data, the cache returns stale results. The post-miss linear scan duplicates what already happened when repopulating the map. If the name is absent, calling FindTypeDecl("absent") repeatedly does a map lookup miss + linear scan miss every time after the map is populated, since no negative cache entry is stored.
+
+Simpler form: either a sorted array with binary search (the module is built once) or a plain hash map built once per module and stored on the module. The thread-local pointer-stability cache is a hand-rolled weak reference that does not belong here.
+
+H. BaseStoreTargetName and BaseIndexedTargetName parse strings
+
+What exists: BaseStoreTargetName (lines 208-218, backend.cpp) scans instruction.target_display for a .field_name suffix and strips it to recover a base variable name. BaseIndexedTargetName scans for [...] to recover an array base name.
+
+Why harmful: target_display is a human-readable string. The MIR instruction already has target_name, target_kind, and target_base_type - but the code does not trust them and re-parses the display string to find the base. This is the frontend storing structured data as text for later re-interpretation.
+
+Simpler form: the kStoreTarget + kField path needs to write back to the base local/global. The MIR instruction should carry an explicit base-local or base-global reference field so the backend can look it up directly without string surgery.
+
+I. globals rebuilt per function instead of once per module
+
+What exists: RenderExecutableFunction builds state.globals by iterating all module.globals on every function call. For a module with N functions and M globals, this is O(NxM) work. The globals table is rebuilt identically for every function.
+
+Simpler form: build the global map once before iterating functions and pass it in.
+
+J. Error message construction is inconsistent and verbose
+
+What exists: about 50 call sites inline "...in function '" + function.name + "' block '" + block.label + "'". Two helpers, FunctionBlockContext and ExecutableFunctionBlockContext, were introduced to factor this, but they are used only at a subset of call sites.
+
+The helpers themselves take 2-3 arguments and return a string that is then concatenated into a larger string. This is a string-building abstraction over string building.
+
+Simpler form: use FunctionBlockContext consistently everywhere, or eliminate both helpers and store function.name + "/" + block.label on a context struct passed through the call chain so call sites do not assemble it at all.
+
+4. Suggested Rewrites
+
+FindTypeDecl - replace the thread-local cache with a map on the module, or at minimum remove the redundant post-miss scan:
+
+const mir::TypeDecl* FindTypeDecl(const mir::Module& module, std::string_view name) {
+    // Module is immutable once lowering starts; caller can cache at module level.
+    for (const auto& td : module.type_decls) {
+        if (td.name == name) return &td;
+    }
+    return nullptr;
+}
+
+For large modules, replace with a sorted index built once. The thread-local cache mechanism should live at the call site that actually has module lifetime, not inside this function.
+
+BinaryOpcodeForLLVM - table:
+
+struct BinaryEntry { const char* op; const char* fi; const char* ui; const char* si; };
+static constexpr BinaryEntry kBinaryOps[] = {
+    {"+", "fadd", "add",  "add" },
+    {"-", "fsub", "sub",  "sub" },
+    {"*", "fmul", "mul",  "mul" },
+    {"/", "fdiv", "udiv", "sdiv"},
+    {"%", "frem", "urem", "srem"},
+    {"<<", nullptr, "shl", "shl"},
+    {">>", nullptr, "lshr","ashr"},
+    {"&",  nullptr, "and", "and"},
+    {"|",  nullptr, "or",  "or" },
+    {"^",  nullptr, "xor", "xor"},
+};
+// look up instruction.op, select column by float/unsigned/signed
+
+Eliminates 13 if-chains. Same for ComparePredicateForLLVM.
+
+ResolveSingleExecutableOperand - inline it:
+
+Before (current, about 30 lines of wrapper):
+
+if (!ResolveSingleExecutableOperand(state, instruction, "op_name", block, source_path, diagnostics, operand)) return false;
+
+After (direct, about 5 lines):
+
+if (!RequireOperandCount(instruction, 1, "...", "op_name", state.function->name, block, source_path, diagnostics)) return false;
+if (!ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, operand)) return false;
+
+The wrapper saves no lines; it costs a level of indirection with no benefit.
