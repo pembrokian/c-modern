@@ -577,19 +577,13 @@ class Parser {
             return nullptr;
         }
 
-        std::vector<Token> prefix_tokens;
-        std::vector<TypeExpr::Kind> prefix_kinds;
-        while (Check(TokenKind::kConst) || Check(TokenKind::kStar)) {
-            const auto prefix = Advance();
-            if (prefix_tokens.size() >= kMaxTypeExprDepth) {
-                ReportError(prefix, "type expression nesting exceeds parser limit");
-                while (Check(TokenKind::kConst) || Check(TokenKind::kStar)) {
-                    Advance();
-                }
-                break;
-            }
-            prefix_tokens.push_back(prefix);
-            prefix_kinds.push_back(prefix.kind == TokenKind::kConst ? TypeExpr::Kind::kConst : TypeExpr::Kind::kPointer);
+        if (Match(TokenKind::kConst) || Match(TokenKind::kStar)) {
+            auto type = std::make_unique<TypeExpr>();
+            type->kind = Previous().kind == TokenKind::kConst ? TypeExpr::Kind::kConst : TypeExpr::Kind::kPointer;
+            type->span.begin = Previous().span.begin;
+            type->inner = ParseTypeExpr(depth + 1);
+            type->span.end = type->inner != nullptr ? type->inner->span.end : Previous().span.end;
+            return type;
         }
 
         std::unique_ptr<TypeExpr> type;
@@ -638,15 +632,6 @@ class Parser {
             }
 
             type->span.end = Previous().span.end;
-        }
-
-        for (std::size_t index = prefix_tokens.size(); index > 0; --index) {
-            auto wrapper = std::make_unique<TypeExpr>();
-            wrapper->kind = prefix_kinds[index - 1];
-            wrapper->span.begin = prefix_tokens[index - 1].span.begin;
-            wrapper->inner = std::move(type);
-            wrapper->span.end = wrapper->inner != nullptr ? wrapper->inner->span.end : prefix_tokens[index - 1].span.end;
-            type = std::move(wrapper);
         }
 
         return type;
@@ -801,50 +786,64 @@ class Parser {
         return statements;
     }
 
+    bool LooksLikeVariantCasePattern() const {
+        return Check(TokenKind::kIdentifier) &&
+               (Peek(1).kind == TokenKind::kLParen || (Peek(1).kind == TokenKind::kDot && Peek(2).kind == TokenKind::kIdentifier));
+    }
+
+    std::string ParseCaseVariantName() {
+        std::string name;
+        if (!Check(TokenKind::kIdentifier)) {
+            ReportError(Current(), "expected variant name");
+            return name;
+        }
+
+        name = Current().lexeme;
+        Advance();
+        if (!Match(TokenKind::kDot)) {
+            return name;
+        }
+
+        const auto second = ParseIdentifier("expected variant name after '.'");
+        if (!second.has_value()) {
+            return name;
+        }
+        name += "." + *second;
+
+        if (!Match(TokenKind::kDot)) {
+            return name;
+        }
+
+        const auto third = ParseIdentifier("expected variant name after '.'");
+        if (third.has_value()) {
+            name += "." + *third;
+        }
+        return name;
+    }
+
+    void ParseCasePatternBindings(CasePattern& pattern) {
+        if (!Match(TokenKind::kLParen)) {
+            return;
+        }
+
+        if (!Check(TokenKind::kRParen)) {
+            do {
+                const auto binding = ParseIdentifier("expected pattern binding name");
+                if (binding.has_value()) {
+                    pattern.bindings.push_back(*binding);
+                }
+            } while (Match(TokenKind::kComma));
+        }
+        Consume(TokenKind::kRParen, "expected ')' after pattern bindings");
+    }
+
     CasePattern ParseCasePattern() {
         CasePattern pattern;
         pattern.span.begin = Current().span.begin;
-        if (Check(TokenKind::kIdentifier) && Peek(1).kind == TokenKind::kDot && Peek(2).kind == TokenKind::kIdentifier) {
+        if (LooksLikeVariantCasePattern()) {
             pattern.kind = CasePattern::Kind::kVariant;
-            const auto qualifier = Advance();
-            Advance();
-            const auto variant_or_type = Advance();
-            if (Check(TokenKind::kDot) && Peek(1).kind == TokenKind::kIdentifier) {
-                Advance();
-                const auto variant = Advance();
-                pattern.variant_name = qualifier.lexeme + "." + variant_or_type.lexeme + "." + variant.lexeme;
-            } else {
-                pattern.variant_name = qualifier.lexeme + "." + variant_or_type.lexeme;
-            }
-            if (Match(TokenKind::kLParen)) {
-                if (!Check(TokenKind::kRParen)) {
-                    do {
-                        const auto binding = ParseIdentifier("expected pattern binding name");
-                        if (binding.has_value()) {
-                            pattern.bindings.push_back(*binding);
-                        }
-                    } while (Match(TokenKind::kComma));
-                }
-                Consume(TokenKind::kRParen, "expected ')' after pattern bindings");
-            }
-            pattern.span.end = Previous().span.end;
-            return pattern;
-        }
-
-        if (Check(TokenKind::kIdentifier) && Peek(1).kind == TokenKind::kLParen) {
-            pattern.kind = CasePattern::Kind::kVariant;
-            pattern.variant_name = Current().lexeme;
-            Advance();
-            Advance();
-            if (!Check(TokenKind::kRParen)) {
-                do {
-                    const auto binding = ParseIdentifier("expected pattern binding name");
-                    if (binding.has_value()) {
-                        pattern.bindings.push_back(*binding);
-                    }
-                } while (Match(TokenKind::kComma));
-            }
-            Consume(TokenKind::kRParen, "expected ')' after pattern bindings");
+            pattern.variant_name = ParseCaseVariantName();
+            ParseCasePatternBindings(pattern);
             pattern.span.end = Previous().span.end;
             return pattern;
         }
@@ -1047,7 +1046,18 @@ class Parser {
     }
 
     std::unique_ptr<Expr> ParseRangeExpr() {
-        auto expr = ParseBinaryChain(&Parser::ParseLogicalOrExpr, {TokenKind::kRange});
+        auto expr = ParseLogicalOrExpr();
+        while (Match(TokenKind::kRange)) {
+            const auto op = Previous();
+            auto node = std::make_unique<Expr>();
+            node->kind = Expr::Kind::kBinary;
+            node->span.begin = expr->span.begin;
+            node->text = std::string(mc::lex::ToString(op.kind));
+            node->left = std::move(expr);
+            node->right = ParseLogicalOrExpr();
+            node->span.end = node->right->span.end;
+            expr = std::move(node);
+        }
         if (expr->kind == Expr::Kind::kBinary && expr->text == "..") {
             expr->kind = Expr::Kind::kRange;
         }
@@ -1055,59 +1065,115 @@ class Parser {
     }
 
     std::unique_ptr<Expr> ParseLogicalOrExpr() {
-        return ParseBinaryChain(&Parser::ParseLogicalAndExpr, {TokenKind::kPipePipe});
-    }
-
-    std::unique_ptr<Expr> ParseLogicalAndExpr() {
-        return ParseBinaryChain(&Parser::ParseEqualityExpr, {TokenKind::kAmpAmp});
-    }
-
-    std::unique_ptr<Expr> ParseEqualityExpr() {
-        return ParseBinaryChain(&Parser::ParseRelationalExpr, {TokenKind::kEqEq, TokenKind::kBangEq});
-    }
-
-    std::unique_ptr<Expr> ParseRelationalExpr() {
-        return ParseBinaryChain(&Parser::ParseShiftExpr, {TokenKind::kLt, TokenKind::kLtEq, TokenKind::kGt, TokenKind::kGtEq});
-    }
-
-    std::unique_ptr<Expr> ParseShiftExpr() {
-        return ParseBinaryChain(&Parser::ParseAdditiveExpr, {TokenKind::kLtLt, TokenKind::kGtGt});
-    }
-
-    std::unique_ptr<Expr> ParseAdditiveExpr() {
-        return ParseBinaryChain(&Parser::ParseMultiplicativeExpr, {TokenKind::kPlus, TokenKind::kMinus});
-    }
-
-    std::unique_ptr<Expr> ParseMultiplicativeExpr() {
-        return ParseBinaryChain(&Parser::ParseUnaryExpr, {TokenKind::kStar, TokenKind::kSlash, TokenKind::kPercent});
-    }
-
-    std::unique_ptr<Expr> ParseBinaryChain(std::unique_ptr<Expr> (Parser::*parse_operand)(),
-                                           std::initializer_list<TokenKind> operators) {
-        auto expr = (this->*parse_operand)();
-        while (MatchesAny(operators)) {
+        auto expr = ParseLogicalAndExpr();
+        while (Match(TokenKind::kPipePipe)) {
             const auto op = Previous();
             auto node = std::make_unique<Expr>();
             node->kind = Expr::Kind::kBinary;
             node->span.begin = expr->span.begin;
             node->text = std::string(mc::lex::ToString(op.kind));
             node->left = std::move(expr);
-            // parse_operand bottoms out at ParsePrimaryExpr, which always
-            // returns a non-null sentinel node on error.
-            node->right = (this->*parse_operand)();
+            node->right = ParseLogicalAndExpr();
             node->span.end = node->right->span.end;
             expr = std::move(node);
         }
         return expr;
     }
 
-    bool MatchesAny(std::initializer_list<TokenKind> kinds) {
-        for (const auto kind : kinds) {
-            if (Match(kind)) {
-                return true;
-            }
+    std::unique_ptr<Expr> ParseLogicalAndExpr() {
+        auto expr = ParseEqualityExpr();
+        while (Match(TokenKind::kAmpAmp)) {
+            const auto op = Previous();
+            auto node = std::make_unique<Expr>();
+            node->kind = Expr::Kind::kBinary;
+            node->span.begin = expr->span.begin;
+            node->text = std::string(mc::lex::ToString(op.kind));
+            node->left = std::move(expr);
+            node->right = ParseEqualityExpr();
+            node->span.end = node->right->span.end;
+            expr = std::move(node);
         }
-        return false;
+        return expr;
+    }
+
+    std::unique_ptr<Expr> ParseEqualityExpr() {
+        auto expr = ParseRelationalExpr();
+        while (Match(TokenKind::kEqEq) || Match(TokenKind::kBangEq)) {
+            const auto op = Previous();
+            auto node = std::make_unique<Expr>();
+            node->kind = Expr::Kind::kBinary;
+            node->span.begin = expr->span.begin;
+            node->text = std::string(mc::lex::ToString(op.kind));
+            node->left = std::move(expr);
+            node->right = ParseRelationalExpr();
+            node->span.end = node->right->span.end;
+            expr = std::move(node);
+        }
+        return expr;
+    }
+
+    std::unique_ptr<Expr> ParseRelationalExpr() {
+        auto expr = ParseShiftExpr();
+        while (Match(TokenKind::kLt) || Match(TokenKind::kLtEq) || Match(TokenKind::kGt) || Match(TokenKind::kGtEq)) {
+            const auto op = Previous();
+            auto node = std::make_unique<Expr>();
+            node->kind = Expr::Kind::kBinary;
+            node->span.begin = expr->span.begin;
+            node->text = std::string(mc::lex::ToString(op.kind));
+            node->left = std::move(expr);
+            node->right = ParseShiftExpr();
+            node->span.end = node->right->span.end;
+            expr = std::move(node);
+        }
+        return expr;
+    }
+
+    std::unique_ptr<Expr> ParseShiftExpr() {
+        auto expr = ParseAdditiveExpr();
+        while (Match(TokenKind::kLtLt) || Match(TokenKind::kGtGt)) {
+            const auto op = Previous();
+            auto node = std::make_unique<Expr>();
+            node->kind = Expr::Kind::kBinary;
+            node->span.begin = expr->span.begin;
+            node->text = std::string(mc::lex::ToString(op.kind));
+            node->left = std::move(expr);
+            node->right = ParseAdditiveExpr();
+            node->span.end = node->right->span.end;
+            expr = std::move(node);
+        }
+        return expr;
+    }
+
+    std::unique_ptr<Expr> ParseAdditiveExpr() {
+        auto expr = ParseMultiplicativeExpr();
+        while (Match(TokenKind::kPlus) || Match(TokenKind::kMinus)) {
+            const auto op = Previous();
+            auto node = std::make_unique<Expr>();
+            node->kind = Expr::Kind::kBinary;
+            node->span.begin = expr->span.begin;
+            node->text = std::string(mc::lex::ToString(op.kind));
+            node->left = std::move(expr);
+            node->right = ParseMultiplicativeExpr();
+            node->span.end = node->right->span.end;
+            expr = std::move(node);
+        }
+        return expr;
+    }
+
+    std::unique_ptr<Expr> ParseMultiplicativeExpr() {
+        auto expr = ParseUnaryExpr();
+        while (Match(TokenKind::kStar) || Match(TokenKind::kSlash) || Match(TokenKind::kPercent)) {
+            const auto op = Previous();
+            auto node = std::make_unique<Expr>();
+            node->kind = Expr::Kind::kBinary;
+            node->span.begin = expr->span.begin;
+            node->text = std::string(mc::lex::ToString(op.kind));
+            node->left = std::move(expr);
+            node->right = ParseUnaryExpr();
+            node->span.end = node->right->span.end;
+            expr = std::move(node);
+        }
+        return expr;
     }
 
     std::optional<std::size_t> SkipArrayLengthLookahead(std::size_t offset) const {
@@ -1137,6 +1203,9 @@ class Parser {
     // SkipTypeExprLookahead — lookahead-only type-expression scanner used to
     // disambiguate type-call and postfix-type-argument syntax.
     //
+    // This is a grammar workaround for the current `<...>` ambiguity. Keep the
+    // scanning rules close to ParseTypeExpr so the two do not silently drift.
+    //
     // Contract: given a token offset relative to the current position, scan
     // forward over the tokens that form a valid type expression and return the
     // offset of the first token past the last consumed token.  Returns
@@ -1145,6 +1214,36 @@ class Parser {
     // lookahead depth.
     std::optional<std::size_t> SkipTypeExprLookahead(std::size_t offset, bool allow_bare_identifier) const {
         return SkipTypeExprLookahead(offset, allow_bare_identifier, 0);
+    }
+
+    std::optional<std::size_t> SkipTypeArgListLookahead(std::size_t offset, std::size_t depth) const {
+        if (Peek(offset).kind != TokenKind::kLt) {
+            return std::nullopt;
+        }
+
+        std::size_t next = offset + 1;
+        if (Peek(next).kind == TokenKind::kGt) {
+            return next + 1;
+        }
+
+        while (true) {
+            if (depth >= kMaxTypeExprDepth) {
+                return std::nullopt;
+            }
+            const auto type_arg_end = SkipTypeExprLookahead(next, true, depth + 1);
+            if (!type_arg_end.has_value()) {
+                return std::nullopt;
+            }
+            next = *type_arg_end;
+            if (Peek(next).kind == TokenKind::kComma) {
+                ++next;
+                continue;
+            }
+            if (Peek(next).kind != TokenKind::kGt) {
+                return std::nullopt;
+            }
+            return next + 1;
+        }
     }
 
     std::optional<std::size_t> SkipTypeExprLookahead(std::size_t offset,
@@ -1183,28 +1282,7 @@ class Parser {
             case TokenKind::kIdentifier: {
                 std::size_t next = offset + 1;
                 if (Peek(next).kind == TokenKind::kLt) {
-                    ++next;
-                    if (Peek(next).kind != TokenKind::kGt) {
-                        while (true) {
-                            if (nesting >= kMaxTypeExprDepth) {
-                                return std::nullopt;
-                            }
-                            const auto type_arg_end = SkipTypeExprLookahead(next, true, nesting + 1);
-                            if (!type_arg_end.has_value()) {
-                                return std::nullopt;
-                            }
-                            next = *type_arg_end;
-                            if (Peek(next).kind == TokenKind::kComma) {
-                                ++next;
-                                continue;
-                            }
-                            break;
-                        }
-                    }
-                    if (Peek(next).kind != TokenKind::kGt) {
-                        return std::nullopt;
-                    }
-                    return next + 1;
+                    return SkipTypeArgListLookahead(next, nesting);
                 }
                 return allow_bare_identifier ? std::optional<std::size_t>(next) : std::nullopt;
             }
@@ -1226,25 +1304,9 @@ class Parser {
             return false;
         }
 
-        std::size_t next = 1;
-        if (Peek(next).kind == TokenKind::kGt) {
-            return Peek(next + 1).kind == TokenKind::kLParen || Peek(next + 1).kind == TokenKind::kLBrace;
-        }
-
-        while (true) {
-            const auto type_end = SkipTypeExprLookahead(next, true);
-            if (!type_end.has_value()) {
-                return false;
-            }
-            next = *type_end;
-            if (Peek(next).kind == TokenKind::kGt) {
-                return Peek(next + 1).kind == TokenKind::kLParen || Peek(next + 1).kind == TokenKind::kLBrace;
-            }
-            if (Peek(next).kind != TokenKind::kComma) {
-                return false;
-            }
-            next += 1;
-        }
+        const auto after_type_args = SkipTypeArgListLookahead(0, 0);
+        return after_type_args.has_value() &&
+               (Peek(*after_type_args).kind == TokenKind::kLParen || Peek(*after_type_args).kind == TokenKind::kLBrace);
     }
 
     std::unique_ptr<Expr> ParseTypeCallExpr() {
