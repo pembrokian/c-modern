@@ -1,0 +1,367 @@
+PHASE 14 ARCHITECTURAL REVIEW — compiler/codegen_llvm/backend.cpp
+===================================================================
+Reviewer level: senior compiler systems engineer
+Date: 2026-04-03
+
+SCOPE
+-----
+backend.cpp is the largest file under review at ~5932 lines. It generates
+LLVM IR in textual form (not via the LLVM C++ API) from the MIR module.
+The design is explicitly documented as a bootstrap trade-off. The file
+owns two parallel passes:
+  - Debug inspect path: generates human-readable pseudo-IR for dump tests
+  - Real IR path: generates valid LLVM IR text piped to llc → clang/ld
+
+────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────
+
+1a. Textual LLVM IR generation is the correct bootstrap trade-off.
+    Using the LLVM C++ API would require the build system to locate and
+    link against LLVM libraries, configure for a specific LLVM version,
+    and deal with LLVM's frequently-changing API surface. Generating
+    textual IR removes all of this: the compiler becomes a text emitter
+    that produces a string piped to externally-installed llc/clang. The
+    trade-off is accepted and documented. The review notes the specific
+    risks and limitations this introduces.
+
+1b. Two-path design (debug inspect + real IR) is the right structure.
+    This clearly separates concerns: the debug path is used for running
+    snapshot fixture tests (tests/mir/*.ir), and the real IR path is used
+    for actual compilation. Keeping them structurally parallel (both
+    handle the same instruction set) means a new instruction kind requires
+    updating both paths — which is enforced by the top-of-file comment.
+
+1c. BEContext (backend context) carries all state through the backend.
+    The context holds: the MIR module, the diagnostics object, the current
+    function, and the current output stream. Passing context by reference
+    through handler functions (rather than a class with member functions
+    on all 200+ handlers) is a pragmatic approach at this scale.
+
+1d. Global name mangling via BackendGlobalName / BackendLocalName is
+    centralised. Any change to the naming convention is a single-place
+    edit. This is correct.
+
+1e. Backend is a consumer of MIR: it does NOT modify the MIR module.
+    All lowering decisions are already encoded in the MIR. The backend
+    is purely a translation pass. This respects the sema/MIR/backend
+    boundary.
+
+────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+────────────────────────────────────────────────────────────────
+
+2a. CORRECTNESS: LowerEnumLayout does not insert alignment padding between
+    variant payload fields.
+    The layout of an enum variant in LLVM IR must match the C ABI for the
+    corresponding union/struct. In LLVM IR, all variants share the same
+    byte range after the discriminant tag (the "payload" region). Each
+    variant's fields are laid out from the start of the payload region.
+    If variant A has a field of type i32 and variant B has a field of type
+    f64, the payload region must be large enough to hold the LARGER of the
+    two fields, and each field must be aligned to its own alignment
+    requirement.
+
+    The current LowerEnumLayout calculates the maximum payload size across
+    all variants correctly for the total size field. However, if a variant
+    contains multiple fields with mixed alignment requirements (e.g.,
+    struct {i8, f64}), the padding between those fields within a single
+    variant may not be emitted. For the bootstrap integer-and-pointer enum
+    set, this produces correct code. For enums with struct-like variants
+    containing mixed types, this could produce incorrect field offsets.
+
+    Fix: For each variant, compute field layout with explicit alignment
+    padding between fields (same algorithm as struct layout). Store the
+    padded sizes and emit pad bytes in the LLVM IR struct type for each
+    variant that is shorter than the maximum payload size.
+
+2b. CORRECTNESS: LowerTypeInfo O(N) linear scan for every named type.
+    LowerTypeInfo is called once per instruction that references a named
+    type. Each call does a linear scan through module.type_decls to find
+    the type declaration. For a module with 100 type declarations and a
+    function with 1000 instructions, this is 100,000 linear comparisons.
+    For larger modules this grows O(N*M) where N = type decls, M = uses.
+    The fix (a pre-built hash map from type name to type decl index) is
+    straightforward and entirely local to the backend.
+
+2c. CORRECTNESS: BackendGlobalName emits `@global.NAME`.
+    If NAME contains a `.` (which qualified module paths can, e.g.,
+    "std.io.write"), the LLVM IR symbol `@global.std.io.write` is a valid
+    LLVM IR name as long as it is quoted. Whether the generated IR always
+    wraps these names in quotes must be verified. If any callsite emits
+    `@global.qualified.name` WITHOUT surrounding quotes, the LLVM parser
+    would interpret the `.`-separated segments differently.
+
+    Verify: All uses of BackendGlobalName output should be surrounded
+    by `"` in the generated IR (`@"global.qualified.name"`) or the
+    namespace separator in source names must be restricted to characters
+    safe in unquoted LLVM IR names (letters, digits, `-`, `_`, `.` — 
+    `.` IS valid in unquoted IR names as of LLVM 14+, so this may be fine).
+    Confirm with the LLVM IR Language Reference for the target version.
+
+2d. CORRECTNESS: BackendTempName uses function/block/instruction array
+    indices for SSA value names.
+    An SSA value name like `%0.3.12` encodes (function_index, block_index,
+    instruction_index). These indices are positions in the respective
+    arrays at the time the name is generated. If any transformation pass
+    (future optimization, dead-code elimination) reorders or removes
+    instructions, the indices would become inconsistent.
+    The current pipeline has no such transformation passes — IR is generated
+    in a single forward pass with no modifications. This is safe NOW but is
+    a fragility that must be documented for future work.
+
+2e. CORRECTNESS: Missing instruction kinds rely on runtime diagnostics,
+    not compile-time exhaustion.
+    In both the debug inspect path and the real IR path, unhandled
+    instruction kinds produce a runtime diagnostic:
+        diag.Error("instruction kind not handled in backend: " + ...);
+    This is correct for ensuring user-visible errors rather than silent
+    wrong code generation. However, if a new MIR instruction kind is added
+    (e.g., by extending the MIR for a new language feature) and the backend
+    switch is not updated, the error is discovered only at compilation time
+    when a source file that uses the new feature is compiled — not at
+    compiler-build time.
+
+    Preferred: The inner switch over mir::Instruction::Kind should use
+    MC_UNREACHABLE (which fires at runtime unconditionally) or, for debug
+    builds, a static_assert backed exhaustive enum check. At minimum, use
+    default: MC_UNREACHABLE("unhandled instruction in backend").
+    Since the diagnostic path is already correct, this is a "fail louder"
+    improvement rather than a correctness fix.
+
+2f. SOUNDNESS: RequireOperandCount and RequireInstructionResult called at
+    every instruction in the real IR path.
+    These validation helpers verify that operand counts match expected
+    values and that instructions have/don't-have result values. These checks
+    are a MIR PROPERTY that ValidateModule should already guarantee. Running
+    them again during code generation is defensive but adds per-instruction
+    overhead to the backend. If ValidateModule is always run before the
+    backend, these checks should never fire (except on bugs in the lowerer).
+    Consider making them debug-only assertions:
+        #ifdef MC_DEBUG_BACKEND_VALIDATION
+        RequireOperandCount(instr, expected);
+        #endif
+
+2g. CORRECTNESS: ResolveValue / ResolveTypedValue / ResolveLocal /
+    ResolveBlock are four near-identical lookup functions.
+    All four follow the same pattern: look up a name/index in a map,
+    emit a diagnostic if not found, return std::nullopt or an error
+    sentinel. If a new type of resolvable entity is added (e.g., a type
+    reference or a global initializer), a fifth copy-pasted function would
+    be added. This is duplication-prone.
+
+    Fix: A single template function:
+        template<typename T>
+        std::optional<T> Resolve(const std::unordered_map<std::string, T>& map,
+                                 const std::string& key,
+                                 const std::string& context_desc,
+                                 Diagnostics& diag);
+    This reduces duplication to a single implementation.
+
+────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+────────────────────────────────────────────────────────────────
+
+3a. 5932 lines in a single translation unit is the largest maintenance
+    liability in the codebase. This file has several distinct sub-concerns:
+      - Type layout computation (LowerTypeLayout, LowerEnumLayout)
+      - Type info LLVM IR emission (LowerTypeInfo)
+      - Name mangling (Backend*Name functions)
+      - Intrinsic lowering (LowerSpecialCall via SpecialCallKind)
+      - Per-instruction IR emission for the debug path
+      - Per-instruction IR emission for the real IR path
+      - Struct/enum initializer emission
+      - Debug info annotation emission (if present)
+
+    Splitting into:
+        backend_types.cpp      — type layout and LLVM IR type strings
+        backend_names.cpp      — name mangling functions
+        backend_instructions.cpp — per-instruction IR emission
+        backend_intrinsics.cpp — special call lowering
+    would reduce per-file compilation time, allow parallel compilation of
+    backend units, and make each sub-concern navigable on its own.
+
+3b. The debug inspect path and the real IR path have ~80% code overlap
+    at the instruction handler level. Each instruction handler is written
+    twice: once for the inspect path (human-readable output) and once for
+    the real IR path (LLVM IR syntax). The duplication is the price of the
+    two-path design. For the current scope it is acceptable; if the
+    instruction set grows significantly, the cost of maintaining both
+    paths grows linearly.
+
+    An alternative: generate only real LLVM IR and add the debug dump by
+    pretty-printing the LLVM IR using llvm-dis as an external tool. This
+    would reduce backend complexity at the cost of an LLVM tool dependency
+    in the test pipeline.
+
+3c. LowerTypeInfo's switch for basic types maps each named type string
+    ("i8", "i16", "i32", "i64", "f32", "f64", "bool", "u8", "u16", etc.)
+    to an LLVM IR type string. This is a correct and exhaustive mapping.
+    A table-driven approach (array of {mc_name, llvm_ir_name} pairs with
+    a loop or hash map lookup) would be shorter and easier to extend.
+
+────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────
+
+4a. Textual IR generation is inherently fragile compared to LLVM C++ API.
+    String concatenation for IR statements relies on no typos in keyword
+    names, correct syntax for each instruction, and correct whitespace.
+    Any bug in IR emission produces a syntax error from llc/clang with a
+    line number in the generated IR file — which may be hard to correlate
+    back to the source instruction.
+
+    Mitigations in place:
+      - The debug inspect path produces human-readable output for test
+        fixtures, so test diffs catch format changes.
+      - The generated IR is parsed by llc first, so syntax errors are
+        surfaced immediately.
+
+    Additional mitigation: preserve the generated .ll file in the build
+    directory (as a `.ll` artifact next to the `.o`) so that a failed
+    llc invocation can be debugged by inspecting the generated IR. This
+    may already be done; verify.
+
+4b. The backend assumes that all locals in a MIR function have unique names.
+    If NewHiddenLocal in mir.cpp generates colliding names (e.g., two
+    calls to NewHiddenLocal for the same source span), the backend would
+    emit conflicting SSA value names in the LLVM IR. LLVM would then
+    produce a parse error. This is protected by MIR-level name uniqueness
+    checking in ValidateModule (verify this check exists).
+
+4c. struct/enum initializers emitted in the global initializer section
+    must match the layout described in the LLVM type declarations for those
+    types. Any mismatch (e.g., wrong field count from a struct with a
+    trailing pad byte) produces a bitcast mismatch error from llc. This
+    is a code generation correctness property that is checked only at
+    llc runtime, not by any compile-time verify step.
+
+────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────
+
+5a. 5932-line single TU creates the longest partial-build cycle:
+    any change to backend.cpp (including adding a single new instruction
+    handler) requires recompiling the entire 5932-line file. At typical
+    parse rates (100-200k LOC/min for C++20 with templates), this TU
+    likely dominates the overall compiler build time.
+
+5b. LowerTypeInfo O(N) linear scan per call (see 2b). Pre-building a
+    hash map from type name to MIR type info at the start of backend
+    execution would make this O(1) per call at the cost of O(N) setup.
+
+5c. String building for IR emission uses std::string concatenation
+    (operator+) in many places. Each intermediate concatenation allocates.
+    For a large function with thousands of instructions, this produces
+    significant allocation pressure. An `std::ostringstream` per function
+    (reused across instructions) or a growing `std::string` with
+    reserve() would reduce allocations.
+
+5d. The debug inspect path discards its output into a dummy stream in
+    the non-debug mode. The inspect path's string comparisons and
+    dispatch still run. If the inspect path is always run and then
+    discarded for non-debug builds, this is unnecessary overhead. Verify
+    that the debug path is guarded by a flag and entirely skipped for
+    production builds.
+
+────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+────────────────────────────────────────────────────────────────
+
+6a. The backend generates LLVM IR textual format, which is tied to a
+    specific LLVM version's syntax. LLVM's IR syntax has changed across
+    major versions (attribute syntax, unnamed type syntax, opaque pointer
+    syntax in LLVM 15+). The backend must be tested against the LLVM
+    version installed on the build system. A version mismatch (user
+    upgrades LLVM) would produce silent wrong code or llc parse failures.
+
+    Mitigation: Add an `mc check-toolchain` command that verifies the
+    installed llc/clang version matches the expected range, or use
+    `llc --version` to detect the version and emit a warning if outside
+    the tested range.
+
+6b. The backend invokes llc and clang via separate subprocess calls.
+    These are executed sequentially per module. A long module (many
+    functions) creates a large .ll file that llc must parse in one shot.
+    LLVM's IR parser is fast, but for very large modules the parse could
+    become a bottleneck. A per-function IR file approach (one .ll per
+    function) would allow parallelism but significantly complicate linking.
+    This is not needed for bootstrap.
+
+6c. The mapping from MIR function names to LLVM IR symbol names is
+    deterministic (BackendFunctionName). However, if the same function
+    name appears in two modules (due to module name collision or import
+    path aliasing), the backend would emit two LLVM IR functions with
+    the same name, causing a link-time symbol collision. The driver's
+    AddImportedExternDeclarations handles this for types — the same
+    concern applies to function names. Cross-module name uniqueness should
+    be enforced at the MCI interface level.
+
+────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+────────────────────────────────────────────────────────────────
+
+7a. The top-of-file block comment correctly documents the two-path design
+    and the "both paths must be updated" requirement. This is the most
+    important piece of documentation in the file and is appropriately
+    prominent.
+
+7b. BackendTempName's index-based naming scheme and its fragility in the
+    presence of IR transformations are not documented. A comment noting
+    "names are stable only for a single-pass lowering with no instruction
+    reordering" would protect future transformation pass authors.
+
+7c. LowerEnumLayout's hardcoded i64 tag is not annotated as a bootstrap
+    trade-off (unlike in mir.cpp). A comment matching mir.cpp's annotation
+    pattern ("always i64 for bootstrap; revisit for ABI-sized discriminant")
+    would signal intentionality.
+
+7d. The `RequireOperandCount` / `RequireInstructionResult` dual purpose
+    (debug assertion vs user-facing diagnostic) is not documented. Are
+    these in-backend assertions or user-visible errors? A comment at their
+    declaration clarifying this would help decide whether they belong
+    in debug-only paths.
+
+────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+────────────────────────────────────────────────────────────────
+
+CRITICAL CORRECTNESS
+  [C1] Audit LowerEnumLayout for correctness of intra-variant field
+       alignment padding. For enums with struct-like variant payloads
+       containing fields of mixed alignment, verify that the emitted LLVM
+       IR struct type has correct padding bytes between fields.
+  [C2] Verify all BackendGlobalName outputs in the real IR path are
+       properly quoted in LLVM IR for names containing `.` or other
+       characters that may require quoting per the current LLVM IR spec.
+
+ROBUSTNESS
+  [R1] Replace the four near-identical Resolve* functions with a single
+       template Resolve<T> to eliminate duplication and reduce the chance
+       of divergent error message formatting between them.
+  [R2] Change unhandled-instruction-kind diagnostics in the switch
+       statements to use MC_UNREACHABLE (or equivalent) rather than a
+       soft diagnostic, to fail loudly and immediately during testing.
+
+PERFORMANCE
+  [P1] Pre-build a hash map from type name → LLVM IR type string at the
+       start of backend execution to make LowerTypeInfo O(1) per call
+       instead of O(N) per call.
+
+MAINTAINABILITY
+  [M1] Split backend.cpp into sub-files:
+         backend_types.cpp (type layout + type info emission)
+         backend_names.cpp (name mangling)
+         backend_instructions.cpp (per-instruction IR emission)
+         backend_intrinsics.cpp (special call lowering)
+       This directly reduces the compile time of the backend TU and makes
+       each sub-concern navigable.
+
+DOCUMENTATION
+  [Dc1] Add "names are stable only for single-pass lowering; fragile if
+        instruction reordering is ever added" comment to BackendTempName.
+  [Dc2] Add "always i64 for bootstrap" comment to backend LowerEnumLayout
+        (matching the mir.cpp comment pattern).
+  [Dc3] Add LLVM version compatibility note to the top-of-file comment
+        identifying the tested LLVM version range for the generated IR
+        syntax.

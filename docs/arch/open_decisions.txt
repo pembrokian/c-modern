@@ -7,6 +7,8 @@ The core language semantics now live in:
 - docs/arch/language_spec.txt
 - docs/arch/runtime_spec.txt
 - docs/arch/canonical_programs.txt
+- docs/plan/backlog.txt
+- docs/plan/decision_log.txt
 
 The major language-design decisions are now settled for v0.2:
 - integer semantics and reduced UB
@@ -20,6 +22,9 @@ The major language-design decisions are now settled for v0.2:
 - no hidden language runtime
 
 What remains open is smaller and mostly about packaging, conventions, and what v0.2 should standardize early.
+
+Use docs/plan/backlog.txt for follow-up work and recurring implementation themes.
+Use docs/plan/decision_log.txt for intentional limited solutions and deferred fuller fixes.
 
 1. Error-Handling Ergonomics Follow-Up
 

@@ -1,0 +1,302 @@
+PHASE 14 ARCHITECTURAL REVIEW — compiler/mir/mir.cpp
+======================================================
+Reviewer level: senior compiler systems engineer
+Date: 2026-04-03
+
+SCOPE
+-----
+mir.cpp is the largest file under review at ~4714 lines. It contains:
+  - Type classification predicates (IsIntegerType, IsFloatType, etc.)
+  - FunctionLowerer: lowering sema AST/typed exprs into basic-block MIR
+  - SpecialCallKind dispatch and ClassifySpecialCall
+  - ValidateModule: ~1600-line MIR validator
+  - MIR dump functions
+The MIR is a basic-block SSA IR with explicit terminators per block.
+
+────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────
+
+1a. The basic-block SSA design with explicit block terminators is sound.
+    Basic blocks are held in a flat vector and referenced by index. Edges
+    (successors) come from the terminator instruction. This is a standard
+    and correct MIR representation for a structured-language compiler.
+
+1b. FunctionLowerer is a stateful single-use object: construct, call Run(),
+    discard. The constructor initialises all state; Run() drives the lowering
+    pass; helpers are private members. This lifecycle is correct.
+
+1c. DeferScope stack correctly models language-level defer semantics.
+    The stack-of-stacks pattern naturally handles nested loop scopes: each
+    pushed scope holds a list of deferred calls, and structured exits (break,
+    continue, return) drain the appropriate stack levels in LIFO order.
+    This is correct for structured control flow.
+
+1d. SpecialCallKind enum makes the intrinsic dispatch explicit and auditable.
+    Having an enum, a classification function, and a single dispatch table is
+    better than ad-hoc string comparisons scattered throughout the lowerer.
+
+1e. The two-phase approach (sema produces Module, FunctionLowerer consumes
+    Module) respects the sema/MIR boundary. FunctionLowerer does not re-run
+    any semantic checks — it trusts that sema has already validated the AST
+    it is lowering.
+
+1f. ValidateModule is the single correctness gate after lowering.
+    All structural invariants (terminator placement, use-def dominance,
+    block reachability, type consistency at call sites) are checked here.
+    This is the right architecture for detecting lowering bugs early.
+
+1g. The type classification predicates in mir.cpp have no Module context.
+    Unlike check.cpp's equivalents, the mir.cpp predicates operate on
+    `sema::Type` WITHOUT the ability to resolve type aliases through the
+    module's type_decls. This is an architectural gap (see section 2a).
+
+────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+────────────────────────────────────────────────────────────────
+
+2a. CORRECTNESS: Type classification duplicated between mir.cpp and
+    check.cpp with different semantics.
+    Functions like IsIntegerType, IsFloatType, IsNumericType,
+    IsPointerLikeType, IsBoolType, IsUintPtrType, IsIntegerLikeType appear
+    in BOTH check.cpp and mir.cpp. The critical difference:
+      - check.cpp versions accept a Module& parameter and call
+        StripTypeAliases / StripAliasOrDistinct before classifying.
+      - mir.cpp versions operate on the raw Type struct with no alias
+        stripping.
+    This means: if a user defines `type MyInt = i32;` and uses MyInt as
+    an arithmetic operand, check.cpp correctly recognises MyInt as integer
+    (after alias stripping). The mir.cpp version would see kNamed with
+    text "MyInt" and NOT recognise it as integer. If any lowering decision
+    in FunctionLowerer depends on these predicates for named types, it will
+    produce incorrect MIR for aliased types.
+
+    Impact: In practice, lowering code primarily dispatches on types via
+    the types stored in the Module's type_decls (which are already the
+    canonical forms), so the alias issue may not manifest in the current
+    instruction set. However the risk is latent and grows with each new
+    lowering pass that adds type-dependent logic.
+
+    Fix: Create a shared type-predicate utility (e.g., sema/type_util.h)
+    that takes an optional Module* for alias resolution, and have both
+    check.cpp and mir.cpp use it.
+
+2b. CORRECTNESS: ClassifySpecialCall hardcodes intrinsic names as string
+    literals checked in a linear list via string comparison.
+    The same intrinsic names are also referenced in check.cpp's
+    ValidateBuiltinCall and in backend.cpp's intrinsic lowering. Any
+    rename or addition of an intrinsic requires changes in at least three
+    places. There is no compile-time guarantee that all three are in sync.
+
+    Fix: Define intrinsic names as constants in a shared header
+    (e.g., sema/builtins.h or compiler/intrinsics.h), and have
+    ClassifySpecialCall, check.cpp's ValidateBuiltinCall, and
+    backend.cpp's lowering all reference those constants.
+
+2c. CORRECTNESS: NewHiddenLocal uses $ prefix for synthetically generated
+    local names to avoid collision with user-visible names.
+    The code comment notes: "If the source language ever permits $-prefixed
+    identifiers, this scheme must change." This is a known time-bomb:
+    if the language spec is ever extended to permit $ in identifiers
+    (common in some languages for metaprogramming), New$ names would
+    collide with user names. A non-identifier sentinel like
+    `%hidden.0`, `%hidden.1` (using % not valid in identifiers) would be
+    safer, or a counter-only naming like `..5` that is guaranteed unreachable
+    by the lexer.
+
+2d. CORRECTNESS: SpecialCallProducesValue has a malformed indentation in
+    its boolean expression. The kArenaNew case uses inconsistent spacing:
+        kind == SpecialCallKind::kAtomicCompareExchange ||
+          kind == SpecialCallKind::kArenaNew;  // extra indent on this line
+    While this does not affect compilation, it is a misread hazard,
+    especially in a predicate function where every case determines whether
+    a call produces a value into a register.
+
+2e. CORRECTNESS: ValidateModule does not detect all possible lowering errors
+    at loop-entry-block structure. If a loop creates multiple predecessor
+    blocks and a hidden local is used from before the loop inside the loop
+    body, dominator checks should catch this. Verify the dominator checker
+    correctly handles back-edges (loop back-branches creating cycles in
+    the block graph).
+
+2f. SOUNDNESS: FunctionLowerer::Run creates the entry block but if decl_.body
+    is null (which sema prevents but is not compiler-enforced), the generated
+    function would have a single empty entry block with no terminator.
+    ValidateModule would catch this, but a debug assert `MC_DCHECK(decl_.body
+    != nullptr, ...)` at the top of Run() would make the precondition explicit.
+
+────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+────────────────────────────────────────────────────────────────
+
+3a. ValidateModule at ~1600 lines is too large to navigate and maintain.
+    The function mixes at least four distinct validation concerns:
+      (1) Structural integrity: all blocks have terminators, no empty
+          functions, all block successors exist.
+      (2) Instruction-level validity: operand count per instruction kind.
+      (3) Use-def dominance: every use is dominated by its definition.
+      (4) Type consistency: call-site argument types match function signatures.
+    These should each be separate functions:
+        ValidateStructure(MirModule&, Diagnostics&)
+        ValidateOperandCounts(MirModule&, Diagnostics&)
+        ValidateDominance(MirModule&, Diagnostics&)
+        ValidateCallTypes(MirModule&, Diagnostics&)
+    Each can be called sequentially from a top-level `ValidateModule` stub.
+    The split would also allow early-exit: if structural validation fails,
+    dominance checking should not run (its assumptions would be violated).
+
+3b. ClassifySpecialCall runs N string comparisons sequentially.
+    For bootstrap, where N is ~20 intrinsics and this is called once per
+    call instruction, the cost is negligible. For the long term, a string
+    hash map would be cleaner and faster.
+
+3c. LowerEnumLayout unconditionally uses i64 (8 bytes) for the discriminant.
+    A two-variant enum wastes 7 bytes of discriminant. This is a deliberate
+    bootstrap trade-off. A comment documenting "always i64 for simplicity;
+    revisit for ABI efficiency" would convey the intentionality.
+
+3d. FindMirTypeDecl, FindMirGlobalDecl, FindMirFunction are each O(N) linear
+    scans over their respective arrays.
+    For a module with many declarations, these are called per-lowering step
+    and per-ValidateModule instruction. The cumulative cost grows quadratically
+    with module size. For bootstrap modules (tens to low hundreds of
+    declarations) this is fine. The scans should be wrapped with a comment
+    noting they are O(N) and linking to the backlog item for hash maps.
+
+3e. DeferScope::Emit and DeferScope::Pop correctly drain the defer stack.
+    The interaction between nested loops and defer is subtle but the code
+    is well-commented. This is a positive example of complexity that is
+    proportional to the actual language semantics.
+
+────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────
+
+4a. ProcedureParamCount parses type.metadata every time it is called.
+    If type.metadata is malformed (truncated or wrong format), this silently
+    returns 0. Since ProcedureParamCount is called during call-site arity
+    validation, a malformed metadata would produce a wrong arity that
+    passes validation but generates incorrect code. An assertion that
+    parse succeeded (metadata was well-formed) would surface this bug early.
+
+4b. The instruction list in each MIR block is a flat vector of Instructions.
+    Adding, removing, or reordering instructions during lowering requires
+    careful index management. The current lowering code appends only (never
+    inserts, never deletes), which is safe. Any future transformation pass
+    that mutates instruction lists must carefully update all index references.
+
+4c. MIR uses index types (uint32_t block indices, local name string keys)
+    for references. There is no type-safe "BlockRef" or "LocalRef" wrapper
+    that would prevent mixing block indices with local indices at compile
+    time. The existing code appears to use them correctly by convention, but
+    a NewType wrapper would catch accidental mixups.
+
+────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────
+
+5a. local_types_ and local_info_ are std::unordered_map<std::string, ...>.
+    String key maps are correct but pay string hashing and allocation on
+    every lookup. For function-local temporaries where the key is a short
+    string like "$0", "$1", this is acceptable.
+
+5b. ValidateModule makes multiple passes over the instruction list.
+    For a function with N instructions, the dominance check requires a block
+    ordering pass (topological sort) plus a dominance tree traversal:
+    O(N+E) where E is the number of edges. For normal functions this is fast.
+    Functions with pathological control flow (e.g., deeply nested loops
+    from macro expansion) could push N into the thousands; the current
+    algorithm is still O(N) per function.
+
+5c. MIR module stores functions in a std::vector<MirFunction>.
+    Growing this vector reallocates and moves all functions. FunctionLowerer
+    holds a reference to the target function by pointer. If the function
+    vector reallocates DURING lowering (which it doesn't — the function is
+    emplaced before lowering begins), the pointer would dangle. This is safe
+    as structured but fragile. Consider reserving capacity before lowering.
+
+────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+────────────────────────────────────────────────────────────────
+
+6a. The MIR module is not designed for concurrent lowering of multiple
+    functions. FunctionLowerer writes into `module_.functions.back()`.
+    This is single-threaded only. If parallel compilation is ever added,
+    each function should be lowered into a temporary MirFunction and then
+    appended atomically.
+
+6b. The intrinsic call dispatch (ClassifySpecialCall + the switch on
+    SpecialCallKind) is split across multiple functions: classification
+    happens in ClassifySpecialCall, lowering happens in LowerSpecialCall
+    (or equivalent), validation in ValidateModule, and backend code
+    generation in backend.cpp. Any new intrinsic must be threaded through
+    all four locations. A single table-driven intrinsic descriptor (enum,
+    signature, MIR arity, backend opcode) would reduce the spread.
+
+6c. There is no MIR textual serialisation / deserialisation (only dump for
+    human reading). If incremental compilation of individual functions were
+    needed, MIR would need to be serialisable to disk and reloadable.
+    This is not needed for the current pipeline (sema → MIR → backend in
+    one pass per module). Acceptable for bootstrap.
+
+────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+────────────────────────────────────────────────────────────────
+
+7a. The FunctionLowerer class header comment documents the call sequence:
+    construct → Run() → the function is appended to module_. This is
+    exactly the right documentation for a single-use object.
+
+7b. DeferScope semantics around break/continue/return are documented inline.
+    These are non-obvious corner cases and the comments improve confidence
+    in correctness.
+
+7c. SpecialCallProducesValue malformed indentation (see 2d) is in a function
+    that has a comment block at the top. The comment is correct; the
+    inconsistent indentation in the body is a copy-paste artifact.
+
+7d. The $ prefix in NewHiddenLocal has an inline comment noting the future
+    risk. This is appropriate documentation of a known fragility.
+
+7e. ValidateModule has no top-level block comment explaining the four
+    concerns it validates (see 3a). A brief introductory comment listing
+    what passes it runs would help any engineer working on the MIR
+    validation logic.
+
+────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+────────────────────────────────────────────────────────────────
+
+CRITICAL CORRECTNESS
+  [C1] Investigate whether any FunctionLowerer dispatch path uses the mir.cpp
+       type classification predicates (IsIntegerType etc.) on kNamed types
+       WITHOUT alias resolution. If so, fix by factoring a shared
+       sema/type_util.h with module-context-aware predicates. Even if no
+       current code path is affected, eliminate the latent duplication.
+
+  [C2] Centralise intrinsic names as constants in a shared header referenced
+       by ClassifySpecialCall, check.cpp's ValidateBuiltinCall, and
+       backend.cpp's intrinsic lowering. Rename or add intrinsics will
+       become one-place changes.
+
+MAINTAINABILITY
+  [S1] Split ValidateModule (~1600 lines) into at minimum:
+         ValidateStructure, ValidateDominance, ValidateCallTypes.
+       Early-exit from ValidateModule if structural validation reports
+       errors, to avoid misleading diagnostics from subsequent passes.
+
+  [S2] Fix the malformed indentation in SpecialCallProducesValue.
+
+DOCUMENTATION
+  [Dc1] Add a top-level block comment to ValidateModule describing the
+        four validation passes it performs and their ordering.
+  [Dc2] Add "always i64 for bootstrap; see backlog for ABI-sized discriminant"
+        comment to LowerEnumLayout.
+  [Dc3] Add O(N) scan comment to FindMirTypeDecl / FindMirGlobalDecl /
+        FindMirFunction with a reference to the hash-map improvement backlog.
+
+FUTURE SAFETY
+  [F1] Replace NewHiddenLocal's $ prefix with a character sequence not
+       reachable by the lexer (e.g., use only %hidden.N or a sigil outside
+       the identifier character set defined in the language spec) to prevent
+       future collision risk if $ is added to the identifier grammar.

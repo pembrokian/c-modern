@@ -1,0 +1,324 @@
+PHASE 14 ARCHITECTURAL REVIEW — compiler/driver/driver.cpp
+===========================================================
+Reviewer level: senior compiler systems engineer
+Date: 2026-04-03
+
+SCOPE
+-----
+driver.cpp is the top-level orchestration layer at ~2586 lines. It owns:
+  - CLI argument parsing (commands: check, build, run, test, init)
+  - Module graph discovery and topological ordering
+  - The incremental build state file (.state.txt, per-module caching)
+  - CompileModuleGraph: the compilation pipeline for a module/project
+  - RunExecutableCommand: fork/exec subprocess wrapper
+  - Interface artifact (.mci) writing and loading for cross-module imports
+  - Project (.mc_project) file reading and module discovery
+
+────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────
+
+1a. The graph-based module ordering is correct.
+    DiscoverModuleGraph produces a dependency-ordered node list (dependencies
+    before dependents). CompileModuleGraph iterates this list, compiling each
+    module after all its dependencies are compiled. This is the correct
+    compilation ordering for a module system.
+
+1b. Separation of "check-only" and "build" pipelines is clean.
+    RunCheck runs sema+MIR validation without object file generation.
+    RunBuild runs the full pipeline through object file generation and
+    linking. This allows IDE integration (check) to avoid the expensive
+    backend step.
+
+1c. fork/execv (not system()) for subprocess execution is correct.
+    Using execv rather than system() avoids shell injection and the PATH
+    traversal issues of system(). The driver correctly constructs the argv
+    vector as a null-terminated array of char* pointing into the command
+    vector's string data.
+
+1d. Incremental build state as a text file (.state.txt) is simple and
+    inspectable. The format is one key=value pair per line. Human-readable
+    build state is a strong bootstrap advantage: developers can inspect and
+    manually reset state without special tooling.
+
+1e. Cross-module interface (.mci) files correctly decouple compilation units.
+    The interface artifact for module A is written to disk after sema+MIR
+    completes for A, and module B can then load A's interface before
+    compiling B. This is the correct way to handle separate compilation in
+    a module system.
+
+────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+────────────────────────────────────────────────────────────────
+
+2a. SECURITY / CORRECTNESS: JoinCommand / QuoteShellArg are used for
+    display/logging only — NOT for the actual execv call.
+    The actual execv is called with `argv.data()` which comes from the
+    raw command vector strings (unquoted). `JoinCommand` is called only
+    in diagnostic logging code to display a human-readable representation.
+    This is correct: execv takes argv directly without shell interpretation,
+    so shell quoting is irrelevant for the actual execution. However, the
+    naming (QuoteShellArg, JoinCommand) implies these functions affect
+    execution, which is misleading. Any future developer who wires up
+    JoinCommand output to a shell-based invocation (e.g., system()) would
+    get a command string with properly quoted arguments, which would work
+    accidentally correctly — but only because QuoteShellArg generates
+    single-quoted POSIX shell strings. This is macOS/Linux-only behavior.
+    The divergence between display-command and execv-command should be
+    documented.
+
+    Fix: Rename JoinCommand to FormatCommandForDisplay and QuoteShellArg
+    to ShellDisplayQuote, or add a comment at each callsite clarifying
+    "display only — not used for execv".
+
+2b. CORRECTNESS: format_version is loaded but never validated.
+    LoadModuleBuildState reads the first line of the .state.txt file and
+    extracts format_version. However, the code never compares this value
+    against `kModuleBuildStateFormatVersion` to detect a stale state file
+    from an older build. If the format changes (new fields, changed
+    semantics of existing fields), old state files would be silently
+    misinterpreted, potentially producing incorrect incremental build
+    decisions (skipping recompilation when the source or format changed).
+
+    Fix:
+        if (state.format_version != kModuleBuildStateFormatVersion) {
+            return std::nullopt; // force full recompilation
+        }
+    This is a one-line addition that protects correctness on format updates.
+
+2c. CORRECTNESS: AddImportedExternDeclarations silently discards the second
+    definition when two imported modules export the same type name.
+        if (!existing_types.insert(type_decl.name).second) continue;
+    This means the first imported module's type wins silently. If the two
+    types have different layouts (e.g., from two versions of a library),
+    the compiled code would use the first type's layout with the second
+    module's code, producing incorrect code without any diagnostic.
+
+    Fix: When a name collision is detected, emit a diagnostic:
+        diag.Error(kNoSpan, "imported type '" + type_decl.name +
+                   "' is defined in multiple imported modules");
+    The user would then need to explicitly qualify which module's type to
+    use (via an alias or explicit qualification).
+
+2d. CORRECTNESS: HashText uses 64-bit FNV-1a for content hashing.
+    FNV-1a 64-bit has ~4 billion collision-free entries at the 1% collision
+    probability threshold. For source-file content hashing in a build system,
+    the inputs are unique strings (full file contents), so the collision
+    probability for any individual comparison is ~2^-64. However, a birthday
+    attack in a project with 2^32 source files would produce collisions with
+    50% probability. This is not a practical concern for current project sizes.
+    The bigger concern is: FNV-1a is NOT a cryptographic hash. A malicious
+    actor who can write source files can craft a source change that produces
+    the same hash as the original, causing the compiler to skip recompilation
+    of a modified file. This is a security concern only in adversarial
+    environments where the build directory is writable by untrusted parties.
+    For a local bootstrap compiler this is an acceptable trade-off.
+
+    Document with a comment: "FNV-1a 64-bit is not collision-resistant for
+    adversarial inputs; acceptable for trusted build environments."
+
+2e. CORRECTNESS: RunExecutableCommand busy-poll waitpid(WNOHANG) loop
+    with 10ms sleep.
+        while (true) {
+            int result = waitpid(pid, &status, WNOHANG);
+            if (result != 0) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    This is functionally correct but introduces up to 10ms of artificial
+    latency per process completion. For a build that invokes dozens of
+    llc/clang subprocesses sequentially, this wastes ~100-500ms per build.
+    A blocking waitpid (without WNOHANG) is simpler and correct since
+    the driver does not need to do other work while waiting:
+        waitpid(pid, &status, 0);
+
+2f. CORRECTNESS: Open file descriptors after fork are inherited by the child.
+    If the driver has any open std::ofstream / std::ifstream instances at
+    the point of fork(), those file descriptors are duplicated in the child
+    process. After execv(), they are closed (O_CLOEXEC not set by
+    std::fstream on macOS). If execv() fails (and the child calls _exit()),
+    the destructors are NOT called for C++ objects in the child, so
+    buffers may not be flushed. For std::ofstream this is a risk of
+    partial/unsynced file writes.
+
+    Fix: ensure all std::ofstream instances used by the driver are
+    closed before calling RunExecutableCommand, or use open() with
+    O_CLOEXEC directly for files that must not be inherited.
+
+2g. SOUNDNESS: CompileModuleGraph assumes nodes are in topological order
+    but does not assert it at runtime (even in debug builds). If
+    DiscoverModuleGraph has a bug that produces an incorrect order, the
+    symptom would be a confusing "module interface file not found" error
+    rather than an assertion failure pointing to the ordering bug.
+
+    Fix: In debug builds, verify that for each node, all its dependencies
+    appear before it in the node list before compiling:
+        MC_DCHECK(AllDepsCompiledBefore(graph, i), "node ordering incorrect");
+
+────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+────────────────────────────────────────────────────────────────
+
+3a. CompileModuleGraph is ~200 lines doing at least six orthogonal concerns:
+      (1) Load imported interfaces for each module
+      (2) Check if recompilation is needed (incremental state comparison)
+      (3) Run sema for each module
+      (4) Run MIR lowering and validation
+      (5) Write interface artifact (.mci) to disk
+      (6) Invoke backend to generate object file
+
+    This violates the single-responsibility principle and makes it
+    difficult to:
+      - Test individual steps in isolation
+      - Skip steps conditionally (e.g., check-only run skips backend)
+      - Add new pipeline steps without touching a 200-line function
+
+    Refactoring suggestion:
+        struct ModuleCompileResult { ... };
+        ModuleCompileResult CompileModule(const ModuleNode&, ...) {
+            auto sema_result = RunSemaForModule(...);
+            if (!sema_result) return error;
+            auto mir_result = RunMirForModule(sema_result, ...);
+            if (!mir_result) return error;
+            WriteInterfaceArtifact(mir_result, ...);
+            if (emit_object) RunBackendForModule(mir_result, ...);
+            return success;
+        }
+
+3b. RunCheck, RunBuild, RunRun share a common preamble:
+    load project → discover graph → compile modules. Only the final step
+    differs. A shared helper RunPipeline(project, graph, CompileFlags)
+    would eliminate the structural duplication.
+
+3c. LoadModuleBuildState uses a hand-rolled line-by-line parser for the
+    key=value format. This parser exists only for .state.txt. Centralising
+    key=value parsing (it's also needed for .mc_project files) would reduce
+    duplicated parsing code.
+
+────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────
+
+4a. POSIX fork/exec usage is correct but platform-specific.
+    The driver uses fork(), execv(), waitpid(), O_CLOEXEC patterns that
+    are POSIX. This is appropriate for the stated target (macOS/Linux).
+    A Windows port would require significant rework. The file correctly
+    does not attempt to be portable; a comment documenting
+    "POSIX-only; no Windows support" would be accurate.
+
+4b. Error handling from execv() on failure calls _exit()
+    (not exit()), which is correct: calling exit() after fork() in the
+    child would flush buffers (risking double-writes) and run C++ destructors
+    in the child process (which is incorrect post-exec). _exit() terminates
+    immediately.
+
+4c. The state file is written atomically via write-then-rename pattern
+    (if implemented). Verify that WriteModuleBuildState writes to a
+    temporary file and renames, rather than writing directly to the state
+    file. If the driver is interrupted mid-write, a partial state file
+    would leave the build in an incorrect cached state. If direct write,
+    add rename-based atomic update.
+
+────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────
+
+5a. Compilation is fully sequential: one module at a time.
+    For a project with many independent modules, parallel compilation
+    via job scheduling (multiple concurrent CompileModule calls) would
+    significantly improve throughput. The current architecture does not
+    support this without refactoring (shared Diagnostics, mutable module
+    state). This is a known bootstrap limitation.
+
+5b. The FNV hash is computed over the full source file content on every
+    build. For large source files that have not changed, the hash computation
+    is still O(N) in file size. caching the hash alongside the modification
+    timestamp (and only recomputing hash when mtime changes) would reduce
+    I/O. This is a standard incremental build optimisation.
+
+5c. The module graph discovery traverses import statements in each source
+    file. For a large project with deep import chains, this requires
+    reading every source file at least once. The current approach caches
+    the graph in the project load step, which is correct.
+
+────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+────────────────────────────────────────────────────────────────
+
+6a. The driver has no test for partial-write robustness.
+    If the driver crashes between writing the .mci file and writing the
+    .state.txt file, subsequent builds would find a valid .mci but no
+    state entry, causing unconditional recompilation. This is CORRECT
+    behavior (conservative) and safe. The only issue would be if the .mci
+    is corrupt (partial write). Adding a magic/checksum to .mci files
+    would allow detecting and discarding corrupt interface files.
+
+6b. The driver acquires no filesystem lock before writing .state.txt or
+    .mci files. Two concurrent invocations of `mc build` on the same
+    project directory would produce race conditions on state file writes.
+    This is not a supported use case for the bootstrap compiler, but a
+    comment noting "single-invocation assumption" would be appropriate.
+
+6c. The driver emits diagnostics to stderr via a single Diagnostics object.
+    All error messages from all modules accumulate before the driver exits.
+    If the number of errors is very large (hundreds of modules with errors),
+    the output could be overwhelming. A per-module error limit would
+    improve usability.
+
+────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+────────────────────────────────────────────────────────────────
+
+7a. RunExecutableCommand has an inline comment explaining the WNOHANG
+    loop and why 10ms is used. The comment is correct but should note
+    the latency cost and the alternative (blocking waitpid).
+
+7b. The incremental build state format is documented in a comment block
+    near kModuleBuildStateFormatVersion. This is correct practice.
+    However, the format version is never validated (see 2b).
+
+7c. QuoteShellArg has a comment documenting it as POSIX single-quote
+    escaping. This is accurate. The comment does not clarify that it
+    is for display only, not for execv.
+
+7d. CompileModuleGraph has no top-level block comment describing the
+    six-step pipeline it runs per module. Adding a brief ordered list
+    ("1. Load interfaces, 2. Check incremental state, 3. Run sema, ...")
+    would help future maintainers understand the intended flow.
+
+────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+────────────────────────────────────────────────────────────────
+
+CRITICAL CORRECTNESS
+  [C1] Validate format_version in LoadModuleBuildState against
+       kModuleBuildStateFormatVersion. Return nullopt (force recompile)
+       if versions do not match. This is a one-line safety net against
+       stale state files.
+  [C2] Replace the busy-poll waitpid(WNOHANG)+sleep loop in
+       RunExecutableCommand with a blocking waitpid(pid, &status, 0).
+       Simpler, lower latency, no wasted CPU.
+  [C3] Emit a diagnostic (not silent continue) in
+       AddImportedExternDeclarations when a type name collision is detected
+       across two distinct imported modules.
+
+SOUNDNESS
+  [S1] Add a debug-mode topological order assertion in CompileModuleGraph
+       to catch ordering bugs from DiscoverModuleGraph early.
+
+SIMPLICITY
+  [R1] Break CompileModuleGraph into sub-functions:
+       LoadModuleInterfaces, RunModuleSema, RunModuleMIR,
+       WriteModuleInterface, RunModuleBackend. The 200-line orchestrator
+       should become a sequential call to these five functions.
+  [R2] Clarify JoinCommand / QuoteShellArg naming to make it obvious they
+       are for display only, not for execv.
+
+DOCUMENTATION
+  [Dc1] Add top-level block comment to CompileModuleGraph describing the
+        pipeline steps in order.
+  [Dc2] Add "display only — not used for execv" comment at JoinCommand
+        callsites or rename the functions.
+  [Dc3] Add "FNV-1a 64-bit — not collision-resistant for adversarial inputs;
+        acceptable for trusted local builds" comment near HashText.
+  [Dc4] Document the single-invocation assumption (no concurrent mc build
+        on the same project directory).

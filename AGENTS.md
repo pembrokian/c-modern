@@ -12,9 +12,17 @@ This repository is a bootstrap Modern C compiler. Treat it as a staged compiler 
 See these files first:
 
 - `README.md`
-- `docs/plan/plan.txt`
+- `docs/plan/admin/bootstrap_plan.txt`
 - `docs/plan/phase3_bootstrap_finish.txt`
 - `docs/agent/repo_map.md`
+
+Documentation routing:
+
+- `docs/arch/open_decisions.txt`: unresolved language, architecture, or packaging questions only
+- `docs/arch/key_decisions.txt`: settled design choices with short rationale
+- `docs/plan/backlog.txt`: implementation themes, deferred tasks, and recurring follow-up work
+- `docs/plan/decision_log.txt`: intentional limited solutions, blockers, and deferred fuller fixes
+- `docs/plan/*phase*.txt`: phase-scoped milestones, summaries, and closeouts
 
 ## Working Rules
 
@@ -70,6 +78,9 @@ If you add a feature that changes compiler-visible behavior, update the narrowes
 ## Common Pitfalls
 
 - `docs/plan/phase3_bootstrap_finish.txt` is a repository-specific milestone note, not the full language plan.
+- Do not leave resolved questions in `docs/arch/open_decisions.txt`; move them to the appropriate spec, key decisions, backlog, or decision log file.
+- Do not use `docs/plan/backlog.txt` as a replacement for `docs/arch/open_decisions.txt`; backlog is for work items, not unresolved semantics.
+- Do not use `docs/plan/decision_log.txt` for general status updates; it is only for deliberate limited solutions and the reason they were chosen.
 - Import handling currently lives in bootstrap sema and is intentionally simpler than a future interface-artifact system.
 - Layout support exists, but it is still first-cut bootstrap behavior and not full ABI completion.
 - The build tree under `build/` is disposable.

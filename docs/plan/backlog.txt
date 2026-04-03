@@ -1,0 +1,36 @@
+Modern C - Backlog
+
+Purpose
+
+This file is for implementation work that is known, wanted, or repeatedly rediscovered, but is not yet committed to a specific phase doc.
+
+Use this file for:
+- themes that need follow-up work
+- concrete tasks that were deferred during implementation
+- recurring cleanup or refinement items
+- issues that keep surfacing across compiler layers
+
+Do not use this file for:
+- unresolved language or architecture questions that belong in docs/arch/open_decisions.txt
+- settled rationale that belongs in docs/arch/key_decisions.txt
+- phase-specific milestone tracking that belongs in the relevant phase doc
+
+Suggested entry shape
+
+- status: active | deferred | parked
+- area: parser | sema | mir | codegen | runtime | stdlib | tooling | docs
+- task: short description of the work
+- why: what limiter or pressure exposed the item
+- next step: the smallest useful follow-up
+- reference: phase doc, issue, commit, or decision log entry if available
+
+Current themes
+
+- Phase 8: keep the admission matrix, findings log, and blocked canonical entries explicit so deferred pressure never disappears into prose
+- Phase 8: keep bounded threaded and evented-networking canonical entries named as blocked until runtime and sync support are honest enough
+- Phase 12: admit `time`, `os`, `sync`, `hal`, and `testing` only when a real consumer matrix and stated API surface justify them
+- Phase 13: finish `mc test` timeout reporting, manifest ergonomics, and deterministic rebuild correctness without collapsing C++ fixture suites too early
+- Phase 14: refresh canonical-program admission and closure work so each deferred entry has a named owner gap, proof path, or backlog item
+- tighten the path from limited bootstrap solutions to fuller spec-aligned implementations
+- collect repeated compiler-layer limitations before they become accidental design
+- promote stable patterns from ad hoc fixes into deliberate architecture once pressure is proven

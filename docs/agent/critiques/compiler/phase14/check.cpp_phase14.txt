@@ -1,0 +1,363 @@
+PHASE 14 ARCHITECTURAL REVIEW — compiler/sema/check.cpp
+=========================================================
+Reviewer level: senior compiler systems engineer
+Date: 2026-04-03
+
+SCOPE
+-----
+check.cpp is the semantic analysis module. It performs name resolution,
+type checking, const evaluation, layout computation, and builds the Module
+summary consumed by both MIR lowering and interface artifact generation.
+At ~2866 lines this is the largest single-responsibility file in the
+compiler (mir.cpp is larger but spans lowering + validation + dumping).
+
+────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────
+
+1a. Phase ordering is correct and explicitly documented.
+    The comment at the top of Checker::Run() lists the six sub-phases:
+    SeedImportedSymbols → CollectTopLevelDecls → ValidateExportBlock →
+    ValidateTypeDecls → ValidateGlobals → ValidateFunctionSignatures →
+    ValidateFunctions → BuildModuleLookupMaps.
+    This ordering is sound and each phase has a clear precondition that is
+    met by the previous phases.
+
+1b. Single-class Checker is appropriate for this bootstrap phase.
+    All state (imported_modules_, function_map_, type_map_, scopes_, etc.)
+    is co-located. The class is constructed, Run() is called once, and the
+    result is consumed. This is a correct "use-once arena" pattern. The
+    constructor / Run() / destructor lifecycle is clear.
+
+1c. CheckProgramInternal handles recursive import resolution via memoisation.
+    The exported_cache and visit_state maps prevent redundant re-checking
+    and detect import cycles. This is architecturally sound. Import cycles
+    are caught via the kVisiting sentinel, which is correct.
+
+1d. DESIGN CONCERN: Type classification functions duplicated in check.cpp
+    and mir.cpp.
+    `IsIntegerTypeName`, `IsFloatTypeName`, `IsNumericType`,
+    `IsIntegerLikeType`, `IsBoolType`, `IsPointerLikeType`, `IsUintPtrType`
+    all appear in BOTH check.cpp (operating with a Module for alias
+    resolution) and mir.cpp (operating without Module context). This
+    creates a divergence risk. If a new numeric type is added (e.g., u128),
+    it must be added in both files independently or type-checking and
+    MIR-lowering will disagree. For a bootstrap phase this duplication is
+    manageable, but it should be flagged in the backlog.
+
+    The correct long-term home is a shared sema utility in check.h or a
+    new sema/type_predicates.h, with the MIR-local versions delegating to
+    it after stripping the module context that the MIR layer doesn't have.
+
+1e. DESIGN CONCERN: Dual-path module lookups (fast map vs linear scan).
+    FindFunctionSignature and FindTypeDecl both check whether the lookup map
+    is populated and fall back to a linear scan if not. This implicit
+    contract — "if the map is empty, always scan; if the map is populated,
+    always use it" — is fragile. The map is populated by BuildModuleLookupMaps
+    which is called both at the end of Checker::Run() and at the end of
+    BuildExportedModuleSurfaceInternal. If a caller constructs a Module and
+    forgets to call BuildModuleLookupMaps, lookups silently fall back to
+    linear scan. Worse, since both paths must stay in sync, a Module that
+    is partially built (functions added after the last BuildModuleLookupMaps
+    call) will return stale/wrong results from the fast path and correct but
+    slower results from the slow path.
+
+    Recommendation: Remove the dual-path and always use the map. Either
+    guarantee the map is always current (rebuild lazily on access) or always
+    linear-scan and build the map only for the hot lookup sites.
+
+────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+────────────────────────────────────────────────────────────────
+
+2a. CRITICAL: Undefined behaviour in const-eval left shift.
+    In EvaluateConstExpr (kBinary case):
+        result.integer_value = lhs << rhs;
+    Both lhs and rhs are int64_t. Left shifting a signed integer when:
+      - rhs < 0, or
+      - rhs >= 64, or
+      - the result is not representable in int64_t
+    is undefined behaviour in C++20 (C++20 made left-shift of negative
+    values well-defined, but not shift-by-negative or shift-by-≥width).
+    A hostile or erroneous source file with `const X = 1 << -1` or
+    `const X = 1 << 100` triggers UB.
+
+    Fix: add a guard before the shift:
+        if (rhs < 0 || rhs >= 64) {
+            return std::nullopt; // treat as non-evaluable
+        }
+        result.integer_value = static_cast<int64_t>(
+            static_cast<uint64_t>(lhs) << static_cast<uint64_t>(rhs));
+    Use unsigned shift for well-defined wrapping semantics.
+
+2b. CRITICAL: ParseIntegerLiteral only handles ASCII decimal digits.
+    The function accepts only characters '0'..'9'. If the lexer produces
+    hex literals (0x1F), binary literals (0b1010), octal literals (0o17),
+    or literals with digit separators (1_000_000), const evaluation will
+    silently return std::nullopt. The caller in ValidateGlobals then reports
+    "initializer must be a compile-time constant" even though the literal IS
+    constant — it simply wasn't understood by the evaluator.
+
+    Additionally, numeric literals with type suffixes (e.g., "42i32") would
+    fail because 'i' is not a decimal digit. If the lexer stores suffixed
+    literals in the text field, this is a silent failure of const evaluation
+    for all typed integer literals.
+
+    Fix: Strip any trailing non-digit suffix before parsing, and support
+    at least hex. Alternatively, centralise integer literal parsing so the
+    lexer and the const evaluator share the same parser.
+
+2c. CORRECTNESS: SpanKey collision for synthetic Expr nodes.
+    SpanKey encodes a source span as "line:col-line:col". In CheckBindingOrAssign,
+    a synthetic Expr is created with its span set to `stmt.span`:
+        Expr target;
+        target.kind = Expr::Kind::kName;
+        target.text = stmt.pattern.names[index];
+        target.span = stmt.span;
+        CheckAssignableTarget(target, ...);
+    CheckAssignableTarget calls AnalyzeExpr on non-name cases, which calls
+    RecordExprType. If RecordExprType is called with a span that already has
+    an entry in expr_type_indices, it OVERWRITES the type entry for that
+    source position. If the assignment target expression is at the same span
+    as the stmt (which it is, since `target.span = stmt.span`), the type map
+    entry for the stmt span gets clobbered with the target's type.
+
+    This is harmless only because kName expressions in CheckAssignableTarget
+    return before calling AnalyzeExpr — but only for the known-name path.
+    The "unknown name" path calls AnalyzeExpr and returns UnknownType, which
+    is then recorded at stmt.span. If another expression at the same span
+    was previously recorded, it is now lost.
+
+    Wider concern: SpanKey is used as a map key but two distinct nodes can
+    occupy the same source span (e.g., the binding statement and the implicit
+    first name expression within it). The map cannot reliably distinguish
+    them. This is a fundamental limitation of span-indexed type facts.
+    Future work should index by node identity (pointer address or node ID)
+    rather than span.
+
+2d. CORRECTNESS: Const eval of integer overflow is unchecked.
+    Addition, subtraction, and multiplication of int64_t in EvaluateConstExpr
+    do not check for overflow:
+        result.integer_value = lhs + rhs;  // potential signed overflow (UB)
+    Signed integer overflow is UB in C++. For a compiler's const evaluator
+    this is particularly embarrassing: the compiler may silently wrap/miscompute
+    a constant that appears valid, producing wrong output.
+
+    Fix: Use __builtin_add_overflow / __builtin_mul_overflow (GCC/Clang) or
+    a portable overflow-checked arithmetic helper.
+
+2e. CORRECTNESS: StmtAlwaysReturns does not handle break/continue as
+    reachability terminators for the PURPOSE of return analysis.
+    The current implementation correctly treats break/continue as
+    non-returning. However, it does not account for the case where ALL
+    branches of a switch case end with break (not return) — in that case,
+    the switch is correctly not considered always-returning. This is fine.
+    But consider a switch with all cases either returning or breaking, where
+    the break targets the outer loop rather than the switch. The current
+    analysis is conservative (may report "function may exit without returning"
+    when in fact it is guaranteed to return), which is safe but noisy.
+
+2f. CORRECTNESS: ValidateGlobals type check uses AnalyzeExpr in global scope.
+    AnalyzeExpr can call LookupValue, which walks scopes_. During
+    ValidateGlobals, scopes_ is empty (no scopes are pushed for global
+    context). LookupValue then falls through to global_symbols_, which is
+    populated in CollectTopLevelDecls. This is correct — the global scope
+    lookup works via global_symbols_ — but the code path depends on the
+    ordering of phases and the fact that scopes_ is empty. An explicit
+    comment explaining this expected state would help future readers.
+
+2g. SOUNDNESS: Layout computation for alias/distinct types does not resolve
+    through the chain.
+    ComputeTypeLayout for a kDistinct or kTypeAlias delegates to
+    ComputeTypeLayout(type_decl->aliased_type, ...). But if the aliased_type
+    is itself a distinct or alias, the recursion will handle it. However, if
+    a distinct type aliases another distinct type that is not yet in the
+    type_decl lookup (e.g., imported from another module), ComputeTypeLayout
+    will return {} (invalid layout) but silently, not via Report. This means
+    a layout query for an imported distinct type silently fails.
+
+────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+────────────────────────────────────────────────────────────────
+
+3a. AnalyzeExpr kQualifiedName is excessively long (~80 lines).
+    The kQualifiedName case handles:
+      - Local variable field access (Slice/Buffer/string projections)
+      - Global variable field access
+      - Imported module member (function, global)
+      - Qualified function lookup (e.g., "enum_type.Variant")
+      - Imported type enum variant
+    These are seven distinct cases in a single deeply-nested if-chain.
+    Each should be a private helper method on Checker. This would both
+    shorten AnalyzeExpr and make the individual cases independently testable
+    or reachable from other code paths without code duplication.
+
+3b. IsExplicitlyConvertible has duplicated Slice-inference logic.
+    There are two structurally identical blocks:
+      (1) Check `expected.name == "Slice"` against array/slice/buffer actual.
+      (2) Check `stripped_expected.name == "Slice"` against stripped actual.
+    These could be unified by a helper that resolves both raw and stripped
+    pairs together, eliminating the duplication. The current structure requires
+    two places to update when the Slice inference rules change.
+
+3c. EvaluateConstExpr binary float case has a pre-check followed by a
+    deferred secondary check:
+        if (expr.text == "/" && rhs == 0.0) { return std::nullopt; }
+        result.float_value = expr.text == "+" ? ... : 0.0;
+        if (expr.text != "+" && ...) { return std::nullopt; }
+    The second `return std::nullopt` branch is reached when the operator is
+    unrecognised AFTER the floating-point division-by-zero check. This means
+    the function computes `result.float_value = 0.0` for unrecognised
+    operators and then discards it. Reordering to check the operator set
+    before computing would be cleaner and avoids the dead computation.
+
+3d. AnalyzeCall duplicates the return-type extraction logic.
+    The return-type extraction pattern (strip param_count types, return
+    single/tuple based on arity) appears identically in three places within
+    AnalyzeCall: the arity-mismatch branch, the normal return, and the
+    AnalyzeVariantConstructorCall path. This should be a shared helper.
+
+────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────
+
+4a. AnalyzeExpr is called recursively on all child expressions via
+    CheckStmt → CheckStmt → AnalyzeExpr chains. Each function call consumes
+    stack. For deeply nested code (e.g., long chains of binary operations or
+    deeply nested blocks), this could overflow the stack. No depth limit is
+    enforced. This is the same concern as in DumpExpr.
+
+4b. Memory safety is otherwise good. All nodes are owned by unique_ptr
+    chains, all module data is owned by Module, and Checker holds only
+    non-owning pointers and references.
+
+4c. const_eval_cache_ uses std::string keys. Cache lookup allocates a
+    temporary string on every call to EvaluateTopLevelConst. For modules
+    with many consts this adds allocation pressure. A string_view-keyed
+    map using a transparent comparator would avoid the allocation.
+
+────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────
+
+5a. StripTypeAliases and StripAliasOrDistinct are called on every expression
+    analysis. Neither result is cached per (type, module) pair. For a module
+    with many deeply aliased types, the type stripping work is O(alias_depth)
+    on every expression. In a pathological module (dozens of alias chains of
+    depth 10), this could make type-checking O(N * depth) in the total
+    number of type references.
+
+    Fix: memoize the alias-stripping result per (type string, module identity).
+    A simple approach: compute a canonical string for each type once and cache
+    it in a flat hash map keyed on the type structure.
+
+5b. FindFunctionSignature / FindTypeDecl slow path is O(N) per call.
+    During SeedImportedSymbols and CollectTopLevelDecls (before
+    BuildModuleLookupMaps is called), lookups use the slow linear scan path.
+    This makes CollectTopLevelDecls O(N²) in the number of declarations via
+    repeated calls to FindFunctionSignature from ValidateFunctionSignatures.
+    (Actually, ValidateFunctionSignatures is called after CollectTopLevelDecls
+    so the map exists. But the map is rebuilt after ALL push_backs, which is
+    the safe order. This is fine.)
+
+    The more significant concern is that modules handed to Checker from the
+    driver via CheckOptions::imported_modules do NOT have BuildModuleLookupMaps
+    called on them in all paths. The code in CheckProgramInternal calls
+    BuildExportedModuleSurfaceInternal which calls BuildModuleLookupMaps.
+    But the return from CheckProgramInternal via the exported_cache path
+    returns a Module copy from the cache. Callers using that copy get the
+    lookup maps. This is correct but not obvious from code inspection.
+
+5c. Layout computation runs on every invocation of Checker::Run(). Struct
+    layouts are recomputed for each source file that references the type,
+    even for imported types whose layouts are already known from the exported
+    module surface. The TypeDeclSummary.layout field is populated per-Checker
+    instance, not globally.
+
+────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+────────────────────────────────────────────────────────────────
+
+6a. Import cycle detection uses visit_state keyed by normalised absolute
+    path. This is correct for the filesystem-based import model. However,
+    calling std::filesystem::absolute on every import is a system call.
+    For large projects with many imports, this could add measurable overhead.
+    Caching normalised paths per session would help.
+
+6b. CheckSourceFile (the no-imports variant) is exported for testing.
+    The signature difference between CheckProgram and CheckSourceFile
+    (with vs without import resolution) means tests that use CheckSourceFile
+    cannot exercise the import seeding path. This is intentional —
+    CheckSourceFile is for unit-level sema tests — but it means type-import
+    interaction bugs require integration tests through CheckProgram.
+
+6c. The exported module surface building in BuildExportedModuleSurfaceInternal
+    copies the entire Module, then discards non-exported members. For large
+    modules, this could create significant short-lived memory traffic. The
+    alternative (filter during construction) would be more efficient but
+    more complex. Given bootstrap scale, the current approach is acceptable.
+
+────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+────────────────────────────────────────────────────────────────
+
+7a. The phase ordering comment in Run() is one of the best-documented
+    sections in the entire compiler. It explicitly states preconditions for
+    each phase. This should be maintained as functionality is added.
+
+7b. StripAliasOrDistinct has a subtle interaction with StripTypeAliases:
+    it calls StripTypeAliases in a loop to handle mixed alias+distinct chains.
+    The visited set prevents infinite loops. This logic is not obviously
+    correct on first read and deserves a longer comment explaining what kind
+    of type chain it is designed to handle, e.g.:
+        "Handles chains like: type A = B; distinct C = A; which requires
+         both alias stripping and distinct unwrapping in one pass."
+
+7c. SpanKey's role as a map key for expr type facts deserves a comment
+    explaining the implicit assumption that a given source span contains
+    at most one semantically interesting AST node. This assumption breaks
+    for synthetic nodes (see 2c above) and requires future work.
+
+────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+────────────────────────────────────────────────────────────────
+
+CRITICAL CORRECTNESS / SAFETY
+  [C1] Fix undefined behaviour in const-eval integer shift (EvaluateConstExpr
+       kBinary case): guard rhs < 0 || rhs >= 64, using unsigned shift.
+  [C2] Fix const-eval integer overflow (add, sub, mul) with overflow-checked
+       arithmetic helpers to avoid signed integer UB.
+  [C3] Fix or document ParseIntegerLiteral: it silently fails for hex, binary,
+       octal, underscored literals, and suffixed literals. Align with the
+       lexer's output format.
+
+CORRECTNESS
+  [C4] Document and audit the SpanKey collision risk for synthetic Expr
+       nodes in CheckBindingOrAssign. Consider replacing SpanKey with a
+       node-identity-based key (pointer or sequential ID).
+  [C5] Add null-check guards in ValidateGlobals where AnalyzeExpr may be
+       called in global scope without any active scopes — add a comment
+       explaining the contract.
+
+DESIGN / ARCHITECTURE
+  [D1] Consolidate type-classification predicates (IsIntegerTypeName,
+       IsFloatTypeName, IsNumericType, IsIntegerLikeType, IsBoolType,
+       IsPointerLikeType, IsUintPtrType) into a single canonical source
+       in sema/type_predicates.h, shared between check.cpp and mir.cpp.
+  [D2] Remove dual-path (map + linear scan) from FindFunctionSignature and
+       FindTypeDecl. Guarantee the map is always populated or always scan.
+  [D3] Split the kQualifiedName case in AnalyzeExpr into helper methods to
+       reduce function length and improve testability.
+
+SIMPLICITY
+  [S1] Unify the duplicated Slice-inference logic in IsExplicitlyConvertible
+       into a single helper.
+  [S2] Unify the return-type extraction pattern duplicated in AnalyzeCall.
+  [S3] Reorder EvaluateConstExpr float binary to check operator before
+       computing to eliminate the dead 0.0 assignment for unknown operators.
+
+PERFORMANCE
+  [P1] Memoize StripTypeAliases results per (type, module) pair to avoid
+       repeated alias resolution on the same types in complex modules.
+  [P2] Use string_view-keyed transparent comparator for const_eval_cache_
+       to avoid temporary string allocation on every cache lookup.

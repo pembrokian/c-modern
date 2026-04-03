@@ -1,0 +1,242 @@
+PHASE 14 ARCHITECTURAL REVIEW — compiler/ast/ast.cpp
+======================================================
+Reviewer level: senior compiler systems engineer
+Date: 2026-04-03
+
+SCOPE
+-----
+This file is the AST dump/serialization layer. Its only public API is
+DumpSourceFile. All node types (Expr, Stmt, Decl, TypeExpr) are fat structs
+defined in ast.h and intentionally documented there as a bootstrap expedient.
+This review covers ast.cpp and the ast.h data model it serializes.
+
+────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────
+
+1a. Correct separation of concerns.
+    The file does exactly one thing: produce a human-readable textual dump of
+    an already-constructed AST. There are no mutations, no allocations beyond
+    the final string, and no cross-layer dependencies. This is the correct
+    shape for a dump/diagnostic module.
+
+1b. Fat-struct node design is a deliberate, documented bootstrap trade-off.
+    All Expr/Stmt/Decl/TypeExpr variants live in single structs. The comment
+    in ast.h is clear and defensible for a bootstrap phase. The main cost is
+    that every node carries fields that are unused for its particular Kind,
+    wasting memory. For a bootstrap compiler processing single-file programs
+    this is acceptable.
+
+1c. The file has no coupling to sema, MIR, or the driver.
+    ast.cpp includes only ast.h and support/assert.h. This boundary is clean
+    and should be preserved.
+
+1d. DumpSourceFile is effectively the only entry point.
+    All DumpXxx helpers are file-local (anonymous namespace). This is good
+    encapsulation.
+
+1e. Recursive dump without an explicit visitor interface.
+    The dump functions call each other directly. There is no Visitor interface
+    or traversal abstraction. This is fine for a file whose only purpose is
+    text output. Adding a visitor here would be premature abstraction.
+
+────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+────────────────────────────────────────────────────────────────
+
+2a. CRITICAL: `assert(stmt.has_default_case == !stmt.default_case.statements.empty())`
+    This assertion encodes a structural invariant: "has_default_case is true
+    if and only if the default_case has at least one statement." This invariant
+    is WRONG in principle. A valid `default:` clause may syntactically be
+    empty in other languages. In this language the grammar may permit it too
+    (the parser sets `has_default_case = true` when it sees the `default`
+    keyword, regardless of whether any statements follow). If a source file
+    contains:
+
+        switch x {
+          default:
+        }
+
+    the parser sets `has_default_case = true` and `default_case.statements`
+    is empty. The assert fires and terminates the compiler process even in
+    debug builds. In release builds the assert is silently skipped, meaning
+    the dump silently omits the default clause.
+
+    Fix: remove the assert. Use `has_default_case` (not the statements
+    vector's emptiness) as the single source of truth in the dump:
+
+        if (stmt.has_default_case) {
+            WriteLine(stream, indent + 1, "default:");
+            for (const auto& item : stmt.default_case.statements) {
+                DumpStmt(*item, stream, indent + 2);
+            }
+        }
+
+2b. `secondary_text` field meaning inconsistency between header and dump.
+    In ast.h the comment says secondary_text for kLiteral is "type suffix
+    following the numeric literal". But in ParsePrimaryExpr (parser.cpp),
+    `expr->secondary_text` is set to `mc::lex::ToString(Current().kind)`,
+    which is the token kind name (e.g., "int_literal", "float_literal").
+    DumpExpr prints it as "extra=...", which matches neither documentation.
+    The field carries overloaded meaning and the dump label does not
+    distinguish the two uses. This is a documentation inconsistency, not a
+    correctness bug, but it misleads anyone reading AST dumps.
+
+    Fix: rename the dump label to "kind=" for kLiteral nodes, or document
+    clearly in the dump which interpretation applies.
+
+2c. Null-pointer deference risk in DumpField.
+    DumpField calls `DumpType(*field.type, ...)` without checking whether
+    `field.type` is null. FieldDecl.type is a `unique_ptr<TypeExpr>`. If the
+    parser emits a FieldDecl with a null type (e.g., when a parse error
+    produced a partial node before error recovery), DumpField would dereference
+    a null pointer.
+
+    The parser's ParseFieldDecl does call ParseTypeExpr which can return nullptr
+    on error. The field is stored as-is. A null check here is cheap defensive
+    correctness.
+
+    Fix:
+        if (field.type != nullptr) {
+            DumpType(*field.type, stream, indent + 1);
+        } else {
+            WriteLine(stream, indent + 1, "<missing type>");
+        }
+
+    The same pattern applies to DumpFieldInit's `if (init.value != nullptr)`
+    which IS already guarded - inconsistency only in DumpField.
+
+2d. ParamDecl dump omits the type when present but type is null.
+    In DumpDecl, params are iterated:
+        DumpAttributes(param.attributes, stream, indent + 2);
+        DumpType(*param.type, stream, indent + 2);
+    No null check on param.type. Same issue as 2c.
+
+────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+────────────────────────────────────────────────────────────────
+
+3a. WriteIndent + manual stream concatenation vs. WriteLine is inconsistently
+    used. Some arms use `WriteLine(stream, depth, text)`, others manually call
+    `WriteIndent` then `stream << text`. This inconsistency is minor but
+    makes the code harder to scan. The pattern is used in over 20 places.
+    Standardising on `WriteLine` for all complete-line output would improve
+    uniformity.
+
+    Example of inconsistency (DumpDecl):
+        stream << "FuncDecl";
+        if (!decl.name.empty()) {
+            stream << " name=" << decl.name;
+        }
+        stream << '\n';
+
+    vs. the pattern in DumpExpr which also uses manual stream <<. This is
+    acceptable but worth noting for future maintainers.
+
+3b. The `using Indent = int;` type alias is used only within this file.
+    The alias does not add semantics (it is identical to int) but it does
+    label intent. This is a minor positive.
+
+3c. All `ToString` overloads are anonymous namespace functions. They
+    duplicate the same function name in ast.cpp that exists in other files
+    (mir.cpp, check.cpp) for the same Decl::Kind enum. The implementations
+    differ (ast.cpp returns "FuncDecl", check.cpp returns "func"). This
+    divergence from a single source of truth is fine as long as the dump
+    format doesn't need to round-trip.
+
+────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────
+
+4a. No memory safety concerns. All child traversals use `const &` references
+    to unique_ptr-owned nodes. No raw pointer arithmetic.
+
+4b. Stack overflow risk for deeply nested ASTs.
+    All dump functions are mutually recursive without a depth counter.
+    A deeply nested expression tree (e.g., thousands of nested AddExprs
+    produced by legitimate array initialisation, or by adversarial input)
+    could overflow the call stack. For a bootstrap compiler processing
+    authored programs this is unlikely in practice, but for any fuzzing
+    scenario it is a real risk.
+
+    Recommended mitigation: add an `int depth` parameter and hard-abort
+    (print a truncation marker) if depth exceeds a safe limit (e.g., 512).
+
+4c. Stream passed by reference through all recursion levels.
+    This is correct and idiomatic. The single ostringstream is allocated on
+    the stack of DumpSourceFile and shared via reference.
+
+────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────
+
+5a. Single-pass string accumulation via ostringstream is efficient. The
+    output is returned by value (std::string via ostringstream::str()), which
+    involves one copy but is fine for diagnostic use.
+
+5b. No heap allocation per node beyond the final string. Acceptable.
+
+5c. For extremely large source files (hundreds of functions with complex
+    bodies), the ostringstream could grow to several megabytes. No concern
+    for typical use.
+
+────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+────────────────────────────────────────────────────────────────
+
+6a. The dump format is used as the golden fixture for parser tests
+    (tests/parser/*.txt files). Any change to the dump format — including
+    adding or removing a field, or changing a label — will break all
+    parser fixtures. The format is effectively a public interface of the
+    test infrastructure. Changes must be intentional and golden files
+    updated atomically.
+
+6b. The dump format uses `name=`, `text=`, `extra=`, `hasInitializer=true`,
+    etc. These key-value pairs are informally structured. There is no schema.
+    Future tooling that parses dump output (e.g., diff tools, test
+    infrastructure) must understand this implicit schema.
+
+────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+────────────────────────────────────────────────────────────────
+
+7a. The file itself has minimal inline comments, but ast.h has thorough
+    per-field documentation for the Expr node. The dump functions are
+    self-evident.
+
+7b. The assert discussed in 2a is not commented. Any invariant encoded in an
+    `assert` should have a comment explaining WHY the invariant holds and
+    what it means if it fires.
+
+────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+────────────────────────────────────────────────────────────────
+
+CRITICAL
+  [C1] Remove or fix the `assert(stmt.has_default_case ==
+       !stmt.default_case.statements.empty())` — it is semantically wrong
+       for empty default clauses and crashes in debug builds. Use
+       `has_default_case` as the authoritative flag.
+
+  [C2] Add null checks before `DumpType(*field.type, ...)` and
+       `DumpType(*param.type, ...)` to prevent null dereference on
+       error-recovery partial nodes.
+
+DESIGN / ARCHITECTURE
+  [D1] Document the `secondary_text` meaning for kLiteral nodes in the dump
+       (token kind string vs type suffix). Update the dump label from "extra="
+       to something that distinguishes the two uses, or fix parser.cpp to
+       match the stated header semantics.
+
+SIMPLICITY / MAINTAINABILITY
+  [S1] Standardise on `WriteLine` for all complete-line output to eliminate
+       the inconsistency between `WriteLine` calls and manual `WriteIndent` +
+       `stream <<` patterns.
+
+SAFETY
+  [Sa1] Add a recursion depth parameter and truncation guard to all DumpXxx
+        functions to prevent stack overflow on adversarial or deeply nested
+        ASTs.
+
+PERFORMANCE
+  No significant performance concerns for the dump path at current scale.

@@ -1,0 +1,35 @@
+Modern C - Decision Log
+
+Purpose
+
+This file records implementation choices where the team intentionally chose a limited or provisional solution because a fuller solution was blocked, too broad, or not yet justified.
+
+Use this file for:
+- limited solutions chosen during implementation
+- cases where a deeper fix was deferred on purpose
+- compiler-layer workarounds that should be revisited later
+- decisions that are not language-spec questions but still matter for future cleanup
+
+Do not use this file for:
+- unresolved questions that belong in docs/arch/open_decisions.txt
+- durable settled design rationale that belongs in docs/arch/key_decisions.txt
+- ordinary progress notes or implementation summaries
+
+Suggested entry shape
+
+- date: YYYY-MM-DD
+- area: parser | sema | mir | codegen | runtime | stdlib | tooling | docs
+- context: what was being implemented
+- limiter: what prevented the fuller solution
+- decision: what limited solution was chosen
+- tradeoff: what was accepted or sacrificed
+- revisit trigger: what should cause this to be reopened
+- reference: related phase doc, backlog item, or code location
+
+Entries
+
+- 2026-04-03 | phase 8 file walker | the hosted bootstrap slice had whole-file loading but no admitted directory traversal surface | admit a narrow hosted `fs.is_dir` plus newline-delimited, sorted `fs.list_dir` surface | avoids inventing a richer directory-entry API before the repository can prove it honestly | revisit when directory-iteration pressure grows
+- 2026-04-03 | phase 8 hashing tool | the admitted slice could prove a checksum utility with whole-file reads, but streaming reads were not yet honest pressure | land a narrow whole-file checksum over `fs.read_all` with explicit fixed-width hex formatting | postpones streaming and richer buffer helpers to later pressure work | revisit when streaming I/O becomes an admitted repository need
+- 2026-04-03 | phase 8 arena-backed parser utility | the bootstrap slice did not yet expose richer arena string helpers | store AST nodes in an arena while borrowing token slices from the owned file buffer | keeps allocator pairing and tree construction honest without widening mem prematurely | revisit when owned text helpers become real pressure
+- 2026-04-03 | phase 11 address-flow probe | the second probe exposed an upstream MIR limitation on `&pair.right`, not a backend-owned defect | narrow the probe to the supported address-sensitive shape `&local` so 11C still lands a real backend regression | avoids papering over the wrong layer while keeping backend coverage honest | revisit when MIR owns the broader address-sensitive member-flow shape
+- 2026-04-03 | phase 12 deferred module admission | there was no honest consumer matrix for `time`, `os`, `sync`, `hal`, and `testing` yet | keep those modules deferred until real program or toolchain pressure justifies a stated API | preserves a narrower stdlib surface for now | revisit when a concrete consumer matrix exists

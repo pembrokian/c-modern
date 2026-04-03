@@ -8,6 +8,8 @@ This file is a fast orientation map for agents working in this repository.
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
+- `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
+- `docs/plan/decision_log.txt`: record of intentional limited solutions and deferred fuller fixes
 - `docs/plan/phase3_bootstrap_finish.txt`: repository-specific bootstrap Phase 3 milestone note
 - `build/`: disposable build output
 

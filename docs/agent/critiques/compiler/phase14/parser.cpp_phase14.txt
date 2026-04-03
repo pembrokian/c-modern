@@ -1,0 +1,320 @@
+PHASE 14 ARCHITECTURAL REVIEW — compiler/parse/parser.cpp
+===========================================================
+Reviewer level: senior compiler systems engineer
+Date: 2026-04-03
+
+SCOPE
+-----
+parser.cpp is a single-pass recursive-descent parser operating on a flat
+token vector produced by the lexer. It builds an AST of fat-struct nodes
+(ast.h). At ~1569 lines it is the most constrained and well-bounded of the
+six reviewed files. The file has no extern dependencies beyond the token
+vector and ast.h.
+
+────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────
+
+1a. Recursive descent is the correct choice for this grammar.
+    The grammar is LL(k) with bounded lookahead for disambiguation. The
+    operator precedence chain (ParseRangeExpr → ParseLogicalOrExpr → ...→
+    ParseUnaryExpr) is the standard Pratt-like precedence encoding, clear
+    and correct.
+
+1b. Single class, single public method (Run()), consumed once.
+    This is the correct lifecycle. No state leaks between invocations. The
+    Parser is constructed, Run() is called, and the result is returned.
+
+1c. ParseBinaryChain generic loop correctly encodes left-associativity.
+    Using an initializer_list of operator kinds with a method pointer for the
+    operand-level parser is clean and avoids duplicating the "parse operator,
+    build binary node" pattern for each precedence level.
+
+1d. AggInitGuard RAII pattern is well-documented and correct.
+    The flag `allow_aggregate_init_` is correctly threaded through condition
+    positions (if, for, while) using the guard. This is a clean solution to
+    the if-ambiguity problem that would otherwise require significant
+    lookahead.
+
+1e. kBindingOrAssign deferred disambiguation to sema is well-motivated.
+    The comment in ast.h explains this clearly. The parser cannot distinguish
+    `x = 5` (new binding) from `x = 5` (assignment to existing x) without
+    scope information. Emitting a synthetic kind and letting sema resolve it
+    is the correct approach.
+
+1f. ParsePrimaryExpr always returns non-null (error sentinel instead of null).
+    On parse failure, ParsePrimaryExpr returns a literal Expr with `text =
+    "<error>"` rather than nullptr. This protects all callers from null
+    dereference without requiring every callsite to check. This is correct
+    defensive design.
+
+1g. ParseBlockStmt similarly returns a non-null empty block on failure.
+    Same rationale as 1f. Combined with 1f, the parse tree is always
+    structurally valid even after errors.
+
+────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+────────────────────────────────────────────────────────────────
+
+2a. CORRECTNESS: secondary_text for kLiteral nodes stores the token kind
+    name, not the type suffix as documented in ast.h.
+    In ParsePrimaryExpr:
+        expr->secondary_text = std::string(mc::lex::ToString(Current().kind));
+    mc::lex::ToString returns the TokenKind name ("int_literal",
+    "float_literal", "string_literal", "true", "false", "nil"), which is the
+    token kind, not a user-visible type suffix.
+    ast.h documents secondary_text for kLiteral as:
+        "type suffix following the numeric literal"
+    This is a documentation-implementation mismatch. Sema uses this field
+    to detect float literals (via `text.find_first_of(".eE")`), not via
+    secondary_text. So the field is redundant for the current sema but
+    carries an inconsistent contract with the header documentation.
+    Either:
+      (a) fix ast.h to document the field as "token kind name", or
+      (b) fix the parser to store the actual suffix (if any) in secondary_text
+          as documented.
+    Currently the field is unused by sema/mir/backend — its only use is in
+    ast dump (as "extra=..."), so this is a low-priority consistency fix.
+
+2b. CORRECTNESS: ParseReturnStmt uses `IsStatementTerminator` to detect
+    the end of the expression list, but `SkipNewlines` is NOT called after
+    consumption. If there is a trailing space after `return` on a line with
+    no expressions, and the next line starts with `}`, the parser correctly
+    reads an empty return. This is fine.
+    However, if `return` is on the same line as the `{` of a following block
+    (which is not valid syntax in this language), the parser would attempt
+    to parse an expression starting with `{` and enter aggregate-init
+    parsing. This edge case is handled correctly because `ParseReturnStmt`
+    calls `ParseExprList` which calls `ParseExpr(true)` — but aggregate init
+    of a block immediately after `return` would create a node with `text = ""`
+    and left containing the previous expr... Actually, ParseReturnStmt calls
+    `ParseExprList` (not ParseExpr directly), which calls `ParseExpr()` with
+    allow_aggregate_init=true. Since the AggInitGuard is not set here, an
+    `{` after `return` on the same line WOULD start an aggregate init, which
+    is correct — `return {x: 5}` should be valid.
+
+2c. CORRECTNESS: SkipTypeExprLookahead is recursive with no depth bound.
+    For deeply nested type expressions like `***...***T` (k pointer
+    indirections), each `kStar` token recurses one level deeper. With k=1000
+    pointer indirections (trivially written as a type expression), this
+    causes 1000 recursive calls in SkipTypeExprLookahead. At typical stack
+    sizes (8MB, ~32-64 bytes per frame), this overflows at roughly 10,000-
+    20,000 levels. For legitimate source code this is not a concern. For
+    adversarial input (fuzz testing) it is a crash vector.
+
+    Same applies to `ParseTypeExpr` itself (which calls itself recursively
+    for kPointer/kConst/kParen) and `ParseUnaryExpr` (which calls itself
+    recursively for nested unary operators like `!!!!!x`).
+
+    Fix: add a depth counter to the recursive descent functions and produce
+    a parse error + recovery when the limit is reached.
+
+2d. CORRECTNESS: ParseCasePattern manual Advance() calls are fragile.
+    For the "5-token qualified variant" case:
+        Advance(); Advance(); Advance(); Advance(); Advance();
+    These five explicit Advance() calls have no labels or comments about
+    what token each advance consumes. If the lookahead pattern changes (e.g.,
+    to support nested qualified names), these advance counts would be wrong
+    and silently corrupt the token stream.
+
+    Fix: use named variables to capture and advance over specific tokens:
+        const auto mod_tok = Advance();  // consume module name
+        Advance();                        // consume '.'
+        const auto type_tok = Advance(); // consume type name
+        Advance();                        // consume '.'
+        const auto var_tok = Advance();   // consume variant name
+    Or better, factor out a `ParseQualifiedVariantName()` helper.
+
+2e. CORRECTNESS: ParseBinaryChain with right-operand null dereference risk.
+    `node->span.end = node->right->span.end;` assumes node->right is never
+    null. node->right is set by `(this->*parse_operand)()`. Since
+    ParsePrimaryExpr never returns null (see 1f), this is safe. However
+    the safety is non-obvious and relies on an invariant in a different
+    function.
+
+    A comment noting this invariant ("parse_operand never returns null
+    because ParsePrimaryExpr always returns a sentinel expr on error")
+    would protect future maintainers who modify ParsePrimaryExpr.
+
+2f. CORRECTNESS: ParseForStmt range-vs-foreach discrimination.
+    For `for x in expr { ... }`, the statement kind is determined by:
+        stmt->kind = ... iterable->kind == Expr::Kind::kRange ?
+                     Stmt::Kind::kForRange : Stmt::Kind::kForEach;
+    This means the parse result depends on the type of the expression in the
+    "in" clause. For `for x in a..b { ... }`, the binary `..` correctly
+    produces kRange, so kForRange is emitted. For `for x in arr[0..n] { ... }`,
+    the slice expression `arr[0..n]` is kSlice (not kRange), so kForEach is
+    emitted. This seems correct but the discrimination is based on the
+    AST KIND of the expression rather than its semantic type, which means
+    a variable holding a range type (`var r: Range<i32> = ...`) used in
+    `for x in r` would be classified as kForEach, then sema would need to
+    handle it via the range element type. Verify this is handled in sema.
+
+2g. SOUNDNESS: ParseExprList does not stop at a statement separator.
+    ParseExprList parses `expr (',' expr)*`. In the context of multi-value
+    returns like `return a, b`, ParseReturnStmt calls ParseExprList which
+    consumes until there is no more comma. If there is an accidental comma
+    on the return line that the user did not intend (e.g., trailing comma
+    like `return a, b,`), ParseExprList would then try to parse the next
+    expression starting at the brace or newline, producing a parse error
+    there rather than at the trailing comma position. Minor usability issue.
+
+────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+────────────────────────────────────────────────────────────────
+
+3a. ParseSwitchCase and ParseDefaultCase share almost identical body-parsing
+    logic. The only difference is the pattern parsing at the start. A shared
+    `ParseCaseBodyStatements` helper would eliminate the duplication:
+
+    std::vector<std::unique_ptr<Stmt>> ParseCaseBodyStatements() {
+        std::vector<std::unique_ptr<Stmt>> stmts;
+        if (!IsAtCaseBoundary()) stmts.push_back(ParseStatement());
+        SkipStatementSeparator();
+        while (!IsAtCaseBoundary() && !AtEnd()) {
+            stmts.push_back(ParseStatement());
+            SkipStatementSeparator();
+        }
+        return stmts;
+    }
+
+    where `IsAtCaseBoundary()` checks for kCase/kDefault/kRBrace.
+
+3b. LooksLikePostfixTypeArgs and LooksLikeTypeCallExpr both use
+    SkipTypeExprLookahead. They are structurally similar. They could share
+    a helper `ScanTypeArgList(offset) -> std::optional<size_t>` that skips
+    over `< types >` and returns the offset after `>`.
+
+3c. ParsePostfixExpr is long (~100 lines) but structured as a clean
+    `while(true) { if (...) continue; break; }` loop. This is the standard
+    pattern for postfix operator parsing and is idiomatic. No refactoring
+    is needed here.
+
+3d. ParseAssignOrExprStmt handles three cases:
+      (1) bare-name assignment: `x = expr` → kBindingOrAssign
+      (2) bare-name list assignment: `x, y = expr` → kBindingOrAssign
+      (3) structured assignment: `a.b = expr` → kAssign
+      (4) expression statement: `f()` → kExpr
+    The transitions between these cases are encoded by the order of
+    `if (Match(kAssign))` / `if (IsBareNameExpr && LooksLikeBareNameListAssignment)`
+    / `if (Check(kComma))`. This is correct but deserves a comment explaining
+    the dispatch table.
+
+────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────
+
+4a. Peek(offset) clamps to the last token (EOF) if offset is out of range:
+        return tokens_[target < tokens_.size() ? target : tokens_.size() - 1];
+    This means `Peek(very_large_offset)` returns the EOF token rather than
+    crashing. This is defensive and correct.
+
+4b. The tokens_ vector is borrowed by reference from the lexer's LexResult.
+    LexResult must outlive the Parser. This is enforced at the call site
+    (in parser.cpp's Parse() free function), but is not a compile-time
+    guarantee. If a caller stores the parser separately from the LexResult,
+    tokens_ would dangle. The constructor should accept LexResult by const
+    reference (which it does) but there is no lifetime annotation. This is
+    a C++ lifetime convention limitation, acceptable for this codebase.
+
+4c. SynchronizeTopLevel and SynchronizeStatement are correct recovery
+    anchors. They stop at statement/declaration boundaries. However, if
+    recovery stops at a `func` keyword that is INSIDE a broken function body,
+    the outer synchronization at the top level would try to parse it as a
+    new top-level function. This could cascade into a sequence of misleading
+    errors. This is a known limitation of top-level recovery in recursive
+    descent parsers, not unique to this implementation.
+
+────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────
+
+5a. The lookahead functions (SkipTypeExprLookahead, LooksLikeBindingStmt,
+    LooksLikeBareNameListAssignment, LooksLikePostfixTypeArgs) all execute
+    O(k) token scans where k is the lookahead depth. For normal source files
+    these are short. Adversarial input with very long type argument lists
+    could make LooksLikePostfixTypeArgs O(N) on every expression.
+
+5b. Token vector access via Peek is O(1). The token stream is fully
+    materialised before parsing. This is the correct approach — streaming
+    parsers over lexer tokens are harder to read and not necessary here.
+
+5c. All AST nodes are allocated with `std::make_unique<NodeType>()`. For a
+    large function with thousands of expressions, this creates thousands of
+    heap allocations. An arena allocator would reduce memory fragmentation
+    and allocation overhead. This is a known bootstrap trade-off documented
+    in the design comments.
+
+────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+────────────────────────────────────────────────────────────────
+
+6a. The parser produces AST nodes with source spans. For downstream tools
+    (error reporting, IDE integration, incremental reparse), span accuracy
+    is critical. The span assignment is done manually at each node
+    construction site (span.begin = ..., span.end = ...). There is no
+    mechanism to flag a node with "span was synthesised" vs "span from
+    source", which is important for error messages from derived synthetic
+    nodes (e.g., the empty block returned from ParseBlockStmt on failure).
+
+6b. This parser does not support error recovery within expressions —
+    SynchronizeStatement is a statement-level anchor. If an expression is
+    malformed, the parser emits an error and returns a literal `<error>`
+    sentinel. The statement-level recovery then skips tokens to the next
+    newline. This produces at most one error per statement, which is
+    acceptable for a bootstrap compiler but may suppress cascaded errors
+    that would be informative.
+
+────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+────────────────────────────────────────────────────────────────
+
+7a. SkipTypeExprLookahead has an exceptionally clear contract comment:
+    "Never consumes tokens; safe to call at any lookahead depth." This
+    should be preserved and extended to all lookahead functions.
+
+7b. SynchronizeTopLevel has a clear comment explaining the recovery
+    strategy and the safe token set. This is the correct level of
+    documentation for an error-recovery function.
+
+7c. AggInitGuard has a thorough inline comment explaining WHY the flag
+    must be false in condition positions. This is an example of exactly
+    the right comment: it documents a non-obvious language design
+    interaction, not just what the code does.
+
+7d. The manual Advance() calls in ParseCasePattern (see 2d) have NO
+    comments. This is conspicuous given the otherwise good documentation
+    quality. These should be annotated.
+
+────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+────────────────────────────────────────────────────────────────
+
+CRITICAL CORRECTNESS / SAFETY
+  [C1] Add recursion depth guards to SkipTypeExprLookahead, ParseTypeExpr,
+       and ParseUnaryExpr to prevent stack overflow on adversarial or
+       pathologically deep input. Emit a parse error and recover.
+  [C2] Replace the raw Advance() sequences in ParseCasePattern with
+       explicitly named token captures or a helper, to prevent silent
+       token-stream corruption if the pattern changes.
+
+CORRECTNESS
+  [C3] Resolve the secondary_text field contract mismatch between ast.h
+       documentation ("type suffix") and parser implementation ("token kind
+       name"). Pick one meaning and consistently document + implement it.
+  [C4] Add a comment on ParseBinaryChain's `node->right->span.end`
+       dereference documenting why `right` is guaranteed non-null.
+
+SIMPLICITY
+  [S1] Extract ParseCaseBodyStatements helper shared by ParseSwitchCase
+       and ParseDefaultCase to eliminate duplicated case-body parsing code.
+  [S2] Add a comment to ParseAssignOrExprStmt explaining the four-case
+       dispatch table (binding-or-assign, name-list, structured assign,
+       expr statement).
+
+DOCUMENTATION
+  [Dc1] Annotate the five-Advance() sequence in ParseCasePattern with per-
+        token comments explaining what each advance consumes.
+  [Dc2] Document ParseForStmt's kind-discrimination logic: note that the
+        kForRange vs kForEach decision is based on the parsed expression
+        kind (kRange literal syntax) not the semantic type of the iterable.
