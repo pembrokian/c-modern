@@ -570,8 +570,12 @@ Recommended first follow-up documents:
 - `/Users/ro/dev/c_modern/docs/plan/phase11_backend_deepening.txt`
   as the repository-specific execution plan for unfinished Phase 5 backend
   deepening on the first hosted target
-- a Phase 6 library-surface critique and closure plan
-- a Phase 7 toolchain maturity plan focused on .mci and mc test correctness
+- `/Users/ro/dev/c_modern/docs/plan/phase12_stdlib_runtime_maturity.txt`
+  as the repository-specific execution plan for unfinished Phase 6 stdlib and
+  runtime maturity work
+- `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt`
+  as the repository-specific execution plan for unfinished Phase 7 toolchain
+  maturity work focused on .mci, rebuild trust, and mc test correctness
 - a refreshed Phase 8 admission matrix once the enabling layers deepen
 
 Acceptance criteria for this roadmap document

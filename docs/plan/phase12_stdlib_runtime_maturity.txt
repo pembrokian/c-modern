@@ -1,0 +1,389 @@
+Phase 12 -- Phase 6 Stdlib And Runtime Maturity
+================================================
+
+Status
+------
+PLANNED
+
+Repository status note
+----------------------
+- The repository already has a real bootstrap Phase 6 boundary recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase6_minimal_standard_library_and_runtime_boundary.txt`
+  and summarized in
+  `/Users/ro/dev/c_modern/docs/plan/phase6_implementation_summary.txt`.
+- The broader non-bootstrap expansion path is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`.
+- This file does not introduce a new architecture phase after Phase 8.
+  It is a repository-specific execution label for the unfinished library and
+  runtime work that still belongs to Phase 6 ownership.
+- Do not describe Phase 12 as a new language or compiler layer.
+  It is the concrete closure plan for moving the current hosted stdlib and
+  runtime slice from bootstrap-shaped utility seams toward an honest minimal
+  library boundary that real hosted programs can depend on without compiler,
+  backend, or driver-local repair.
+
+Dependency note
+---------------
+- Phase 12 depends on the current repository posture described in:
+  - `/Users/ro/dev/c_modern/docs/plan/plan.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase6_minimal_standard_library_and_runtime_boundary.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase6_implementation_summary.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/stdlib_spec.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/runtime_spec.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/allocation_spec.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/canonical_programs.txt`
+  - the current hosted runtime seam under `/Users/ro/dev/c_modern/runtime/hosted/`
+  - the current stdlib modules under `/Users/ro/dev/c_modern/stdlib/`
+  - the current executable proof layers under
+    `/Users/ro/dev/c_modern/tests/stdlib/`,
+    `/Users/ro/dev/c_modern/tests/tool/`, and
+    `/Users/ro/dev/c_modern/tests/codegen/`
+- Phase 12 must preserve the existing ownership split:
+  - sema owns language meaning and representation truth
+  - MIR owns typed lowered semantic truth
+  - the backend realizes MIR on the current hosted target without redefining
+    library semantics
+  - `stdlib/` owns library API shape and module behavior
+  - `runtime/hosted/` owns hosted process entry and the narrow low-level seam
+    required to start an executable program
+  - the driver and build layer orchestrate workflow and artifact paths rather
+    than compensating for missing library or runtime ownership
+- If library expansion appears to require new language meaning or new lowered
+  semantic forms, route that gap back to the owning earlier phase or land the
+  owner change first.
+
+Repository-specific scope note
+------------------------------
+- The architecture texts stop at Phase 8 and already require later pressure
+  findings to route back to the smallest correct owner.
+- This repository uses the Phase 12 label only to package the next execution
+  wave as a concrete plan document under `docs/plan/`.
+- In substance, Phase 12 is the implementation plan for Workstreams 6A
+  through 6E from the non-bootstrap roadmap, with the first execution wave
+  explicitly prioritizing API honesty for already-admitted modules, runtime
+  boundary cleanup, and library-focused proof before deferred module breadth.
+
+Purpose
+-------
+Turn the broad non-bootstrap Phase 6 roadmap into an execution-ready plan that
+can be implemented in reviewable waves without blurring the boundary between
+language-owned semantics, MIR-owned lowered truth, backend-owned executable
+realization, stdlib-owned API contracts, and runtime-owned hosted entry.
+
+After Phase 12:
+
+- the existing hosted library modules reflect deliberate ownership and error
+  contracts instead of bootstrap convenience seams being treated as the normal
+  API shape
+- hosted runtime support remains small, explicit, and outside the normal
+  import surface rather than bleeding into compiler or backend-local behavior
+- allocation, buffer, string, utf8, and file APIs are honest enough that
+  real hosted utilities can use them without repeated workaround patterns
+- newly admitted modules such as `time`, `os`, `sync`, `hal`, or `testing`
+  land only when a real repository consumer or spec obligation requires them
+- deterministic stdlib and executable regressions under
+  `/Users/ro/dev/c_modern/tests/stdlib/` and related proof layers become the
+  authoritative evidence for supported library behavior on the first hosted
+  target
+
+Problem being solved
+--------------------
+- The repository already has a real hosted stdlib/runtime slice for `mem`,
+  `io`, `fs`, `strings`, `utf8`, and a narrow `testing` companion surface.
+- That library layer is still incomplete relative to the long-term Phase 6
+  contract in `plan.txt` and the repository's own non-bootstrap roadmap.
+- The main remaining risk is not total absence of library support, but partial
+  boundary honesty: some admitted APIs remain bootstrap-shaped, some runtime
+  seams still reflect bring-up convenience more than final ownership, richer
+  string or utf8 utilities remain intentionally narrow, and deferred module
+  families have not yet been admitted through executable proof.
+- Without an explicit execution plan:
+  - library convenience helpers can drift into de facto long-term contracts
+    without an intentional review of ownership or allocation visibility
+  - runtime support can slowly accumulate behavior that should live in stdlib
+    code or build-tool wiring instead of the hosted startup seam
+  - Phase 8 programs can normalize awkward allocation, text, or file flows
+    instead of routing those repeated problems back into Phase 6 work
+  - test coverage can remain weighted toward executable end-to-end proofs
+    without enough narrow stdlib regressions to make library behavior stable
+
+Core rule
+---------
+- Fix language meaning in sema, lowered-semantic truth in MIR, and executable
+  realization in the backend, not by smuggling semantics into stdlib or
+  runtime code.
+- Keep the runtime boundary minimal and explicit.
+- Prefer a narrower honest library API over a broader bootstrap convenience
+  wrapper whose ownership or allocation behavior is unclear.
+- Admit new modules only when a real consumer or explicit architecture
+  obligation justifies them.
+- Keep library tests, executable behavior, and fixture outputs deterministic
+  so the library proof layer remains reviewable.
+
+Current repository posture
+--------------------------
+- The main library surfaces currently live under
+  `/Users/ro/dev/c_modern/stdlib/`, with admitted hosted slices for `mem`,
+  `io`, `fs`, `strings`, `utf8`, and `testing`.
+- The hosted runtime seam already lives under
+  `/Users/ro/dev/c_modern/runtime/hosted/`, and hosted process entry is no
+  longer synthesized purely inside backend lowering.
+- The current admitted library surface already proves explicit allocator flow,
+  borrowed string helpers, file loading, stdout writes, and ordinary test
+  failure propagation on the first hosted target.
+- The repository still does not claim the broader Phase 6 module surface,
+  richer utf8 behavior, fuller allocator realism, or a fully mature testing
+  companion API.
+- Some current APIs and helper naming remain shaped by bootstrap constraints
+  rather than by the steadier long-term ownership intended by the architecture
+  texts.
+
+Phase 12 execution waves
+------------------------
+Phase 12A -- Existing Module API Honesty
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Move the already-admitted stdlib modules toward deliberate long-term ownership
+and error contracts without widening them beyond what current repository proof
+can support honestly.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 6A -- API honesty for existing modules
+
+Tasks
+~~~~~
+1. Audit the current `mem`, `io`, `fs`, `strings`, `utf8`, and `testing`
+   surfaces against `stdlib_spec.txt`, `runtime_spec.txt`, and the actual
+   program patterns now present in the repository.
+2. Separate honest temporary bootstrap choices from API shapes that should be
+   frozen as real repository contracts.
+3. Tighten allocator visibility, owned-buffer flows, borrowed-text boundaries,
+   and error-return conventions where current convenience seams are hiding too
+   much policy.
+4. Keep non-allocating helpers non-allocating by default, especially in
+   `strings` and `utf8`, unless an API explicitly owns allocation behavior.
+5. Add or update focused stdlib and executable proofs so each admitted surface
+   is backed by deterministic behavior rather than example-only usage.
+
+Phase 12B -- Runtime Boundary Cleanup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Keep hosted startup and low-level support in the runtime layer while reducing
+compiler or backend knowledge of library implementation details.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 6B -- Runtime boundary cleanup
+
+Tasks
+~~~~~
+1. Re-audit the hosted runtime seam for startup construction, argv handling,
+   and any checked-support or helper symbols that the executable path depends
+   on today.
+2. Move or document remaining behavior so hosted entry remains an explicit
+   runtime-owned seam instead of a backend-local convenience path.
+3. Reduce compiler knowledge of stdlib implementation details where sema-owned
+   layout, declarations, or library code can carry the truth directly.
+4. Keep the runtime support object small and replaceable rather than growing it
+   into a hidden service layer.
+5. Add narrow proof that the runtime boundary remains deterministic and does
+   not change library-visible behavior accidentally.
+
+Phase 12C -- Deferred Module Admission
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Admit deferred library modules only when the repository has real program or
+toolchain pressure that requires them.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 6C -- Deferred module admission
+
+Tasks
+~~~~~
+1. Build a concrete consumer matrix for `time`, `os`, `sync`, `hal`, and
+   `testing` from current examples, tool needs, and canonical program pressure.
+2. Admit a module only when a real repository consumer requires it and the API
+   surface can be stated honestly.
+3. Keep each newly admitted module narrow, explicit, and supported by focused
+   proof instead of landing placeholder shells.
+4. Preserve module ownership boundaries from `stdlib_spec.txt` rather than
+   collapsing unrelated functionality into a grab-bag utility layer.
+5. Record intentionally deferred modules or operations as named enabling gaps
+   rather than leaving them ambiguous.
+
+Phase 12D -- Text, Utf8, and Allocation Realism
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Deepen the text and allocation surfaces enough that bounded real utilities can
+be written naturally without forcing bootstrap-shaped workarounds.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 6D -- String, utf8, and allocation realism
+
+Tasks
+~~~~~
+1. Audit repeated text, file, and allocation friction in current examples and
+   pressure programs.
+2. Expand borrowed-string and utf8 helpers only where repeated repository
+   consumers justify the added surface.
+3. Improve allocator and buffer helper realism where current APIs create
+   unnecessary ownership ambiguity or repetitive boilerplate.
+4. Preserve the rule that strings stays non-allocating by default unless a
+   helper explicitly owns allocation.
+5. Promote repeated library awkwardness into narrow stdlib regressions instead
+   of normalizing it inside examples.
+
+Phase 12E -- Stdlib Proof And Regression Hardening
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Make stdlib-focused proof a first-class validation layer so library behavior
+is not carried only by broad end-to-end executable tests.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 6E -- Stdlib-focused test discipline
+
+Tasks
+~~~~~
+1. Grow `/Users/ro/dev/c_modern/tests/stdlib/` as a real proof layer for
+   allocation, files, text, utf8, and testing behavior.
+2. Keep executable proofs where user-visible behavior is the clearest contract,
+   but prefer narrower stdlib tests when library behavior can be isolated.
+3. Convert repeated Phase 8 library findings into stable library regressions
+   where Phase 6 is the correct owner.
+4. Preserve deterministic test inputs and outputs across library and tool
+   coverage.
+5. Keep unsupported library forms failing narrowly and intentionally rather
+   than through backend accidents or undocumented behavior.
+
+Canonical artifacts
+-------------------
+Phase 12 should produce or update the following canonical surfaces:
+
+- `/Users/ro/dev/c_modern/docs/plan/phase12_stdlib_runtime_maturity.txt`
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  so the roadmap points to this concrete Phase 12 follow-up plan
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/phase6_implementation_summary.txt`
+  as repository truth deepens
+- stdlib implementation updates under `/Users/ro/dev/c_modern/stdlib/`
+- runtime updates under `/Users/ro/dev/c_modern/runtime/hosted/`
+- narrow compiler or backend updates only when already-owned library or
+  runtime behavior must be wired through existing flows rather than defined
+  there
+- deterministic regression coverage under
+  `/Users/ro/dev/c_modern/tests/stdlib/`,
+  `/Users/ro/dev/c_modern/tests/tool/`, and
+  `/Users/ro/dev/c_modern/tests/codegen/`
+- bounded CMake or README updates only if new library tests, examples, or
+  runtime wiring require them
+
+Allowed edit surface
+--------------------
+- `/Users/ro/dev/c_modern/docs/plan/`
+- `/Users/ro/dev/c_modern/stdlib/`
+- `/Users/ro/dev/c_modern/runtime/hosted/`
+- `/Users/ro/dev/c_modern/tests/stdlib/`
+- `/Users/ro/dev/c_modern/tests/tool/`
+- `/Users/ro/dev/c_modern/tests/codegen/`
+- `/Users/ro/dev/c_modern/tests/cases/`
+- `/Users/ro/dev/c_modern/examples/` only if a bounded real-program proof is
+  the clearest evidence for a newly admitted library surface
+- `/Users/ro/dev/c_modern/compiler/driver/` only for command plumbing,
+  runtime wiring, or deterministic diagnostics that expose already-defined
+  stdlib or runtime behavior
+- `/Users/ro/dev/c_modern/compiler/sema/` only for narrow downstream updates
+  if existing semantic structure needs a factual library-boundary fix rather
+  than a new semantic policy
+- `/Users/ro/dev/c_modern/compiler/mir/` only for narrow downstream updates if
+  existing lowered structure needs a factual runtime-consumption fix rather
+  than a new semantic policy
+- `/Users/ro/dev/c_modern/compiler/codegen_llvm/` only if a real hosted-entry
+  or already-owned library ABI issue requires it
+- `/Users/ro/dev/c_modern/CMakeLists.txt`
+- `/Users/ro/dev/c_modern/README.md`
+
+Out of scope
+------------
+- new semantic policy that belongs to Phase 3 ownership
+- new lowered-semantic instruction meaning that belongs to Phase 4 ownership
+- backend target-matrix widening or non-hosted bring-up
+- broad package management or remote dependency fetching
+- speculative library breadth not justified by current repository pressure or
+  architecture obligations
+- turning runtime support into a large service or abstraction layer
+- broad toolchain-model redesign that belongs to Phase 7 ownership
+- Phase 8 program-family expansion beyond the bounded proofs needed to justify
+  concrete library surfaces
+
+Suggested proof and artifacts
+-----------------------------
+- expand `/Users/ro/dev/c_modern/tests/stdlib/` with focused proof for
+  allocator flow, file loading, borrowed text, utf8 helpers, and testing
+  behavior as each surface matures
+- keep deterministic executable proofs under
+  `/Users/ro/dev/c_modern/tests/codegen/` or `/Users/ro/dev/c_modern/tests/tool/`
+  when the real contract is user-visible runtime behavior rather than only
+  library-local state
+- add or update bounded examples only when a real hosted utility is the
+  clearest honest proof for a newly admitted module or API family
+- convert repeated pressure-program library failures into the narrowest stable
+  stdlib regression layer rather than carrying them only in examples
+- keep crisp unsupported-case tests for intentionally deferred modules or API
+  shapes
+
+Execution order
+---------------
+Recommended landing order inside Phase 12:
+
+1. Phase 12A -- existing module API honesty audit and first tightening pass
+2. Phase 12B -- runtime boundary cleanup and ownership reduction in the
+   compiler or backend where practical
+3. Phase 12E -- stdlib-focused proof hardening alongside each admitted change
+4. Phase 12D -- text, utf8, and allocation realism once repeated friction is
+   concrete enough to guide narrow additions
+5. Phase 12C -- deferred module admission only after real consumers or spec
+   obligations clearly justify each module
+
+The order is intentional:
+
+- API honesty and runtime cleanup have the highest leverage for preventing
+  bootstrap seams from becoming accidental long-term contracts
+- proof hardening should accompany each admission step rather than wait until
+  the end
+- richer text or allocation helpers should be driven by repeated pressure,
+  not by speculative breadth
+- deferred module families should land only after the repository has clear
+  evidence that they are needed
+
+Exit criteria
+-------------
+- real hosted programs use stdlib and runtime APIs that reflect deliberate
+  ownership, allocation, and error contracts rather than bootstrap shortcuts
+- hosted runtime support remains small, explicit, and outside the normal
+  import surface
+- already-admitted modules are backed by focused deterministic regressions in
+  addition to end-to-end executable proofs
+- newly admitted module families are either implemented and proven through
+  real consumers or remain explicitly deferred as named enabling gaps
+- repeated library friction from Phase 8 is routed back into stable Phase 12
+  backlog or regression work instead of remaining anecdotal
+
+Acceptance criteria for this plan document
+------------------------------------------
+- The repository has one explicit written execution plan for the unfinished
+  stdlib and runtime maturity work that still belongs to Phase 6 ownership.
+- The plan preserves the current ownership model and does not collapse missing
+  semantic, MIR, backend, or toolchain truth into library or runtime-local
+  workarounds.
+- The plan keeps the first hosted target narrow while making its library and
+  runtime boundary materially more honest.

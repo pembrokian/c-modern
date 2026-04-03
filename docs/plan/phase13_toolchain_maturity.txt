@@ -1,0 +1,374 @@
+Phase 13 -- Phase 7 Toolchain Maturity
+======================================
+
+Status
+------
+PLANNED
+
+Repository status note
+----------------------
+- The repository already has a real bootstrap Phase 7 boundary recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase7_build_tool_harness.txt`
+  and summarized in
+  `/Users/ro/dev/c_modern/docs/plan/phase7_implementation_summary.txt`.
+- The broader non-bootstrap expansion path is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`.
+- This file does not introduce a new architecture phase after Phase 8.
+  It is a repository-specific execution label for the unfinished toolchain,
+  separate-compilation, and test-harness work that still belongs to Phase 7
+  ownership.
+- Do not describe Phase 13 as a new compiler layer.
+  It is the concrete closure plan for moving the current bootstrap project and
+  test workflow into a more trusted ordinary multi-module toolchain path
+  without letting driver, build, or test orchestration redefine language or
+  library semantics.
+
+Dependency note
+---------------
+- Phase 13 depends on the current repository posture described in:
+  - `/Users/ro/dev/c_modern/docs/plan/plan.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase7_build_tool_harness.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase7_implementation_summary.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/build_spec.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/test_spec.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/runtime_spec.txt`
+  - the current project-driver and build-graph entrypoints under
+    `/Users/ro/dev/c_modern/compiler/driver/`
+  - the current deterministic interface-artifact support under
+    `/Users/ro/dev/c_modern/compiler/mci/`
+  - the current import, dump-path, and source-scanning helpers under
+    `/Users/ro/dev/c_modern/compiler/support/`
+  - the current tool and project proof layers under
+    `/Users/ro/dev/c_modern/tests/tool/`
+- Phase 13 must preserve the existing ownership split:
+  - the compiler owns parsing, sema, MIR, backend lowering, and interface
+    artifact truth
+  - the build tool owns target description, dependency ordering, rebuild
+    decisions, runner generation, and process orchestration
+  - `.mci` artifacts are a trusted interface boundary, not a second place to
+    invent semantic meaning
+  - the test harness owns discovery, runner generation, reporting, and timeout
+    enforcement rather than redefining language-level test semantics ad hoc
+- If toolchain maturity appears to require new semantic policy or new library
+  semantics, route that gap back to the owning earlier phase or land the owner
+  change first.
+
+Repository-specific scope note
+------------------------------
+- The architecture texts stop at Phase 8 and already require later pressure
+  findings to route back to the smallest correct owner.
+- This repository uses the Phase 13 label only to package the next execution
+  wave as a concrete plan document under `docs/plan/`.
+- In substance, Phase 13 is the implementation plan for Workstreams 7A
+  through 7E from the non-bootstrap roadmap, with the first execution wave
+  explicitly prioritizing `.mci` trust boundaries, build-graph correctness,
+  and `mc test` completion before any broader target-model expansion.
+
+Purpose
+-------
+Turn the broad non-bootstrap Phase 7 roadmap into an execution-ready plan that
+can be implemented in reviewable waves without blurring the boundary between
+compiler-owned semantic truth, build-tool-owned orchestration, interface
+artifact reuse, and test-harness-owned runner behavior.
+
+After Phase 13:
+
+- normal multi-module development uses a deterministic, inspectable, and more
+  trusted project workflow rather than a bootstrap-thin project path
+- `.mci` artifacts are trusted enough that separate compilation does not rely
+  on hidden semantic reconstruction or accidental whole-source fallback
+- build-graph validation, target selection, rebuild invalidation, and import
+  resolution behave consistently across project commands
+- `mc test` more closely matches the repository-owned contract from
+  `test_spec.txt`, including timeout handling and sharper deterministic
+  reporting
+- diagnostics for missing roots, ambiguous graphs, invalid targets, and
+  mismatched workflow assumptions become strong enough that project misuse
+  fails clearly and early
+
+Problem being solved
+--------------------
+- The repository already has a working bootstrap Phase 7 slice: declarative
+  `build.toml`, target builds, `.mci` emission and consumption, incremental
+  reuse, `mc run`, and a narrow ordinary plus manifest-driven `mc test` path.
+- That toolchain layer is still incomplete relative to the long-term Phase 7
+  contract in `plan.txt` and the repository's own non-bootstrap roadmap.
+- The main remaining risk is not lack of a project workflow, but partial trust
+  and maturity: `.mci` remains narrower than a fully trusted interface
+  boundary, the target model is still intentionally limited, ordinary test
+  ergonomics and timeout behavior remain bootstrap-shaped, and rebuild or
+  diagnostics behavior can still drift as the project model deepens.
+- Without an explicit execution plan:
+  - build-graph and `.mci` behavior can remain good enough for current
+    repository fixtures without becoming a durable ordinary development path
+  - project commands and direct-source commands can slowly diverge in import
+    policy or diagnostics
+  - repeated toolchain failures found by Phase 8 programs can remain anecdotal
+    instead of becoming narrow deterministic tool regressions
+  - `mc test` can remain a narrow bootstrap runner rather than growing into a
+    credible, inspectable test-harness path
+
+Core rule
+---------
+- Fix semantic meaning in sema and lowered truth in MIR, not in `.mci`, the
+  build graph, or generated test runners.
+- Keep the project graph explicit and inspectable.
+- Prefer a narrower honest workflow contract over a broader bootstrap
+  convenience path whose invalidation or import behavior is unclear.
+- Preserve determinism in interface artifacts, target ordering, rebuild
+  decisions, generated runners, and test reporting.
+- Keep unsupported project or test forms failing narrowly and intentionally.
+
+Current repository posture
+--------------------------
+- The current driver already exposes direct-source and project-driven `mc`
+  flows for check, build, run, test, and dump-paths under
+  `/Users/ro/dev/c_modern/compiler/driver/`.
+- Deterministic text `.mci` artifacts already exist under
+  `/Users/ro/dev/c_modern/compiler/mci/`, and project builds already use them
+  for downstream semantic import consumption.
+- The repository already has incremental project rebuild reuse, deterministic
+  target selection rules, a narrow manifest-driven compiler-regression path,
+  and generated ordinary test runners.
+- The current tree still does not claim non-hosted workflow maturity,
+  broader target kinds, full spec-level ordinary test ergonomics, or timeout
+  enforcement.
+- Some project and test behavior remains intentionally bootstrap-shaped rather
+  than fully trusted as the ordinary long-term toolchain boundary.
+
+Phase 13 execution waves
+------------------------
+Phase 13A -- Separate Compilation Trust Boundary
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Make `.mci` a more trusted interface boundary so dependent builds consume
+stable semantic exports rather than leaning on narrow bootstrap assumptions.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 7A -- Separate-compilation maturity
+
+Tasks
+~~~~~
+1. Re-audit the exported semantic surface, `.mci` serialization, `.mci`
+   validation, and import consumption paths against the current repository
+   semantics.
+2. Tighten `.mci` validation so malformed, stale, or semantically incomplete
+   interface artifacts fail clearly rather than degrading into accidental
+   source-driven fallback.
+3. Ensure imported functions, globals, types, and layout-sensitive facts are
+   preserved across normal builds without downstream repair.
+4. Keep interface hash behavior tied to semantic export change rather than
+   incidental implementation churn.
+5. Add focused project tests proving `.mci` trust on real multi-module builds.
+
+Phase 13B -- Build Graph And Target Model Deepening
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Deepen project-graph validation and target modeling only where the repository
+already has honest semantics and executable proof.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 7B -- Build graph and target-model deepening
+
+Tasks
+~~~~~
+1. Re-audit admitted target kinds, startup settings, root selection, and mode
+   behavior against `build_spec.txt` and current repository consumers.
+2. Improve validation for invalid targets, missing defaults, ambiguous graphs,
+   duplicate roots, and inconsistent startup settings.
+3. Deepen target-model support only where the architecture already calls for
+   it and the repository has real proof demand.
+4. Keep graph construction explicit, deterministic, and inspectable rather
+   than hidden behind build-script behavior.
+5. Add focused tool regressions for every newly admitted target or graph rule.
+
+Phase 13C -- Test Harness Completion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Make `mc test` a more complete ordinary repository tool without turning it
+into a second test language or a replacement for every existing C++ fixture.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 7C -- Test harness completion
+
+Tasks
+~~~~~
+1. Re-audit the current ordinary-test contract, manifest-driven regression
+   classes, and generated runner behavior against `test_spec.txt`.
+2. Implement timeout handling and deterministic timeout reporting where the
+   current bootstrap slice only parses the field.
+3. Improve ordinary test ergonomics only where the owning language and stdlib
+   surfaces can support them honestly.
+4. Strengthen deterministic PASS, FAIL, timeout, and manifest-case reporting
+   without hiding the underlying project or executable behavior.
+5. Keep C++ fixture suites in place where they remain the clearest stable
+   proof, instead of trying to collapse everything into `mc test` at once.
+
+Phase 13D -- Determinism And Rebuild Correctness
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Preserve trusted rebuild reuse as the project model deepens, so ordinary
+workflow speed-ups remain semantically correct rather than accidental.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 7D -- Determinism and rebuild correctness
+
+Tasks
+~~~~~
+1. Re-audit interface-hash-driven rebuild behavior for no-op, implementation-
+   only, and interface-changing edits across multi-module builds.
+2. Tighten downstream invalidation so it tracks interface change precisely
+   rather than source churn or insufficient dependency knowledge.
+3. Preserve deterministic `.mci`, object, runner, dump, and executable path
+   computation as the graph grows.
+4. Add regressions for edge cases where project reuse could become unsound or
+   unnecessarily broad.
+5. Keep direct-source and project workflows coherent without forcing them into
+   identical implementation paths when their artifact models genuinely differ.
+
+Phase 13E -- Workflow Diagnostics And Strictness
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Improve workflow diagnostics so misuse of project mode, import configuration,
+or test configuration fails narrowly and reviewably.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 7E -- Diagnostics and workflow strictness
+
+Tasks
+~~~~~
+1. Strengthen missing-root, duplicate-module, ambiguous-graph, invalid-target,
+   and invalid-manifest diagnostics.
+2. Surface import-root ordering and target-selection decisions clearly in
+   deterministic diagnostics when project configuration is wrong.
+3. Keep direct-source and project-driven command behavior coherent enough that
+   users can predict which workflow boundary they are using.
+4. Promote repeated project-workflow confusion from examples or Phase 8
+   programs into stable tool-level regressions.
+5. Keep unsupported workflow shapes rejected through explicit driver checks
+   rather than through later compiler, linker, or runtime accidents.
+
+Canonical artifacts
+-------------------
+Phase 13 should produce or update the following canonical surfaces:
+
+- `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt`
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  so the roadmap points to this concrete Phase 13 follow-up plan
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/phase7_implementation_summary.txt`
+  as repository truth deepens
+- build-graph and command-surface updates under
+  `/Users/ro/dev/c_modern/compiler/driver/`
+- interface-artifact updates under `/Users/ro/dev/c_modern/compiler/mci/`
+- narrow import, dump-path, or source-scanning updates under
+  `/Users/ro/dev/c_modern/compiler/support/`
+- narrow sema updates only when `.mci` import consumption or export authority
+  requires factual semantic-surface alignment rather than new language policy
+- deterministic regression coverage under `/Users/ro/dev/c_modern/tests/tool/`
+- bounded README or CMake updates only if new tool tests or documented command
+  behavior require them
+
+Allowed edit surface
+--------------------
+- `/Users/ro/dev/c_modern/docs/plan/`
+- `/Users/ro/dev/c_modern/compiler/driver/`
+- `/Users/ro/dev/c_modern/compiler/mci/`
+- `/Users/ro/dev/c_modern/compiler/support/`
+- `/Users/ro/dev/c_modern/compiler/sema/` only for narrow export or import
+  alignment changes that reflect already-owned semantic truth
+- `/Users/ro/dev/c_modern/compiler/codegen_llvm/` only if an existing project
+  or runner artifact interface requires factual wiring support
+- `/Users/ro/dev/c_modern/tests/tool/`
+- `/Users/ro/dev/c_modern/tests/cases/`
+- `/Users/ro/dev/c_modern/examples/` only if a focused multi-module project
+  fixture is the clearest proof for a newly admitted workflow rule
+- `/Users/ro/dev/c_modern/CMakeLists.txt`
+- `/Users/ro/dev/c_modern/README.md`
+
+Out of scope
+------------
+- new semantic policy that belongs to Phase 3 ownership
+- new lowered-semantic instruction meaning that belongs to Phase 4 ownership
+- broad stdlib or runtime API redesign that belongs to Phase 6 ownership
+- target-matrix widening or broad non-hosted bring-up beyond what current
+  repository proof honestly supports
+- package management, remote dependency fetching, or version solving
+- hidden vendor discovery or scripted build behavior
+- replacing the repository C++ fixture suite wholesale with `mc test`
+- broad daemonized build-cache or IDE-oriented infrastructure
+- Phase 8 program-family expansion beyond the bounded project proofs needed to
+  justify concrete toolchain behavior
+
+Suggested proof and artifacts
+-----------------------------
+- expand `/Users/ro/dev/c_modern/tests/tool/` with deterministic project
+  fixtures covering `.mci` validation, graph validation, rebuild invalidation,
+  target settings, timeout handling, and sharper diagnostics
+- keep narrow `.mci` or driver-level tests when interface or workflow behavior
+  is the clearest stable contract and full end-to-end programs would add noise
+- add bounded project fixtures only when a real multi-module workflow is the
+  clearest honest proof for a newly admitted rule
+- convert repeated Phase 8 workflow failures into the narrowest stable tool or
+  interface-artifact regression layer rather than carrying them only in
+  examples
+- keep crisp unsupported-case tests for intentionally deferred target kinds,
+  test shapes, or workflow policies
+
+Execution order
+---------------
+Recommended landing order inside Phase 13:
+
+1. Phase 13A -- separate-compilation trust boundary tightening
+2. Phase 13D -- determinism and rebuild correctness hardening alongside each
+   `.mci` or graph change
+3. Phase 13E -- workflow diagnostics and strictness improvements as the rules
+   are frozen
+4. Phase 13C -- test harness completion once the underlying project graph and
+   artifact behavior are steadier
+5. Phase 13B -- target-model deepening only after the current bootstrap target
+   path is trustworthy enough to extend honestly
+
+The order is intentional:
+
+- `.mci` trust and rebuild correctness have the highest leverage for ordinary
+  multi-module credibility
+- diagnostics should tighten as behavior is frozen rather than after drift has
+  accumulated
+- test harness completion should build on a stable project graph instead of
+  becoming a forcing function for immature workflow behavior
+- broader target modeling should follow proven workflow foundations rather than
+  lead them
+
+Exit criteria
+-------------
+- normal multi-module development uses a deterministic, inspectable, and more
+  semantically faithful workflow than the current bootstrap slice
+- `.mci` artifacts, graph ordering, and rebuild invalidation are trusted
+  enough to support real project reuse beyond curated examples
+- `mc test` covers the repository-owned ordinary and manifest-driven testing
+  contract with deterministic reporting and timeout handling
+- diagnostics for invalid project graphs, roots, targets, and test inputs fail
+  clearly and early
+- repeated toolchain friction from Phase 8 is routed back into stable Phase 13
+  backlog or regression work instead of remaining anecdotal
+
+Acceptance criteria for this plan document
+------------------------------------------
+- The repository has one explicit written execution plan for the unfinished
+  toolchain maturity work that still belongs to Phase 7 ownership.
+- The plan preserves the current ownership model and does not collapse missing
+  semantic or library truth into driver, `.mci`, or test-runner workarounds.
+- The plan keeps the project workflow explicit and deterministic while making
+  it materially more credible for ordinary multi-module use.
