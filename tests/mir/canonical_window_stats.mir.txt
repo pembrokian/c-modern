@@ -10,8 +10,8 @@ Module
     Local name=slice type=Slice<i32>
     Local name=window type=Slice<i32>
     Local name=total type=i32
-    Local name=$iterable0 type=Slice<i32>
-    Local name=$index1 type=usize
+    Local name=%hidden.iterable0 type=Slice<i32>
+    Local name=%hidden.index1 type=usize
     Local name=index type=usize
     Local name=value type=i32
     Block label=entry0
@@ -28,19 +28,19 @@ Module
       const %v7:int_literal op=0
       store_local target=total operands=[%v7]
       load_local %v8:Slice<i32> target=window
-      store_local target=$iterable0 operands=[%v8]
+      store_local target=%hidden.iterable0 operands=[%v8]
       const %v9:usize op=0
-      store_local target=$index1 operands=[%v9]
+      store_local target=%hidden.index1 operands=[%v9]
       terminator branch target=foreach_cond1
     Block label=foreach_cond1
-      load_local %v10:usize target=$index1
-      load_local %v11:Slice<i32> target=$iterable0
+      load_local %v10:usize target=%hidden.index1
+      load_local %v11:Slice<i32> target=%hidden.iterable0
       field %v12:usize target=len target_kind=field target_name=len target_display=window.len target_base=Slice<i32> operands=[%v11]
       binary %v13:bool op=< operands=[%v10, %v12]
       terminator cond value=%v13 true=foreach_body2 false=foreach_exit4
     Block label=foreach_body2
-      load_local %v14:Slice<i32> target=$iterable0
-      load_local %v15:usize target=$index1
+      load_local %v14:Slice<i32> target=%hidden.iterable0
+      load_local %v15:usize target=%hidden.index1
       field %v16:usize target=len target_kind=field target_name=len target_base=Slice<i32> operands=[%v14]
       bounds_check op=index operands=[%v15, %v16]
       index %v17:i32 target_kind=index target_display=window[index] target_base=Slice<i32> operands=[%v14, %v15] target_types=[usize]
@@ -52,10 +52,10 @@ Module
       store_local target=total operands=[%v20]
       terminator branch target=foreach_step3
     Block label=foreach_step3
-      load_local %v21:usize target=$index1
+      load_local %v21:usize target=%hidden.index1
       const %v22:usize op=1
       binary %v23:usize op=+ arithmetic=wrap operands=[%v21, %v22]
-      store_local target=$index1 operands=[%v23]
+      store_local target=%hidden.index1 operands=[%v23]
       terminator branch target=foreach_cond1
     Block label=foreach_exit4
       load_local %v24:i32 target=total

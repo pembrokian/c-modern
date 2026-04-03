@@ -5,9 +5,9 @@ Module
   Function name=walk returns=[i32]
     Local name=values type=Slice<i32> param readonly
     Local name=total type=i32
-    Local name=$defer_callee0 type=proc()->void readonly
-    Local name=$iterable1 type=Slice<i32>
-    Local name=$index2 type=usize
+    Local name=%hidden.defer_callee0 type=proc()->void readonly
+    Local name=%hidden.iterable1 type=Slice<i32>
+    Local name=%hidden.index2 type=usize
     Local name=index type=usize
     Local name=value type=i32
     Local name=idx type=int_literal
@@ -15,21 +15,21 @@ Module
       const %v0:int_literal op=0
       store_local target=total operands=[%v0]
       symbol_ref %v1:proc()->void target=cleanup target_kind=function target_name=cleanup
-      store_local target=$defer_callee0 operands=[%v1]
+      store_local target=%hidden.defer_callee0 operands=[%v1]
       load_local %v2:Slice<i32> target=values
-      store_local target=$iterable1 operands=[%v2]
+      store_local target=%hidden.iterable1 operands=[%v2]
       const %v3:usize op=0
-      store_local target=$index2 operands=[%v3]
+      store_local target=%hidden.index2 operands=[%v3]
       terminator branch target=foreach_cond1
     Block label=foreach_cond1
-      load_local %v4:usize target=$index2
-      load_local %v5:Slice<i32> target=$iterable1
+      load_local %v4:usize target=%hidden.index2
+      load_local %v5:Slice<i32> target=%hidden.iterable1
       field %v6:usize target=len target_kind=field target_name=len target_display=values.len target_base=Slice<i32> operands=[%v5]
       binary %v7:bool op=< operands=[%v4, %v6]
       terminator cond value=%v7 true=foreach_body2 false=foreach_exit4
     Block label=foreach_body2
-      load_local %v8:Slice<i32> target=$iterable1
-      load_local %v9:usize target=$index2
+      load_local %v8:Slice<i32> target=%hidden.iterable1
+      load_local %v9:usize target=%hidden.index2
       field %v10:usize target=len target_kind=field target_name=len target_base=Slice<i32> operands=[%v8]
       bounds_check op=index operands=[%v9, %v10]
       index %v11:i32 target_kind=index target_display=values[index] target_base=Slice<i32> operands=[%v8, %v9] target_types=[usize]
@@ -41,10 +41,10 @@ Module
       store_local target=total operands=[%v14]
       terminator branch target=foreach_step3
     Block label=foreach_step3
-      load_local %v15:usize target=$index2
+      load_local %v15:usize target=%hidden.index2
       const %v16:usize op=1
       binary %v17:usize op=+ arithmetic=wrap operands=[%v15, %v16]
-      store_local target=$index2 operands=[%v17]
+      store_local target=%hidden.index2 operands=[%v17]
       terminator branch target=foreach_cond1
     Block label=foreach_exit4
       const %v18:int_literal op=0
@@ -69,6 +69,6 @@ Module
       terminator branch target=range_cond5
     Block label=range_exit8
       load_local %v28:i32 target=total
-      load_local %v29:proc()->void target=$defer_callee0
+      load_local %v29:proc()->void target=%hidden.defer_callee0
       call target=cleanup target_kind=function target_name=cleanup operands=[%v29]
       terminator return values=[%v28]

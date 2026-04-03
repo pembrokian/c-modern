@@ -276,7 +276,7 @@ void TestKnownSymbolRefsAreTyped() {
     if (dump.find("proc(i32)->i32 target=inc") == std::string::npos) {
         Fail("function symbol references should preserve procedure types");
     }
-    if (dump.find("Local name=$defer_callee0 type=proc(i32)->i32 readonly") == std::string::npos) {
+    if (dump.find("Local name=%hidden.defer_callee0 type=proc(i32)->i32 readonly") == std::string::npos) {
         Fail("deferred callees should preserve procedure types in hidden locals");
     }
     if (dump.find("unknown") != std::string::npos) {
@@ -829,10 +829,10 @@ void TestDeferArgumentsAreEvaluatedImmediately() {
     }
 
     const auto dump = mc::mir::DumpModule(*lowered.module);
-    const auto snapshot_pos = dump.find("store_local target=$defer_arg");
+    const auto snapshot_pos = dump.find("store_local target=%hidden.defer_arg");
     const auto mutation_pos = dump.find("store_local target=value", snapshot_pos == std::string::npos ? 0 : snapshot_pos + 1);
     const auto replay_load_pos = dump.find("load_local ", mutation_pos == std::string::npos ? 0 : mutation_pos);
-    const auto replay_arg_pos = dump.find("target=$defer_arg", mutation_pos == std::string::npos ? 0 : mutation_pos);
+    const auto replay_arg_pos = dump.find("target=%hidden.defer_arg", mutation_pos == std::string::npos ? 0 : mutation_pos);
     if (snapshot_pos == std::string::npos) {
         Fail("defer lowering should snapshot call arguments into hidden locals");
     }
@@ -842,7 +842,7 @@ void TestDeferArgumentsAreEvaluatedImmediately() {
     if (mutation_pos == std::string::npos || !(snapshot_pos < mutation_pos && mutation_pos < replay_arg_pos)) {
         Fail("defer argument snapshot should happen before later mutations and be reused on unwind");
     }
-    if (dump.find("Local name=$defer_callee0 type=proc(i32)->void readonly") == std::string::npos) {
+    if (dump.find("Local name=%hidden.defer_callee0 type=proc(i32)->void readonly") == std::string::npos) {
         Fail("defer lowering should preserve sema-known callee procedure types in hidden locals");
     }
 }

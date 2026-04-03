@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <sstream>
 #include <string_view>
@@ -30,6 +31,7 @@ struct ValuePiece {
 };
 
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name);
+sema::Type StripMirAliasOrDistinct(const Module& module, sema::Type type);
 
 std::string_view ToString(TypeDecl::Kind kind) {
     switch (kind) {
@@ -381,19 +383,39 @@ void WriteLine(std::ostringstream& stream, int indent, const std::string& text) 
     stream << text << '\n';
 }
 
+bool IsIntegerTypeName(std::string_view name) {
+    static const std::unordered_set<std::string_view> names = {
+        "i8", "i16", "i32", "i64", "isize", "u8", "u16", "u32", "u64", "usize", "uintptr",
+    };
+    return names.find(name) != names.end();
+}
+
+bool IsFloatTypeName(std::string_view name) {
+    return name == "f32" || name == "f64";
+}
+
 bool IsIntegerType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kNamed &&
-           (type.name == "i8" || type.name == "i16" || type.name == "i32" || type.name == "i64" || type.name == "isize" ||
-            type.name == "u8" || type.name == "u16" || type.name == "u32" || type.name == "u64" || type.name == "usize" ||
-            type.name == "uintptr");
+    return type.kind == sema::Type::Kind::kNamed && IsIntegerTypeName(type.name);
 }
 
 bool IsFloatType(const sema::Type& type) {
-    return type.kind == sema::Type::Kind::kNamed && (type.name == "f32" || type.name == "f64");
+    return type.kind == sema::Type::Kind::kNamed && IsFloatTypeName(type.name);
 }
 
 bool IsNumericType(const sema::Type& type) {
     return type.kind == sema::Type::Kind::kIntLiteral || type.kind == sema::Type::Kind::kFloatLiteral || IsIntegerType(type) || IsFloatType(type);
+}
+
+bool IsIntegerType(const Module& module, const sema::Type& type) {
+    return IsIntegerType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+}
+
+bool IsFloatType(const Module& module, const sema::Type& type) {
+    return IsFloatType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+}
+
+bool IsNumericType(const Module& module, const sema::Type& type) {
+    return IsNumericType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 bool IsWraparoundBinaryOp(std::string_view op) {
@@ -404,8 +426,16 @@ bool IsIntegerLikeType(const sema::Type& type) {
     return type.kind == sema::Type::Kind::kIntLiteral || IsIntegerType(type);
 }
 
+bool IsIntegerLikeType(const Module& module, const sema::Type& type) {
+    return IsIntegerLikeType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+}
+
 bool IsBoolType(const sema::Type& type) {
     return type == sema::BoolType() || (type.kind == sema::Type::Kind::kNamed && type.name == "bool");
+}
+
+bool IsBoolType(const Module& module, const sema::Type& type) {
+    return IsBoolType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 std::string_view LeafTypeName(std::string_view name) {
@@ -424,12 +454,24 @@ bool IsMemoryOrderType(const sema::Type& type) {
     return IsNamedTypeFamily(type, "MemoryOrder");
 }
 
+bool IsMemoryOrderType(const Module& module, const sema::Type& type) {
+    return IsMemoryOrderType(StripMirAliasOrDistinct(module, type));
+}
+
 bool IsPointerLikeType(const sema::Type& type) {
     return type.kind == sema::Type::Kind::kPointer;
 }
 
+bool IsPointerLikeType(const Module& module, const sema::Type& type) {
+    return IsPointerLikeType(StripMirAliasOrDistinct(module, type));
+}
+
 bool IsUintPtrType(const sema::Type& type) {
     return type.kind == sema::Type::Kind::kNamed && type.name == "uintptr";
+}
+
+bool IsUintPtrType(const Module& module, const sema::Type& type) {
+    return IsUintPtrType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
 bool IsBuiltinNamedNonAggregate(const sema::Type& type) {
@@ -443,8 +485,37 @@ bool IsBuiltinNamedNonAggregate(const sema::Type& type) {
     return IsIntegerType(canonical) || IsFloatType(canonical) || canonical.name == "bool";
 }
 
+bool IsBuiltinNamedNonAggregate(const Module& module, const sema::Type& type) {
+    return IsBuiltinNamedNonAggregate(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+}
+
 bool IsUsizeCompatibleType(const sema::Type& type) {
     return type == sema::NamedType("usize") || type.kind == sema::Type::Kind::kIntLiteral;
+}
+
+bool IsUsizeCompatibleType(const Module& module, const sema::Type& type) {
+    return IsUsizeCompatibleType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+}
+
+bool IsAssignableType(const Module& module, const sema::Type& expected, const sema::Type& actual) {
+    const sema::Type canonical_expected = sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, expected));
+    const sema::Type canonical_actual = sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, actual));
+    if (sema::IsUnknown(expected) || sema::IsUnknown(actual)) {
+        return true;
+    }
+    if (canonical_expected == canonical_actual) {
+        return true;
+    }
+    if (IsIntegerType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kIntLiteral) {
+        return true;
+    }
+    if (IsFloatType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kFloatLiteral) {
+        return true;
+    }
+    if (IsPointerLikeType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kNil) {
+        return true;
+    }
+    return false;
 }
 
 bool IsAssignableType(const sema::Type& expected, const sema::Type& actual) {
@@ -461,6 +532,34 @@ bool IsAssignableType(const sema::Type& expected, const sema::Type& actual) {
         return true;
     }
     if (IsPointerLikeType(expected) && actual.kind == sema::Type::Kind::kNil) {
+        return true;
+    }
+    return false;
+}
+
+bool HasCompatibleNumericTypes(const Module& module, const sema::Type& left, const sema::Type& right) {
+    const sema::Type canonical_left = sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, left));
+    const sema::Type canonical_right = sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, right));
+    if (sema::IsUnknown(left) || sema::IsUnknown(right)) {
+        return true;
+    }
+    if (canonical_left == canonical_right) {
+        return IsNumericType(canonical_left);
+    }
+    if (IsIntegerType(canonical_left) && canonical_right.kind == sema::Type::Kind::kIntLiteral) {
+        return true;
+    }
+    if (IsIntegerType(canonical_right) && canonical_left.kind == sema::Type::Kind::kIntLiteral) {
+        return true;
+    }
+    if (IsFloatType(canonical_left) && canonical_right.kind == sema::Type::Kind::kFloatLiteral) {
+        return true;
+    }
+    if (IsFloatType(canonical_right) && canonical_left.kind == sema::Type::Kind::kFloatLiteral) {
+        return true;
+    }
+    if ((canonical_left.kind == sema::Type::Kind::kFloatLiteral && canonical_right.kind == sema::Type::Kind::kIntLiteral) ||
+        (canonical_right.kind == sema::Type::Kind::kFloatLiteral && canonical_left.kind == sema::Type::Kind::kIntLiteral)) {
         return true;
     }
     return false;
@@ -492,6 +591,10 @@ bool HasCompatibleNumericTypes(const sema::Type& left, const sema::Type& right) 
     return false;
 }
 
+bool HasCompatibleComparisonTypes(const Module& module, const sema::Type& left, const sema::Type& right) {
+    return HasCompatibleNumericTypes(module, left, right) || IsAssignableType(module, left, right) || IsAssignableType(module, right, left);
+}
+
 bool HasCompatibleComparisonTypes(const sema::Type& left, const sema::Type& right) {
     return HasCompatibleNumericTypes(left, right) || IsAssignableType(left, right) || IsAssignableType(right, left);
 }
@@ -516,17 +619,21 @@ sema::Type IterableElementType(const sema::Type& iterable_type) {
 }
 
 sema::Type StripMirAliasOrDistinct(const Module& module, sema::Type type) {
-    if (type.kind != sema::Type::Kind::kNamed) {
-        return type;
+    std::unordered_set<std::string> visited;
+    while (type.kind == sema::Type::Kind::kNamed) {
+        const TypeDecl* type_decl = FindMirTypeDecl(module, type.name);
+        if (type_decl == nullptr) {
+            break;
+        }
+        if (type_decl->kind != TypeDecl::Kind::kDistinct && type_decl->kind != TypeDecl::Kind::kAlias) {
+            break;
+        }
+        if (!visited.insert(type.name).second) {
+            break;
+        }
+        type = type_decl->aliased_type;
     }
-    const TypeDecl* type_decl = FindMirTypeDecl(module, type.name);
-    if (type_decl == nullptr) {
-        return type;
-    }
-    if (type_decl->kind != TypeDecl::Kind::kDistinct && type_decl->kind != TypeDecl::Kind::kAlias) {
-        return type;
-    }
-    return type_decl->aliased_type;
+    return type;
 }
 
 std::optional<sema::Type> PointerPointeeType(const sema::Type& type) {
@@ -575,9 +682,9 @@ SpecialCallKind ClassifySpecialCall(std::string_view callee_name) {
     if (callee_name == "buffer_free" || callee_name == "mem.buffer_free") {
         return SpecialCallKind::kBufferFree;
     }
-        if (callee_name == "arena_new" || callee_name == "mem.arena_new") {
-            return SpecialCallKind::kArenaNew;
-        }
+    if (callee_name == "arena_new" || callee_name == "mem.arena_new") {
+        return SpecialCallKind::kArenaNew;
+    }
     if (callee_name == "slice_from_buffer" || callee_name == "mem.slice_from_buffer") {
         return SpecialCallKind::kSliceFromBuffer;
     }
@@ -689,7 +796,9 @@ std::size_t ProcedureParamCount(const sema::Type& type) {
     if (type.kind != sema::Type::Kind::kProcedure || type.metadata.empty()) {
         return 0;
     }
-    return mc::support::ParseArrayLength(type.metadata).value_or(0);
+    const auto parsed = mc::support::ParseArrayLength(type.metadata);
+    assert(parsed.has_value() && "procedure metadata must encode parameter count");
+    return parsed.value_or(0);
 }
 
 std::vector<sema::Type> ProcedureReturnTypes(const sema::Type& type) {
@@ -715,6 +824,8 @@ sema::Type ProcedureResultType(const sema::Type& type) {
 }
 
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name) {
+    // Bootstrap MIR still uses linear declaration scans here. Module sizes are
+    // small, and a dedicated lookup table can be added when MIR metadata grows.
     for (const auto& type_decl : module.type_decls) {
         if (type_decl.name == name) {
             return &type_decl;
@@ -724,6 +835,8 @@ const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name) {
 }
 
 const GlobalDecl* FindMirGlobalDecl(const Module& module, std::string_view name) {
+    // Bootstrap MIR still uses linear declaration scans here. Module sizes are
+    // small, and a dedicated lookup table can be added when MIR metadata grows.
     for (const auto& global : module.globals) {
         for (const auto& global_name : global.names) {
             if (global_name == name) {
@@ -735,6 +848,8 @@ const GlobalDecl* FindMirGlobalDecl(const Module& module, std::string_view name)
 }
 
 const Function* FindMirFunction(const Module& module, std::string_view name) {
+    // Bootstrap MIR still uses linear declaration scans here. Module sizes are
+    // small, and a dedicated lookup table can be added when MIR metadata grows.
     for (const auto& function : module.functions) {
         if (function.name == name) {
             return &function;
@@ -853,6 +968,9 @@ class FunctionLowerer {
     }
 
     Function Run() {
+        assert(decl_.kind == Decl::Kind::kFunc && "FunctionLowerer only lowers non-extern function declarations");
+        assert(decl_.body != nullptr && "FunctionLowerer expects sema-checked function bodies");
+
         const sema::FunctionSignature* signature = sema::FindFunctionSignature(sema_module_, decl_.name);
         for (std::size_t index = 0; index < decl_.params.size(); ++index) {
             const sema::Type type =
@@ -869,10 +987,7 @@ class FunctionLowerer {
         }
 
         current_block_ = CreateBlock("entry");
-
-        if (decl_.body != nullptr) {
-            LowerStmt(*decl_.body);
-        }
+        LowerStmt(*decl_.body);
 
         if (current_block_.has_value() && function_.blocks[*current_block_].terminator.kind == Terminator::Kind::kNone) {
             if (function_.return_types.empty()) {
@@ -936,10 +1051,10 @@ class FunctionLowerer {
         return "%v" + std::to_string(next_value_id_++);
     }
 
-    // Hidden lowering temporaries use a '$' prefix. Bootstrap lexing still accepts user
-    // identifiers beginning with '$', so this naming convention remains internal-only.
+    // Hidden lowering temporaries use a sigil outside the source identifier grammar
+    // so they cannot collide with user-visible local names.
     std::string NewHiddenLocal(const std::string& prefix) {
-        return "$" + prefix + std::to_string(next_hidden_local_id_++);
+        return "%hidden." + prefix + std::to_string(next_hidden_local_id_++);
     }
 
     std::vector<sema::Type> ExpandReturnTypes(const sema::Type& type) const {
@@ -1043,10 +1158,10 @@ class FunctionLowerer {
     }
 
     bool SpecialCallProducesValue(SpecialCallKind kind) const {
-            return kind == SpecialCallKind::kMmioPtr || kind == SpecialCallKind::kBufferNew || kind == SpecialCallKind::kArenaNew || kind == SpecialCallKind::kSliceFromBuffer ||
-             kind == SpecialCallKind::kVolatileLoad || kind == SpecialCallKind::kAtomicLoad ||
-               kind == SpecialCallKind::kAtomicExchange || kind == SpecialCallKind::kAtomicCompareExchange ||
-               kind == SpecialCallKind::kAtomicFetchAdd;
+        return kind == SpecialCallKind::kMmioPtr || kind == SpecialCallKind::kBufferNew || kind == SpecialCallKind::kArenaNew ||
+               kind == SpecialCallKind::kSliceFromBuffer || kind == SpecialCallKind::kVolatileLoad ||
+               kind == SpecialCallKind::kAtomicLoad || kind == SpecialCallKind::kAtomicExchange ||
+               kind == SpecialCallKind::kAtomicCompareExchange || kind == SpecialCallKind::kAtomicFetchAdd;
     }
 
     std::string SpecialCallAtomicOrder(const Expr& expr, SpecialCallKind kind) const {
@@ -1059,7 +1174,7 @@ class FunctionLowerer {
                 return RenderOrderName(expr, 2);
             case SpecialCallKind::kBufferNew:
             case SpecialCallKind::kBufferFree:
-                case SpecialCallKind::kArenaNew:
+            case SpecialCallKind::kArenaNew:
             case SpecialCallKind::kSliceFromBuffer:
             case SpecialCallKind::kAtomicCompareExchange:
             case SpecialCallKind::kNone:
@@ -2906,8 +3021,283 @@ Function LowerFunctionDecl(const ast::Decl& decl,
     return FunctionLowerer(decl, module, file_path, sema_module, diagnostics).Run();
 }
 
-// Bootstrap MIR validation checks structural integrity, use-def shape, and SSA dominance.
-// Every operand use must be in a block dominated by the block where the value is defined.
+using ValidationReporter = std::function<void(const std::string&)>;
+
+bool ValidateFunctionStructure(const Function& function,
+                               const ValidationReporter& report,
+                               std::unordered_map<std::string, const BasicBlock*>& blocks_by_label,
+                               std::unordered_set<std::string>& reachable_blocks) {
+    bool ok = true;
+    auto fail = [&](const std::string& message) {
+        report(message);
+        ok = false;
+    };
+
+    if (function.blocks.empty()) {
+        fail("function has no MIR blocks: " + function.name);
+        return false;
+    }
+
+    std::unordered_set<std::string> block_labels;
+    for (const auto& block : function.blocks) {
+        if (!block_labels.insert(block.label).second) {
+            fail("duplicate MIR block label in function " + function.name + ": " + block.label);
+        }
+        blocks_by_label[block.label] = &block;
+    }
+
+    for (const auto& block : function.blocks) {
+        switch (block.terminator.kind) {
+            case Terminator::Kind::kNone:
+                fail("unterminated MIR block in function " + function.name + ": " + block.label);
+                break;
+            case Terminator::Kind::kReturn:
+                if (!block.terminator.true_target.empty() || !block.terminator.false_target.empty()) {
+                    fail("return terminator must not name branch targets in function " + function.name + ": " + block.label);
+                }
+                break;
+            case Terminator::Kind::kBranch:
+                if (!block.terminator.values.empty()) {
+                    fail("branch terminator must not carry values in function " + function.name + ": " + block.label);
+                }
+                if (block.terminator.true_target.empty()) {
+                    fail("branch terminator must name a target in function " + function.name + ": " + block.label);
+                } else if (!block_labels.contains(block.terminator.true_target)) {
+                    fail("branch targets missing MIR block in function " + function.name + ": " + block.terminator.true_target);
+                }
+                if (!block.terminator.false_target.empty()) {
+                    fail("branch terminator must not name a false target in function " + function.name + ": " + block.label);
+                }
+                break;
+            case Terminator::Kind::kCondBranch:
+                if (block.terminator.values.size() != 1) {
+                    fail("conditional branch must use exactly one condition value in function " + function.name + ": " + block.label);
+                }
+                if (block.terminator.true_target.empty()) {
+                    fail("conditional branch must name a true target in function " + function.name + ": " + block.label);
+                } else if (!block_labels.contains(block.terminator.true_target)) {
+                    fail("conditional branch true target missing MIR block in function " + function.name + ": " +
+                         block.terminator.true_target);
+                }
+                if (block.terminator.false_target.empty()) {
+                    fail("conditional branch must name a false target in function " + function.name + ": " + block.label);
+                } else if (!block_labels.contains(block.terminator.false_target)) {
+                    fail("conditional branch false target missing MIR block in function " + function.name + ": " +
+                         block.terminator.false_target);
+                }
+                break;
+        }
+    }
+
+    std::vector<std::string> worklist;
+    worklist.push_back(function.blocks.front().label);
+    while (!worklist.empty()) {
+        const std::string label = worklist.back();
+        worklist.pop_back();
+        if (!reachable_blocks.insert(label).second) {
+            continue;
+        }
+
+        const auto found_block = blocks_by_label.find(label);
+        if (found_block == blocks_by_label.end()) {
+            continue;
+        }
+
+        const auto& terminator = found_block->second->terminator;
+        if (terminator.kind == Terminator::Kind::kBranch) {
+            worklist.push_back(terminator.true_target);
+        }
+        if (terminator.kind == Terminator::Kind::kCondBranch) {
+            worklist.push_back(terminator.true_target);
+            worklist.push_back(terminator.false_target);
+        }
+    }
+
+    return ok;
+}
+
+void ValidateFunctionDominance(const Function& function,
+                               const std::unordered_map<std::string, const BasicBlock*>& blocks_by_label,
+                               const std::unordered_set<std::string>& reachable_blocks,
+                               const ValidationReporter& report) {
+    // Uses Cooper's iterative algorithm to compute the immediate dominator
+    // of each reachable block, then verifies that every SSA value is only
+    // used in blocks dominated by its definition block.
+
+    std::unordered_map<std::string, std::vector<std::string>> preds;
+    for (const auto& label : reachable_blocks) {
+        preds.emplace(label, std::vector<std::string>{});
+    }
+    for (const auto& blk : function.blocks) {
+        if (!reachable_blocks.contains(blk.label)) {
+            continue;
+        }
+        auto add_edge = [&](const std::string& target) {
+            if (reachable_blocks.contains(target)) {
+                preds[target].push_back(blk.label);
+            }
+        };
+        if (blk.terminator.kind == Terminator::Kind::kBranch) {
+            add_edge(blk.terminator.true_target);
+        } else if (blk.terminator.kind == Terminator::Kind::kCondBranch) {
+            add_edge(blk.terminator.true_target);
+            add_edge(blk.terminator.false_target);
+        }
+    }
+
+    const std::string entry_label = function.blocks.front().label;
+    std::vector<std::string> rpo;
+    {
+        std::unordered_set<std::string> visited;
+        std::vector<std::pair<std::string, bool>> stack;
+        stack.push_back({entry_label, false});
+        while (!stack.empty()) {
+            auto [label, processed] = stack.back();
+            stack.pop_back();
+            if (processed) {
+                rpo.push_back(label);
+                continue;
+            }
+            if (!visited.insert(label).second) {
+                continue;
+            }
+            stack.push_back({label, true});
+            const auto found = blocks_by_label.find(label);
+            if (found == blocks_by_label.end()) {
+                continue;
+            }
+            const auto& terminator = found->second->terminator;
+            if (terminator.kind == Terminator::Kind::kCondBranch) {
+                if (reachable_blocks.contains(terminator.false_target)) {
+                    stack.push_back({terminator.false_target, false});
+                }
+                if (reachable_blocks.contains(terminator.true_target)) {
+                    stack.push_back({terminator.true_target, false});
+                }
+            } else if (terminator.kind == Terminator::Kind::kBranch) {
+                if (reachable_blocks.contains(terminator.true_target)) {
+                    stack.push_back({terminator.true_target, false});
+                }
+            }
+        }
+        std::reverse(rpo.begin(), rpo.end());
+    }
+
+    std::unordered_map<std::string, std::size_t> rpo_number;
+    for (std::size_t index = 0; index < rpo.size(); ++index) {
+        rpo_number[rpo[index]] = index;
+    }
+
+    std::unordered_map<std::string, std::string> idom;
+    idom[entry_label] = entry_label;
+    auto intersect = [&](const std::string& left, const std::string& right) -> std::string {
+        std::string finger_left = left;
+        std::string finger_right = right;
+        while (finger_left != finger_right) {
+            while (rpo_number.count(finger_left) && rpo_number.count(finger_right) &&
+                   rpo_number.at(finger_left) > rpo_number.at(finger_right)) {
+                finger_left = idom.at(finger_left);
+            }
+            while (rpo_number.count(finger_left) && rpo_number.count(finger_right) &&
+                   rpo_number.at(finger_right) > rpo_number.at(finger_left)) {
+                finger_right = idom.at(finger_right);
+            }
+        }
+        return finger_left;
+    };
+
+    bool dom_changed = true;
+    while (dom_changed) {
+        dom_changed = false;
+        for (const auto& block_label : rpo) {
+            if (block_label == entry_label) {
+                continue;
+            }
+            const auto& block_preds = preds.at(block_label);
+            std::string new_idom;
+            for (const auto& pred : block_preds) {
+                if (idom.count(pred)) {
+                    new_idom = pred;
+                    break;
+                }
+            }
+            if (new_idom.empty()) {
+                continue;
+            }
+            for (const auto& pred : block_preds) {
+                if (pred == new_idom || !idom.count(pred)) {
+                    continue;
+                }
+                new_idom = intersect(pred, new_idom);
+            }
+            if (!idom.count(block_label) || idom.at(block_label) != new_idom) {
+                idom[block_label] = new_idom;
+                dom_changed = true;
+            }
+        }
+    }
+
+    std::unordered_map<std::string, std::string> value_def_block;
+    for (const auto& blk : function.blocks) {
+        if (!reachable_blocks.contains(blk.label)) {
+            continue;
+        }
+        for (const auto& instr : blk.instructions) {
+            if (!instr.result.empty()) {
+                value_def_block[instr.result] = blk.label;
+            }
+        }
+    }
+
+    auto dominates = [&](const std::string& def_block, const std::string& use_block) -> bool {
+        std::string cursor = use_block;
+        while (cursor != def_block) {
+            const auto it = idom.find(cursor);
+            if (it == idom.end() || it->second == cursor) {
+                return false;
+            }
+            cursor = it->second;
+        }
+        return true;
+    };
+
+    auto check_operand_dominance = [&](const std::string& operand, const std::string& use_block_label) {
+        const auto def_it = value_def_block.find(operand);
+        if (def_it == value_def_block.end()) {
+            return;
+        }
+        if (def_it->second == use_block_label) {
+            return;
+        }
+        if (!dominates(def_it->second, use_block_label)) {
+            report("SSA dominance violation in function " + function.name + ": " + operand +
+                   " (defined in " + def_it->second + ") used in " + use_block_label);
+        }
+    };
+
+    for (const auto& blk : function.blocks) {
+        if (!reachable_blocks.contains(blk.label)) {
+            continue;
+        }
+        for (const auto& instr : blk.instructions) {
+            for (const auto& operand : instr.operands) {
+                if (!operand.empty()) {
+                    check_operand_dominance(operand, blk.label);
+                }
+            }
+        }
+        for (const auto& value : blk.terminator.values) {
+            if (!value.empty()) {
+                check_operand_dominance(value, blk.label);
+            }
+        }
+    }
+}
+
+// Bootstrap MIR validation runs three ordered passes per non-extern function:
+//   1. Block structure and reachability.
+//   2. Instruction, operand, and type validation.
+//   3. SSA dominance validation.
 bool ValidateModule(const Module& module,
                     const std::filesystem::path& file_path,
                     support::DiagnosticSink& diagnostics) {
@@ -2933,86 +3323,10 @@ bool ValidateModule(const Module& module,
             continue;
         }
 
-        if (function.blocks.empty()) {
-            report("function has no MIR blocks: " + function.name);
-            continue;
-        }
-
-        std::unordered_set<std::string> block_labels;
         std::unordered_map<std::string, const BasicBlock*> blocks_by_label;
-        for (const auto& block : function.blocks) {
-            if (!block_labels.insert(block.label).second) {
-                report("duplicate MIR block label in function " + function.name + ": " + block.label);
-            }
-            blocks_by_label[block.label] = &block;
-        }
-
-        for (const auto& block : function.blocks) {
-            switch (block.terminator.kind) {
-                case Terminator::Kind::kNone:
-                    report("unterminated MIR block in function " + function.name + ": " + block.label);
-                    break;
-                case Terminator::Kind::kReturn:
-                    if (!block.terminator.true_target.empty() || !block.terminator.false_target.empty()) {
-                        report("return terminator must not name branch targets in function " + function.name + ": " + block.label);
-                    }
-                    break;
-                case Terminator::Kind::kBranch:
-                    if (!block.terminator.values.empty()) {
-                        report("branch terminator must not carry values in function " + function.name + ": " + block.label);
-                    }
-                    if (block.terminator.true_target.empty()) {
-                        report("branch terminator must name a target in function " + function.name + ": " + block.label);
-                    } else if (!block_labels.contains(block.terminator.true_target)) {
-                        report("branch targets missing MIR block in function " + function.name + ": " + block.terminator.true_target);
-                    }
-                    if (!block.terminator.false_target.empty()) {
-                        report("branch terminator must not name a false target in function " + function.name + ": " + block.label);
-                    }
-                    break;
-                case Terminator::Kind::kCondBranch:
-                    if (block.terminator.values.size() != 1) {
-                        report("conditional branch must use exactly one condition value in function " + function.name + ": " + block.label);
-                    }
-                    if (block.terminator.true_target.empty()) {
-                        report("conditional branch must name a true target in function " + function.name + ": " + block.label);
-                    } else if (!block_labels.contains(block.terminator.true_target)) {
-                        report("conditional branch true target missing MIR block in function " + function.name + ": " +
-                               block.terminator.true_target);
-                    }
-                    if (block.terminator.false_target.empty()) {
-                        report("conditional branch must name a false target in function " + function.name + ": " + block.label);
-                    } else if (!block_labels.contains(block.terminator.false_target)) {
-                        report("conditional branch false target missing MIR block in function " + function.name + ": " +
-                               block.terminator.false_target);
-                    }
-                    break;
-            }
-        }
-
         std::unordered_set<std::string> reachable_blocks;
-        std::vector<std::string> worklist;
-        worklist.push_back(function.blocks.front().label);
-        while (!worklist.empty()) {
-            const std::string label = worklist.back();
-            worklist.pop_back();
-            if (!reachable_blocks.insert(label).second) {
-                continue;
-            }
-
-            const auto found_block = blocks_by_label.find(label);
-            if (found_block == blocks_by_label.end()) {
-                continue;
-            }
-
-            const auto& terminator = found_block->second->terminator;
-            if (terminator.kind == Terminator::Kind::kBranch) {
-                worklist.push_back(terminator.true_target);
-            }
-            if (terminator.kind == Terminator::Kind::kCondBranch) {
-                worklist.push_back(terminator.true_target);
-                worklist.push_back(terminator.false_target);
-            }
+        if (!ValidateFunctionStructure(function, report, blocks_by_label, reachable_blocks)) {
+            continue;
         }
 
         std::unordered_set<std::string> defined_values;
@@ -3132,7 +3446,7 @@ bool ValidateModule(const Module& module,
                             report("store_local declared type mismatch in function " + function.name + " for " + instruction.target + ": expected " +
                                    sema::FormatType(found_local->second) + ", got " + sema::FormatType(instruction.type));
                         }
-                        if (operand_types.size() == 1 && !IsAssignableType(found_local->second, operand_types.front())) {
+                        if (operand_types.size() == 1 && !IsAssignableType(module, found_local->second, operand_types.front())) {
                             report("store_local operand type mismatch in function " + function.name + " for " + instruction.target + ": expected " +
                                    sema::FormatType(found_local->second) + ", got " + sema::FormatType(operand_types.front()));
                         }
@@ -3145,7 +3459,8 @@ bool ValidateModule(const Module& module,
                         if (instruction.target.empty() && instruction.target_name.empty() && instruction.target_display.empty()) {
                             report("store_target must name a target in function " + function.name);
                         }
-                        if (!operand_types.empty() && !sema::IsUnknown(instruction.type) && !IsAssignableType(instruction.type, operand_types.front())) {
+                        if (!operand_types.empty() && !sema::IsUnknown(instruction.type) &&
+                            !IsAssignableType(module, instruction.type, operand_types.front())) {
                             report("store_target declared type mismatch in function " + function.name + ": expected " +
                                    sema::FormatType(instruction.type) + ", got " + sema::FormatType(operand_types.front()));
                         }
@@ -3187,7 +3502,7 @@ bool ValidateModule(const Module& module,
                                 for (const auto& field : fields) {
                                     if (field.first == instruction.target_name) {
                                         found_field = true;
-                                        if (!operand_types.empty() && !IsAssignableType(field.second, operand_types.front())) {
+                                        if (!operand_types.empty() && !IsAssignableType(module, field.second, operand_types.front())) {
                                             report("store_target field type mismatch in function " + function.name + " for " +
                                                    instruction.target_name + ": expected " + sema::FormatType(field.second) + ", got " +
                                                    sema::FormatType(operand_types.front()));
@@ -3235,7 +3550,8 @@ bool ValidateModule(const Module& module,
                                     instruction.target_aux_types.front() != operand_types[2]) {
                                     report("store_target index metadata type mismatch in function " + function.name);
                                 }
-                                if (!operand_types.empty() && !sema::IsUnknown(element_type) && !IsAssignableType(element_type, operand_types.front())) {
+                                if (!operand_types.empty() && !sema::IsUnknown(element_type) &&
+                                    !IsAssignableType(module, element_type, operand_types.front())) {
                                     report("store_target indexed element type mismatch in function " + function.name + ": expected " +
                                            sema::FormatType(element_type) + ", got " + sema::FormatType(operand_types.front()));
                                 }
@@ -3258,7 +3574,8 @@ bool ValidateModule(const Module& module,
                             case Instruction::TargetKind::kOther:
                                 if (instruction.operands.size() == 2 && instruction.target_base_type.kind == sema::Type::Kind::kPointer &&
                                     !instruction.target_base_type.subtypes.empty()) {
-                                    if (!operand_types.empty() && !IsAssignableType(instruction.target_base_type.subtypes.front(), operand_types.front())) {
+                                    if (!operand_types.empty() &&
+                                        !IsAssignableType(module, instruction.target_base_type.subtypes.front(), operand_types.front())) {
                                         report("store_target pointer target type mismatch in function " + function.name + ": expected " +
                                                sema::FormatType(instruction.target_base_type.subtypes.front()) + ", got " +
                                                sema::FormatType(operand_types.front()));
@@ -3277,14 +3594,15 @@ bool ValidateModule(const Module& module,
                         if (instruction.operands.size() != 1) {
                             report("unary must use exactly one operand in function " + function.name);
                         }
-                        if (instruction.op == "!" && !IsBoolType(instruction.type)) {
+                        if (instruction.op == "!" && !IsBoolType(module, instruction.type)) {
                             report("logical unary must produce bool in function " + function.name);
                         }
-                        if (instruction.op == "!" && operand_types.size() == 1 && !IsBoolType(operand_types.front()) && !sema::IsUnknown(operand_types.front())) {
+                        if (instruction.op == "!" && operand_types.size() == 1 && !IsBoolType(module, operand_types.front()) &&
+                            !sema::IsUnknown(operand_types.front())) {
                             report("logical unary requires bool operand in function " + function.name);
                         }
                         if (instruction.op == "&" && instruction.type.kind == sema::Type::Kind::kPointer && !instruction.type.subtypes.empty() &&
-                            operand_types.size() == 1 && !IsAssignableType(instruction.type.subtypes.front(), operand_types.front())) {
+                            operand_types.size() == 1 && !IsAssignableType(module, instruction.type.subtypes.front(), operand_types.front())) {
                             report("address-of unary result type mismatch in function " + function.name);
                         }
                         if (instruction.op == "&" && !sema::IsUnknown(instruction.type) && instruction.type.kind != sema::Type::Kind::kPointer) {
@@ -3300,10 +3618,10 @@ bool ValidateModule(const Module& module,
                             report("pointer dereference result type mismatch in function " + function.name);
                         }
                         if (instruction.op == "-" && operand_types.size() == 1) {
-                            if (!sema::IsUnknown(operand_types.front()) && !IsNumericType(operand_types.front())) {
+                            if (!sema::IsUnknown(operand_types.front()) && !IsNumericType(module, operand_types.front())) {
                                 report("numeric unary requires numeric operand in function " + function.name);
                             }
-                            if (!sema::IsUnknown(instruction.type) && !IsNumericType(instruction.type)) {
+                            if (!sema::IsUnknown(instruction.type) && !IsNumericType(module, instruction.type)) {
                                 report("numeric unary must produce numeric type in function " + function.name);
                             }
                         }
@@ -3331,7 +3649,7 @@ bool ValidateModule(const Module& module,
                             break;
                         }
                         for (const auto& operand_type : operand_types) {
-                            if (!sema::IsUnknown(operand_type) && !IsUsizeCompatibleType(StripMirAliasOrDistinct(module, operand_type))) {
+                            if (!sema::IsUnknown(operand_type) && !IsUsizeCompatibleType(module, operand_type)) {
                                 report("bounds_check operands must be usize-compatible in function " + function.name);
                             }
                         }
@@ -3348,7 +3666,7 @@ bool ValidateModule(const Module& module,
                             break;
                         }
                         for (const auto& operand_type : operand_types) {
-                            if (!sema::IsUnknown(operand_type) && !IsNumericType(operand_type)) {
+                            if (!sema::IsUnknown(operand_type) && !IsNumericType(module, operand_type)) {
                                 report("div_check operands must be numeric in function " + function.name);
                             }
                         }
@@ -3365,10 +3683,10 @@ bool ValidateModule(const Module& module,
                             break;
                         }
                         if (operand_types.size() == 2) {
-                            if (!sema::IsUnknown(operand_types.front()) && !IsIntegerLikeType(operand_types.front())) {
+                            if (!sema::IsUnknown(operand_types.front()) && !IsIntegerLikeType(module, operand_types.front())) {
                                 report("shift_check value operand must be integer-typed in function " + function.name);
                             }
-                            if (!sema::IsUnknown(operand_types.back()) && !IsIntegerLikeType(operand_types.back())) {
+                            if (!sema::IsUnknown(operand_types.back()) && !IsIntegerLikeType(module, operand_types.back())) {
                                 report("shift_check count operand must be integer-typed in function " + function.name);
                             }
                         }
@@ -3393,20 +3711,20 @@ bool ValidateModule(const Module& module,
                         }
                         if ((instruction.op == "==" || instruction.op == "!=" || instruction.op == "<" || instruction.op == "<=" || instruction.op == ">" ||
                              instruction.op == ">=" || instruction.op == "&&" || instruction.op == "||") &&
-                            !IsBoolType(instruction.type)) {
+                            !IsBoolType(module, instruction.type)) {
                             report("comparison/logical binary must produce bool in function " + function.name);
                         }
                         if ((instruction.op == "==" || instruction.op == "!=" || instruction.op == "<" || instruction.op == "<=" || instruction.op == ">" ||
                              instruction.op == ">=") && operand_types.size() == 2 &&
-                            !HasCompatibleComparisonTypes(operand_types.front(), operand_types.back())) {
+                            !HasCompatibleComparisonTypes(module, operand_types.front(), operand_types.back())) {
                             report("comparison requires compatible operand types in function " + function.name);
                         }
                         if (instruction.op == "<<" || instruction.op == ">>") {
                             if (operand_types.size() == 2) {
-                                if (!sema::IsUnknown(operand_types.front()) && !IsIntegerLikeType(operand_types.front())) {
+                                if (!sema::IsUnknown(operand_types.front()) && !IsIntegerLikeType(module, operand_types.front())) {
                                     report("shift binary requires integer left operand in function " + function.name);
                                 }
-                                if (!sema::IsUnknown(operand_types.back()) && !IsIntegerLikeType(operand_types.back())) {
+                                if (!sema::IsUnknown(operand_types.back()) && !IsIntegerLikeType(module, operand_types.back())) {
                                     report("shift binary requires integer right operand in function " + function.name);
                                 }
                                 if (!sema::IsUnknown(operand_types.front()) && instruction.type != operand_types.front()) {
@@ -3420,21 +3738,21 @@ bool ValidateModule(const Module& module,
                         }
                         if (instruction.op == "&&" || instruction.op == "||") {
                             for (const auto& operand_type : operand_types) {
-                                if (!sema::IsUnknown(operand_type) && !IsBoolType(operand_type)) {
+                                if (!sema::IsUnknown(operand_type) && !IsBoolType(module, operand_type)) {
                                     report("logical binary requires bool operands in function " + function.name);
                                 }
                             }
                         }
                         if (instruction.op == "+" || instruction.op == "-" || instruction.op == "*" || instruction.op == "/" || instruction.op == "%") {
                             for (const auto& operand_type : operand_types) {
-                                if (!sema::IsUnknown(operand_type) && !IsNumericType(operand_type)) {
+                                if (!sema::IsUnknown(operand_type) && !IsNumericType(module, operand_type)) {
                                     report("arithmetic binary requires numeric operands in function " + function.name);
                                 }
                             }
-                            if (operand_types.size() == 2 && !HasCompatibleNumericTypes(operand_types.front(), operand_types.back())) {
+                            if (operand_types.size() == 2 && !HasCompatibleNumericTypes(module, operand_types.front(), operand_types.back())) {
                                 report("arithmetic binary requires compatible operand types in function " + function.name);
                             }
-                            if (!sema::IsUnknown(instruction.type) && !IsNumericType(instruction.type)) {
+                            if (!sema::IsUnknown(instruction.type) && !IsNumericType(module, instruction.type)) {
                                 report("arithmetic binary must produce numeric type in function " + function.name);
                             }
                             if ((instruction.op == "/" || instruction.op == "%") &&
@@ -3579,7 +3897,7 @@ bool ValidateModule(const Module& module,
                                 instruction.type.name != "Slice") {
                                 report("array_to_slice requires array source and Slice target in function " + function.name);
                             } else if (!operand_types.front().subtypes.empty() && !instruction.type.subtypes.empty() &&
-                                       !IsAssignableType(instruction.type.subtypes.front(), operand_types.front().subtypes.front())) {
+                                       !IsAssignableType(module, instruction.type.subtypes.front(), operand_types.front().subtypes.front())) {
                                 report("array_to_slice element type mismatch in function " + function.name);
                             }
                         }
@@ -3606,7 +3924,7 @@ bool ValidateModule(const Module& module,
                                 instruction.type.kind != sema::Type::Kind::kNamed || !IsNamedTypeFamily(instruction.type, "Slice")) {
                                 report("buffer_to_slice requires Buffer source and Slice target in function " + function.name);
                             } else if (!operand_types.front().subtypes.empty() && !instruction.type.subtypes.empty() &&
-                                       !IsAssignableType(instruction.type.subtypes.front(), operand_types.front().subtypes.front())) {
+                                       !IsAssignableType(module, instruction.type.subtypes.front(), operand_types.front().subtypes.front())) {
                                 report("buffer_to_slice element type mismatch in function " + function.name);
                             }
                         }
@@ -3629,7 +3947,7 @@ bool ValidateModule(const Module& module,
                             if (!allocator_pointee.has_value() || !IsNamedTypeFamily(*allocator_pointee, "Allocator")) {
                                 report("buffer_new allocator operand must be *Allocator in function " + function.name);
                             }
-                            if (!IsIntegerLikeType(operand_types[1])) {
+                            if (!IsIntegerLikeType(module, operand_types[1])) {
                                 report("buffer_new capacity operand must be an integer type in function " + function.name);
                             }
                         }
@@ -3713,7 +4031,7 @@ bool ValidateModule(const Module& module,
                             for (std::size_t index = 0; index < param_count && index + 1 < operand_types.size(); ++index) {
                                 const sema::Type& expected = callee_type.subtypes[index];
                                 const sema::Type& actual = operand_types[index + 1];
-                                if (!IsAssignableType(expected, actual)) {
+                                if (!IsAssignableType(module, expected, actual)) {
                                     report("call argument type mismatch in function " + function.name + ": expected " +
                                            sema::FormatType(expected) + ", got " + sema::FormatType(actual));
                                 }
@@ -3742,7 +4060,7 @@ bool ValidateModule(const Module& module,
                                 if (!sema::IsUnknown(operand_types.front())) {
                                     report("volatile_load requires pointer operand in function " + function.name);
                                 }
-                            } else if (!IsAssignableType(instruction.type, *pointee)) {
+                            } else if (!IsAssignableType(module, instruction.type, *pointee)) {
                                 report("volatile_load result type mismatch in function " + function.name);
                             }
                         }
@@ -3765,7 +4083,7 @@ bool ValidateModule(const Module& module,
                                 if (!sema::IsUnknown(operand_types.front())) {
                                     report("volatile_store requires pointer operand in function " + function.name);
                                 }
-                            } else if (!IsAssignableType(*pointee, operand_types[1])) {
+                            } else if (!IsAssignableType(module, *pointee, operand_types[1])) {
                                 report("volatile_store value type mismatch in function " + function.name);
                             }
                         }
@@ -3809,7 +4127,7 @@ bool ValidateModule(const Module& module,
                         if (is_store && !instruction.result.empty()) {
                             report("atomic_store must not produce a result in function " + function.name);
                         }
-                        if (is_compare_exchange && !IsBoolType(instruction.type)) {
+                        if (is_compare_exchange && !IsBoolType(module, instruction.type)) {
                             report("atomic_compare_exchange must produce bool in function " + function.name);
                         }
                         if (operand_types.empty()) {
@@ -3828,22 +4146,22 @@ bool ValidateModule(const Module& module,
                             }
                         };
                         if (is_load) {
-                            if (!IsAssignableType(instruction.type, *atomic_element)) {
+                            if (!IsAssignableType(module, instruction.type, *atomic_element)) {
                                 report("atomic_load result type mismatch in function " + function.name);
                             }
                             require_order(1, "atomic_load");
                         }
                         if (is_store) {
-                            if (operand_types.size() > 1 && !IsAssignableType(*atomic_element, operand_types[1])) {
+                            if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
                                 report("atomic_store value type mismatch in function " + function.name);
                             }
                             require_order(2, "atomic_store");
                         }
                         if (is_exchange) {
-                            if (!IsAssignableType(instruction.type, *atomic_element)) {
+                            if (!IsAssignableType(module, instruction.type, *atomic_element)) {
                                 report("atomic_exchange result type mismatch in function " + function.name);
                             }
-                            if (operand_types.size() > 1 && !IsAssignableType(*atomic_element, operand_types[1])) {
+                            if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
                                 report("atomic_exchange value type mismatch in function " + function.name);
                             }
                             require_order(2, "atomic_exchange");
@@ -3851,21 +4169,21 @@ bool ValidateModule(const Module& module,
                         if (is_compare_exchange) {
                             if (operand_types.size() > 1) {
                                 const auto expected_pointee = PointerPointeeType(StripMirAliasOrDistinct(module, operand_types[1]));
-                                if (!expected_pointee.has_value() || !IsAssignableType(*expected_pointee, *atomic_element)) {
+                                if (!expected_pointee.has_value() || !IsAssignableType(module, *expected_pointee, *atomic_element)) {
                                     report("atomic_compare_exchange expected pointer type mismatch in function " + function.name);
                                 }
                             }
-                            if (operand_types.size() > 2 && !IsAssignableType(*atomic_element, operand_types[2])) {
+                            if (operand_types.size() > 2 && !IsAssignableType(module, *atomic_element, operand_types[2])) {
                                 report("atomic_compare_exchange desired value type mismatch in function " + function.name);
                             }
                             require_order(3, "atomic_compare_exchange success order");
                             require_order(4, "atomic_compare_exchange failure order");
                         }
                         if (is_fetch_add) {
-                            if (!IsAssignableType(instruction.type, *atomic_element)) {
+                            if (!IsAssignableType(module, instruction.type, *atomic_element)) {
                                 report("atomic_fetch_add result type mismatch in function " + function.name);
                             }
-                            if (operand_types.size() > 1 && !IsAssignableType(*atomic_element, operand_types[1])) {
+                            if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
                                 report("atomic_fetch_add value type mismatch in function " + function.name);
                             }
                             require_order(2, "atomic_fetch_add");
@@ -3930,7 +4248,7 @@ bool ValidateModule(const Module& module,
                                 if (!found_field) {
                                     report("field references unknown member in function " + function.name + ": " + std::string(field_name));
                                 }
-                            } else if (IsBuiltinNamedNonAggregate(base_type)) {
+                            } else if (IsBuiltinNamedNonAggregate(module, base_type)) {
                                 report("field requires named aggregate base in function " + function.name);
                             }
                         } else if (!sema::IsUnknown(base_type)) {
@@ -4087,7 +4405,7 @@ bool ValidateModule(const Module& module,
                                         continue;
                                     }
                                 }
-                                if (!IsAssignableType(expected_type, operand_types[index])) {
+                                if (!IsAssignableType(module, expected_type, operand_types[index])) {
                                     report("aggregate_init field type mismatch in function " + function.name + " for " + field_name + ": expected " +
                                            sema::FormatType(expected_type) + ", got " + sema::FormatType(operand_types[index]));
                                 }
@@ -4135,7 +4453,7 @@ bool ValidateModule(const Module& module,
                             break;
                         }
                         for (std::size_t index = 0; index < operand_types.size() && index < variant_decl->payload_fields.size(); ++index) {
-                            if (!IsAssignableType(variant_decl->payload_fields[index].second, operand_types[index])) {
+                            if (!IsAssignableType(module, variant_decl->payload_fields[index].second, operand_types[index])) {
                                 report("variant_init operand type mismatch in function " + function.name + " for " + variant_decl->name +
                                        ": expected " + sema::FormatType(variant_decl->payload_fields[index].second) + ", got " +
                                        sema::FormatType(operand_types[index]));
@@ -4316,7 +4634,7 @@ bool ValidateModule(const Module& module,
                         if (index < function.return_types.size()) {
                             const auto found_type = value_types.find(value);
                             const sema::Type actual = found_type == value_types.end() ? sema::UnknownType() : found_type->second;
-                            if (!IsAssignableType(function.return_types[index], actual)) {
+                            if (!IsAssignableType(module, function.return_types[index], actual)) {
                                 report("return type mismatch in function " + function.name + ": expected " +
                                        sema::FormatType(function.return_types[index]) + ", got " + sema::FormatType(actual));
                             }
@@ -4331,7 +4649,7 @@ bool ValidateModule(const Module& module,
                     } else if (block.terminator.values.size() == 1) {
                         const auto found_type = value_types.find(block.terminator.values.front());
                         const sema::Type condition_type = found_type == value_types.end() ? sema::UnknownType() : found_type->second;
-                        if (!sema::IsUnknown(condition_type) && !IsBoolType(condition_type)) {
+                        if (!sema::IsUnknown(condition_type) && !IsBoolType(module, condition_type)) {
                             report("conditional branch condition must have bool type in function " + function.name);
                         }
                     }
@@ -4339,181 +4657,7 @@ bool ValidateModule(const Module& module,
             }
         }
 
-        // ── SSA dominance pass ──────────────────────────────────────────────
-        // Uses Cooper's iterative algorithm to compute the immediate dominator
-        // of each reachable block, then verifies that for every value operand V
-        // used in block B, the block that defines V dominates B.
-
-        // Step A: build predecessor map (only reachable blocks).
-        std::unordered_map<std::string, std::vector<std::string>> preds;
-        for (const auto& label : reachable_blocks) {
-            preds.emplace(label, std::vector<std::string>{});
-        }
-        for (const auto& blk : function.blocks) {
-            if (!reachable_blocks.contains(blk.label)) {
-                continue;
-            }
-            auto add_edge = [&](const std::string& target) {
-                if (reachable_blocks.contains(target)) {
-                    preds[target].push_back(blk.label);
-                }
-            };
-            if (blk.terminator.kind == Terminator::Kind::kBranch) {
-                add_edge(blk.terminator.true_target);
-            } else if (blk.terminator.kind == Terminator::Kind::kCondBranch) {
-                add_edge(blk.terminator.true_target);
-                add_edge(blk.terminator.false_target);
-            }
-        }
-
-        // Step B: compute RPO via DFS and build rpo_number.
-        const std::string entry_label = function.blocks.front().label;
-        std::vector<std::string> rpo;
-        {
-            std::unordered_set<std::string> visited;
-            std::vector<std::pair<std::string, bool>> stack;
-            stack.push_back({entry_label, false});
-            while (!stack.empty()) {
-                auto [label, processed] = stack.back();
-                stack.pop_back();
-                if (processed) {
-                    rpo.push_back(label);
-                    continue;
-                }
-                if (!visited.insert(label).second) {
-                    continue;
-                }
-                stack.push_back({label, true});
-                const auto found = blocks_by_label.find(label);
-                if (found == blocks_by_label.end()) {
-                    continue;
-                }
-                const auto& t = found->second->terminator;
-                if (t.kind == Terminator::Kind::kCondBranch) {
-                    if (reachable_blocks.contains(t.false_target)) {
-                        stack.push_back({t.false_target, false});
-                    }
-                    if (reachable_blocks.contains(t.true_target)) {
-                        stack.push_back({t.true_target, false});
-                    }
-                } else if (t.kind == Terminator::Kind::kBranch) {
-                    if (reachable_blocks.contains(t.true_target)) {
-                        stack.push_back({t.true_target, false});
-                    }
-                }
-            }
-            std::reverse(rpo.begin(), rpo.end());
-        }
-        std::unordered_map<std::string, std::size_t> rpo_number;
-        for (std::size_t i = 0; i < rpo.size(); ++i) {
-            rpo_number[rpo[i]] = i;
-        }
-
-        // Step C: Cooper's iterative dominator algorithm.
-        std::unordered_map<std::string, std::string> idom;
-        idom[entry_label] = entry_label;
-        auto intersect = [&](const std::string& a, const std::string& b) -> std::string {
-            std::string finger1 = a;
-            std::string finger2 = b;
-            while (finger1 != finger2) {
-                while (rpo_number.count(finger1) && rpo_number.count(finger2) &&
-                       rpo_number.at(finger1) > rpo_number.at(finger2)) {
-                    finger1 = idom.at(finger1);
-                }
-                while (rpo_number.count(finger1) && rpo_number.count(finger2) &&
-                       rpo_number.at(finger2) > rpo_number.at(finger1)) {
-                    finger2 = idom.at(finger2);
-                }
-            }
-            return finger1;
-        };
-        bool dom_changed = true;
-        while (dom_changed) {
-            dom_changed = false;
-            for (const auto& b_label : rpo) {
-                if (b_label == entry_label) {
-                    continue;
-                }
-                const auto& b_preds = preds.at(b_label);
-                std::string new_idom;
-                for (const auto& p : b_preds) {
-                    if (idom.count(p)) {
-                        new_idom = p;
-                        break;
-                    }
-                }
-                if (new_idom.empty()) {
-                    continue;
-                }
-                for (const auto& p : b_preds) {
-                    if (p == new_idom || !idom.count(p)) {
-                        continue;
-                    }
-                    new_idom = intersect(p, new_idom);
-                }
-                if (!idom.count(b_label) || idom.at(b_label) != new_idom) {
-                    idom[b_label] = new_idom;
-                    dom_changed = true;
-                }
-            }
-        }
-
-        // Step D: record which block defines each SSA value.
-        std::unordered_map<std::string, std::string> value_def_block;
-        for (const auto& blk : function.blocks) {
-            if (!reachable_blocks.contains(blk.label)) {
-                continue;
-            }
-            for (const auto& instr : blk.instructions) {
-                if (!instr.result.empty()) {
-                    value_def_block[instr.result] = blk.label;
-                }
-            }
-        }
-
-        // Step E: dominance helper and check.
-        auto dominates = [&](const std::string& def_block, const std::string& use_block) -> bool {
-            std::string cursor = use_block;
-            while (cursor != def_block) {
-                const auto it = idom.find(cursor);
-                if (it == idom.end() || it->second == cursor) {
-                    return false;
-                }
-                cursor = it->second;
-            }
-            return true;
-        };
-        auto check_operand_dominance = [&](const std::string& operand, const std::string& use_block_label) {
-            const auto def_it = value_def_block.find(operand);
-            if (def_it == value_def_block.end()) {
-                return;  // not an SSA value (local name) or already caught by pass 1
-            }
-            if (def_it->second == use_block_label) {
-                return;  // same-block — sequential order enforced by pass 1
-            }
-            if (!dominates(def_it->second, use_block_label)) {
-                report("SSA dominance violation in function " + function.name + ": " + operand +
-                       " (defined in " + def_it->second + ") used in " + use_block_label);
-            }
-        };
-        for (const auto& blk : function.blocks) {
-            if (!reachable_blocks.contains(blk.label)) {
-                continue;
-            }
-            for (const auto& instr : blk.instructions) {
-                for (const auto& operand : instr.operands) {
-                    if (!operand.empty()) {
-                        check_operand_dominance(operand, blk.label);
-                    }
-                }
-            }
-            for (const auto& val : blk.terminator.values) {
-                if (!val.empty()) {
-                    check_operand_dominance(val, blk.label);
-                }
-            }
-        }
-        // ── end SSA dominance pass ───────────────────────────────────────────
+        ValidateFunctionDominance(function, blocks_by_label, reachable_blocks, report);
     }
 
     return ok;

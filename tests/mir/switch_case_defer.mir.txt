@@ -4,7 +4,7 @@ Module
       terminator return
   Function name=choose returns=[i32]
     Local name=flag type=i32 param readonly
-    Local name=$defer_callee0 type=proc()->void readonly
+    Local name=%hidden.defer_callee0 type=proc()->void readonly
     Block label=entry0
       load_local %v0:i32 target=flag
       const %v1:int_literal op=0
@@ -15,8 +15,8 @@ Module
       terminator return values=[%v6]
     Block label=switch_case3
       symbol_ref %v3:proc()->void target=hit target_kind=function target_name=hit
-      store_local target=$defer_callee0 operands=[%v3]
+      store_local target=%hidden.defer_callee0 operands=[%v3]
       const %v4:int_literal op=10
-      load_local %v5:proc()->void target=$defer_callee0
+      load_local %v5:proc()->void target=%hidden.defer_callee0
       call target=hit target_kind=function target_name=hit operands=[%v5]
       terminator return values=[%v4]
