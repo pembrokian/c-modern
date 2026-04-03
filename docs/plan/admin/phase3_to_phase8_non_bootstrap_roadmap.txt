@@ -15,6 +15,8 @@ Source documents
 - /Users/ro/dev/c_modern/docs/plan/phase7_implementation_summary.txt
 - /Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt
 - /Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_closeout.txt
+- /Users/ro/dev/c_modern/docs/plan/phase14_pressure_program_expansion.txt
+- /Users/ro/dev/c_modern/docs/plan/phase14_pressure_program_expansion_closeout.txt
 - /Users/ro/dev/c_modern/docs/plan/phase8_implementation_summary.txt
 - /Users/ro/dev/c_modern/docs/arch/canonical_programs.txt
 - /Users/ro/dev/c_modern/docs/arch/build_spec.txt
@@ -476,6 +478,8 @@ Current bootstrap boundary
 - the repository has an admitted first-pass canonical set and bounded real
   utilities including text filtering, file walking, hashing, and arena-backed
   parsing
+- the current repository-bounded follow-up for this phase is now recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase14_pressure_program_expansion.txt`
 - the current summary explicitly leaves threaded and evented-networking
   canonical pressure deferred, along with broader streaming, richer buffer
   helpers, and wider runtime surfaces
@@ -581,7 +585,9 @@ Recommended first follow-up documents:
 - `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt`
   as the repository-specific execution plan for unfinished Phase 7 toolchain
   maturity work focused on .mci, rebuild trust, and mc test correctness
-- a refreshed Phase 8 admission matrix once the enabling layers deepen
+- `/Users/ro/dev/c_modern/docs/plan/phase14_pressure_program_expansion.txt`
+  as the repository-specific execution plan for unfinished Phase 8 pressure
+  expansion beyond the admitted first-pass slice
 
 Acceptance criteria for this roadmap document
 ---------------------------------------------

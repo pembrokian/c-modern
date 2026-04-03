@@ -5,6 +5,9 @@ Purpose
 -------
 - Turn Phase 8 program admission into repository truth instead of prose inference.
 - Record, per pressure program, what is being stressed, how it is proven, and whether it is implemented, blocked, or deferred.
+- Phase 14A refreshes this matrix against `docs/arch/canonical_programs.txt`, the
+	landed first-pass Phase 8 slice, and older lower-layer canonical artifacts
+	that already exist in the repository.
 
 Status model
 ------------
@@ -18,6 +21,18 @@ Proof path defaults
 - Use direct-source proof for single-file canonical programs whose pressure value does not depend on explicit project layout.
 - Use dedicated build.toml fixtures for multi-module programs and for any proof that is meant to validate the explicit Phase 7 project workflow.
 - Ordinary tests for project-style pressure programs must import the real project modules through configured roots.
+
+Canonical status notes
+----------------------
+- implemented: the repository contains the program and deterministic proof at
+	the intended Phase 8 pressure layer.
+- legacy lower-layer proof: the repository contains a real canonical example or
+	fixture, but it is currently proven only at a lower layer such as MIR and is
+	not yet counted as a full admitted Phase 8 executable or project proof.
+- blocked: the program is meaningful and remains in scope, but a named
+	enabling gap prevents honest admission on the current hosted slice.
+- deferred: the program remains part of the long-term pressure set, but the
+	repository is not yet admitting it beyond explicit backlog and owner naming.
 
 Slice 1 -- Immediate canonical proofs
 -------------------------------------
@@ -95,29 +110,350 @@ C ABI boundary
 - Observable behavior: calls one narrow host C function and returns a deterministic result through Modern C code
 - Known exclusions: no header parsing, no broad C binding generation
 
+Legacy canonical artifacts already present in the repository
+-----------------------------------------------------------
+
+eval
+~~~~
+- Status: legacy lower-layer proof
+- Packaging: direct-source source example plus MIR fixture
+- Intended proof: MIR fixture coverage in `tests/mir/mir_fixture_tests.cpp`
+- Pressure focus: earlier bootstrap expression and control-flow lowering
+- Proof artifact: `examples/canonical/eval.mc` plus `canonical_eval.mir.txt`
+- Phase 14A note: superseded at the Phase 8 executable layer by the admitted
+	recursive evaluator, but still retained as a repository-owned lower-layer
+	canonical artifact
+
+memory poll
+~~~~~~~~~~~
+- Status: legacy lower-layer proof
+- Packaging: direct-source source example plus MIR fixture
+- Intended proof: MIR fixture coverage in `tests/mir/mir_fixture_tests.cpp`
+- Pressure focus: low-level polling and explicit state update shapes from an
+	earlier bootstrap slice
+- Proof artifact: `examples/canonical/memory_poll.mc` plus
+	`canonical_memory_poll.mir.txt`
+- Phase 14A note: not currently counted as an admitted Phase 8 executable or
+	project proof; any future Phase 8 pressure promotion should route through an
+	explicit Phase 14 follow-up rather than being assumed from MIR coverage
+
+window stats
+~~~~~~~~~~~~
+- Status: legacy lower-layer proof
+- Packaging: direct-source source example plus MIR fixture
+- Intended proof: MIR fixture coverage in `tests/mir/mir_fixture_tests.cpp`
+- Pressure focus: aggregate arithmetic and earlier bootstrap container-style
+	control flow
+- Proof artifact: `examples/canonical/window_stats.mc` plus
+	`canonical_window_stats.mir.txt`
+- Phase 14A note: still useful as a lower-layer example, but not yet part of
+	the admitted executable or project-proven Phase 8 set
+
 Deferred later canonical entries
 --------------------------------
 
 single-threaded evented echo server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: deferred
+- Status: blocked
 - Packaging: dedicated project fixture once portable poller and networking surface are admitted
-- Reason: outside the first-pass A/B/C closure; requires a larger hosted I/O and net boundary than the current repository admits
+- Pressure focus: readiness-based poller surface, explicit event buffers,
+	fallible handle closure, and one portable `File` handle across `io` and
+	`net`
+- Enabling gap: no admitted portable `io` poller surface and no admitted
+	portable `net` module on the current hosted slice; Phase 6 owns the missing
+	library boundary, not examples or the driver
+- Phase 14A note: this remains the lead evented-networking canonical entry and
+	should not be silently replaced by a weaker surrogate
 
 partial-write response state machine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: deferred
+- Status: blocked
 - Packaging: dedicated project fixture once writable readiness and interest updates exist
-- Reason: depends on the same poller and socket surface as the evented server
+- Pressure focus: partial writes, caller-owned connection state, and poller
+	interest updates after state transitions
+- Enabling gap: no admitted `io.poller_set(...)` style writable-interest API,
+	and no admitted portable poller or `net` surface to prove partial-write
+	handling honestly
+- Phase 14A note: remains blocked behind the same Phase 6 ownership gap as the
+	evented echo server, with the added requirement for writable-interest update
+	support
 
 evented TCP client request-response
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: deferred
+- Status: blocked
 - Packaging: dedicated project fixture once client-side networking and poller updates exist
-- Reason: depends on the same portable network and poller layer as the server-side entries
+- Pressure focus: client-side `connect_tcp`, readiness transitions, and the
+	ordinary fallible `io.close` rule in a normal network flow
+- Enabling gap: no admitted portable `net.connect_tcp(...)`, no admitted
+	poller surface, and no project-proven portable networking boundary on the
+	current hosted slice
+- Phase 14A note: blocked for the same Phase 6 owner reasons as the server
+	entries; Phase 8 should admit it only after the underlying portable network
+	surface is real
+
+MMIO register access
+~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Packaging: direct-source once a truthful hardware-boundary module exists
+- Pressure focus: explicit MMIO pointer formation, volatile load and store,
+	and ordering at the hardware boundary
+- Enabling gap: `hal` remains explicitly deferred in the repository Phase 6
+	posture even though MIR already has bootstrap support for the current
+	library-shaped MMIO boundary
+- Phase 14A note: this is not blocked by Phase 8 examples; it is blocked by
+	the lack of an admitted `hal` module and hosted proof obligation
+
+bounded ring buffer
+~~~~~~~~~~~~~~~~~~~
+- Status: deferred
+- Packaging: direct-source executable or sema-level proof once selected as a
+	next-wave canonical pressure artifact
+- Pressure focus: wraparound arithmetic, slice indexing, and explicit
+	invariants without concurrency
+- Current posture: the repository likely has enough admitted core language and
+	container support to express this shape, but it has not yet been admitted as
+	a repository-owned Phase 8 executable proof
+- Phase 14A note: keep this explicit as a plausible next-wave canonical entry
+	rather than assuming it is already proven by broader language fixtures
+
+distinct type safety
+~~~~~~~~~~~~~~~~~~~~
+- Status: deferred
+- Packaging: direct-source executable or sema-heavy canonical proof once
+	selected for a next executable pressure wave
+- Pressure focus: zero-cost logical type separation and explicit conversion at
+	real boundaries only
+- Current posture: distinct-type support is present and proven in sema and MIR
+	layers, but this specific canonical program is not yet recorded as an
+	admitted Phase 8 executable artifact
+- Phase 14A note: defer as a likely next-wave semantic-pressure candidate
+	rather than claiming it from lower-layer support alone
+
+fixed array, slice, and buffer conversion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred
+- Packaging: direct-source executable or sema and MIR backed canonical proof
+- Pressure focus: explicit array-to-slice and buffer-to-slice conversion
+	points, ownership clarity, and helper spelling stability
+- Current posture: array-to-slice and buffer-to-slice conversions already have
+	MIR fixture coverage, but this fuller canonical program is not yet admitted
+	as a repository-owned Phase 8 executable proof
+- Phase 14A note: suitable next-wave canonical pressure once the repository
+	wants a fuller container-model executable proof
+
+hosted default allocator use
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred
+- Packaging: direct-source executable proof
+- Pressure focus: explicit hosted allocator access through `mem.default_allocator()`
+	and ordinary `Buffer<T>` ownership flow
+- Current posture: the necessary `mem` surface exists and is already used by
+	other admitted programs, but this specific canonical shape has not been
+	admitted as a named Phase 8 artifact
+- Phase 14A note: explicit next-wave candidate if the repository wants a
+	smaller allocator-convention executable proof separate from file I/O or
+	arena pressure
+
+arena allocator through the common protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Packaging: direct-source executable once the common allocator protocol is
+	admitted honestly
+- Pressure focus: arena allocation through the generic `Allocator` protocol
+	instead of the current direct `Arena` helper surface
+- Enabling gap: the current admitted arena support is a narrow direct helper
+	path in `mem`; the common allocator-protocol variant described by the
+	canonical program is not yet the repository-owned Phase 6 contract
+- Phase 14A note: this remains blocked on honest Phase 6 API maturity rather
+	than on a missing Phase 8 example
+
+shared counter with mutex
+~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Packaging: dedicated project fixture once `sync` and hosted threading are
+	admitted
+- Pressure focus: thread spawn and join, mutex initialization, and DRF-SC
+	shared-state coordination without language-level concurrency syntax
+- Enabling gap: `sync` remains explicitly deferred in the current Phase 6
+	posture, and the hosted runtime does not yet admit the required threading
+	boundary
+- Phase 14A note: keep this explicit as the first thread-based canonical
+	pressure entry instead of collapsing it into a vague future threaded example
+
+producer-consumer with condition variable
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Packaging: dedicated project fixture once `sync` condvar support is admitted
+- Pressure focus: blocking coordination, wait-and-reacquire semantics, and
+	bounded userland queues on top of primitive synchronization
+- Enabling gap: no admitted `sync.Condvar` surface, no hosted threading
+	boundary, and no project-level proof posture for this concurrency family
+- Phase 14A note: blocked behind the same deferred `sync` module family as the
+	mutex example, with additional condvar semantics still outside the current
+	repository slice
+
+atomic flag publication
+~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Packaging: direct-source or dedicated project fixture once atomics are
+	admitted through `sync`
+- Pressure focus: explicit memory-order semantics, release-acquire
+	publication, and the separation between atomics and volatile/MMIO behavior
+- Enabling gap: while the compiler and MIR have bootstrap atomic support, the
+	repository does not yet admit a portable `sync` atomic library surface for
+	ordinary Phase 8 programs
+- Phase 14A note: blocked on honest Phase 6 `sync` surface admission, not on
+	the lack of low-level compiler hooks
 
 Real utility candidates for later Phase 8 work
 ----------------------------------------------
+
+Real-program family matrix
+--------------------------
+
+text processing
+~~~~~~~~~~~~~~~
+- Current status: implemented first-pass family
+- Current proof: `grep-lite`
+- Distinct pressure already covered: explicit project roots, substring search,
+	file reads, stdout behavior, and ordinary tests through `mc test`
+- Next-wave admission rule: only add another text utility if it pressures a
+	distinct repository-owned gap such as richer tokenization, structured text
+	transforms, or line-streaming behavior that grep-lite does not already cover
+- Current owner gates: richer streaming I/O or buffer helpers remain Phase 6
+	follow-up work, not something to hide inside a bigger text tool
+
+traversal
+~~~~~~~~~
+- Current status: implemented first-pass family
+- Current proof: `file walker`
+- Distinct pressure already covered: deterministic directory traversal,
+	explicit recursion, path joins, and sorted output under project mode
+- Next-wave admission rule: only add another traversal utility if it exposes a
+	new pressure dimension such as filtering, aggregation, or multi-module graph
+	structure beyond plain recursive walking
+- Current owner gates: richer path or metadata APIs remain Phase 6 follow-up
+	work and should be admitted honestly before a larger filesystem tool depends
+	on them
+
+hashing and checksums
+~~~~~~~~~~~~~~~~~~~~~
+- Current status: implemented first-pass family
+- Current proof: `hash_tool`
+- Distinct pressure already covered: whole-file byte processing, deterministic
+	hex formatting, and project-owned output checks
+- Next-wave admission rule: only add another checksum utility if it pressures
+	a new surface such as streaming reads, multiple-input aggregation, or
+	reusable formatting helpers that the bounded whole-file tool does not touch
+- Current owner gates: streaming I/O and richer buffer helpers remain explicit
+	Phase 6 follow-up rather than silent prerequisites hidden in the utility
+
+parsing and arena-backed utilities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Current status: implemented first-pass family
+- Current proof: `arena_expr`
+- Distinct pressure already covered: arena pairing, borrowed token slices,
+	pointer-stable AST nodes, recursive descent structure, and deterministic
+	normalized output
+- Next-wave admission rule: only add another parser-style utility if it adds a
+	materially different pressure dimension such as richer diagnostics, multi-
+	file project structure, or allocator-protocol reuse beyond direct `Arena`
+	helpers
+- Current owner gates: richer arena string helpers and common allocator-
+	protocol support remain explicit Phase 6 follow-up work
+
+concurrency
+~~~~~~~~~~~
+- Current status: blocked family
+- Current proof: none admitted yet
+- Candidate next-wave utility: bounded threaded example only after `sync` and
+	hosted threading are admitted honestly
+- Distinct pressure sought: thread spawn and join, mutex or condvar
+	coordination, deterministic ordinary-test proof, and explicit shared-state
+	synchronization without language-level concurrency syntax
+- Current owner gates: `sync` module admission, hosted runtime threading, and
+	test-proof discipline belong to Phase 6 and Phase 7 enabling work
+
+networking
+~~~~~~~~~~
+- Current status: blocked family
+- Current proof: none admitted yet
+- Candidate next-wave utility: bounded network client or server only after
+	portable `net` and `io` poller surfaces are admitted honestly
+- Distinct pressure sought: readiness transitions, fallible handle closure,
+	explicit client or server state machines, and project-mode workflow proof
+- Current owner gates: portable `net`, portable poller support, and any
+	required ordinary-test harness posture remain enabling work outside examples
+
+allocator and buffer convention utilities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Current status: deferred family
+- Current proof: pressure is currently carried indirectly by read-entire-file,
+	scoped temporary buffer, arena-backed canonical programs, and `arena_expr`
+- Candidate next-wave utility: a small bounded tool whose main purpose is to
+	pressure default allocator use, buffer slicing, or ownership handoff without
+	depending on richer file or text surfaces
+- Distinct pressure sought: explicit conventional allocator access and buffer
+	ownership discipline as the main contract rather than as incidental program
+	setup
+- Current owner gates: only admit if it adds clearer pressure than the current
+	canonical allocator examples and does not duplicate existing proof
+
+next-wave real utility candidates
+---------------------------------
+
+streaming text filter
+~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred candidate
+- Intended family: text processing
+- Pressure focus: line-streaming or chunked input once the repository has an
+	honest streaming I/O surface
+- Admission rule: do not admit until it adds distinct pressure beyond
+	grep-lite and the necessary streaming boundary is real
+
+directory summarizer
+~~~~~~~~~~~~~~~~~~~~
+- Status: deferred candidate
+- Intended family: traversal
+- Pressure focus: traversal plus aggregation, counting, or filtering rather
+	than plain recursive listing
+- Admission rule: only admit if it exercises repository-owned path or
+	aggregation pressure not already covered by file walker
+
+multi-input checksum tool
+~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred candidate
+- Intended family: hashing and checksums
+- Pressure focus: multiple-input workflows, reusable formatting paths, or
+	streaming follow-up once the enabling I/O surface exists
+- Admission rule: do not admit as a mere larger version of `hash_tool`
+
+diagnostic parser utility
+~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred candidate
+- Intended family: parsing and arena-backed utilities
+- Pressure focus: richer parse errors, location reporting, or multi-module
+	parser structure once the repository wants pressure beyond normalization
+- Admission rule: only admit when the diagnostic or project-structure pressure
+	is the point, not just to make the parser utility larger
+
+bounded threaded worker tool
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked candidate
+- Intended family: concurrency
+- Pressure focus: one reviewable thread-based workflow such as shared counter,
+	work queue, or producer-consumer coordination
+- Admission rule: only admit after `sync` and hosted threading are repository-
+	owned surfaces with deterministic proof hooks
+
+bounded network probe
+~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked candidate
+- Intended family: networking
+- Pressure focus: one reviewable client or server utility over honest portable
+	`net` and `io` poller APIs
+- Admission rule: only admit after the portable networking boundary is real;
+	do not route around it with `os` imports or ad hoc host-specific helpers
 
 grep-lite
 ~~~~~~~~~

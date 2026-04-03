@@ -1,0 +1,76 @@
+Phase 14 -- Pressure Program Expansion Closeout
+===============================================
+
+Status
+------
+COMPLETED (repository-bounded first wave)
+
+Purpose
+-------
+Record the concrete Phase 14 slice now admitted in the repository so the
+pressure-program evidence hardening completed here is not inferred only from
+edits to the planning document.
+
+This is a repository closeout note, not a new architecture phase.
+It closes the bounded first wave described in
+`/Users/ro/dev/c_modern/docs/plan/phase14_pressure_program_expansion.txt`
+without claiming that the full long-term Phase 8 pressure surface from
+`plan.txt` or `canonical_programs.txt` is complete.
+
+What landed
+-----------
+- Phase 14A: the Phase 8 admission matrix now re-audits the broader canonical
+  pressure set against current repository truth instead of tracking only the
+  first-pass slice informally.
+- Phase 14A: the admission matrix now distinguishes admitted executable or
+  project proofs from older lower-layer canonical artifacts already present in
+  the repository, such as MIR-backed legacy examples.
+- Phase 14A: blocked and deferred canonical entries now carry explicit owner-
+  attributed enabling gaps rather than remaining ambiguous future work.
+- Phase 14B: the Phase 8 findings log now records named blocking conditions
+  for evented networking, MMIO, allocator-protocol maturity, and `sync`-driven
+  concurrency pressure.
+- Phase 14B: likely next-wave canonical candidates such as ring buffer,
+  distinct-type pressure, container-conversion pressure, and standalone
+  default-allocator proof remain explicit repository candidates rather than
+  implied by lower-layer support alone.
+- Phase 14C: the admission matrix now includes a concrete real-program family
+  matrix covering text processing, traversal, hashing, parsing, concurrency,
+  networking, and allocator or buffer convention utilities.
+- Phase 14C: next-wave real utility candidates now have explicit admission
+  rules tied to distinct pressure dimensions and owner-gated prerequisites
+  rather than opportunistic example growth.
+- Phase 14D: the findings log now includes a cross-program routing summary,
+  explicit Phase 12 and Phase 13 linkage rules, and design-signal capture
+  criteria for repeated pressure.
+- Phase 14D: repeated friction patterns across real utilities and canonical
+  programs are now routed back to Phase 12 stdlib/runtime maturity or Phase 13
+  toolchain maturity before being treated as language or build-model follow-up.
+- Phase 14E: the Phase 8 implementation summary now records the tightened
+  evidence contract: no additional canonical or real program should be treated
+  as admitted unless the admission matrix, findings log, and deterministic
+  proof layer agree.
+
+What did not land
+-----------------
+- this closeout does not admit new executable canonical programs beyond the
+  repository-specific first-pass Phase 8 slice already recorded earlier
+- this closeout does not admit new real utility projects beyond grep-lite,
+  file walker, hash tool, and arena_expr
+- this closeout does not claim portable `net`, poller, `sync`, or `hal`
+  surfaces are now implemented; it records those as explicit enabling gaps
+- this closeout does not claim the broader long-term architecture-level Phase 8
+  program set is fully complete
+
+Validation
+----------
+- documentation diagnostics for the updated Phase 8 admission matrix,
+  findings log, implementation summary, and Phase 14 planning document
+
+Closeout statement
+------------------
+The repository-bounded first Phase 14 wave is complete. The repository now has
+sharper pressure-program truth for what the current hosted slice actually
+proves, what remains blocked behind earlier-phase owners, which real-program
+families are already covered, and what threshold of repeated evidence is
+required before reopening design questions.

@@ -14,6 +14,19 @@ What landed
 - Repository-owned canonical proofs for the admitted first-pass set: hello-stdout, read-entire-file, scoped temporary buffer, line-oriented config parser, arena-backed AST build, recursive evaluator, and C ABI boundary proof.
 - Deterministic executable proof wiring for the admitted canonical set through the existing executable/codegen suites, so the programs are repository proof artifacts rather than hand-run samples.
 - An explicit Phase 8 admission matrix, findings log, and repository-specific plan documents under `docs/plan/` so implemented, deferred, and blocked pressure programs are recorded as repository truth.
+- A Phase 14 follow-up refresh of the Phase 8 admission matrix now distinguishes
+	admitted first-pass executable proofs from older lower-layer canonical
+	artifacts, records explicit blocked owners for unadmitted canonical entries,
+	and adds a concrete real-program family matrix plus next-wave utility
+	candidates.
+- A Phase 14 follow-up refresh of the Phase 8 findings log now records named
+	enabling gaps for evented networking, MMIO, allocator-protocol maturity, and
+	`sync`-driven concurrency pressure rather than leaving those entries as vague
+	deferred work.
+- The Phase 8 evidence layer now carries explicit cross-program owner routing
+	and design-signal capture rules so repeated pressure is routed back into
+	Phase 12 stdlib/runtime maturity or Phase 13 toolchain maturity before being
+	treated as a language or build-model follow-up.
 - A first real utility project under `examples/real/grep_lite/` proving the explicit Phase 7 project workflow through `mc run` and `mc test`.
 - Project-mode imported interface qualification fixes required by real stdlib composition, including driver-loaded interface rewriting through the semantic imported-surface path and preservation of imported named types across MIR/build-unit namespacing.
 - A narrow hosted directory traversal surface through `fs.is_dir(...)` and sorted `fs.list_dir(...)`, plus the real file walker project under `examples/real/file_walker/`.
@@ -26,6 +39,10 @@ What did not land in this slice
 -------------------------------
 - The bounded threaded example remains deferred because the current runtime and `sync` surface do not yet support honest pressure-testing in this repository slice.
 - Later canonical evented-networking entries remain deferred because the repository still does not admit the required poller and networking boundary.
+- MMIO, `hal`, richer allocator-protocol pressure, and broader concurrency
+	canonical entries remain blocked or deferred behind named enabling gaps;
+	the Phase 14 follow-up records those owners explicitly but does not claim the
+	underlying Phase 6 work is complete.
 - Streaming file reads, richer buffer helpers, richer arena string helpers, and broader formatting/diagnostic library surface remain later follow-up work; the admitted Phase 8 slice proves bounded utilities without widening into those areas prematurely.
 - Phase 8 closure here does not claim the full long-term architecture-level canonical program set from `docs/arch/canonical_programs.txt`; it records the admitted repository-specific first-pass closure only.
 
@@ -33,6 +50,11 @@ Repository proof added
 ----------------------
 - `tests/codegen/codegen_executable_tests.cpp` covers the admitted canonical executable proofs, including the arena-backed AST example and recursive evaluator.
 - `tests/tool/phase7_tool_tests.cpp` now exercises the real utility project workflows for grep-lite, file walker, the bounded hash tool, and the arena-backed parser utility.
+- The Phase 14 follow-up did not admit new executable or project proofs by
+	itself; instead it tightened the repository rule that no additional
+	canonical or real program should be treated as admitted without matching
+	deterministic coverage recorded in the matrix, findings log, and proof
+	layers together.
 - The canonical CMake/CTest workflow remains the validation surface for the admitted slice instead of ad hoc shell scripts.
 
 Validation run

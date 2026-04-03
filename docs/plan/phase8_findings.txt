@@ -19,6 +19,52 @@ Decision rule
 - Fix implementation, stdlib, runtime, or tooling truth first.
 - Reopen language or build-model questions only after repeated multi-program pressure.
 
+Cross-program routing summary
+-----------------------------
+- sema: owns distinct-type authority, import-visible type preservation, and any
+	semantic rule that examples expose as incorrect language meaning rather than
+	awkward library shape
+- MIR: owns typed lowered truth for explicit conversions, aggregate and enum
+	lowering, checked or low-level instruction forms, and validator coverage when
+	programs expose a mismatch between checked semantics and lowered structure
+- backend: owns executable realization on the first hosted target when an
+	admitted program already has correct sema and MIR truth but still fails to
+	build or run honestly
+- stdlib: owns API honesty, allocation visibility, borrowed versus owned text
+	boundaries, directory traversal, future poller and network surfaces, and any
+	`sync` or `hal` module admission needed by blocked canonical programs
+- runtime: owns hosted startup and narrow low-level support when a blocked or
+	awkward pressure program truly needs process-entry, thread, or hosted support
+	rather than a broader library redesign
+- driver and test harness: own project roots, `.mci` usage, `mc run`, `mc test`,
+	timeout behavior, and deterministic workflow reporting when a real utility
+	exposes workflow friction instead of semantic or library gaps
+
+Phase 12 and Phase 13 pressure links
+------------------------------------
+- Phase 12 link: repeated pressure around streaming I/O, richer buffer helpers,
+	allocator protocol honesty, poller and net admission, `sync`, and `hal`
+	should route into the Phase 12 stdlib and runtime maturity backlog rather
+	than being normalized inside utilities
+- Phase 13 link: repeated pressure around project-mode imports, `.mci`
+	qualification, ordinary tests, or deterministic project execution should
+	route into the Phase 13 toolchain maturity backlog rather than being hidden
+	in per-example fixture glue
+
+Design-signal capture rules
+---------------------------
+- A single awkward program is not yet a design signal; first try to fix the
+	owning implementation, stdlib, runtime, or toolchain truth.
+- Treat a pattern as a design signal only when multiple independent programs
+	expose the same friction after the current owner truth is otherwise honest.
+- Do not reopen language, import-model, or allocator-model questions merely
+	because a larger example would prefer a convenience shortcut.
+- When a repeated pattern is still owner-local, record it as backlog or an
+	enabling gap rather than as spec-level follow-up.
+- Any real design signal should name the repeated programs, the attempted
+	owner-local fixes, and the reason the remaining pressure is no longer just an
+	implementation gap.
+
 Per-program findings template
 -----------------------------
 
@@ -65,8 +111,210 @@ C ABI boundary
 
 Deferred canonical networking entries
 -------------------------------------
-- Status: deferred beyond first-pass A/B/C closure
-- Reason: portable poller and network boundary not yet admitted for this repository slice
+- Status: re-audited for Phase 14B
+- Classification: named enabling gaps recorded, not silently deferred
+- Decision: keep the networking canonical entries explicit as blocked Phase 6
+	pressure until the repository admits honest portable `io` poller and `net`
+	surfaces
+
+single-threaded evented echo server
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Classification: stdlib or runtime gap
+- Enabling gap: no admitted portable `io` poller API, no admitted portable
+	`net` module, and no repository-owned hosted proof path for scalable
+	readiness-based I/O
+- Owner: Phase 6 stdlib and runtime boundary maturity, not Phase 8 examples or
+	driver-local workarounds
+- Phase 14B decision: retain as the lead evented-networking canonical entry
+	and do not weaken it into a synchronous surrogate
+
+partial-write response state machine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Classification: stdlib gap
+- Enabling gap: no admitted writable-interest update surface such as
+	`io.poller_set(...)`, and no admitted portable poller or `net` layer to
+	prove partial-write state transitions honestly
+- Owner: Phase 6 `io` and `net` boundary work
+- Phase 14B decision: keep blocked behind explicit writable-readiness and
+	interest-update requirements rather than treating it as covered by the echo
+	server entry
+
+evented TCP client request-response
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Classification: stdlib or runtime gap
+- Enabling gap: no admitted `net.connect_tcp(...)`, no admitted portable
+	poller surface, and no repository-owned client-side networking proof path
+- Owner: Phase 6 portable networking and poller admission
+- Phase 14B decision: keep explicit as the client-side counterpart to the
+	server entries so future admission pressure does not stay server-only
+
+MMIO register access
+--------------------
+- Status: blocked
+- Classification: stdlib or runtime gap
+- Enabling gap: `hal` remains explicitly deferred even though bootstrap MIR
+	support exists for the current library-shaped MMIO boundary
+- Owner: Phase 6 module admission and hardware-boundary library truth
+- Phase 14B decision: do not admit an MMIO canonical program until the
+	repository has an honest `hal` surface instead of backend- or MIR-local
+	capability alone
+
+Concurrency canonical entries
+-----------------------------
+
+shared counter with mutex
+~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Classification: stdlib or runtime gap
+- Enabling gap: `sync` remains deferred, hosted thread spawn and join are not
+	admitted, and there is no repository-owned mutex proof surface for ordinary
+	programs
+- Owner: Phase 6 `sync` admission and hosted runtime boundary work
+- Phase 14B decision: treat this as the first honest thread-based canonical
+	pressure target once `sync` exists, not as a vague future threaded example
+
+producer-consumer with condition variable
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Classification: stdlib or runtime gap
+- Enabling gap: no admitted `sync.Condvar` surface, no hosted threading path,
+	and no proved wait-and-reacquire semantics on the current hosted slice
+- Owner: Phase 6 `sync` admission
+- Phase 14B decision: keep distinct from the mutex case because condvar
+	semantics are a separate acceptance pressure, not just a larger test
+
+atomic flag publication
+~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Classification: stdlib gap
+- Enabling gap: bootstrap compiler support for atomics exists, but no admitted
+	portable `sync` atomic library surface exposes ordinary program-facing
+	memory-order operations
+- Owner: Phase 6 `sync` surface maturity, not a new MIR or backend design pass
+- Phase 14B decision: keep atomics separate from volatile and MMIO pressure so
+	the repository does not blur hardware ordering with thread synchronization
+
+Deferred next-wave canonical candidates
+---------------------------------------
+
+bounded ring buffer
+~~~~~~~~~~~~~~~~~~~
+- Status: deferred candidate
+- Classification: admission sequencing choice
+- Current posture: likely expressible on the current admitted core, but not
+	yet chosen as a repository-owned canonical executable proof
+- Phase 14B decision: keep as a plausible next-wave candidate for container
+	and arithmetic pressure after the admission matrix refresh, rather than
+	auto-admitting it without proof wiring
+
+distinct type safety
+~~~~~~~~~~~~~~~~~~~~
+- Status: deferred candidate
+- Classification: admission sequencing choice
+- Current posture: sema and MIR already support the underlying feature set,
+	but this exact canonical program is not yet tracked as an admitted executable
+	artifact
+- Phase 14B decision: keep as a focused semantic-pressure candidate for a
+	later executable wave rather than inferring Phase 8 closure from lower-layer
+	support
+
+fixed array, slice, and buffer conversion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred candidate
+- Classification: admission sequencing choice
+- Current posture: lower-layer conversion fixtures exist, but the fuller
+	canonical program is not yet admitted as a repository-owned executable proof
+- Phase 14B decision: keep explicit as a next-wave candidate for container
+	model pressure rather than assuming MIR coverage is sufficient
+
+hosted default allocator use
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: deferred candidate
+- Classification: admission sequencing choice
+- Current posture: the necessary `mem` surface exists and is already exercised
+	indirectly, but the standalone allocator-convention canonical program is not
+	yet an admitted artifact
+- Phase 14B decision: keep as a small executable candidate for a future wave
+	if the repository wants a clearer default-allocator proof separate from file
+	loading and arena usage
+
+arena allocator through the common protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: blocked
+- Classification: stdlib gap
+- Enabling gap: the repository currently admits a direct `mem.Arena` helper
+	path, not the fuller common `Allocator` protocol variant described by the
+	canonical program
+- Owner: Phase 6 allocator-surface maturity
+- Phase 14B decision: block explicitly on honest API maturity rather than
+	widening the mem surface opportunistically inside a Phase 8 example
+
+Repeated pressure patterns and current routing
+---------------------------------------------
+
+project-mode import and interface fidelity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Programs: `grep-lite` and the broader project-mode real utility path
+- Current classification: tooling gap resolved, monitor for recurrence
+- Owner: Phase 13 driver, `.mci`, and project workflow behavior
+- Current repository decision: keep this as toolchain routing, not a language
+	or stdlib design question, unless repeated independent programs still expose
+	the same import-model friction after the current fixes
+
+filesystem breadth versus honest narrow APIs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Programs: `file walker`, `read-entire-file`, and future traversal candidates
+- Current classification: stdlib or runtime gap with bounded closure strategy
+- Owner: Phase 12 stdlib maturity
+- Current repository decision: admit narrow truthful helpers such as
+	`fs.is_dir(...)` and `fs.list_dir(...)`, but do not let utilities force a
+	premature richer filesystem abstraction layer
+
+whole-file convenience versus streaming pressure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Programs: `hash_tool`, `grep-lite`, and future streaming text or checksum
+	candidates
+- Current classification: stdlib gap, not yet a language or backend problem
+- Owner: Phase 12 stdlib maturity
+- Current repository decision: whole-file utilities are an honest first-pass
+	pressure slice; reopen the streaming design only when multiple next-wave
+	utilities still want it after the current admitted bounded suite
+
+arena helper sufficiency versus common allocator protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Programs: `arena-backed AST build`, `arena_expr`, and the blocked arena
+	allocator-through-protocol canonical entry
+- Current classification: stdlib gap with possible later design pressure
+- Owner: Phase 12 allocator-surface maturity
+- Current repository decision: keep direct `Arena` helpers as the admitted
+	truth for now; only escalate to a design-signal question if multiple programs
+	still require common-protocol allocator reuse after Phase 12 closes that gap
+
+poller, net, and sync as enabling boundaries
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Programs: evented echo server, partial-write response state machine,
+	evented TCP client, shared counter, producer-consumer, atomic flag
+	publication, and the deferred bounded threaded example
+- Current classification: named enabling gaps, not ambiguous future work
+- Owner: Phase 12 stdlib and runtime maturity, with Phase 13 proof-path follow-
+	up where project or ordinary-test workflow becomes part of admission
+- Current repository decision: treat these as blocked library and runtime
+	boundaries until admitted honestly; do not approximate them with host-
+	specific helpers or example-local shims
+
+volatile and atomics separation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Programs: MMIO register access and atomic flag publication
+- Current classification: early design-signal watch item, but not yet a
+	reopened specification question
+- Owner: Phase 12 module admission plus the existing compiler low-level support
+- Current repository decision: keep MMIO and thread-synchronization pressure
+	explicitly separate; only escalate to a design follow-up if later admitted
+	programs still expose an unresolved semantic boundary after honest `hal` and
+	`sync` surfaces exist
 
 Real utility candidates
 -----------------------

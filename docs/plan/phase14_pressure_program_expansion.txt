@@ -1,0 +1,446 @@
+Phase 14 -- Phase 8 Pressure Program Expansion
+==============================================
+
+Status
+------
+PLANNED
+
+Closeout note
+-------------
+- The repository-bounded first implementation wave is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase14_pressure_program_expansion_closeout.txt`.
+- This planning document remains the forward-looking execution plan and should
+  not be read as the sole source of repository truth for what has already
+  landed.
+
+Repository status note
+----------------------
+- The repository already has a real repository-specific first-pass Phase 8
+  closure recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase8_implementation_summary.txt`.
+- The original repository-specific Phase 8 plan, admission matrix, and
+  findings capture already live in:
+  - `/Users/ro/dev/c_modern/docs/plan/phase8_semantic_pressure_testing.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase8_admission_matrix.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase8_findings.txt`
+- The broader non-bootstrap expansion path is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`.
+- This file does not introduce a new architecture phase after Phase 8.
+  It is a repository-specific execution label for the unfinished canonical
+  pressure, real-program expansion, and findings-hardening work that still
+  belongs to Phase 8 ownership.
+- Do not describe Phase 14 as a new compiler, library, or toolchain layer.
+  It is the concrete follow-up plan for extending the admitted first-pass
+  Phase 8 slice into a broader and more durable pressure suite without
+  letting examples, utilities, or workflow fixtures redefine earlier-phase
+  semantic, MIR, backend, stdlib, runtime, or toolchain truth.
+
+Dependency note
+---------------
+- Phase 14 depends on the current repository posture described in:
+  - `/Users/ro/dev/c_modern/docs/plan/plan.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase8_semantic_pressure_testing.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase8_admission_matrix.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase8_findings.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase8_implementation_summary.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase12_stdlib_runtime_maturity.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/canonical_programs.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/build_spec.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/test_spec.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/runtime_spec.txt`
+  - `/Users/ro/dev/c_modern/docs/arch/stdlib_spec.txt`
+  - the current canonical and real pressure programs under
+    `/Users/ro/dev/c_modern/examples/`
+  - the current hosted stdlib and runtime slices under
+    `/Users/ro/dev/c_modern/stdlib/` and `/Users/ro/dev/c_modern/runtime/hosted/`
+  - the current proof layers under
+    `/Users/ro/dev/c_modern/tests/codegen/`,
+    `/Users/ro/dev/c_modern/tests/tool/`,
+    `/Users/ro/dev/c_modern/tests/stdlib/`,
+    `/Users/ro/dev/c_modern/tests/sema/`, and
+    `/Users/ro/dev/c_modern/tests/mir/`
+- Phase 14 must preserve the existing ownership split:
+  - sema owns language meaning and import-visible semantic truth
+  - MIR owns typed lowered semantic truth
+  - the backend realizes MIR on the first hosted target without inventing
+    missing language or library policy
+  - stdlib and runtime own library contracts and hosted startup boundaries
+  - the driver and project workflow own orchestration, artifacts, and runner
+    behavior rather than compensating for semantic or library gaps
+  - pressure programs validate the design and route findings; they do not
+    become a second specification source by accident
+- If pressure expansion appears to require new semantic policy, new lowered
+  meaning, or speculative library breadth, route that gap back to the owning
+  earlier phase or land the owner change first.
+
+Repository-specific scope note
+------------------------------
+- The architecture texts stop at Phase 8 and already require pressure
+  findings to route back to the smallest correct owner.
+- This repository uses the Phase 14 label only to package the next execution
+  wave as a concrete plan document under `docs/plan/`.
+- In substance, Phase 14 is the implementation plan for the unfinished
+  Workstreams 8A through 8E from the non-bootstrap roadmap after the admitted
+  first-pass Phase 8 slice.
+- The first execution wave explicitly prioritizes refreshing the admission
+  matrix, closing the next meaningful canonical-pressure gaps, and tightening
+  findings-to-regression discipline before any broader utility-family growth.
+
+Purpose
+-------
+Turn the broad non-bootstrap Phase 8 roadmap and the repository's first-pass
+Phase 8 closure into an execution-ready second-wave plan that can be
+implemented in reviewable slices without blurring the boundary between
+pressure evidence and the owning compiler, stdlib, runtime, or toolchain
+layers.
+
+After Phase 14:
+
+- the repository's admitted canonical pressure set is broader, more explicit,
+  and less dependent on first-pass omissions or informal follow-up intent
+- deferred or blocked canonical entries are either advanced honestly or kept
+  as named enabling gaps with clear owner attribution
+- the real-program suite expands one bounded family at a time instead of
+  remaining clustered around the first-pass text, traversal, hashing, and
+  parser utilities
+- repeated friction discovered by pressure programs is promoted promptly into
+  sema, MIR, backend, stdlib, runtime, or tool regressions instead of being
+  normalized inside examples
+- the admission matrix, findings log, and proof artifacts become the durable
+  repository evidence for what the current hosted slice can and cannot yet do
+
+Problem being solved
+--------------------
+- The repository already has a real first-pass Phase 8 slice: a bounded
+  canonical set, several real utility projects, explicit admission and
+  findings documents, and deterministic executable or project proof.
+- That pressure layer is still incomplete relative to the long-term Phase 8
+  contract in `plan.txt` and the non-bootstrap roadmap.
+- The main remaining risk is not absence of pressure evidence, but partial
+  closure and drift:
+  - the first-pass canonical set can be mistaken for the full meaningful
+    canonical pressure surface
+  - deferred threading and evented-networking entries can remain ambiguous
+    rather than being advanced or held as named enabling gaps
+  - later real-program families can remain anecdotal ideas instead of explicit
+    repository-backed execution slices
+  - repeated findings can stay trapped in examples, README notes, or human
+    memory instead of becoming earlier-phase backlog or stable regressions
+  - proof can remain weighted toward the first landed projects without a clear
+    second-wave plan for what comes next and why
+- Without an explicit execution plan:
+  - Phase 8 can overclaim from a successful first pass while meaningful
+    remaining pressure is still deferred
+  - examples can silently absorb awkward compiler, library, or workflow seams
+    that should instead become owner-facing fixes
+  - new program families can land opportunistically without a clear admission
+    rule, findings taxonomy, or regression strategy
+  - Phase 12 and Phase 13 follow-up work can deepen without Phase 8 applying
+    renewed pressure back onto those boundaries
+
+Core rule
+---------
+- Pressure programs are evidence, not a place to hide missing truth.
+- Fix semantic meaning in sema, lowered truth in MIR, executable behavior in
+  the backend, library contracts in stdlib, hosted startup or low-level seams
+  in runtime, and workflow behavior in the driver or test harness.
+- Keep the pressure suite explicit: admitted, blocked, deferred, and proven
+  status must be recorded directly in repository artifacts.
+- Prefer a narrower honest pressure artifact over a broader utility whose
+  required owner truth is still missing or unclear.
+- Reopen language, build-model, or library design only after repeated
+  multi-program evidence rather than one awkward program.
+- Preserve deterministic outputs, diagnostics, dumps, and test behavior so
+  pressure evidence remains reviewable.
+
+Current repository posture
+--------------------------
+- The current repository already proves a first-pass canonical set including
+  hello-stdout, read-entire-file, scoped temporary buffer, line-oriented
+  config parser, arena-backed AST build, recursive evaluator, and a C ABI
+  boundary example.
+- The current repository already proves bounded real utilities including
+  grep-lite, file walker, a whole-file hashing tool, and an arena-backed
+  parser utility.
+- Phase 8 admission and findings are already recorded explicitly in
+  `/Users/ro/dev/c_modern/docs/plan/phase8_admission_matrix.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/phase8_findings.txt`.
+- Deferred pressure remains explicit but unfinished: bounded threaded
+  examples, evented-networking canonical entries, streaming-oriented I/O
+  pressure, richer buffer helpers, and wider runtime or library surfaces.
+- Some current pressure programs still intentionally avoid deeper pressure on
+  concurrency, poller-driven I/O, richer diagnostics, or broader ownership
+  helpers because the owning Phase 6 and Phase 7 surfaces were not yet honest
+  enough to admit them.
+- The repository therefore needs a second-wave Phase 8 plan that expands only
+  where the enabling layers are now real enough to pressure honestly.
+
+Phase 14 execution waves
+------------------------
+Phase 14A -- Admission Matrix Refresh And Canonical Re-Audit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Refresh the repository's explicit Phase 8 admission truth so the next wave is
+driven by the real remaining canonical set and current owner boundaries.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 8A -- Canonical-program closure
+
+Tasks
+~~~~~
+1. Re-audit `canonical_programs.txt`, the current Phase 8 admission matrix,
+   the Phase 8 findings log, and the landed first-pass examples against the
+   repository's present compiler, stdlib, runtime, and toolchain posture.
+2. Separate three classes explicitly: already-proven first-pass entries,
+   next-wave candidates that now have honest enabling layers, and entries that
+   remain blocked behind named Phase 6 or Phase 7 gaps.
+3. Refresh the admission matrix so every meaningful canonical entry has a
+   stated status, intended proof path, pressure focus, and named enabling gap
+   if it is still blocked.
+4. Reconfirm packaging decisions for each next-wave pressure program:
+   direct-source, dedicated project fixture, or project plus ordinary tests.
+5. Keep deferred threaded and evented-networking entries explicit; do not let
+   them disappear into prose simply because they are still not admitted.
+
+Phase 14B -- Deferred Canonical Program Closure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Advance the next meaningful canonical programs where the repository now has
+enough truthful owner support, and record crisp enabling gaps where it does
+not.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 8A -- Canonical-program closure
+
+Tasks
+~~~~~
+1. Revisit the deferred canonical entries from `canonical_programs.txt`,
+   especially the bounded threaded and evented-networking pressures, against
+   the current stdlib, runtime, and toolchain boundaries.
+2. Admit a deferred canonical entry only when the repository can state the
+   required API, runtime, and proof surface honestly without speculative
+   widening.
+3. Where the enabling layers are still not honest enough, record the blocker
+   as a named gap with the smallest correct owner, such as `sync`, portable
+   `io` poller support, portable `net` surface, or ordinary-test workflow
+   maturity.
+4. Keep canonical programs meaningful acceptance pressure artifacts rather
+   than replacing hard blocked entries with weaker surrogates.
+5. Add deterministic executable or project proof for every newly admitted
+   canonical entry so the admission matrix reflects repository truth, not
+   planned intent.
+
+Phase 14C -- Real-Program Family Expansion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Expand the bounded real-program suite one family at a time so Phase 8 keeps
+testing the deeper hosted slice through reviewable real utilities.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 8B -- Real-program family expansion
+
+Tasks
+~~~~~
+1. Build a concrete next-wave family matrix for text processing, traversal,
+   hashing, parsing, concurrency, networking, and other repository-relevant
+   utility families.
+2. Admit a new real utility only when it adds a distinct pressure dimension
+   that the current suite does not already cover clearly.
+3. Prefer bounded utilities with deterministic input and output over broader
+   tools whose size would hide the actual pressure signal.
+4. Use project-mode proofs whenever import roots, `.mci`, `mc run`, or
+   `mc test` behavior are part of the intended pressure.
+5. Keep new real programs self-contained by default, and only share helpers
+   when the helper is itself intended as reusable repository-owned surface.
+
+Phase 14D -- Pressure-Finding Routing And Design Signal Capture
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Strengthen the rule that repeated pressure findings become owner-facing work
+items or design signals instead of lingering as example-local awkwardness.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 8C -- Pressure-driven finding routing
+- 8D -- Design-signal capture
+
+Tasks
+~~~~~
+1. Re-audit the current findings taxonomy so implementation bugs, capability
+   gaps, stdlib or runtime gaps, tooling gaps, and true design signals remain
+   sharply separated.
+2. Route each repeated friction point to the smallest correct owner: sema,
+   MIR, backend, stdlib, runtime, or driver and test harness.
+3. Escalate a pattern to a design-signal or post-v0.2 follow-up only after
+   repeated evidence across multiple programs, not from a single awkward case.
+4. Keep Phase 12 and Phase 13 follow-up pressure explicit when Phase 8 exposes
+   remaining library, runtime, `.mci`, graph, or ordinary-test weakness.
+5. Update the findings log whenever a pressure program changes repository
+   understanding of what is implemented, blocked, or still awkward.
+
+Phase 14E -- Regression Hardening And Proof Maintenance
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Make the second-wave Phase 8 evidence durable by converting program pressure
+into the narrowest stable proof layer that captures the real contract.
+
+Maps to roadmap workstreams
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- 8E -- Regression hardening from pressure findings
+
+Tasks
+~~~~~
+1. For every newly admitted canonical or real program, add deterministic proof
+   through the narrowest honest layer: executable tests, project workflow
+   tests, sema fixtures, MIR fixtures, stdlib regressions, or tool tests.
+2. Promote lower-layer failures discovered by programs into the owning test
+   layer when that contract is clearer than a whole-program proof.
+3. Keep the Phase 8 admission matrix, findings log, and repository proof in
+   sync so no program is considered admitted without deterministic coverage.
+4. Re-run earlier admitted pressure artifacts as new families land so later
+   growth does not silently regress first-pass examples.
+5. Preserve deterministic outputs, exit codes, diagnostics, and dump content
+   across all pressure-driven regression layers.
+
+Canonical artifacts
+-------------------
+Phase 14 should produce or update the following canonical surfaces:
+
+- `/Users/ro/dev/c_modern/docs/plan/phase14_pressure_program_expansion.txt`
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/phase3_to_phase8_non_bootstrap_roadmap.txt`
+  so the roadmap points to this concrete Phase 14 follow-up plan
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/phase8_admission_matrix.txt`
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/phase8_findings.txt`
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/phase8_implementation_summary.txt`
+  as the repository-owned Phase 8 truth deepens
+- bounded updates to `/Users/ro/dev/c_modern/examples/` for newly admitted
+  canonical or real pressure programs
+- deterministic regression coverage under
+  `/Users/ro/dev/c_modern/tests/codegen/`,
+  `/Users/ro/dev/c_modern/tests/tool/`,
+  `/Users/ro/dev/c_modern/tests/stdlib/`,
+  `/Users/ro/dev/c_modern/tests/sema/`,
+  `/Users/ro/dev/c_modern/tests/mir/`, and
+  `/Users/ro/dev/c_modern/tests/cases/`
+- narrow compiler, stdlib, runtime, or driver updates only where already-owned
+  truth must be deepened to support an admitted pressure artifact honestly
+- bounded README or CMake updates only if new pressure artifacts or proof
+  wiring change documented repository workflows
+
+Allowed edit surface
+--------------------
+- `/Users/ro/dev/c_modern/docs/plan/`
+- `/Users/ro/dev/c_modern/examples/`
+- `/Users/ro/dev/c_modern/tests/codegen/`
+- `/Users/ro/dev/c_modern/tests/tool/`
+- `/Users/ro/dev/c_modern/tests/stdlib/`
+- `/Users/ro/dev/c_modern/tests/sema/`
+- `/Users/ro/dev/c_modern/tests/mir/`
+- `/Users/ro/dev/c_modern/tests/cases/`
+- `/Users/ro/dev/c_modern/compiler/sema/` only for factual semantic fixes or
+  import-surface completion exposed by admitted pressure programs
+- `/Users/ro/dev/c_modern/compiler/mir/` only for factual lowering or
+  validation completion exposed by admitted pressure programs
+- `/Users/ro/dev/c_modern/compiler/codegen_llvm/` only for factual executable
+  support on the first hosted target
+- `/Users/ro/dev/c_modern/compiler/driver/` only for command, project, or
+  deterministic workflow fixes exposed by admitted pressure programs
+- `/Users/ro/dev/c_modern/compiler/support/` only for narrow deterministic
+  path, source, or diagnostic support needed by admitted proof wiring
+- `/Users/ro/dev/c_modern/stdlib/`
+- `/Users/ro/dev/c_modern/runtime/hosted/`
+- `/Users/ro/dev/c_modern/CMakeLists.txt`
+- `/Users/ro/dev/c_modern/README.md`
+
+Out of scope
+------------
+- introducing a new architecture phase after Phase 8
+- speculative language redesign not supported by repeated multi-program
+  evidence
+- new semantic policy that belongs to unfinished Phase 3 ownership
+- new lowered-semantic instruction meaning that belongs to unfinished Phase 4
+  ownership
+- broad target-matrix widening or non-hosted bring-up
+- package management, remote dependency fetching, or hidden vendoring models
+- broad stdlib or runtime breadth not justified by current admitted pressure
+- replacing the repository's C++ fixture suites wholesale with pressure
+  programs or `mc test`
+- turning Phase 8 into a grab-bag examples directory without explicit
+  admission, proof, and findings discipline
+
+Suggested proof and artifacts
+-----------------------------
+- refresh `/Users/ro/dev/c_modern/docs/plan/phase8_admission_matrix.txt` so
+  every meaningful canonical and next-wave real program has explicit status,
+  pressure focus, proof path, and enabling-gap notes
+- keep `/Users/ro/dev/c_modern/docs/plan/phase8_findings.txt` as the durable
+  per-program findings log rather than relying on scattered commit history or
+  example-local comments
+- add focused project and executable proof for every newly admitted canonical
+  or real program
+- convert repeated pressure findings into sema, MIR, stdlib, runtime, or tool
+  regressions as soon as the owning contract is clear
+- keep crisp unsupported-case tests for intentionally blocked threading,
+  poller, or networking shapes when the repository chooses not to admit them
+
+Execution order
+---------------
+Recommended landing order inside Phase 14:
+
+1. Phase 14A -- admission matrix refresh and canonical re-audit
+2. Phase 14B -- next meaningful canonical closure or explicit enabling-gap
+   naming
+3. Phase 14E -- regression hardening alongside each newly admitted program
+4. Phase 14C -- real-program family expansion once the next canonical wave is
+   grounded
+5. Phase 14D -- design-signal capture and backlog routing from repeated
+   cross-program evidence
+
+The order is intentional:
+
+- the repository needs explicit admission truth before it widens the pressure
+  suite further
+- meaningful canonical closure should lead because it is the clearest
+  acceptance pressure from the architecture texts
+- regression hardening must accompany each admission step rather than wait for
+  a larger batch of programs
+- broader real-program growth should follow once the canonical and proof rules
+  are sharper
+- design questions should only reopen after repeated pressure across the
+  refreshed suite, not before
+
+Exit criteria
+-------------
+- every meaningful canonical pressure program is either implemented and proven
+  in the repository or blocked by a named enabling gap with a clear owner
+- the repository has a broader but still bounded real-program suite that adds
+  distinct pressure beyond the first-pass text, traversal, hashing, and arena
+  parser utilities
+- repeated Phase 8 findings are systematically converted into backlog or the
+  narrowest stable regression layer instead of remaining anecdotal
+- the admission matrix, findings log, and proof artifacts agree on what the
+  current hosted slice supports, defers, and rejects
+- Phase 12 and Phase 13 maturity work is being re-pressured through real
+  programs rather than assumed complete once the underlying implementation
+  lands
+
+Acceptance criteria for this plan document
+------------------------------------------
+- The repository has one explicit written execution plan for the unfinished
+  second-wave pressure-program work that still belongs to Phase 8 ownership.
+- The plan preserves the current ownership model and does not collapse missing
+  semantic, MIR, backend, stdlib, runtime, or toolchain truth into examples or
+  ad hoc fixtures.
+- The plan keeps the pressure suite bounded, explicit, and reviewable while
+  materially extending the repository's admitted Phase 8 evidence.
