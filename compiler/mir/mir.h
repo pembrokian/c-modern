@@ -38,6 +38,7 @@ struct TypeDecl {
 
 struct GlobalDecl {
     bool is_const = false;
+    bool is_extern = false;
     std::vector<std::string> names;
     sema::Type type;
     std::vector<std::string> initializers;

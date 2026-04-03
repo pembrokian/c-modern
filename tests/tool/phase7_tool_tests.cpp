@@ -357,6 +357,56 @@ void TestProjectBuildAndMciEmission(const std::filesystem::path& binary_root,
     }
 }
 
+void TestProjectImportedGlobalMirDeclarations(const std::filesystem::path& binary_root,
+                                              const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase7_imported_globals_project";
+    const std::filesystem::path project_path = WriteBasicProject(
+        project_root,
+        "export { LIMIT, counter }\n"
+        "\n"
+        "const LIMIT: i32 = 9\n"
+        "var counter: i32 = 4\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    helper.counter = helper.counter + helper.LIMIT\n"
+        "    return helper.counter\n"
+        "}\n");
+    const std::filesystem::path build_dir = binary_root / "phase7_imported_globals_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string(),
+                                                      "--dump-mir"},
+                                                     build_dir / "build_output.txt",
+                                                     "phase7 imported global dump-mir build");
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail("phase7 imported global dump-mir build should succeed:\n" + output);
+    }
+
+    const auto helper_mci = mc::support::ComputeDumpTargets(project_root / "src/helper.mc", build_dir).mci;
+    const auto main_mir = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir).mir;
+    const std::string helper_mci_text = ReadFile(helper_mci);
+    const std::string main_mir_text = ReadFile(main_mir);
+    ExpectOutputContains(helper_mci_text,
+                         "global\t0\tcounter\ti32\t",
+                         "helper .mci should record exported mutable globals");
+    ExpectOutputContains(main_mir_text,
+                         "ConstGlobal names=[helper.LIMIT] type=i32 extern",
+                         "dependent MIR should record imported const globals as extern globals");
+    ExpectOutputContains(main_mir_text,
+                         "VarGlobal names=[helper.counter] type=i32 extern",
+                         "dependent MIR should record imported mutable globals as extern globals");
+    ExpectOutputContains(main_mir_text,
+                         "store_target target=helper.counter target_kind=global target_name=helper.counter",
+                         "dependent MIR should lower imported mutable global stores as global targets");
+}
+
 void TestIncrementalRebuildBehavior(const std::filesystem::path& binary_root,
                                     const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "phase7_incremental_project";
@@ -808,6 +858,7 @@ int main(int argc, char** argv) {
 
     TestHelpMentionsRun(binary_root, mc_path);
     TestProjectBuildAndMciEmission(binary_root, mc_path);
+    TestProjectImportedGlobalMirDeclarations(binary_root, mc_path);
     TestIncrementalRebuildBehavior(binary_root, mc_path);
     TestRunExitCodeAndArgs(binary_root, mc_path);
     TestProjectTestCommandSucceeds(binary_root, mc_path);

@@ -993,6 +993,13 @@ void AddImportedExternDeclarations(mc::mir::Module& module,
         existing_functions.insert(function.name);
     }
 
+    std::unordered_set<std::string> existing_globals;
+    for (const auto& global : module.globals) {
+        for (const auto& name : global.names) {
+            existing_globals.insert(name);
+        }
+    }
+
     for (const auto& [module_name, imported_module] : imported_modules) {
         for (const auto& type_decl : imported_module.type_decls) {
             if (!existing_types.insert(type_decl.name).second) {
@@ -1022,6 +1029,23 @@ void AddImportedExternDeclarations(mc::mir::Module& module,
             }
             extern_function.return_types = function.return_types;
             module.functions.push_back(std::move(extern_function));
+        }
+
+        for (const auto& global : imported_module.globals) {
+            mc::mir::GlobalDecl extern_global;
+            extern_global.is_const = global.is_const;
+            extern_global.is_extern = true;
+            extern_global.type = global.type;
+            for (const auto& name : global.names) {
+                const std::string qualified_name = QualifyImportedSymbol(module_name, name);
+                if (!existing_globals.insert(qualified_name).second) {
+                    continue;
+                }
+                extern_global.names.push_back(qualified_name);
+            }
+            if (!extern_global.names.empty()) {
+                module.globals.push_back(std::move(extern_global));
+            }
         }
     }
 }

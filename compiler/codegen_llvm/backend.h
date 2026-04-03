@@ -49,6 +49,7 @@ struct BackendBlock {
 
 struct BackendGlobal {
     bool is_const = false;
+    bool is_extern = false;
     std::string source_name;
     std::string backend_name;
     sema::Type type;

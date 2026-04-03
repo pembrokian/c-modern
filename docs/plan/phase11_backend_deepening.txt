@@ -3,7 +3,7 @@ Phase 11 -- Phase 5 Backend Deepening
 
 Status
 ------
-PLANNED
+COMPLETED (repository-bounded closeout)
 
 Repository status note
 ----------------------
@@ -19,6 +19,8 @@ Repository status note
   deep enough that the admitted non-bootstrap MIR surface builds and runs
   without backend-local semantic repair or bootstrap-shaped exclusions being
   treated as the normal path.
+- Closeout for the implemented repository slice is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase11_backend_deepening_closeout.txt`.
 
 Dependency note
 ---------------

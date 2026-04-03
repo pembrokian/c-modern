@@ -209,10 +209,10 @@ void TestLowerModuleRejectsUnsupportedTarget() {
 void TestLowerModuleRejectsUnsupportedInstruction() {
     auto module = MakeMinimalSupportedModule();
     module.functions[0].blocks[0].instructions.push_back({
-        .kind = mc::mir::Instruction::Kind::kAtomicLoad,
+        .kind = mc::mir::Instruction::Kind::kAtomicCompareExchange,
         .result = "%v1",
-        .type = mc::sema::NamedType("i32"),
-        .operands = {"%v0"},
+        .type = mc::sema::BoolType(),
+        .operands = {"%v0", "%v0", "%v0", "%v0", "%v0"},
     });
 
     mc::support::DiagnosticSink diagnostics;
@@ -223,7 +223,7 @@ void TestLowerModuleRejectsUnsupportedInstruction() {
     const auto result = mc::codegen_llvm::LowerModule(module, "tests/cases/hello.mc", options, diagnostics);
     Expect(!result.ok, "out-of-scope MIR should fail backend preflight");
     Expect(diagnostics.HasErrors(), "out-of-scope MIR should emit backend diagnostics");
-    Expect(diagnostics.Render().find("does not support MIR instruction 'atomic_load'") != std::string::npos,
+    Expect(diagnostics.Render().find("does not yet support MIR instruction 'atomic_compare_exchange'") != std::string::npos,
            "instruction diagnostic should name the unsupported MIR opcode");
 }
 

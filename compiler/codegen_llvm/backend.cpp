@@ -55,6 +55,11 @@ struct FunctionLoweringState {
     std::unordered_map<std::string, BackendTypeInfo> value_types;
 };
 
+bool IsAtomicScalarType(const BackendTypeInfo& type_info);
+std::optional<std::string> LLVMAtomicOrderKeyword(std::string_view order_name);
+bool AtomicOrderAllowedForInstruction(mir::Instruction::Kind kind,
+                                      std::string_view order_name);
+
 std::string_view ToString(mir::Instruction::Kind kind) {
     switch (kind) {
         case mir::Instruction::Kind::kConst:
@@ -1021,9 +1026,12 @@ bool LowerInstruction(const mir::Instruction& instruction,
         }
 
         case mir::Instruction::Kind::kSymbolRef: {
-            if ((instruction.target_kind != mir::Instruction::TargetKind::kFunction &&
-                 instruction.target_kind != mir::Instruction::TargetKind::kGlobal) ||
-                instruction.target_name.empty()) {
+            const bool function_or_global = instruction.target_kind == mir::Instruction::TargetKind::kFunction ||
+                                            instruction.target_kind == mir::Instruction::TargetKind::kGlobal;
+            const bool enum_constant = instruction.target_kind == mir::Instruction::TargetKind::kOther &&
+                                       instruction.type.kind == sema::Type::Kind::kNamed &&
+                                       !instruction.target_name.empty();
+            if ((!function_or_global && !enum_constant) || instruction.target_name.empty()) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap backend only admits function and global symbol_ref values in the current bootstrap slice; function '" +
                                        function.name + "' block '" + block.label + "' uses target_kind='" +
@@ -1045,6 +1053,29 @@ bool LowerInstruction(const mir::Instruction& instruction,
             }
             const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
             RecordLoweredValue(state, instruction.result, backend_name, type_info);
+            if (enum_constant) {
+                const mir::TypeDecl* type_decl = FindTypeDecl(*state.module, instruction.type.name);
+                if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kEnum) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap backend could not resolve enum symbol_ref type '" +
+                                           sema::FormatType(instruction.type) + "' in function '" + function.name +
+                                           "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                std::size_t variant_index = 0;
+                const mir::VariantDecl* variant_decl = FindVariantDecl(*type_decl, instruction.target_name, &variant_index);
+                if (variant_decl == nullptr || !variant_decl->payload_fields.empty()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap backend only supports payload-free enum symbol_ref values in function '" +
+                                           function.name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                backend_block.instructions.push_back(backend_name + " = enum_const " + FormatTypeInfo(type_info) + " " +
+                                                     instruction.target_name + " tag=" + std::to_string(variant_index));
+                return true;
+            }
             backend_block.instructions.push_back(backend_name + " = symbol_ref " + FormatTypeInfo(type_info) + " " +
                                                  (instruction.target_kind == mir::Instruction::TargetKind::kFunction
                                                       ? BackendFunctionName(instruction.target_name)
@@ -1420,16 +1451,212 @@ bool LowerInstruction(const mir::Instruction& instruction,
             return true;
         }
 
-        case mir::Instruction::Kind::kVolatileLoad:
-        case mir::Instruction::Kind::kVolatileStore:
-        case mir::Instruction::Kind::kAtomicLoad:
-        case mir::Instruction::Kind::kAtomicStore:
+        case mir::Instruction::Kind::kVolatileLoad: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            std::string ptr;
+            if (!ResolveSingleOperand(state,
+                                      instruction,
+                                      "LLVM bootstrap backend",
+                                      "volatile_load",
+                                      function,
+                                      block,
+                                      source_path,
+                                      diagnostics,
+                                      ptr)) {
+                return false;
+            }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "volatile_load in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
+            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
+            backend_block.instructions.push_back(backend_name + " = volatile_load " + FormatTypeInfo(type_info) + " " + ptr);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kVolatileStore: {
+            std::string ptr;
+            BackendTypeInfo ptr_type;
+            std::string value;
+            BackendTypeInfo value_type;
+            if (!ResolveTwoTypedOperands(state,
+                                         instruction,
+                                         "LLVM bootstrap backend",
+                                         "volatile_store",
+                                         function,
+                                         block,
+                                         source_path,
+                                         diagnostics,
+                                         ptr,
+                                         ptr_type,
+                                         value,
+                                         value_type)) {
+                return false;
+            }
+            backend_block.instructions.push_back("volatile_store " + FormatTypeInfo(value_type) + " " + value + " -> " + ptr);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kAtomicLoad: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            if (instruction.operands.empty()) {
+                return false;
+            }
+            std::string ptr;
+            BackendTypeInfo ptr_type;
+            if (!ResolveTypedValue(state,
+                                   instruction.operands[0],
+                                   function,
+                                   block,
+                                   source_path,
+                                   diagnostics,
+                                   ptr,
+                                   ptr_type)) {
+                return false;
+            }
+            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
+            if (!order.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires constant MemoryOrder metadata for 'atomic_load' in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      "atomic_load in function '" + function.name + "' block '" + block.label + "'",
+                                      type_info)) {
+                return false;
+            }
+            if (!IsAtomicScalarType(type_info)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend only supports scalar atomic_load element types in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
+            RecordLoweredValue(state, instruction.result, backend_name, type_info);
+            backend_block.instructions.push_back(backend_name + " = atomic_load order=" + instruction.atomic_order + " " +
+                                                 FormatTypeInfo(type_info) + " " + ptr);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kAtomicStore: {
+            if (instruction.operands.size() < 2) {
+                return false;
+            }
+            std::string ptr;
+            BackendTypeInfo ptr_type;
+            std::string value;
+            BackendTypeInfo value_type;
+            if (!ResolveTypedValue(state,
+                                   instruction.operands[0],
+                                   function,
+                                   block,
+                                   source_path,
+                                   diagnostics,
+                                   ptr,
+                                   ptr_type) ||
+                !ResolveTypedValue(state,
+                                   instruction.operands[1],
+                                   function,
+                                   block,
+                                   source_path,
+                                   diagnostics,
+                                   value,
+                                   value_type)) {
+                return false;
+            }
+            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
+            if (!order.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires constant MemoryOrder metadata for 'atomic_store' in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            if (!IsAtomicScalarType(value_type)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend only supports scalar atomic_store element types in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            backend_block.instructions.push_back("atomic_store order=" + instruction.atomic_order + " " +
+                                                 FormatTypeInfo(value_type) + " " + value + " -> " + ptr);
+            return true;
+        }
+
         case mir::Instruction::Kind::kAtomicExchange:
+        case mir::Instruction::Kind::kAtomicFetchAdd: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            if (instruction.operands.size() < 2) {
+                return false;
+            }
+            std::string ptr;
+            BackendTypeInfo ptr_type;
+            std::string value;
+            BackendTypeInfo value_type;
+            if (!ResolveTypedValue(state,
+                                   instruction.operands[0],
+                                   function,
+                                   block,
+                                   source_path,
+                                   diagnostics,
+                                   ptr,
+                                   ptr_type) ||
+                !ResolveTypedValue(state,
+                                   instruction.operands[1],
+                                   function,
+                                   block,
+                                   source_path,
+                                   diagnostics,
+                                   value,
+                                   value_type)) {
+                return false;
+            }
+            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
+            if (!order.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires constant MemoryOrder metadata for '" +
+                                       std::string(ToString(instruction.kind)) + "' in function '" + function.name +
+                                       "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            if (!IsAtomicScalarType(value_type)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend only supports scalar " + std::string(ToString(instruction.kind)) +
+                                       " element types in function '" + function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            const std::string backend_name = BackendTempName(state.function_index, block_index, instruction_index);
+            RecordLoweredValue(state, instruction.result, backend_name, value_type);
+            backend_block.instructions.push_back(backend_name + " = " + std::string(ToString(instruction.kind)) + " order=" +
+                                                 instruction.atomic_order + " " + FormatTypeInfo(value_type) + " " + ptr + ", " + value);
+            return true;
+        }
+
         case mir::Instruction::Kind::kAtomicCompareExchange:
-        case mir::Instruction::Kind::kAtomicFetchAdd:
             ReportBackendError(source_path,
-                               "LLVM bootstrap backend does not support MIR instruction '" +
-                                   std::string(ToString(instruction.kind)) + "' in Stage 3; function '" +
+                               "LLVM bootstrap backend does not yet support MIR instruction 'atomic_compare_exchange' in Stage 3; function '" +
                                    function.name + "' block '" + block.label + "'",
                                diagnostics);
             return false;
@@ -1664,6 +1891,7 @@ bool LowerGlobal(const mir::Module& module,
     for (const auto& name : global.names) {
         backend_module.globals.push_back({
             .is_const = global.is_const,
+            .is_extern = global.is_extern,
             .source_name = name,
             .backend_name = BackendGlobalName(name),
             .type = global.type,
@@ -1690,6 +1918,7 @@ struct ExecutableGlobalInfo {
     sema::Type type;
     BackendTypeInfo lowered_type;
     bool is_const = false;
+    bool is_extern = false;
     std::vector<std::string> initializers;
 };
 
@@ -1901,6 +2130,40 @@ bool IsFloatType(const BackendTypeInfo& type_info) {
 
 bool IsIntegerType(const BackendTypeInfo& type_info) {
     return !type_info.backend_name.empty() && type_info.backend_name[0] == 'i';
+}
+
+bool IsAtomicScalarType(const BackendTypeInfo& type_info) {
+    return type_info.backend_name == "ptr" || IsIntegerType(type_info);
+}
+
+std::optional<std::string> LLVMAtomicOrderKeyword(std::string_view order_name) {
+    const std::string leaf = VariantLeafName(order_name);
+    if (leaf == "Relaxed") {
+        return "monotonic";
+    }
+    if (leaf == "Acquire") {
+        return "acquire";
+    }
+    if (leaf == "Release") {
+        return "release";
+    }
+    return std::nullopt;
+}
+
+bool AtomicOrderAllowedForInstruction(mir::Instruction::Kind kind,
+                                      std::string_view order_name) {
+    const std::string leaf = VariantLeafName(order_name);
+    switch (kind) {
+        case mir::Instruction::Kind::kAtomicLoad:
+            return leaf == "Relaxed" || leaf == "Acquire";
+        case mir::Instruction::Kind::kAtomicStore:
+            return leaf == "Relaxed" || leaf == "Release";
+        case mir::Instruction::Kind::kAtomicExchange:
+        case mir::Instruction::Kind::kAtomicFetchAdd:
+            return leaf == "Relaxed" || leaf == "Acquire" || leaf == "Release";
+        default:
+            return false;
+    }
 }
 
 bool IsUnsignedSourceType(std::string_view source_name) {
@@ -3602,9 +3865,12 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
-            if ((instruction.target_kind != mir::Instruction::TargetKind::kFunction &&
-                 instruction.target_kind != mir::Instruction::TargetKind::kGlobal) ||
-                instruction.target_name.empty()) {
+            const bool function_or_global = instruction.target_kind == mir::Instruction::TargetKind::kFunction ||
+                                            instruction.target_kind == mir::Instruction::TargetKind::kGlobal;
+            const bool enum_constant = instruction.target_kind == mir::Instruction::TargetKind::kOther &&
+                                       instruction.type.kind == sema::Type::Kind::kNamed &&
+                                       !instruction.target_name.empty();
+            if ((!function_or_global && !enum_constant) || instruction.target_name.empty()) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission only supports function and global symbol_ref values in function '" +
                                        state.function->name + "' block '" + block.label + "'",
@@ -3620,6 +3886,41 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                       ExecutableFunctionBlockContext("symbol_ref", state, block),
                                       type_info)) {
                 return false;
+            }
+
+            if (enum_constant) {
+                const mir::TypeDecl* type_decl = FindTypeDecl(*state.module, instruction.type.name);
+                if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kEnum) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission could not resolve enum symbol_ref type '" +
+                                           sema::FormatType(instruction.type) + "' in function '" + state.function->name +
+                                           "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                const auto lowered_layout = LowerEnumLayout(*state.module, *type_decl, instruction.type);
+                if (!lowered_layout.has_value()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission could not lower enum symbol_ref type '" +
+                                           sema::FormatType(instruction.type) + "' in function '" + state.function->name +
+                                           "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                std::size_t variant_index = 0;
+                const mir::VariantDecl* variant_decl = FindVariantDecl(*type_decl, instruction.target_name, &variant_index);
+                if (variant_decl == nullptr || !variant_decl->payload_fields.empty()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission only supports payload-free enum symbol_ref values in function '" +
+                                           state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                const std::string value_temp = LLVMTempName(function_index, block_index, instruction_index);
+                output_lines.push_back(value_temp + " = insertvalue " + lowered_layout->aggregate_type.backend_name +
+                                       " zeroinitializer, i64 " + std::to_string(variant_index) + ", 0");
+                RecordExecutableValue(state, instruction.result, value_temp, lowered_layout->aggregate_type);
+                return true;
             }
 
             if (instruction.target_kind == mir::Instruction::TargetKind::kFunction) {
@@ -4017,17 +4318,245 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             return true;
         }
 
-        case mir::Instruction::Kind::kVolatileLoad:
-        case mir::Instruction::Kind::kVolatileStore:
-        case mir::Instruction::Kind::kAtomicLoad:
-        case mir::Instruction::Kind::kAtomicStore:
+        case mir::Instruction::Kind::kVolatileLoad: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+                return false;
+            }
+            ExecutableValue ptr;
+            if (!ResolveSingleExecutableOperand(state,
+                                                instruction,
+                                                "volatile_load",
+                                                block,
+                                                source_path,
+                                                diagnostics,
+                                                ptr)) {
+                return false;
+            }
+            if (ptr.type.backend_name != "ptr") {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires pointer operand for volatile_load in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            BackendTypeInfo result_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("volatile_load", state, block),
+                                      result_type)) {
+                return false;
+            }
+            if (!IsAtomicScalarType(result_type)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission only supports scalar volatile_load element types in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+            output_lines.push_back(temp + " = load volatile " + LLVMTypeName(result_type) + ", ptr " + ptr.text + ", align " +
+                                   std::to_string(result_type.alignment));
+            RecordExecutableValue(state, instruction.result, temp, result_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kVolatileStore: {
+            ExecutableValue ptr;
+            ExecutableValue value;
+            if (!ResolveTwoExecutableOperands(state,
+                                              instruction,
+                                              "volatile_store",
+                                              block,
+                                              source_path,
+                                              diagnostics,
+                                              ptr,
+                                              value)) {
+                return false;
+            }
+            if (ptr.type.backend_name != "ptr") {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires pointer operand for volatile_store in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            if (!IsAtomicScalarType(value.type)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission only supports scalar volatile_store element types in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            output_lines.push_back("store volatile " + LLVMTypeName(value.type) + " " + value.text + ", ptr " + ptr.text +
+                                   ", align " + std::to_string(value.type.alignment));
+            return true;
+        }
+
+        case mir::Instruction::Kind::kAtomicLoad: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics) ||
+                !RequireOperandCount(instruction,
+                                     2,
+                                     "LLVM bootstrap executable emission",
+                                     "atomic_load",
+                                     state.function->name,
+                                     block,
+                                     source_path,
+                                     diagnostics)) {
+                return false;
+            }
+            ExecutableValue ptr;
+            if (!ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, ptr)) {
+                return false;
+            }
+            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
+            if (!order.has_value() || !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires supported constant MemoryOrder metadata for 'atomic_load' in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            if (ptr.type.backend_name != "ptr") {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires pointer operand for atomic_load in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            BackendTypeInfo result_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("atomic_load", state, block),
+                                      result_type)) {
+                return false;
+            }
+            if (!IsAtomicScalarType(result_type)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission only supports scalar atomic_load element types in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+            output_lines.push_back(temp + " = load atomic " + LLVMTypeName(result_type) + ", ptr " + ptr.text + " " + *order +
+                                   ", align " + std::to_string(result_type.alignment));
+            RecordExecutableValue(state, instruction.result, temp, result_type);
+            return true;
+        }
+
+        case mir::Instruction::Kind::kAtomicStore: {
+            if (!RequireOperandCount(instruction,
+                                     3,
+                                     "LLVM bootstrap executable emission",
+                                     "atomic_store",
+                                     state.function->name,
+                                     block,
+                                     source_path,
+                                     diagnostics)) {
+                return false;
+            }
+            ExecutableValue ptr;
+            ExecutableValue value;
+            if (!ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, ptr) ||
+                !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, value)) {
+                return false;
+            }
+            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
+            if (!order.has_value() || !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires supported constant MemoryOrder metadata for 'atomic_store' in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            if (ptr.type.backend_name != "ptr") {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires pointer operand for atomic_store in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            if (!IsAtomicScalarType(value.type)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission only supports scalar atomic_store element types in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            output_lines.push_back("store atomic " + LLVMTypeName(value.type) + " " + value.text + ", ptr " + ptr.text + " " +
+                                   *order + ", align " + std::to_string(value.type.alignment));
+            return true;
+        }
+
         case mir::Instruction::Kind::kAtomicExchange:
+        case mir::Instruction::Kind::kAtomicFetchAdd: {
+            if (!RequireInstructionResult(instruction, block, source_path, diagnostics) ||
+                !RequireOperandCount(instruction,
+                                     3,
+                                     "LLVM bootstrap executable emission",
+                                     std::string(ToString(instruction.kind)),
+                                     state.function->name,
+                                     block,
+                                     source_path,
+                                     diagnostics)) {
+                return false;
+            }
+            ExecutableValue ptr;
+            ExecutableValue value;
+            if (!ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, ptr) ||
+                !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, value)) {
+                return false;
+            }
+            const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
+            if (!order.has_value() || !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires supported constant MemoryOrder metadata for '" +
+                                       std::string(ToString(instruction.kind)) + "' in function '" + state.function->name +
+                                       "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            if (ptr.type.backend_name != "ptr") {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires pointer operand for '" + std::string(ToString(instruction.kind)) +
+                                       "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            if (!IsAtomicScalarType(value.type) ||
+                (instruction.kind == mir::Instruction::Kind::kAtomicFetchAdd && !IsIntegerType(value.type))) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission only supports scalar atomic element types for '" +
+                                       std::string(ToString(instruction.kind)) + "' in function '" + state.function->name +
+                                       "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            BackendTypeInfo result_type;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext(ToString(instruction.kind), state, block),
+                                      result_type)) {
+                return false;
+            }
+            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+            const std::string op_name = instruction.kind == mir::Instruction::Kind::kAtomicExchange ? "xchg" : "add";
+            output_lines.push_back(temp + " = atomicrmw " + op_name + " ptr " + ptr.text + ", " + LLVMTypeName(value.type) + " " +
+                                   value.text + " " + *order + ", align " + std::to_string(value.type.alignment));
+            RecordExecutableValue(state, instruction.result, temp, result_type);
+            return true;
+        }
+
         case mir::Instruction::Kind::kAtomicCompareExchange:
-        case mir::Instruction::Kind::kAtomicFetchAdd:
             ReportBackendError(source_path,
-                               "LLVM bootstrap executable emission does not support MIR instruction '" +
-                                   std::string(ToString(instruction.kind)) + "' in function '" + state.function->name +
-                                   "' block '" + block.label + "'",
+                               "LLVM bootstrap executable emission does not yet support MIR instruction 'atomic_compare_exchange' in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
                                diagnostics);
             return false;
 
@@ -4628,6 +5157,7 @@ bool RenderExecutableFunction(const mir::Module& module,
                                       .type = global.type,
                                       .lowered_type = global_type,
                                       .is_const = global.is_const,
+                                      .is_extern = global.is_extern,
                                       .initializers = global.initializers,
                                   });
         }
@@ -4959,10 +5489,17 @@ bool RenderLlvmModule(const mir::Module& module,
                                   global_type)) {
             return false;
         }
-        const std::string init_value = global.initializers.empty() ? LLVMZeroValue(global_type)
-                                                                   : FormatLLVMLiteral(global_type, global.initializers.front());
         for (const auto& name : global.names) {
-            stream << LLVMGlobalName(name) << " = " << (global.is_const ? "constant " : "global ")
+            stream << LLVMGlobalName(name) << " = ";
+            if (global.is_extern) {
+                stream << "external " << (global.is_const ? "constant " : "global ")
+                       << global_type.backend_name << ", align " << global_type.alignment << "\n";
+                continue;
+            }
+
+            const std::string init_value = global.initializers.empty() ? LLVMZeroValue(global_type)
+                                                                       : FormatLLVMLiteral(global_type, global.initializers.front());
+            stream << (global.is_const ? "constant " : "global ")
                    << global_type.backend_name << " " << init_value << ", align " << global_type.alignment << "\n";
         }
     }
@@ -5295,6 +5832,9 @@ std::string DumpModule(const BackendModule& module) {
                     << " type=" << FormatTypeInfo(global.lowered_type);
         if (global.is_const) {
             global_line << " const";
+        }
+        if (global.is_extern) {
+            global_line << " extern";
         }
         if (!global.initializers.empty()) {
             global_line << " init=[";

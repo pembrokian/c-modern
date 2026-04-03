@@ -2377,7 +2377,7 @@ void TestValidatorRejectsArenaNewNonArenaOperand() {
     if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
         Fail("validator should reject arena_new with non-Arena operand");
     }
-    if (diagnostics.Render().find("arena_new requires *Arena operand") == std::string::npos) {
+    if (diagnostics.Render().find("arena_new requires Arena operand") == std::string::npos) {
         Fail("validator should explain invalid arena_new operands");
     }
 }

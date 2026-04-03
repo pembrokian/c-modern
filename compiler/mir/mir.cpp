@@ -2147,6 +2147,20 @@ class FunctionLowerer {
                 continue;
             }
 
+            if (target.kind == Expr::Kind::kQualifiedName && InferTargetKindForExpr(target) == Instruction::TargetKind::kGlobal) {
+                const std::string qualified_name = CombineQualifiedName(target);
+                Emit({
+                    .kind = Instruction::Kind::kStoreTarget,
+                    .type = KnownTypeOrError(ExprTypeOrUnknown(target), target.span, "assignment target type"),
+                    .target = qualified_name,
+                    .target_kind = Instruction::TargetKind::kGlobal,
+                    .target_name = qualified_name,
+                    .target_display = qualified_name,
+                    .operands = {values[index].value},
+                });
+                continue;
+            }
+
             EmitStoreTarget(target, values[index]);
         }
     }
@@ -2746,6 +2760,7 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
         if (decl.kind == Decl::Kind::kConst || decl.kind == Decl::Kind::kVar) {
             GlobalDecl global;
             global.is_const = decl.kind == Decl::Kind::kConst;
+            global.is_extern = false;
             global.names = decl.pattern.names;
             global.type = sema::TypeFromAst(decl.type_ann.get());
             for (const auto& value : decl.values) {
@@ -3566,9 +3581,14 @@ bool ValidateModule(const Module& module,
                             report("arena_new must produce *T in function " + function.name);
                         }
                         if (operand_types.size() == 1) {
-                            const auto arena_pointee = PointerPointeeType(StripMirAliasOrDistinct(module, operand_types.front()));
-                            if (!arena_pointee.has_value() || !IsNamedTypeFamily(*arena_pointee, "Arena")) {
-                                report("arena_new requires *Arena operand in function " + function.name);
+                            const sema::Type arena_operand = StripMirAliasOrDistinct(module, operand_types.front());
+                            const auto arena_pointee = PointerPointeeType(arena_operand);
+                            const bool named_arena = operand_types.front().kind == sema::Type::Kind::kNamed &&
+                                                     IsNamedTypeFamily(operand_types.front(), "Arena");
+                            const bool pointer_sized_arena = arena_pointee.has_value() && arena_pointee->kind == sema::Type::Kind::kNamed &&
+                                                             arena_pointee->name == "u8";
+                            if (!named_arena && !pointer_sized_arena) {
+                                report("arena_new requires Arena operand in function " + function.name);
                             }
                         }
                         break;
@@ -4466,6 +4486,9 @@ std::string DumpModule(const Module& module) {
         header << ']';
         if (!sema::IsUnknown(global.type)) {
             header << " type=" << sema::FormatType(global.type);
+        }
+        if (global.is_extern) {
+            header << " extern";
         }
         WriteLine(stream, 1, header.str());
         for (const auto& initializer : global.initializers) {

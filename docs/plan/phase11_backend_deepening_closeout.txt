@@ -1,0 +1,105 @@
+Phase 11 -- Backend Deepening Closeout
+======================================
+
+Status
+------
+COMPLETED (repository-bounded slice)
+
+Purpose
+-------
+Record the concrete Phase 11 backend deepening work that landed in this
+repository after the original planning document
+`/Users/ro/dev/c_modern/docs/plan/phase11_backend_deepening.txt`.
+
+This is a repository closeout note, not a new architecture phase.
+It closes the planned execution waves in the bounded form actually admitted by
+the current repository, and it preserves explicit unsupported boundaries where
+upstream sema or MIR ownership still intentionally stops wider executable
+admission.
+
+Implemented scope
+-----------------
+Phase 11A -- Executable surface closure
+
+- project-mode imported extern globals are now materialized in dependent MIR
+  and backend lowering rather than being lost outside the defining module
+- imported mutable global assignment lowers as a true global store rather than
+  an unclassified store target
+- project-mode executable proof exists for imported const and mutable globals
+
+Phase 11B -- Checked-operation completion
+
+- executable checked-operation coverage widened beyond the earlier bootstrap
+  subset
+- admitted proof now covers additional signedness and width combinations for
+  checked remainder, checked shift, divide-by-zero, and shift-count failure
+
+Phase 11C -- Representation-sensitive lowering
+
+- imported layout-sensitive aggregate flows are proven in project mode for
+  packed and padded aggregates
+- backend work stayed subordinate to sema and MIR ownership: imported distinct
+  conversion failures blocked in sema and address-of qualified-name failures
+  blocked in MIR were not misclassified as backend gaps
+
+Phase 11D -- Low-level operation support
+
+- admitted executable lowering now exists for:
+  - volatile_load
+  - volatile_store
+  - atomic_load
+  - atomic_store
+  - atomic_exchange
+  - atomic_fetch_add
+- admitted MemoryOrder support is intentionally bounded to constant metadata
+  forms already explicit in MIR and proven in backend or executable regressions
+- unsupported low-level forms remain explicit, especially
+  atomic_compare_exchange and non-constant order metadata
+
+Phase 11E -- Backend hygiene and inspectability
+
+- deterministic backend dump proof was added for the new low-level supported
+  subset
+- unsupported low-level boundaries are covered by explicit backend diagnostics
+  rather than linker or runtime accidents
+- backend widening remained MIR-driven and did not add new semantic policy or
+  reinterpret language meaning inside codegen
+
+Key supporting regressions
+--------------------------
+- `/Users/ro/dev/c_modern/tests/codegen/codegen_executable_tests.cpp`
+  now covers widened checked operations, imported globals, imported
+  layout-sensitive aggregates, low-level executable success, and explicit
+  low-level failure boundaries
+- `/Users/ro/dev/c_modern/tests/codegen/low_level_intrinsics.mc`
+  and
+  `/Users/ro/dev/c_modern/tests/codegen/low_level_intrinsics.backend.txt`
+  pin deterministic backend dump behavior for the admitted low-level subset
+- `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp`
+  proves imported-global MIR declarations in the project path
+- `/Users/ro/dev/c_modern/tests/tool/codegen_llvm_tests.cpp`
+  keeps the unsupported backend boundary explicit for still-unadmitted MIR
+  instructions
+
+Bounded exclusions kept explicit
+--------------------------------
+- this closeout does not claim full low-level completion across all MIR shapes
+- atomic_compare_exchange remains intentionally unsupported in the backend
+- non-constant MemoryOrder metadata remains intentionally rejected
+- upstream sema or MIR gaps discovered during Phase 11 probing remain upstream
+  work rather than backend debt hidden behind codegen workarounds
+
+Validation summary
+------------------
+- focused backend and executable proof remains green for:
+  - `mc_codegen_llvm_unit`
+  - `mc_codegen_fixture_unit`
+  - `mc_codegen_executable_unit`
+
+Closeout statement
+------------------
+The repository-specific Phase 11 plan is closed in a bounded and honest form.
+The first hosted backend target is materially deeper than the earlier bootstrap
+Phase 5 slice, checked and representation-sensitive behavior have broader
+deterministic proof, and the admitted low-level subset now has explicit
+executable realization plus explicit unsupported boundaries.

@@ -300,6 +300,40 @@ void RunBuiltOutputFixture(const std::filesystem::path& mc_path,
                            "run built executable " + artifacts.executable.generic_string());
 }
 
+void RunBuiltProjectFixture(const std::filesystem::path& mc_path,
+                            const std::filesystem::path& project_path,
+                            const std::filesystem::path& root_source_path,
+                            const std::filesystem::path& build_dir,
+                            int expected_exit_code,
+                            const std::vector<std::string>& run_args) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          "--project",
+                          project_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build --project " + project_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(root_source_path, build_dir);
+    if (!std::filesystem::exists(artifacts.llvm_ir)) {
+        Fail("expected LLVM IR artifact: " + artifacts.llvm_ir.generic_string());
+    }
+    if (!std::filesystem::exists(artifacts.object)) {
+        Fail("expected object artifact: " + artifacts.object.generic_string());
+    }
+    if (!std::filesystem::exists(artifacts.executable)) {
+        Fail("expected executable artifact: " + artifacts.executable.generic_string());
+    }
+
+    ExpectExecutableExit(artifacts.executable,
+                         run_args,
+                         expected_exit_code,
+                         "run built executable " + artifacts.executable.generic_string());
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -473,6 +507,42 @@ int main(int argc, char** argv) {
                     0,
                     {});
 
+    const std::filesystem::path checked_remainder_i16_source = work_root / "checked_remainder_i16_ok.mc";
+    WriteFile(checked_remainder_i16_source,
+              "func remainder(value: i16, denom: i16) i16 {\n"
+              "    return value % denom\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    if remainder(17, 5) == 2 {\n"
+              "        return 0\n"
+              "    }\n"
+              "    return 1\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    checked_remainder_i16_source,
+                    work_root / "checked_remainder_i16_ok_build",
+                    0,
+                    {});
+
+    const std::filesystem::path checked_shift_i64_source = work_root / "checked_shift_i64_ok.mc";
+    WriteFile(checked_shift_i64_source,
+              "func shift(value: i64, count: i64) i64 {\n"
+              "    return value >> count\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    if shift(32, 3) == 4 {\n"
+              "        return 0\n"
+              "    }\n"
+              "    return 1\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    checked_shift_i64_source,
+                    work_root / "checked_shift_i64_ok_build",
+                    0,
+                    {});
+
     const std::filesystem::path checked_shift_i8_source = work_root / "checked_shift_i8_ok.mc";
     WriteFile(checked_shift_i8_source,
               "func shift(value: i8, count: i8) i8 {\n"
@@ -538,6 +608,22 @@ int main(int argc, char** argv) {
                            {},
                            {"call void @__mc_check_div_i64"});
 
+    const std::filesystem::path div_zero_u8_source = work_root / "checked_div_zero_u8.mc";
+    WriteFile(div_zero_u8_source,
+              "func explode(value: u8, denom: u8) u8 {\n"
+              "    return value / denom\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    doomed: u8 = explode(12, 0)\n"
+              "    return 0\n"
+              "}\n");
+    RunBuiltFailureFixture(mc_path,
+                           div_zero_u8_source,
+                           work_root / "checked_div_zero_u8_build",
+                           {},
+                           {"call void @__mc_check_div_i8"});
+
     const std::filesystem::path shift_oob_source = work_root / "checked_shift_oob.mc";
     WriteFile(shift_oob_source,
               "func main() i32 {\n"
@@ -566,6 +652,102 @@ int main(int argc, char** argv) {
                            work_root / "checked_shift_oob_u16_build",
                            {},
                            {"call void @__mc_check_shift_16"});
+
+    const std::filesystem::path shift_oob_u8_source = work_root / "checked_shift_oob_u8.mc";
+    WriteFile(shift_oob_u8_source,
+              "func explode(value: u8, count: u8) u8 {\n"
+              "    return value << count\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    doomed: u8 = explode(1, 8)\n"
+              "    return 0\n"
+              "}\n");
+    RunBuiltFailureFixture(mc_path,
+                           shift_oob_u8_source,
+                           work_root / "checked_shift_oob_u8_build",
+                           {},
+                           {"call void @__mc_check_shift_8"});
+
+    const std::filesystem::path low_level_supported_source = work_root / "low_level_supported.mc";
+    WriteFile(low_level_supported_source,
+              "enum MemoryOrder {\n"
+              "    Relaxed,\n"
+              "    Acquire,\n"
+              "    Release,\n"
+              "}\n"
+              "\n"
+              "struct Atomic<T> {}\n"
+              "\n"
+              "func volatile_load(ptr: *i32) i32 {\n"
+              "    return 0\n"
+              "}\n"
+              "\n"
+              "func volatile_store(ptr: *i32, value: i32) {\n"
+              "}\n"
+              "\n"
+              "func atomic_load(ptr: *Atomic<i32>, order: MemoryOrder) i32 {\n"
+              "    return 0\n"
+              "}\n"
+              "\n"
+              "func atomic_store(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) {\n"
+              "}\n"
+              "\n"
+              "func atomic_exchange(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) i32 {\n"
+              "    return value\n"
+              "}\n"
+              "\n"
+              "func atomic_fetch_add(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) i32 {\n"
+              "    return value\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    raw: i32 = 4\n"
+              "    stored: i32 = 9\n"
+              "    exchange_value: i32 = 5\n"
+              "    add_value: i32 = 2\n"
+              "    volatile_store(&raw, stored)\n"
+              "    loaded: i32 = volatile_load(&raw)\n"
+              "    atom: *Atomic<i32> = (*Atomic<i32>)((uintptr)(&raw))\n"
+              "    prior: i32 = atomic_exchange(atom, exchange_value, MemoryOrder.Acquire)\n"
+              "    added: i32 = atomic_fetch_add(atom, add_value, MemoryOrder.Release)\n"
+              "    latest: i32 = atomic_load(atom, MemoryOrder.Acquire)\n"
+              "    atomic_store(atom, prior, MemoryOrder.Release)\n"
+              "    return loaded + prior + added + latest + raw\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    low_level_supported_source,
+                    work_root / "low_level_supported_build",
+                    39,
+                    {});
+
+    const std::filesystem::path low_level_dynamic_order_source = work_root / "low_level_dynamic_order_fail.mc";
+    WriteFile(low_level_dynamic_order_source,
+              "enum MemoryOrder {\n"
+              "    Relaxed,\n"
+              "    Acquire,\n"
+              "    Release,\n"
+              "}\n"
+              "\n"
+              "struct Atomic<T> {}\n"
+              "\n"
+              "func atomic_load(ptr: *Atomic<i32>, order: MemoryOrder) i32 {\n"
+              "    return 0\n"
+              "}\n"
+              "\n"
+              "func read(atom: *Atomic<i32>, order: MemoryOrder) i32 {\n"
+              "    return atomic_load(atom, order)\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    raw: i32 = 0\n"
+              "    atom: *Atomic<i32> = (*Atomic<i32>)((uintptr)(&raw))\n"
+              "    return read(atom, MemoryOrder.Acquire)\n"
+              "}\n");
+    RunBuildFailureFixture(mc_path,
+                           low_level_dynamic_order_source,
+                           work_root / "low_level_dynamic_order_fail_build",
+                           "requires constant MemoryOrder metadata for 'atomic_load'");
 
     const std::filesystem::path bounds_index_source = work_root / "bounds_index_oob.mc";
     WriteFile(bounds_index_source,
@@ -719,6 +901,107 @@ int main(int argc, char** argv) {
                     work_root / "phase8_config_parser_build",
                     0,
                     {});
+
+    const std::filesystem::path imported_project_root = work_root / "imported_globals_project";
+    WriteFile(imported_project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase11a-imported-globals\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(imported_project_root / "src/helper.mc",
+              "export { Pair, make_pair, LIMIT, counter }\n"
+              "\n"
+              "struct Pair {\n"
+              "    left: i32,\n"
+              "    right: i32,\n"
+              "}\n"
+              "\n"
+              "const LIMIT: i32 = 9\n"
+              "var counter: i32 = 4\n"
+              "\n"
+              "func make_pair() Pair {\n"
+              "    return Pair{ left: LIMIT, right: 5 }\n"
+              "}\n");
+    WriteFile(imported_project_root / "src/main.mc",
+              "import helper\n"
+              "\n"
+              "func main() i32 {\n"
+              "    pair: helper.Pair = helper.make_pair()\n"
+              "    helper.counter = helper.counter + pair.right\n"
+              "    return pair.left + helper.counter + helper.LIMIT\n"
+              "}\n");
+    RunBuiltProjectFixture(mc_path,
+                           imported_project_root / "build.toml",
+                           imported_project_root / "src/main.mc",
+                           work_root / "imported_globals_project_build",
+                           27,
+                           {});
+
+    const std::filesystem::path imported_layout_project_root = work_root / "imported_layout_project";
+    WriteFile(imported_layout_project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase11c-imported-layout\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(imported_layout_project_root / "src/helper.mc",
+              "export { PackedHeader, make_packed, PaddedHeader, make_padded }\n"
+              "\n"
+              "@packed\n"
+              "struct PackedHeader {\n"
+              "    tag: u8,\n"
+              "    value: i32,\n"
+              "    tail: u8,\n"
+              "}\n"
+              "\n"
+              "struct PaddedHeader {\n"
+              "    tag: u8,\n"
+              "    value: i32,\n"
+              "    tail: u8,\n"
+              "}\n"
+              "\n"
+              "func make_packed() PackedHeader {\n"
+              "    return PackedHeader{ tag: 2, value: 9, tail: 1 }\n"
+              "}\n"
+              "\n"
+              "func make_padded() PaddedHeader {\n"
+              "    return PaddedHeader{ tag: 3, value: 11, tail: 4 }\n"
+              "}\n");
+    WriteFile(imported_layout_project_root / "src/main.mc",
+              "import helper\n"
+              "\n"
+              "func main() i32 {\n"
+              "    packed: helper.PackedHeader = helper.make_packed()\n"
+              "    padded: helper.PaddedHeader = helper.make_padded()\n"
+              "    return (i32)(packed.tag) + packed.value + (i32)(packed.tail) + (i32)(padded.tag) + padded.value + (i32)(padded.tail)\n"
+              "}\n");
+    RunBuiltProjectFixture(mc_path,
+                           imported_layout_project_root / "build.toml",
+                           imported_layout_project_root / "src/main.mc",
+                           work_root / "imported_layout_project_build",
+                           30,
+                           {});
 
     RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/arena_ast_build.mc",
