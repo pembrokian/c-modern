@@ -2320,6 +2320,19 @@ class FunctionLowerer {
             case Stmt::Kind::kForCondition:
                 LowerWhileLike(stmt);
                 return;
+            case Stmt::Kind::kForIn: {
+                const auto* fact = sema::FindForInFact(sema_module_, stmt);
+                if (fact == nullptr) {
+                    Report(stmt.span, "MIR lowering requires semantic classification for for-in statement");
+                    return;
+                }
+                if (fact->resolution == sema::ForInResolution::kForRange) {
+                    LowerForRange(stmt);
+                } else {
+                    LowerForEach(stmt);
+                }
+                return;
+            }
             case Stmt::Kind::kForEach:
             case Stmt::Kind::kForEachIndex:
                 LowerForEach(stmt);

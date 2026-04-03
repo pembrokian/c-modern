@@ -239,7 +239,7 @@ void TestParserHandlesTypesAndLoopForms() {
     Expect(dump.find("PointerType") != std::string::npos, "dump should include pointer types");
     Expect(dump.find("typeArgs:") != std::string::npos, "dump should include call type arguments");
     Expect(dump.find("ForEachIndexStmt") != std::string::npos, "dump should include index foreach loop");
-    Expect(dump.find("ForRangeStmt") != std::string::npos, "dump should include range loop");
+    Expect(dump.find("ForInStmt") != std::string::npos, "dump should include deferred for-in loop");
     Expect(dump.find("WhileStmt") != std::string::npos, "dump should include while loop");
 }
 

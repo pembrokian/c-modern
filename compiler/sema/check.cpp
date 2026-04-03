@@ -1571,6 +1571,13 @@ class Checker {
         };
     }
 
+    void RecordForInFact(const Stmt& stmt, ForInResolution resolution) {
+        module_->for_in_facts[stmt.span] = {
+            .span = stmt.span,
+            .resolution = resolution,
+        };
+    }
+
     const TypeDeclSummary* LookupStructType(const Type& type) const {
         const Type stripped = StripType(type, *module_, TypeStripMode::kAliasesOnly);
         if (stripped.kind != Type::Kind::kNamed) {
@@ -2133,6 +2140,9 @@ class Checker {
             case Stmt::Kind::kForCondition:
                 CheckConditionLoop(stmt);
                 return;
+            case Stmt::Kind::kForIn:
+                CheckForIn(stmt);
+                return;
             case Stmt::Kind::kForEach:
             case Stmt::Kind::kForEachIndex:
                 CheckForEach(stmt);
@@ -2329,6 +2339,37 @@ class Checker {
         if (stmt.then_branch != nullptr) {
             CheckStmt(*stmt.then_branch);
         }
+        --loop_depth_;
+    }
+
+    void CheckForIn(const Stmt& stmt) {
+        if (stmt.exprs.empty()) {
+            return;
+        }
+
+        const Type iterable = AnalyzeExpr(*stmt.exprs.front());
+        const bool is_range = iterable.kind == Type::Kind::kRange;
+        RecordForInFact(stmt, is_range ? ForInResolution::kForRange : ForInResolution::kForEach);
+
+        Type element_type = UnknownType();
+        if (is_range && !iterable.subtypes.empty()) {
+            element_type = iterable.subtypes.front();
+        }
+        if (!is_range && iterable.kind == Type::Kind::kArray && !iterable.subtypes.empty()) {
+            element_type = iterable.subtypes.front();
+        }
+        if (!is_range && iterable.kind == Type::Kind::kNamed && (iterable.name == "Slice" || iterable.name == "Buffer") &&
+            !iterable.subtypes.empty()) {
+            element_type = iterable.subtypes.front();
+        }
+
+        ++loop_depth_;
+        PushScope();
+        BindValue(stmt.loop_name, element_type, true, stmt.span);
+        if (stmt.then_branch != nullptr) {
+            CheckStmt(*stmt.then_branch);
+        }
+        PopScope();
         --loop_depth_;
     }
 
@@ -2636,6 +2677,14 @@ const Type* FindExprType(const Module& module, const ast::Expr& expr) {
 const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const ast::Stmt& stmt) {
     const auto found = module.binding_or_assign_facts.find(stmt.span);
     if (found != module.binding_or_assign_facts.end()) {
+        return &found->second;
+    }
+    return nullptr;
+}
+
+const ForInFact* FindForInFact(const Module& module, const ast::Stmt& stmt) {
+    const auto found = module.for_in_facts.find(stmt.span);
+    if (found != module.for_in_facts.end()) {
         return &found->second;
     }
     return nullptr;

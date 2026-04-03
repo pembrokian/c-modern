@@ -89,6 +89,16 @@ struct BindingOrAssignFact {
     std::vector<BindingOrAssignResolution> resolutions;
 };
 
+enum class ForInResolution {
+    kForEach,
+    kForRange,
+};
+
+struct ForInFact {
+    support::SourceSpan span {};
+    ForInResolution resolution = ForInResolution::kForEach;
+};
+
 struct SourceSpanHash {
     std::size_t operator()(const support::SourceSpan& span) const noexcept {
         std::size_t hash = 1469598103934665603ull;
@@ -117,6 +127,7 @@ struct Module {
     std::vector<FunctionSignature> functions;
     std::unordered_map<support::SourceSpan, Type, SourceSpanHash, SourceSpanEqual> expr_types;
     std::unordered_map<support::SourceSpan, BindingOrAssignFact, SourceSpanHash, SourceSpanEqual> binding_or_assign_facts;
+    std::unordered_map<support::SourceSpan, ForInFact, SourceSpanHash, SourceSpanEqual> for_in_facts;
     // Optional name -> index caches for functions and type declarations.
     // BuildModuleLookupMaps() refreshes them after bulk population, but
     // semantic lookups remain correct even if callers mutate the vectors
@@ -159,6 +170,7 @@ const TypeDeclSummary* FindTypeDecl(const Module& module, std::string_view name)
 const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view name);
 const Type* FindExprType(const Module& module, const ast::Expr& expr);
 const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const ast::Stmt& stmt);
+const ForInFact* FindForInFact(const Module& module, const ast::Stmt& stmt);
 std::string DumpModule(const Module& module);
 // Rebuild the auxiliary name -> index lookup caches (function_lookup,
 // type_decl_lookup) from the current contents of Module::functions and

@@ -180,6 +180,10 @@ struct Stmt : Node {
         kSwitch,
         kWhile,
         kForCondition,
+        // kForIn: parser-deferred loop classification.
+        // The parser knows this is `for name in expr`, but sema must decide
+        // whether `expr` is a semantic range or an ordinary iterable.
+        kForIn,
         kForEach,
         kForEachIndex,
         kForRange,

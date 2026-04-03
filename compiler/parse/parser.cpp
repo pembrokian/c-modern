@@ -862,8 +862,7 @@ class Parser {
             auto iterable = ParseExpr(false);
             auto body = ParseBlockStmt();
             auto stmt = std::make_unique<Stmt>();
-            // Parse-time discrimination only recognises literal range syntax.
-            stmt->kind = iterable != nullptr && iterable->kind == Expr::Kind::kRange ? Stmt::Kind::kForRange : Stmt::Kind::kForEach;
+            stmt->kind = Stmt::Kind::kForIn;
             stmt->span.begin = start;
             stmt->loop_name = std::move(name);
             stmt->exprs.push_back(std::move(iterable));

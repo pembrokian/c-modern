@@ -86,6 +86,8 @@ std::string_view ToString(Stmt::Kind kind) {
             return "WhileStmt";
         case Stmt::Kind::kForCondition:
             return "ForConditionStmt";
+        case Stmt::Kind::kForIn:
+            return "ForInStmt";
         case Stmt::Kind::kForEach:
             return "ForEachStmt";
         case Stmt::Kind::kForEachIndex:
