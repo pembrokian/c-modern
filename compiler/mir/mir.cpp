@@ -35,16 +35,10 @@ struct ValuePiece {
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name);
 sema::Type StripMirAliasOrDistinct(const Module& module, sema::Type type);
 
-template <typename Enum, std::size_t N>
-std::string_view EnumNameOr(std::string_view fallback, Enum value, const std::string_view (&names)[N]) {
-    const std::size_t index = static_cast<std::size_t>(value);
-    if (index < N && !names[index].empty()) {
-        return names[index];
-    }
-    return fallback;
-}
-
 constexpr std::string_view kTypeDeclKindNames[] = {"struct", "enum", "distinct", "alias"};
+constexpr std::size_t kTypeDeclKindCount = static_cast<std::size_t>(TypeDecl::Kind::kAlias) + 1;
+static_assert(sizeof(kTypeDeclKindNames) / sizeof(kTypeDeclKindNames[0]) == kTypeDeclKindCount);
+
 constexpr std::string_view kInstructionKindNames[] = {"const",
                                                       "local_addr",
                                                       "arena_new",
@@ -82,8 +76,19 @@ constexpr std::string_view kInstructionKindNames[] = {"const",
                                                       "variant_init",
                                                       "variant_match",
                                                       "variant_extract"};
+constexpr std::size_t kInstructionKindCount = static_cast<std::size_t>(Instruction::Kind::kVariantExtract) + 1;
+static_assert(sizeof(kInstructionKindNames) / sizeof(kInstructionKindNames[0]) == kInstructionKindCount);
+
 constexpr std::string_view kInstructionTargetKindNames[] = {"none", "function", "global", "field", "deref_field", "index", "other"};
+constexpr std::size_t kInstructionTargetKindCount = static_cast<std::size_t>(Instruction::TargetKind::kOther) + 1;
+static_assert(sizeof(kInstructionTargetKindNames) / sizeof(kInstructionTargetKindNames[0]) == kInstructionTargetKindCount);
+
 constexpr std::string_view kInstructionArithmeticSemanticsNames[] = {"none", "wrap"};
+constexpr std::size_t kInstructionArithmeticSemanticsCount =
+    static_cast<std::size_t>(Instruction::ArithmeticSemantics::kWrap) + 1;
+static_assert(sizeof(kInstructionArithmeticSemanticsNames) / sizeof(kInstructionArithmeticSemanticsNames[0]) ==
+              kInstructionArithmeticSemanticsCount);
+
 constexpr std::string_view kExprKindNames[] = {"name",
                                                "qualified-name",
                                                "literal",
@@ -97,13 +102,37 @@ constexpr std::string_view kExprKindNames[] = {"name",
                                                "slice",
                                                "aggregate-init",
                                                "paren"};
+constexpr std::size_t kExprKindCount = static_cast<std::size_t>(Expr::Kind::kParen) + 1;
+static_assert(sizeof(kExprKindNames) / sizeof(kExprKindNames[0]) == kExprKindCount);
+
+constexpr std::size_t TypeDeclKindIndex(TypeDecl::Kind kind) {
+    return static_cast<std::size_t>(kind);
+}
+
+constexpr std::size_t InstructionKindIndex(Instruction::Kind kind) {
+    return static_cast<std::size_t>(kind);
+}
+
+constexpr std::size_t InstructionTargetKindIndex(Instruction::TargetKind kind) {
+    return static_cast<std::size_t>(kind);
+}
+
+constexpr std::size_t InstructionArithmeticSemanticsIndex(Instruction::ArithmeticSemantics semantics) {
+    return static_cast<std::size_t>(semantics);
+}
+
+constexpr std::size_t ExprKindIndex(Expr::Kind kind) {
+    return static_cast<std::size_t>(kind);
+}
 
 std::string_view ToString(TypeDecl::Kind kind) {
-    return EnumNameOr("type", kind, kTypeDeclKindNames);
+    const std::size_t index = TypeDeclKindIndex(kind);
+    return index < kTypeDeclKindCount ? kTypeDeclKindNames[index] : "type";
 }
 
 std::string_view ToString(Instruction::Kind kind) {
-    return EnumNameOr("instr", kind, kInstructionKindNames);
+    const std::size_t index = InstructionKindIndex(kind);
+    return index < kInstructionKindCount ? kInstructionKindNames[index] : "instr";
 }
 
 bool IsAddressOfLvalueKind(Expr::Kind kind) {
@@ -121,15 +150,18 @@ bool IsAddressOfLvalueKind(Expr::Kind kind) {
 }
 
 std::string_view ToString(Instruction::TargetKind kind) {
-    return EnumNameOr("none", kind, kInstructionTargetKindNames);
+    const std::size_t index = InstructionTargetKindIndex(kind);
+    return index < kInstructionTargetKindCount ? kInstructionTargetKindNames[index] : "none";
 }
 
 std::string_view ToString(Instruction::ArithmeticSemantics semantics) {
-    return EnumNameOr("none", semantics, kInstructionArithmeticSemanticsNames);
+    const std::size_t index = InstructionArithmeticSemanticsIndex(semantics);
+    return index < kInstructionArithmeticSemanticsCount ? kInstructionArithmeticSemanticsNames[index] : "none";
 }
 
 std::string_view ToString(Expr::Kind kind) {
-    return EnumNameOr("expr", kind, kExprKindNames);
+    const std::size_t index = ExprKindIndex(kind);
+    return index < kExprKindCount ? kExprKindNames[index] : "expr";
 }
 
 std::string VariantTypeName(std::string_view variant_name) {

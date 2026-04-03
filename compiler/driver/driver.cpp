@@ -3,10 +3,13 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -200,8 +203,27 @@ std::optional<CommandOptions> ParseCommandOptions(int argc,
                                                   int start_index,
                                                   std::ostream& errors) {
     CommandOptions options;
-
     int index = start_index;
+
+    struct BoolFlag {
+        std::string_view name;
+        bool CommandOptions::*member;
+    };
+    constexpr std::array<BoolFlag, 4> bool_flags {{
+        {"--emit-dump-paths", &CommandOptions::emit_dump_paths},
+        {"--dump-ast", &CommandOptions::dump_ast},
+        {"--dump-mir", &CommandOptions::dump_mir},
+        {"--dump-backend", &CommandOptions::dump_backend},
+    }};
+
+    const auto require_value = [&](std::string_view flag) -> std::optional<std::string_view> {
+        if (index + 1 >= argc) {
+            errors << "missing value for " << flag << '\n';
+            return std::nullopt;
+        }
+        return std::string_view(argv[++index]);
+    };
+
     if (index < argc) {
         const std::string_view first = argv[index];
         if (!first.empty() && !first.starts_with("--")) {
@@ -218,84 +240,70 @@ std::optional<CommandOptions> ParseCommandOptions(int argc,
             break;
         }
 
-        if (argument == "--emit-dump-paths") {
-            options.emit_dump_paths = true;
-            continue;
+        bool matched_flag = false;
+        for (const auto& flag : bool_flags) {
+            if (argument == flag.name) {
+                options.*(flag.member) = true;
+                matched_flag = true;
+                break;
+            }
         }
-
-        if (argument == "--dump-ast") {
-            options.dump_ast = true;
-            continue;
-        }
-
-        if (argument == "--dump-mir") {
-            options.dump_mir = true;
-            continue;
-        }
-
-        if (argument == "--dump-backend") {
-            options.dump_backend = true;
+        if (matched_flag) {
             continue;
         }
 
         if (argument == "--build-dir") {
-            if (index + 1 >= argc) {
-                errors << "missing value for --build-dir\n";
+            const auto value = require_value(argument);
+            if (!value.has_value()) {
                 return std::nullopt;
             }
-
-            options.build_dir = argv[++index];
+            options.build_dir = *value;
             options.build_dir_explicit = true;
             continue;
         }
 
         if (argument == "--project") {
-            if (index + 1 >= argc) {
-                errors << "missing value for --project\n";
+            const auto value = require_value(argument);
+            if (!value.has_value()) {
                 return std::nullopt;
             }
-
-            options.project_path = std::filesystem::path(argv[++index]);
+            options.project_path = std::filesystem::path(*value);
             continue;
         }
 
         if (argument == "--target") {
-            if (index + 1 >= argc) {
-                errors << "missing value for --target\n";
+            const auto value = require_value(argument);
+            if (!value.has_value()) {
                 return std::nullopt;
             }
-
-            options.target_name = std::string(argv[++index]);
+            options.target_name = std::string(*value);
             continue;
         }
 
         if (argument == "--mode") {
-            if (index + 1 >= argc) {
-                errors << "missing value for --mode\n";
+            const auto value = require_value(argument);
+            if (!value.has_value()) {
                 return std::nullopt;
             }
-
-            options.mode_override = std::string(argv[++index]);
+            options.mode_override = std::string(*value);
             continue;
         }
 
         if (argument == "--env") {
-            if (index + 1 >= argc) {
-                errors << "missing value for --env\n";
+            const auto value = require_value(argument);
+            if (!value.has_value()) {
                 return std::nullopt;
             }
-
-            options.env_override = std::string(argv[++index]);
+            options.env_override = std::string(*value);
             continue;
         }
 
         if (argument == "--import-root") {
-            if (index + 1 >= argc) {
-                errors << "missing value for --import-root\n";
+            const auto value = require_value(argument);
+            if (!value.has_value()) {
                 return std::nullopt;
             }
-
-            options.import_roots.push_back(argv[++index]);
+            options.import_roots.push_back(*value);
             continue;
         }
 
@@ -327,13 +335,6 @@ void PrintArtifactTargets(const support::DumpTargets& dump_targets,
     stream << "executable: " << build_targets.executable.generic_string() << '\n';
 }
 
-struct CheckedProgram {
-    std::filesystem::path source_path;
-    mc::parse::ParseResult parse_result;
-    mc::sema::CheckResult sema_result;
-    mc::mir::LowerResult mir_result;
-};
-
 struct BuildUnit {
     std::filesystem::path source_path;
     mc::parse::ParseResult parse_result;
@@ -361,14 +362,6 @@ struct ModuleBuildState {
 };
 
 constexpr int kModuleBuildStateFormatVersion = 1;
-
-struct ProcessExecutionResult {
-    bool exited = false;
-    int exit_code = -1;
-    bool signaled = false;
-    int signal_number = -1;
-    bool timed_out = false;
-};
 
 struct CompileNode {
     std::string module_name;
@@ -442,31 +435,21 @@ std::filesystem::path ComputeRuntimeObjectPath(const std::filesystem::path& entr
     return build_targets.object.parent_path() / (build_targets.object.stem().generic_string() + ".runtime.o");
 }
 
-// Display-only POSIX shell quoting for diagnostics and logs. Subprocesses run
-// via execv with the raw argv vector below; this formatting is never used for
-// execution.
-std::string ShellDisplayQuote(std::string_view argument) {
-    std::string quoted;
-    quoted.reserve(argument.size() + 2);
-    quoted.push_back('\'');
-    for (const char ch : argument) {
-        if (ch == '\'') {
-            quoted += "'\\''";
-            continue;
-        }
-        quoted.push_back(ch);
-    }
-    quoted.push_back('\'');
-    return quoted;
-}
-
 std::string FormatCommandForDisplay(const std::vector<std::string>& args) {
     std::ostringstream command;
     for (std::size_t index = 0; index < args.size(); ++index) {
         if (index > 0) {
             command << ' ';
         }
-        command << ShellDisplayQuote(args[index]);
+        command << '\'';
+        for (const char ch : args[index]) {
+            if (ch == '\'') {
+                command << "'\\''";
+                continue;
+            }
+            command << ch;
+        }
+        command << '\'';
     }
     return command.str();
 }
@@ -484,26 +467,50 @@ WaitForChildResult WaitForChildProcess(const pid_t pid,
         return waitpid(pid, &status, 0) == pid ? WaitForChildResult::kExited : WaitForChildResult::kWaitError;
     }
 
-    const auto start = std::chrono::steady_clock::now();
-    while (true) {
-        const pid_t wait_result = waitpid(pid, &status, WNOHANG);
-        if (wait_result == pid) {
-            return WaitForChildResult::kExited;
+    struct WaitState {
+        pid_t wait_result = -1;
+        int wait_status = 0;
+        bool done = false;
+    };
+
+    WaitState state;
+    std::mutex mutex;
+    std::condition_variable condition;
+    std::thread waiter([&]() {
+        int local_status = 0;
+        const pid_t local_result = waitpid(pid, &local_status, 0);
+
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            state.wait_result = local_result;
+            state.wait_status = local_status;
+            state.done = true;
         }
-        if (wait_result < 0) {
+        condition.notify_one();
+    });
+
+    std::unique_lock<std::mutex> lock(mutex);
+    const bool completed = condition.wait_for(lock,
+                                              std::chrono::milliseconds(*timeout_ms),
+                                              [&]() { return state.done; });
+    if (!completed) {
+        kill(pid, SIGKILL);
+        lock.unlock();
+        waiter.join();
+        if (state.wait_result < 0) {
             return WaitForChildResult::kWaitError;
         }
-
-        const auto elapsed =
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-        if (elapsed >= *timeout_ms) {
-            kill(pid, SIGKILL);
-            waitpid(pid, nullptr, 0);
+        if (WIFSIGNALED(state.wait_status) && WTERMSIG(state.wait_status) == SIGKILL) {
             return WaitForChildResult::kTimedOut;
         }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        status = state.wait_status;
+        return state.wait_result == pid ? WaitForChildResult::kExited : WaitForChildResult::kWaitError;
     }
+
+    status = state.wait_status;
+    lock.unlock();
+    waiter.join();
+    return state.wait_result == pid ? WaitForChildResult::kExited : WaitForChildResult::kWaitError;
 }
 
 int RunExecutableCommand(const std::filesystem::path& executable_path,
@@ -560,16 +567,14 @@ std::optional<ModuleBuildState> LoadModuleBuildState(const std::filesystem::path
         return std::nullopt;
     }
 
-    ModuleBuildState state;
-    int format_version = 0;
-    std::string line;
-    while (std::getline(input, line)) {
-        if (line.empty()) {
-            continue;
+    const auto read_state_line = [&](std::string_view expected_key) -> std::optional<std::string> {
+        std::string line;
+        if (!std::getline(input, line)) {
+            return std::nullopt;
         }
 
         const std::size_t tab = line.find('\t');
-        if (tab == std::string::npos) {
+        if (tab == std::string::npos || std::string_view(line.data(), tab) != expected_key) {
             diagnostics.Report({
                 .file_path = path,
                 .span = support::kDefaultSourceSpan,
@@ -579,68 +584,84 @@ std::optional<ModuleBuildState> LoadModuleBuildState(const std::filesystem::path
             return std::nullopt;
         }
 
-        const std::string key = line.substr(0, tab);
-        const std::string value = line.substr(tab + 1);
-        if (key == "format") {
-            const auto parsed = support::ParseArrayLength(value);
-            if (!parsed.has_value()) {
-                diagnostics.Report({
-                    .file_path = path,
-                    .span = support::kDefaultSourceSpan,
-                    .severity = support::DiagnosticSeverity::kError,
-                    .message = "invalid module build state format entry",
-                });
-                return std::nullopt;
-            }
-            format_version = static_cast<int>(*parsed);
-            continue;
-        }
-        if (key == "target") {
-            state.target_identity = value;
-            continue;
-        }
-        if (key == "mode") {
-            state.mode = value;
-            continue;
-        }
-        if (key == "env") {
-            state.env = value;
-            continue;
-        }
-        if (key == "source_hash") {
-            state.source_hash = value;
-            continue;
-        }
-        if (key == "interface_hash") {
-            state.interface_hash = value;
-            continue;
-        }
-        if (key == "wrap_hosted_main") {
-            state.wrap_hosted_main = value == "1";
-            continue;
-        }
-        if (key == "import_hash") {
-            const std::size_t equals = value.find('=');
-            if (equals == std::string::npos) {
-                diagnostics.Report({
-                    .file_path = path,
-                    .span = support::kDefaultSourceSpan,
-                    .severity = support::DiagnosticSeverity::kError,
-                    .message = "invalid imported interface hash entry",
-                });
-                return std::nullopt;
-            }
-            state.imported_interface_hashes.push_back({value.substr(0, equals), value.substr(equals + 1)});
-            continue;
-        }
+        return line.substr(tab + 1);
+    };
+
+    const auto format_text = read_state_line("format");
+    if (!format_text.has_value()) {
+        return std::nullopt;
+    }
+    const auto parsed_format = support::ParseArrayLength(*format_text);
+    if (!parsed_format.has_value()) {
+        diagnostics.Report({
+            .file_path = path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "invalid module build state format entry",
+        });
+        return std::nullopt;
+    }
+    if (static_cast<int>(*parsed_format) != kModuleBuildStateFormatVersion) {
+        return std::nullopt;
     }
 
-    if (format_version != kModuleBuildStateFormatVersion) {
+    auto target_identity = read_state_line("target");
+    auto mode = read_state_line("mode");
+    auto env = read_state_line("env");
+    auto source_hash = read_state_line("source_hash");
+    auto interface_hash = read_state_line("interface_hash");
+    auto wrap_hosted_main_text = read_state_line("wrap_hosted_main");
+    if (!target_identity.has_value() || !mode.has_value() || !env.has_value() ||
+        !source_hash.has_value() || !interface_hash.has_value() || !wrap_hosted_main_text.has_value()) {
         return std::nullopt;
     }
-    if (state.target_identity.empty() || state.mode.empty() || state.env.empty() || state.source_hash.empty() || state.interface_hash.empty()) {
-        return std::nullopt;
+
+    ModuleBuildState state {
+        .target_identity = std::move(*target_identity),
+        .mode = std::move(*mode),
+        .env = std::move(*env),
+        .source_hash = std::move(*source_hash),
+        .interface_hash = std::move(*interface_hash),
+        .wrap_hosted_main = *wrap_hosted_main_text == "1",
+    };
+
+    std::string line;
+    while (std::getline(input, line)) {
+        if (line.empty()) {
+            diagnostics.Report({
+                .file_path = path,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "invalid module build state entry",
+            });
+            return std::nullopt;
+        }
+
+        const std::size_t tab = line.find('\t');
+        if (tab == std::string::npos || std::string_view(line.data(), tab) != "import_hash") {
+            diagnostics.Report({
+                .file_path = path,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "invalid module build state entry",
+            });
+            return std::nullopt;
+        }
+
+        const std::string value = line.substr(tab + 1);
+        const std::size_t equals = value.find('=');
+        if (equals == std::string::npos) {
+            diagnostics.Report({
+                .file_path = path,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "invalid imported interface hash entry",
+            });
+            return std::nullopt;
+        }
+        state.imported_interface_hashes.push_back({value.substr(0, equals), value.substr(equals + 1)});
     }
+
     return state;
 }
 
@@ -666,9 +687,7 @@ bool WriteModuleBuildState(const std::filesystem::path& path,
     output << "source_hash\t" << state.source_hash << '\n';
     output << "interface_hash\t" << state.interface_hash << '\n';
     output << "wrap_hosted_main\t" << (state.wrap_hosted_main ? "1" : "0") << '\n';
-    auto sorted_import_hashes = state.imported_interface_hashes;
-    std::sort(sorted_import_hashes.begin(), sorted_import_hashes.end());
-    for (const auto& [import_name, hash] : sorted_import_hashes) {
+    for (const auto& [import_name, hash] : state.imported_interface_hashes) {
         output << "import_hash\t" << import_name << '=' << hash << '\n';
     }
     return static_cast<bool>(output);
@@ -687,10 +706,7 @@ bool ShouldReuseModuleObject(const ModuleBuildState& state,
         state.wrap_hosted_main != current.wrap_hosted_main) {
         return false;
     }
-    // Sort both sides before comparing so that import-resolution order
-    // differences between builds do not cause spurious cache misses.
-    auto sorted = [](auto v) { std::sort(v.begin(), v.end()); return v; };
-    return sorted(state.imported_interface_hashes) == sorted(current.imported_interface_hashes);
+    return state.imported_interface_hashes == current.imported_interface_hashes;
 }
 
 std::optional<ProjectFile> LoadSelectedProject(const CommandOptions& options,
@@ -1008,7 +1024,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         const auto build_targets = support::ComputeBuildArtifactTargets(node.source_path, graph.build_dir);
         const auto state_path = ComputeModuleStatePath(node.source_path, graph.build_dir);
 
-        const ModuleBuildState current_state {
+        ModuleBuildState current_state {
             .target_identity = graph.target_config.triple,
             .mode = graph.mode,
             .env = graph.env,
@@ -1017,6 +1033,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
             .wrap_hosted_main = node.source_path == graph.entry_source_path,
             .imported_interface_hashes = imported_data->interface_hashes,
         };
+        std::sort(current_state.imported_interface_hashes.begin(), current_state.imported_interface_hashes.end());
 
         const auto previous_state = LoadModuleBuildState(state_path, diagnostics);
         const bool reuse_object = emit_objects && previous_state.has_value() &&
@@ -1404,9 +1421,9 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
     return merged;
 }
 
-std::optional<CheckedProgram> CompileToMir(const CommandOptions& options,
-                                           support::DiagnosticSink& diagnostics,
-                                           bool include_imports_for_build) {
+std::optional<BuildUnit> CompileToMir(const CommandOptions& options,
+                                      support::DiagnosticSink& diagnostics,
+                                      bool include_imports_for_build) {
     const auto entry_path = std::filesystem::absolute(options.source_path).lexically_normal();
     const auto import_roots = ComputeEffectiveImportRoots(entry_path, options.import_roots);
     const auto bootstrap_config = mc::codegen_llvm::BootstrapTargetConfig();
@@ -1430,7 +1447,7 @@ std::optional<CheckedProgram> CompileToMir(const CommandOptions& options,
         entry_unit.mir_result.module = std::move(merged_module);
     }
 
-    return CheckedProgram {
+    return BuildUnit {
         .source_path = entry_unit.source_path,
         .parse_result = std::move(entry_unit.parse_result),
         .sema_result = std::move(entry_unit.sema_result),
