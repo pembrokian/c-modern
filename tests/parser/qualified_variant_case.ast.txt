@@ -1,0 +1,25 @@
+SourceFile
+  FuncDecl name=test
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          SwitchStmt
+            exprs:
+              NameExpr text=x
+            cases:
+              SwitchCase:
+                VariantCasePattern name=mod.Color.Red
+                ReturnStmt
+                  exprs:
+                    LiteralExpr text=1 kind=int_lit
+              SwitchCase:
+                VariantCasePattern name=mod.Color.Blue
+                  bindings=[v]
+                ReturnStmt
+                  exprs:
+                    NameExpr text=v
+          ReturnStmt
+            exprs:
+              LiteralExpr text=0 kind=int_lit

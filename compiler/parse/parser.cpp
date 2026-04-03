@@ -7,6 +7,9 @@
 namespace mc::parse {
 namespace {
 
+constexpr std::size_t kMaxTypeExprDepth = 256;
+constexpr std::size_t kMaxUnaryExprDepth = 256;
+
 using mc::ast::Attribute;
 using mc::ast::AttributeArg;
 using mc::ast::CasePattern;
@@ -565,74 +568,87 @@ class Parser {
     }
 
     std::unique_ptr<TypeExpr> ParseTypeExpr() {
-        if (Match(TokenKind::kConst)) {
-            auto type = std::make_unique<TypeExpr>();
-            type->kind = TypeExpr::Kind::kConst;
-            type->span.begin = Previous().span.begin;
-            type->inner = ParseTypeExpr();
-            type->span.end = type->inner != nullptr ? type->inner->span.end : Previous().span.end;
-            return type;
+        return ParseTypeExpr(0);
+    }
+
+    std::unique_ptr<TypeExpr> ParseTypeExpr(std::size_t depth) {
+        if (depth >= kMaxTypeExprDepth) {
+            ReportError(Current(), "type expression nesting exceeds parser limit");
+            return nullptr;
         }
 
-        if (Match(TokenKind::kStar)) {
-            auto type = std::make_unique<TypeExpr>();
-            type->kind = TypeExpr::Kind::kPointer;
-            type->span.begin = Previous().span.begin;
-            type->inner = ParseTypeExpr();
-            type->span.end = type->inner != nullptr ? type->inner->span.end : Previous().span.end;
-            return type;
+        std::vector<Token> prefix_tokens;
+        std::vector<TypeExpr::Kind> prefix_kinds;
+        while (Check(TokenKind::kConst) || Check(TokenKind::kStar)) {
+            const auto prefix = Advance();
+            if (prefix_tokens.size() >= kMaxTypeExprDepth) {
+                ReportError(prefix, "type expression nesting exceeds parser limit");
+                while (Check(TokenKind::kConst) || Check(TokenKind::kStar)) {
+                    Advance();
+                }
+                break;
+            }
+            prefix_tokens.push_back(prefix);
+            prefix_kinds.push_back(prefix.kind == TokenKind::kConst ? TypeExpr::Kind::kConst : TypeExpr::Kind::kPointer);
         }
 
+        std::unique_ptr<TypeExpr> type;
         if (Match(TokenKind::kLBracket)) {
-            auto type = std::make_unique<TypeExpr>();
+            type = std::make_unique<TypeExpr>();
             type->kind = TypeExpr::Kind::kArray;
             type->span.begin = Previous().span.begin;
             type->length_expr = ParseExpr();
             Consume(TokenKind::kRBracket, "expected ']' after array length");
-            type->inner = ParseTypeExpr();
+            type->inner = ParseTypeExpr(depth + 1);
             type->span.end = type->inner != nullptr ? type->inner->span.end : Previous().span.end;
-            return type;
-        }
-
-        if (Match(TokenKind::kLParen)) {
-            auto type = std::make_unique<TypeExpr>();
+        } else if (Match(TokenKind::kLParen)) {
+            type = std::make_unique<TypeExpr>();
             type->kind = TypeExpr::Kind::kParen;
             type->span.begin = Previous().span.begin;
-            type->inner = ParseTypeExpr();
+            type->inner = ParseTypeExpr(depth + 1);
             const auto* close = Consume(TokenKind::kRParen, "expected ')' after parenthesized type");
             type->span.end = close != nullptr ? close->span.end : Previous().span.end;
-            return type;
-        }
-
-        if (!Check(TokenKind::kIdentifier)) {
-            ReportError(Current(), "expected type expression");
-            return nullptr;
-        }
-
-        auto type = std::make_unique<TypeExpr>();
-        type->kind = TypeExpr::Kind::kNamed;
-        type->span.begin = Current().span.begin;
-        type->name = Current().lexeme;
-        Advance();
-
-        while (Match(TokenKind::kDot)) {
-            const auto member = ParseIdentifier("expected type name after '.'");
-            if (!member.has_value()) {
-                break;
+        } else {
+            if (!Check(TokenKind::kIdentifier)) {
+                ReportError(Current(), "expected type expression");
+                return nullptr;
             }
-            type->name += "." + *member;
-        }
 
-        if (Match(TokenKind::kLt)) {
-            if (!Check(TokenKind::kGt)) {
-                do {
-                    type->type_args.push_back(ParseTypeExpr());
-                } while (Match(TokenKind::kComma));
+            type = std::make_unique<TypeExpr>();
+            type->kind = TypeExpr::Kind::kNamed;
+            type->span.begin = Current().span.begin;
+            type->name = Current().lexeme;
+            Advance();
+
+            while (Match(TokenKind::kDot)) {
+                const auto member = ParseIdentifier("expected type name after '.'");
+                if (!member.has_value()) {
+                    break;
+                }
+                type->name += "." + *member;
             }
-            Consume(TokenKind::kGt, "expected '>' after type arguments");
+
+            if (Match(TokenKind::kLt)) {
+                if (!Check(TokenKind::kGt)) {
+                    do {
+                        type->type_args.push_back(ParseTypeExpr(depth + 1));
+                    } while (Match(TokenKind::kComma));
+                }
+                Consume(TokenKind::kGt, "expected '>' after type arguments");
+            }
+
+            type->span.end = Previous().span.end;
         }
 
-        type->span.end = Previous().span.end;
+        for (std::size_t index = prefix_tokens.size(); index > 0; --index) {
+            auto wrapper = std::make_unique<TypeExpr>();
+            wrapper->kind = prefix_kinds[index - 1];
+            wrapper->span.begin = prefix_tokens[index - 1].span.begin;
+            wrapper->inner = std::move(type);
+            wrapper->span.end = wrapper->inner != nullptr ? wrapper->inner->span.end : prefix_tokens[index - 1].span.end;
+            type = std::move(wrapper);
+        }
+
         return type;
     }
 
@@ -758,14 +774,7 @@ class Parser {
         case_node.span.begin = start;
         case_node.pattern = ParseCasePattern();
         Consume(TokenKind::kColon, "expected ':' after case pattern");
-        if (!Check(TokenKind::kCase) && !Check(TokenKind::kDefault) && !Check(TokenKind::kRBrace) && !Check(TokenKind::kNewline)) {
-            case_node.statements.push_back(ParseStatement());
-        }
-        SkipStatementSeparator();
-        while (!Check(TokenKind::kCase) && !Check(TokenKind::kDefault) && !Check(TokenKind::kRBrace) && !AtEnd()) {
-            case_node.statements.push_back(ParseStatement());
-            SkipStatementSeparator();
-        }
+        case_node.statements = ParseCaseBodyStatements();
         case_node.span.end = Previous().span.end;
         return case_node;
     }
@@ -774,16 +783,22 @@ class Parser {
         DefaultCase case_node;
         case_node.span.begin = start;
         Consume(TokenKind::kColon, "expected ':' after default");
-        if (!Check(TokenKind::kCase) && !Check(TokenKind::kDefault) && !Check(TokenKind::kRBrace) && !Check(TokenKind::kNewline)) {
-            case_node.statements.push_back(ParseStatement());
-        }
-        SkipStatementSeparator();
-        while (!Check(TokenKind::kCase) && !Check(TokenKind::kDefault) && !Check(TokenKind::kRBrace) && !AtEnd()) {
-            case_node.statements.push_back(ParseStatement());
-            SkipStatementSeparator();
-        }
+        case_node.statements = ParseCaseBodyStatements();
         case_node.span.end = Previous().span.end;
         return case_node;
+    }
+
+    std::vector<std::unique_ptr<Stmt>> ParseCaseBodyStatements() {
+        std::vector<std::unique_ptr<Stmt>> statements;
+        if (!IsCaseBoundary() && !Check(TokenKind::kNewline) && !AtEnd()) {
+            statements.push_back(ParseStatement());
+        }
+        SkipStatementSeparator();
+        while (!IsCaseBoundary() && !AtEnd()) {
+            statements.push_back(ParseStatement());
+            SkipStatementSeparator();
+        }
+        return statements;
     }
 
     CasePattern ParseCasePattern() {
@@ -791,16 +806,15 @@ class Parser {
         pattern.span.begin = Current().span.begin;
         if (Check(TokenKind::kIdentifier) && Peek(1).kind == TokenKind::kDot && Peek(2).kind == TokenKind::kIdentifier) {
             pattern.kind = CasePattern::Kind::kVariant;
-            // Check for qualified mod.Type.Variant (5-token) before falling through to
-            // the simpler Type.Variant (3-token) form.
-            if (Peek(3).kind == TokenKind::kDot && Peek(4).kind == TokenKind::kIdentifier) {
-                pattern.variant_name = Current().lexeme + "." + Peek(2).lexeme + "." + Peek(4).lexeme;
-                Advance(); Advance(); Advance(); Advance(); Advance();
+            const auto qualifier = Advance();
+            Advance();
+            const auto variant_or_type = Advance();
+            if (Check(TokenKind::kDot) && Peek(1).kind == TokenKind::kIdentifier) {
+                Advance();
+                const auto variant = Advance();
+                pattern.variant_name = qualifier.lexeme + "." + variant_or_type.lexeme + "." + variant.lexeme;
             } else {
-                pattern.variant_name = Current().lexeme + std::string(".") + Peek(2).lexeme;
-                Advance();
-                Advance();
-                Advance();
+                pattern.variant_name = qualifier.lexeme + "." + variant_or_type.lexeme;
             }
             if (Match(TokenKind::kLParen)) {
                 if (!Check(TokenKind::kRParen)) {
@@ -849,6 +863,7 @@ class Parser {
             auto iterable = ParseExpr(false);
             auto body = ParseBlockStmt();
             auto stmt = std::make_unique<Stmt>();
+            // Parse-time discrimination only recognises literal range syntax.
             stmt->kind = iterable != nullptr && iterable->kind == Expr::Kind::kRange ? Stmt::Kind::kForRange : Stmt::Kind::kForEach;
             stmt->span.begin = start;
             stmt->loop_name = std::move(name);
@@ -935,6 +950,9 @@ class Parser {
     std::unique_ptr<Stmt> ParseAssignOrExprStmt() {
         const auto start = Current().span.begin;
         auto first = ParseExpr();
+        // Dispatch order matters here:
+        // bare-name '=' binds/assigns, bare-name lists defer to sema,
+        // structured targets use kAssign, everything else is an expr stmt.
         if (Match(TokenKind::kAssign)) {
             if (IsBareNameExpr(*first)) {
                 auto stmt = std::make_unique<Stmt>();
@@ -1074,6 +1092,8 @@ class Parser {
             node->span.begin = expr->span.begin;
             node->text = std::string(mc::lex::ToString(op.kind));
             node->left = std::move(expr);
+            // parse_operand bottoms out at ParsePrimaryExpr, which always
+            // returns a non-null sentinel node on error.
             node->right = (this->*parse_operand)();
             node->span.end = node->right->span.end;
             expr = std::move(node);
@@ -1115,7 +1135,7 @@ class Parser {
     }
 
     // SkipTypeExprLookahead — lookahead-only type-expression scanner used to
-    // disambiguate binding syntax from assignment/expression syntax.
+    // disambiguate type-call and postfix-type-argument syntax.
     //
     // Contract: given a token offset relative to the current position, scan
     // forward over the tokens that form a valid type expression and return the
@@ -1124,20 +1144,37 @@ class Parser {
     // expression in the grammar.  Never consumes tokens; safe to call at any
     // lookahead depth.
     std::optional<std::size_t> SkipTypeExprLookahead(std::size_t offset, bool allow_bare_identifier) const {
+        return SkipTypeExprLookahead(offset, allow_bare_identifier, 0);
+    }
+
+    std::optional<std::size_t> SkipTypeExprLookahead(std::size_t offset,
+                                                     bool allow_bare_identifier,
+                                                     std::size_t depth) const {
+        std::size_t nesting = depth;
+        while (Peek(offset).kind == TokenKind::kConst || Peek(offset).kind == TokenKind::kStar) {
+            if (nesting >= kMaxTypeExprDepth) {
+                return std::nullopt;
+            }
+            ++nesting;
+            ++offset;
+        }
+
         switch (Peek(offset).kind) {
-            case TokenKind::kConst:
-                return SkipTypeExprLookahead(offset + 1, true);
-            case TokenKind::kStar:
-                return SkipTypeExprLookahead(offset + 1, true);
             case TokenKind::kLBracket: {
+                if (nesting >= kMaxTypeExprDepth) {
+                    return std::nullopt;
+                }
                 const auto after_length = SkipArrayLengthLookahead(offset + 1);
                 if (!after_length.has_value()) {
                     return std::nullopt;
                 }
-                return SkipTypeExprLookahead(*after_length, true);
+                return SkipTypeExprLookahead(*after_length, true, nesting + 1);
             }
             case TokenKind::kLParen: {
-                const auto inner = SkipTypeExprLookahead(offset + 1, true);
+                if (nesting >= kMaxTypeExprDepth) {
+                    return std::nullopt;
+                }
+                const auto inner = SkipTypeExprLookahead(offset + 1, true, nesting + 1);
                 if (!inner.has_value() || Peek(*inner).kind != TokenKind::kRParen) {
                     return std::nullopt;
                 }
@@ -1149,7 +1186,10 @@ class Parser {
                     ++next;
                     if (Peek(next).kind != TokenKind::kGt) {
                         while (true) {
-                            const auto type_arg_end = SkipTypeExprLookahead(next, true);
+                            if (nesting >= kMaxTypeExprDepth) {
+                                return std::nullopt;
+                            }
+                            const auto type_arg_end = SkipTypeExprLookahead(next, true, nesting + 1);
                             if (!type_arg_end.has_value()) {
                                 return std::nullopt;
                             }
@@ -1229,17 +1269,30 @@ class Parser {
         if (LooksLikeTypeCallExpr()) {
             return ParseTypeCallExpr();
         }
-        if (MatchesAny({TokenKind::kBang, TokenKind::kMinus, TokenKind::kAmp, TokenKind::kStar})) {
-            const auto op = Previous();
-            auto expr = std::make_unique<Expr>();
-            expr->kind = Expr::Kind::kUnary;
-            expr->span.begin = op.span.begin;
-            expr->text = std::string(mc::lex::ToString(op.kind));
-            expr->left = ParseUnaryExpr();
-            expr->span.end = expr->left->span.end;
-            return expr;
+        std::vector<Token> operators;
+        while (IsPrefixUnaryOperator(Current().kind)) {
+            const auto op = Advance();
+            if (operators.size() >= kMaxUnaryExprDepth) {
+                ReportError(op, "unary expression nesting exceeds parser limit");
+                while (IsPrefixUnaryOperator(Current().kind)) {
+                    Advance();
+                }
+                break;
+            }
+            operators.push_back(op);
         }
-        return ParsePostfixExpr();
+
+        auto expr = ParsePostfixExpr();
+        for (std::size_t index = operators.size(); index > 0; --index) {
+            auto unary = std::make_unique<Expr>();
+            unary->kind = Expr::Kind::kUnary;
+            unary->span.begin = operators[index - 1].span.begin;
+            unary->text = std::string(mc::lex::ToString(operators[index - 1].kind));
+            unary->left = std::move(expr);
+            unary->span.end = unary->left->span.end;
+            expr = std::move(unary);
+        }
+        return expr;
     }
 
     std::unique_ptr<Expr> ParsePostfixExpr() {
@@ -1509,6 +1562,14 @@ class Parser {
             default:
                 return false;
         }
+    }
+
+    bool IsCaseBoundary() const {
+        return Check(TokenKind::kCase) || Check(TokenKind::kDefault) || Check(TokenKind::kRBrace);
+    }
+
+    bool IsPrefixUnaryOperator(TokenKind kind) const {
+        return kind == TokenKind::kBang || kind == TokenKind::kMinus || kind == TokenKind::kAmp || kind == TokenKind::kStar;
     }
 
     bool IsStatementTerminator(TokenKind kind) const {
