@@ -29,6 +29,7 @@
 #include "compiler/mir/mir.h"
 #include "compiler/parse/parser.h"
 #include "compiler/sema/check.h"
+#include "compiler/support/assert.h"
 #include "compiler/support/diagnostics.h"
 #include "compiler/support/dump_paths.h"
 #include "compiler/support/source_manager.h"
@@ -420,6 +421,8 @@ std::string HexU64(std::uint64_t value) {
 }
 
 std::string HashText(std::string_view text) {
+    // FNV-1a 64-bit is deterministic and cheap for trusted local build caching.
+    // It is not collision-resistant against adversarial inputs.
     std::uint64_t hash = 1469598103934665603ull;
     for (const unsigned char byte : text) {
         hash ^= static_cast<std::uint64_t>(byte);
@@ -439,7 +442,10 @@ std::filesystem::path ComputeRuntimeObjectPath(const std::filesystem::path& entr
     return build_targets.object.parent_path() / (build_targets.object.stem().generic_string() + ".runtime.o");
 }
 
-std::string QuoteShellArg(std::string_view argument) {
+// Display-only POSIX shell quoting for diagnostics and logs. Subprocesses run
+// via execv with the raw argv vector below; this formatting is never used for
+// execution.
+std::string ShellDisplayQuote(std::string_view argument) {
     std::string quoted;
     quoted.reserve(argument.size() + 2);
     quoted.push_back('\'');
@@ -454,15 +460,50 @@ std::string QuoteShellArg(std::string_view argument) {
     return quoted;
 }
 
-std::string JoinCommand(const std::vector<std::string>& args) {
+std::string FormatCommandForDisplay(const std::vector<std::string>& args) {
     std::ostringstream command;
     for (std::size_t index = 0; index < args.size(); ++index) {
         if (index > 0) {
             command << ' ';
         }
-        command << QuoteShellArg(args[index]);
+        command << ShellDisplayQuote(args[index]);
     }
     return command.str();
+}
+
+enum class WaitForChildResult {
+    kExited,
+    kWaitError,
+    kTimedOut,
+};
+
+WaitForChildResult WaitForChildProcess(const pid_t pid,
+                                       const std::optional<int>& timeout_ms,
+                                       int& status) {
+    if (!timeout_ms.has_value() || *timeout_ms <= 0) {
+        return waitpid(pid, &status, 0) == pid ? WaitForChildResult::kExited : WaitForChildResult::kWaitError;
+    }
+
+    const auto start = std::chrono::steady_clock::now();
+    while (true) {
+        const pid_t wait_result = waitpid(pid, &status, WNOHANG);
+        if (wait_result == pid) {
+            return WaitForChildResult::kExited;
+        }
+        if (wait_result < 0) {
+            return WaitForChildResult::kWaitError;
+        }
+
+        const auto elapsed =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+        if (elapsed >= *timeout_ms) {
+            kill(pid, SIGKILL);
+            waitpid(pid, nullptr, 0);
+            return WaitForChildResult::kTimedOut;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 }
 
 int RunExecutableCommand(const std::filesystem::path& executable_path,
@@ -489,11 +530,9 @@ int RunExecutableCommand(const std::filesystem::path& executable_path,
         _exit(127);
     }
 
-    const auto start = std::chrono::steady_clock::now();
-    while (true) {
-        int status = 0;
-        const pid_t wait_result = waitpid(pid, &status, WNOHANG);
-        if (wait_result == pid) {
+    int status = 0;
+    switch (WaitForChildProcess(pid, timeout_ms, status)) {
+        case WaitForChildResult::kExited:
 #ifdef WIFEXITED
             if (WIFEXITED(status)) {
                 return WEXITSTATUS(status);
@@ -505,22 +544,13 @@ int RunExecutableCommand(const std::filesystem::path& executable_path,
             }
 #endif
             return status;
-        }
-        if (wait_result < 0) {
+        case WaitForChildResult::kWaitError:
             return 127;
-        }
-
-        if (timeout_ms.has_value() && *timeout_ms > 0) {
-            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-            if (elapsed >= *timeout_ms) {
-                kill(pid, SIGKILL);
-                waitpid(pid, nullptr, 0);
-                return 124;
-            }
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        case WaitForChildResult::kTimedOut:
+            return 124;
     }
+
+    MC_UNREACHABLE("unhandled child wait result");
 }
 
 std::optional<ModuleBuildState> LoadModuleBuildState(const std::filesystem::path& path,
@@ -787,6 +817,30 @@ std::optional<CompileGraph> DiscoverModuleGraph(
     return graph;
 }
 
+void AssertCompileGraphTopologicalOrder(const CompileGraph& graph) {
+#ifdef NDEBUG
+    (void)graph;
+#else
+    std::unordered_map<std::string, std::size_t> node_indices;
+    node_indices.reserve(graph.nodes.size());
+    for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
+        node_indices.emplace(graph.nodes[index].source_path.generic_string(), index);
+    }
+
+    for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
+        for (const auto& [import_name, import_path] : graph.nodes[index].imports) {
+            const std::string import_key = std::filesystem::absolute(import_path).lexically_normal().generic_string();
+            const auto found = node_indices.find(import_key);
+            if (found == node_indices.end()) {
+                MC_UNREACHABLE("compile graph is missing an imported module node");
+            }
+            (void)import_name;
+            assert(found->second < index && "compile graph nodes must be topologically ordered");
+        }
+    }
+#endif
+}
+
 std::optional<TargetBuildGraph> BuildTargetGraph(const CommandOptions& options,
                                                  support::DiagnosticSink& diagnostics) {
     auto project = LoadSelectedProject(options, diagnostics);
@@ -909,6 +963,17 @@ void NamespaceImportedBuildUnit(mc::mir::Module& module,
 std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
                                                         support::DiagnosticSink& diagnostics,
                                                         bool emit_objects) {
+    // Per module, the driver runs a fixed dependency-ordered pipeline:
+    // 1. Load imported interfaces.
+    // 2. Recompute the current incremental-build state.
+    // 3. Run sema.
+    // 4. Write the interface artifact when it changed.
+    // 5. Lower and validate MIR.
+    // 6. Optionally build the object file and persist state.
+    // The bootstrap driver assumes a single mc invocation owns a build
+    // directory; state and interface files are rewritten without file locks.
+    AssertCompileGraphTopologicalOrder(graph);
+
     std::vector<BuildUnit> units;
     units.reserve(graph.nodes.size());
 
@@ -1108,7 +1173,17 @@ void AddImportedExternDeclarations(mc::mir::Module& module,
         }
     }
 
+    std::vector<std::pair<std::string, const mc::sema::Module*>> ordered_imports;
+    ordered_imports.reserve(imported_modules.size());
     for (const auto& [module_name, imported_module] : imported_modules) {
+        ordered_imports.push_back({module_name, &imported_module});
+    }
+    std::sort(ordered_imports.begin(), ordered_imports.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.first < rhs.first;
+    });
+
+    for (const auto& [module_name, imported_module_ptr] : ordered_imports) {
+        const auto& imported_module = *imported_module_ptr;
         for (const auto& type_decl : imported_module.type_decls) {
             if (!existing_types.insert(type_decl.name).second) {
                 continue;
@@ -1877,11 +1952,9 @@ CapturedCommandResult RunExecutableCapture(const std::filesystem::path& executab
         _exit(127);
     }
 
-    const auto start = std::chrono::steady_clock::now();
-    while (true) {
-        int status = 0;
-        const pid_t wait_result = waitpid(pid, &status, WNOHANG);
-        if (wait_result == pid) {
+    int status = 0;
+    switch (WaitForChildProcess(pid, timeout_ms, status)) {
+        case WaitForChildResult::kExited:
 #ifdef WIFEXITED
             if (WIFEXITED(status)) {
                 result.exited = true;
@@ -1895,26 +1968,15 @@ CapturedCommandResult RunExecutableCapture(const std::filesystem::path& executab
             }
 #endif
             break;
-        }
-        if (wait_result < 0) {
+        case WaitForChildResult::kWaitError:
             result.exited = true;
             result.exit_code = 127;
             break;
-        }
-
-        if (timeout_ms.has_value() && *timeout_ms > 0) {
-            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-            if (elapsed >= *timeout_ms) {
-                kill(pid, SIGKILL);
-                waitpid(pid, nullptr, 0);
-                result.timed_out = true;
-                result.signaled = true;
-                result.signal_number = SIGKILL;
-                break;
-            }
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        case WaitForChildResult::kTimedOut:
+            result.timed_out = true;
+            result.signaled = true;
+            result.signal_number = SIGKILL;
+            break;
     }
 
     support::DiagnosticSink diagnostics;
