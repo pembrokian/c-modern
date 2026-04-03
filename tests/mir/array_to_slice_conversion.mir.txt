@@ -7,5 +7,5 @@ Module
       array_to_slice %v1:Slice<i32> target=Slice<i32> operands=[%v0]
       store_local target=slice operands=[%v1]
       load_local %v2:Slice<i32> target=slice
-      field %v3:usize target=len operands=[%v2]
+      field %v3:usize target=len target_kind=field target_name=len target_display=slice.len target_base=Slice<i32> operands=[%v2]
       terminator return values=[%v3]

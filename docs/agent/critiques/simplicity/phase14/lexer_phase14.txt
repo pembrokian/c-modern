@@ -1,0 +1,171 @@
+LEXER (lexer.cpp) — SIMPLICITY REVIEW
+Phase 14 / April 2026
+======================================================================
+
+SUMMARY
+
+Acceptable overall. The lexer is a single-pass scanner with clear state
+and predictable control flow. The biggest problem is that the keyword
+map and the ToString switch are two representations of the same data.
+A secondary issue is that `ConsumeDigitSequence` takes a function pointer
+for a character predicate when two concrete call sites would do.
+
+----------------------------------------------------------------------
+HIGH-IMPACT SIMPLIFICATIONS
+
+1. `kKeywords` (unordered_map) and `ToString(TokenKind)` (switch) are
+   two sources of truth for TokenKind↔string. Unify them.
+2. `ConsumeDigitSequence` takes a bool (*is_digit)(char) function pointer.
+   It has exactly two callers passing IsDecimalDigit and IsHexDigit.
+   The function pointer is not general; it is a premature parameterization
+   of two cases that could be handled directly.
+3. `LexIdentifier` constructs a std::string from a string_view substr, then
+   does a hash-map lookup. For keyword detection at bootstrap scale, a
+   sorted array linear scan or trie would avoid the heap allocation.
+
+----------------------------------------------------------------------
+SPECIFIC FINDINGS
+
+FINDING 1: Two tables encoding the same set of token-string pairs
+-----------------------------------------------------------------
+What exists:
+  const std::unordered_map<std::string_view, TokenKind> kKeywords
+    maps keyword text → TokenKind (used in LexIdentifier).
+
+  std::string_view ToString(TokenKind kind) — a 70-case switch
+    maps TokenKind → string text (used for diagnostics).
+
+Why it is unnecessary:
+  These two structures are dual representations of one table. When a
+  keyword is added, it must be entered in both places. There is no link
+  between them, so they can drift. The `kKeywords` map covers keywords
+  only; `ToString` covers all tokens. But the keyword half of `ToString`
+  is entirely redundant with `kKeywords`.
+
+  For a language with 25 keywords and ~55 total token kinds, an
+  unordered_map is overkill. The hash overhead on every identifier is
+  measurable. A sorted string array + binary search is sufficient and
+  produces a single canonical table.
+
+Simpler form:
+  struct TokenEntry { std::string_view text; TokenKind kind; };
+  static constexpr TokenEntry kTokenTable[] = {
+      // sorted by text for binary search
+      {"!", TokenKind::kBang}, {"!=", TokenKind::kBangEq}, ...
+      {"break", TokenKind::kBreak}, {"case", TokenKind::kCase}, ...
+  };
+  // keyword lookup: binary search kTokenTable for identifier text
+  // ToString: linear scan kTokenTable for kind, return text
+  One table. One place to add tokens.
+
+
+FINDING 2: Function pointer in ConsumeDigitSequence is premature generality
+---------------------------------------------------------------------------
+What exists:
+  void ConsumeDigitSequence(bool& ok,
+                            const SourcePosition& literal_start,
+                            bool (*is_digit)(char),
+                            bool allow_separator,
+                            const char* missing_digits_message,
+                            const char* separator_message)
+
+  Called twice: once with &Lexer::IsDecimalDigit, once with &Lexer::IsHexDigit.
+
+Why it is unnecessary:
+  The function signature is complex for what it does. It was parameterized
+  to avoid two copies of the same loop, but that loop is 30 lines. The
+  function has six parameters, two of which are error message strings that
+  differ only at the call site. The two call sites pass entirely different
+  string literals.
+
+  A cleaner factoring: two distinct functions, ConsumeDecimalDigits and
+  ConsumeHexDigits, each 20 lines. No function pointers, no message
+  parameters, no `allow_separator` bool. The shared structure is clear
+  from reading them side by side; it does not need to be forced into a
+  single parameterized function.
+
+  Alternatively, if the abstraction is kept: make it a private helper
+  with an enum (kDecimal, kHex) instead of a function pointer and two
+  string parameters. Six parameters is too many.
+
+
+FINDING 3: String heap allocation in LexIdentifier on every token
+-----------------------------------------------------------------
+What exists:
+  const auto text = std::string(source_text_.substr(start_index, index_ - start_index));
+  const auto keyword = kKeywords.find(text);
+
+Why it is a problem:
+  Every identifier and every keyword allocation goes on the heap for the
+  purpose of a map lookup. The source_text_ string_view is stable; a
+  direct string_view lookup would work if the map key is string_view
+  (which it is: `std::unordered_map<std::string_view, TokenKind>`).
+  The substr call is also unnecessary:
+    std::string_view sv = source_text_.substr(start_index, ...);
+    const auto keyword = kKeywords.find(sv);
+  This avoids the allocation entirely for the lookup. The Token::lexeme
+  field stores a std::string, so the allocation happens once when
+  building the token — but that is unavoidable given the Token layout.
+  The map lookup allocation is avoidable.
+
+
+FINDING 4: LeafLiteral field stores raw source text, not decoded value
+----------------------------------------------------------------------
+What exists:
+  Token::lexeme stores the raw source text of every token, including
+  string literals with escape sequences (e.g., `"hello\nworld"`).
+
+  The sema layer (check.cpp) later re-parses this text with its own
+  ParseIntegerLiteral and ParseFloatLiteral helpers, and the code gen
+  layer will need to decode string escapes.
+
+Why it is a problem:
+  Text parsed once should not be re-parsed. The lexer already scans
+  integer and float literals character by character; it has everything
+  needed to store the decoded numeric value in the token. For string
+  literals, storing the decoded byte string (not the escape-encoded
+  source form) would eliminate re-interpretation downstream.
+
+  This is a cross-cutting issue touching the Token structure. It is
+  documented here because the lexer is where the parse should happen.
+  See also the check.cpp critique (FINDING 1 there).
+
+
+FINDING 5: LexPunctuation returns optional<Token> but never returns nullopt
+           for any character that isn't already unconsumed
+---------------------------------------------------------------------------
+What exists:
+  std::optional<Token> LexPunctuation(SourcePosition start)
+  Returns nullopt only for '|' (bare, single) and via the default case.
+
+Why it is an odd contract:
+  The outer Run() loop calls LexPunctuation only when the current char
+  is none of: identifier start, digit, '"', newline. The only char
+  that falls through to the Run() error path is an unrecognized character.
+  Single '|' without a following '|' reaches the break, returns nullopt,
+  and then the outer loop reports "unexpected character" — which is the
+  correct behavior, but is now a silent failure where LexPunctuation
+  does not report the error itself.
+
+  The inconsistency: LexPunctuation (not the outer loop) should own the
+  error for unrecognized punctuation. Either LexPunctuation always
+  produces a token and reports errors internally (remove optional), or
+  the outer loop owns all errors. The current split — LexPunctuation
+  sometimes reports, sometimes returns nullopt for the outer loop to
+  report — is inconsistent.
+
+  This is minor. The current behavior is correct. But the optional
+  return creates a two-step dispatch for the common error case.
+
+
+----------------------------------------------------------------------
+STRUCTURAL OBSERVATION
+
+The Lexer class wraps state (source_text_, index_, line_, column_,
+file_path_, diagnostics_) that is entirely set at construction and
+consumed in one Run() call. That is correct. The class exists to hold
+the pass-by-reference state across helper methods, which is a legitimate
+use of a class.
+
+At 590 lines this is compact for a lexer. The control flow in Run()
+is clear. The main issue is the keyword table duplication.

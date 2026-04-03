@@ -65,6 +65,6 @@ Module
       bounds_check op=index operands=[%v26, %v27]
       index %v28:i32 target_kind=index target_display=window[0] target_base=Slice<i32> operands=[%v25, %v26] target_types=[int_literal]
       load_local %v29:Slice<i32> target=window
-      field %v30:usize target=len operands=[%v29]
+      field %v30:usize target=len target_kind=field target_name=len target_display=window.len target_base=Slice<i32> operands=[%v29]
       aggregate_init %v31:WindowStats target=WindowStats operands=[%v24, %v28, %v30] fields=[total, first, count]
       terminator return values=[%v31]

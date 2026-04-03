@@ -1,0 +1,264 @@
+SEMANTIC CHECKER (check.cpp) — SIMPLICITY REVIEW
+Phase 14 / April 2026
+======================================================================
+
+SUMMARY
+
+Too complex. At 2946 lines this is the heaviest file in the compiler and
+it carries several categories of unnecessary structure: re-parsing of
+already-parsed information, duplicated type-stripping logic, a const
+evaluator that mixes operator dispatch with value construction, and a
+private string-key lookup cache that mirrors data already in the module.
+The Checker class has too many responsibilities and too much private state
+that does not need to be class state.
+
+----------------------------------------------------------------------
+HIGH-IMPACT SIMPLIFICATIONS
+
+1. ParseIntegerLiteral and ParseFloatLiteral duplicate work the lexer
+   already did. The token carries the source text; the value should have
+   been decoded at lex time.
+
+2. StripTypeAliases / StripAliasOrDistinct / StripTypeAliasesInternal —
+   three closely related functions with overlapping contracts. One is
+   sufficient.
+
+3. The const evaluator (EvaluateConstExpr) dispatches on both operator
+   string AND value kind, producing 200+ lines of nested conditions.
+   The operator dispatch and the value arithmetic should be separate.
+
+4. SpanKey() converts source positions to a formatted string to use as a
+   map key. Source positions are two pairs of integers; that is a 64-bit
+   integer key waiting to happen, not a string.
+
+5. RecordExprType / RecordBindingOrAssignFact both search for existing
+   entries via the string-key map, fall back to the vector, then store
+   an index back in the map. This is a hand-rolled secondary index onto
+   a vector. Use the map directly or a plain unordered_map, not both.
+
+6. WriteIndent + WriteLine duplicated from ast.cpp — same critique.
+
+----------------------------------------------------------------------
+SPECIFIC FINDINGS
+
+FINDING 1: IntegerLiteral and FloatLiteral re-parsed at check time
+------------------------------------------------------------------
+What exists:
+  std::optional<std::int64_t> ParseIntegerLiteral(std::string_view text)
+  std::optional<double> ParseFloatLiteral(std::string_view text)
+
+  Both strip '_' separators, handle 0x prefixes, and convert from the
+  raw token lexeme text to a numeric value. This is also what the lexer
+  does character-by-character while scanning.
+
+Why it is unnecessary:
+  The lexer has already validated that the token text is a legal numeric
+  literal. It knows the base (hex vs decimal) because it chose the hex
+  path. It knows whether '.' or 'e' appeared. Storing the decoded value
+  in the Token, or in a separate numeric literal table, would eliminate
+  this re-parse entirely.
+
+  ParseIntegerLiteral is called from EvaluateConstExpr for literal tokens
+  and from ParseGlobalConstValue when reading back string-serialized
+  constant values. The former would disappear with decoded tokens. The
+  latter is a symptom of FINDING 5 below.
+
+Simpler form:
+  Token carries a union { int64_t integer; double floating; } for numeric
+  literal tokens. The lexer fills it. ParseIntegerLiteral and
+  ParseFloatLiteral are deleted.
+
+
+FINDING 2: Three type-stripping functions with overlapping semantics
+--------------------------------------------------------------------
+What exists:
+  StripTypeAliasesInternal  — recursively expands only kTypeAlias kinds
+  StripTypeAliases          — thin wrapper that calls Internal
+  StripAliasOrDistinct      — a while loop that calls StripTypeAliases AND
+                              expands kDistinct kinds, with its own
+                              `visited` set for cycle protection
+
+  All three are called in check.cpp. IsAssignable, IsNumericType,
+  IsPointerLikeType, etc., each pick one of the three based on what
+  semantics they want. There is no central documentation of when to strip
+  only aliases vs. aliases+distinct.
+
+Why it is unnecessary:
+  The distinction between "strip aliases only" and "strip aliases and
+  distinct" is a semantic policy, not a mechanical difference. Both should
+  be one function with a parameter, or the callers should be audited so
+  one semantic covers all cases. Three entry points for the same walk
+  invites bugs where the wrong stripper is used.
+
+Simpler form:
+  Type StripType(Type type, const Module& module, bool include_distinct);
+  Delete StripTypeAliasesInternal (it becomes the body); fold the
+  external wrapper. Two fewer function names, one clear policy switch.
+
+
+FINDING 3: EvaluateConstExpr — operator dispatch mixed with value construction
+------------------------------------------------------------------------------
+What exists:
+  std::optional<ConstValue> EvaluateConstExpr(...) — a 200-line switch
+  on expr.kind, with a nested Expr::Kind::kBinary case that is itself
+  a 100-line cascade of if-else chains checking expr.text as a string
+  for each operator.
+
+Why it is unnecessary:
+  Binary operator dispatch should be a table. The current code is a
+  chain of:
+    if (expr.text == "+") { ... CheckedAddInt64 ... }
+    else if (expr.text == "-") { ... CheckedSubInt64 ... }
+    ...
+  for both integer and float paths, repeated twice (once for each numeric
+  kind). The logic is correct but buried in 100 lines of nearly-duplicate
+  conditionals.
+
+Simpler form:
+  struct BinaryOp {
+      std::string_view op;
+      std::optional<int64_t> (*integer_fn)(int64_t, int64_t);   // null if not supported
+      double (*float_fn)(double, double);                         // null if not supported
+  };
+  static constexpr BinaryOp kBinaryOps[] = {
+      {"+", CheckedAddInt64, [](double a, double b){ return a + b; }},
+      ...
+  };
+
+  The comparison operator path is a separate table. The 100-line cascade
+  becomes a table lookup plus two dispatch lines.
+
+
+FINDING 4: SpanKey() converts integers to string for use as a map key
+----------------------------------------------------------------------
+What exists:
+  std::string SpanKey(const mc::support::SourceSpan& span) {
+      return std::to_string(span.begin.line) + ":" + ... + ":" + ...;
+  }
+
+  This string is used as the key in:
+    module_->expr_type_indices: unordered_map<string, size_t>
+    module_->binding_or_assign_indices: unordered_map<string, size_t>
+
+Why it is unnecessary:
+  A SourceSpan is four integers (begin.line, begin.column, end.line,
+  end.column). That is 4×64-bit = 256 bits, or comfortably packed into
+  a 64-bit key using reasonable bit-packing (e.g., 16 bits per field for
+  files under 65K lines). Converting to a formatted string and hashing
+  the string is slower, allocates heap memory, and is harder to debug
+  than a numeric key.
+
+  Map lookups in RecordExprType and RecordBindingOrAssignFact are on the
+  hot path of type checking every expression. Using string keys here is
+  a performance and clarity regression.
+
+Simpler form:
+  uint64_t SpanKey(const SourceSpan& span) {
+      return ((uint64_t)span.begin.line << 48) |
+             ((uint64_t)span.begin.column << 32) |
+             ((uint64_t)span.end.line << 16) |
+             (uint64_t)span.end.column;
+  }
+  Map key type becomes uint64_t. No heap allocation, no formatting.
+
+
+FINDING 5: RecordExprType and RecordBindingOrAssignFact maintain a
+           hand-rolled vector+map secondary index
+------------------------------------------------------------------
+What exists:
+  module_->expr_types — a vector<ExprTypeFact>
+  module_->expr_type_indices — unordered_map<string, size_t>
+
+  RecordExprType checks the map first. If found, updates the vector
+  entry. If not, appends to the vector and inserts index into the map.
+
+Why it is unnecessary:
+  This is a hand-coded upsert on a vector with a parallel map index.
+  The map IS the primary container — the vector index it stores is just
+  a position in a vector that is only ever appended to. This can be
+  replaced by a plain unordered_map<SpanKey, ExprTypeFact> where the
+  value is stored directly in the map, not via a vector indirection.
+
+  The vector+map pair exists apparently to support ordered iteration
+  over type facts during the module dump. But iteration order can be
+  imposed by sorting the map at dump time; it does not require a
+  parallel vector.
+
+Simpler form:
+  std::unordered_map<uint64_t, ExprTypeFact> expr_types;
+  RecordExprType: expr_types[SpanKey(expr.span)] = {span, type};
+  FindExprType: auto it = expr_types.find(SpanKey(expr.span)); ...
+  One data structure. No index. No vector. No upsert logic.
+
+
+FINDING 6: WriteIndent + WriteLine duplicated from ast.cpp
+----------------------------------------------------------
+What exists:
+  Identical WriteIndent/WriteLine helpers in check.cpp, with the same
+  body as ast.cpp's versions.
+
+Why it is unnecessary:
+  These belong in support/. They are reproduced in at least two places.
+  Either make them freestanding in a support header, or tolerate the
+  duplication and stop pretending it is a deliberate design.
+
+  This applies equally to mir.cpp (which has its own copies) and
+  driver.cpp.
+
+
+FINDING 7: Checker class private fields include multiple lookup maps that
+          are also stored on the Module
+----------------------------------------------------------------------
+What exists:
+  Checker has:
+    function_map_: unordered_map<string, const FunctionSignature*>
+    type_map_: unordered_map<string, const TypeDeclSummary*>
+    global_symbols_: unordered_map<string, ValueBinding>
+    value_symbols_: unordered_map<string, Decl::Kind>
+    type_symbols_: unordered_map<string, Decl::Kind>
+    const_eval_cache_: unordered_map<string, ConstValue>
+
+  Some of these are also stored in module_ (which is a Module*).
+  BuildModuleLookupMaps(module) is called at the end of Run() to
+  populate the module's own lookup tables from the module's vectors.
+
+Why it is a problem:
+  There are two places associating names with types/functions/globals.
+  The Checker builds its own maps as it collects declarations, then at
+  the end copies the same information into the Module's lookup maps.
+  The Module's lookup maps then become the external interface for the
+  rest of the pipeline.
+
+  value_symbols_ and type_symbols_ store Decl::Kind for duplicate
+  detection, which is correct for the sema phase. But function_map_
+  and type_map_ are just pointer caches into module_->functions and
+  module_->type_decls. These could be queried via linear scan during
+  collection (the module is small at collection time) and fully indexed
+  in Module at the end. No need to maintain both a Checker-internal map
+  and a Module map.
+
+Simpler form:
+  During collection: use linear scan on the growing module vectors for
+  duplicate detection. At end of collection: call BuildModuleLookupMaps
+  once. The Checker's function_map_ and type_map_ disappear. Only
+  value_symbols_ and type_symbols_ remain as Checker state (for
+  duplicate detection during collection).
+
+
+----------------------------------------------------------------------
+THE REAL PROBLEM: Checker class carries too much responsibility
+
+The Checker does: import seeding, declaration collection, type
+validation, layout computation, global validation, function signature
+validation, function body type checking, const evaluation, and module
+dump preparation. All in one 2500-line class with 10 private fields.
+
+This is not obviously wrong for a bootstrap compiler, but it means
+every part of the checker silently has access to everything. When a
+method reads `type_map_` or `function_map_`, you cannot tell from the
+method signature whether it is doing collection or checking.
+
+The fields that belong to the "collection" sub-phase vs. the "checking"
+sub-phase should be separated, even if only by comment grouping. The
+current layout makes the two-phase nature of the checker (collect-then-
+check) invisible.

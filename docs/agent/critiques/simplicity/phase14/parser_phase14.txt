@@ -1,0 +1,227 @@
+PARSER (parser.cpp) — SIMPLICITY REVIEW
+Phase 14 / April 2026
+======================================================================
+
+SUMMARY
+
+Acceptable. At 1630 lines this is a recursive-descent parser with
+straightforward structure. The Parser class is well-scoped: it wraps
+token stream state and emits AST nodes. Most of the complexity is
+inherent in the grammar.
+
+Three real problems: the lookahead machinery (SkipTypeExprLookahead,
+LooksLikeTypeCallExpr, LooksLikePostfixTypeArgs) is a re-implemented
+scanner embedded in the parser, the ParseBinaryChain function pointer
+dispatch obscures precedence, and the type expression prefix-reversal
+pattern is unnecessarily convoluted.
+
+----------------------------------------------------------------------
+HIGH-IMPACT SIMPLIFICATIONS
+
+1. The lookahead scanner (SkipTypeExprLookahead + helpers) is a second,
+   read-only tokenizer built inside the parser to disambiguate two
+   grammar constructs. Its existence signals a grammar ambiguity that
+   should be resolved differently.
+
+2. ParseBinaryChain takes a method pointer (std::unique_ptr<Expr>
+   (Parser::*)()) to thread the precedence chain. Each individual
+   parse-level wrapper becomes a one-liner that calls ParseBinaryChain.
+   The method pointer dispatch is harder to read than just writing the
+   call inline.
+
+3. TypeExpr prefix reversal: the parser collects prefix tokens (const,
+   *) into a vector, parses the base type, then reverses and wraps in
+   a loop. This two-pass approach is unnecessary; prefix types can be
+   constructed right-to-left with a recursive call or a stack, not a
+   prefix vector + reverse loop.
+
+----------------------------------------------------------------------
+SPECIFIC FINDINGS
+
+FINDING 1: SkipTypeExprLookahead is a second scanner buried in the parser
+--------------------------------------------------------------------------
+What exists:
+  SkipTypeExprLookahead(offset, allow_bare_identifier, depth) — a
+  recursive lookahead function that re-implements the grammar of type
+  expressions, scanning forward without consuming tokens, to determine
+  whether the upcoming tokens form a valid type expression.
+
+  Called from LooksLikeTypeCallExpr() and LooksLikePostfixTypeArgs(),
+  which are called from ParsePostfixExpr() to disambiguate `f<T>(x)` 
+  (type-parameterized call) from `a < b` (comparison).
+
+Why it is a problem:
+  This exists because `<` is both a comparison operator and a
+  type-argument opener. The parser speculates by scanning ahead to see
+  whether `<identifier...>` looks like type arguments. If yes, it takes
+  the type-call path. If no, it falls back to the comparison path.
+
+  The lookahead scanner duplicates the type expression grammar in a
+  pure-lookahead form. Any change to the type expression grammar must be
+  reflected in both the real ParseTypeExpr and the lookahead
+  SkipTypeExprLookahead. This is a maintenance burden and a source of
+  bugs.
+
+  The root cause is the grammar ambiguity: `f<` could start a
+  type-parameterized call or a comparison. The resolution is either:
+    (a) Require type arguments to be syntactically unambiguous (e.g., 
+        use `@` or `!` instead of `<>` for type args), or
+    (b) Live with the lookahead and document it as a deliberate grammar
+        compromise.
+
+  At this stage (b) is likely correct, but the lookahead scanner should
+  be clearly marked as a GRAMMAR WORKAROUND, not treated as regular
+  parsing infrastructure.
+
+
+FINDING 2: ParseBinaryChain method pointer dispatch
+---------------------------------------------------
+What exists:
+  std::unique_ptr<Expr> ParseBinaryChain(
+      std::unique_ptr<Expr> (Parser::*parse_operand)(),
+      std::initializer_list<TokenKind> operators)
+
+  Eight callers, each a one-liner:
+    ParseLogicalOrExpr() { return ParseBinaryChain(&Parser::ParseLogicalAndExpr, {kPipePipe}); }
+    ParseAdditiveExpr()  { return ParseBinaryChain(&Parser::ParseMultiplicativeExpr, {kPlus, kMinus}); }
+    ...
+
+Why it is unnecessary:
+  The method pointer parameterization saves ~5 lines by writing the
+  loop once. The cost is that every reader must understand that
+  "parse_operand" is a member function pointer, which is the ugliest
+  corner of C++. The loop body is 12 lines. Inlining it into two or
+  three of the distinct precedence levels with different operators and
+  different operand parsers would be clearer.
+
+  Alternatively: if the factoring is kept, replace the method pointer
+  with `std::function<std::unique_ptr<Expr>()>` bound at the call site —
+  but that is slower. The clearest option for a bootstrap compiler is
+  to inline the loop.
+
+Simpler form:
+  std::unique_ptr<Expr> ParseAdditiveExpr() {
+      auto expr = ParseMultiplicativeExpr();
+      while (Check(kPlus) || Check(kMinus)) {
+          const auto op = Advance();
+          auto node = std::make_unique<Expr>();
+          node->kind = Expr::Kind::kBinary;
+          node->text = std::string(mc::lex::ToString(op.kind));
+          node->left = std::move(expr);
+          node->right = ParseMultiplicativeExpr();
+          expr = std::move(node);
+      }
+      return expr;
+  }
+  8 callers × 10 lines = 80 lines. Current: 8 one-liners + 12-line
+  shared function + 8-line MatchesAny = same. No real savings, worse
+  readability.
+
+
+FINDING 3: TypeExpr prefix vector + reverse loop
+------------------------------------------------
+What exists:
+  In ParseTypeExpr():
+    std::vector<Token> prefix_tokens;
+    std::vector<TypeExpr::Kind> prefix_kinds;
+    while (Check(kConst) || Check(kStar)) {
+        prefix_tokens.push_back(Advance());
+        prefix_kinds.push_back(...);
+    }
+    // ... parse base type ...
+    for (std::size_t index = prefix_tokens.size(); index > 0; --index) {
+        auto wrapper = std::make_unique<TypeExpr>();
+        // wrap from innermost to outermost
+    }
+
+Why it is unnecessary:
+  The prefixes are collected forward, then the wrapping loop iterates
+  backward. This is a roundabout way to build a right-associative chain.
+  It requires two vectors that are allocated for every type expression.
+
+  Direct recursion handles this without the vectors:
+    if (Check(kConst)) {
+        Advance();
+        auto inner = ParseTypeExpr(depth + 1);
+        auto wrapper = ...; wrapper->kind = kConst; wrapper->inner = std::move(inner);
+        return wrapper;
+    }
+    if (Check(kStar)) { ... same ... }
+    // base case: parse the named/array/paren type
+
+  Recursive prefix descent avoids vectors entirely. The depth limit is
+  already checked for the real recursion; it serves equally for prefix
+  recursion.
+
+
+FINDING 4: ParseForStmt looks ambiguous at parse time — discrimination
+      between ForEach and ForRange happens by examining the iterable
+----------------------------------------------------------------------
+What exists:
+  stmt->kind = iterable != nullptr && iterable->kind == Expr::Kind::kRange
+               ? Stmt::Kind::kForRange
+               : Stmt::Kind::kForEach;
+
+Why it is a problem:
+  The discriminated kind (ForRange vs ForEach) depends on the parsed
+  iterable expression being a range expression ('..'). This is a sema
+  concern, not a parse concern. If the iterable is a named variable
+  whose type is a range, the parser would misclassify it as ForEach.
+  The distinction between ForEach and ForRange should be resolved in
+  sema, based on the expression type, not in the parser based on the
+  expression kind.
+
+  This makes the parser encode a partial type inference that belongs
+  downstream. The parser should emit a single Stmt::Kind::kForIn and
+  let sema resolve the range vs. slice distinction.
+
+  This is already noted in the code ("Parse-time discrimination only
+  recognises literal range syntax"), so it is a known limitation, but
+  it is still an architectural friction point.
+
+
+FINDING 5: ParseCasePattern — three separate code paths with
+      overlapping structure
+-----------------------------------------------------------
+What exists:
+  ParseCasePattern() has three explicit cases:
+    1. Identifier '.' identifier (maybe '.' identifier again) — qualified variant
+    2. Identifier '(' — simple variant with payload
+    3. Expression — fell through from both variant paths
+
+  Both variant paths manually scan and assemble a variant_name string
+  by concatenating lexemes with '.'.
+
+Why it is a problem:
+  The qualified name assembly (`qualifier.lexeme + "." + ...`) duplicates
+  the qualified name parsing that ParsePrimaryExpr / ParsePostfixExpr
+  would handle for expressions. For variant patterns, the qualification
+  depth is bounded (up to 3 components), but the manual assembly is
+  ad hoc.
+
+  If the grammar allows variant patterns as qualified identifiers, then
+  ParseCasePattern should parse a qualified identifier using the same
+  machinery as expression parsing, then interpret the result as a variant
+  pattern, rather than re-implementing qualified name scanning inline.
+
+
+----------------------------------------------------------------------
+STRUCTURAL OBSERVATION
+
+The Parser class is appropriately scoped: it owns the token stream index,
+the error flag, and the diagnostic sink, and nothing else. The helpers
+(Match, Check, Consume, etc.) are conventional and correct.
+
+The `AggInitGuard` RAII pattern for allow_aggregate_init_ is a red flag:
+it uses a hidden class-level flag to plumb context through the call
+stack. This is implicit control flow. The flag exists because aggregate
+init syntax (`Foo { x: 1 }`) can be ambiguous with a condition followed
+by a block. Passing `allow_aggregate_init` explicitly as a parameter to
+ParseExpr (which it does for direct callers), but propagating it
+implicitly through class state for inner sub-expressions, is
+inconsistent. Pick one: always pass it explicitly through to all
+sub-parsers, or deduce it structurally from something cleaner.
+
+At 1630 lines, the parser is large but not gratuitously so. Most of
+the lines are declaration parsers, which is appropriate for the number
+of declaration forms in the language.

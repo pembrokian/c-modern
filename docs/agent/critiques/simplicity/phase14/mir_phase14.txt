@@ -1,0 +1,271 @@
+MIR (mir.cpp) — SIMPLICITY REVIEW
+Phase 14 / April 2026
+======================================================================
+
+SUMMARY
+
+Too complex. At 4856 lines this is the largest file in the compiler.
+The complexity concentration is in three areas: (1) a type-predicate
+ecosystem where every predicate exists in two or three versions —
+with-module and without-module variants — (2) a special-call
+classification system driven by string comparison against hardcoded
+callee names, and (3) the ValidateModule function that is 1300+ lines
+of inline case dispatch. The dump infrastructure adds another 200 lines
+of the same WriteIndent/WriteLine pattern seen everywhere else.
+
+----------------------------------------------------------------------
+HIGH-IMPACT SIMPLIFICATIONS
+
+1. Every type predicate (IsIntegerType, IsFloatType, IsNumericType,
+   IsPointerLikeType, IsBoolType, IsIntegerLikeType, IsUintPtrType) has
+   two overloads: one taking `(const Module&, const sema::Type&)` and
+   one taking just `(const sema::Type&)`. That is 14 functions for 7
+   predicates. The with-module forms call StripMirAliasOrDistinct before
+   delegating to sema::. The without-module forms exist only for call
+   sites that already have a canonical type. Merge into one set.
+
+2. ClassifySpecialCall is a string-comparison cascade over callee names.
+   These names are known statically. They should be in a table, not
+   spelled out as 13 if-chains, each checking two forms (qualified and
+   unqualified, e.g. "buffer_new" and "mem.buffer_new").
+
+3. ValidateModule >= 1300 lines of a single switch-within-loop. Each
+   case is a self-contained sub-validation. These should be individual
+   functions called from ValidateModule, not inlined cases.
+
+4. HasCompatibleNumericTypes and IsAssignableType also have
+   with-module and without-module variants, doubling them. Same
+   issue as the predicates.
+
+5. The FunctionLowerer class is 800+ lines of a single Run() method
+   with ~30 private helpers. This is the correct-by-structure design —
+   class wrapping local state — but the name "FunctionLowerer" conflicts
+   with LowerFunctionDecl (the external entry point). The boundary
+   between "what is on the class" and "what is a free function" is
+   not enforced by any rule.
+
+----------------------------------------------------------------------
+SPECIFIC FINDINGS
+
+FINDING 1: Predicate duplication — with-module and without-module forms
+-----------------------------------------------------------------------
+What exists:
+  bool IsIntegerType(const Module& module, const sema::Type& type);
+  bool IsIntegerType(sema::Type stripped_type);  // in sema:: namespace
+  bool IsFloatType(const Module& module, const sema::Type& type);
+  ...repeated for: IsNumericType, IsIntegerLikeType, IsBoolType,
+                   IsPointerLikeType, IsUintPtrType, IsAssignableType,
+                   HasCompatibleNumericTypes, HasCompatibleComparisonTypes
+
+  The mir.cpp with-module versions call:
+    sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type))
+  then delegate to the sema:: predicate.
+
+Why it is unnecessary:
+  The module-local variants exist because ValidateModule and
+  FunctionLowerer often have a module in scope and want to strip
+  aliases/distinct before checking the predicate. The without-module
+  forms are used where the type is already stripped.
+
+  The real issue: type stripping is optional. Because it is optional and
+  callers must opt in by choosing the right overload, callers can silently
+  call the wrong predicate on an unstripped type. This is a latent bug.
+
+  Simpler form: one set of predicates, all with-module. Make stripping
+  mandatory. Callers that have already stripped can pass in the stripped
+  type with no overhead (they have been doing that anyway once they had
+  the stripped type). This is three fewer overload sets.
+
+  Alternatively: a single CanonicalType(module, type) function that
+  returns the stripped+canonical result, and all predicates work only
+  on CanonicalType. One canonical form, one predicate set, no overloads.
+
+
+FINDING 2: ClassifySpecialCall is a 13-branch string table written as code
+--------------------------------------------------------------------------
+What exists:
+  SpecialCallKind ClassifySpecialCall(std::string_view callee_name) {
+      if (callee_name == "mmio_ptr" || callee_name == "hal.mmio_ptr")
+          return SpecialCallKind::kMmioPtr;
+      if (callee_name == "buffer_new" || callee_name == "mem.buffer_new")
+          return SpecialCallKind::kBufferNew;
+      ... 11 more cases ...
+  }
+
+  Each intrinsic function has two recognized names: unqualified and
+  module-qualified (e.g., "atomic_load" and "sync.atomic_load").
+
+Why it is unnecessary:
+  This is a static lookup table written as code. Any new intrinsic
+  requires adding an if-chain entry. The unqualified and qualified forms
+  are mechanically derivable from a (leaf_name, module_name) pair.
+
+Simpler form:
+  struct SpecialCallEntry {
+      std::string_view leaf_name;
+      std::string_view module_name;
+      SpecialCallKind kind;
+  };
+  static constexpr SpecialCallEntry kSpecialCalls[] = {
+      {"mmio_ptr",               "hal",  SpecialCallKind::kMmioPtr},
+      {"buffer_new",             "mem",  SpecialCallKind::kBufferNew},
+      ...
+  };
+
+  SpecialCallKind ClassifySpecialCall(std::string_view callee_name) {
+      for (const auto& entry : kSpecialCalls) {
+          if (callee_name == entry.leaf_name ||
+              callee_name == (entry.module_name + "." + entry.leaf_name))
+              return entry.kind;
+      }
+      return SpecialCallKind::kNone;
+  }
+
+  This collapses 30+ lines to a table + 8-line loop. Adding an intrinsic
+  is one table row.
+
+
+FINDING 3: ValidateModule inlines 1300+ lines as switch cases
+-------------------------------------------------------------
+What exists:
+  bool ValidateModule(...) {
+      // outer loop over functions
+      //   inner loop over blocks
+      //     inner loop over instructions
+      //       switch (instruction.kind) {
+      //           case kLocalAddr: { 50 lines }
+      //           case kLoadLocal: { 30 lines }
+      //           ... 28 more cases, 10-100 lines each ...
+      //       }
+
+Why it is a problem:
+  The individual validation cases have no external dependencies on each
+  other. Each is a self-contained check of one instruction kind. Inlining
+  them all into one function produces a 1300-line function that is
+  impossible to navigate. Error messages are generated with identical
+  patterns throughout ("report("... in function " + function.name)").
+
+  Each case should be a named function: ValidateLocalAddr,
+  ValidateLoadLocal, ValidateStoreLocal, etc. ValidateModule's inner
+  switch becomes one-line dispatches. The report lambda is passed as a
+  parameter or through a Validator context struct.
+
+Simpler form:
+  struct ValidationContext {
+      const Module& module;
+      const Function& function;
+      const BasicBlock& block;
+      std::unordered_map<std::string, sema::Type>& value_types;
+      std::unordered_map<std::string, sema::Type>& local_types;
+      const std::function<void(const std::string&)>& report;
+  };
+
+  void ValidateLocalAddrInstruction(const Instruction& instr,
+                                    const ValidationContext& ctx);
+  void ValidateStoreTargetInstruction(const Instruction& instr,
+                                      const ValidationContext& ctx);
+  // ... one per instruction kind ...
+
+  The switch in ValidateModule becomes a table or a switch with
+  one-line calls. Total code: same lines, but each function can be
+  read and tested independently.
+
+
+FINDING 4: FindMirTypeDecl / FindMirGlobalDecl / FindMirFunction
+           all use linear scan with the same comment: "Bootstrap MIR
+           still uses linear declaration scans here"
+----------------------------------------------------------------
+What exists:
+  Three O(n) scan functions with identical justification comments.
+
+Why it is tolerable but should be tracked:
+  The comments are honest about the limitation. For bootstrap scale
+  this is fine. But at the point where module sizes grow (imported
+  modules aggregating many type decls), these become bottlenecks.
+
+  The MIR module does not have the same lookup maps that the sema module
+  has (which are built by BuildModuleLookupMaps). If the sema::Module
+  lookup maps are passed into MIR validation, the MIR does not need
+  its own lookup infrastructure.
+
+  This is a future concern, not an immediate action.
+
+
+FINDING 5: DeferredCall struct has 12 fields, several of which apply
+           only to specific special-call kinds
+--------------------------------------------------------------------
+What exists:
+  struct DeferredCall {
+      std::string target;
+      Instruction::TargetKind target_kind;
+      std::string target_name;
+      std::string target_display;
+      SpecialCallKind special_kind;
+      sema::Type type;
+      std::string op;
+      std::string atomic_order;
+      std::string atomic_success_order;
+      std::string atomic_failure_order;
+      std::string callee_local;
+      std::vector<std::string> arg_locals;
+  };
+
+Why it is a problem:
+  `atomic_order`, `atomic_success_order`, `atomic_failure_order` are
+  only populated for atomic special calls. `op` is only used for
+  binary operations. These are optional fields in a flat struct, which
+  is a union waiting to be designed properly.
+
+  The struct is used to represent deferred calls in the defer statement
+  implementation within FunctionLowerer. It is populated once, stored
+  in a vector, then emitted at defer unwind time. Because all fields
+  are optional depending on special_kind, the struct is always partially
+  initialized. This is the Opacity sin: hidden state — which fields are
+  valid depends on special_kind, and there is no enforcement.
+
+Simpler form:
+  For bootstrap scale, a flat struct with optional fields is acceptable.
+  The improvement is: document with comments which fields are valid for
+  which special_kind values, so readers do not need to search the
+  emission code to understand the struct.
+
+
+FINDING 6: TargetMetadata and DeferredCall carry overlapping target fields
+--------------------------------------------------------------------------
+What exists:
+  struct TargetMetadata { string target; TargetKind kind; string name; string display; };
+  struct DeferredCall { string target; TargetKind target_kind; string target_name;
+                        string target_display; ... };
+
+  The first four fields of DeferredCall map 1:1 to the four fields of
+  TargetMetadata. DeferredCall does not embed TargetMetadata — it
+  duplicates the fields.
+
+Simpler form:
+  Embed TargetMetadata in DeferredCall:
+  struct DeferredCall {
+      TargetMetadata target_meta;
+      SpecialCallKind special_kind;
+      sema::Type type;
+      ...
+  };
+  One struct, one name for the concept.
+
+
+----------------------------------------------------------------------
+STRUCTURAL OBSERVATION
+
+FunctionLowerer is the right design: a class that holds per-function AST
+walk state and produces a Function. The 800-line Run() method is the
+problem within that design. Run() should dispatch to named LowerXxxStmt
+functions rather than inlining everything.
+
+The FunctionLowerer / LowerFunctionDecl naming confusion: LowerFunctionDecl
+is the public entry point defined at the bottom of the file; it
+constructs a FunctionLowerer and calls Run(). The names are consistent
+but the relationship is indirect. LowerFunctionDecl should be the only
+thing callers know about.
+
+The DumpModule function at the bottom (190 lines) is fine. It follows
+the same recursive print structure as ast.cpp's dump. Same WriteIndent/
+WriteLine duplication critique applies.

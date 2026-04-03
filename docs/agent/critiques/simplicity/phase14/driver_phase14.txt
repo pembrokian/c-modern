@@ -1,0 +1,276 @@
+DRIVER (driver.cpp) — SIMPLICITY REVIEW
+Phase 14 / April 2026
+======================================================================
+
+SUMMARY
+
+Too complex. At 2648 lines this file has the most structural heterogeneity
+in the codebase: it is simultaneously a CLI parser, a build graph
+discoverer, an incremental build cache, a process spawner, a project file
+consumer, and a test runner. Most of this complexity is unavoidable for a
+build driver, but several specific mechanisms have unnecessary indirection
+and redundant structure.
+
+The worst problem is the ModuleBuildState text serialization: it parses
+a flat key-value text format by hand, using string comparison against
+hardcoded keys, and then re-validates the same constraints that the format
+was designed to express. This should either be a structured file or a
+trivially parseable binary record.
+
+----------------------------------------------------------------------
+HIGH-IMPACT SIMPLIFICATIONS
+
+1. LoadModuleBuildState is a hand-rolled deserializer for a key-value
+   text format. It uses string comparisons and string::substr. The
+   parser is 80 lines that would be 10 lines with a proper schema.
+
+2. ShellDisplayQuote exists for display purposes only ("never used for
+   execution") but is treated as a general utility. It should be a
+   trivial lambda or inline expression at the one place it is used.
+
+3. WaitForChildProcess / RunExecutableCommand: the child process setup
+   uses fork/execv directly, with a separate polling loop for timeouts.
+   The polling loop sleep_for(10ms) is a spin-wait. This is unacceptable
+   in anything that cares about responsiveness. Use waitpid with SIGALRM
+   or a pipe/signalfd approach instead.
+
+4. ParseCommandOptions is a 110-line if-chain of string comparisons
+   against "--" flag names. This is a table written as code. The pattern
+   is repeated: check for exact string match, validate next argument
+   exists, assign to field. That is three lines × 10 flags = 30 lines
+   if done with a table.
+
+5. ShouldReuseModuleObject sorts the `imported_interface_hashes` vectors
+   twice (once per side) purely for comparison, allocating two temporary
+   sorted vectors. Sort once at write time, compare directly.
+
+----------------------------------------------------------------------
+SPECIFIC FINDINGS
+
+FINDING 1: ModuleBuildState text serialization is hand-rolled and brittle
+--------------------------------------------------------------------------
+What exists:
+  std::optional<ModuleBuildState> LoadModuleBuildState(...) — 80 lines
+  bool WriteModuleBuildState(...) — 30 lines
+
+  The format is: one key-value pair per line, tab-separated. The parser
+  reads line by line, calls line.find('\t'), then a sequence of:
+    if (key == "format") { ... parse_int(value) }
+    if (key == "target") { state.target_identity = value; }
+    if (key == "mode")   { state.mode = value; }
+    ...
+
+  The parser then re-validates field completeness at the end:
+    if (state.target_identity.empty() || state.mode.empty() || ...)
+
+Why it is unnecessary:
+  The format is fixed and the number of fields is small (8 fields, with
+  one repeated field for import hashes). Writing and reading this format
+  by hand is 110 lines for what amounts to a record with fixed fields.
+
+  The key-based dispatch in the reader exists because the writer emits
+  fields in a fixed order but the reader handles them in any order. If
+  the format specifies a fixed order (which it effectively does, since
+  the writer always emits in the same order), the reader can read fields
+  positionally. This eliminates the key lookup, the if-chain, and the
+  end-of-parse completeness check.
+
+  Alternatively: use the fixed format and assert field ordering in the
+  reader. The tolerance for arbitrary order buys nothing — no tool
+  produces these files except this writer.
+
+Simpler form (fixed-order reader):
+  // Line 1: format\t<int>
+  // Line 2: target\t<string>
+  // Line 3: mode\t<string>
+  // ... exactly 7 fixed lines + N import_hash lines
+
+  Read exactly as written. If any line does not match expected key,
+  return nullopt. No if-chain dispatch needed.
+
+
+FINDING 2: ParseCommandOptions — flag dispatch is a table written as code
+-------------------------------------------------------------------------
+What exists:
+  A 110-line sequence of:
+    if (argument == "--emit-dump-paths") { options.emit_dump_paths = true; }
+    if (argument == "--dump-ast") { options.dump_ast = true; }
+    if (argument == "--build-dir") {
+        if (index + 1 >= argc) { errors << ...; return nullopt; }
+        options.build_dir = argv[++index];
+        options.build_dir_explicit = true;
+    }
+    ... 10 more flags ...
+
+Why it is unnecessary:
+  This is a static dispatch table encoded as 110 lines of if blocks.
+  The structure is uniform: flag string, optional value, assignment target.
+  In a bootstrap compiler where correctness matters more than generality,
+  this is tolerable — but it is also fragile. Adding a flag requires
+  careful duplication of the pattern.
+
+Simpler form:
+  For boolean flags: a table of (string, bool CommandOptions::*) pairs.
+  For value flags: a table of (string, string* / path*) members.
+  For the single special case (--): inline.
+
+  This is not a net reduction in lines, but it eliminates the chance of
+  copy-paste errors in the "if (index + 1 >= argc)" guard pattern that
+  appears 8 times.
+
+
+FINDING 3: ShouldReuseModuleObject sorts vectors to compare them
+----------------------------------------------------------------
+What exists:
+  bool ShouldReuseModuleObject(...) {
+      auto sorted = [](auto v) { std::sort(v.begin(), v.end()); return v; };
+      return sorted(state.imported_interface_hashes) ==
+             sorted(current.imported_interface_hashes);
+  }
+
+  This allocates two temporary vectors by value, sorts both, then
+  compares.
+
+Why it is unnecessary:
+  If import hashes are always sorted when written (WriteModuleBuildState
+  sorts before writing), then a reader that reads them in file order
+  gets them pre-sorted. The ShouldReuseModuleObject comparison can be
+  a direct vector comparison without allocation or sorting.
+
+  WriteModuleBuildState does sort before writing:
+    std::sort(sorted_import_hashes.begin(), sorted_import_hashes.end());
+  So the stored state is always sorted. The current state (current)
+  is built by the driver during the current build; it accumulates import
+  hashes in graph-traversal order. If the driver sorts current before
+  calling ShouldReuseModuleObject (one sort, not two), the comparison
+  is direct.
+
+Simpler form:
+  Sort current.imported_interface_hashes once before calling
+  ShouldReuseModuleObject. In ShouldReuseModuleObject, compare directly.
+  Delete the local sorted lambda.
+
+
+FINDING 4: WaitForChildProcess uses a 10ms polling sleep
+--------------------------------------------------------
+What exists:
+  while (true) {
+      const pid_t wait_result = waitpid(pid, &status, WNOHANG);
+      ...
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+Why it is a problem:
+  This is a polling loop that burns CPU and introduces up to 10ms
+  of latency in detecting process completion. Under load (many modules
+  compiling), this adds non-trivial idle time.
+
+  The standard approach: use `waitpid` with `WUNTRACED` in the main
+  path (blocking, no timeout needed in 99% of calls), and handle the
+  timeout case with `SIGALRM` + `sigaction`. The timeout case is rare
+  (test processes that hang). Polling is never the right primitive for
+  event detection.
+
+  For a bootstrap compiler this is a quality-of-life issue, not a
+  correctness issue. But it is the kind of thing that should not be
+  introduced casually.
+
+
+FINDING 5: ShellDisplayQuote is a 12-line function for display-only output
+--------------------------------------------------------------------------
+What exists:
+  std::string ShellDisplayQuote(std::string_view argument) — 12 lines
+  FormatCommandForDisplay calls ShellDisplayQuote per argument.
+
+Why it is unnecessary to be a named function:
+  The comment says "Display-only POSIX shell quoting for diagnostics and
+  logs. Subprocesses run via execv with the raw argv vector; this
+  formatting is never used for execution."
+
+  A function named ShellDisplayQuote that is documented to be
+  display-only and never executed has a dangerous name: it looks like
+  a safe quoting function. Someone could accidentally use it to
+  construct arguments for shell execution.
+
+  Since it is only called from FormatCommandForDisplay, fold it in there.
+  FormatCommandForDisplay can do its own quoting inline. Remove the
+  dangerous public-looking helper.
+
+
+FINDING 6: CheckedProgram and BuildUnit are nearly identical structs
+--------------------------------------------------------------------
+What exists:
+  struct CheckedProgram {
+      std::filesystem::path source_path;
+      mc::parse::ParseResult parse_result;
+      mc::sema::CheckResult sema_result;
+      mc::mir::LowerResult mir_result;
+  };
+
+  struct BuildUnit {
+      std::filesystem::path source_path;
+      mc::parse::ParseResult parse_result;
+      mc::sema::CheckResult sema_result;
+      mc::mir::LowerResult mir_result;
+      std::filesystem::path llvm_ir_path;
+      std::filesystem::path object_path;
+      std::string interface_hash;
+      bool reused_object = false;
+  };
+
+Why it is unnecessary:
+  BuildUnit extends CheckedProgram with build-specific fields. They
+  are not related by inheritance but they carry identical initial fields.
+  When a function takes CheckedProgram and another takes BuildUnit, the
+  reader must check whether the fields align.
+
+  Either: make BuildUnit extend (or embed) CheckedProgram, or delete
+  CheckedProgram and use BuildUnit everywhere. The two-struct split
+  creates a false seam between "checked" and "build" stages that is
+  not reflected in how they are actually constructed.
+
+  In practice: the check path builds a CheckedProgram; the build path
+  builds a BuildUnit by copying the same fields. This is structural
+  redundancy.
+
+
+FINDING 7: ProcessExecutionResult struct is defined but never used
+-----------------------------------------------------------------
+What exists:
+  struct ProcessExecutionResult {
+      bool exited = false;
+      int exit_code = -1;
+      bool signaled = false;
+      int signal_number = -1;
+      bool timed_out = false;
+  };
+
+Why it exists:
+  It is defined in the file but RunExecutableCommand returns int, not
+  ProcessExecutionResult. The struct appears to be an early design that
+  was replaced by the int return convention but never deleted.
+
+Action: Delete it.
+
+
+----------------------------------------------------------------------
+STRUCTURAL OBSERVATION
+
+The driver is the right kind of code to be long: it glues together many
+pipeline stages. The length is partly inherent. The problem is that it
+does not clearly separate its concerns. The file contains:
+
+  Sections 1-200:   data types (CommandOptions, BuildUnit, etc.)
+  Sections 200-400: support functions (hashing, path computation, child processes)
+  Sections 400-800: project loading and graph discovery
+  Sections 800-2600: compile, build, run, test command implementations
+
+These could be separate files. The entire project management layer
+(project loading, graph discovery, incremental cache) is distinct from
+the pipeline execution (parse/sema/mir/codegen). At 2648 lines, the
+driver is the second-largest file in the compiler, and almost all of
+it is unique logic that cannot be shared or tested in isolation.
+
+One concrete split worth making: the build-state serialization
+(LoadModuleBuildState, WriteModuleBuildState, ShouldReuseModuleObject)
+belongs in its own translation unit. It is independently testable.

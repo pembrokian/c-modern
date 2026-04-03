@@ -1,0 +1,162 @@
+AST DUMP (ast.cpp) — SIMPLICITY REVIEW
+Phase 14 / April 2026
+======================================================================
+
+SUMMARY
+
+Acceptable with one significant structural problem. The file is a 539-line
+dump printer, which is what it should be. Most of the code is
+straightforward recursive descent printing. The problems are mechanical
+redundancy and a hidden indirection in how the Expr node encodes its
+second textual field.
+
+----------------------------------------------------------------------
+HIGH-IMPACT SIMPLIFICATIONS
+
+1. The four ToString() switch tables are code. They should be data.
+2. `SecondaryTextLabel()` is a dispatcher for a cosmetic string; it
+   encodes semantic knowledge about Expr subtypes inside the dump layer.
+3. `WriteIndent` + `WriteLine` are two functions doing one job with an
+   unnecessary level of wrapping. `WriteLine` calls `WriteIndent` then
+   appends — that is simply `stream << indent_spaces << text << '\n'`
+   and does not need to be two separate functions.
+4. `ReachedDumpDepthLimit()` has a side effect (writes to stream) embedded
+   in a predicate. The side effect is invisible at the call site.
+
+----------------------------------------------------------------------
+SPECIFIC FINDINGS
+
+FINDING 1: Four identical switch tables as code
+-----------------------------------------------
+What exists:
+  Four functions — ToString(TypeExpr::Kind), ToString(Expr::Kind),
+  ToString(Stmt::Kind), ToString(Decl::Kind) — each a switch block
+  returning a string literal.
+
+Why it is unnecessary:
+  These are static tables. They do not compute anything. Each additional
+  kind requires a code change in two places: the enum definition and
+  the switch. A static array of string_views indexed by the enum ordinal
+  is shorter, faster, and trivially extensible.
+
+Simpler form:
+  static constexpr std::string_view kExprKindNames[] = {
+      "NameExpr", "QualifiedNameExpr", ... // ordered by Expr::Kind value
+  };
+  // usage: kExprKindNames[static_cast<int>(kind)]
+
+  This is valid only if the enum values are contiguous from zero, which
+  they appear to be. If not, a plain sorted array of pairs is still
+  shorter than four switch blocks.
+
+
+FINDING 2: SecondaryTextLabel() encodes semantic meaning in the dump layer
+--------------------------------------------------------------------------
+What exists:
+  std::string_view SecondaryTextLabel(const Expr& expr) {
+      switch (expr.kind) {
+          case Expr::Kind::kQualifiedName: return " member=";
+          case Expr::Kind::kLiteral:       return " kind=";
+          default:                         return " secondary=";
+      }
+  }
+
+Why it is unnecessary:
+  The AST Expr already carries a `secondary_text` string. If the label
+  for that field differs by node kind, the label belongs in the AST
+  definition, not rediscovered at dump time. The dump layer should not
+  need to interpret kind to decide what to call a field.
+
+  Alternatively: if "secondary=" is always the right label, just print
+  "secondary=". The special-casing of "member=" and "kind=" tells you
+  those uses of secondary_text have distinct semantics — which means the
+  field should be named differently in the AST, or split into two distinct
+  fields (member_name and literal_kind). Either way this function should
+  not exist.
+
+Simpler form:
+  Delete SecondaryTextLabel(). In the dump, print " secondary=" always,
+  or — better — fix the AST to use named fields so the dump just prints
+  what it sees.
+
+
+FINDING 3: WriteIndent + WriteLine is one function written as two
+-----------------------------------------------------------------
+What exists:
+  void WriteIndent(std::ostringstream& stream, Indent indent) {
+      for (Indent count = 0; count < indent; ++count) { stream << "  "; }
+  }
+  void WriteLine(std::ostringstream& stream, Indent indent, std::string_view text) {
+      WriteIndent(stream, indent);
+      stream << text << '\n';
+  }
+
+Why it is unnecessary:
+  WriteIndent is called stand-alone only a handful of times (mostly when
+  followed immediately by additional stream writes). In those cases the
+  pattern is WriteIndent + stream << ... + stream << '\n'. That is three
+  operations to do what a single helper should do. The abstraction into
+  two functions adds no clarity; it adds a call indirection.
+
+  The `Indent` typedef aliasing `int` buys nothing — it just requires
+  the reader to look up what Indent means.
+
+Simpler form:
+  One function: void Emit(std::ostringstream& s, int indent, std::string_view text).
+  When you want to append after the indent, just call WriteIndent and then
+  write directly. Keep it to two operations, not three.
+
+
+FINDING 4: ReachedDumpDepthLimit() has a hidden write side-effect
+-----------------------------------------------------------------
+What exists:
+  bool ReachedDumpDepthLimit(...) {
+      if (depth <= kMaxDumpDepth) { return false; }
+      WriteLine(stream, indent, "<max depth reached>");
+      return true;
+  }
+
+Why it is harmful:
+  A function named "ReachedXXX" is a predicate. Predicates should not
+  write to streams. The caller does `if (ReachedDumpDepthLimit(...)) return;`
+  — the emission of the sentinel message is invisible at the call site.
+  This is hidden control flow embedded in a boolean check.
+
+Simpler form:
+  Let the caller handle the emission:
+    if (depth > kMaxDumpDepth) {
+        stream << "  <max depth reached>\n";
+        return;
+    }
+  This is two lines instead of a function call whose name hides a side
+  effect. The call sites are few (four total); there is no burden in
+  inlining this.
+
+
+FINDING 5: DumpPattern is called redundantly via null-guard checks
+-----------------------------------------------------------------
+What exists:
+  The DumpDecl and DumpStmt functions each check `!pattern.names.empty()`
+  before calling DumpPattern. DumpPattern itself iterates the names vector.
+  If the vector is empty, DumpPattern would emit nothing. The guard
+  duplicates the emptiness check.
+
+Simpler form:
+  Let DumpPattern return immediately if names is empty. Remove the
+  external guards. Every caller saying "if not empty, dump it" is just
+  a missing early-return in the callee.
+
+
+----------------------------------------------------------------------
+STRUCTURAL OBSERVATION
+
+The file is a dump printer that lives inside the AST namespace, operates
+on AST types, and uses a local ostringstream. That is correct. Its size
+(539 lines) is appropriate for what it does.
+
+The only structural question worth asking: should DumpSourceFile be the
+entire public API, with all Dump* helpers private to the translation unit?
+Yes. They already are anonymous-namespace-scoped (except DumpSourceFile).
+This is fine.
+
+No other structural changes warranted.

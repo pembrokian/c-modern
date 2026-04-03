@@ -11,5 +11,5 @@ Module
       aggregate_init %v2:PackedPair target=PackedPair operands=[%v0, %v1] fields=[small, large]
       store_local target=pair operands=[%v2]
       load_local %v3:PackedPair target=pair
-      field %v4:i32 target=large operands=[%v3]
+      field %v4:i32 target=large target_kind=field target_name=large target_display=pair.large target_base=PackedPair operands=[%v3]
       terminator return values=[%v4]

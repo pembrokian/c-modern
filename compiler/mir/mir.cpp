@@ -35,100 +35,75 @@ struct ValuePiece {
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name);
 sema::Type StripMirAliasOrDistinct(const Module& module, sema::Type type);
 
-std::string_view ToString(TypeDecl::Kind kind) {
-    switch (kind) {
-        case TypeDecl::Kind::kStruct:
-            return "struct";
-        case TypeDecl::Kind::kEnum:
-            return "enum";
-        case TypeDecl::Kind::kDistinct:
-            return "distinct";
-        case TypeDecl::Kind::kAlias:
-            return "alias";
+template <typename Enum, std::size_t N>
+std::string_view EnumNameOr(std::string_view fallback, Enum value, const std::string_view (&names)[N]) {
+    const std::size_t index = static_cast<std::size_t>(value);
+    if (index < N && !names[index].empty()) {
+        return names[index];
     }
+    return fallback;
+}
 
-    return "type";
+constexpr std::string_view kTypeDeclKindNames[] = {"struct", "enum", "distinct", "alias"};
+constexpr std::string_view kInstructionKindNames[] = {"const",
+                                                      "local_addr",
+                                                      "arena_new",
+                                                      "load_local",
+                                                      "store_local",
+                                                      "store_target",
+                                                      "symbol_ref",
+                                                      "bounds_check",
+                                                      "div_check",
+                                                      "shift_check",
+                                                      "unary",
+                                                      "binary",
+                                                      "convert",
+                                                      "convert_numeric",
+                                                      "convert_distinct",
+                                                      "pointer_to_int",
+                                                      "int_to_pointer",
+                                                      "array_to_slice",
+                                                      "buffer_to_slice",
+                                                      "buffer_new",
+                                                      "buffer_free",
+                                                      "slice_from_buffer",
+                                                      "call",
+                                                      "volatile_load",
+                                                      "volatile_store",
+                                                      "atomic_load",
+                                                      "atomic_store",
+                                                      "atomic_exchange",
+                                                      "atomic_compare_exchange",
+                                                      "atomic_fetch_add",
+                                                      "field",
+                                                      "index",
+                                                      "slice",
+                                                      "aggregate_init",
+                                                      "variant_init",
+                                                      "variant_match",
+                                                      "variant_extract"};
+constexpr std::string_view kInstructionTargetKindNames[] = {"none", "function", "global", "field", "deref_field", "index", "other"};
+constexpr std::string_view kInstructionArithmeticSemanticsNames[] = {"none", "wrap"};
+constexpr std::string_view kExprKindNames[] = {"name",
+                                               "qualified-name",
+                                               "literal",
+                                               "unary",
+                                               "binary",
+                                               "range",
+                                               "call",
+                                               "field",
+                                               "deref-field",
+                                               "index",
+                                               "slice",
+                                               "aggregate-init",
+                                               "paren"};
+
+std::string_view ToString(TypeDecl::Kind kind) {
+    return EnumNameOr("type", kind, kTypeDeclKindNames);
 }
 
 std::string_view ToString(Instruction::Kind kind) {
-    switch (kind) {
-        case Instruction::Kind::kConst:
-            return "const";
-        case Instruction::Kind::kLocalAddr:
-            return "local_addr";
-        case Instruction::Kind::kArenaNew:
-            return "arena_new";
-        case Instruction::Kind::kLoadLocal:
-            return "load_local";
-        case Instruction::Kind::kStoreLocal:
-            return "store_local";
-        case Instruction::Kind::kStoreTarget:
-            return "store_target";
-        case Instruction::Kind::kSymbolRef:
-            return "symbol_ref";
-        case Instruction::Kind::kBoundsCheck:
-            return "bounds_check";
-        case Instruction::Kind::kDivCheck:
-            return "div_check";
-        case Instruction::Kind::kShiftCheck:
-            return "shift_check";
-        case Instruction::Kind::kUnary:
-            return "unary";
-        case Instruction::Kind::kBinary:
-            return "binary";
-        case Instruction::Kind::kConvert:
-            return "convert";
-        case Instruction::Kind::kConvertNumeric:
-            return "convert_numeric";
-        case Instruction::Kind::kConvertDistinct:
-            return "convert_distinct";
-        case Instruction::Kind::kPointerToInt:
-            return "pointer_to_int";
-        case Instruction::Kind::kIntToPointer:
-            return "int_to_pointer";
-        case Instruction::Kind::kArrayToSlice:
-            return "array_to_slice";
-        case Instruction::Kind::kBufferToSlice:
-            return "buffer_to_slice";
-        case Instruction::Kind::kBufferNew:
-            return "buffer_new";
-        case Instruction::Kind::kBufferFree:
-            return "buffer_free";
-        case Instruction::Kind::kSliceFromBuffer:
-            return "slice_from_buffer";
-        case Instruction::Kind::kCall:
-            return "call";
-        case Instruction::Kind::kVolatileLoad:
-            return "volatile_load";
-        case Instruction::Kind::kVolatileStore:
-            return "volatile_store";
-        case Instruction::Kind::kAtomicLoad:
-            return "atomic_load";
-        case Instruction::Kind::kAtomicStore:
-            return "atomic_store";
-        case Instruction::Kind::kAtomicExchange:
-            return "atomic_exchange";
-        case Instruction::Kind::kAtomicCompareExchange:
-            return "atomic_compare_exchange";
-        case Instruction::Kind::kAtomicFetchAdd:
-            return "atomic_fetch_add";
-        case Instruction::Kind::kField:
-            return "field";
-        case Instruction::Kind::kIndex:
-            return "index";
-        case Instruction::Kind::kSlice:
-            return "slice";
-        case Instruction::Kind::kAggregateInit:
-            return "aggregate_init";
-        case Instruction::Kind::kVariantInit:
-            return "variant_init";
-        case Instruction::Kind::kVariantMatch:
-            return "variant_match";
-        case Instruction::Kind::kVariantExtract:
-            return "variant_extract";
-    }
-
-    return "instr";
+    return EnumNameOr("instr", kind, kInstructionKindNames);
 }
 
 bool IsAddressOfLvalueKind(Expr::Kind kind) {
@@ -146,68 +121,15 @@ bool IsAddressOfLvalueKind(Expr::Kind kind) {
 }
 
 std::string_view ToString(Instruction::TargetKind kind) {
-    switch (kind) {
-        case Instruction::TargetKind::kNone:
-            return "none";
-        case Instruction::TargetKind::kFunction:
-            return "function";
-        case Instruction::TargetKind::kGlobal:
-            return "global";
-        case Instruction::TargetKind::kField:
-            return "field";
-        case Instruction::TargetKind::kDerefField:
-            return "deref_field";
-        case Instruction::TargetKind::kIndex:
-            return "index";
-        case Instruction::TargetKind::kOther:
-            return "other";
-    }
-
-    return "none";
+    return EnumNameOr("none", kind, kInstructionTargetKindNames);
 }
 
 std::string_view ToString(Instruction::ArithmeticSemantics semantics) {
-    switch (semantics) {
-        case Instruction::ArithmeticSemantics::kNone:
-            return "none";
-        case Instruction::ArithmeticSemantics::kWrap:
-            return "wrap";
-    }
-
-    return "none";
+    return EnumNameOr("none", semantics, kInstructionArithmeticSemanticsNames);
 }
 
 std::string_view ToString(Expr::Kind kind) {
-    switch (kind) {
-        case Expr::Kind::kName:
-            return "name";
-        case Expr::Kind::kQualifiedName:
-            return "qualified-name";
-        case Expr::Kind::kLiteral:
-            return "literal";
-        case Expr::Kind::kUnary:
-            return "unary";
-        case Expr::Kind::kBinary:
-            return "binary";
-        case Expr::Kind::kRange:
-            return "range";
-        case Expr::Kind::kCall:
-            return "call";
-        case Expr::Kind::kField:
-            return "field";
-        case Expr::Kind::kDerefField:
-            return "deref-field";
-        case Expr::Kind::kIndex:
-            return "index";
-        case Expr::Kind::kSlice:
-            return "slice";
-        case Expr::Kind::kAggregateInit:
-            return "aggregate-init";
-        case Expr::Kind::kParen:
-            return "paren";
-    }
-
-    return "expr";
+    return EnumNameOr("expr", kind, kExprKindNames);
 }
 
 std::string VariantTypeName(std::string_view variant_name) {
@@ -233,6 +155,53 @@ std::string CombineQualifiedName(const Expr& expr) {
     return expr.text;
 }
 
+std::string RenderExprInline(const Expr& expr);
+
+std::string RenderExprOrPlaceholder(const Expr* expr) {
+    return expr != nullptr ? RenderExprInline(*expr) : std::string("<?>");
+}
+
+std::string RenderTypeExprInline(const ast::TypeExpr& type) {
+    switch (type.kind) {
+        case ast::TypeExpr::Kind::kNamed: {
+            if (type.type_args.empty()) {
+                return type.name;
+            }
+            std::ostringstream stream;
+            stream << type.name << '<';
+            for (std::size_t index = 0; index < type.type_args.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                stream << RenderTypeExprInline(*type.type_args[index]);
+            }
+            stream << '>';
+            return stream.str();
+        }
+        case ast::TypeExpr::Kind::kPointer:
+            return "*" + (type.inner != nullptr ? RenderTypeExprInline(*type.inner) : std::string("<?>"));
+        case ast::TypeExpr::Kind::kConst:
+            return "const " + (type.inner != nullptr ? RenderTypeExprInline(*type.inner) : std::string("<?>"));
+        case ast::TypeExpr::Kind::kArray:
+            return "[" + (type.length_expr != nullptr ? RenderExprInline(*type.length_expr) : std::string("?")) + "]" +
+                   (type.inner != nullptr ? RenderTypeExprInline(*type.inner) : std::string("<?>"));
+        case ast::TypeExpr::Kind::kParen:
+            return "(" + (type.inner != nullptr ? RenderTypeExprInline(*type.inner) : std::string("<?>")) + ")";
+    }
+    return "<?>";
+}
+
+void AppendRenderedTypeArgs(std::ostringstream& stream, const std::vector<std::unique_ptr<ast::TypeExpr>>& type_args) {
+    stream << '<';
+    for (std::size_t index = 0; index < type_args.size(); ++index) {
+        if (index > 0) {
+            stream << ", ";
+        }
+        stream << RenderTypeExprInline(*type_args[index]);
+    }
+    stream << '>';
+}
+
 std::string RenderExprInline(const Expr& expr) {
     switch (expr.kind) {
         case Expr::Kind::kName:
@@ -242,87 +211,20 @@ std::string RenderExprInline(const Expr& expr) {
                 return base;
             }
             std::ostringstream stream;
-            const auto render_type = [&](const ast::TypeExpr& type, const auto& self) -> std::string {
-                switch (type.kind) {
-                    case ast::TypeExpr::Kind::kNamed: {
-                        if (type.type_args.empty()) {
-                            return type.name;
-                        }
-                        std::ostringstream type_stream;
-                        type_stream << type.name << '<';
-                        for (std::size_t index = 0; index < type.type_args.size(); ++index) {
-                            if (index > 0) {
-                                type_stream << ", ";
-                            }
-                            type_stream << self(*type.type_args[index], self);
-                        }
-                        type_stream << '>';
-                        return type_stream.str();
-                    }
-                    case ast::TypeExpr::Kind::kPointer:
-                        return "*" + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
-                    case ast::TypeExpr::Kind::kConst:
-                        return "const " + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
-                    case ast::TypeExpr::Kind::kArray:
-                        return "[" + (type.length_expr != nullptr ? RenderExprInline(*type.length_expr) : std::string("?")) + "]" +
-                               (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
-                    case ast::TypeExpr::Kind::kParen:
-                        return "(" + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>")) + ")";
-                }
-                return "<?>";
-            };
-            stream << base << '<';
-            for (std::size_t index = 0; index < expr.type_args.size(); ++index) {
-                if (index > 0) {
-                    stream << ", ";
-                }
-                stream << render_type(*expr.type_args[index], render_type);
-            }
-            stream << '>';
+            stream << base;
+            AppendRenderedTypeArgs(stream, expr.type_args);
             return stream.str();
         }
         case Expr::Kind::kLiteral:
             return expr.text;
         case Expr::Kind::kUnary:
-            return expr.text + (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>"));
+            return expr.text + RenderExprOrPlaceholder(expr.left.get());
         case Expr::Kind::kBinary:
         case Expr::Kind::kRange:
-            return (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) + " " + expr.text + " " +
-                   (expr.right != nullptr ? RenderExprInline(*expr.right) : std::string("<?>"));
+            return RenderExprOrPlaceholder(expr.left.get()) + " " + expr.text + " " + RenderExprOrPlaceholder(expr.right.get());
         case Expr::Kind::kCall: {
             std::ostringstream stream;
-            const auto render_type = [&](const ast::TypeExpr& type, const auto& self) -> std::string {
-                switch (type.kind) {
-                    case ast::TypeExpr::Kind::kNamed: {
-                        if (type.type_args.empty()) {
-                            return type.name;
-                        }
-                        std::ostringstream type_stream;
-                        type_stream << type.name << '<';
-                        for (std::size_t index = 0; index < type.type_args.size(); ++index) {
-                            if (index > 0) {
-                                type_stream << ", ";
-                            }
-                            type_stream << self(*type.type_args[index], self);
-                        }
-                        type_stream << '>';
-                        return type_stream.str();
-                    }
-                    case ast::TypeExpr::Kind::kPointer:
-                        return "*" + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
-                    case ast::TypeExpr::Kind::kConst:
-                        return "const " + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
-                    case ast::TypeExpr::Kind::kArray:
-                        return "[" + (type.length_expr != nullptr ? RenderExprInline(*type.length_expr) : std::string("?")) + "]" +
-                               (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>"));
-                    case ast::TypeExpr::Kind::kParen:
-                        return "(" + (type.inner != nullptr ? self(*type.inner, self) : std::string("<?>")) + ")";
-                }
-                return "<?>";
-            };
-            stream << (expr.type_target != nullptr ? render_type(*expr.type_target, render_type)
-                                                   : (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")))
-                   << '(';
+            stream << (expr.type_target != nullptr ? RenderTypeExprInline(*expr.type_target) : RenderExprOrPlaceholder(expr.left.get())) << '(';
             for (std::size_t index = 0; index < expr.args.size(); ++index) {
                 if (index > 0) {
                     stream << ", ";
@@ -333,15 +235,14 @@ std::string RenderExprInline(const Expr& expr) {
             return stream.str();
         }
         case Expr::Kind::kField:
-            return (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) + "." + expr.text;
+            return RenderExprOrPlaceholder(expr.left.get()) + "." + expr.text;
         case Expr::Kind::kDerefField:
-            return (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) + ".*";
+            return RenderExprOrPlaceholder(expr.left.get()) + ".*";
         case Expr::Kind::kIndex:
-            return (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) + "[" +
-                   (expr.right != nullptr ? RenderExprInline(*expr.right) : std::string("<?>")) + "]";
+            return RenderExprOrPlaceholder(expr.left.get()) + "[" + RenderExprOrPlaceholder(expr.right.get()) + "]";
         case Expr::Kind::kSlice: {
             std::ostringstream stream;
-            stream << (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) << '[';
+            stream << RenderExprOrPlaceholder(expr.left.get()) << '[';
             if (expr.right != nullptr) {
                 stream << RenderExprInline(*expr.right);
             }
@@ -354,7 +255,7 @@ std::string RenderExprInline(const Expr& expr) {
         }
         case Expr::Kind::kAggregateInit: {
             std::ostringstream stream;
-            stream << (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) << '{';
+            stream << RenderExprOrPlaceholder(expr.left.get()) << '{';
             for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
                 if (index > 0) {
                     stream << ", ";
@@ -368,7 +269,7 @@ std::string RenderExprInline(const Expr& expr) {
             return stream.str();
         }
         case Expr::Kind::kParen:
-            return "(" + (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) + ")";
+            return "(" + RenderExprOrPlaceholder(expr.left.get()) + ")";
     }
 
     return "<?>";
@@ -385,16 +286,20 @@ void WriteLine(std::ostringstream& stream, int indent, const std::string& text) 
     stream << text << '\n';
 }
 
+sema::Type CanonicalMirType(const Module& module, const sema::Type& type) {
+    return sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type));
+}
+
 bool IsIntegerType(const Module& module, const sema::Type& type) {
-    return sema::IsIntegerType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsIntegerType(CanonicalMirType(module, type));
 }
 
 bool IsFloatType(const Module& module, const sema::Type& type) {
-    return sema::IsFloatType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsFloatType(CanonicalMirType(module, type));
 }
 
 bool IsNumericType(const Module& module, const sema::Type& type) {
-    return sema::IsNumericType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsNumericType(CanonicalMirType(module, type));
 }
 
 bool IsWraparoundBinaryOp(std::string_view op) {
@@ -402,11 +307,11 @@ bool IsWraparoundBinaryOp(std::string_view op) {
 }
 
 bool IsIntegerLikeType(const Module& module, const sema::Type& type) {
-    return sema::IsIntegerLikeType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsIntegerLikeType(CanonicalMirType(module, type));
 }
 
 bool IsBoolType(const Module& module, const sema::Type& type) {
-    return sema::IsBoolType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsBoolType(CanonicalMirType(module, type));
 }
 
 std::string_view LeafTypeName(std::string_view name) {
@@ -421,20 +326,16 @@ bool IsNamedTypeFamily(const sema::Type& type, std::string_view family_name) {
     return type.kind == sema::Type::Kind::kNamed && LeafTypeName(type.name) == family_name;
 }
 
-bool IsMemoryOrderType(const sema::Type& type) {
-    return IsNamedTypeFamily(type, "MemoryOrder");
-}
-
 bool IsMemoryOrderType(const Module& module, const sema::Type& type) {
-    return IsMemoryOrderType(StripMirAliasOrDistinct(module, type));
+    return IsNamedTypeFamily(StripMirAliasOrDistinct(module, type), "MemoryOrder");
 }
 
 bool IsPointerLikeType(const Module& module, const sema::Type& type) {
-    return sema::IsPointerLikeType(StripMirAliasOrDistinct(module, type));
+    return sema::IsPointerLikeType(CanonicalMirType(module, type));
 }
 
 bool IsUintPtrType(const Module& module, const sema::Type& type) {
-    return sema::IsUintPtrType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
+    return sema::IsUintPtrType(CanonicalMirType(module, type));
 }
 
 bool IsBuiltinNamedNonAggregate(const sema::Type& type) {
@@ -460,28 +361,7 @@ bool IsUsizeCompatibleType(const Module& module, const sema::Type& type) {
     return IsUsizeCompatibleType(sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type)));
 }
 
-bool IsAssignableType(const Module& module, const sema::Type& expected, const sema::Type& actual) {
-    const sema::Type canonical_expected = sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, expected));
-    const sema::Type canonical_actual = sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, actual));
-    if (sema::IsUnknown(expected) || sema::IsUnknown(actual)) {
-        return true;
-    }
-    if (canonical_expected == canonical_actual) {
-        return true;
-    }
-    if (IsIntegerType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kIntLiteral) {
-        return true;
-    }
-    if (IsFloatType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kFloatLiteral) {
-        return true;
-    }
-    if (sema::IsPointerLikeType(canonical_expected) && canonical_actual.kind == sema::Type::Kind::kNil) {
-        return true;
-    }
-    return false;
-}
-
-bool IsAssignableType(const sema::Type& expected, const sema::Type& actual) {
+bool IsAssignableCanonicalTypes(const sema::Type& expected, const sema::Type& actual) {
     if (sema::IsUnknown(expected) || sema::IsUnknown(actual)) {
         return true;
     }
@@ -500,35 +380,11 @@ bool IsAssignableType(const sema::Type& expected, const sema::Type& actual) {
     return false;
 }
 
-bool HasCompatibleNumericTypes(const Module& module, const sema::Type& left, const sema::Type& right) {
-    const sema::Type canonical_left = sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, left));
-    const sema::Type canonical_right = sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, right));
-    if (sema::IsUnknown(left) || sema::IsUnknown(right)) {
-        return true;
-    }
-    if (canonical_left == canonical_right) {
-        return sema::IsNumericType(canonical_left);
-    }
-    if (sema::IsIntegerType(canonical_left) && canonical_right.kind == sema::Type::Kind::kIntLiteral) {
-        return true;
-    }
-    if (sema::IsIntegerType(canonical_right) && canonical_left.kind == sema::Type::Kind::kIntLiteral) {
-        return true;
-    }
-    if (sema::IsFloatType(canonical_left) && canonical_right.kind == sema::Type::Kind::kFloatLiteral) {
-        return true;
-    }
-    if (sema::IsFloatType(canonical_right) && canonical_left.kind == sema::Type::Kind::kFloatLiteral) {
-        return true;
-    }
-    if ((canonical_left.kind == sema::Type::Kind::kFloatLiteral && canonical_right.kind == sema::Type::Kind::kIntLiteral) ||
-        (canonical_right.kind == sema::Type::Kind::kFloatLiteral && canonical_left.kind == sema::Type::Kind::kIntLiteral)) {
-        return true;
-    }
-    return false;
+bool IsAssignableType(const Module& module, const sema::Type& expected, const sema::Type& actual) {
+    return IsAssignableCanonicalTypes(CanonicalMirType(module, expected), CanonicalMirType(module, actual));
 }
 
-bool HasCompatibleNumericTypes(const sema::Type& left, const sema::Type& right) {
+bool HasCompatibleCanonicalNumericTypes(const sema::Type& left, const sema::Type& right) {
     if (sema::IsUnknown(left) || sema::IsUnknown(right)) {
         return true;
     }
@@ -554,12 +410,12 @@ bool HasCompatibleNumericTypes(const sema::Type& left, const sema::Type& right) 
     return false;
 }
 
-bool HasCompatibleComparisonTypes(const Module& module, const sema::Type& left, const sema::Type& right) {
-    return HasCompatibleNumericTypes(module, left, right) || IsAssignableType(module, left, right) || IsAssignableType(module, right, left);
+bool HasCompatibleNumericTypes(const Module& module, const sema::Type& left, const sema::Type& right) {
+    return HasCompatibleCanonicalNumericTypes(CanonicalMirType(module, left), CanonicalMirType(module, right));
 }
 
-bool HasCompatibleComparisonTypes(const sema::Type& left, const sema::Type& right) {
-    return HasCompatibleNumericTypes(left, right) || IsAssignableType(left, right) || IsAssignableType(right, left);
+bool HasCompatibleComparisonTypes(const Module& module, const sema::Type& left, const sema::Type& right) {
+    return HasCompatibleNumericTypes(module, left, right) || IsAssignableType(module, left, right) || IsAssignableType(module, right, left);
 }
 
 sema::Type RangeElementType(const sema::Type& range_type) {
@@ -635,42 +491,39 @@ enum class SpecialCallKind {
     kAtomicFetchAdd,
 };
 
+struct SpecialCallEntry {
+    std::string_view leaf_name;
+    std::string_view module_name;
+    SpecialCallKind kind;
+};
+
+constexpr SpecialCallEntry kSpecialCallTable[] = {
+    {"mmio_ptr", "hal", SpecialCallKind::kMmioPtr},
+    {"buffer_new", "mem", SpecialCallKind::kBufferNew},
+    {"buffer_free", "mem", SpecialCallKind::kBufferFree},
+    {"arena_new", "mem", SpecialCallKind::kArenaNew},
+    {"slice_from_buffer", "mem", SpecialCallKind::kSliceFromBuffer},
+    {"volatile_load", "hal", SpecialCallKind::kVolatileLoad},
+    {"volatile_store", "hal", SpecialCallKind::kVolatileStore},
+    {"atomic_load", "sync", SpecialCallKind::kAtomicLoad},
+    {"atomic_store", "sync", SpecialCallKind::kAtomicStore},
+    {"atomic_exchange", "sync", SpecialCallKind::kAtomicExchange},
+    {"atomic_compare_exchange", "sync", SpecialCallKind::kAtomicCompareExchange},
+    {"atomic_fetch_add", "sync", SpecialCallKind::kAtomicFetchAdd},
+};
+
+bool MatchesSpecialCallName(std::string_view callee_name, const SpecialCallEntry& entry) {
+    return callee_name == entry.leaf_name ||
+           (callee_name.starts_with(entry.module_name) && callee_name.size() == entry.module_name.size() + 1 + entry.leaf_name.size() &&
+            callee_name[entry.module_name.size()] == '.' &&
+            callee_name.substr(entry.module_name.size() + 1) == entry.leaf_name);
+}
+
 SpecialCallKind ClassifySpecialCall(std::string_view callee_name) {
-    if (callee_name == "mmio_ptr" || callee_name == "hal.mmio_ptr") {
-        return SpecialCallKind::kMmioPtr;
-    }
-    if (callee_name == "buffer_new" || callee_name == "mem.buffer_new") {
-        return SpecialCallKind::kBufferNew;
-    }
-    if (callee_name == "buffer_free" || callee_name == "mem.buffer_free") {
-        return SpecialCallKind::kBufferFree;
-    }
-    if (callee_name == "arena_new" || callee_name == "mem.arena_new") {
-        return SpecialCallKind::kArenaNew;
-    }
-    if (callee_name == "slice_from_buffer" || callee_name == "mem.slice_from_buffer") {
-        return SpecialCallKind::kSliceFromBuffer;
-    }
-    if (callee_name == "volatile_load" || callee_name == "hal.volatile_load") {
-        return SpecialCallKind::kVolatileLoad;
-    }
-    if (callee_name == "volatile_store" || callee_name == "hal.volatile_store") {
-        return SpecialCallKind::kVolatileStore;
-    }
-    if (callee_name == "atomic_load" || callee_name == "sync.atomic_load") {
-        return SpecialCallKind::kAtomicLoad;
-    }
-    if (callee_name == "atomic_store" || callee_name == "sync.atomic_store") {
-        return SpecialCallKind::kAtomicStore;
-    }
-    if (callee_name == "atomic_exchange" || callee_name == "sync.atomic_exchange") {
-        return SpecialCallKind::kAtomicExchange;
-    }
-    if (callee_name == "atomic_compare_exchange" || callee_name == "sync.atomic_compare_exchange") {
-        return SpecialCallKind::kAtomicCompareExchange;
-    }
-    if (callee_name == "atomic_fetch_add" || callee_name == "sync.atomic_fetch_add") {
-        return SpecialCallKind::kAtomicFetchAdd;
+    for (const auto& entry : kSpecialCallTable) {
+        if (MatchesSpecialCallName(callee_name, entry)) {
+            return entry.kind;
+        }
     }
     return SpecialCallKind::kNone;
 }
@@ -847,19 +700,6 @@ const VariantDecl* FindMirVariantDecl(const TypeDecl& type_decl, std::string_vie
 }
 
 std::string_view PrimaryTargetName(const Instruction& instruction) {
-    if (!instruction.target_name.empty()) {
-        return instruction.target_name;
-    }
-    return instruction.target;
-}
-
-std::string_view DisplayTarget(const Instruction& instruction) {
-    if (!instruction.target_display.empty()) {
-        return instruction.target_display;
-    }
-    if (!instruction.target.empty()) {
-        return instruction.target;
-    }
     return instruction.target_name;
 }
 
@@ -970,26 +810,24 @@ class FunctionLowerer {
         std::size_t unwind_scope_depth = 0;
     };
 
-    struct DeferredCall {
-        std::string target;
-        Instruction::TargetKind target_kind = Instruction::TargetKind::kNone;
-        std::string target_name;
-        std::string target_display;
-        SpecialCallKind special_kind = SpecialCallKind::kNone;
-        sema::Type type;
-        std::string op;
-        std::string atomic_order;
-        std::string atomic_success_order;
-        std::string atomic_failure_order;
-        std::string callee_local;
-        std::vector<std::string> arg_locals;
-    };
-
     struct TargetMetadata {
         std::string target;
         Instruction::TargetKind kind = Instruction::TargetKind::kNone;
         std::string name;
         std::string display;
+    };
+
+    struct DeferredCall {
+        TargetMetadata target;
+        SpecialCallKind special_kind = SpecialCallKind::kNone;
+        sema::Type type;
+        // Atomic order fields are only populated for deferred atomic intrinsics.
+        std::string atomic_order;
+        std::string atomic_success_order;
+        std::string atomic_failure_order;
+        // Only generic deferred calls snapshot a callee local.
+        std::string callee_local;
+        std::vector<std::string> arg_locals;
     };
 
     struct DeferScope {
@@ -1445,10 +1283,7 @@ class FunctionLowerer {
         const auto callee = special_kind == SpecialCallKind::kNone ? LowerCalleeExpr(*expr.left) : ValueInfo {};
         const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
         DeferredCall call {
-            .target = target_metadata.target,
-            .target_kind = target_metadata.kind,
-            .target_name = target_metadata.name,
-            .target_display = target_metadata.display,
+            .target = target_metadata,
             .special_kind = special_kind,
             .type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "deferred call result type"),
             .atomic_order = SpecialCallAtomicOrder(expr, special_kind),
@@ -1474,13 +1309,7 @@ class FunctionLowerer {
             for (const auto& arg_local : call.arg_locals) {
                 args.push_back(LoadLocalValue(arg_local));
             }
-            const TargetMetadata target_metadata {
-                .target = call.target,
-                .kind = call.target_kind,
-                .name = call.target_name,
-                .display = call.target_display,
-            };
-            static_cast<void>(EmitSpecialCallInstruction(target_metadata,
+            static_cast<void>(EmitSpecialCallInstruction(call.target,
                                                          call.special_kind,
                                                          args,
                                                          call.type,
@@ -1500,10 +1329,10 @@ class FunctionLowerer {
         Emit({
             .kind = Instruction::Kind::kCall,
             .type = call.type,
-            .target = call.target,
-            .target_kind = call.target_kind,
-            .target_name = call.target_name,
-            .target_display = call.target_display,
+            .target = call.target.target,
+            .target_kind = call.target.kind,
+            .target_name = call.target.name,
+            .target_display = call.target.display,
             .operands = std::move(operands),
         });
     }
@@ -1882,11 +1711,16 @@ class FunctionLowerer {
                     const auto base = LoadLocalValue(expr.text);
                     const std::string value = NewValue();
                     const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "qualified field expression type");
+                    const std::string target_display = CombineQualifiedName(expr);
                     Emit({
                         .kind = Instruction::Kind::kField,
                         .result = value,
                         .type = type,
                         .target = expr.secondary_text,
+                        .target_kind = Instruction::TargetKind::kField,
+                        .target_name = expr.secondary_text,
+                        .target_display = target_display,
+                        .target_base_type = base.type,
                         .operands = {base.value},
                     });
                     return {value, type};
@@ -3284,6 +3118,329 @@ void ValidateFunctionDominance(const Function& function,
     }
 }
 
+struct ValidationContext {
+    const Module& module;
+    const Function& function;
+    const std::vector<sema::Type>& operand_types;
+    const Instruction* previous_instruction;
+    const ValidationReporter& report;
+};
+
+void ValidateStoreTargetInstruction(const Instruction& instruction, const ValidationContext& ctx) {
+    const auto& module = ctx.module;
+    const auto& function = ctx.function;
+    const auto& operand_types = ctx.operand_types;
+    const auto& report = ctx.report;
+
+    if (!instruction.result.empty()) {
+        report("store_target must not produce a result in function " + function.name);
+    }
+    if (instruction.target.empty() && instruction.target_name.empty() && instruction.target_display.empty()) {
+        report("store_target must name a target in function " + function.name);
+    }
+    if (!operand_types.empty() && !sema::IsUnknown(instruction.type) && !IsAssignableType(module, instruction.type, operand_types.front())) {
+        report("store_target declared type mismatch in function " + function.name + ": expected " + sema::FormatType(instruction.type) +
+               ", got " + sema::FormatType(operand_types.front()));
+    }
+    switch (instruction.target_kind) {
+        case Instruction::TargetKind::kField:
+        case Instruction::TargetKind::kDerefField: {
+            if (instruction.operands.size() != 2) {
+                report("store_target field access must use value and base operands in function " + function.name);
+            }
+            if (instruction.target_base_storage == Instruction::StorageBaseKind::kNone != instruction.target_base_name.empty()) {
+                report("store_target field access direct-base metadata must pair kind and name in function " + function.name);
+            }
+            if (!instruction.target_aux_types.empty()) {
+                report("store_target field access must not carry index metadata in function " + function.name);
+            }
+            if (instruction.target_name.empty()) {
+                report("store_target field access must name a field in function " + function.name);
+                break;
+            }
+            if (operand_types.size() >= 2 && !sema::IsUnknown(instruction.target_base_type) && instruction.target_base_type != operand_types[1]) {
+                report("store_target field base metadata mismatch in function " + function.name);
+            }
+            if (instruction.target_base_type.kind != sema::Type::Kind::kNamed) {
+                const auto builtin_fields = sema::BuiltinAggregateFields(instruction.target_base_type);
+                if (!sema::IsUnknown(instruction.target_base_type) && builtin_fields.empty()) {
+                    report("store_target field access requires named aggregate base in function " + function.name);
+                }
+                if (builtin_fields.empty()) {
+                    break;
+                }
+            }
+            const TypeDecl* type_decl = FindMirTypeDecl(module, instruction.target_base_type.name);
+            const auto builtin_fields = sema::BuiltinAggregateFields(instruction.target_base_type);
+            if (type_decl == nullptr && builtin_fields.empty()) {
+                report("store_target field base type is unknown in function " + function.name + ": " + instruction.target_base_type.name);
+                break;
+            }
+            bool found_field = false;
+            const auto& fields = type_decl != nullptr ? type_decl->fields : builtin_fields;
+            for (const auto& field : fields) {
+                if (field.first == instruction.target_name) {
+                    found_field = true;
+                    if (!operand_types.empty() && !IsAssignableType(module, field.second, operand_types.front())) {
+                        report("store_target field type mismatch in function " + function.name + " for " + instruction.target_name + ": expected " +
+                               sema::FormatType(field.second) + ", got " + sema::FormatType(operand_types.front()));
+                    }
+                    break;
+                }
+            }
+            if (!found_field) {
+                report("store_target field is unknown in function " + function.name + ": " + instruction.target_name);
+            }
+            break;
+        }
+        case Instruction::TargetKind::kIndex: {
+            if (instruction.operands.size() != 3) {
+                report("store_target index access must use value, base, and index operands in function " + function.name);
+            }
+            if (instruction.target_base_storage == Instruction::StorageBaseKind::kNone != instruction.target_base_name.empty()) {
+                report("store_target index access direct-base metadata must pair kind and name in function " + function.name);
+            }
+            if (!instruction.target_name.empty()) {
+                report("store_target index access must not name a field target in function " + function.name);
+            }
+            if (instruction.target_aux_types.size() != 1) {
+                report("store_target index access must carry exactly one index type in function " + function.name);
+            }
+            if (operand_types.size() >= 2 && !sema::IsUnknown(instruction.target_base_type) && instruction.target_base_type != operand_types[1]) {
+                report("store_target index base metadata mismatch in function " + function.name);
+            }
+            sema::Type element_type = sema::UnknownType();
+            if (instruction.target_base_type.kind == sema::Type::Kind::kArray && !instruction.target_base_type.subtypes.empty()) {
+                element_type = instruction.target_base_type.subtypes.front();
+            }
+            if (instruction.target_base_type.kind == sema::Type::Kind::kNamed &&
+                (IsNamedTypeFamily(instruction.target_base_type, "Slice") || IsNamedTypeFamily(instruction.target_base_type, "Buffer")) &&
+                !instruction.target_base_type.subtypes.empty()) {
+                element_type = instruction.target_base_type.subtypes.front();
+            }
+            if (sema::IsUnknown(element_type) && !sema::IsUnknown(instruction.target_base_type)) {
+                report("store_target index requires array, slice, or buffer base in function " + function.name);
+            }
+            if (!instruction.target_aux_types.empty() && instruction.target_aux_types.front() != sema::NamedType("usize") &&
+                instruction.target_aux_types.front().kind != sema::Type::Kind::kIntLiteral) {
+                report("store_target index operand must be usize-compatible in function " + function.name);
+            }
+            if (operand_types.size() >= 3 && !instruction.target_aux_types.empty() && instruction.target_aux_types.front() != operand_types[2]) {
+                report("store_target index metadata type mismatch in function " + function.name);
+            }
+            if (!operand_types.empty() && !sema::IsUnknown(element_type) && !IsAssignableType(module, element_type, operand_types.front())) {
+                report("store_target indexed element type mismatch in function " + function.name + ": expected " + sema::FormatType(element_type) +
+                       ", got " + sema::FormatType(operand_types.front()));
+            }
+            break;
+        }
+        case Instruction::TargetKind::kGlobal:
+            if (instruction.operands.size() != 1) {
+                report("store_target global access must use exactly one value operand in function " + function.name);
+            }
+            if (instruction.target_name.empty()) {
+                report("store_target global access must name the target symbol in function " + function.name);
+            }
+            if (!instruction.target_aux_types.empty() || !instruction.target_name.empty() && !sema::IsUnknown(instruction.target_base_type)) {
+                report("store_target global access must not carry structured base metadata in function " + function.name);
+            }
+            break;
+        case Instruction::TargetKind::kNone:
+        case Instruction::TargetKind::kFunction:
+        case Instruction::TargetKind::kOther:
+            if (instruction.operands.size() == 2 && instruction.target_base_type.kind == sema::Type::Kind::kPointer &&
+                !instruction.target_base_type.subtypes.empty()) {
+                if (!operand_types.empty() && !IsAssignableType(module, instruction.target_base_type.subtypes.front(), operand_types.front())) {
+                    report("store_target pointer target type mismatch in function " + function.name + ": expected " +
+                           sema::FormatType(instruction.target_base_type.subtypes.front()) + ", got " + sema::FormatType(operand_types.front()));
+                }
+                if (operand_types.size() >= 2 && operand_types[1] != instruction.target_base_type) {
+                    report("store_target pointer base metadata mismatch in function " + function.name);
+                }
+            }
+            break;
+    }
+}
+
+void ValidateBinaryInstruction(const Instruction& instruction, const ValidationContext& ctx) {
+    const auto& module = ctx.module;
+    const auto& function = ctx.function;
+    const auto& operand_types = ctx.operand_types;
+    const Instruction* previous_instruction = ctx.previous_instruction;
+    const auto& report = ctx.report;
+
+    if (instruction.result.empty()) {
+        report("binary must produce a result in function " + function.name);
+    }
+    if (instruction.operands.size() != 2) {
+        report("binary must use exactly two operands in function " + function.name);
+    }
+    const sema::Type binary_result_type = StripMirAliasOrDistinct(module, instruction.type);
+    const bool requires_wrap_semantics =
+        IsWraparoundBinaryOp(instruction.op) && !sema::IsUnknown(binary_result_type) && IsIntegerType(module, binary_result_type);
+    if (requires_wrap_semantics && instruction.arithmetic_semantics != Instruction::ArithmeticSemantics::kWrap) {
+        report("integer arithmetic binary must record wrap semantics in function " + function.name);
+    }
+    if (instruction.arithmetic_semantics == Instruction::ArithmeticSemantics::kWrap &&
+        (!IsWraparoundBinaryOp(instruction.op) || !sema::IsUnknown(binary_result_type) && !IsIntegerType(module, binary_result_type))) {
+        report("wrap semantics are only valid on integer +, -, or * binaries in function " + function.name);
+    }
+    if ((instruction.op == "==" || instruction.op == "!=" || instruction.op == "<" || instruction.op == "<=" || instruction.op == ">" ||
+         instruction.op == ">=" || instruction.op == "&&" || instruction.op == "||") &&
+        !IsBoolType(module, instruction.type)) {
+        report("comparison/logical binary must produce bool in function " + function.name);
+    }
+    if ((instruction.op == "==" || instruction.op == "!=" || instruction.op == "<" || instruction.op == "<=" || instruction.op == ">" ||
+         instruction.op == ">=") &&
+        operand_types.size() == 2 && !HasCompatibleComparisonTypes(module, operand_types.front(), operand_types.back())) {
+        report("comparison requires compatible operand types in function " + function.name);
+    }
+    if (instruction.op == "<<" || instruction.op == ">>") {
+        if (operand_types.size() == 2) {
+            if (!sema::IsUnknown(operand_types.front()) && !IsIntegerLikeType(module, operand_types.front())) {
+                report("shift binary requires integer left operand in function " + function.name);
+            }
+            if (!sema::IsUnknown(operand_types.back()) && !IsIntegerLikeType(module, operand_types.back())) {
+                report("shift binary requires integer right operand in function " + function.name);
+            }
+            if (!sema::IsUnknown(operand_types.front()) && instruction.type != operand_types.front()) {
+                report("shift binary must preserve the left operand type in function " + function.name);
+            }
+        }
+        if (previous_instruction == nullptr || previous_instruction->kind != Instruction::Kind::kShiftCheck ||
+            previous_instruction->op != instruction.op || previous_instruction->operands != instruction.operands) {
+            report("shift binary must be preceded by matching shift_check in function " + function.name);
+        }
+    }
+    if (instruction.op == "&&" || instruction.op == "||") {
+        for (const auto& operand_type : operand_types) {
+            if (!sema::IsUnknown(operand_type) && !IsBoolType(module, operand_type)) {
+                report("logical binary requires bool operands in function " + function.name);
+            }
+        }
+    }
+    if (instruction.op == "+" || instruction.op == "-" || instruction.op == "*" || instruction.op == "/" || instruction.op == "%") {
+        for (const auto& operand_type : operand_types) {
+            if (!sema::IsUnknown(operand_type) && !IsNumericType(module, operand_type)) {
+                report("arithmetic binary requires numeric operands in function " + function.name);
+            }
+        }
+        if (operand_types.size() == 2 && !HasCompatibleNumericTypes(module, operand_types.front(), operand_types.back())) {
+            report("arithmetic binary requires compatible operand types in function " + function.name);
+        }
+        if (!sema::IsUnknown(instruction.type) && !IsNumericType(module, instruction.type)) {
+            report("arithmetic binary must produce numeric type in function " + function.name);
+        }
+        if ((instruction.op == "/" || instruction.op == "%") &&
+            (previous_instruction == nullptr || previous_instruction->kind != Instruction::Kind::kDivCheck ||
+             previous_instruction->op != instruction.op || previous_instruction->operands != instruction.operands)) {
+            report("division and remainder must be preceded by matching div_check in function " + function.name);
+        }
+    }
+}
+
+void ValidateAtomicInstruction(const Instruction& instruction, const ValidationContext& ctx) {
+    const auto& module = ctx.module;
+    const auto& function = ctx.function;
+    const auto& operand_types = ctx.operand_types;
+    const auto& report = ctx.report;
+
+    const bool is_load = instruction.kind == Instruction::Kind::kAtomicLoad;
+    const bool is_store = instruction.kind == Instruction::Kind::kAtomicStore;
+    const bool is_exchange = instruction.kind == Instruction::Kind::kAtomicExchange;
+    const bool is_compare_exchange = instruction.kind == Instruction::Kind::kAtomicCompareExchange;
+    const bool is_fetch_add = instruction.kind == Instruction::Kind::kAtomicFetchAdd;
+    const SpecialCallKind expected_special_kind = is_load                 ? SpecialCallKind::kAtomicLoad
+                                                : is_store               ? SpecialCallKind::kAtomicStore
+                                                : is_exchange            ? SpecialCallKind::kAtomicExchange
+                                                : is_compare_exchange    ? SpecialCallKind::kAtomicCompareExchange
+                                                                          : SpecialCallKind::kAtomicFetchAdd;
+    if (ClassifySpecialCall(PrimaryTargetName(instruction)) != expected_special_kind) {
+        report(std::string(ToString(instruction.kind)) + " must use matching atomic call metadata in function " + function.name);
+    }
+    const std::size_t expected_operands = is_load ? 2 : (is_store || is_exchange || is_fetch_add ? 3 : 5);
+    if (instruction.operands.size() != expected_operands) {
+        report(std::string(ToString(instruction.kind)) + " operand count mismatch in function " + function.name);
+        return;
+    }
+    if ((is_load || is_store || is_exchange || is_fetch_add) && !HasAtomicOrderMetadata(instruction)) {
+        report(std::string(ToString(instruction.kind)) + " must record order metadata in function " + function.name);
+    }
+    if (is_compare_exchange && !HasCompareExchangeOrderMetadata(instruction)) {
+        report("atomic_compare_exchange must record success/failure order metadata in function " + function.name);
+    }
+    if (!instruction.op.empty()) {
+        report(std::string(ToString(instruction.kind)) + " must not encode atomic order metadata in generic op text in function " + function.name);
+    }
+    if ((is_load || is_exchange || is_fetch_add) && instruction.result.empty()) {
+        report(std::string(ToString(instruction.kind)) + " must produce a result in function " + function.name);
+    }
+    if (is_store && !instruction.result.empty()) {
+        report("atomic_store must not produce a result in function " + function.name);
+    }
+    if (is_compare_exchange && !IsBoolType(module, instruction.type)) {
+        report("atomic_compare_exchange must produce bool in function " + function.name);
+    }
+    if (operand_types.empty()) {
+        return;
+    }
+    const auto atomic_element = AtomicElementType(module, operand_types.front());
+    if (!atomic_element.has_value()) {
+        if (!sema::IsUnknown(operand_types.front())) {
+            report(std::string(ToString(instruction.kind)) + " requires *Atomic<T> operand in function " + function.name);
+        }
+        return;
+    }
+    const auto require_order = [&](std::size_t index, const std::string& label) {
+        if (index < operand_types.size() && !sema::IsUnknown(operand_types[index]) && !IsMemoryOrderType(module, operand_types[index])) {
+            report(label + " must use MemoryOrder operand in function " + function.name);
+        }
+    };
+    if (is_load) {
+        if (!IsAssignableType(module, instruction.type, *atomic_element)) {
+            report("atomic_load result type mismatch in function " + function.name);
+        }
+        require_order(1, "atomic_load");
+    }
+    if (is_store) {
+        if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
+            report("atomic_store value type mismatch in function " + function.name);
+        }
+        require_order(2, "atomic_store");
+    }
+    if (is_exchange) {
+        if (!IsAssignableType(module, instruction.type, *atomic_element)) {
+            report("atomic_exchange result type mismatch in function " + function.name);
+        }
+        if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
+            report("atomic_exchange value type mismatch in function " + function.name);
+        }
+        require_order(2, "atomic_exchange");
+    }
+    if (is_compare_exchange) {
+        if (operand_types.size() > 1) {
+            const auto expected_pointee = PointerPointeeType(StripMirAliasOrDistinct(module, operand_types[1]));
+            if (!expected_pointee.has_value() || !IsAssignableType(module, *expected_pointee, *atomic_element)) {
+                report("atomic_compare_exchange expected pointer type mismatch in function " + function.name);
+            }
+        }
+        if (operand_types.size() > 2 && !IsAssignableType(module, *atomic_element, operand_types[2])) {
+            report("atomic_compare_exchange desired value type mismatch in function " + function.name);
+        }
+        require_order(3, "atomic_compare_exchange success order");
+        require_order(4, "atomic_compare_exchange failure order");
+    }
+    if (is_fetch_add) {
+        if (!IsAssignableType(module, instruction.type, *atomic_element)) {
+            report("atomic_fetch_add result type mismatch in function " + function.name);
+        }
+        if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
+            report("atomic_fetch_add value type mismatch in function " + function.name);
+        }
+        require_order(2, "atomic_fetch_add");
+    }
+}
+
 // Bootstrap MIR validation runs three ordered passes per non-extern function:
 //   1. Block structure and reachability.
 //   2. Instruction, operand, and type validation.
@@ -3344,6 +3501,8 @@ bool ValidateModule(const Module& module,
                     const auto found_type = value_types.find(operand);
                     operand_types.push_back(found_type == value_types.end() ? sema::UnknownType() : found_type->second);
                 }
+
+                const ValidationContext validation_ctx {module, function, operand_types, previous_instruction, report};
 
                 switch (instruction.kind) {
                     case Instruction::Kind::kLocalAddr: {
@@ -3443,147 +3602,7 @@ bool ValidateModule(const Module& module,
                         break;
                     }
                     case Instruction::Kind::kStoreTarget:
-                        if (!instruction.result.empty()) {
-                            report("store_target must not produce a result in function " + function.name);
-                        }
-                        if (instruction.target.empty() && instruction.target_name.empty() && instruction.target_display.empty()) {
-                            report("store_target must name a target in function " + function.name);
-                        }
-                        if (!operand_types.empty() && !sema::IsUnknown(instruction.type) &&
-                            !IsAssignableType(module, instruction.type, operand_types.front())) {
-                            report("store_target declared type mismatch in function " + function.name + ": expected " +
-                                   sema::FormatType(instruction.type) + ", got " + sema::FormatType(operand_types.front()));
-                        }
-                        switch (instruction.target_kind) {
-                            case Instruction::TargetKind::kField:
-                            case Instruction::TargetKind::kDerefField: {
-                                if (instruction.operands.size() != 2) {
-                                    report("store_target field access must use value and base operands in function " + function.name);
-                                }
-                                if (instruction.target_base_storage == Instruction::StorageBaseKind::kNone !=
-                                    instruction.target_base_name.empty()) {
-                                    report("store_target field access direct-base metadata must pair kind and name in function " + function.name);
-                                }
-                                if (!instruction.target_aux_types.empty()) {
-                                    report("store_target field access must not carry index metadata in function " + function.name);
-                                }
-                                if (instruction.target_name.empty()) {
-                                    report("store_target field access must name a field in function " + function.name);
-                                    break;
-                                }
-                                if (operand_types.size() >= 2 && !sema::IsUnknown(instruction.target_base_type) &&
-                                    instruction.target_base_type != operand_types[1]) {
-                                    report("store_target field base metadata mismatch in function " + function.name);
-                                }
-                                if (instruction.target_base_type.kind != sema::Type::Kind::kNamed) {
-                                    const auto builtin_fields = sema::BuiltinAggregateFields(instruction.target_base_type);
-                                    if (!sema::IsUnknown(instruction.target_base_type) && builtin_fields.empty()) {
-                                        report("store_target field access requires named aggregate base in function " + function.name);
-                                    }
-                                    if (builtin_fields.empty()) {
-                                        break;
-                                    }
-                                }
-                                const TypeDecl* type_decl = FindMirTypeDecl(module, instruction.target_base_type.name);
-                                const auto builtin_fields = sema::BuiltinAggregateFields(instruction.target_base_type);
-                                if (type_decl == nullptr && builtin_fields.empty()) {
-                                    report("store_target field base type is unknown in function " + function.name + ": " +
-                                           instruction.target_base_type.name);
-                                    break;
-                                }
-                                bool found_field = false;
-                                const auto& fields = type_decl != nullptr ? type_decl->fields : builtin_fields;
-                                for (const auto& field : fields) {
-                                    if (field.first == instruction.target_name) {
-                                        found_field = true;
-                                        if (!operand_types.empty() && !IsAssignableType(module, field.second, operand_types.front())) {
-                                            report("store_target field type mismatch in function " + function.name + " for " +
-                                                   instruction.target_name + ": expected " + sema::FormatType(field.second) + ", got " +
-                                                   sema::FormatType(operand_types.front()));
-                                        }
-                                        break;
-                                    }
-                                }
-                                if (!found_field) {
-                                    report("store_target field is unknown in function " + function.name + ": " + instruction.target_name);
-                                }
-                                break;
-                            }
-                            case Instruction::TargetKind::kIndex: {
-                                if (instruction.operands.size() != 3) {
-                                    report("store_target index access must use value, base, and index operands in function " + function.name);
-                                }
-                                if (instruction.target_base_storage == Instruction::StorageBaseKind::kNone !=
-                                    instruction.target_base_name.empty()) {
-                                    report("store_target index access direct-base metadata must pair kind and name in function " + function.name);
-                                }
-                                if (!instruction.target_name.empty()) {
-                                    report("store_target index access must not name a field target in function " + function.name);
-                                }
-                                if (instruction.target_aux_types.size() != 1) {
-                                    report("store_target index access must carry exactly one index type in function " + function.name);
-                                }
-                                if (operand_types.size() >= 2 && !sema::IsUnknown(instruction.target_base_type) &&
-                                    instruction.target_base_type != operand_types[1]) {
-                                    report("store_target index base metadata mismatch in function " + function.name);
-                                }
-                                sema::Type element_type = sema::UnknownType();
-                                if (instruction.target_base_type.kind == sema::Type::Kind::kArray && !instruction.target_base_type.subtypes.empty()) {
-                                    element_type = instruction.target_base_type.subtypes.front();
-                                }
-                                if (instruction.target_base_type.kind == sema::Type::Kind::kNamed &&
-                                    (IsNamedTypeFamily(instruction.target_base_type, "Slice") ||
-                                     IsNamedTypeFamily(instruction.target_base_type, "Buffer")) &&
-                                    !instruction.target_base_type.subtypes.empty()) {
-                                    element_type = instruction.target_base_type.subtypes.front();
-                                }
-                                if (sema::IsUnknown(element_type) && !sema::IsUnknown(instruction.target_base_type)) {
-                                    report("store_target index requires array, slice, or buffer base in function " + function.name);
-                                }
-                                if (!instruction.target_aux_types.empty() && instruction.target_aux_types.front() != sema::NamedType("usize") &&
-                                    instruction.target_aux_types.front().kind != sema::Type::Kind::kIntLiteral) {
-                                    report("store_target index operand must be usize-compatible in function " + function.name);
-                                }
-                                if (operand_types.size() >= 3 && !instruction.target_aux_types.empty() &&
-                                    instruction.target_aux_types.front() != operand_types[2]) {
-                                    report("store_target index metadata type mismatch in function " + function.name);
-                                }
-                                if (!operand_types.empty() && !sema::IsUnknown(element_type) &&
-                                    !IsAssignableType(module, element_type, operand_types.front())) {
-                                    report("store_target indexed element type mismatch in function " + function.name + ": expected " +
-                                           sema::FormatType(element_type) + ", got " + sema::FormatType(operand_types.front()));
-                                }
-                                break;
-                            }
-                            case Instruction::TargetKind::kGlobal:
-                                if (instruction.operands.size() != 1) {
-                                    report("store_target global access must use exactly one value operand in function " + function.name);
-                                }
-                                if (instruction.target_name.empty()) {
-                                    report("store_target global access must name the target symbol in function " + function.name);
-                                }
-                                if (!instruction.target_aux_types.empty() || !instruction.target_name.empty() &&
-                                                                           !sema::IsUnknown(instruction.target_base_type)) {
-                                    report("store_target global access must not carry structured base metadata in function " + function.name);
-                                }
-                                break;
-                            case Instruction::TargetKind::kNone:
-                            case Instruction::TargetKind::kFunction:
-                            case Instruction::TargetKind::kOther:
-                                if (instruction.operands.size() == 2 && instruction.target_base_type.kind == sema::Type::Kind::kPointer &&
-                                    !instruction.target_base_type.subtypes.empty()) {
-                                    if (!operand_types.empty() &&
-                                        !IsAssignableType(module, instruction.target_base_type.subtypes.front(), operand_types.front())) {
-                                        report("store_target pointer target type mismatch in function " + function.name + ": expected " +
-                                               sema::FormatType(instruction.target_base_type.subtypes.front()) + ", got " +
-                                               sema::FormatType(operand_types.front()));
-                                    }
-                                    if (operand_types.size() >= 2 && operand_types[1] != instruction.target_base_type) {
-                                        report("store_target pointer base metadata mismatch in function " + function.name);
-                                    }
-                                }
-                                break;
-                        }
+                        ValidateStoreTargetInstruction(instruction, validation_ctx);
                         break;
                     case Instruction::Kind::kUnary: {
                         if (instruction.result.empty()) {
@@ -3689,78 +3708,9 @@ bool ValidateModule(const Module& module,
                             }
                         }
                         break;
-                    case Instruction::Kind::kBinary: {
-                        if (instruction.result.empty()) {
-                            report("binary must produce a result in function " + function.name);
-                        }
-                        if (instruction.operands.size() != 2) {
-                            report("binary must use exactly two operands in function " + function.name);
-                        }
-                        const sema::Type binary_result_type = StripMirAliasOrDistinct(module, instruction.type);
-                        const bool requires_wrap_semantics = IsWraparoundBinaryOp(instruction.op) && !sema::IsUnknown(binary_result_type) &&
-                                                            IsIntegerType(binary_result_type);
-                        if (requires_wrap_semantics &&
-                            instruction.arithmetic_semantics != Instruction::ArithmeticSemantics::kWrap) {
-                            report("integer arithmetic binary must record wrap semantics in function " + function.name);
-                        }
-                        if (instruction.arithmetic_semantics == Instruction::ArithmeticSemantics::kWrap &&
-                            (!IsWraparoundBinaryOp(instruction.op) || !sema::IsUnknown(binary_result_type) && !IsIntegerType(binary_result_type))) {
-                            report("wrap semantics are only valid on integer +, -, or * binaries in function " + function.name);
-                        }
-                        if ((instruction.op == "==" || instruction.op == "!=" || instruction.op == "<" || instruction.op == "<=" || instruction.op == ">" ||
-                             instruction.op == ">=" || instruction.op == "&&" || instruction.op == "||") &&
-                            !IsBoolType(module, instruction.type)) {
-                            report("comparison/logical binary must produce bool in function " + function.name);
-                        }
-                        if ((instruction.op == "==" || instruction.op == "!=" || instruction.op == "<" || instruction.op == "<=" || instruction.op == ">" ||
-                             instruction.op == ">=") && operand_types.size() == 2 &&
-                            !HasCompatibleComparisonTypes(module, operand_types.front(), operand_types.back())) {
-                            report("comparison requires compatible operand types in function " + function.name);
-                        }
-                        if (instruction.op == "<<" || instruction.op == ">>") {
-                            if (operand_types.size() == 2) {
-                                if (!sema::IsUnknown(operand_types.front()) && !IsIntegerLikeType(module, operand_types.front())) {
-                                    report("shift binary requires integer left operand in function " + function.name);
-                                }
-                                if (!sema::IsUnknown(operand_types.back()) && !IsIntegerLikeType(module, operand_types.back())) {
-                                    report("shift binary requires integer right operand in function " + function.name);
-                                }
-                                if (!sema::IsUnknown(operand_types.front()) && instruction.type != operand_types.front()) {
-                                    report("shift binary must preserve the left operand type in function " + function.name);
-                                }
-                            }
-                            if (previous_instruction == nullptr || previous_instruction->kind != Instruction::Kind::kShiftCheck ||
-                                previous_instruction->op != instruction.op || previous_instruction->operands != instruction.operands) {
-                                report("shift binary must be preceded by matching shift_check in function " + function.name);
-                            }
-                        }
-                        if (instruction.op == "&&" || instruction.op == "||") {
-                            for (const auto& operand_type : operand_types) {
-                                if (!sema::IsUnknown(operand_type) && !IsBoolType(module, operand_type)) {
-                                    report("logical binary requires bool operands in function " + function.name);
-                                }
-                            }
-                        }
-                        if (instruction.op == "+" || instruction.op == "-" || instruction.op == "*" || instruction.op == "/" || instruction.op == "%") {
-                            for (const auto& operand_type : operand_types) {
-                                if (!sema::IsUnknown(operand_type) && !IsNumericType(module, operand_type)) {
-                                    report("arithmetic binary requires numeric operands in function " + function.name);
-                                }
-                            }
-                            if (operand_types.size() == 2 && !HasCompatibleNumericTypes(module, operand_types.front(), operand_types.back())) {
-                                report("arithmetic binary requires compatible operand types in function " + function.name);
-                            }
-                            if (!sema::IsUnknown(instruction.type) && !IsNumericType(module, instruction.type)) {
-                                report("arithmetic binary must produce numeric type in function " + function.name);
-                            }
-                            if ((instruction.op == "/" || instruction.op == "%") &&
-                                (previous_instruction == nullptr || previous_instruction->kind != Instruction::Kind::kDivCheck ||
-                                 previous_instruction->op != instruction.op || previous_instruction->operands != instruction.operands)) {
-                                report("division and remainder must be preceded by matching div_check in function " + function.name);
-                            }
-                        }
+                    case Instruction::Kind::kBinary:
+                        ValidateBinaryInstruction(instruction, validation_ctx);
                         break;
-                    }
                     case Instruction::Kind::kConvert:
                         if (instruction.result.empty()) {
                             report("convert must produce a result in function " + function.name);
@@ -3796,9 +3746,7 @@ bool ValidateModule(const Module& module,
                             ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kNumeric) {
                             report("convert_numeric must encode a numeric conversion family in function " + function.name);
                         }
-                        if (operand_types.size() == 1 &&
-                            (!IsNumericType(StripMirAliasOrDistinct(module, operand_types.front())) ||
-                             !IsNumericType(StripMirAliasOrDistinct(module, instruction.type)))) {
+                        if (operand_types.size() == 1 && (!IsNumericType(module, operand_types.front()) || !IsNumericType(module, instruction.type))) {
                             report("convert_numeric requires numeric source and target types in function " + function.name);
                         }
                         break;
@@ -3846,8 +3794,7 @@ bool ValidateModule(const Module& module,
                             ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kPointerToInt) {
                             report("pointer_to_int must encode a pointer-to-uintptr conversion family in function " + function.name);
                         }
-                        if (operand_types.size() == 1 && (!IsPointerLikeType(StripMirAliasOrDistinct(module, operand_types.front())) ||
-                                                         !IsUintPtrType(StripMirAliasOrDistinct(module, instruction.type)))) {
+                        if (operand_types.size() == 1 && (!IsPointerLikeType(module, operand_types.front()) || !IsUintPtrType(module, instruction.type))) {
                             report("pointer_to_int requires pointer source and uintptr target in function " + function.name);
                         }
                         break;
@@ -3868,8 +3815,7 @@ bool ValidateModule(const Module& module,
                             ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kIntToPointer) {
                             report("int_to_pointer must encode a uintptr-to-pointer conversion family in function " + function.name);
                         }
-                        if (operand_types.size() == 1 && (!IsUintPtrType(StripMirAliasOrDistinct(module, operand_types.front())) ||
-                                                         !IsPointerLikeType(StripMirAliasOrDistinct(module, instruction.type)))) {
+                        if (operand_types.size() == 1 && (!IsUintPtrType(module, operand_types.front()) || !IsPointerLikeType(module, instruction.type))) {
                             report("int_to_pointer requires uintptr source and pointer target in function " + function.name);
                         }
                         break;
@@ -4091,103 +4037,9 @@ bool ValidateModule(const Module& module,
                     case Instruction::Kind::kAtomicStore:
                     case Instruction::Kind::kAtomicExchange:
                     case Instruction::Kind::kAtomicCompareExchange:
-                    case Instruction::Kind::kAtomicFetchAdd: {
-                        const bool is_load = instruction.kind == Instruction::Kind::kAtomicLoad;
-                        const bool is_store = instruction.kind == Instruction::Kind::kAtomicStore;
-                        const bool is_exchange = instruction.kind == Instruction::Kind::kAtomicExchange;
-                        const bool is_compare_exchange = instruction.kind == Instruction::Kind::kAtomicCompareExchange;
-                        const bool is_fetch_add = instruction.kind == Instruction::Kind::kAtomicFetchAdd;
-                        const SpecialCallKind expected_special_kind = is_load     ? SpecialCallKind::kAtomicLoad
-                                                              : is_store          ? SpecialCallKind::kAtomicStore
-                                                              : is_exchange       ? SpecialCallKind::kAtomicExchange
-                                                              : is_compare_exchange ? SpecialCallKind::kAtomicCompareExchange
-                                                                                    : SpecialCallKind::kAtomicFetchAdd;
-                        if (ClassifySpecialCall(PrimaryTargetName(instruction)) != expected_special_kind) {
-                            report(std::string(ToString(instruction.kind)) + " must use matching atomic call metadata in function " + function.name);
-                        }
-                        const std::size_t expected_operands = is_load ? 2 : (is_store || is_exchange || is_fetch_add ? 3 : 5);
-                        if (instruction.operands.size() != expected_operands) {
-                            report(std::string(ToString(instruction.kind)) + " operand count mismatch in function " + function.name);
-                            break;
-                        }
-                        if ((is_load || is_store || is_exchange || is_fetch_add) && !HasAtomicOrderMetadata(instruction)) {
-                            report(std::string(ToString(instruction.kind)) + " must record order metadata in function " + function.name);
-                        }
-                        if (is_compare_exchange && !HasCompareExchangeOrderMetadata(instruction)) {
-                            report("atomic_compare_exchange must record success/failure order metadata in function " + function.name);
-                        }
-                        if (!instruction.op.empty()) {
-                            report(std::string(ToString(instruction.kind)) + " must not encode atomic order metadata in generic op text in function " + function.name);
-                        }
-                        if ((is_load || is_exchange || is_fetch_add) && instruction.result.empty()) {
-                            report(std::string(ToString(instruction.kind)) + " must produce a result in function " + function.name);
-                        }
-                        if (is_store && !instruction.result.empty()) {
-                            report("atomic_store must not produce a result in function " + function.name);
-                        }
-                        if (is_compare_exchange && !IsBoolType(module, instruction.type)) {
-                            report("atomic_compare_exchange must produce bool in function " + function.name);
-                        }
-                        if (operand_types.empty()) {
-                            break;
-                        }
-                        const auto atomic_element = AtomicElementType(module, operand_types.front());
-                        if (!atomic_element.has_value()) {
-                            if (!sema::IsUnknown(operand_types.front())) {
-                                report(std::string(ToString(instruction.kind)) + " requires *Atomic<T> operand in function " + function.name);
-                            }
-                            break;
-                        }
-                        const auto require_order = [&](std::size_t index, const std::string& label) {
-                            if (index < operand_types.size() && !sema::IsUnknown(operand_types[index]) && !IsMemoryOrderType(operand_types[index])) {
-                                report(label + " must use MemoryOrder operand in function " + function.name);
-                            }
-                        };
-                        if (is_load) {
-                            if (!IsAssignableType(module, instruction.type, *atomic_element)) {
-                                report("atomic_load result type mismatch in function " + function.name);
-                            }
-                            require_order(1, "atomic_load");
-                        }
-                        if (is_store) {
-                            if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
-                                report("atomic_store value type mismatch in function " + function.name);
-                            }
-                            require_order(2, "atomic_store");
-                        }
-                        if (is_exchange) {
-                            if (!IsAssignableType(module, instruction.type, *atomic_element)) {
-                                report("atomic_exchange result type mismatch in function " + function.name);
-                            }
-                            if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
-                                report("atomic_exchange value type mismatch in function " + function.name);
-                            }
-                            require_order(2, "atomic_exchange");
-                        }
-                        if (is_compare_exchange) {
-                            if (operand_types.size() > 1) {
-                                const auto expected_pointee = PointerPointeeType(StripMirAliasOrDistinct(module, operand_types[1]));
-                                if (!expected_pointee.has_value() || !IsAssignableType(module, *expected_pointee, *atomic_element)) {
-                                    report("atomic_compare_exchange expected pointer type mismatch in function " + function.name);
-                                }
-                            }
-                            if (operand_types.size() > 2 && !IsAssignableType(module, *atomic_element, operand_types[2])) {
-                                report("atomic_compare_exchange desired value type mismatch in function " + function.name);
-                            }
-                            require_order(3, "atomic_compare_exchange success order");
-                            require_order(4, "atomic_compare_exchange failure order");
-                        }
-                        if (is_fetch_add) {
-                            if (!IsAssignableType(module, instruction.type, *atomic_element)) {
-                                report("atomic_fetch_add result type mismatch in function " + function.name);
-                            }
-                            if (operand_types.size() > 1 && !IsAssignableType(module, *atomic_element, operand_types[1])) {
-                                report("atomic_fetch_add value type mismatch in function " + function.name);
-                            }
-                            require_order(2, "atomic_fetch_add");
-                        }
+                    case Instruction::Kind::kAtomicFetchAdd:
+                        ValidateAtomicInstruction(instruction, validation_ctx);
                         break;
-                    }
                     case Instruction::Kind::kField: {
                         if (instruction.result.empty()) {
                             report("field must produce a result in function " + function.name);
