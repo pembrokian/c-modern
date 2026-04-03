@@ -11,6 +11,6 @@ SourceFile
                   NameExpr text=Config
                 inits:
                   FieldInit name=path
-                    LiteralExpr text="out" extra=string_lit
+                    LiteralExpr text="out" kind=string_lit
                   FieldInit name=mode
-                    LiteralExpr text="fast" extra=string_lit
+                    LiteralExpr text="fast" kind=string_lit

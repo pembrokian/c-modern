@@ -1,0 +1,16 @@
+SourceFile
+  FuncDecl name=classify
+    ParamDecl name=x
+      NamedType name=i32
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          SwitchStmt
+            exprs:
+              NameExpr text=x
+            default:
+          ReturnStmt
+            exprs:
+              LiteralExpr text=0 kind=int_lit

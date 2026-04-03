@@ -10,6 +10,8 @@ namespace {
 
 using Indent = int;
 
+constexpr int kMaxDumpDepth = 512;
+
 std::string_view ToString(TypeExpr::Kind kind) {
     switch (kind) {
         case TypeExpr::Kind::kNamed:
@@ -137,9 +139,30 @@ void WriteLine(std::ostringstream& stream, Indent indent, std::string_view text)
     stream << text << '\n';
 }
 
-void DumpType(const TypeExpr& type, std::ostringstream& stream, Indent indent);
-void DumpExpr(const Expr& expr, std::ostringstream& stream, Indent indent);
-void DumpStmt(const Stmt& stmt, std::ostringstream& stream, Indent indent);
+bool ReachedDumpDepthLimit(std::ostringstream& stream, Indent indent, int depth) {
+    if (depth <= kMaxDumpDepth) {
+        return false;
+    }
+
+    WriteLine(stream, indent, "<max depth reached>");
+    return true;
+}
+
+std::string_view SecondaryTextLabel(const Expr& expr) {
+    switch (expr.kind) {
+        case Expr::Kind::kQualifiedName:
+            return " member=";
+        case Expr::Kind::kLiteral:
+            return " kind=";
+        default:
+            return " secondary=";
+    }
+}
+
+void DumpType(const TypeExpr& type, std::ostringstream& stream, Indent indent, int depth = 0);
+void DumpExpr(const Expr& expr, std::ostringstream& stream, Indent indent, int depth = 0);
+void DumpStmt(const Stmt& stmt, std::ostringstream& stream, Indent indent, int depth = 0);
+void DumpDecl(const Decl& decl, std::ostringstream& stream, Indent indent, int depth = 0);
 
 void DumpAttributes(const std::vector<Attribute>& attributes, std::ostringstream& stream, Indent indent) {
     for (const auto& attribute : attributes) {
@@ -174,10 +197,18 @@ void DumpPattern(const NamePattern& pattern, std::ostringstream& stream, Indent 
 void DumpField(const FieldDecl& field, std::ostringstream& stream, Indent indent) {
     WriteIndent(stream, indent);
     stream << "FieldDecl name=" << field.name << '\n';
-    DumpType(*field.type, stream, indent + 1);
+    if (field.type != nullptr) {
+        DumpType(*field.type, stream, indent + 1);
+    } else {
+        WriteLine(stream, indent + 1, "<missing type>");
+    }
 }
 
-void DumpType(const TypeExpr& type, std::ostringstream& stream, Indent indent) {
+void DumpType(const TypeExpr& type, std::ostringstream& stream, Indent indent, int depth) {
+    if (ReachedDumpDepthLimit(stream, indent, depth)) {
+        return;
+    }
+
     WriteIndent(stream, indent);
     stream << ToString(type.kind);
     if (!type.name.empty()) {
@@ -187,19 +218,19 @@ void DumpType(const TypeExpr& type, std::ostringstream& stream, Indent indent) {
 
     if (type.length_expr != nullptr) {
         WriteLine(stream, indent + 1, "length:");
-        DumpExpr(*type.length_expr, stream, indent + 2);
+        DumpExpr(*type.length_expr, stream, indent + 2, depth + 1);
     }
 
     if (!type.type_args.empty()) {
         WriteLine(stream, indent + 1, "typeArgs:");
         for (const auto& arg : type.type_args) {
-            DumpType(*arg, stream, indent + 2);
+            DumpType(*arg, stream, indent + 2, depth + 1);
         }
     }
 
     if (type.inner != nullptr) {
         WriteLine(stream, indent + 1, "inner:");
-        DumpType(*type.inner, stream, indent + 2);
+        DumpType(*type.inner, stream, indent + 2, depth + 1);
     }
 }
 
@@ -215,48 +246,52 @@ void DumpFieldInit(const FieldInit& init, std::ostringstream& stream, Indent ind
     }
 }
 
-void DumpExpr(const Expr& expr, std::ostringstream& stream, Indent indent) {
+void DumpExpr(const Expr& expr, std::ostringstream& stream, Indent indent, int depth) {
+    if (ReachedDumpDepthLimit(stream, indent, depth)) {
+        return;
+    }
+
     WriteIndent(stream, indent);
     stream << ToString(expr.kind);
     if (!expr.text.empty()) {
         stream << " text=" << expr.text;
     }
     if (!expr.secondary_text.empty()) {
-        stream << " extra=" << expr.secondary_text;
+        stream << SecondaryTextLabel(expr) << expr.secondary_text;
     }
     stream << '\n';
 
     if (expr.left != nullptr) {
         WriteLine(stream, indent + 1, "left:");
-        DumpExpr(*expr.left, stream, indent + 2);
+        DumpExpr(*expr.left, stream, indent + 2, depth + 1);
     }
 
     if (expr.right != nullptr) {
         WriteLine(stream, indent + 1, "right:");
-        DumpExpr(*expr.right, stream, indent + 2);
+        DumpExpr(*expr.right, stream, indent + 2, depth + 1);
     }
 
     if (expr.extra != nullptr) {
         WriteLine(stream, indent + 1, "extra:");
-        DumpExpr(*expr.extra, stream, indent + 2);
+        DumpExpr(*expr.extra, stream, indent + 2, depth + 1);
     }
 
     if (!expr.type_args.empty()) {
         WriteLine(stream, indent + 1, "typeArgs:");
         for (const auto& arg : expr.type_args) {
-            DumpType(*arg, stream, indent + 2);
+            DumpType(*arg, stream, indent + 2, depth + 1);
         }
     }
 
     if (expr.type_target != nullptr) {
         WriteLine(stream, indent + 1, "typeTarget:");
-        DumpType(*expr.type_target, stream, indent + 2);
+        DumpType(*expr.type_target, stream, indent + 2, depth + 1);
     }
 
     if (!expr.args.empty()) {
         WriteLine(stream, indent + 1, "args:");
         for (const auto& arg : expr.args) {
-            DumpExpr(*arg, stream, indent + 2);
+            DumpExpr(*arg, stream, indent + 2, depth + 1);
         }
     }
 
@@ -293,7 +328,11 @@ void DumpCasePattern(const CasePattern& pattern, std::ostringstream& stream, Ind
     }
 }
 
-void DumpStmt(const Stmt& stmt, std::ostringstream& stream, Indent indent) {
+void DumpStmt(const Stmt& stmt, std::ostringstream& stream, Indent indent, int depth) {
+    if (ReachedDumpDepthLimit(stream, indent, depth)) {
+        return;
+    }
+
     WriteIndent(stream, indent);
     stream << ToString(stmt.kind);
     if (!stmt.loop_name.empty()) {
@@ -313,45 +352,45 @@ void DumpStmt(const Stmt& stmt, std::ostringstream& stream, Indent indent) {
 
     if (stmt.type_ann != nullptr) {
         WriteLine(stream, indent + 1, "type:");
-        DumpType(*stmt.type_ann, stream, indent + 2);
+        DumpType(*stmt.type_ann, stream, indent + 2, depth + 1);
     }
 
     if (!stmt.exprs.empty()) {
         WriteLine(stream, indent + 1, "exprs:");
         for (const auto& expr : stmt.exprs) {
-            DumpExpr(*expr, stream, indent + 2);
+            DumpExpr(*expr, stream, indent + 2, depth + 1);
         }
     }
 
     if (!stmt.assign_targets.empty()) {
         WriteLine(stream, indent + 1, "targets:");
         for (const auto& expr : stmt.assign_targets) {
-            DumpExpr(*expr, stream, indent + 2);
+            DumpExpr(*expr, stream, indent + 2, depth + 1);
         }
     }
 
     if (!stmt.assign_values.empty()) {
         WriteLine(stream, indent + 1, "values:");
         for (const auto& expr : stmt.assign_values) {
-            DumpExpr(*expr, stream, indent + 2);
+            DumpExpr(*expr, stream, indent + 2, depth + 1);
         }
     }
 
     if (!stmt.statements.empty()) {
         WriteLine(stream, indent + 1, "statements:");
         for (const auto& child : stmt.statements) {
-            DumpStmt(*child, stream, indent + 2);
+            DumpStmt(*child, stream, indent + 2, depth + 1);
         }
     }
 
     if (stmt.then_branch != nullptr) {
         WriteLine(stream, indent + 1, "then:");
-        DumpStmt(*stmt.then_branch, stream, indent + 2);
+        DumpStmt(*stmt.then_branch, stream, indent + 2, depth + 1);
     }
 
     if (stmt.else_branch != nullptr) {
         WriteLine(stream, indent + 1, "else:");
-        DumpStmt(*stmt.else_branch, stream, indent + 2);
+        DumpStmt(*stmt.else_branch, stream, indent + 2, depth + 1);
     }
 
     if (!stmt.switch_cases.empty()) {
@@ -360,21 +399,24 @@ void DumpStmt(const Stmt& stmt, std::ostringstream& stream, Indent indent) {
             WriteLine(stream, indent + 2, "SwitchCase:");
             DumpCasePattern(case_node.pattern, stream, indent + 3);
             for (const auto& item : case_node.statements) {
-                DumpStmt(*item, stream, indent + 3);
+                DumpStmt(*item, stream, indent + 3, depth + 1);
             }
         }
     }
 
-    assert(stmt.has_default_case == !stmt.default_case.statements.empty());
     if (stmt.has_default_case) {
         WriteLine(stream, indent + 1, "default:");
         for (const auto& item : stmt.default_case.statements) {
-            DumpStmt(*item, stream, indent + 2);
+            DumpStmt(*item, stream, indent + 2, depth + 1);
         }
     }
 }
 
-void DumpDecl(const Decl& decl, std::ostringstream& stream, Indent indent) {
+void DumpDecl(const Decl& decl, std::ostringstream& stream, Indent indent, int depth) {
+    if (ReachedDumpDepthLimit(stream, indent, depth)) {
+        return;
+    }
+
     WriteIndent(stream, indent);
     stream << ToString(decl.kind);
     if (!decl.name.empty()) {
@@ -406,19 +448,23 @@ void DumpDecl(const Decl& decl, std::ostringstream& stream, Indent indent) {
         WriteIndent(stream, indent + 1);
         stream << "ParamDecl name=" << param.name << '\n';
         DumpAttributes(param.attributes, stream, indent + 2);
-        DumpType(*param.type, stream, indent + 2);
+        if (param.type != nullptr) {
+            DumpType(*param.type, stream, indent + 2, depth + 1);
+        } else {
+            WriteLine(stream, indent + 2, "<missing type>");
+        }
     }
 
     if (!decl.return_types.empty()) {
         WriteLine(stream, indent + 1, "returns:");
         for (const auto& type : decl.return_types) {
-            DumpType(*type, stream, indent + 2);
+            DumpType(*type, stream, indent + 2, depth + 1);
         }
     }
 
     if (decl.body != nullptr) {
         WriteLine(stream, indent + 1, "body:");
-        DumpStmt(*decl.body, stream, indent + 2);
+        DumpStmt(*decl.body, stream, indent + 2, depth + 1);
     }
 
     if (!decl.fields.empty()) {
@@ -445,18 +491,18 @@ void DumpDecl(const Decl& decl, std::ostringstream& stream, Indent indent) {
 
     if (decl.type_ann != nullptr) {
         WriteLine(stream, indent + 1, "type:");
-        DumpType(*decl.type_ann, stream, indent + 2);
+        DumpType(*decl.type_ann, stream, indent + 2, depth + 1);
     }
 
     if (decl.aliased_type != nullptr) {
         WriteLine(stream, indent + 1, "aliasedType:");
-        DumpType(*decl.aliased_type, stream, indent + 2);
+        DumpType(*decl.aliased_type, stream, indent + 2, depth + 1);
     }
 
     if (!decl.values.empty()) {
         WriteLine(stream, indent + 1, "values:");
         for (const auto& value : decl.values) {
-            DumpExpr(*value, stream, indent + 2);
+            DumpExpr(*value, stream, indent + 2, depth + 1);
         }
     }
 }

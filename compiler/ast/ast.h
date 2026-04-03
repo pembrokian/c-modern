@@ -109,7 +109,7 @@ struct DefaultCase : Node {
 // Field usage by Kind:
 //   kName            : text = identifier name
 //   kQualifiedName   : text = module name, secondary_text = member name
-//   kLiteral         : text = literal token text, secondary_text = suffix (e.g. "i32")
+//   kLiteral         : text = literal token text, secondary_text = literal token kind name
 //   kUnary           : text = operator, left = operand
 //   kBinary          : text = operator, left = lhs, right = rhs
 //   kRange           : left = begin, right = end (nullptr means open end)
@@ -126,7 +126,7 @@ struct DefaultCase : Node {
 //
 // secondary_text meanings by Kind:
 //   kQualifiedName   : member name after the dot
-//   kLiteral         : type suffix following the numeric literal
+//   kLiteral         : lexer token kind name (for example "string_lit" or "int_lit")
 //   (all other Kinds leave secondary_text empty)
 struct Expr : Node {
     enum class Kind {

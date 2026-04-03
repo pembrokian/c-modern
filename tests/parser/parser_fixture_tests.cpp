@@ -92,6 +92,7 @@ int main(int argc, char** argv) {
     const std::vector<FixtureCase> fixtures = {
         {"aggregate_named_fields.mc", "aggregate_named_fields.ast.txt", true},
         {"binding_or_assign_ambiguous.mc", "binding_or_assign_ambiguous.ast.txt", true},
+        {"switch_empty_default.mc", "switch_empty_default.ast.txt", true},
         {"missing_param_paren.mc", "missing_param_paren.errors.txt", false},
         {"missing_block_brace.mc", "missing_block_brace.errors.txt", false},
         {"switch_case_bad.mc", "switch_case_bad.errors.txt", false},
