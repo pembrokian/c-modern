@@ -157,6 +157,7 @@ int main(int argc, char** argv) {
         {"import_root_ok_main.mc", "import_root_ok_main.sema.txt", {"tests/sema/import_roots"}, true},
         {"layout_ok.mc", "layout_ok.sema.txt", {}, true},
         {"noalias_signature_ok.mc", "noalias_signature_ok.sema.txt", {}, true},
+        {"tuple_return_ok.mc", "tuple_return_ok.sema.txt", {}, true},
         {"array_length_non_constant_bad.mc", "array_length_non_constant_bad.errors.txt", {}, false},
         {"distinct_implicit_conversion_bad.mc", "distinct_implicit_conversion_bad.errors.txt", {}, false},
         {"distinct_non_scalar_bad.mc", "distinct_non_scalar_bad.errors.txt", {}, false},

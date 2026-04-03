@@ -8,7 +8,8 @@ func main(args: Slice<cstr>) i32 {
         return 90
     }
 
-    buf: *Buffer<u8> = fs.read_all_default(args[1])
+    alloc: *mem.Allocator = mem.default_allocator()
+    buf: *Buffer<u8> = fs.read_all(args[1], alloc)
     len: usize = mem.buffer_len(buf)
     if len != 7 {
         mem.buffer_free<u8>(buf)

@@ -24,6 +24,11 @@ struct ValueInfo {
     sema::Type type;
 };
 
+struct ValuePiece {
+    ValueInfo value;
+    mc::support::SourceSpan span;
+};
+
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name);
 
 std::string_view ToString(TypeDecl::Kind kind) {
@@ -2095,6 +2100,77 @@ class FunctionLowerer {
         });
     }
 
+    ValueInfo EmitTupleExtractValue(const ValueInfo& tuple_value,
+                                    std::size_t index,
+                                    const mc::support::SourceSpan& span) {
+        if (tuple_value.type.kind != sema::Type::Kind::kTuple || index >= tuple_value.type.subtypes.size()) {
+            Report(span, "MIR lowering expected tuple value for multi-result destructuring");
+            return EmitLiteralValue("0", sema::UnknownType());
+        }
+
+        const std::string value = NewValue();
+        const std::string field_name = std::to_string(index);
+        Emit({
+            .kind = Instruction::Kind::kField,
+            .result = value,
+            .type = tuple_value.type.subtypes[index],
+            .target = field_name,
+            .target_kind = Instruction::TargetKind::kField,
+            .target_name = field_name,
+            .target_display = tuple_value.value + "." + field_name,
+            .target_base_type = tuple_value.type,
+            .operands = {tuple_value.value},
+        });
+        return {value, tuple_value.type.subtypes[index]};
+    }
+
+    std::optional<std::vector<ValuePiece>> LowerExprValuesForArity(const std::vector<std::unique_ptr<Expr>>& exprs,
+                                                                   std::size_t expected_count,
+                                                                   const mc::support::SourceSpan& report_span,
+                                                                   std::string_view count_error) {
+        auto lower_direct = [&]() {
+            std::vector<ValuePiece> values;
+            values.reserve(exprs.size());
+            for (const auto& expr : exprs) {
+                values.push_back({
+                    .value = LowerExpr(*expr),
+                    .span = expr->span,
+                });
+            }
+            return values;
+        };
+
+        if (exprs.size() == expected_count) {
+            return lower_direct();
+        }
+
+        std::vector<ValuePiece> flattened;
+        flattened.reserve(expected_count);
+        for (const auto& expr : exprs) {
+            const ValueInfo value = LowerExpr(*expr);
+            if (value.type.kind == sema::Type::Kind::kTuple) {
+                for (std::size_t index = 0; index < value.type.subtypes.size(); ++index) {
+                    flattened.push_back({
+                        .value = EmitTupleExtractValue(value, index, expr->span),
+                        .span = expr->span,
+                    });
+                }
+            } else {
+                flattened.push_back({
+                    .value = value,
+                    .span = expr->span,
+                });
+            }
+        }
+
+        if (flattened.size() != expected_count) {
+            Report(report_span, std::string(count_error));
+            return std::nullopt;
+        }
+
+        return flattened;
+    }
+
     void LowerBindingLike(const Stmt& stmt, bool is_mutable) {
         const sema::Type declared_type = sema::TypeFromAst(stmt.type_ann.get());
         if (!stmt.has_initializer) {
@@ -2108,42 +2184,36 @@ class FunctionLowerer {
             return;
         }
 
-        if (stmt.pattern.names.size() != stmt.exprs.size()) {
-            Report(stmt.span, "bootstrap MIR requires one initializer per binding name");
+        const auto values = LowerExprValuesForArity(stmt.exprs,
+                                                    stmt.pattern.names.size(),
+                                                    stmt.span,
+                                                    "bootstrap MIR requires one initializer per binding name");
+        if (!values.has_value()) {
             return;
-        }
-
-        std::vector<ValueInfo> values;
-        values.reserve(stmt.exprs.size());
-        for (const auto& expr : stmt.exprs) {
-            values.push_back(LowerExpr(*expr));
         }
 
         for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
             BindLocal(stmt.pattern.names[index],
-                      values[index].value,
-                      sema::IsUnknown(declared_type) ? values[index].type : declared_type,
+                      (*values)[index].value.value,
+                      sema::IsUnknown(declared_type) ? (*values)[index].value.type : declared_type,
                       is_mutable,
                       stmt.span);
         }
     }
 
     void LowerAssign(const Stmt& stmt) {
-        if (stmt.assign_targets.size() != stmt.assign_values.size()) {
-            Report(stmt.span, "bootstrap MIR requires one value per assignment target");
+        const auto values = LowerExprValuesForArity(stmt.assign_values,
+                                                    stmt.assign_targets.size(),
+                                                    stmt.span,
+                                                    "bootstrap MIR requires one value per assignment target");
+        if (!values.has_value()) {
             return;
-        }
-
-        std::vector<ValueInfo> values;
-        values.reserve(stmt.assign_values.size());
-        for (const auto& expr : stmt.assign_values) {
-            values.push_back(LowerExpr(*expr));
         }
 
         for (std::size_t index = 0; index < stmt.assign_targets.size(); ++index) {
             const Expr& target = *stmt.assign_targets[index];
             if (target.kind == Expr::Kind::kName) {
-                AssignNamedTarget(target.text, values[index], target.span);
+                AssignNamedTarget(target.text, (*values)[index].value, target.span);
                 continue;
             }
 
@@ -2156,12 +2226,12 @@ class FunctionLowerer {
                     .target_kind = Instruction::TargetKind::kGlobal,
                     .target_name = qualified_name,
                     .target_display = qualified_name,
-                    .operands = {values[index].value},
+                    .operands = {(*values)[index].value.value},
                 });
                 continue;
             }
 
-            EmitStoreTarget(target, values[index]);
+            EmitStoreTarget(target, (*values)[index].value);
         }
     }
 
@@ -2227,23 +2297,29 @@ class FunctionLowerer {
                     Report(stmt.span, "MIR lowering requires semantic classification for binding-or-assignment statement");
                     return;
                 }
-                if (fact->resolutions.size() != stmt.pattern.names.size() || stmt.exprs.size() != stmt.pattern.names.size()) {
+                if (fact->resolutions.size() != stmt.pattern.names.size()) {
                     Report(stmt.span, "MIR lowering requires one semantic resolution and one initializer per binding-or-assignment name");
                     return;
                 }
 
-                std::vector<ValueInfo> values;
-                values.reserve(stmt.exprs.size());
-                for (const auto& expr : stmt.exprs) {
-                    values.push_back(LowerExpr(*expr));
+                const auto values = LowerExprValuesForArity(stmt.exprs,
+                                                            stmt.pattern.names.size(),
+                                                            stmt.span,
+                                                            "MIR lowering requires one semantic resolution and one initializer per binding-or-assignment name");
+                if (!values.has_value()) {
+                    return;
                 }
 
                 for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
                     if (fact->resolutions[index] == sema::BindingOrAssignResolution::kAssign) {
-                        AssignNamedTarget(stmt.pattern.names[index], values[index], stmt.span);
+                        AssignNamedTarget(stmt.pattern.names[index], (*values)[index].value, stmt.span);
                         continue;
                     }
-                    BindLocal(stmt.pattern.names[index], values[index].value, values[index].type, true, stmt.span);
+                    BindLocal(stmt.pattern.names[index],
+                              (*values)[index].value.value,
+                              (*values)[index].value.type,
+                              true,
+                              stmt.span);
                 }
                 return;
             }
@@ -2650,8 +2726,16 @@ class FunctionLowerer {
     void LowerReturn(const Stmt& stmt) {
         EnsureCurrentBlock();
         std::vector<std::string> return_values;
-        for (const auto& expr : stmt.exprs) {
-            return_values.push_back(LowerExpr(*expr).value);
+        const auto values = LowerExprValuesForArity(stmt.exprs,
+                                                    function_.return_types.size(),
+                                                    stmt.span,
+                                                    "bootstrap MIR return value count does not match function signature");
+        if (!values.has_value()) {
+            return;
+        }
+        return_values.reserve(values->size());
+        for (const auto& value : *values) {
+            return_values.push_back(value.value.value);
         }
         EmitDeferredScopesToDepth(0);
         auto& block = function_.blocks[*current_block_];

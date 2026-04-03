@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -103,6 +104,7 @@ struct ObjectBuildResult {
 struct LinkOptions {
     TargetConfig target;
     std::vector<std::filesystem::path> object_paths;
+    std::optional<std::filesystem::path> runtime_source_path;
     std::filesystem::path runtime_object_path;
     std::filesystem::path executable_path;
 };
@@ -115,6 +117,7 @@ struct LinkResult {
 
 struct BuildOptions {
     TargetConfig target;
+    std::optional<std::filesystem::path> runtime_source_path;
     BuildArtifacts artifacts;
 };
 

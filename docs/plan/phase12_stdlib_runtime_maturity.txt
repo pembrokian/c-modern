@@ -5,6 +5,14 @@ Status
 ------
 PLANNED
 
+Closeout note
+-------------
+- The repository-bounded first implementation wave is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase12_stdlib_runtime_maturity_closeout.txt`.
+- This planning document remains the forward-looking execution plan and should
+  not be read as the sole source of repository truth for what has already
+  landed.
+
 Repository status note
 ----------------------
 - The repository already has a real bootstrap Phase 6 boundary recorded in
@@ -80,7 +88,7 @@ After Phase 12:
   import surface rather than bleeding into compiler or backend-local behavior
 - allocation, buffer, string, utf8, and file APIs are honest enough that
   real hosted utilities can use them without repeated workaround patterns
-- newly admitted modules such as `time`, `os`, `sync`, `hal`, or `testing`
+- newly admitted modules such as `time`, `os`, `sync`, or `hal`
   land only when a real repository consumer or spec obligation requires them
 - deterministic stdlib and executable regressions under
   `/Users/ro/dev/c_modern/tests/stdlib/` and related proof layers become the
@@ -135,6 +143,10 @@ Current repository posture
 - The repository still does not claim the broader Phase 6 module surface,
   richer utf8 behavior, fuller allocator realism, or a fully mature testing
   companion API.
+- Current consumer pressure admits `testing` only as the narrow companion
+  surface already exercised by the Phase 7 ordinary-test path; `time`, `os`,
+  `sync`, and `hal` remain explicitly deferred until a real hosted program or
+  architecture obligation requires them.
 - Some current APIs and helper naming remain shaped by bootstrap constraints
   rather than by the steadier long-term ownership intended by the architecture
   texts.

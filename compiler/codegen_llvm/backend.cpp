@@ -43,7 +43,6 @@ using mc::kBootstrapTriple;
 using mc::kBootstrapTargetFamily;
 constexpr std::string_view kBootstrapObjectFormat = "macho";
 constexpr std::string_view kInspectSurface = "backend_ir_text";
-constexpr std::string_view kHostedRuntimeSupportPath = "runtime/hosted/mc_hosted_runtime.c";
 
 struct FunctionLoweringState {
     std::size_t function_index = 0;
@@ -475,6 +474,27 @@ std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
                                     element->size * *length,
                                     element->alignment);
         }
+        case sema::Type::Kind::kTuple: {
+            std::ostringstream backend_name;
+            backend_name << '{';
+            std::size_t size = 0;
+            std::size_t alignment = 1;
+            for (std::size_t index = 0; index < type.subtypes.size(); ++index) {
+                auto lowered_field = LowerTypeInfo(module, type.subtypes[index]);
+                if (!lowered_field.has_value()) {
+                    return std::nullopt;
+                }
+                if (index > 0) {
+                    backend_name << ", ";
+                }
+                backend_name << lowered_field->backend_name;
+                size = AlignTo(size, lowered_field->alignment);
+                size += lowered_field->size;
+                alignment = std::max(alignment, lowered_field->alignment);
+            }
+            backend_name << '}';
+            return use_backend_type(backend_name.str(), AlignTo(size, alignment), alignment);
+        }
         case sema::Type::Kind::kProcedure:
             return use_backend_type("ptr", 8, 8);
         case sema::Type::Kind::kNil:
@@ -548,6 +568,17 @@ std::string FormatReturnTypes(const std::vector<BackendTypeInfo>& types) {
     return stream.str();
 }
 
+std::optional<BackendTypeInfo> LowerFunctionReturnType(const mir::Module& module,
+                                                       const std::vector<sema::Type>& return_types) {
+    if (return_types.empty()) {
+        return std::nullopt;
+    }
+    if (return_types.size() == 1) {
+        return LowerTypeInfo(module, return_types.front());
+    }
+    return LowerTypeInfo(module, sema::TupleType(return_types));
+}
+
 std::string JoinOperands(const std::vector<std::string>& operands) {
     std::ostringstream stream;
     for (std::size_t index = 0; index < operands.size(); ++index) {
@@ -569,6 +600,20 @@ std::optional<std::string> BaseStoreTargetName(const mir::Instruction& instructi
         return std::nullopt;
     }
     return instruction.target_display.substr(0, instruction.target_display.size() - suffix.size());
+}
+
+std::optional<std::string> BaseIndexedTargetName(const mir::Instruction& instruction) {
+    if (instruction.target_display.empty() || instruction.target_display.back() != ']') {
+        return std::nullopt;
+    }
+    const std::size_t marker = instruction.target_display.rfind('[');
+    if (marker == std::string::npos || marker == 0) {
+        return std::nullopt;
+    }
+    if (instruction.target_display.find(':', marker) != std::string::npos) {
+        return std::nullopt;
+    }
+    return instruction.target_display.substr(0, marker);
 }
 
 const BackendLocal* FindLocal(const FunctionLoweringState& state,
@@ -1691,38 +1736,44 @@ bool LowerTerminator(const mir::BasicBlock& block,
                 return true;
             }
 
-            if (block.terminator.values.size() != 1 || function.return_types.size() != 1) {
+            if (block.terminator.values.size() != function.return_types.size()) {
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap backend only supports single-value returns in the current bootstrap slice; function '" +
+                                   "LLVM bootstrap backend return value count does not match function signature in function '" +
                                        function.name + "' block '" + block.label + "'",
                                    diagnostics);
                 return false;
             }
 
-            std::string value;
-            if (!ResolveValue(state,
-                              block.terminator.values.front(),
-                              function,
-                              block,
-                              source_path,
-                              diagnostics,
-                              value)) {
+            std::vector<std::string> values;
+            values.reserve(block.terminator.values.size());
+            for (const auto& return_value : block.terminator.values) {
+                std::string value;
+                if (!ResolveValue(state,
+                                  return_value,
+                                  function,
+                                  block,
+                                  source_path,
+                                  diagnostics,
+                                  value)) {
+                    return false;
+                }
+                values.push_back(std::move(value));
+            }
+
+            const auto lowered_return_type = LowerFunctionReturnType(*state.module, function.return_types);
+            if (!lowered_return_type.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend could not lower return type for function '" + function.name + "' block '" +
+                                       block.label + "'",
+                                   diagnostics);
                 return false;
             }
 
-            const auto* return_type = function.return_types.empty() ? nullptr : &function.return_types.front();
-            BackendTypeInfo lowered_return_type;
-            if (return_type != nullptr &&
-                !LowerInstructionType(*state.module,
-                                      *return_type,
-                                      source_path,
-                                      diagnostics,
-                                      "return in function '" + function.name + "' block '" + block.label + "'",
-                                      lowered_return_type)) {
-                return false;
+            if (function.return_types.size() == 1) {
+                backend_block.terminator = "ret " + FormatTypeInfo(*lowered_return_type) + " " + values.front();
+            } else {
+                backend_block.terminator = "ret " + FormatTypeInfo(*lowered_return_type) + " (" + JoinOperands(values) + ")";
             }
-
-            backend_block.terminator = "ret " + FormatTypeInfo(lowered_return_type) + " " + value;
             return true;
         }
 
@@ -3450,24 +3501,16 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
         return true;
     }
 
-    if (callee->return_types.size() != 1) {
+    const auto lowered_return_type = LowerFunctionReturnType(*state.module, callee->return_types);
+    if (!lowered_return_type.has_value()) {
         ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission only supports single-value direct calls to '" +
+                           "LLVM bootstrap executable emission could not lower call result type for '" +
                                instruction.target_name + "' in function '" + state.function->name + "' block '" +
                                block.label + "'",
                            diagnostics);
         return false;
     }
-
-    BackendTypeInfo result_type;
-    if (!LowerInstructionType(*state.module,
-                              callee->return_types.front(),
-                              source_path,
-                              diagnostics,
-                              FunctionBlockContext("call result", state.function->name, block),
-                              result_type)) {
-        return false;
-    }
+    BackendTypeInfo result_type = *lowered_return_type;
 
     const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
     output_lines.push_back(temp + " = call " + LLVMTypeName(result_type) + " " + function_it->second + "(" +
@@ -4211,13 +4254,27 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
 
             const std::string ptr_temp = LLVMTempName(function_index, block_index, instruction_index) + ".ptr";
             if (!base.type.backend_name.empty() && base.type.backend_name.front() == '[') {
-                const std::string array_slot = EmitAggregateStackSlot(base,
-                                                                      function_index,
-                                                                      block_index,
-                                                                      instruction_index,
-                                                                      "store_array",
-                                                                      output_lines);
-                output_lines.push_back(ptr_temp + " = getelementptr inbounds " + base.type.backend_name + ", ptr " + array_slot + ", i64 0, i64 " +
+                std::string array_ptr;
+                if (const auto base_name = BaseIndexedTargetName(instruction); base_name.has_value()) {
+                    const auto local_it = state.local_slots.find(*base_name);
+                    if (local_it != state.local_slots.end()) {
+                        array_ptr = local_it->second;
+                    } else {
+                        const auto global_it = state.globals.find(*base_name);
+                        if (global_it != state.globals.end()) {
+                            array_ptr = global_it->second.backend_name;
+                        }
+                    }
+                }
+                if (array_ptr.empty()) {
+                    array_ptr = EmitAggregateStackSlot(base,
+                                                       function_index,
+                                                       block_index,
+                                                       instruction_index,
+                                                       "store_array",
+                                                       output_lines);
+                }
+                output_lines.push_back(ptr_temp + " = getelementptr inbounds " + base.type.backend_name + ", ptr " + array_ptr + ", i64 0, i64 " +
                                        index_i64);
             } else if (base.type.backend_name == "{ptr, i64}") {
                 const std::string data_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".data";
@@ -4953,36 +5010,67 @@ bool RenderExecutableTerminator(const mir::BasicBlock& block,
                 output_lines.push_back("ret void");
                 return true;
             }
-            if (block.terminator.values.size() != 1 || state.function->return_types.size() != 1) {
+            if (block.terminator.values.size() != state.function->return_types.size()) {
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap executable emission only supports single-value returns in function '" +
+                                   "LLVM bootstrap executable emission return value count does not match function signature in function '" +
                                        state.function->name + "' block '" + block.label + "'",
                                    diagnostics);
                 return false;
             }
 
-            ExecutableValue value;
-            if (!ResolveExecutableValue(state,
-                                        block.terminator.values.front(),
-                                        block,
-                                        source_path,
-                                        diagnostics,
-                                        value)) {
+            const auto return_type = LowerFunctionReturnType(*state.module, state.function->return_types);
+            if (!return_type.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not lower return type for function '" + state.function->name +
+                                       "' block '" + block.label + "'",
+                                   diagnostics);
                 return false;
             }
 
-            BackendTypeInfo return_type;
-            if (!LowerInstructionType(*state.module,
-                                      state.function->return_types.front(),
-                                      source_path,
-                                      diagnostics,
-                                      "return in executable emission for function '" + state.function->name + "' block '" +
-                                          block.label + "'",
-                                      return_type)) {
-                return false;
+            if (state.function->return_types.size() == 1) {
+                ExecutableValue value;
+                if (!ResolveExecutableValue(state,
+                                            block.terminator.values.front(),
+                                            block,
+                                            source_path,
+                                            diagnostics,
+                                            value)) {
+                    return false;
+                }
+                output_lines.push_back("ret " + return_type->backend_name + " " + value.text);
+                return true;
             }
 
-            output_lines.push_back("ret " + return_type.backend_name + " " + value.text);
+            std::string current_value = LLVMStructInsertBase(*return_type);
+            for (std::size_t index = 0; index < block.terminator.values.size(); ++index) {
+                ExecutableValue value;
+                if (!ResolveExecutableValue(state,
+                                            block.terminator.values[index],
+                                            block,
+                                            source_path,
+                                            diagnostics,
+                                            value)) {
+                    return false;
+                }
+
+                BackendTypeInfo field_type;
+                if (!LowerInstructionType(*state.module,
+                                          state.function->return_types[index],
+                                          source_path,
+                                          diagnostics,
+                                          "return field in executable emission for function '" + state.function->name + "' block '" +
+                                              block.label + "'",
+                                          field_type)) {
+                    return false;
+                }
+
+                const std::string next_value = "%ret." + block.label + "." + std::to_string(index);
+                output_lines.push_back(next_value + " = insertvalue " + return_type->backend_name + " " + current_value + ", " +
+                                       field_type.backend_name + " " + value.text + ", " + std::to_string(index));
+                current_value = next_value;
+            }
+
+            output_lines.push_back("ret " + return_type->backend_name + " " + current_value);
             return true;
         }
 
@@ -5051,14 +5139,6 @@ bool RenderExecutableFunction(const mir::Module& module,
                               const std::filesystem::path& source_path,
                               support::DiagnosticSink& diagnostics,
                               std::ostringstream& stream) {
-    if (function.return_types.size() > 1) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission does not support multi-value returns for function '" +
-                               function.name + "'",
-                           diagnostics);
-        return false;
-    }
-
     const auto params = ParameterLocals(function);
     std::vector<BackendTypeInfo> param_types;
     param_types.reserve(params.size());
@@ -5115,14 +5195,15 @@ bool RenderExecutableFunction(const mir::Module& module,
     }
 
     BackendTypeInfo return_type;
-    if (!function.return_types.empty() &&
-        !LowerInstructionType(module,
-                              function.return_types.front(),
-                              source_path,
-                              diagnostics,
-                              "return type for executable emission in function '" + function.name + "'",
-                              return_type)) {
-        return false;
+    if (!function.return_types.empty()) {
+        const auto lowered_return_type = LowerFunctionReturnType(module, function.return_types);
+        if (!lowered_return_type.has_value()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend could not lower return type for executable emission in function '" + function.name + "'",
+                               diagnostics);
+            return false;
+        }
+        return_type = *lowered_return_type;
     }
 
     stream << "define " << (function.return_types.empty() ? std::string("void") : return_type.backend_name) << " "
@@ -5265,13 +5346,6 @@ bool RenderExternFunctionDeclaration(const mir::Module& module,
                            diagnostics);
         return false;
     }
-    if (function.return_types.size() > 1) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission does not support multi-value extern returns for function '" +
-                               function.name + "'",
-                           diagnostics);
-        return false;
-    }
 
     const auto params = ParameterLocals(function);
     std::vector<BackendTypeInfo> param_types;
@@ -5291,16 +5365,14 @@ bool RenderExternFunctionDeclaration(const mir::Module& module,
 
     std::string return_backend_name = "void";
     if (!function.return_types.empty()) {
-        BackendTypeInfo return_type;
-        if (!LowerInstructionType(module,
-                                  function.return_types.front(),
-                                  source_path,
-                                  diagnostics,
-                                  "extern return type for '" + function.name + "'",
-                                  return_type)) {
+        const auto return_type = LowerFunctionReturnType(module, function.return_types);
+        if (!return_type.has_value()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend could not lower extern return type for '" + function.name + "'",
+                               diagnostics);
             return false;
         }
-        return_backend_name = return_type.backend_name;
+        return_backend_name = return_type->backend_name;
     }
 
     stream << "declare " << return_backend_name << " " << LLVMFunctionSymbol(function.name, wrap_hosted_main) << "(";
@@ -5581,38 +5653,6 @@ bool RunHostCommand(const std::vector<std::string>& args,
     return false;
 }
 
-std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesystem::path& start_path) {
-    std::filesystem::path current = std::filesystem::absolute(start_path).lexically_normal();
-    if (!std::filesystem::is_directory(current)) {
-        current = current.parent_path();
-    }
-
-    while (!current.empty()) {
-        if (std::filesystem::exists(current / "stdlib") && std::filesystem::exists(current / "runtime")) {
-            return current;
-        }
-        if (current == current.root_path()) {
-            break;
-        }
-        current = current.parent_path();
-    }
-
-    return std::nullopt;
-}
-
-std::optional<std::filesystem::path> DiscoverHostedRuntimeSupportSource(const std::filesystem::path& source_path) {
-    const auto repo_root = DiscoverRepositoryRoot(source_path);
-    if (!repo_root.has_value()) {
-        return std::nullopt;
-    }
-
-    const std::filesystem::path runtime_source = *repo_root / std::string(kHostedRuntimeSupportPath);
-    if (!std::filesystem::exists(runtime_source)) {
-        return std::nullopt;
-    }
-    return runtime_source;
-}
-
 }  // namespace
 
 TargetConfig BootstrapTargetConfig() {
@@ -5725,18 +5765,25 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
     std::filesystem::create_directories(options.executable_path.parent_path());
     std::filesystem::create_directories(options.runtime_object_path.parent_path());
 
-    const auto runtime_support_source = DiscoverHostedRuntimeSupportSource(source_path);
-    if (!runtime_support_source.has_value()) {
+    if (!options.runtime_source_path.has_value()) {
         ReportBackendError(source_path,
-                           "LLVM bootstrap backend could not locate hosted runtime support source '" +
-                               std::string(kHostedRuntimeSupportPath) + "'",
+                           "LLVM bootstrap backend requires an explicit hosted runtime support source path",
+                           diagnostics);
+        return {};
+    }
+
+    const auto& runtime_support_source = *options.runtime_source_path;
+    if (!std::filesystem::exists(runtime_support_source)) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend could not read hosted runtime support source '" +
+                               runtime_support_source.generic_string() + "'",
                            diagnostics);
         return {};
     }
 
     const bool runtime_object_missing = !std::filesystem::exists(options.runtime_object_path);
     const bool runtime_source_is_newer = !runtime_object_missing &&
-                                         std::filesystem::last_write_time(*runtime_support_source) >
+                                         std::filesystem::last_write_time(runtime_support_source) >
                                              std::filesystem::last_write_time(options.runtime_object_path);
     if (runtime_object_missing || runtime_source_is_newer) {
         if (!RunHostCommand({"xcrun",
@@ -5744,7 +5791,7 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
                              "-target",
                              options.target.triple,
                              "-c",
-                             runtime_support_source->generic_string(),
+                             runtime_support_source.generic_string(),
                              "-o",
                              options.runtime_object_path.generic_string()},
                             source_path,
@@ -5806,6 +5853,7 @@ BuildResult BuildExecutable(const mir::Module& module,
                                             {
                                                 .target = options.target,
                                                 .object_paths = {options.artifacts.object_path},
+                                                .runtime_source_path = options.runtime_source_path,
                                                 .runtime_object_path = runtime_object_path,
                                                 .executable_path = options.artifacts.executable_path,
                                             },

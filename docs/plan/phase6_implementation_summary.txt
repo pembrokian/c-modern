@@ -26,12 +26,15 @@ What landed
   `buffer_free`, `buffer_len`, and `slice_from_buffer`; `buffer_new<T>` and
   `buffer_free<T>` now use a real callable generic helper path in the admitted
   bootstrap surface.
-- `stdlib/fs.mc` provides hosted `file_size`, `read_all`, and
-  `read_all_default`, with explicit allocator flow through `mem.Allocator` for
-  the admitted file-loading proof.
+- `stdlib/fs.mc` provides hosted `file_size` and `read_all`, with explicit
+  allocator flow through `mem.Allocator` for the admitted file-loading proof.
 - `stdlib/strings.mc` provides non-allocating borrowed-text helpers.
 - `stdlib/utf8.mc` provides a narrow borrowed-text helper slice layered on
   `strings`.
+- `stdlib/utf8.mc` now also provides narrow borrowed helpers `valid_bytes` and
+  `codepoint_len` for byte-slice validation and leading-code-point sizing.
+- `stdlib/testing.mc` provides a narrow toolchain-companion `testing.fail()`
+  helper used by the admitted ordinary-test slice.
 - imported stdlib values now resolve through real module-qualified access such
   as `io.write_line(...)`.
 - imported user-defined types now support dotted type expressions such as
@@ -48,7 +51,6 @@ Executable proof now present
 - hosted file-size querying through `import fs` and `file_size`
 - hosted file loading through `import fs` plus explicit allocator ownership via
   `import mem`
-- hosted file loading through the admitted convenience wrapper `fs.read_all_default`
 - borrowed-text length and emptiness helpers through `import strings`
 - module-chained borrowed-text helpers through `import utf8`
 
@@ -60,15 +62,15 @@ Key repository-specific constraints still in force
   such as `buffer_new<T>`, `buffer_free<T>`, and `slice_from_buffer<T>`, but
   it still returns pointer-backed bootstrap `*Buffer<T>` values rather than
   the long-term multi-value canonical API shape
-- `fs.read_all_default` remains a narrow hosted convenience path, but the more
-  explicit admitted flow now uses `fs.read_all(path, mem.default_allocator())`
+- admitted hosted file loading now uses the explicit flow
+  `fs.read_all(path, mem.default_allocator())`
 - fuller canonical `utf8` validation is no longer blocked by generic helper
   calls or executable `buffer_to_slice` lowering, but the library itself still
   only exposes the narrow borrowed-text helper slice landed earlier
 
 Deferred within Phase 6
 -----------------------
-- `os`, `time`, `sync`, `hal`, and `testing`
+- `os`, `time`, `sync`, and `hal`
 - fuller canonical `utf8` helpers such as `utf8.valid`, `decode`, and `encode`
 - broader nil-lowering and address-of coverage beyond the admitted hosted shim
   boundary

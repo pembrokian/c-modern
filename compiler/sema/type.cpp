@@ -235,6 +235,13 @@ Type CanonicalizeBuiltinType(Type type) {
 std::vector<std::pair<std::string, Type>> BuiltinAggregateFields(const Type& raw_type) {
     const Type type = CanonicalizeBuiltinType(raw_type);
     std::vector<std::pair<std::string, Type>> fields;
+    if (type.kind == Type::Kind::kTuple) {
+        fields.reserve(type.subtypes.size());
+        for (std::size_t index = 0; index < type.subtypes.size(); ++index) {
+            fields.push_back({std::to_string(index), type.subtypes[index]});
+        }
+        return fields;
+    }
     if (type.kind == Type::Kind::kString) {
         fields.push_back({"ptr", PointerType(NamedType("u8"))});
         fields.push_back({"len", NamedType("usize")});

@@ -1,7 +1,7 @@
 export { main, parse_config }
 
 import errors
-import text
+import strings
 
 func parse_config(input: str) errors.Error {
     rest: str = input
@@ -10,7 +10,7 @@ func parse_config(input: str) errors.Error {
     mode: str = ""
 
     while rest.len != 0 {
-        newline: usize = text.find_byte(rest, 10)
+        newline: usize = strings.find_byte(rest, 10)
         raw_line: str = rest
         has_more: bool = false
         if newline != rest.len {
@@ -21,8 +21,8 @@ func parse_config(input: str) errors.Error {
             rest = rest[0:0]
         }
 
-        line: str = text.trim_space(raw_line)
-        if text.is_blank(line) {
+        line: str = strings.trim_space(raw_line)
+        if strings.is_blank(line) {
             line_no = line_no + 1
             if !has_more {
                 break
@@ -30,19 +30,19 @@ func parse_config(input: str) errors.Error {
             continue
         }
 
-        equals: usize = text.find_byte(line, 61)
+        equals: usize = strings.find_byte(line, 61)
         if equals == line.len {
             return errors.fail_code(line_no)
         }
 
-        key: str = text.trim_space(line[0:equals])
-        value: str = text.trim_space(line[equals + 1:line.len])
-        if text.eq(key, "port") {
-            if !text.eq(value, "8080") {
+        key: str = strings.trim_space(line[0:equals])
+        value: str = strings.trim_space(line[equals + 1:line.len])
+        if strings.eq(key, "port") {
+            if !strings.eq(value, "8080") {
                 return errors.fail_code(line_no + 100)
             }
             port = 8080
-        } else if text.eq(key, "mode") {
+        } else if strings.eq(key, "mode") {
             mode = value
         } else {
             return errors.fail_code(line_no + 200)
@@ -57,7 +57,7 @@ func parse_config(input: str) errors.Error {
     if port != 8080 {
         return errors.fail_code(300)
     }
-    if !text.eq(mode, "fast") {
+    if !strings.eq(mode, "fast") {
         return errors.fail_code(301)
     }
 

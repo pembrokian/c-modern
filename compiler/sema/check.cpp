@@ -27,6 +27,11 @@ struct ValueBinding {
     bool is_mutable = true;
 };
 
+struct ExprTypeValue {
+    Type type;
+    mc::support::SourceSpan span;
+};
+
 enum class VisitState {
     kVisiting,
     kDone,
@@ -2203,28 +2208,82 @@ class Checker {
         }
     }
 
+    std::optional<std::vector<ExprTypeValue>> AnalyzeExprValuesForArity(const std::vector<std::unique_ptr<Expr>>& exprs,
+                                                                        std::size_t expected_count,
+                                                                        const mc::support::SourceSpan& report_span,
+                                                                        std::string_view count_error) {
+        auto analyze_direct = [&]() {
+            std::vector<ExprTypeValue> values;
+            values.reserve(exprs.size());
+            for (const auto& expr : exprs) {
+                values.push_back({
+                    .type = AnalyzeExpr(*expr),
+                    .span = expr->span,
+                });
+            }
+            return values;
+        };
+
+        if (exprs.size() == expected_count) {
+            return analyze_direct();
+        }
+
+        std::vector<ExprTypeValue> flattened;
+        flattened.reserve(expected_count);
+        for (const auto& expr : exprs) {
+            const Type type = AnalyzeExpr(*expr);
+            if (type.kind == Type::Kind::kTuple) {
+                for (const auto& element_type : type.subtypes) {
+                    flattened.push_back({
+                        .type = element_type,
+                        .span = expr->span,
+                    });
+                }
+            } else {
+                flattened.push_back({
+                    .type = type,
+                    .span = expr->span,
+                });
+            }
+        }
+
+        if (flattened.size() != expected_count) {
+            Report(report_span, std::string(count_error));
+            return std::nullopt;
+        }
+
+        return flattened;
+    }
+
     void CheckBindingLike(const Stmt& stmt, bool is_mutable) {
         ValidateTypeExpr(stmt.type_ann.get(), current_function_ != nullptr ? current_function_->type_params : std::vector<std::string> {}, stmt.span);
         const Type declared_type = SemanticTypeFromAst(stmt.type_ann.get(),
                                    current_function_ != nullptr ? current_function_->type_params
                                                 : std::vector<std::string> {});
-        if (stmt.has_initializer && stmt.pattern.names.size() != stmt.exprs.size()) {
-            Report(stmt.span, "binding requires one initializer per bound name");
-            return;
-        }
 
         std::vector<Type> value_types;
         value_types.reserve(stmt.pattern.names.size());
-        for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
-            Type value_type = declared_type;
-            if (index < stmt.exprs.size()) {
-                value_type = AnalyzeExpr(*stmt.exprs[index]);
-                if (!IsUnknown(declared_type) && !IsAssignable(declared_type, value_type, *module_)) {
-                    Report(stmt.exprs[index]->span, "binding type mismatch for " + stmt.pattern.names[index] + ": expected " +
-                                                   FormatType(declared_type) + ", got " + FormatType(value_type));
-                }
+        if (stmt.has_initializer) {
+            const auto values = AnalyzeExprValuesForArity(stmt.exprs,
+                                                          stmt.pattern.names.size(),
+                                                          stmt.span,
+                                                          "binding requires one initializer per bound name");
+            if (!values.has_value()) {
+                return;
             }
-            value_types.push_back(value_type);
+            for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+                const Type& value_type = (*values)[index].type;
+                if (!IsUnknown(declared_type) && !IsAssignable(declared_type, value_type, *module_)) {
+                    Report((*values)[index].span,
+                           "binding type mismatch for " + stmt.pattern.names[index] + ": expected " +
+                               FormatType(declared_type) + ", got " + FormatType(value_type));
+                }
+                value_types.push_back(value_type);
+            }
+        } else {
+            for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+                value_types.push_back(declared_type);
+            }
         }
 
         for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
@@ -2233,15 +2292,12 @@ class Checker {
     }
 
     void CheckBindingOrAssign(const Stmt& stmt) {
-        if (stmt.pattern.names.size() != stmt.exprs.size()) {
-            Report(stmt.span, "binding-or-assignment requires one value per name");
+        const auto values = AnalyzeExprValuesForArity(stmt.exprs,
+                                                      stmt.pattern.names.size(),
+                                                      stmt.span,
+                                                      "binding-or-assignment requires one value per name");
+        if (!values.has_value()) {
             return;
-        }
-
-        std::vector<Type> value_types;
-        value_types.reserve(stmt.exprs.size());
-        for (const auto& expr : stmt.exprs) {
-            value_types.push_back(AnalyzeExpr(*expr));
         }
 
         std::vector<BindingOrAssignResolution> resolutions;
@@ -2257,21 +2313,23 @@ class Checker {
                 target.kind = Expr::Kind::kName;
                 target.text = stmt.pattern.names[index];
                 target.span = stmt.span;
-                CheckAssignableTarget(target, value_types[index]);
+                CheckAssignableTarget(target, (*values)[index].type);
                 continue;
             }
-            BindValue(stmt.pattern.names[index], value_types[index], true, stmt.span);
+            BindValue(stmt.pattern.names[index], (*values)[index].type, true, stmt.span);
         }
     }
 
     void CheckAssign(const Stmt& stmt) {
-        if (stmt.assign_targets.size() != stmt.assign_values.size()) {
-            Report(stmt.span, "assignment requires one value per target");
+        const auto values = AnalyzeExprValuesForArity(stmt.assign_values,
+                                                      stmt.assign_targets.size(),
+                                                      stmt.span,
+                                                      "assignment requires one value per target");
+        if (!values.has_value()) {
             return;
         }
         for (std::size_t index = 0; index < stmt.assign_targets.size(); ++index) {
-            const Type value_type = AnalyzeExpr(*stmt.assign_values[index]);
-            CheckAssignableTarget(*stmt.assign_targets[index], value_type);
+            CheckAssignableTarget(*stmt.assign_targets[index], (*values)[index].type);
         }
     }
 
@@ -2374,14 +2432,17 @@ class Checker {
         if (current_function_ == nullptr) {
             return;
         }
-        if (stmt.exprs.size() != current_function_->return_types.size()) {
-            Report(stmt.span, "return value count does not match function signature");
+        const auto values = AnalyzeExprValuesForArity(stmt.exprs,
+                                                      current_function_->return_types.size(),
+                                                      stmt.span,
+                                                      "return value count does not match function signature");
+        if (!values.has_value()) {
             return;
         }
-        for (std::size_t index = 0; index < stmt.exprs.size(); ++index) {
-            const Type actual = AnalyzeExpr(*stmt.exprs[index]);
+        for (std::size_t index = 0; index < current_function_->return_types.size(); ++index) {
+            const Type& actual = (*values)[index].type;
             if (!IsAssignable(current_function_->return_types[index], actual, *module_)) {
-                Report(stmt.exprs[index]->span,
+                Report((*values)[index].span,
                        "return type mismatch: expected " + FormatType(current_function_->return_types[index]) + ", got " +
                            FormatType(actual));
             }

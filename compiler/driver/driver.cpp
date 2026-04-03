@@ -71,6 +71,8 @@ InvocationKind ClassifyInvocation(const CommandOptions& options) {
                : InvocationKind::kDirectSource;
 }
 
+constexpr std::string_view kHostedRuntimeSupportRelativePath = "runtime/hosted/mc_hosted_runtime.c";
+
 std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesystem::path& start_path) {
     std::filesystem::path current = std::filesystem::absolute(start_path).lexically_normal();
     if (!std::filesystem::is_directory(current)) {
@@ -88,6 +90,19 @@ std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesyste
     }
 
     return std::nullopt;
+}
+
+std::optional<std::filesystem::path> DiscoverHostedRuntimeSupportSource(const std::filesystem::path& source_path) {
+    const auto repo_root = DiscoverRepositoryRoot(source_path);
+    if (!repo_root.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::filesystem::path runtime_source = *repo_root / std::string(kHostedRuntimeSupportRelativePath);
+    if (!std::filesystem::exists(runtime_source)) {
+        return std::nullopt;
+    }
+    return runtime_source;
 }
 
 std::vector<std::filesystem::path> ComputeEffectiveImportRoots(const std::filesystem::path& source_path,
@@ -1829,11 +1844,13 @@ bool EvaluateRunOutputCase(const CompilerRegressionCase& regression_case,
     }
 
     const auto build_targets = support::ComputeBuildArtifactTargets(regression_case.source_path, build_dir);
+    const auto runtime_source_path = DiscoverHostedRuntimeSupportSource(regression_case.source_path);
     const auto build_result = mc::codegen_llvm::BuildExecutable(
         *checked->mir_result.module,
         regression_case.source_path,
         {
             .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .runtime_source_path = runtime_source_path,
             .artifacts = {
                 .llvm_ir_path = build_targets.llvm_ir,
                 .object_path = build_targets.object,
@@ -1953,10 +1970,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
     const BuildUnit& entry_unit = units->back();
     const auto build_targets = support::ComputeBuildArtifactTargets(entry_unit.source_path, graph.compile_graph.build_dir);
     const auto runtime_object_path = ComputeRuntimeObjectPath(entry_unit.source_path, graph.compile_graph.build_dir);
-    const auto repo_root = DiscoverRepositoryRoot(entry_unit.source_path);
-    const auto runtime_source_path = repo_root.has_value()
-                                         ? std::optional<std::filesystem::path> {*repo_root / "runtime/hosted/mc_hosted_runtime.c"}
-                                         : std::optional<std::filesystem::path> {};
+    const auto runtime_source_path = DiscoverHostedRuntimeSupportSource(entry_unit.source_path);
 
     if (ShouldRelinkProjectExecutable(build_targets.executable, runtime_object_path, runtime_source_path, *units)) {
         std::vector<std::filesystem::path> object_paths;
@@ -1969,6 +1983,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
                                                                   {
                                                                       .target = graph.compile_graph.target_config,
                                                                       .object_paths = object_paths,
+                                                                      .runtime_source_path = runtime_source_path,
                                                                       .runtime_object_path = runtime_object_path,
                                                                       .executable_path = build_targets.executable,
                                                                   },
@@ -2143,6 +2158,7 @@ int RunBuild(const CommandOptions& options) {
             checked->source_path,
             {
                 .target = mc::codegen_llvm::BootstrapTargetConfig(),
+                .runtime_source_path = DiscoverHostedRuntimeSupportSource(checked->source_path),
                 .artifacts = {
                     .llvm_ir_path = build_targets.llvm_ir,
                     .object_path = build_targets.object,

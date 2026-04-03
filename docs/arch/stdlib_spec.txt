@@ -46,7 +46,12 @@ Toolchain companion module:
 
 `utf8`
 - UTF-8 validation and encode or decode primitives only
-- examples: `valid`, `decode`, `encode`
+- examples: `valid`, `valid_bytes`, `codepoint_len`, `decode`, `encode`
+- current repository shape: fallible decode and encode use explicit value-plus-
+	error returns, namely `decode(text) (Decoded, Error)` and
+	`encode(codepoint) (Encoded, Error)`
+- current repository shape: `Decoded` carries `{ codepoint, width }`, and
+	`Encoded` carries `{ bytes, len }` for borrowed UTF-8 code-unit output
 
 `strings`
 - text operations over `str` and string-like views
@@ -161,6 +166,10 @@ These spellings should now be treated as canonical:
 - `strings.lines`
 - `strings.split_once`
 - `utf8.valid`
+- `utf8.valid_bytes`
+- `utf8.codepoint_len`
+- `utf8.decode`
+- `utf8.encode`
 - `io.close`
 - `io.poller_set`
 - `io.write_line`

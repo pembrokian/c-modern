@@ -1,4 +1,4 @@
-export { file_size, is_dir, list_dir, read_all, read_all_default }
+export { file_size, is_dir, list_dir, read_all }
 
 import mem
 
@@ -21,8 +21,4 @@ func list_dir(path: str, alloc: *mem.Allocator) *Buffer<u8> {
 
 func read_all(path: str, alloc: *mem.Allocator) *Buffer<u8> {
     return __mc_fs_read_all(path, alloc)
-}
-
-func read_all_default(path: str) *Buffer<u8> {
-    return read_all(path, mem.default_allocator())
 }

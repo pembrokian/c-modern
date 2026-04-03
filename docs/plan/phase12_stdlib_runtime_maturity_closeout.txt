@@ -1,0 +1,77 @@
+Phase 12 -- Stdlib And Runtime Maturity Closeout
+================================================
+
+Status
+------
+COMPLETED (repository-bounded first wave)
+
+Purpose
+-------
+Record the concrete Phase 12 slice now admitted in the repository so
+implementation truth lives in a closeout note rather than being inferred from
+the planning document alone.
+
+Scope of this closeout
+----------------------
+- This is a repository closeout note for the current bounded Phase 12 wave.
+- It does not claim the full long-term Phase 6 surface from `plan.txt`.
+- It preserves the existing ownership model: stdlib owns library API truth,
+  `runtime/hosted/` owns hosted startup and low-level process entry, the driver
+  owns workflow/path wiring, and the backend realizes already-defined runtime
+  consumption rather than discovering repository layout on its own.
+
+What landed
+-----------
+- Phase 12A: the hosted file-loading surface now uses the explicit contract
+  `fs.read_all(path, mem.default_allocator())`; the bootstrap convenience
+  wrapper `fs.read_all_default` is no longer part of the admitted `fs` API.
+- Phase 12A: real repository consumers and executable fixtures were migrated to
+  explicit allocator flow.
+- Phase 12B: hosted runtime source discovery moved out of the backend and into
+  the driver/workflow layer; backend linking now consumes an explicit runtime
+  source path.
+- Phase 12B: executable proof now covers borrowed hosted argv forwarding for
+  empty and space-containing arguments.
+- Phase 12E: focused stdlib executable regressions now cover `fs.is_dir` and
+  deterministic `fs.list_dir` output directly.
+- Phase 12D: canonical non-allocating text helpers `eq`, `find_byte`,
+  `trim_space`, and `is_blank` now live on `strings`, while `text` remains as a
+  compatibility shim.
+- Phase 12D: canonical examples now use the `strings` surface directly where
+  appropriate.
+- Phase 12D: `utf8` now exposes narrow borrowed helpers beyond `valid`, namely
+  `valid_bytes` and `codepoint_len`, with focused proof.
+- Follow-up compiler-owned work now supports statement-boundary tuple
+  propagation and executable multi-value `(value, Error)` returns well enough
+  for honest fallible `utf8.decode` and `utf8.encode` proof.
+- Phase 12D follow-up: `utf8.decode(text)` now returns
+  `(utf8.Decoded, errors.Error)`, and `utf8.encode(codepoint)` now returns
+  `(utf8.Encoded, errors.Error)` with raw encoded bytes plus length.
+- Phase 12D: proof surfaced and fixed two library-boundary bugs: a C/MC ABI
+  mismatch for `__mc_strings_eq`, and all-whitespace `strings.trim_space`
+  slicing that trapped instead of returning an empty borrowed string.
+- Phase 12C: repository truth now treats `testing` as the already-admitted
+  narrow toolchain companion module used by the Phase 7 ordinary-test path,
+  while `time`, `os`, `sync`, and `hal` remain explicitly deferred.
+
+What remains deferred
+---------------------
+- broader `time`, `os`, `sync`, and `hal` admission
+- broader allocation and owned-text helper realism beyond the bounded borrowed
+  helper additions landed here
+- any library API shape that would require new semantic, MIR, or backend policy
+  rather than a library/runtime ownership fix
+
+Validation
+----------
+- `cmake --build build/debug -j4`
+- focused sema, MIR, and executable regressions covering tuple-return
+  propagation plus fallible UTF-8 decode and encode proof
+
+Closeout statement
+------------------
+The current repository-bounded Phase 12 wave is complete. The hosted stdlib and
+runtime slice is materially more honest than the earlier bootstrap surface, the
+runtime boundary is more clearly owned by `runtime/hosted/` plus driver wiring,
+and the proof layer is stronger and narrower where library behavior is the real
+contract.

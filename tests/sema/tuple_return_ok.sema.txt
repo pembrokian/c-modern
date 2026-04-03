@@ -1,0 +1,3 @@
+SemanticModule
+  Function name=pair params=[] returns=[i32, i32]
+  Function name=sum params=[] returns=[i32]

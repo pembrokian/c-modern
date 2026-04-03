@@ -252,6 +252,7 @@ int main(int argc, char** argv) {
         {"qualified_variant_import_root_ok.mc", "qualified_variant_import_root_ok.mir.txt", true, "", {}, {{"color_module", "import_roots/color_module.mc"}}},
         {"scoped_defer.mc", "scoped_defer.mir.txt", true, "", {}, {}},
         {"switch_variant.mc", "switch_variant.mir.txt", true, "", {}, {}},
+        {"tuple_return_propagation.mc", "tuple_return_propagation.mir.txt", true, "", {}, {}},
         {"variant_binding_shadow_fail.mc", "variant_binding_shadow_fail.errors.txt", false, "", {}, {}},
     };
 

@@ -784,6 +784,32 @@ int main(int argc, char** argv) {
                     0,
                     {"alpha", "beta"});
 
+    const std::filesystem::path hosted_args_roundtrip_source = work_root / "hosted_main_args_roundtrip.mc";
+    WriteFile(hosted_args_roundtrip_source,
+              "import io\n"
+              "\n"
+              "func main(args: Slice<cstr>) i32 {\n"
+              "    if args.len != 4 {\n"
+              "        return 10\n"
+              "    }\n"
+              "    if args[1].len != 0 {\n"
+              "        return 11\n"
+              "    }\n"
+              "    if io.write_line(args[2]) != 0 {\n"
+              "        return 12\n"
+              "    }\n"
+              "    if io.write_line(args[3]) != 0 {\n"
+              "        return 13\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n");
+    RunBuiltOutputFixture(mc_path,
+                          hosted_args_roundtrip_source,
+                          work_root / "hosted_main_args_roundtrip_build",
+                          {"", "two words", "tail"},
+                          0,
+                          "two words\ntail\n");
+
     RunBuiltOutputFixture(mc_path,
                           source_root / "tests/stdlib/hello_stdout.mc",
                           work_root / "phase6_hello_stdout_build",
@@ -818,8 +844,26 @@ int main(int argc, char** argv) {
                     {});
 
     RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/array_local_store_roundtrip.mc",
+                    work_root / "phase12_array_local_store_roundtrip_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/string_helpers.mc",
+                    work_root / "phase12_string_helpers_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
                     source_root / "tests/stdlib/utf8_byte_len.mc",
                     work_root / "phase6_utf8_byte_len_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/utf8_codepoint_len.mc",
+                    work_root / "phase12_utf8_codepoint_len_build",
                     0,
                     {});
 
@@ -830,8 +874,20 @@ int main(int argc, char** argv) {
                     {});
 
     RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/utf8_valid_bytes.mc",
+                    work_root / "phase12_utf8_valid_bytes_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
                     source_root / "tests/stdlib/utf8_invalid_bytes.mc",
                     work_root / "phase6_utf8_invalid_bytes_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/utf8_decode_encode.mc",
+                    work_root / "phase12_utf8_decode_encode_build",
                     0,
                     {});
 
@@ -844,6 +900,24 @@ int main(int argc, char** argv) {
                     0,
                     {phase6_file_input.generic_string()});
 
+    const std::filesystem::path phase6_dir_input = work_root / "phase6_dir_input";
+    std::filesystem::create_directories(phase6_dir_input / "nested");
+    WriteFile(phase6_dir_input / "alpha.txt", "a\n");
+    WriteFile(phase6_dir_input / "zeta.txt", "z\n");
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/is_dir_kind.mc",
+                    work_root / "phase6_is_dir_kind_build",
+                    0,
+                    {phase6_dir_input.generic_string(), phase6_file_input.generic_string()});
+
+    RunBuiltOutputFixture(mc_path,
+                          source_root / "tests/stdlib/list_dir_stdout.mc",
+                          work_root / "phase6_list_dir_stdout_build",
+                          {phase6_dir_input.generic_string()},
+                          0,
+                          "alpha.txt\nnested/\nzeta.txt\n");
+
     RunBuiltFixture(mc_path,
                     source_root / "tests/stdlib/file_read_len.mc",
                     work_root / "phase6_file_read_len_build",
@@ -851,8 +925,8 @@ int main(int argc, char** argv) {
                     {phase6_file_input.generic_string()});
 
     RunBuiltFixture(mc_path,
-                    source_root / "tests/stdlib/file_read_default_len.mc",
-                    work_root / "phase6_file_read_default_len_build",
+                    source_root / "tests/stdlib/file_read_default_allocator_len.mc",
+                    work_root / "phase6_file_read_default_allocator_len_build",
                     0,
                     {phase6_file_input.generic_string()});
 

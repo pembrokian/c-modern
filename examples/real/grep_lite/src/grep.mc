@@ -98,7 +98,8 @@ func print_matches(text: str, needle: str) usize {
 }
 
 func run(needle: str, path: str) i32 {
-    buf: *Buffer<u8> = fs.read_all_default(path)
+    alloc: *mem.Allocator = mem.default_allocator()
+    buf: *Buffer<u8> = fs.read_all(path, alloc)
     if buf == nil {
         return 92
     }

@@ -74,7 +74,8 @@ func format_line(hash: u64, path: str) *Buffer<u8> {
 }
 
 func run(path: str) i32 {
-    contents: *Buffer<u8> = fs.read_all_default(path)
+    alloc: *mem.Allocator = mem.default_allocator()
+    contents: *Buffer<u8> = fs.read_all(path, alloc)
     if contents == nil {
         return 92
     }

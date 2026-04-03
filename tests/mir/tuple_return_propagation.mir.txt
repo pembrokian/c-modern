@@ -1,0 +1,31 @@
+Module
+  Function name=pair returns=[i32, i32]
+    Block label=entry0
+      const %v0:int_literal op=1
+      const %v1:int_literal op=2
+      terminator return values=[%v0, %v1]
+  Function name=forward returns=[i32, i32]
+    Block label=entry0
+      symbol_ref %v0:proc()->tuple<i32, i32> target=pair target_kind=function target_name=pair
+      call %v1:tuple<i32, i32> target=pair target_kind=function target_name=pair operands=[%v0]
+      field %v2:i32 target=0 target_kind=field target_name=0 target_display=%v1.0 target_base=tuple<i32, i32> operands=[%v1]
+      field %v3:i32 target=1 target_kind=field target_name=1 target_display=%v1.1 target_base=tuple<i32, i32> operands=[%v1]
+      terminator return values=[%v2, %v3]
+  Function name=sum returns=[i32]
+    Local name=left type=i32
+    Local name=right type=i32
+    Block label=entry0
+      const %v0:int_literal op=0
+      store_local target=left operands=[%v0]
+      const %v1:int_literal op=0
+      store_local target=right operands=[%v1]
+      symbol_ref %v2:proc()->tuple<i32, i32> target=pair target_kind=function target_name=pair
+      call %v3:tuple<i32, i32> target=pair target_kind=function target_name=pair operands=[%v2]
+      field %v4:i32 target=0 target_kind=field target_name=0 target_display=%v3.0 target_base=tuple<i32, i32> operands=[%v3]
+      field %v5:i32 target=1 target_kind=field target_name=1 target_display=%v3.1 target_base=tuple<i32, i32> operands=[%v3]
+      store_local target=left operands=[%v4]
+      store_local target=right operands=[%v5]
+      load_local %v6:i32 target=left
+      load_local %v7:i32 target=right
+      binary %v8:i32 op=+ arithmetic=wrap operands=[%v6, %v7]
+      terminator return values=[%v8]
