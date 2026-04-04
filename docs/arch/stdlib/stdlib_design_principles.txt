@@ -1,0 +1,130 @@
+Modern C - Standard Library Design Principles
+
+Purpose
+
+This document records the cross-cutting design principles that should govern the Modern C standard library.
+It complements `language_spec.txt` and `stdlib_spec.txt` by freezing library philosophy and API-shape constraints rather than enumerating individual modules.
+
+1. The Standard Library Must Preserve Language Intent
+
+Core rule:
+- the standard library must reinforce the language's explicit, low-magic model rather than work around it
+
+Consequences:
+- no hidden runtime services should be smuggled in as ordinary library convenience
+- no ambient allocation policy should be implied by innocent-looking APIs
+- no library abstraction should hide control flow, synchronization, ownership transfer, or expensive storage behavior behind surface simplicity
+
+2. Keep Ownership Honest
+
+Ownership rules:
+- APIs must make borrowed versus owning results visible in their types
+- borrowed views such as `str` and `Slice<T>` must not masquerade as owning storage
+- owning results should use explicit owning types such as `Buffer<T>` or other clearly named owning containers
+
+Design bias:
+- if an operation allocates, that fact should be visible in the function signature or in the returned type
+- if an operation borrows caller storage, that fact should remain visible rather than being hidden behind implicit copies
+
+3. Prefer Non-Allocating APIs By Default
+
+Default rule:
+- first-pass library APIs should prefer caller-provided storage, borrowed views, and explicit result buffers over hidden allocation
+
+Why:
+- it matches the language rule that allocation is a library feature, not a hidden semantic effect
+- it keeps performance and failure behavior visible
+- it avoids turning convenience helpers into de facto runtime policy
+
+Corollaries:
+- text helpers should stay non-allocating by default
+- I/O and formatting helpers should prefer writing into caller-controlled sinks or buffers
+- if an API does allocate, it should usually accept an explicit allocator when allocator choice is part of the contract
+
+4. Keep Module Boundaries Sharp
+
+Boundary rule:
+- each standard module should own a narrow conceptually coherent surface
+
+Examples:
+- `mem` owns allocation and owning contiguous storage helpers
+- `strings` owns non-allocating text helpers over `str`
+- `utf8` owns UTF-8 validation and encode or decode primitives
+- `io` owns portable stream and readiness-oriented I/O
+- `sync` owns concurrency primitives, not general event loops or text helpers
+- `os` and `hal` own explicit escape hatches for platform and hardware reality
+
+Negative rule:
+- do not create junk-drawer modules that blur these boundaries
+- do not duplicate the same concept under near-synonym modules
+
+5. Portable Surface First, Escape Hatches Explicit
+
+Portability rule:
+- portable modules should present the smallest useful cross-platform contract
+- backend-specific details should stay in `os`, `hal`, or implementation internals unless the portable layer truly requires them
+
+Escape-hatch rule:
+- when low-level control is necessary, expose it explicitly rather than contaminating ordinary portable APIs
+- explicit escape hatches are preferable to pretending all platforms share one rich low-level model
+
+6. Fallibility Must Stay Visible
+
+Error-handling rule:
+- fallible operations should return explicit `Error` values according to the language's ordinary conventions
+- the library should not invent exception-like control flow, ambient failure channels, or hidden global error states
+
+API consequence:
+- allocation, I/O, UTF-8 validation, networking, and subprocess-style operations should report failure honestly
+- APIs should not erase meaningful close-time, flush-time, parse-time, or allocation-time failures merely because some platforms make them uncommon
+
+7. Determinism Over Cleverness
+
+Determinism rule:
+- library APIs and toolchain-facing outputs should be deterministic whenever the underlying operation is defined and deterministic
+
+Why:
+- determinism keeps tests stable
+- determinism reduces accidental platform drift
+- determinism aligns with the compiler and interface-artifact design of the rest of the project
+
+Practical implications:
+- helper surfaces should avoid unspecified ordering when a deterministic one is cheap and obvious
+- serialization and textual debug outputs should prefer stable ordering
+
+8. No Library-Level Hidden Frameworks
+
+Framework rule:
+- the standard library should remain a library, not become a disguised application framework
+
+This means:
+- no hidden scheduler requirement for ordinary I/O
+- no mandatory dependency injection container, registry, or service locator pattern
+- no large assertion framework or ambient test object model in core modules
+- no omnibus `core` prelude that quietly shapes every program
+
+9. Small Surface, Real Pressure
+
+Growth rule:
+- new APIs should be added because real programs need them, not because other ecosystems have them
+
+Admission criteria:
+- the capability solves a recurring real use case
+- the ownership and error model are explicit
+- the module placement is clear
+- the surface does not require hidden allocation or hidden runtime state unless that is the explicit contract
+
+10. Toolchain Companion Modules Stay Ordinary
+
+Companion rule:
+- shipped helper modules such as `testing` are ordinary library modules, not compiler magic
+- toolchain distribution status does not justify special semantics
+
+Consequence:
+- documentation, imports, and build behavior should treat companion modules as explicit dependencies
+- the compiler should not hard-code framework behavior into the language just because the module ships with the toolchain
+
+Bottom line:
+- the standard library should be small, explicit, and structurally honest
+- ownership, allocation, failure, and portability boundaries should remain visible in API shapes
+- if a convenience API would hide too much reality, the library should choose the more explicit design instead

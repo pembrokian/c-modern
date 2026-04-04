@@ -9,6 +9,26 @@ var phase: i32 = 0
 var shared_value: i32 = 0
 var worker_status: i32 = 0
 
+func cleanup_mutex_only(mu: *sync.Mutex) i32 {
+    err: errors.Error = sync.mutex_destroy(mu)
+    if !errors.is_ok(err) {
+        return 25
+    }
+    return 0
+}
+
+func cleanup_sync(mu: *sync.Mutex, cv: *sync.Condvar) i32 {
+    err: errors.Error = sync.condvar_destroy(cv)
+    if !errors.is_ok(err) {
+        return 23
+    }
+    err = sync.mutex_destroy(mu)
+    if !errors.is_ok(err) {
+        return 24
+    }
+    return 0
+}
+
 func worker(ignored: *i32) {
     err: errors.Error = sync.mutex_lock(handoff_mu_ptr)
     if !errors.is_ok(err) {
@@ -61,6 +81,10 @@ func main() i32 {
     }
     cv, err = sync.condvar_init()
     if !errors.is_ok(err) {
+        condvar_init_cleanup_status: i32 = cleanup_mutex_only(&mu)
+        if condvar_init_cleanup_status != 0 {
+            return condvar_init_cleanup_status
+        }
         return 11
     }
 
@@ -81,6 +105,10 @@ func main() i32 {
         unlock_err_on_spawn: errors.Error = sync.mutex_unlock(&mu)
         if !errors.is_ok(unlock_err_on_spawn) {
             return 13
+        }
+        spawn_cleanup_status: i32 = cleanup_sync(&mu, &cv)
+        if spawn_cleanup_status != 0 {
+            return spawn_cleanup_status
         }
         return 14
     }
@@ -121,6 +149,11 @@ func main() i32 {
     }
     if shared_value != 7 {
         return 22
+    }
+
+    final_cleanup_status: i32 = cleanup_sync(&mu, &cv)
+    if final_cleanup_status != 0 {
+        return final_cleanup_status
     }
 
     return 0

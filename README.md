@@ -16,7 +16,7 @@ What is in place:
 - the admitted repository-specific Phase 7 A/B/C/D/E/F/G/H slice with build.toml schema v1 parsing, target graph discovery, deterministic text `.mci` interface artifacts, interface-hash-driven incremental project rebuilds, separate per-module object emission, `mc run`, and `mc test`
 - the admitted repository-specific first-pass Phase 8 slice with canonical pressure-program proof plus bounded real utility projects for text search, file walking, whole-file hashing, and arena-backed parsing
 - the admitted repository-bounded follow-on networking slice with hosted `io` poller plus narrow `net`, direct-source evented server or client executable proof, the real `examples/real/evented_echo/` project fixture, and normal `mc run` or `mc test` workflow proof for that project
-- the admitted repository-bounded hosted `sync` slice with typed `thread_spawn`, `thread_join`, mutex init or lock or unlock, condvar init or wait or signal, and narrow `MemoryOrder` plus `Atomic<T>` load or store support, proved by the direct-source shared-counter, producer-consumer, and atomic-publication canonical executables
+- the admitted repository-bounded hosted `sync` slice with typed `thread_spawn`, `thread_join`, mutex init or destroy or lock or unlock, condvar init or destroy or wait or signal, and narrow `MemoryOrder` plus `Atomic<T>` load or store support, proved by the direct-source shared-counter, producer-consumer, and atomic-publication canonical executables
 - parser, sema, MIR, and tool smoke tests wired through CTest and exposed through the same `make` command path used for local development
 
 Supported hosted slice:

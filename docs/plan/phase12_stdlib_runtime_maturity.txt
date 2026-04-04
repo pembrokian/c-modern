@@ -194,9 +194,11 @@ Chosen narrow sync API surface
 - `func thread_spawn<T>(entry: func(*T), ctx: *T) (Thread, Error)`
 - `func thread_join(thread: Thread) Error`
 - `func mutex_init() (Mutex, Error)`
+- `func mutex_destroy(mu: *Mutex) Error`
 - `func mutex_lock(mu: *Mutex) Error`
 - `func mutex_unlock(mu: *Mutex) Error`
 - `func condvar_init() (Condvar, Error)`
+- `func condvar_destroy(cv: *Condvar) Error`
 - `func condvar_wait(cv: *Condvar, mu: *Mutex) Error`
 - `func condvar_signal(cv: *Condvar) Error`
 - `func atomic_load<T>(ptr: *Atomic<T>, order: MemoryOrder) T`
@@ -214,8 +216,10 @@ First-wave hosted ownership notes
   admitted slice does not rely on zero-initialized mutex state
 - the first admitted slice stayed mutex-only on purpose; the current follow-on
   first added `Condvar` init, wait, and signal for producer-consumer pressure,
-  then added a narrow `Atomic<T>` plus `MemoryOrder` surface for publication
-  without reopening destroy, broadcast, or read-modify-write surface work
+  then added a narrow `Atomic<T>` plus `MemoryOrder` surface for publication,
+  and now admits `mutex_destroy` plus `condvar_destroy` so canonical hosted
+  proofs can clean up the sync objects they initialize without reopening
+  broadcast or read-modify-write surface work
 
 Chosen proof layer for the sync wave
 ------------------------------------
@@ -237,8 +241,7 @@ Explicit exclusions for the narrow sync wave
 --------------------------------------------
 - no `atomic_exchange`, `atomic_compare_exchange`, or `atomic_fetch_add`
   surface in this follow-on
-- no condvar broadcast or destroy surface in this follow-on
-- no mutex destroy surface in this follow-on
+- no condvar broadcast surface in this follow-on
 - no scheduler, async runtime, green threads, or task abstraction
 - no thread-local storage or OS-facing process control grab bag under `sync`
 - no claim of non-hosted or multi-platform threading support in this wave
@@ -246,9 +249,9 @@ Explicit exclusions for the narrow sync wave
 Current implemented bootstrap sync slice
 ----------------------------------------
 - the repository now admits `stdlib/sync.mc` for hosted typed thread spawn or
-  join, mutex init or lock or unlock, condvar init or wait or signal, and the
-  narrow `MemoryOrder` plus `Atomic<T>` load or store surface used by the
-  atomic-publication proof
+  join, mutex init or destroy or lock or unlock, condvar init or destroy or
+  wait or signal, and the narrow `MemoryOrder` plus `Atomic<T>` load or store
+  surface used by the atomic-publication proof
 - the admitted proof layer is the pair of direct-source canonical executables
   `/Users/ro/dev/c_modern/examples/canonical/shared_counter_mutex.mc` and
   `/Users/ro/dev/c_modern/examples/canonical/producer_consumer_condvar.mc`,
@@ -257,9 +260,8 @@ Current implemented bootstrap sync slice
   `/Users/ro/dev/c_modern/tests/codegen/codegen_executable_tests.cpp`
 - the current bootstrap implementation stores opaque hosted pointers in
   `Thread`, `Mutex`, and `Condvar`; thread backing allocations are released on
-  join, while mutex and condvar backing allocations currently remain
-  process-lifetime because the repository has not yet justified broader
-  destroy APIs
+  join, and mutex or condvar backing allocations are now released on successful
+  destroy through the admitted narrow lifecycle API
 - the current publication proof stays deliberately narrow: it proves release-
   acquire flag publication through admitted atomic load or store operations,
   while broader read-modify-write atomics and remaining literal-width codegen

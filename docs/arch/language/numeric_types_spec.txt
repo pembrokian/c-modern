@@ -1,0 +1,139 @@
+Modern C - Numeric Types Specification
+
+Purpose
+
+This document freezes the v0.2 numeric type model for Modern C.
+It exists to make arithmetic, literal checking, conversion rules, and pointer-sized integer use explicit and stable across sema, MIR, and the backend.
+
+Authority and scope:
+- `language_spec.txt` remains the primary semantic authority.
+- `grammar_spec.txt` remains the concrete syntax authority for numeric literals.
+- `types_spec.txt` remains the authority for general type identity and literal pseudo-type handling.
+- `memory_model_spec.txt` remains the authority for value-semantics and memory-observable consequences of defined arithmetic behavior.
+- this document freezes the admitted numeric types, explicit-conversion boundaries, arithmetic behavior, and intended roles of pointer-sized integer forms.
+
+1. Admitted Numeric Scalar Types
+
+The v0.2 builtin numeric scalar types are:
+- unsigned integers: `ui8`, `ui16`, `ui32`, `ui64`, `usize`, `uintptr`
+- signed integers: `i8`, `i16`, `i32`, `i64`, `isize`
+- floating-point types: `f32`, `f64`
+- scalar text code-point type: `utf`
+
+Rules:
+- these are builtin scalar types, not library aliases
+- each named builtin numeric type is distinct from the others
+- there are no implicit numeric conversions between builtin numeric types
+- `bool` is a builtin scalar type, but it is not part of the numeric-conversion lattice for v0.2
+
+2. Integer Types
+
+Integer representation rules:
+- all integer types are fixed-width two's-complement integers
+- signed and unsigned integer arithmetic both use modular wrap semantics
+- integer overflow is defined behavior, not undefined behavior
+
+Role rules:
+- `ui8`, `ui16`, `ui32`, and `ui64` are fixed-width unsigned integer types
+- `i8`, `i16`, `i32`, and `i64` are fixed-width signed integer types
+- `usize` and `isize` are the canonical pointer-sized integer types for sizes, indices, and count-like operations
+- `uintptr` is the explicit integer form for pointer-address interop and low-level escape hatches
+
+Compiler rule:
+- the compiler must not import C-style "usual arithmetic conversions" into Modern C
+- the compiler must not assume signed overflow cannot occur
+
+3. Floating-Point Types
+
+Floating-point rules:
+- `f32` and `f64` are distinct builtin floating-point types
+- the language admits them as explicit scalar types rather than as promotion targets of integer expressions
+- there is no implicit widening from integer to float or from `f32` to `f64`
+- there is no implicit narrowing from `f64` to `f32`
+
+Scope note:
+- this document does not add a hidden floating-point coercion lattice
+- floating-point operations must preserve the programmer's explicit type choices
+- if a program wants a different floating-point type, it must spell an explicit conversion
+
+4. The `utf` Scalar Type
+
+`utf` rules:
+- `utf` is a builtin scalar type used for Unicode scalar-value oriented text operations
+- `utf` is not a byte-sequence type and not a string type
+- raw UTF-8 code units are represented with `ui8` sequences, not `utf`
+- string values remain `str`, not arrays of `utf`
+
+Boundary rules:
+- conversions between `utf` and integer types are explicit
+- text encoding and decoding surfaces belong in the `utf8` standard library module rather than in hidden language magic
+- the existence of `utf` does not imply a different runtime string representation from UTF-8 byte slices
+
+5. Literal And Conversion Rules
+
+Literal rules:
+- numeric literals begin as checker-internal literal pseudo-types until a concrete target type is chosen
+- acceptance of a literal into a concrete numeric type is a semantic-checking decision, not a parser trick
+- numeric separators such as `_` are governed by `grammar_spec.txt`
+
+Conversion rules:
+- explicit conversions use `(<type-expr>)(value)`
+- concrete numeric types do not implicitly convert to one another in assignments, returns, calls, operators, tuple construction, aggregate construction, or enum payload construction
+- distinct types over numeric bases remain non-interchangeable with their base type unless explicitly converted
+
+Consequences:
+- mixed-type numeric expressions require an explicit type choice by the programmer
+- the compiler should reject ambiguous or unsupported numeric mixing in sema rather than silently inventing a common type later
+
+6. Arithmetic Semantics
+
+Defined arithmetic rules:
+- signed and unsigned integer arithmetic use modular wrap
+- division by zero is a checked runtime fault
+- shift counts outside the bit width are a checked runtime fault
+- `%` on unsigned integers is the mathematical remainder after truncating division
+
+Checked-build rule:
+- checked builds may trap additional invalid operations
+- checked behavior does not redefine the release semantics of otherwise defined arithmetic
+
+Optimizer rule:
+- because overflow wraps, optimizers must not apply transforms that rely on "overflow cannot happen" assumptions
+- because conversions are explicit, optimizers must preserve the program's written numeric type boundaries
+
+7. Comparisons And Mixed-Type Expressions
+
+Expression rules:
+- arithmetic and comparison operators do not trigger hidden promotions
+- operand types must already be semantically compatible under the ordinary rules or be made compatible through explicit conversion
+- enum values, pointers, and booleans are not silently reclassified as integers for arithmetic convenience
+
+Practical consequence:
+- source code remains explicit about whether an operation is byte-sized, pointer-sized, signed, unsigned, float-based, or text-scalar-oriented
+- performance-sensitive code can therefore choose exact arithmetic widths without fighting a hidden coercion model
+
+8. Pointer-Sized Integer Boundaries
+
+`usize` and `isize`:
+- these are the canonical size and index integer types
+- they should be preferred for collection lengths, slice lengths, capacities, and similar size-bearing interfaces
+- using them does not create a hidden platform-abstraction layer; it makes pointer-size dependence explicit
+
+`uintptr`:
+- pointer-to-`uintptr` and `uintptr`-to-pointer conversions are explicit low-level operations
+- a pointer round trip through `uintptr` preserves usability only if the numeric value is unchanged and the original allocation remains live
+- `uintptr` is intended for FFI, MMIO, runtime, and similarly low-level boundaries, not as a replacement for typed pointers in ordinary code
+
+9. Non-Goals
+
+This document does not define:
+- C-style integer promotion rules
+- implicit float widening or narrowing
+- implicit conversion between integers and `utf`
+- saturating integer arithmetic as the default semantics
+- optimizer freedom to treat signed overflow as impossible
+
+Bottom line:
+- Modern C numeric code is explicit about width, signedness, and conversion intent
+- integer overflow is defined as wrap
+- mixed numeric expressions require the programmer to choose the conversion surface instead of inheriting C's implicit promotion rules

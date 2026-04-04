@@ -1,0 +1,133 @@
+Modern C - String Specification
+
+Purpose
+
+This document freezes the v0.2 string model for Modern C.
+It exists to keep borrowed-text semantics, UTF-8 invariants, raw-byte boundaries, and interop forms explicit across the language, the standard library, and compiler internals.
+
+Authority and scope:
+- `language_spec.txt` remains the primary semantic authority.
+- `grammar_spec.txt` remains the concrete syntax authority for string literals.
+- `types_spec.txt` remains the authority for the semantic string type's place in the broader type system.
+- `stdlib_spec.txt` remains the packaging authority for `strings` and `utf8` module boundaries.
+- this document freezes the semantic meaning of `str`, string literal behavior, UTF-8 invariants, slice and byte boundaries, and explicit null-terminated interop forms.
+
+1. Core String Model
+
+The canonical language-level string type is:
+
+```text
+type str = Slice<const ui8>
+```
+
+Semantic meaning:
+- `str` is immutable borrowed text
+- `str` always contains valid UTF-8
+- `str` is a non-owning view, not an owning container
+- `str` is distinct from raw byte slices because it carries a stronger semantic invariant than "sequence of bytes"
+
+Rules:
+- the language does not provide a hidden owning string type in v0.2
+- the language does not provide implicit allocation when manipulating strings
+- compiler phases must preserve the semantic distinction between text and raw bytes
+
+2. Ownership And Lifetime
+
+Borrowing rules:
+- `str` borrows storage from an underlying allocation, fixed array, buffer, or string literal backing store
+- `str` does not extend the lifetime of the underlying storage
+- using a `str` after the underlying storage becomes invalid is invalid behavior
+
+Consequence:
+- functions returning `str` must return a view into storage that remains valid for the documented lifetime of that result
+- if an API needs to return owned text storage, it should return an owning container such as `Buffer<ui8>` or another explicit owning library type rather than pretending `str` owns memory
+
+3. UTF-8 Invariants
+
+Core invariants:
+- every `str` value denotes valid UTF-8 bytes
+- raw bytes that are not known to be valid UTF-8 are not `str`
+- string operations that return `str` must preserve UTF-8 validity or return an explicit failure instead
+
+Boundary rules:
+- the compiler and standard library must not manufacture invalid `str` values through convenience conversions
+- UTF-8 validation and encode or decode behavior belongs in explicit library surfaces such as `utf8.valid`, `utf8.decode`, and `utf8.encode`
+- text-processing helpers may remain byte-oriented internally, but their exposed `str` results must still satisfy the UTF-8 invariant
+
+4. Raw Bytes Versus Text
+
+Representation split:
+- raw bytes use `Slice<ui8>` or `Slice<const ui8>`
+- text uses `str`
+- this split is intentional and must remain visible in APIs
+
+Rules:
+- APIs should not accept `str` when they actually mean arbitrary bytes
+- APIs should not return raw byte slices when they claim to return text
+- conversion from bytes to `str` is only valid when the byte sequence is known or proven to be valid UTF-8
+- conversion from `str` to raw byte slice view is explicit and loses the stronger text invariant at the type boundary
+
+5. String Literals
+
+Literal rules:
+- string literals produce `str`
+- the literal backing storage is static and read-only
+- string literals are UTF-8 text in source form according to the grammar document
+- string literals are not implicitly null-terminated for language semantics
+
+Consequences:
+- ordinary string literals are suitable for borrowed-text use without allocation
+- language-level string values do not imply C-string compatibility
+- any null terminator required for interop must be introduced through an explicit interop-oriented representation
+
+6. Indexing, Slicing, And Substrings
+
+Bounds rules:
+- because `str` is a slice-shaped type, indexing and slicing obey the ordinary slice bounds rules from `language_spec.txt`
+- `text[i]` requires `0 <= i < text.len`
+- `text[a:b]` requires `0 <= a <= b <= text.len`
+
+UTF-8 preservation rule:
+- a library operation that returns `str` must only expose byte ranges that remain valid UTF-8
+- a substring operation that cannot guarantee UTF-8 validity must fail explicitly or return a raw byte slice instead of `str`
+
+Model note:
+- v0.2 does not introduce hidden code-point indexing or grapheme-cluster indexing in the core language
+- the underlying representation remains UTF-8 bytes with explicit library help for higher-level text operations
+
+7. Interop And Null-Terminated Strings
+
+Interop rules:
+- null-terminated strings exist only as an explicit interop form
+- the standard library defines `cstr` as the conventional null-terminated read-only C string type
+- `str` and `cstr` are not implicitly interchangeable
+
+Consequences:
+- FFI boundaries must spell the intended string form explicitly
+- ordinary Modern C APIs should prefer `str` for borrowed text and should not require null termination unless the contract is specifically C-facing
+- the language does not treat a hidden trailing `\0` as part of ordinary string semantics
+
+8. Standard Library Boundary
+
+Packaging rules:
+- `strings` owns non-allocating text helpers over `str`
+- `utf8` owns UTF-8 validation and encode or decode primitives
+- richer text processing remains a library concern, not a hidden language runtime feature
+
+API-shape rules:
+- the initial standard string surface should stay small, explicit, and non-allocating by default
+- helper APIs should make allocation and ownership visible rather than hiding them behind apparently pure text operations
+- functions that cannot maintain the `str` invariant should return an explicit failure or a raw byte-oriented type
+
+9. Non-Goals
+
+This document does not define:
+- a hidden owning `String` runtime type
+- implicit conversion between text and null-terminated C strings
+- automatic UTF-8 repair, replacement, or normalization during ordinary string operations
+- code-point or grapheme indexing as a core-language operation in v0.2
+
+Bottom line:
+- `str` is borrowed immutable valid UTF-8 text
+- raw bytes and text remain intentionally distinct
+- interop-specific null-terminated strings stay explicit instead of leaking into ordinary language semantics

@@ -1,4 +1,4 @@
-export { Thread, Mutex, Condvar, MemoryOrder, Atomic, thread_spawn, thread_join, mutex_init, mutex_lock, mutex_unlock, condvar_init, condvar_wait, condvar_signal, atomic_load, atomic_store }
+export { Thread, Mutex, Condvar, MemoryOrder, Atomic, thread_spawn, thread_join, mutex_init, mutex_destroy, mutex_lock, mutex_unlock, condvar_init, condvar_destroy, condvar_wait, condvar_signal, atomic_load, atomic_store }
 
 import errors
 
@@ -27,9 +27,11 @@ struct Atomic<T> {}
 extern(c) func __mc_sync_thread_spawn(entry: uintptr, ctx: uintptr, err: *errors.Error) Thread
 extern(c) func __mc_sync_thread_join(thread: Thread) errors.Error
 extern(c) func __mc_sync_mutex_init(err: *errors.Error) Mutex
+extern(c) func __mc_sync_mutex_destroy(mu: *Mutex) errors.Error
 extern(c) func __mc_sync_mutex_lock(mu: *Mutex) errors.Error
 extern(c) func __mc_sync_mutex_unlock(mu: *Mutex) errors.Error
 extern(c) func __mc_sync_condvar_init(err: *errors.Error) Condvar
+extern(c) func __mc_sync_condvar_destroy(cv: *Condvar) errors.Error
 extern(c) func __mc_sync_condvar_wait(cv: *Condvar, mu: *Mutex) errors.Error
 extern(c) func __mc_sync_condvar_signal(cv: *Condvar) errors.Error
 
@@ -56,6 +58,10 @@ func mutex_init() (Mutex, errors.Error) {
     return mu, err
 }
 
+func mutex_destroy(mu: *Mutex) errors.Error {
+    return __mc_sync_mutex_destroy(mu)
+}
+
 func mutex_lock(mu: *Mutex) errors.Error {
     return __mc_sync_mutex_lock(mu)
 }
@@ -68,6 +74,10 @@ func condvar_init() (Condvar, errors.Error) {
     err: errors.Error = errors.ok()
     cv: Condvar = __mc_sync_condvar_init(&err)
     return cv, err
+}
+
+func condvar_destroy(cv: *Condvar) errors.Error {
+    return __mc_sync_condvar_destroy(cv)
 }
 
 func condvar_wait(cv: *Condvar, mu: *Mutex) errors.Error {

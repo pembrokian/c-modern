@@ -210,7 +210,7 @@ atomic flag publication
 - Proof: examples/canonical/atomic_flag_publication.mc now builds and runs in
 	tests/codegen/codegen_executable_tests.cpp
 - Remaining limit: the current admitted slice still excludes exchange,
-	compare-exchange, fetch-add, destroy APIs, and the fuller backend cleanup
+	compare-exchange, fetch-add, condvar broadcast, and the fuller backend cleanup
 	needed to make literal atomic stores as direct as the long-term surface wants
 
 Deferred next-wave canonical candidates

@@ -1,0 +1,132 @@
+Modern C - Enums and Tagged Union Specification
+
+Purpose
+
+This document freezes the v0.2 enum model for Modern C.
+In Modern C, `enum` means a tagged union value type, not a C-style integer enumerator set.
+
+Authority and scope:
+- `language_spec.txt` remains the primary semantic authority.
+- `grammar_spec.txt` remains the concrete syntax authority for enum declarations and switch case spellings.
+- `types_spec.txt` remains the authority for general nominal type identity rules.
+- this document freezes the semantic model for enum values, variant construction, exhaustiveness, layout commitments, and interop boundaries.
+- this document does not add implicit ordinal conversions, hidden discriminant access, or C-compatibility promises beyond what the language already states.
+
+1. Core Model
+
+Enum model:
+- an enum declaration defines one nominal tagged union type
+- each enum value carries exactly one active variant tag
+- a variant may carry zero payload fields or an ordered payload field list
+- the active tag is part of the semantic value, not merely a lowering detail
+
+Rules:
+- enums are core language types
+- enum values are ordinary value-semantic program values
+- exhaustiveness over enum variants is a semantic rule, not parser sugar
+- the compiler must preserve both active variant identity and payload semantics through sema, MIR, and code generation
+
+Illustrative shape:
+
+```text
+enum Token {
+	Int(value: i64)
+	Plus
+	Minus
+}
+```
+
+2. Declaration And Variant Rules
+
+Declaration rules:
+- an enum declaration introduces one nominal type name
+- variant names are scoped to their parent enum declaration
+- each variant name within an enum must be unique
+- each payload field name within a single variant must be unique
+
+Payload rules:
+- a zero-payload variant is a full variant with only tag state
+- a payload-bearing variant carries the declared fields in declared order
+- payload field types obey the ordinary type system; enums do not create a second field-typing model
+- payload field order is semantically relevant for construction, pattern binding, layout, and diagnostics
+
+Generic note:
+- if a particular enum declaration admits type parameters in the source grammar, instantiated enum identity follows the ordinary named-type rules from `types_spec.txt`
+- this document does not introduce any enum-specific generic coercion rules
+
+3. Type Identity And Construction
+
+Identity rules:
+- an enum is a nominal type
+- two enum declarations are distinct types even if they list the same variant names and payload shapes
+- an enum is not interchangeable with integers, with other enums, or with a manually written struct-plus-tag shape unless the language explicitly says so
+
+Construction rules:
+- constructing a variant produces a value of the parent enum type
+- a variant constructor must receive arguments matching the declared payload arity and types
+- payload arguments follow the ordinary explicit-conversion rules of v0.2
+- there are no implicit numeric, pointer, or distinct-type conversions when constructing an enum payload
+
+Consequences:
+- a payload-bearing variant constructor is type-checked like any other typed value-construction surface
+- a zero-payload variant still produces a value of the parent enum type
+- the language does not treat variants as standalone integer constants or standalone nominal types
+
+4. Use In Control Flow
+
+Switch rules:
+- exhaustive switch over enum values is required
+- no implicit fallthrough is permitted
+- case selection is driven by variant identity, not by a user-visible integer discriminant
+- case destructuring binds payload components according to the matched variant's declared payload order
+
+Destructuring rules:
+- case destructuring uses the switch case syntax defined by `language_spec.txt` and `grammar_spec.txt`
+- a destructuring case may bind only the payload corresponding to the matched variant
+- bound values have the declared payload field types after ordinary semantic resolution
+
+Semantic intent:
+- exhaustiveness is checked against the enum's full declared variant set
+- adding a new variant to an enum may therefore require updating existing switches
+- sema owns exhaustiveness checking; later phases must consume, not reinterpret, that result
+
+5. Representation, Layout, And ABI
+
+Layout rules:
+- an enum's physical layout is implementation-defined by default
+- the layout must be stable for a given target ABI and compiler configuration when the semantic declaration is unchanged
+- payload layout is not promised to be source-identical to a handwritten C union layout
+
+ABI rules:
+- default enums are not promised to be C ABI compatible
+- when C interop requires a specific external representation, the source should use an explicit `@abi(c)` struct-plus-union representation instead of relying on default enum layout
+- the language does not expose a general-purpose promise that the tag is stored as any specific integer type or at any specific offset
+
+Compiler-boundary rule:
+- layout facts for enums belong to the semantic type and layout layer
+- MIR and backend lowering may consume those facts, but they must not redefine the enum model independently
+
+6. Value Semantics And Safety Boundaries
+
+Value rules:
+- copying an enum value copies its active variant and payload value according to the ordinary value rules of the payload types
+- enum values do not imply hidden allocation, hidden indirection, or reference counting
+- payload ownership or borrowing behavior comes from the payload field types and APIs, not from the enum mechanism itself
+
+Safety boundary:
+- reading or destructuring an enum value as though it held a different active variant is invalid behavior unless guarded by the language's defined matching and switching rules
+- the active tag is therefore a semantic safety boundary, not optional metadata
+
+7. Non-Goals
+
+This document does not define:
+- implicit conversion between enums and integers
+- user-visible ordinal values for variants by default
+- non-exhaustive enums in v0.2
+- hidden default cases inserted by the compiler
+- a promise that enum layout matches C unions automatically
+
+Bottom line:
+- `enum` in Modern C is the language's tagged union mechanism
+- enum values are nominal, explicit, and exhaustively matched
+- interop-sensitive layouts require explicit opt-in representations rather than relying on default enum lowering

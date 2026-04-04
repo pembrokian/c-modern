@@ -1,0 +1,126 @@
+Modern C - Test Design Principles
+
+Purpose
+
+This document records the cross-cutting principles that should govern testing in Modern C and in the Modern C toolchain.
+It complements `test_spec.txt` by describing the design values behind the test model instead of restating the runner surface mechanically.
+
+1. Tests Are Ordinary Modern C Code
+
+Core rule:
+- tests should be written as ordinary Modern C functions and files whenever possible
+
+Why:
+- this keeps the language surface small
+- this makes tests readable to anyone who understands ordinary code
+- this avoids inventing a second test-specific language or macro layer
+
+Consequences:
+- test control flow should use ordinary functions, values, conditionals, and explicit `Error` returns
+- helper APIs belong in the `testing` module or other normal libraries, not in compiler magic
+
+2. Failure Must Be Explicit
+
+Failure rule:
+- tests should fail through explicit returned errors, explicit process failure, timeout, or trap
+- the test system should not rely on hidden assertion exceptions or implicit long-jump style control flow
+
+Design bias:
+- explicit failure signals are easier to reason about, easier to debug, and consistent with the language's ordinary error-handling model
+
+3. Determinism Is The Default
+
+Determinism rule:
+- tests should be deterministic by default in discovery order, execution order, and observable expectations whenever the program under test is deterministic
+
+Consequences:
+- serial execution is the correct default
+- discovery order should be stable and lexical when practical
+- golden files, semantic dumps, MIR dumps, and tool outputs should prefer deterministic formatting
+
+Negative rule:
+- hidden parallel execution should not be the default
+- randomization should be opt-in and clearly requested when needed
+
+4. Checked Execution Is The Right Default For Tests
+
+Default rule:
+- test builds should prefer checked mode unless the user explicitly asks for another mode
+
+Why:
+- tests are where bounds faults, invalid shifts, bad assumptions, and runtime contract violations should surface early
+- checked execution gives higher-value failures than fast but under-instrumented defaults
+
+5. Use The Narrowest Test Layer That Proves The Contract
+
+Layering rule:
+- every behavior should be tested at the narrowest layer that can prove it honestly
+
+Examples:
+- parser syntax belongs in parser fixtures
+- semantic meaning belongs in sema fixtures and diagnostics
+- lowering behavior belongs in MIR fixtures where possible
+- runtime and ABI behavior belong in executable or run-output tests
+- end-to-end build and driver behavior belong in tool tests
+
+Why:
+- narrow tests fail closer to the root cause
+- narrow tests are cheaper to maintain
+- end-to-end tests remain valuable, but they should not be the only evidence for lower-layer behavior
+
+6. Prefer Stable Expectations Over Brittle Transcript Matching
+
+Expectation rule:
+- tests should lock down real semantic contracts, not accidental formatting noise
+
+Consequences:
+- compile-fail diagnostics should prefer stable substrings or stable identifiers over byte-for-byte transcript matching when full formatting is not the contract
+- goldens should exist when structural output itself is the contract, such as MIR, semantic module dumps, or serialized artifacts
+- when wording changes are intentional, update the narrowest relevant expectations rather than broad unrelated snapshots
+
+7. Test Infrastructure Must Stay Small And Visible
+
+Infrastructure rule:
+- the testing system should provide only the minimum machinery needed for discovery, runner generation, and a few common helpers
+
+This means:
+- no mandatory heavyweight test object model
+- no hidden per-test ambient context unless the API explicitly passes it
+- no requirement for macros, decorators, or reflection to write basic tests
+
+8. Isolation Without Illusion
+
+Isolation rule:
+- tests should isolate side effects deliberately, not through hidden sandbox claims the toolchain cannot actually guarantee
+
+Practical implications:
+- subprocess use, temporary directories, and output capture should be explicit helper patterns
+- file-system and environment assumptions should be made visible in test setup
+- when a test is intentionally global or order-sensitive, that fact should be obvious rather than accidental
+
+9. Toolchain Tests And Language Tests Should Share Philosophy
+
+Shared philosophy rule:
+- compiler, stdlib, runtime, and user-project tests may differ in harness shape, but they should share the same values: explicitness, determinism, small helpers, and stable contracts
+
+Examples:
+- compiler compile-fail tests should avoid brittle formatting dependence
+- stdlib tests should keep ownership and allocation behavior visible
+- runtime tests should make ABI and startup assumptions explicit
+- user-project tests should not need deeper machinery than ordinary functions returning `Error`
+
+10. Growth Should Follow Real Pressure
+
+Evolution rule:
+- new testing features should be added because concrete testing pain requires them, not because other ecosystems offer them
+
+Admission criteria:
+- the feature materially reduces real friction
+- it preserves explicitness and debuggability
+- it does not require hidden language features or hidden runtime state
+- it keeps ordinary tests simple
+
+Bottom line:
+- the best Modern C testing model is explicit, deterministic, and small
+- tests should look like ordinary programs with ordinary failures
+- infrastructure should serve clarity and diagnosis, not become a second framework layered on top of the language

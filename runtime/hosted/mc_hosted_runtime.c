@@ -908,6 +908,22 @@ struct mc_sync_mutex __mc_sync_mutex_init(uintptr_t* out_err) {
     return out;
 }
 
+uintptr_t __mc_sync_mutex_destroy(struct mc_sync_mutex* mu) {
+    if (mu == NULL || mu->raw == 0) {
+        return 1;
+    }
+
+    struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) mu->raw;
+    const int rc = pthread_mutex_destroy(&handle->mutex);
+    if (rc != 0) {
+        return (uintptr_t) rc;
+    }
+
+    free(handle);
+    mu->raw = 0;
+    return 0;
+}
+
 uintptr_t __mc_sync_mutex_lock(struct mc_sync_mutex* mu) {
     if (mu == NULL || mu->raw == 0) {
         return 1;
@@ -947,6 +963,22 @@ struct mc_sync_condvar __mc_sync_condvar_init(uintptr_t* out_err) {
 
     out.raw = (uintptr_t) handle;
     return out;
+}
+
+uintptr_t __mc_sync_condvar_destroy(struct mc_sync_condvar* cv) {
+    if (cv == NULL || cv->raw == 0) {
+        return 1;
+    }
+
+    struct mc_hosted_condvar* cond = (struct mc_hosted_condvar*) cv->raw;
+    const int rc = pthread_cond_destroy(&cond->cond);
+    if (rc != 0) {
+        return (uintptr_t) rc;
+    }
+
+    free(cond);
+    cv->raw = 0;
+    return 0;
 }
 
 uintptr_t __mc_sync_condvar_wait(struct mc_sync_condvar* cv,

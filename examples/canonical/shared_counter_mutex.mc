@@ -46,6 +46,14 @@ func worker2(ignored: *i32) {
     }
 }
 
+func cleanup_mutex(mu: *sync.Mutex) i32 {
+    err: errors.Error = sync.mutex_destroy(mu)
+    if !errors.is_ok(err) {
+        return 19
+    }
+    return 0
+}
+
 func main() i32 {
     err: errors.Error
     mu: sync.Mutex
@@ -62,6 +70,10 @@ func main() i32 {
     t1: sync.Thread
     t1, err = sync.thread_spawn<i32>(worker1, &worker1_status)
     if !errors.is_ok(err) {
+        spawn1_cleanup_status: i32 = cleanup_mutex(&mu)
+        if spawn1_cleanup_status != 0 {
+            return spawn1_cleanup_status
+        }
         return 11
     }
 
@@ -71,6 +83,10 @@ func main() i32 {
         err = sync.thread_join(t1)
         if !errors.is_ok(err) {
             return 12
+        }
+        spawn2_cleanup_status: i32 = cleanup_mutex(&mu)
+        if spawn2_cleanup_status != 0 {
+            return spawn2_cleanup_status
         }
         return 13
     }
@@ -92,6 +108,11 @@ func main() i32 {
     }
     if counter_value != (i64)(ITERATIONS + ITERATIONS) {
         return 18
+    }
+
+    final_cleanup_status: i32 = cleanup_mutex(&mu)
+    if final_cleanup_status != 0 {
+        return final_cleanup_status
     }
 
     return 0
