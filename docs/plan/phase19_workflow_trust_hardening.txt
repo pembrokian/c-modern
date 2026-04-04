@@ -1,0 +1,136 @@
+Phase 19 -- Workflow Trust Hardening On The Admitted Hosted Slice
+================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Deepen trust in the current admitted hosted workflow plateau after the Phase
+18 decision, using the existing networking project family to harden ordinary
+project behavior before the repository widens capability breadth again.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 18 explicitly chose Phase 13-style workflow maturity as the next
+  plateau instead of reopening `sync`, admitting `hal`, or starting broader
+  release hardening immediately.
+- The repository already has two admitted networking project fixtures,
+  `/Users/ro/dev/c_modern/examples/real/evented_echo/` and
+  `/Users/ro/dev/c_modern/examples/real/evented_partial_write/`, both of which
+  now exercise normal `mc run --project ...` and `mc test --project ...`
+  paths.
+- The current Phase 13 closeouts prove a bounded trustworthy workflow, but the
+  backlog still identifies sharper reporting, deterministic build-directory
+  reuse, manifest ergonomics, and workflow diagnostics as the highest-leverage
+  remaining friction on the admitted slice.
+
+Problem being solved
+--------------------
+- The repository has enough capability breadth to compile and test real hosted
+  projects, but ordinary workflow trust is still more bootstrap-shaped than
+  the current public slice deserves.
+- Without a dedicated hardening wave, new examples or new module-family work
+  would accumulate on top of workflow behavior whose reporting and reuse rules
+  are real but still not sharp enough to serve as the default ordinary path.
+- The main remaining risk is not that project mode is missing. The main risk
+  is that project behavior can still feel partially inspectable rather than
+  fully trustworthy when builds are reused, tests fail, manifests are invalid,
+  or a richer real project stresses graph behavior.
+
+Core rule
+---------
+- Use the admitted networking project family as the proof surface.
+- Tighten workflow trust where current real projects already expose pressure.
+- Do not widen target breadth, reopen `sync`, or admit `hal` as a way to avoid
+  current workflow friction.
+- Keep compiler-owned semantic truth in compiler owners; this phase hardens
+  project behavior, reporting, and reuse rather than moving language meaning
+  into driver logic.
+
+Scope
+-----
+- sharpen `mc test` reporting for ordinary project tests and existing manifest-
+  driven regression classes where current output is deterministic but still not
+  as reviewable as it should be
+- harden build-directory reuse rules on the existing networking projects,
+  especially run-test-rerun and test-run-rerun sequences on the same build dir
+- improve manifest and target diagnostics where real project misuse currently
+  fails correctly but not yet as early or as specifically as desired
+- keep direct-source and project-mode behavior coherent enough that users can
+  predict which artifact model they are using without reading implementation
+  details
+- add deterministic tool regressions for every workflow rule tightened during
+  this phase
+
+Preferred pressure points
+-------------------------
+1. PASS, FAIL, and timeout summary sharpness on ordinary project tests.
+2. Deterministic run-test-rerun reuse on the admitted networking projects.
+3. Clearer invalid-manifest, invalid-target, and target-selection diagnostics.
+4. Build-directory contamination or stale-state checks when a real project is
+   rerun through multiple commands.
+5. Better reviewed distinction between checked ordinary-test behavior and the
+   current debug-default executable run path where reporting currently blurs
+   them.
+
+Deliverables
+------------
+- one repository-bounded workflow hardening slice under
+  `/Users/ro/dev/c_modern/compiler/driver/` and supporting tool helpers
+- focused deterministic regressions under
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` proving the
+  hardening on `evented_echo` and `evented_partial_write`
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` when a currently limited
+  workflow behavior is either closed or given a sharper revisit trigger
+- documentation updates only if the admitted hosted workflow statement changes
+  materially in
+  `/Users/ro/dev/c_modern/README.md` or
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`
+
+Suggested execution order
+-------------------------
+1. Re-audit the existing networking project workflow regressions to identify
+   which reporting or reuse cases still rely on weak summary checks.
+2. Harden one reporting slice first so FAIL and timeout behavior become easier
+   to review before more diagnostics are added.
+3. Add run-test-rerun and test-run-rerun coverage on the same build
+   directories for both admitted networking projects.
+4. Tighten invalid-manifest and invalid-target diagnostics only after the
+   intended workflow surface is stable.
+5. Record any still-deferred workflow limitation explicitly rather than
+   leaving it as ambient cleanup.
+
+Exit criteria
+-------------
+- the admitted networking project family continues to prove deterministic
+  `mc run` and `mc test` behavior through richer reuse sequences than the
+  current second-wave closeout covered
+- ordinary project-test reporting is reviewable enough that PASS, FAIL, and
+  timeout outcomes no longer depend on loose summary matching alone
+- invalid project configurations fail earlier and more specifically than the
+  current admitted slice
+- the repository can decide on a next real-project pressure wave without
+  hiding workflow trust debt under new capability breadth
+
+Non-goals
+---------
+- broad target-model widening beyond the currently admitted hosted executable
+  and hosted checked-test slice
+- replacing the focused C++ fixture suites wholesale with `mc test`
+- using this phase to reopen `sync`, `hal`, or cross-platform support work
+- claiming broader release-hardening completion than the current hosted slice
+  note already states
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 19 stands alone as the explicit next-step workflow hardening plan after
+  the Phase 18 plateau decision.
+- The phase keeps its proof surface on already-admitted real projects rather
+  than abstract tool-only cleanup.

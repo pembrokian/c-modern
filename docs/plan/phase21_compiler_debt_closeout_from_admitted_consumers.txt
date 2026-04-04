@@ -1,0 +1,130 @@
+Phase 21 -- Compiler Debt Closeout From Admitted Consumer Pressure
+=================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Use the workflow and real-project pressure accumulated through the admitted
+networking and `sync` slices to close the highest-leverage remaining compiler
+limitations at the correct owning layers.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 17 already removed the highest-leverage typed networking surface
+  flattening and narrowed the remaining deferral in that area to aggregate-bool
+  ABI cleanup.
+- The backlog still carries direct aggregate field-address lowering and the
+  bounded compiler-owned imported generic `thread_spawn<T>` rewrite as active
+  follow-on items.
+- A stronger workflow plateau from Phase 19 and a real sync project from Phase
+  20 would give the repository better evidence about which remaining compiler
+  limitations are still merely theoretical and which ones are now materially
+  harming admitted consumers.
+
+Problem being solved
+--------------------
+- The repository no longer needs broad compiler widening for its own sake.
+- The remaining compiler work is now about closing specific limited solutions
+  and bootstrap-shaped constraints that admitted consumers still expose.
+- Without an explicit owner plan, example and library code could begin to
+  normalize compiler debt through wrapper surfaces, alternate record shapes, or
+  global-shaped rewrites instead of fixing the smallest correct owner.
+
+Core rule
+---------
+- Fix root-cause compiler debt only when admitted consumers justify it.
+- Prefer one closed limited solution over several partially loosened ones.
+- Keep ownership boundaries intact: parser owns syntax, sema owns language
+  meaning, MIR owns typed lowered truth, backend owns executable ABI and target
+  restrictions.
+- Do not widen language surface or stdlib breadth merely to work around a
+  compiler limitation that belongs in the compiler.
+
+Priority candidate set
+----------------------
+1. Direct local or global aggregate field-address lowering so admitted proofs
+   no longer need awkward `&value.field` rewrites.
+2. Aggregate-bool ABI cleanup for the restored typed networking `Event` surface
+   if admitted consumers now justify that backend work.
+3. Broader imported generic procedure-call lowering only if Phase 20 provides
+   a real second consumer beyond the existing `thread_spawn<T>` rewrite.
+
+Admission rule for candidate work
+---------------------------------
+- A candidate should land only if at least one admitted real project or
+  canonical proof is materially cleaner, more honest, or more deterministic
+  after the compiler owner change.
+- If a limitation is still only theoretical, keep it explicit in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt` or
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` rather than widening it
+  preemptively.
+
+Preferred implementation bias
+-----------------------------
+- close one limited solution completely when possible instead of broadening a
+  family of related cases in half-finished form
+- add the narrowest deterministic regression suite that proves the newly owned
+  compiler truth directly
+- update the decision log whenever a limited workaround is removed, narrowed,
+  or retained with a sharper revisit trigger
+
+Deliverables
+------------
+- one or more focused compiler-owner implementation slices under
+  `/Users/ro/dev/c_modern/compiler/sema/`,
+  `/Users/ro/dev/c_modern/compiler/mir/`, and
+  `/Users/ro/dev/c_modern/compiler/codegen_llvm/` as required by the chosen
+  candidate set
+- deterministic sema, MIR, codegen, or tool regressions at the narrowest proof
+  layer that demonstrates the owner-local fix
+- bounded updates to the affected real projects or canonical proofs only after
+  the compiler owner truth lands
+- documentation updates in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` so remaining limited
+  solutions are explicit and sharper than generic cleanup notes
+
+Suggested execution order
+-------------------------
+1. Re-audit Phase 19 and Phase 20 findings and collect only the recurring
+   compiler-owned limitations.
+2. Choose the smallest high-leverage candidate whose removal cleans up a real
+   admitted consumer noticeably.
+3. Land the compiler-owner fix with narrow deterministic regressions before
+   touching library or example code that benefits from it.
+4. Remove or narrow the corresponding workaround from examples, stdlib, or the
+   decision log only after the compiler truth is proven.
+5. Reassess whether any remaining compiler limitation still has a concrete
+   consumer or should remain deferred.
+
+Exit criteria
+-------------
+- at least one active compiler-owned limited solution affecting admitted
+  consumers is closed or materially narrowed
+- real projects or canonical proofs no longer need the corresponding
+  workaround spelling where the compiler owner truth has landed
+- any still-deferred compiler limitation has a sharper revisit trigger than
+  "later cleanup"
+- the repository is in a position to choose its next capability or release
+  plateau from a cleaner compiler baseline
+
+Non-goals
+---------
+- speculative compiler generalization without a concrete admitted consumer
+- broad new syntax work or language-surface expansion unrelated to the named
+  consumer pressure
+- moving library, runtime, or driver responsibilities into the compiler
+- reopening a new capability family merely to justify compiler work
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 21 stands alone as the compiler-debt closeout plan driven by admitted
+  consumer pressure.
+- The phase keeps each candidate tied to a named current limitation and a real
+  consumer trigger rather than abstract completeness goals.
