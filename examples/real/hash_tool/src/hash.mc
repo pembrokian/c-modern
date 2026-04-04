@@ -3,6 +3,7 @@ export { format_line, hash_bytes, hex_u64, run }
 import fs
 import io
 import mem
+import strings
 
 const HASH_SEED: u64 = 1469598103934665603
 const HASH_MULTIPLIER: u64 = 1099511628211
@@ -64,7 +65,7 @@ func format_line(hash: u64, path: str) *Buffer<u8> {
 
     line_bytes[16] = 32
     line_bytes[17] = 32
-    path_bytes: Slice<u8> = Slice<u8>{ ptr: path.ptr, len: path.len }
+    path_bytes: Slice<u8> = strings.bytes(path)
     index = 0
     while index < path.len {
         line_bytes[18 + index] = path_bytes[index]

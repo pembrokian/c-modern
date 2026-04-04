@@ -546,6 +546,7 @@ enum class SpecialCallKind {
     kBufferFree,
     kArenaNew,
     kSliceFromBuffer,
+    kTypedThreadSpawn,
     kVolatileLoad,
     kVolatileStore,
     kAtomicLoad,
@@ -679,6 +680,17 @@ std::size_t ProcedureParamCount(const sema::Type& type) {
     const auto parsed = mc::support::ParseArrayLength(type.metadata);
     assert(parsed.has_value() && "procedure metadata must encode parameter count");
     return parsed.value_or(0);
+}
+std::vector<sema::Type> ProcedureParamTypes(const sema::Type& type) {
+    if (type.kind != sema::Type::Kind::kProcedure) {
+        return {};
+    }
+    const std::size_t param_count = ProcedureParamCount(type);
+    if (param_count > type.subtypes.size()) {
+        return {};
+    }
+    return std::vector<sema::Type>(type.subtypes.begin(),
+                                   type.subtypes.begin() + static_cast<std::ptrdiff_t>(param_count));
 }
 
 std::vector<sema::Type> ProcedureReturnTypes(const sema::Type& type) {
@@ -1095,6 +1107,7 @@ class FunctionLowerer {
             case SpecialCallKind::kAtomicExchange:
             case SpecialCallKind::kAtomicFetchAdd:
                 return RenderOrderName(expr, 2);
+            case SpecialCallKind::kTypedThreadSpawn:
             case SpecialCallKind::kBufferNew:
             case SpecialCallKind::kBufferFree:
             case SpecialCallKind::kArenaNew:
@@ -1128,20 +1141,41 @@ class FunctionLowerer {
         if (expr.left == nullptr || expr.left->kind != Expr::Kind::kQualifiedName) {
             return false;
         }
-        return expr.left->text == "sync" && expr.left->secondary_text == "thread_spawn";
+        return expr.left->text == "sync" && expr.left->secondary_text == "thread_spawn" && !expr.left->type_args.empty();
     }
 
-    bool EmitTypedThreadSpawnCall(const Expr& expr,
-                                  const std::vector<ValueInfo>& args,
-                                  const sema::Type& result_type,
-                                  bool wants_result,
-                                  ValueInfo* result) {
-        if (!IsTypedThreadSpawnCall(expr)) {
+    bool MatchesTypedThreadSpawnSignature(const sema::Type& callee_type) const {
+        const sema::Type stripped_callee = StripMirAliasOrDistinct(module_, callee_type);
+        if (stripped_callee.kind != sema::Type::Kind::kProcedure) {
             return false;
         }
+
+        const auto param_types = ProcedureParamTypes(stripped_callee);
+        if (param_types.size() != 2) {
+            return false;
+        }
+
+        const sema::Type entry_type = StripMirAliasOrDistinct(module_, param_types[0]);
+        const sema::Type ctx_type = StripMirAliasOrDistinct(module_, param_types[1]);
+        if (entry_type.kind != sema::Type::Kind::kProcedure || ctx_type.kind != sema::Type::Kind::kPointer ||
+            ctx_type.subtypes.empty()) {
+            return false;
+        }
+
+        const auto entry_param_types = ProcedureParamTypes(entry_type);
+        if (entry_param_types.size() != 1) {
+            return false;
+        }
+
+        return StripMirAliasOrDistinct(module_, entry_param_types.front()) == ctx_type;
+    }
+
+    bool EmitTypedThreadSpawnRawCall(const std::vector<ValueInfo>& args,
+                                     const sema::Type& result_type,
+                                     bool wants_result,
+                                     ValueInfo* result) {
         if (args.size() != 2) {
-            Report(expr.span, "sync.thread_spawn expects exactly two arguments");
-            return true;
+            return false;
         }
 
         const sema::Type uintptr_type = sema::NamedType("uintptr");
@@ -1177,6 +1211,25 @@ class FunctionLowerer {
             *result = {function_.blocks[*current_block_].instructions.back().result, result_type};
         }
         return true;
+    }
+
+    bool EmitTypedThreadSpawnCall(const Expr& expr,
+                                  const std::vector<ValueInfo>& args,
+                                  const sema::Type& result_type,
+                                  bool wants_result,
+                                  ValueInfo* result) {
+        if (!IsTypedThreadSpawnCall(expr)) {
+            return false;
+        }
+        if (args.size() != 2) {
+            Report(expr.span, "sync.thread_spawn expects exactly two arguments");
+            return true;
+        }
+        if (!MatchesTypedThreadSpawnSignature(ExprTypeOrUnknown(*expr.left))) {
+            Report(expr.span, "sync.thread_spawn rewrite requires imported signature func(*T), *T");
+            return true;
+        }
+        return EmitTypedThreadSpawnRawCall(args, result_type, wants_result, result);
     }
 
     bool EmitSpecialCallInstruction(const TargetMetadata& target_metadata,
@@ -1307,8 +1360,9 @@ class FunctionLowerer {
                 instruction.kind = Instruction::Kind::kAtomicFetchAdd;
                 break;
             default:
-                // kArenaNew, kMmioPtr, kSliceFromBuffer, and kNone are handled
-                // before the switch above and cannot reach this point.
+                // kArenaNew, kMmioPtr, kSliceFromBuffer, kTypedThreadSpawn,
+                // and kNone are handled before the switch above and cannot
+                // reach this point.
                 MC_UNREACHABLE("unhandled SpecialCallKind in EmitSpecialCallInstruction");
         }
 
@@ -1435,7 +1489,8 @@ class FunctionLowerer {
         for (const auto& arg : expr.args) {
             args.push_back(LowerExpr(*arg));
         }
-        const SpecialCallKind special_kind = ClassifySpecialCall(CalleeName(*expr.left));
+        const SpecialCallKind special_kind = IsTypedThreadSpawnCall(expr) ? SpecialCallKind::kTypedThreadSpawn
+                                                                          : ClassifySpecialCall(CalleeName(*expr.left));
         const auto callee = special_kind == SpecialCallKind::kNone ? LowerCalleeExpr(*expr.left) : ValueInfo {};
         const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
         DeferredCall call {
@@ -1459,6 +1514,15 @@ class FunctionLowerer {
     }
 
     void EmitDeferredCall(const DeferredCall& call) {
+        if (call.special_kind == SpecialCallKind::kTypedThreadSpawn) {
+            std::vector<ValueInfo> args;
+            args.reserve(call.arg_locals.size());
+            for (const auto& arg_local : call.arg_locals) {
+                args.push_back(LoadLocalValue(arg_local));
+            }
+            static_cast<void>(EmitTypedThreadSpawnRawCall(args, call.type, false, nullptr));
+            return;
+        }
         if (call.special_kind != SpecialCallKind::kNone) {
             std::vector<ValueInfo> args;
             args.reserve(call.arg_locals.size());
@@ -1881,6 +1945,34 @@ class FunctionLowerer {
                     });
                     return {value, type};
                 }
+                if (const auto* global = sema::FindGlobalSummary(sema_module_, expr.text); global != nullptr) {
+                    const std::string base_value = NewValue();
+                    Emit({
+                        .kind = Instruction::Kind::kSymbolRef,
+                        .result = base_value,
+                        .type = KnownTypeOrError(global->type, expr.span, "qualified global base type"),
+                        .target = expr.text,
+                        .target_kind = Instruction::TargetKind::kGlobal,
+                        .target_name = expr.text,
+                        .target_display = expr.text,
+                    });
+
+                    const std::string value = NewValue();
+                    const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "qualified global field expression type");
+                    const std::string target_display = CombineQualifiedName(expr);
+                    Emit({
+                        .kind = Instruction::Kind::kField,
+                        .result = value,
+                        .type = type,
+                        .target = expr.secondary_text,
+                        .target_kind = Instruction::TargetKind::kField,
+                        .target_name = expr.secondary_text,
+                        .target_display = target_display,
+                        .target_base_type = KnownTypeOrError(global->type, expr.span, "qualified global field base type"),
+                        .operands = {base_value},
+                    });
+                    return {value, type};
+                }
                 const std::string value = NewValue();
                 const std::string qualified_name = CombineQualifiedName(expr);
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "symbol reference type for " + qualified_name);
@@ -1928,25 +2020,27 @@ class FunctionLowerer {
 
                     if (expr.left->kind == Expr::Kind::kQualifiedName) {
                         StoreBaseMetadata base_storage;
+                        sema::Type base_type = sema::UnknownType();
                         if (local_types_.contains(expr.left->text)) {
                             base_storage = {
                                 .kind = Instruction::StorageBaseKind::kLocal,
                                 .name = expr.left->text,
                             };
+                            base_type = local_types_.at(expr.left->text);
+                        } else if (const auto* global = sema::FindGlobalSummary(sema_module_, expr.left->text); global != nullptr) {
+                            base_storage = {
+                                .kind = Instruction::StorageBaseKind::kGlobal,
+                                .name = expr.left->text,
+                            };
+                            base_type = global->type;
                         } else if (InferTargetKindForExpr(*expr.left) == Instruction::TargetKind::kGlobal) {
                             base_storage = {
                                 .kind = Instruction::StorageBaseKind::kGlobal,
                                 .name = CombineQualifiedName(*expr.left),
                             };
+                            base_type = ExprTypeOrUnknown(*expr.left);
                         }
                         if (base_storage.kind != Instruction::StorageBaseKind::kNone) {
-                            const sema::Type base_type = base_storage.kind == Instruction::StorageBaseKind::kLocal
-                                                             ? KnownTypeOrError(local_types_.at(expr.left->text),
-                                                                                expr.left->span,
-                                                                                "address-of qualified field base type")
-                                                             : KnownTypeOrError(ExprTypeOrUnknown(*expr.left),
-                                                                                expr.left->span,
-                                                                                "address-of qualified field base type");
                             const std::string value = NewValue();
                             Emit({
                                 .kind = Instruction::Kind::kLocalAddr,
@@ -1958,7 +2052,9 @@ class FunctionLowerer {
                                 .target_display = CombineQualifiedName(*expr.left),
                                 .target_base_storage = base_storage.kind,
                                 .target_base_name = base_storage.name,
-                                .target_base_type = base_type,
+                                .target_base_type = KnownTypeOrError(base_type,
+                                                                     expr.left->span,
+                                                                     "address-of qualified field base type"),
                             });
                             return {value, type};
                         }
@@ -3595,6 +3691,78 @@ void ValidateBinaryInstruction(const Instruction& instruction, const ValidationC
     }
 }
 
+enum class AtomicOrderKind {
+    kInvalid,
+    kRelaxed,
+    kAcquire,
+    kRelease,
+    kAcqRel,
+    kSeqCst,
+};
+
+AtomicOrderKind ClassifyAtomicOrder(std::string_view order_name) {
+    const std::string leaf = VariantLeafName(order_name);
+    if (leaf == "Relaxed") {
+        return AtomicOrderKind::kRelaxed;
+    }
+    if (leaf == "Acquire") {
+        return AtomicOrderKind::kAcquire;
+    }
+    if (leaf == "Release") {
+        return AtomicOrderKind::kRelease;
+    }
+    if (leaf == "AcqRel") {
+        return AtomicOrderKind::kAcqRel;
+    }
+    if (leaf == "SeqCst") {
+        return AtomicOrderKind::kSeqCst;
+    }
+    return AtomicOrderKind::kInvalid;
+}
+
+bool AtomicOrderAllowedForInstruction(Instruction::Kind kind, std::string_view order_name) {
+    const AtomicOrderKind order = ClassifyAtomicOrder(order_name);
+    switch (kind) {
+        case Instruction::Kind::kAtomicLoad:
+            return order == AtomicOrderKind::kRelaxed || order == AtomicOrderKind::kAcquire ||
+                   order == AtomicOrderKind::kSeqCst;
+        case Instruction::Kind::kAtomicStore:
+            return order == AtomicOrderKind::kRelaxed || order == AtomicOrderKind::kRelease ||
+                   order == AtomicOrderKind::kSeqCst;
+        case Instruction::Kind::kAtomicExchange:
+        case Instruction::Kind::kAtomicFetchAdd:
+        case Instruction::Kind::kAtomicCompareExchange:
+            return order == AtomicOrderKind::kRelaxed || order == AtomicOrderKind::kAcquire ||
+                   order == AtomicOrderKind::kRelease || order == AtomicOrderKind::kAcqRel ||
+                   order == AtomicOrderKind::kSeqCst;
+        default:
+            return false;
+    }
+}
+
+bool AtomicCompareExchangeFailureOrderAllowed(std::string_view success_order_name,
+                                              std::string_view failure_order_name) {
+    const AtomicOrderKind success = ClassifyAtomicOrder(success_order_name);
+    const AtomicOrderKind failure = ClassifyAtomicOrder(failure_order_name);
+    switch (success) {
+        case AtomicOrderKind::kRelaxed:
+            return failure == AtomicOrderKind::kRelaxed;
+        case AtomicOrderKind::kAcquire:
+            return failure == AtomicOrderKind::kRelaxed || failure == AtomicOrderKind::kAcquire;
+        case AtomicOrderKind::kRelease:
+            return failure == AtomicOrderKind::kRelaxed;
+        case AtomicOrderKind::kAcqRel:
+            return failure == AtomicOrderKind::kRelaxed || failure == AtomicOrderKind::kAcquire;
+        case AtomicOrderKind::kSeqCst:
+            return failure == AtomicOrderKind::kRelaxed || failure == AtomicOrderKind::kAcquire ||
+                   failure == AtomicOrderKind::kSeqCst;
+        case AtomicOrderKind::kInvalid:
+            return false;
+    }
+
+    return false;
+}
+
 void ValidateAtomicInstruction(const Instruction& instruction, const ValidationContext& ctx) {
     const auto& module = ctx.module;
     const auto& function = ctx.function;
@@ -3624,6 +3792,18 @@ void ValidateAtomicInstruction(const Instruction& instruction, const ValidationC
     }
     if (is_compare_exchange && !HasCompareExchangeOrderMetadata(instruction)) {
         report("atomic_compare_exchange must record success/failure order metadata in function " + function.name);
+    }
+    if ((is_load || is_store || is_exchange || is_fetch_add) && HasAtomicOrderMetadata(instruction) &&
+        !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
+        report(std::string(ToString(instruction.kind)) + " uses unsupported MemoryOrder metadata in function " + function.name);
+    }
+    if (is_compare_exchange && HasCompareExchangeOrderMetadata(instruction)) {
+        if (!AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_success_order)) {
+            report("atomic_compare_exchange uses unsupported success MemoryOrder metadata in function " + function.name);
+        }
+        if (!AtomicCompareExchangeFailureOrderAllowed(instruction.atomic_success_order, instruction.atomic_failure_order)) {
+            report("atomic_compare_exchange uses unsupported failure MemoryOrder metadata in function " + function.name);
+        }
     }
     if (!instruction.op.empty()) {
         report(std::string(ToString(instruction.kind)) + " must not encode atomic order metadata in generic op text in function " + function.name);

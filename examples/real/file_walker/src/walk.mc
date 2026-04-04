@@ -3,13 +3,14 @@ export { entry_is_dir, entry_name, path_join, run }
 import fs
 import io
 import mem
+import strings
 
 func entry_is_dir(entry: str) bool {
     if entry.len == 0 {
         return false
     }
 
-    bytes: Slice<u8> = Slice<u8>{ ptr: entry.ptr, len: entry.len }
+    bytes: Slice<u8> = strings.bytes(entry)
     return bytes[entry.len - 1] == 47
 }
 
@@ -21,8 +22,8 @@ func entry_name(entry: str) str {
 }
 
 func path_join(base: str, name: str) *Buffer<u8> {
-    base_bytes: Slice<u8> = Slice<u8>{ ptr: base.ptr, len: base.len }
-    name_bytes: Slice<u8> = Slice<u8>{ ptr: name.ptr, len: name.len }
+    base_bytes: Slice<u8> = strings.bytes(base)
+    name_bytes: Slice<u8> = strings.bytes(name)
     need_separator: bool = false
     if base.len > 0 {
         need_separator = base_bytes[base.len - 1] != 47

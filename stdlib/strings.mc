@@ -1,4 +1,4 @@
-export { byte_len, empty, eq, find_byte, trim_space, is_blank }
+export { byte_len, bytes, empty, eq, find_byte, trim_space, is_blank }
 
 extern(c) func __mc_strings_eq(left: str, right: str) i32
 extern(c) func __mc_strings_find_byte(text: str, needle: u8) usize
@@ -7,6 +7,10 @@ extern(c) func __mc_strings_trim_space_end(text: str) usize
 
 func byte_len(text: str) usize {
     return text.len
+}
+
+func bytes(text: str) Slice<u8> {
+    return Slice<u8>{ ptr: text.ptr, len: text.len }
 }
 
 func empty(text: str) bool {

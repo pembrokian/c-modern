@@ -53,19 +53,19 @@ BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_fam
     Block source=entry0 backend=bb7_0.entry0
       %t7_0_0 = load *Atomic<i32> [repr=ptr, size=8, align=8] %local.ptr
       %t7_0_1 = load i32 [repr=i32, size=4, align=4] %local.value
-      %t7_0_2 = enum_const MemoryOrder [repr={i64}, size=8, align=8] MemoryOrder.Release tag=2
-      atomic_store order=MemoryOrder.Release i32 [repr=i32, size=4, align=4] %t7_0_1 -> %t7_0_0
+      %t7_0_2 = enum_const MemoryOrder [repr={i64}, size=8, align=8] MemoryOrder.SeqCst tag=4
+      atomic_store order=MemoryOrder.SeqCst i32 [repr=i32, size=4, align=4] %t7_0_1 -> %t7_0_0
       %t7_0_4 = load *Atomic<i32> [repr=ptr, size=8, align=8] %local.ptr
-      %t7_0_5 = enum_const MemoryOrder [repr={i64}, size=8, align=8] MemoryOrder.Acquire tag=1
-      %t7_0_6 = atomic_load order=MemoryOrder.Acquire i32 [repr=i32, size=4, align=4] %t7_0_4
+      %t7_0_5 = enum_const MemoryOrder [repr={i64}, size=8, align=8] MemoryOrder.SeqCst tag=4
+      %t7_0_6 = atomic_load order=MemoryOrder.SeqCst i32 [repr=i32, size=4, align=4] %t7_0_4
       store i32 %t7_0_6 -> %local.loaded as i32 [repr=i32, size=4, align=4]
       %t7_0_8 = load *Atomic<i32> [repr=ptr, size=8, align=8] %local.ptr
       %t7_0_9 = load i32 [repr=i32, size=4, align=4] %local.loaded
-      %t7_0_10 = enum_const MemoryOrder [repr={i64}, size=8, align=8] MemoryOrder.Acquire tag=1
-      %t7_0_11 = atomic_exchange order=MemoryOrder.Acquire i32 [repr=i32, size=4, align=4] %t7_0_8, %t7_0_9
+      %t7_0_10 = enum_const MemoryOrder [repr={i64}, size=8, align=8] MemoryOrder.AcqRel tag=3
+      %t7_0_11 = atomic_exchange order=MemoryOrder.AcqRel i32 [repr=i32, size=4, align=4] %t7_0_8, %t7_0_9
       store i32 %t7_0_11 -> %local.swapped as i32 [repr=i32, size=4, align=4]
       %t7_0_13 = load *Atomic<i32> [repr=ptr, size=8, align=8] %local.ptr
       %t7_0_14 = load i32 [repr=i32, size=4, align=4] %local.swapped
-      %t7_0_15 = enum_const MemoryOrder [repr={i64}, size=8, align=8] MemoryOrder.Release tag=2
-      %t7_0_16 = atomic_fetch_add order=MemoryOrder.Release i32 [repr=i32, size=4, align=4] %t7_0_13, %t7_0_14
+      %t7_0_15 = enum_const MemoryOrder [repr={i64}, size=8, align=8] MemoryOrder.SeqCst tag=4
+      %t7_0_16 = atomic_fetch_add order=MemoryOrder.SeqCst i32 [repr=i32, size=4, align=4] %t7_0_13, %t7_0_14
       ret i32 [repr=i32, size=4, align=4] %t7_0_16

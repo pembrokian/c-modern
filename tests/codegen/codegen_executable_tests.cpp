@@ -1139,7 +1139,7 @@ int main(int argc, char** argv) {
     RunBuildFailureFixture(mc_path,
                            low_level_dynamic_order_source,
                            work_root / "low_level_dynamic_order_fail_build",
-                           "requires supported constant MemoryOrder metadata for 'atomic_load'");
+                           "atomic_load uses unsupported MemoryOrder metadata");
 
     const std::filesystem::path bounds_index_source = work_root / "bounds_index_oob.mc";
     WriteFile(bounds_index_source,
@@ -1515,6 +1515,12 @@ int main(int argc, char** argv) {
     RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/bounded_ring_buffer.mc",
                     work_root / "phase15_bounded_ring_buffer_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/codegen/field_address_local_global.mc",
+                    work_root / "phase15_field_address_local_global_build",
                     0,
                     {});
 

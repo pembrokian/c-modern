@@ -688,14 +688,20 @@ void TestProjectImportedGlobalMirDeclarations(const std::filesystem::path& binar
                          "global\t0\tcounter\ti32\t",
                          "helper .mci should record exported mutable globals");
     ExpectOutputContains(main_mir_text,
-                         "ConstGlobal names=[helper.LIMIT] type=i32 extern",
-                         "dependent MIR should record imported const globals as extern globals");
+                         "ConstGlobal names=[helper.LIMIT] type=i32",
+                         "merged project MIR should retain imported const globals");
     ExpectOutputContains(main_mir_text,
-                         "VarGlobal names=[helper.counter] type=i32 extern",
-                         "dependent MIR should record imported mutable globals as extern globals");
+                         "init 9",
+                         "merged project MIR should retain imported const global initializers");
+    ExpectOutputContains(main_mir_text,
+                         "VarGlobal names=[helper.counter] type=i32",
+                         "merged project MIR should retain imported mutable globals");
+    ExpectOutputContains(main_mir_text,
+                         "init 4",
+                         "merged project MIR should retain imported mutable global initializers");
     ExpectOutputContains(main_mir_text,
                          "store_target target=helper.counter target_kind=global target_name=helper.counter",
-                         "dependent MIR should lower imported mutable global stores as global targets");
+                         "merged project MIR should lower imported mutable global stores as global targets");
 }
 
 void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binary_root,

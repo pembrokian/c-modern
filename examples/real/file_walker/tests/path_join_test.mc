@@ -1,6 +1,7 @@
 export { test_path_join }
 
 import mem
+import strings
 import testing
 import walk
 
@@ -9,8 +10,8 @@ func same_text(left: str, right: str) bool {
         return false
     }
 
-    left_bytes: Slice<u8> = Slice<u8>{ ptr: left.ptr, len: left.len }
-    right_bytes: Slice<u8> = Slice<u8>{ ptr: right.ptr, len: right.len }
+    left_bytes: Slice<u8> = strings.bytes(left)
+    right_bytes: Slice<u8> = strings.bytes(right)
     index: usize = 0
     while index < left.len {
         if left_bytes[index] != right_bytes[index] {

@@ -1,0 +1,129 @@
+Phase 15 -- Post-Phase-14 Cleanup Closeout
+==========================================
+
+Status
+------
+COMPLETED (repository-bounded cross-phase cleanup wave)
+
+Purpose
+-------
+Record the large post-Phase-14 execution wave now landed in the repository so
+its implementation truth does not live only in scattered plan edits, example
+changes, and focused regression additions.
+
+This is a repository closeout note, not a new architecture phase.
+It records the bounded cleanup and hardening wave that followed the first
+Phase 14 closeout and the initial networking plus `sync` admissions. It does
+not claim that the long-term Phase 6, Phase 7, or Phase 8 architecture work is
+fully complete.
+
+Scope of this closeout
+----------------------
+- This document covers the cross-phase follow-on work that the ranked backlog
+  in `/Users/ro/dev/c_modern/docs/plan/admin/post_phase14_execution_plan.txt`
+  had elevated ahead of any third capability-family expansion.
+- It packages together repository work that belonged to different owners but
+  one execution wave: current-surface proof closure, narrow `sync` follow-on
+  honesty, workflow cleanup for the real networking project, compiler-debt
+  cleanup exposed by admitted waves, borrowed-text cleanup, and the resulting
+  documentation alignment.
+- It does not introduce a new language layer or replace the standing Phase 12,
+  Phase 13, or Phase 14 planning documents.
+
+Why this phase existed
+----------------------
+- After the first Phase 14 closeout, the repository had a real hosted
+  networking family, a first narrow hosted `sync` family, and several current-
+  surface candidate proofs ready to land.
+- The highest-leverage next work was no longer a fresh capability-family
+  admission. It was finishing the current-surface candidate set, narrowing the
+  compiler limitations those admissions exposed, and bringing the support and
+  planning statements back into alignment with repository truth.
+- Without one closeout note, the repository risked treating this large cleanup
+  wave as ambient follow-up instead of a completed execution slice with its own
+  proof and documentation obligations.
+
+What landed
+-----------
+- current-surface Phase 14 follow-on proofs are now complete for the named
+  next-wave candidates that required no new broad module family: bounded ring
+  buffer, distinct-type safety, fixed array/slice/buffer conversion, and a
+  standalone hosted default-allocator proof.
+- the hosted `sync` slice is now materially more honest than the first mutex-
+  only admission: producer-consumer condition-variable proof landed, atomic
+  publication landed, and lifecycle cleanup now includes `mutex_destroy` plus
+  `condvar_destroy`.
+- the atomic-publication proof no longer relies on a typed-local workaround for
+  literal-valued stores; the backend now emits the admitted atomic store shape
+  honestly enough for direct literal use in the canonical proof.
+- the real evented-echo project no longer depends on local hosted ABI
+  declarations in its main server path. Ordinary project code now uses the
+  admitted imported stdlib wrappers directly, while the workflow proof stays on
+  the real project graph.
+- the merged project-MIR path now deduplicates imported type declarations,
+  globals, and duplicate extern wrappers instead of surfacing project-shaped
+  duplicate-symbol failures for already-admitted code.
+- the compiler-owned typed `sync.thread_spawn<T>` rewrite remains explicit but
+  is now narrower and more honest: MIR lowering checks the intended imported
+  `func(*T), *T` surface and preserves the raw-helper rewrite through deferred
+  calls instead of silently falling back to generic imported-call lowering.
+- direct field-address lowering is now proven more honestly through executable
+  coverage for both local and global aggregate fields, and MIR lowering now
+  handles qualified global field address and value paths without falling back
+  to invalid generic symbol references.
+- atomic-order handling is now tighter at the MIR boundary and more honest in
+  the executable backend for the already-admitted low-level operations:
+  invalid order combinations are rejected in MIR, and the backend now accepts
+  the admitted `SeqCst` and `AcqRel` cases for supported load, store,
+  exchange, and fetch-add operations.
+- borrowed-text cleanup is now active through `strings.bytes(...)`, and the
+  covered hashing, grep-lite, file-walker, and evented-echo paths no longer
+  spell ad hoc `str` to `Slice<u8>` conversions by hand.
+- support notes and planning docs no longer describe the evented-echo project
+  workaround or the earlier atomic literal limitation as if they were still the
+  current repository truth.
+
+Cross-phase owner summary
+-------------------------
+- Phase 12 ownership: current-surface proofs, `sync` follow-on honesty,
+  lifecycle cleanup, and borrowed-text helper cleanup.
+- Phase 13 ownership: keep the real networking project on the ordinary tool
+  path while the admitted slice grows.
+- compiler ownership from admitted waves: imported-surface dedup in merged MIR,
+  typed `thread_spawn<T>` rewrite honesty, field-address lowering truth, and
+  admitted atomic codegen cleanup.
+- docs ownership: support statements and ranked-plan text now reflect the
+  repository posture after these landings.
+
+What remains explicitly deferred
+--------------------------------
+- no third new capability family is selected by this closeout
+- broader `sync` widening beyond the admitted slice, including public
+  compare-exchange proof, condvar broadcast, or broader lifecycle ergonomics
+- replacing the compiler-owned typed `thread_spawn<T>` rewrite with fully
+  general imported generic procedure-call lowering
+- broader HAL or MMIO admission, additional backend targets, self-hosting, or
+  public-cut release work beyond the already-published hosted support note
+- any documentation claim that the long-term architecture-level Phase 6, Phase
+  7, or Phase 8 surface is fully complete
+
+Validation
+----------
+- focused MIR regression additions covering deferred typed `thread_spawn<T>`
+  rewrite preservation and invalid atomic-order rejection
+- focused backend fixture and executable regressions covering widened admitted
+  atomic orders and local/global field-address proof
+- real project and executable proof already present in the repository for the
+  evented-echo workflow, current-surface candidates, shared-counter mutex,
+  producer-consumer condvar, and atomic publication examples
+- the debug build plus focused MIR, backend, fixture, and executable harnesses
+  remained green after the final compiler-debt cleanup in this wave
+
+Closeout statement
+------------------
+The repository-bounded Phase 15 cleanup wave is complete. The repository did
+not use this wave to open a third capability family; it used it to finish the
+named current-surface proofs, make the admitted networking and `sync` slices
+more honest, close the highest-leverage compiler debt those admissions had
+exposed, reduce repeated borrowed-text boilerplate, and bring the planning and
+support statements back into line with implementation truth.

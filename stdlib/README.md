@@ -26,7 +26,8 @@ Current repository-specific notes:
   admitted bootstrap surface now supports explicit generic helper calls such as
   `mem.buffer_new<u8>(...)` and `mem.slice_from_buffer<u8>(...)`
 - `strings` stays non-allocating in the admitted slice and currently exposes
-  borrowed-text helpers only
+  borrowed-text helpers only, including `strings.bytes(...)` for explicit
+  borrowed byte views over `str`
 - `utf8` currently exposes a narrow borrowed-text slice built on top of
   `strings`; fuller canonical validation helpers remain deferred, but
   executable byte-view support is now present

@@ -1,29 +1,13 @@
 export { main }
 
+import errors
 import echo_core
-
-struct Poller {
-    raw: uintptr
-}
-
-const EVENT_READABLE: u32 = 1
-
-extern(c) func __mc_io_write_line(text: str) i32
-extern(c) func __mc_io_read(file: i32, bytes: Slice<u8>, err: *uintptr) usize
-extern(c) func __mc_io_write_file(file: i32, bytes: Slice<u8>, err: *uintptr) usize
-extern(c) func __mc_io_close(file: i32) uintptr
-extern(c) func __mc_io_poller_new(err: *uintptr) *Poller
-extern(c) func __mc_io_poller_add(p: *Poller, file: i32, interests: u32) uintptr
-extern(c) func __mc_io_poller_set(p: *Poller, file: i32, interests: u32) uintptr
-extern(c) func __mc_io_poller_remove(p: *Poller, file: i32) uintptr
-extern(c) func __mc_io_poller_wait(p: *Poller, files: *i32, readable: *u8, writable: *u8, failed: *u8, cap: usize, timeout_ms: i32, err: *uintptr) usize
-extern(c) func __mc_io_poller_close(p: *Poller)
-extern(c) func __mc_net_tcp_listen(a: u8, b: u8, c: u8, d: u8, port: u16, err: *uintptr) i32
-extern(c) func __mc_net_accept(listener: i32, err: *uintptr) i32
+import io
+import net
 
 func main(args: Slice<cstr>) i32 {
     if args.len != 2 {
-        status: i32 = __mc_io_write_line("usage: evented-echo <port>")
+        status: i32 = io.write_line("usage: evented-echo <port>")
         if status != 0 {
             return status
         }
@@ -34,15 +18,15 @@ func main(args: Slice<cstr>) i32 {
 }
 
 func close_ignored(file: i32) {
-    ignored = __mc_io_close(file)
-    if ignored != 0 {
+    ignored: errors.Error = io.close(file)
+    if !errors.is_ok(ignored) {
         return
     }
 }
 
-func poller_remove_ignored(poller: *Poller, file: i32) {
-    ignored = __mc_io_poller_remove(poller, file)
-    if ignored != 0 {
+func poller_remove_ignored(poller: *io.Poller, file: i32) {
+    ignored: errors.Error = io.poller_remove(poller, file)
+    if !errors.is_ok(ignored) {
         return
     }
 }
@@ -55,24 +39,24 @@ func run(port_text: str) i32 {
         return 10
     }
 
+    bind: net.IpEndpoint = net.IpEndpoint{ addr: net.IpAddr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
     listener: i32
-    listener_err: uintptr = 0
-    listener = __mc_net_tcp_listen(127, 0, 0, 1, port, &listener_err)
-    if listener_err != 0 {
+    err: errors.Error
+    listener, err = net.tcp_listen(bind)
+    if !errors.is_ok(err) {
         return 11
     }
     defer close_ignored(listener)
 
-    poller: *Poller
-    poller_err: uintptr = 0
-    poller = __mc_io_poller_new(&poller_err)
-    if poller_err != 0 {
+    poller: *io.Poller
+    poller, err = io.poller_new()
+    if !errors.is_ok(err) {
         return 12
     }
-    defer __mc_io_poller_close(poller)
+    defer io.poller_close(poller)
 
-    add_listener_err: uintptr = __mc_io_poller_add(poller, listener, EVENT_READABLE)
-    if add_listener_err != 0 {
+    err = io.poller_add(poller, listener, io.EVENT_READABLE)
+    if !errors.is_ok(err) {
         return 13
     }
 
@@ -89,9 +73,8 @@ func run(port_text: str) i32 {
         readable_ptr: *u8 = (*u8)((uintptr)(&readable))
         writable_ptr: *u8 = (*u8)((uintptr)(&writable))
         failed_ptr: *u8 = (*u8)((uintptr)(&failed))
-        wait_err: uintptr = 0
-        ready = __mc_io_poller_wait(poller, files_ptr, readable_ptr, writable_ptr, failed_ptr, 4, 2000, &wait_err)
-        if wait_err != 0 {
+        ready, err = io.poller_wait(poller, files_ptr, readable_ptr, writable_ptr, failed_ptr, 4, 2000)
+        if !errors.is_ok(err) {
             if accepted {
                 close_ignored(conn)
             }
@@ -121,21 +104,20 @@ func run(port_text: str) i32 {
                     return 17
                 }
 
-                accept_err: uintptr = 0
-                conn = __mc_net_accept(listener, &accept_err)
-                if accept_err != 0 {
+                conn, err = net.accept(listener)
+                if !errors.is_ok(err) {
                     return 18
                 }
                 accepted = true
 
-                add_conn_err: uintptr = __mc_io_poller_add(poller, conn, EVENT_READABLE)
-                if add_conn_err != 0 {
+                err = io.poller_add(poller, conn, io.EVENT_READABLE)
+                if !errors.is_ok(err) {
                     close_ignored(conn)
                     return 19
                 }
 
-                set_conn_err: uintptr = __mc_io_poller_set(poller, conn, EVENT_READABLE)
-                if set_conn_err != 0 {
+                err = io.poller_set(poller, conn, io.EVENT_READABLE)
+                if !errors.is_ok(err) {
                     poller_remove_ignored(poller, conn)
                     close_ignored(conn)
                     return 20
@@ -160,9 +142,8 @@ func run(port_text: str) i32 {
             buf: [16]u8
             bytes: Slice<u8> = (Slice<u8>)(buf)
             nread: usize
-            read_err: uintptr = 0
-            nread = __mc_io_read(conn, bytes, &read_err)
-            if read_err != 0 {
+            nread, err = io.read(conn, bytes)
+            if !errors.is_ok(err) {
                 poller_remove_ignored(poller, conn)
                 close_ignored(conn)
                 return 24
@@ -174,9 +155,8 @@ func run(port_text: str) i32 {
             }
 
             nwritten: usize
-            write_err: uintptr = 0
-            nwritten = __mc_io_write_file(conn, bytes[0:nread], &write_err)
-            if write_err != 0 {
+            nwritten, err = io.write_file(conn, bytes[0:nread])
+            if !errors.is_ok(err) {
                 poller_remove_ignored(poller, conn)
                 close_ignored(conn)
                 return 26

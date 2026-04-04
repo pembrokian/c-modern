@@ -263,6 +263,115 @@ std::optional<sema::Type> FindFieldType(const mir::Module& module,
     return std::nullopt;
 }
 
+std::string_view LeafTypeName(std::string_view name) {
+    const std::size_t separator = name.rfind('.');
+    if (separator == std::string_view::npos) {
+        return name;
+    }
+    return name.substr(separator + 1);
+}
+
+bool IsNamedTypeFamily(const sema::Type& type, std::string_view family_name) {
+    return type.kind == sema::Type::Kind::kNamed && LeafTypeName(type.name) == family_name;
+}
+
+sema::Type StripMirAliasOrDistinct(const mir::Module& module, sema::Type type) {
+    std::unordered_set<std::string> visited;
+    while (type.kind == sema::Type::Kind::kNamed) {
+        const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name);
+        if (type_decl == nullptr) {
+            break;
+        }
+        if (type_decl->kind != mir::TypeDecl::Kind::kDistinct && type_decl->kind != mir::TypeDecl::Kind::kAlias) {
+            break;
+        }
+        if (!visited.insert(type.name).second) {
+            break;
+        }
+        type = type_decl->aliased_type;
+    }
+    return type;
+}
+
+std::optional<sema::Type> PointerPointeeType(const sema::Type& type) {
+    if (type.kind != sema::Type::Kind::kPointer || type.subtypes.empty()) {
+        return std::nullopt;
+    }
+    return type.subtypes.front();
+}
+
+std::optional<sema::Type> AtomicElementType(const mir::Module& module, const sema::Type& pointer_type) {
+    const auto pointee = PointerPointeeType(StripMirAliasOrDistinct(module, pointer_type));
+    if (!pointee.has_value()) {
+        return std::nullopt;
+    }
+    const sema::Type stripped_pointee = StripMirAliasOrDistinct(module, *pointee);
+    if (stripped_pointee.kind != sema::Type::Kind::kNamed || !IsNamedTypeFamily(stripped_pointee, "Atomic") ||
+        stripped_pointee.subtypes.empty()) {
+        return std::nullopt;
+    }
+    return stripped_pointee.subtypes.front();
+}
+
+std::optional<sema::Type> FindFunctionValueType(const mir::Module& module,
+                                                const mir::Function& function,
+                                                std::string_view value_name) {
+    for (const auto& local : function.locals) {
+        if (local.name == value_name) {
+            return local.type;
+        }
+    }
+    for (const auto& block : function.blocks) {
+        for (const auto& instruction : block.instructions) {
+            if (instruction.result == value_name) {
+                return instruction.type;
+            }
+        }
+    }
+    for (const auto& global : module.globals) {
+        for (const auto& global_name : global.names) {
+            if (global_name == value_name) {
+                return global.type;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+bool ResolveAtomicElementBackendType(const mir::Module& module,
+                                     const mir::Function& function,
+                                     const mir::Instruction& instruction,
+                                     const std::filesystem::path& source_path,
+                                     support::DiagnosticSink& diagnostics,
+                                     std::string_view context,
+                                     BackendTypeInfo& element_type) {
+    if (instruction.operands.empty()) {
+        return false;
+    }
+    const auto ptr_type = FindFunctionValueType(module, function, instruction.operands.front());
+    if (!ptr_type.has_value()) {
+        ReportBackendError(source_path,
+                           std::string("LLVM bootstrap executable emission could not resolve atomic pointer type for '") +
+                               std::string(context) + "' in function '" + function.name + "'",
+                           diagnostics);
+        return false;
+    }
+    const auto atomic_element_type = AtomicElementType(module, *ptr_type);
+    if (!atomic_element_type.has_value()) {
+        ReportBackendError(source_path,
+                           std::string("LLVM bootstrap executable emission requires *Atomic<T> pointer for '") +
+                               std::string(context) + "' in function '" + function.name + "'",
+                           diagnostics);
+        return false;
+    }
+    return LowerInstructionType(module,
+                                *atomic_element_type,
+                                source_path,
+                                diagnostics,
+                                std::string(context) + " atomic element",
+                                element_type);
+}
+
 bool ExtendIntegerToI64(const ExecutableValue& value,
                         std::size_t function_index,
                         std::size_t block_index,
@@ -298,12 +407,13 @@ bool AtomicOrderAllowedForInstruction(mir::Instruction::Kind kind,
     const std::string leaf = VariantLeafName(order_name);
     switch (kind) {
         case mir::Instruction::Kind::kAtomicLoad:
-            return leaf == "Relaxed" || leaf == "Acquire";
+            return leaf == "Relaxed" || leaf == "Acquire" || leaf == "SeqCst";
         case mir::Instruction::Kind::kAtomicStore:
-            return leaf == "Relaxed" || leaf == "Release";
+            return leaf == "Relaxed" || leaf == "Release" || leaf == "SeqCst";
         case mir::Instruction::Kind::kAtomicExchange:
         case mir::Instruction::Kind::kAtomicFetchAdd:
-            return leaf == "Relaxed" || leaf == "Acquire" || leaf == "Release";
+            return leaf == "Relaxed" || leaf == "Acquire" || leaf == "Release" || leaf == "AcqRel" ||
+                   leaf == "SeqCst";
         default:
             return false;
     }
@@ -2751,15 +2861,39 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                    diagnostics);
                 return false;
             }
-            if (!IsAtomicScalarType(value.type)) {
+            BackendTypeInfo element_type;
+            if (!ResolveAtomicElementBackendType(*state.module,
+                                                *state.function,
+                                                instruction,
+                                                source_path,
+                                                diagnostics,
+                                                "atomic_store",
+                                                element_type)) {
+                return false;
+            }
+            if (!IsAtomicScalarType(element_type)) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission only supports scalar atomic_store element types in function '" +
                                        state.function->name + "' block '" + block.label + "'",
                                    diagnostics);
                 return false;
             }
-            output_lines.push_back("store atomic " + LLVMTypeName(value.type) + " " + value.text + ", ptr " + ptr.text + " " +
-                                   *order + ", align " + std::to_string(value.type.alignment));
+            std::string stored_value = value.text;
+            if (!EmitNumericConversion(value,
+                                       element_type,
+                                       function_index,
+                                       block_index,
+                                       instruction_index,
+                                       output_lines,
+                                       stored_value)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not coerce atomic_store value to element type in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            output_lines.push_back("store atomic " + LLVMTypeName(element_type) + " " + stored_value + ", ptr " + ptr.text + " " +
+                                   *order + ", align " + std::to_string(element_type.alignment));
             return true;
         }
 
@@ -2798,8 +2932,18 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                    diagnostics);
                 return false;
             }
-            if (!IsAtomicScalarType(value.type) ||
-                (instruction.kind == mir::Instruction::Kind::kAtomicFetchAdd && !IsIntegerType(value.type))) {
+            BackendTypeInfo element_type;
+            if (!ResolveAtomicElementBackendType(*state.module,
+                                                *state.function,
+                                                instruction,
+                                                source_path,
+                                                diagnostics,
+                                                ToString(instruction.kind),
+                                                element_type)) {
+                return false;
+            }
+            if (!IsAtomicScalarType(element_type) ||
+                (instruction.kind == mir::Instruction::Kind::kAtomicFetchAdd && !IsIntegerType(element_type))) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission only supports scalar atomic element types for '" +
                                        std::string(ToString(instruction.kind)) + "' in function '" + state.function->name +
@@ -2818,8 +2962,23 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             }
             const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
             const std::string op_name = instruction.kind == mir::Instruction::Kind::kAtomicExchange ? "xchg" : "add";
-            output_lines.push_back(temp + " = atomicrmw " + op_name + " ptr " + ptr.text + ", " + LLVMTypeName(value.type) + " " +
-                                   value.text + " " + *order + ", align " + std::to_string(value.type.alignment));
+            std::string atomic_value = value.text;
+            if (!EmitNumericConversion(value,
+                                       element_type,
+                                       function_index,
+                                       block_index,
+                                       instruction_index,
+                                       output_lines,
+                                       atomic_value)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not coerce atomic value to element type for '" +
+                                       std::string(ToString(instruction.kind)) + "' in function '" + state.function->name +
+                                       "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            output_lines.push_back(temp + " = atomicrmw " + op_name + " ptr " + ptr.text + ", " + LLVMTypeName(element_type) + " " +
+                                   atomic_value + " " + *order + ", align " + std::to_string(element_type.alignment));
             RecordExecutableValue(state, instruction.result, temp, result_type);
             return true;
         }

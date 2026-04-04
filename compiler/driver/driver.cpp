@@ -972,6 +972,8 @@ std::optional<ImportedInterfaceData> LoadImportedInterfaces(
 void AddImportedExternDeclarations(mc::mir::Module& module,
                                    const std::unordered_map<std::string, mc::sema::Module>& imported_modules);
 
+mc::mir::TypeDecl ConvertImportedTypeDecl(const mc::sema::TypeDeclSummary& type_decl);
+
 void NamespaceImportedBuildUnit(mc::mir::Module& module,
                                 std::string_view module_name);
 
@@ -1133,41 +1135,6 @@ std::string QualifyImportedSymbol(std::string_view module_name,
     return std::string(module_name) + "." + std::string(symbol_name);
 }
 
-mc::mir::TypeDecl ConvertImportedTypeDecl(const mc::sema::TypeDeclSummary& type_decl) {
-    mc::mir::TypeDecl mir_type_decl;
-    switch (type_decl.kind) {
-        case mc::ast::Decl::Kind::kStruct:
-            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kStruct;
-            break;
-        case mc::ast::Decl::Kind::kEnum:
-            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kEnum;
-            break;
-        case mc::ast::Decl::Kind::kDistinct:
-            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kDistinct;
-            break;
-        case mc::ast::Decl::Kind::kTypeAlias:
-            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kAlias;
-            break;
-        case mc::ast::Decl::Kind::kFunc:
-        case mc::ast::Decl::Kind::kExternFunc:
-        case mc::ast::Decl::Kind::kConst:
-        case mc::ast::Decl::Kind::kVar:
-            break;
-    }
-    mir_type_decl.name = type_decl.name;
-    mir_type_decl.type_params = type_decl.type_params;
-    mir_type_decl.is_packed = type_decl.is_packed;
-    mir_type_decl.fields = type_decl.fields;
-    mir_type_decl.aliased_type = type_decl.aliased_type;
-    for (const auto& variant : type_decl.variants) {
-        mc::mir::VariantDecl mir_variant;
-        mir_variant.name = variant.name;
-        mir_variant.payload_fields = variant.payload_fields;
-        mir_type_decl.variants.push_back(std::move(mir_variant));
-    }
-    return mir_type_decl;
-}
-
 void AddImportedExternDeclarations(mc::mir::Module& module,
                                    const std::unordered_map<std::string, mc::sema::Module>& imported_modules) {
     std::unordered_set<std::string> existing_types;
@@ -1247,6 +1214,41 @@ void AddImportedExternDeclarations(mc::mir::Module& module,
             }
         }
     }
+}
+
+mc::mir::TypeDecl ConvertImportedTypeDecl(const mc::sema::TypeDeclSummary& type_decl) {
+    mc::mir::TypeDecl mir_type_decl;
+    switch (type_decl.kind) {
+        case mc::ast::Decl::Kind::kStruct:
+            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kStruct;
+            break;
+        case mc::ast::Decl::Kind::kEnum:
+            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kEnum;
+            break;
+        case mc::ast::Decl::Kind::kDistinct:
+            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kDistinct;
+            break;
+        case mc::ast::Decl::Kind::kTypeAlias:
+            mir_type_decl.kind = mc::mir::TypeDecl::Kind::kAlias;
+            break;
+        case mc::ast::Decl::Kind::kFunc:
+        case mc::ast::Decl::Kind::kExternFunc:
+        case mc::ast::Decl::Kind::kConst:
+        case mc::ast::Decl::Kind::kVar:
+            break;
+    }
+    mir_type_decl.name = type_decl.name;
+    mir_type_decl.type_params = type_decl.type_params;
+    mir_type_decl.is_packed = type_decl.is_packed;
+    mir_type_decl.fields = type_decl.fields;
+    mir_type_decl.aliased_type = type_decl.aliased_type;
+    for (const auto& variant : type_decl.variants) {
+        mc::mir::VariantDecl mir_variant;
+        mir_variant.name = variant.name;
+        mir_variant.payload_fields = variant.payload_fields;
+        mir_type_decl.variants.push_back(std::move(mir_variant));
+    }
+    return mir_type_decl;
 }
 
 mc::sema::Type RewriteImportedTypeNames(mc::sema::Type type,
@@ -1377,6 +1379,9 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
                                                  const std::filesystem::path& entry_source_path) {
     auto merged = std::make_unique<mc::mir::Module>();
     std::unordered_set<std::string> seen_imports;
+    std::unordered_set<std::string> seen_types;
+    std::unordered_set<std::string> seen_functions;
+    std::unordered_set<std::string> seen_globals;
     std::unordered_set<std::string> defined_by_deps;
     for (const auto& unit : units) {
         if (unit.source_path == std::filesystem::absolute(entry_source_path).lexically_normal()) {
@@ -1388,15 +1393,31 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
                 merged->imports.push_back(import_name);
             }
         }
-        merged->type_decls.insert(merged->type_decls.end(),
-                                  unit_module.type_decls.begin(),
-                                  unit_module.type_decls.end());
-        merged->globals.insert(merged->globals.end(),
-                               unit_module.globals.begin(),
-                               unit_module.globals.end());
+        for (const auto& type_decl : unit_module.type_decls) {
+            if (!seen_types.insert(type_decl.name).second) {
+                continue;
+            }
+            merged->type_decls.push_back(type_decl);
+        }
+        for (const auto& global : unit_module.globals) {
+            mc::mir::GlobalDecl merged_global = global;
+            merged_global.names.clear();
+            for (const auto& name : global.names) {
+                if (seen_globals.insert(name).second) {
+                    merged_global.names.push_back(name);
+                }
+            }
+            if (!merged_global.names.empty()) {
+                merged->globals.push_back(std::move(merged_global));
+            }
+        }
         for (const auto& function : unit_module.functions) {
+            if (function.is_extern && !seen_functions.insert(function.name).second) {
+                continue;
+            }
             if (!function.is_extern) {
                 defined_by_deps.insert(function.name);
+                seen_functions.insert(function.name);
             }
             merged->functions.push_back(function);
         }
@@ -1407,14 +1428,34 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
             merged->imports.push_back(import_name);
         }
     }
-    merged->type_decls.insert(merged->type_decls.end(),
-                              entry_module.type_decls.begin(),
-                              entry_module.type_decls.end());
-    merged->globals.insert(merged->globals.end(),
-                           entry_module.globals.begin(),
-                           entry_module.globals.end());
+    for (const auto& type_decl : entry_module.type_decls) {
+        if (!seen_types.insert(type_decl.name).second) {
+            continue;
+        }
+        merged->type_decls.push_back(type_decl);
+    }
+    for (const auto& global : entry_module.globals) {
+        mc::mir::GlobalDecl merged_global = global;
+        merged_global.names.clear();
+        for (const auto& name : global.names) {
+            if (seen_globals.insert(name).second) {
+                merged_global.names.push_back(name);
+            }
+        }
+        if (!merged_global.names.empty()) {
+            merged->globals.push_back(std::move(merged_global));
+        }
+    }
     for (const auto& function : entry_module.functions) {
+        if (function.is_extern) {
+            if (!seen_functions.insert(function.name).second) {
+                continue;
+            }
+            merged->functions.push_back(function);
+            continue;
+        }
         if (!defined_by_deps.count(function.name)) {
+            seen_functions.insert(function.name);
             merged->functions.push_back(function);
         }
     }

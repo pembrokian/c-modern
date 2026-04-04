@@ -67,9 +67,6 @@ Checked versus release audit
 Known limitations
 -----------------
 - the supported host target set is still one hosted platform: Darwin arm64
-- the current project-mode evented networking example still uses local hosted
-  ABI declarations because imported stdlib wrapper duplication in that path is
-  not yet fully removed
 - the current networking slice is intentionally narrow: IPv4 TCP listen,
   accept, and connect plus a portable poller surface; no UDP, DNS, TLS, async
   runtime, or scheduler claims are made

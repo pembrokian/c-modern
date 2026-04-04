@@ -39,6 +39,8 @@ Repository status note
 - The repository-bounded second Phase 13 workflow tightening wave is recorded
   in
   `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_second_wave_closeout.txt`.
+- The repository-bounded post-Phase-14 cleanup wave is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase15_post_phase14_cleanup_closeout.txt`.
 - The current hosted release-hardening support statement is recorded in
   `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`.
 - The repository therefore needs an explicit "what next" plan more than it
@@ -323,9 +325,11 @@ Rank 1 -- Compiler debt from admitted waves
 - why now: both networking and the first sync wave are already landed, so the
   highest-leverage next work is to remove the bootstrap-shaped compiler
   limitations they exposed before widening the surface again
-- first tasks: keep direct field-address lowering honest in MIR, preserve the
-  compiler-owned typed `thread_spawn<T>` rewrite honestly, and narrow the
-  remaining atomic codegen rough edges exposed by the publication proof
+- status: completed for the current post-Phase-14 cleanup wave recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase15_post_phase14_cleanup_closeout.txt`
+- first tasks: keep future admitted-wave compiler debt equally narrow and
+  owner-local; do not reopen broad surface growth to fix issues already closed
+  here
 - proof target: focused compiler regressions plus updated planning docs that no
   longer describe completed waves as future work
 
@@ -372,6 +376,9 @@ Rank 5 -- Text and allocation realism follow-up
 - owner: Phase 12
 - why now: repeated parser, hashing, and future networking utilities will keep
   exposing owned-text and buffer-helper friction
+- status: borrowed-text cleanup is active through `strings.bytes(...)`, with
+  the hash, grep-lite, file-walker, and evented-echo utilities no longer
+  spelling direct `str` byte views by hand in their covered paths
 - first tasks: audit repeated owned-text or allocator boilerplate before adding
   any new helper surface
 - proof target: narrow stdlib regressions and one utility simplification that

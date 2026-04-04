@@ -503,6 +503,74 @@ void TestImportedTypedThreadSpawnLowersToRawHelper() {
     }
 }
 
+void TestDeferredImportedTypedThreadSpawnLowersToRawHelper() {
+    mc::support::DiagnosticSink diagnostics;
+
+    mc::sema::Module imported_sync;
+    mc::sema::TypeDeclSummary thread_type;
+    thread_type.kind = mc::ast::Decl::Kind::kStruct;
+    thread_type.name = "Thread";
+    thread_type.fields.push_back({"raw", mc::sema::NamedType("uintptr")});
+    imported_sync.type_decls.push_back(std::move(thread_type));
+
+    imported_sync.functions.push_back({
+        .name = "thread_spawn",
+        .type_params = {"T"},
+        .param_types = {mc::sema::ProcedureType({mc::sema::PointerType(mc::sema::NamedType("T"))}, {}),
+                        mc::sema::PointerType(mc::sema::NamedType("T"))},
+        .return_types = {mc::sema::NamedType("Thread")},
+    });
+    imported_sync.functions.push_back({
+        .name = "thread_spawn_raw",
+        .param_types = {mc::sema::NamedType("uintptr"), mc::sema::NamedType("uintptr")},
+        .return_types = {mc::sema::NamedType("Thread")},
+    });
+    mc::sema::BuildModuleLookupMaps(imported_sync);
+
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    imported_modules.emplace("sync", std::move(imported_sync));
+
+    mc::sema::CheckOptions options;
+    options.imported_modules = &imported_modules;
+
+    const auto lowered = Lower(
+        "import sync\n"
+        "\n"
+        "struct Ctx {\n"
+        "    value: i32\n"
+        "}\n"
+        "\n"
+        "func worker(ctx: *Ctx) {\n"
+        "    ignored: uintptr = (uintptr)(ctx)\n"
+        "    if ignored == 99 {\n"
+        "        return\n"
+        "    }\n"
+        "}\n"
+        "\n"
+        "func main() {\n"
+        "    ctx: Ctx = Ctx{ value: 7 }\n"
+        "    defer sync.thread_spawn<Ctx>(worker, &ctx)\n"
+        "}\n",
+        options,
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("deferred imported typed thread_spawn lowering should succeed:\n" + diagnostics.Render());
+    }
+    if (!mc::mir::ValidateModule(*lowered.module, "<mir-test>", diagnostics)) {
+        Fail("validator should accept deferred imported typed thread_spawn lowering:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("call target=sync.thread_spawn target_kind=function target_name=sync.thread_spawn") != std::string::npos) {
+        Fail("deferred typed thread_spawn must not fall back to a generic imported call");
+    }
+    if (dump.find("target=sync.thread_spawn_raw") == std::string::npos ||
+        dump.find("pointer_to_int") == std::string::npos) {
+        Fail("deferred typed thread_spawn should lower through the raw helper with explicit uintptr conversions");
+    }
+}
+
 void TestGlobalAddressLoweringUsesExplicitLocalAddr() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
@@ -2339,6 +2407,54 @@ void TestValidatorRejectsAtomicCompareExchangeMissingOrderMetadata() {
     }
 }
 
+void TestValidatorRejectsInvalidAtomicLoadOrder() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::sema::Type atomic_i32 = mc::sema::NamedType("Atomic");
+    atomic_i32.subtypes.push_back(mc::sema::NamedType("i32"));
+
+    mc::mir::Function function;
+    function.name = "broken_atomic_load_order";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v0",
+                .type = mc::sema::PointerType(atomic_i32),
+                .target = "atom",
+                .target_kind = mc::mir::Instruction::TargetKind::kOther,
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("MemoryOrder"),
+                .op = "release",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kAtomicLoad,
+                .result = "%v2",
+                .type = mc::sema::NamedType("i32"),
+                .atomic_order = "MemoryOrder.Release",
+                .target = "atomic_load",
+                .operands = {"%v0", "%v1"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject invalid atomic_load MemoryOrder metadata");
+    }
+    if (diagnostics.Render().find("atomic_load uses unsupported MemoryOrder metadata") == std::string::npos) {
+        Fail("validator should explain invalid atomic_load MemoryOrder metadata");
+    }
+}
+
 void TestValidatorRejectsBufferNewNonAllocatorOperand() {
     mc::support::DiagnosticSink diagnostics;
     mc::mir::Module module;
@@ -2886,6 +3002,7 @@ int main() {
     TestImportedModuleVariantMatchLowersQualifiedVariants();
     TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes();
     TestImportedTypedThreadSpawnLowersToRawHelper();
+    TestDeferredImportedTypedThreadSpawnLowersToRawHelper();
     TestGlobalAddressLoweringUsesExplicitLocalAddr();
     TestAddressOfFieldLowersForDirectAggregateBase();
     TestMixedBindingOrAssignmentUsesSemanticClassification();
@@ -2936,6 +3053,7 @@ int main() {
     TestValidatorRejectsShiftWithoutShiftCheck();
     TestValidatorRejectsConvertNumericBadTargetMetadata();
     TestValidatorRejectsAtomicCompareExchangeMissingOrderMetadata();
+    TestValidatorRejectsInvalidAtomicLoadOrder();
     TestValidatorRejectsBufferNewNonAllocatorOperand();
     TestValidatorRejectsBufferFreeNonBufferOperand();
     TestValidatorRejectsArenaNewNonArenaOperand();

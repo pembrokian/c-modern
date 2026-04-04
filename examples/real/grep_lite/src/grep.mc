@@ -3,6 +3,7 @@ export { contains, count_matches, run }
 import fs
 import io
 import mem
+import strings
 
 func contains(text: str, needle: str) bool {
     if needle.len == 0 {
@@ -12,8 +13,8 @@ func contains(text: str, needle: str) bool {
         return false
     }
 
-    text_bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
-    needle_bytes: Slice<u8> = Slice<u8>{ ptr: needle.ptr, len: needle.len }
+    text_bytes: Slice<u8> = strings.bytes(text)
+    needle_bytes: Slice<u8> = strings.bytes(needle)
     start: usize = 0
     limit: usize = text.len - needle.len
     while start <= limit {
@@ -39,7 +40,7 @@ func count_matches(text: str, needle: str) usize {
         return 0
     }
 
-    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
+    bytes: Slice<u8> = strings.bytes(text)
     count: usize = 0
     start: usize = 0
     while start < text.len {
@@ -69,7 +70,7 @@ func print_matches(text: str, needle: str) usize {
         return 0
     }
 
-    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
+    bytes: Slice<u8> = strings.bytes(text)
     printed: usize = 0
     start: usize = 0
     while start < text.len {

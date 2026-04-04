@@ -27,8 +27,8 @@ What landed
   the actual project graph instead of a duplicated test-only copy
 - the evented-echo project now includes a small exported helper module
   `echo_core` so the networking family pressures the ordinary multi-module
-  workflow honestly without reintroducing the earlier imported-stdlib-wrapper
-  bootstrap workaround into the test surface
+  workflow honestly while ordinary project code continues to use the admitted
+  imported stdlib wrappers in the main server path
 - the Phase 7 tool regression suite now proves deterministic networking
   project workflow for the new capability family by:
   - starting the server through `mc run --project ...`
@@ -39,9 +39,6 @@ What landed
 
 Bounded exclusions kept explicit
 --------------------------------
-- this closeout does not claim the earlier project-mode imported-stdlib-wrapper
-  duplication limiter is fully removed; the admitted evented-echo project still
-  uses local hosted ABI declarations for its runtime boundary
 - this closeout does not claim broader target-model expansion beyond hosted
   executables plus hosted checked tests
 - this closeout does not replace the focused executable harness; it adds the

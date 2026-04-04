@@ -23,10 +23,8 @@ func shared_value_ptr() *ValueAtomic {
 }
 
 func producer(status: *i32) {
-    published_value: i32 = 42
-    ready_value: u32 = 1
-    sync.atomic_store<i32>(shared_value_ptr(), published_value, sync.MemoryOrder.Relaxed)
-    sync.atomic_store<u32>(ready_ptr(), ready_value, sync.MemoryOrder.Release)
+    sync.atomic_store<i32>(shared_value_ptr(), 42, sync.MemoryOrder.Relaxed)
+    sync.atomic_store<u32>(ready_ptr(), 1, sync.MemoryOrder.Release)
     *status = 0
 }
 

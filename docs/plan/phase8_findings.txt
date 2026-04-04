@@ -126,12 +126,12 @@ single-threaded evented echo server
 	so the former Phase 6 owner gap is closed for the lead evented echo entry
 - What it exposed: the first honest hosted networking slice currently works
 	best with plain `i32` handles and caller-owned parallel poller output
-	buffers rather than the cleaner long-term `File` plus `Event` surface, and
-	project-mode imported stdlib wrappers still duplicate `errors.is_ok` in MIR
-	for this path
+	buffers rather than the cleaner long-term `File` plus `Event` surface
+
 - Owner: Phase 6 `io` and `net` boundary work landed the needed runtime and
-	stdlib support; the remaining project-mode imported-wrapper duplication is a
-	compiler owner issue rather than an example-local problem
+	stdlib support; the project-mode imported-wrapper duplication that first
+	appeared here is now closed as compiler debt rather than remaining an
+	example-local limitation
 - Proof: `examples/real/evented_echo/build.toml` exercised by
 	`phase14_evented_echo_project_build` in
 	`tests/codegen/codegen_executable_tests.cpp`
@@ -210,8 +210,7 @@ atomic flag publication
 - Proof: examples/canonical/atomic_flag_publication.mc now builds and runs in
 	tests/codegen/codegen_executable_tests.cpp
 - Remaining limit: the current admitted slice still excludes exchange,
-	compare-exchange, fetch-add, condvar broadcast, and the fuller backend cleanup
-	needed to make literal atomic stores as direct as the long-term surface wants
+	compare-exchange, fetch-add, and condvar broadcast
 
 Deferred next-wave canonical candidates
 ---------------------------------------

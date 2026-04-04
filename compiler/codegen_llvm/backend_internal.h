@@ -244,6 +244,12 @@ inline std::optional<std::string> LLVMAtomicOrderKeyword(std::string_view order_
     if (leaf == "Release") {
         return "release";
     }
+    if (leaf == "AcqRel") {
+        return "acq_rel";
+    }
+    if (leaf == "SeqCst") {
+        return "seq_cst";
+    }
     return std::nullopt;
 }
 

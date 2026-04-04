@@ -2,6 +2,8 @@ enum MemoryOrder {
     Relaxed,
     Acquire,
     Release,
+    AcqRel,
+    SeqCst,
 }
 
 struct Atomic<T> {}
@@ -34,8 +36,8 @@ func volatile_roundtrip(ptr: *i32, value: i32) i32 {
 }
 
 func atomic_demo(ptr: *Atomic<i32>, value: i32) i32 {
-    atomic_store(ptr, value, MemoryOrder.Release)
-    loaded: i32 = atomic_load(ptr, MemoryOrder.Acquire)
-    swapped: i32 = atomic_exchange(ptr, loaded, MemoryOrder.Acquire)
-    return atomic_fetch_add(ptr, swapped, MemoryOrder.Release)
+    atomic_store(ptr, value, MemoryOrder.SeqCst)
+    loaded: i32 = atomic_load(ptr, MemoryOrder.SeqCst)
+    swapped: i32 = atomic_exchange(ptr, loaded, MemoryOrder.AcqRel)
+    return atomic_fetch_add(ptr, swapped, MemoryOrder.SeqCst)
 }

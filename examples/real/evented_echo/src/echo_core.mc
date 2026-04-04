@@ -1,11 +1,13 @@
 export { parse_port }
 
+import strings
+
 func parse_port(text: str) (u16, uintptr) {
     if text.len == 0 {
         return 0, 1
     }
 
-    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
+    bytes: Slice<u8> = strings.bytes(text)
     value: u32 = 0
     index: usize = 0
     while index < bytes.len {
