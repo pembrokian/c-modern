@@ -187,24 +187,31 @@ shared counter with mutex
 
 producer-consumer with condition variable
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Classification: stdlib or runtime gap
-- Enabling gap: no admitted `sync.Condvar` surface, no hosted threading path,
-	and no proved wait-and-reacquire semantics on the current hosted slice
-- Owner: Phase 6 `sync` admission
-- Phase 14B decision: keep distinct from the mutex case because condvar
-	semantics are a separate acceptance pressure, not just a larger test
+- Status: implemented
+- Classification: executable proof landed
+- Resolution: admitted a narrow hosted `sync.Condvar` surface with init, wait,
+	and signal, then proved two-sided wait-and-reacquire coordination through a
+	direct-source producer-consumer handoff that blocks both sides under one
+	mutex and one condition variable before deterministic join
+- Proof: examples/canonical/producer_consumer_condvar.mc now builds and runs
+	in tests/codegen/codegen_executable_tests.cpp
+- Remaining limit: atomic publication remains a separate deferred sync entry;
+	this condvar follow-on still does not admit broadcast, destroy, or broader
+	scheduler claims
 
 atomic flag publication
 ~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Classification: stdlib gap
-- Enabling gap: bootstrap compiler support for atomics exists, but no admitted
-	portable `sync` atomic library surface exposes ordinary program-facing
-	memory-order operations
-- Owner: Phase 6 `sync` surface maturity, not a new MIR or backend design pass
-- Phase 14B decision: keep atomics separate from volatile and MMIO pressure so
-	the repository does not blur hardware ordering with thread synchronization
+- Status: implemented
+- Classification: executable proof landed
+- Resolution: admitted a narrow hosted `sync` atomic surface with
+	`MemoryOrder`, `Atomic<T>`, `atomic_load`, and `atomic_store`, restored the
+	typed `thread_spawn<T>` surface through compiler-owned lowering, and proved
+	release-acquire flag publication in a direct-source canonical executable
+- Proof: examples/canonical/atomic_flag_publication.mc now builds and runs in
+	tests/codegen/codegen_executable_tests.cpp
+- Remaining limit: the current admitted slice still excludes exchange,
+	compare-exchange, fetch-add, destroy APIs, and the fuller backend cleanup
+	needed to make literal atomic stores as direct as the long-term surface wants
 
 Deferred next-wave canonical candidates
 ---------------------------------------

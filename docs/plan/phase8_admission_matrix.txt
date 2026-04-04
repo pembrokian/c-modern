@@ -304,28 +304,33 @@ shared counter with mutex
 
 producer-consumer with condition variable
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Packaging: dedicated project fixture once `sync` condvar support is admitted
+- Status: implemented
+- Packaging: direct-source canonical executable under
+	`examples/canonical/producer_consumer_condvar.mc`
 - Pressure focus: blocking coordination, wait-and-reacquire semantics, and
 	bounded userland queues on top of primitive synchronization
-- Enabling gap: no admitted `sync.Condvar` surface, no hosted threading
-	boundary, and no project-level proof posture for this concurrency family
-- Phase 14A note: blocked behind the same deferred `sync` module family as the
-	mutex example, with additional condvar semantics still outside the current
-	repository slice
+- Admitted slice: hosted pthread-backed runtime support plus the narrow
+	`stdlib/sync.mc` API for `Thread`, `Mutex`, `Condvar`, `thread_spawn`,
+	`thread_join`, `mutex_init`, `mutex_lock`, `mutex_unlock`, `condvar_init`,
+	`condvar_wait`, and `condvar_signal`
+- Phase 14A note: this follow-on keeps the sync family narrow by proving one
+	condvar handoff without admitting atomic publication, broadcast, or destroy
+	surface work in parallel
 
 atomic flag publication
 ~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Packaging: direct-source or dedicated project fixture once atomics are
-	admitted through `sync`
+- Status: implemented
+- Packaging: direct-source canonical executable under
+	`examples/canonical/atomic_flag_publication.mc`
 - Pressure focus: explicit memory-order semantics, release-acquire
 	publication, and the separation between atomics and volatile/MMIO behavior
-- Enabling gap: while the compiler and MIR have bootstrap atomic support, the
-	repository does not yet admit a portable `sync` atomic library surface for
-	ordinary Phase 8 programs
-- Phase 14A note: blocked on honest Phase 6 `sync` surface admission, not on
-	the lack of low-level compiler hooks
+- Admitted slice: narrow hosted `sync` support for `MemoryOrder`, `Atomic<T>`,
+	`atomic_load`, and `atomic_store`, proved through a release-acquire flag
+	publication executable that also exercises the restored typed
+	`thread_spawn<T>` surface
+- Phase 14A note: this follow-on keeps the sync family narrow by proving one
+	publication pattern without admitting exchange, compare-exchange, fetch-add,
+	broadcast, or destroy-surface work in parallel
 
 Real utility candidates for later Phase 8 work
 ----------------------------------------------

@@ -1703,6 +1703,20 @@ class Checker {
             return *builtin_member;
         }
 
+        const Type stripped_base = StripType(raw_base, *module_, TypeStripMode::kAliasesOnly);
+        if (stripped_base.kind == Type::Kind::kNamed) {
+            if (const auto* type_decl = FindTypeDecl(*module_, stripped_base.name);
+                type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
+                for (const auto& variant : type_decl->variants) {
+                    if (variant.name == member_name) {
+                        return stripped_base;
+                    }
+                }
+                Report(span, "type " + type_decl->name + " has no field named " + std::string(member_name));
+                return UnknownType();
+            }
+        }
+
         const TypeDeclSummary* type_decl = LookupStructType(raw_base);
         if (type_decl != nullptr) {
             for (const auto& field : type_decl->fields) {
@@ -1737,6 +1751,13 @@ class Checker {
     Type AnalyzeQualifiedImportedModuleMember(const Expr& expr, const Module& imported_module) {
         if (const auto* function = FindFunctionSignature(imported_module, expr.secondary_text); function != nullptr) {
             return InstantiateFunctionType(*function, expr, CombineQualifiedName(expr));
+        }
+        if (const auto* type_decl = FindTypeDecl(imported_module, QualifyImportedName(expr.text, expr.secondary_text)); type_decl != nullptr) {
+            if (!expr.type_args.empty()) {
+                Report(expr.span, "type arguments apply only to functions: " + CombineQualifiedName(expr));
+                return UnknownType();
+            }
+            return NamedType(type_decl->name);
         }
         if (const auto* global = FindGlobalSummary(imported_module, expr.secondary_text); global != nullptr) {
             if (!expr.type_args.empty()) {

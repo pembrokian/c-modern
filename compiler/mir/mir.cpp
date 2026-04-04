@@ -703,6 +703,16 @@ sema::Type ProcedureResultType(const sema::Type& type) {
     return sema::TupleType(returns);
 }
 
+std::vector<sema::Type> CallReturnTypes(const sema::Type& result_type) {
+    if (result_type.kind == sema::Type::Kind::kVoid) {
+        return {};
+    }
+    if (result_type.kind == sema::Type::Kind::kTuple) {
+        return result_type.subtypes;
+    }
+    return {result_type};
+}
+
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name) {
     // Bootstrap MIR still uses linear declaration scans here. Module sizes are
     // small, and a dedicated lookup table can be added when MIR metadata grows.
@@ -725,6 +735,30 @@ const GlobalDecl* FindMirGlobalDecl(const Module& module, std::string_view name)
         }
     }
     return nullptr;
+}
+
+std::optional<sema::Type> FindMirFieldType(const Module& module,
+                                           const sema::Type& base_type,
+                                           std::string_view field_name) {
+    const auto builtin_fields = sema::BuiltinAggregateFields(base_type);
+    for (const auto& field : builtin_fields) {
+        if (field.first == field_name) {
+            return field.second;
+        }
+    }
+
+    const sema::Type canonical_base = StripMirAliasOrDistinct(module, sema::CanonicalizeBuiltinType(base_type));
+    if (canonical_base.kind == sema::Type::Kind::kNamed) {
+        if (const auto* type_decl = FindMirTypeDecl(module, canonical_base.name)) {
+            for (const auto& field : type_decl->fields) {
+                if (field.first == field_name) {
+                    return field.second;
+                }
+            }
+        }
+    }
+
+    return std::nullopt;
 }
 
 const Function* FindMirFunction(const Module& module, std::string_view name) {
@@ -1090,6 +1124,61 @@ class FunctionLowerer {
         return RenderCompareExchangeFailureOrder(expr);
     }
 
+    bool IsTypedThreadSpawnCall(const Expr& expr) const {
+        if (expr.left == nullptr || expr.left->kind != Expr::Kind::kQualifiedName) {
+            return false;
+        }
+        return expr.left->text == "sync" && expr.left->secondary_text == "thread_spawn";
+    }
+
+    bool EmitTypedThreadSpawnCall(const Expr& expr,
+                                  const std::vector<ValueInfo>& args,
+                                  const sema::Type& result_type,
+                                  bool wants_result,
+                                  ValueInfo* result) {
+        if (!IsTypedThreadSpawnCall(expr)) {
+            return false;
+        }
+        if (args.size() != 2) {
+            Report(expr.span, "sync.thread_spawn expects exactly two arguments");
+            return true;
+        }
+
+        const sema::Type uintptr_type = sema::NamedType("uintptr");
+        const ValueInfo entry = EmitConvertValue(args[0], uintptr_type);
+        const ValueInfo ctx = EmitConvertValue(args[1], uintptr_type);
+        const sema::Type raw_callee_type = sema::ProcedureType({uintptr_type, uintptr_type}, CallReturnTypes(result_type));
+        const std::string raw_target_name = "sync.thread_spawn_raw";
+        const std::string callee_value = NewValue();
+        Emit({
+            .kind = Instruction::Kind::kSymbolRef,
+            .result = callee_value,
+            .type = raw_callee_type,
+            .target = raw_target_name,
+            .target_kind = Instruction::TargetKind::kFunction,
+            .target_name = raw_target_name,
+            .target_display = raw_target_name,
+        });
+
+        Instruction call {
+            .kind = Instruction::Kind::kCall,
+            .type = result_type,
+            .target = raw_target_name,
+            .target_kind = Instruction::TargetKind::kFunction,
+            .target_name = raw_target_name,
+            .target_display = raw_target_name,
+            .operands = {callee_value, entry.value, ctx.value},
+        };
+        if (wants_result) {
+            call.result = NewValue();
+        }
+        Emit(std::move(call));
+        if (wants_result && result != nullptr) {
+            *result = {function_.blocks[*current_block_].instructions.back().result, result_type};
+        }
+        return true;
+    }
+
     bool EmitSpecialCallInstruction(const TargetMetadata& target_metadata,
                                     SpecialCallKind kind,
                                     const std::vector<ValueInfo>& args,
@@ -1276,6 +1365,9 @@ class FunctionLowerer {
 
         const sema::Type call_type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "statement call result type");
         if (TryEmitVariantInit(expr, args, call_type, false, nullptr)) {
+            return;
+        }
+        if (EmitTypedThreadSpawnCall(expr, args, call_type, false, nullptr)) {
             return;
         }
         if (TryEmitSpecialCall(expr, args, call_type, false, nullptr)) {
@@ -1834,6 +1926,66 @@ class FunctionLowerer {
                         return {value, type};
                     }
 
+                    if (expr.left->kind == Expr::Kind::kQualifiedName) {
+                        StoreBaseMetadata base_storage;
+                        if (local_types_.contains(expr.left->text)) {
+                            base_storage = {
+                                .kind = Instruction::StorageBaseKind::kLocal,
+                                .name = expr.left->text,
+                            };
+                        } else if (InferTargetKindForExpr(*expr.left) == Instruction::TargetKind::kGlobal) {
+                            base_storage = {
+                                .kind = Instruction::StorageBaseKind::kGlobal,
+                                .name = CombineQualifiedName(*expr.left),
+                            };
+                        }
+                        if (base_storage.kind != Instruction::StorageBaseKind::kNone) {
+                            const sema::Type base_type = base_storage.kind == Instruction::StorageBaseKind::kLocal
+                                                             ? KnownTypeOrError(local_types_.at(expr.left->text),
+                                                                                expr.left->span,
+                                                                                "address-of qualified field base type")
+                                                             : KnownTypeOrError(ExprTypeOrUnknown(*expr.left),
+                                                                                expr.left->span,
+                                                                                "address-of qualified field base type");
+                            const std::string value = NewValue();
+                            Emit({
+                                .kind = Instruction::Kind::kLocalAddr,
+                                .result = value,
+                                .type = type,
+                                .target = CombineQualifiedName(*expr.left),
+                                .target_kind = Instruction::TargetKind::kField,
+                                .target_name = expr.left->secondary_text,
+                                .target_display = CombineQualifiedName(*expr.left),
+                                .target_base_storage = base_storage.kind,
+                                .target_base_name = base_storage.name,
+                                .target_base_type = base_type,
+                            });
+                            return {value, type};
+                        }
+                    }
+
+                    if (expr.left->kind == Expr::Kind::kField && expr.left->left != nullptr) {
+                        const StoreBaseMetadata base_storage = StoreBaseMetadataForExpr(*expr.left->left);
+                        if (base_storage.kind != Instruction::StorageBaseKind::kNone) {
+                            const std::string value = NewValue();
+                            Emit({
+                                .kind = Instruction::Kind::kLocalAddr,
+                                .result = value,
+                                .type = type,
+                                .target = RenderExprInline(*expr.left),
+                                .target_kind = Instruction::TargetKind::kField,
+                                .target_name = expr.left->text,
+                                .target_display = RenderExprInline(*expr.left),
+                                .target_base_storage = base_storage.kind,
+                                .target_base_name = base_storage.name,
+                                .target_base_type = KnownTypeOrError(ExprTypeOrUnknown(*expr.left->left),
+                                                                     expr.left->left->span,
+                                                                     "address-of field base type"),
+                            });
+                            return {value, type};
+                        }
+                    }
+
                     if (expr.left->kind == Expr::Kind::kParen && expr.left->left != nullptr) {
                         Report(expr.span,
                                "not yet supported in MIR: address-of " + std::string(ToString(expr.left->left->kind)) + " expression");
@@ -1891,6 +2043,10 @@ class FunctionLowerer {
                 if (TryEmitVariantInit(expr, args, type, true, &variant_init_result)) {
                     return variant_init_result;
                 }
+                ValueInfo typed_thread_spawn_result;
+                if (EmitTypedThreadSpawnCall(expr, args, type, true, &typed_thread_spawn_result)) {
+                    return typed_thread_spawn_result;
+                }
                 ValueInfo special_result;
                 if (TryEmitSpecialCall(expr, args, type, true, &special_result)) {
                     return special_result;
@@ -1916,9 +2072,32 @@ class FunctionLowerer {
             }
             case Expr::Kind::kField:
             case Expr::Kind::kDerefField: {
+                const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "field expression type");
+                if (expr.kind == Expr::Kind::kField && expr.left != nullptr) {
+                    const sema::Type selector_type = StripMirAliasOrDistinct(module_, ExprTypeOrUnknown(*expr.left));
+                    if (selector_type.kind == sema::Type::Kind::kNamed) {
+                        const TypeDecl* type_decl = FindMirTypeDecl(module_, selector_type.name);
+                        if (type_decl != nullptr && !type_decl->variants.empty()) {
+                            for (const auto& variant : type_decl->variants) {
+                                if (variant.name == expr.text) {
+                                    const std::string value = NewValue();
+                                    Emit({
+                                        .kind = Instruction::Kind::kSymbolRef,
+                                        .result = value,
+                                        .type = type,
+                                        .target = expr.text,
+                                        .target_kind = Instruction::TargetKind::kOther,
+                                        .target_name = expr.text,
+                                        .target_display = RenderExprInline(expr),
+                                    });
+                                    return {value, type};
+                                }
+                            }
+                        }
+                    }
+                }
                 const auto base = LowerExpr(*expr.left);
                 const std::string value = NewValue();
-                const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "field expression type");
                 const std::string target_display = RenderExprInline(expr);
                 Emit({
                     .kind = Instruction::Kind::kField,
@@ -3614,6 +3793,35 @@ bool ValidateModule(const Module& module,
                             }
                             break;
                         }
+                        if (instruction.target_kind == Instruction::TargetKind::kField) {
+                            if (instruction.target_name.empty()) {
+                                report("local_addr field target must record target_name metadata in function " + function.name);
+                                break;
+                            }
+                            if (instruction.target_base_storage != Instruction::StorageBaseKind::kLocal &&
+                                instruction.target_base_storage != Instruction::StorageBaseKind::kGlobal) {
+                                report("local_addr field target must record direct local/global base storage in function " + function.name);
+                                break;
+                            }
+                            if (instruction.target_base_name.empty()) {
+                                report("local_addr field target must record a base name in function " + function.name);
+                                break;
+                            }
+                            if (sema::IsUnknown(instruction.target_base_type)) {
+                                report("local_addr field target must record a base type in function " + function.name);
+                                break;
+                            }
+                            const auto field_type = FindMirFieldType(module, instruction.target_base_type, instruction.target_name);
+                            if (!field_type.has_value()) {
+                                report("local_addr could not resolve field '" + instruction.target_name + "' in function " + function.name);
+                                break;
+                            }
+                            if (instruction.type.subtypes.front() != *field_type) {
+                                report("local_addr field type mismatch in function " + function.name + " for " + instruction.target + ": expected *" +
+                                       sema::FormatType(*field_type) + ", got " + sema::FormatType(instruction.type));
+                            }
+                            break;
+                        }
                         if (instruction.target_kind != Instruction::TargetKind::kNone) {
                             report("local_addr uses unsupported target kind in function " + function.name + ": " +
                                    std::string(ToString(instruction.target_kind)));
@@ -4170,6 +4378,17 @@ bool ValidateModule(const Module& module,
                                             report("field result type mismatch in function " + function.name + " for " + std::string(field_name));
                                         }
                                         break;
+                                    }
+                                }
+                                if (!found_field && !type_decl->variants.empty()) {
+                                    for (const auto& variant : type_decl->variants) {
+                                        if (variant.name == field_name) {
+                                            found_field = true;
+                                            if (instruction.type != base_type) {
+                                                report("field result type mismatch in function " + function.name + " for " + std::string(field_name));
+                                            }
+                                            break;
+                                        }
                                     }
                                 }
                                 if (!found_field) {

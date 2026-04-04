@@ -155,85 +155,115 @@ Current Step 2 decision
 -----------------------
 - The repository has completed the current-surface Phase 8 closeout work that
   preceded the next Phase 12 breadth decision.
-- The chosen next capability family is Option A from
-  `/Users/ro/dev/c_modern/docs/plan/admin/post_phase14_execution_plan.txt`:
-  portable `io` poller plus narrow `net`.
-- Narrow `sync` plus hosted thread boundary remains the next fallback after
-  Option A if networking stalls or repository goals change, but it is not to
-  be implemented in parallel with the chosen networking wave.
+- Option A from
+  `/Users/ro/dev/c_modern/docs/plan/admin/post_phase14_execution_plan.txt`
+  is now implemented: portable `io` poller plus narrow `net`.
+- The first narrow hosted `sync` slice has also now been admitted as the next
+  follow-up wave: hosted thread spawn or join plus mutex.
+- No further capability family is selected yet; immediate next work is
+  compiler-debt closeout and documentation alignment before wider `sync`,
+  `hal`, or other module breadth.
 
 Current Step 3 follow-up decision
 ---------------------------------
 - The repository has now completed the narrow hosted networking wave and its
   first workflow-tightening follow-up.
-- The next admitted capability family is now the first narrow `sync` slice:
+- The repository has now also completed the first narrow `sync` slice:
   hosted thread spawn and join plus mutex.
-- Condition variables and atomics remain explicitly deferred until the mutex
-  proof and owner slice are stable.
+- Immediate follow-up work is compiler-debt closeout and doc alignment, not a
+  broad new capability-family admission.
+- Condition variables are now admitted, and a narrow atomic-publication proof
+  is now admitted as well; broader sync widening remains deferred until a new
+  consumer justifies it.
 
 Chosen narrow sync consumer matrix
 ----------------------------------
 - lead canonical proof: shared counter with mutex
-- deferred follow-on once mutex semantics are honest: producer-consumer with
+- admitted follow-on once mutex semantics were honest: producer-consumer with
   condition variable
-- separately deferred follow-on: atomic flag publication after a narrow
-  ordinary `Atomic<T>` surface is stated honestly
+- admitted second follow-on once the compiler boundary was narrowed: atomic
+  flag publication with explicit release-acquire ordering
 
 Chosen narrow sync API surface
 ------------------------------
 - `struct Thread`
 - `struct Mutex`
-- `func thread_spawn(entry: uintptr, ctx: uintptr) (Thread, Error)`
+- `struct Condvar`
+- `enum MemoryOrder`
+- `struct Atomic<T>`
+- `func thread_spawn<T>(entry: func(*T), ctx: *T) (Thread, Error)`
 - `func thread_join(thread: Thread) Error`
 - `func mutex_init() (Mutex, Error)`
 - `func mutex_lock(mu: *Mutex) Error`
 - `func mutex_unlock(mu: *Mutex) Error`
+- `func condvar_init() (Condvar, Error)`
+- `func condvar_wait(cv: *Condvar, mu: *Mutex) Error`
+- `func condvar_signal(cv: *Condvar) Error`
+- `func atomic_load<T>(ptr: *Atomic<T>, order: MemoryOrder) T`
+- `func atomic_store<T>(ptr: *Atomic<T>, value: T, order: MemoryOrder)`
 
 First-wave hosted ownership notes
 ---------------------------------
 - the first repository-owned sync slice is hosted only and is expected to map
   to pthread-backed runtime support under `runtime/hosted/`
-- thread entrypoints remain ordinary language functions, but the current
-  bootstrap surface passes them through explicit `uintptr` casts at the
-  callsite because imported generic function signatures with procedure-typed
-  parameters are not yet honest enough for the admitted slice
+- thread entrypoints remain ordinary language functions; the current bootstrap
+  implementation preserves the typed `thread_spawn<T>` surface by lowering it
+  through a compiler-owned rewrite to a raw hosted helper while broader
+  imported generic procedure-call lowering remains deferred
 - mutex initialization and lock or unlock stay explicit API calls; the first
   admitted slice does not rely on zero-initialized mutex state
-- condvars and portable atomics are intentionally out of scope for this first
-  sync wave so the shared-counter proof stays focused on thread spawn, join,
-  and mutex happens-before edges
+- the first admitted slice stayed mutex-only on purpose; the current follow-on
+  first added `Condvar` init, wait, and signal for producer-consumer pressure,
+  then added a narrow `Atomic<T>` plus `MemoryOrder` surface for publication
+  without reopening destroy, broadcast, or read-modify-write surface work
 
 Chosen proof layer for the sync wave
 ------------------------------------
 - focused executable canonical proof for shared counter with mutex under
   `/Users/ro/dev/c_modern/examples/canonical/` plus deterministic execution in
   `/Users/ro/dev/c_modern/tests/codegen/`
+- focused executable follow-on proof for producer-consumer handoff under
+  `/Users/ro/dev/c_modern/examples/canonical/producer_consumer_condvar.mc`,
+  wired into the same deterministic executable coverage
+- focused executable atomic-publication proof under
+  `/Users/ro/dev/c_modern/examples/canonical/atomic_flag_publication.mc`,
+  wired into the same deterministic executable coverage
 - focused stdlib proof only if the admitted `sync` API exposes behavior that
   can be isolated more narrowly than the full canonical program
-- no broader project-mode or condvar proof in the first sync slice
+- no broader project-mode scheduler proof and no broader atomic read-modify-
+  write proof in this follow-on
 
 Explicit exclusions for the narrow sync wave
 --------------------------------------------
-- no `Condvar` admission in parallel with the first mutex wave
-- no `Atomic<T>` surface in parallel with the first mutex wave
+- no `atomic_exchange`, `atomic_compare_exchange`, or `atomic_fetch_add`
+  surface in this follow-on
+- no condvar broadcast or destroy surface in this follow-on
+- no mutex destroy surface in this follow-on
 - no scheduler, async runtime, green threads, or task abstraction
 - no thread-local storage or OS-facing process control grab bag under `sync`
 - no claim of non-hosted or multi-platform threading support in this wave
 
 Current implemented bootstrap sync slice
 ----------------------------------------
-- the repository now admits `stdlib/sync.mc` for hosted thread spawn or join
-  plus mutex init, lock, and unlock
-- the admitted proof layer is the direct-source canonical executable
-  `/Users/ro/dev/c_modern/examples/canonical/shared_counter_mutex.mc`, wired
-  into deterministic executable coverage under
+- the repository now admits `stdlib/sync.mc` for hosted typed thread spawn or
+  join, mutex init or lock or unlock, condvar init or wait or signal, and the
+  narrow `MemoryOrder` plus `Atomic<T>` load or store surface used by the
+  atomic-publication proof
+- the admitted proof layer is the pair of direct-source canonical executables
+  `/Users/ro/dev/c_modern/examples/canonical/shared_counter_mutex.mc` and
+  `/Users/ro/dev/c_modern/examples/canonical/producer_consumer_condvar.mc`,
+  plus `/Users/ro/dev/c_modern/examples/canonical/atomic_flag_publication.mc`,
+  all wired into deterministic executable coverage under
   `/Users/ro/dev/c_modern/tests/codegen/codegen_executable_tests.cpp`
 - the current bootstrap implementation stores opaque hosted pointers in
-  `Thread` and `Mutex`; thread backing allocations are released on join, while
-  mutex backing allocations currently remain process-lifetime because the
-  repository has not yet justified a broader destroy API
-- condition variables and portable atomics remain separate deferred follow-on
-  work rather than implicit parts of this first sync admission
+  `Thread`, `Mutex`, and `Condvar`; thread backing allocations are released on
+  join, while mutex and condvar backing allocations currently remain
+  process-lifetime because the repository has not yet justified broader
+  destroy APIs
+- the current publication proof stays deliberately narrow: it proves release-
+  acquire flag publication through admitted atomic load or store operations,
+  while broader read-modify-write atomics and remaining literal-width codegen
+  cleanup stay separate follow-on work
 
 Chosen next-wave consumer matrix
 --------------------------------

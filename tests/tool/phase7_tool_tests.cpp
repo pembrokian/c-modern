@@ -356,6 +356,37 @@ std::string ReadExactFromSocket(int fd,
     return data;
 }
 
+void ExerciseEventedEchoRoundTrip(const std::filesystem::path& mc_path,
+                                  const std::filesystem::path& project_path,
+                                  const std::filesystem::path& build_dir,
+                                  uint16_t port,
+                                  std::string_view output_name,
+                                  const std::string& context) {
+    const BackgroundProcess run_process = SpawnBackgroundCommand({mc_path.generic_string(),
+                                                                  "run",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--",
+                                                                  std::to_string(port)},
+                                                                 build_dir / std::string(output_name),
+                                                                 context);
+
+    const std::string request = "phase13-echo";
+    const int client_fd = ConnectLoopbackWithRetry(port, 3000, "connect to " + context);
+    WriteAllToSocket(client_fd, request, "write request to " + context);
+    const std::string reply = ReadExactFromSocket(client_fd,
+                                                  request.size(),
+                                                  "read reply from " + context);
+    CloseFd(client_fd);
+    if (reply != request) {
+        Fail(context + ": server returned unexpected payload: '" + reply + "'");
+    }
+
+    ExpectBackgroundProcessSuccess(run_process, 3000, "wait for " + context);
+}
+
 void TestHelpMentionsRun(const std::filesystem::path& binary_root,
                          const std::filesystem::path& mc_path) {
     const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(), "--help"},
@@ -1508,30 +1539,12 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
     const std::filesystem::path build_dir = binary_root / "phase13_evented_echo_build";
     std::filesystem::remove_all(build_dir);
 
-    const uint16_t port = ReserveLoopbackPort();
-    const BackgroundProcess run_process = SpawnBackgroundCommand({mc_path.generic_string(),
-                                                                  "run",
-                                                                  "--project",
-                                                                  project_path.generic_string(),
-                                                                  "--build-dir",
-                                                                  build_dir.generic_string(),
-                                                                  "--",
-                                                                  std::to_string(port)},
-                                                                 build_dir / "phase13_evented_echo_run_output.txt",
-                                                                 "phase13 evented echo run");
-
-    const std::string request = "phase13-echo";
-    const int client_fd = ConnectLoopbackWithRetry(port, 3000, "connect to phase13 evented echo server");
-    WriteAllToSocket(client_fd, request, "write request to phase13 evented echo server");
-    const std::string reply = ReadExactFromSocket(client_fd,
-                                                  request.size(),
-                                                  "read reply from phase13 evented echo server");
-    CloseFd(client_fd);
-    if (reply != request) {
-        Fail("phase13 evented echo server returned unexpected payload: '" + reply + "'");
-    }
-
-    ExpectBackgroundProcessSuccess(run_process, 3000, "wait for phase13 evented echo run");
+    ExerciseEventedEchoRoundTrip(mc_path,
+                                 project_path,
+                                 build_dir,
+                                 ReserveLoopbackPort(),
+                                 "phase13_evented_echo_run_output.txt",
+                                 "phase13 evented echo run");
 
     const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
                                                                 "test",
@@ -1559,6 +1572,13 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
     ExpectOutputContains(test_output,
                          "3 tests, 3 passed, 0 failed",
                          "phase13 evented echo test summary should be deterministic");
+
+    ExerciseEventedEchoRoundTrip(mc_path,
+                                 project_path,
+                                 build_dir,
+                                 ReserveLoopbackPort(),
+                                 "phase13_evented_echo_rerun_output.txt",
+                                 "phase13 evented echo rerun after tests");
 }
 
 }  // namespace

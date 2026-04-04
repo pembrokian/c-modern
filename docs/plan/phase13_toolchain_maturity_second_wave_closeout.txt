@@ -34,6 +34,7 @@ What landed
   - starting the server through `mc run --project ...`
   - performing a real loopback request-response roundtrip
   - reusing the same build directory for `mc test --project ...`
+  - re-running `mc run --project ...` on the same build directory after tests
   - checking deterministic PASS lines and test summary output
 
 Bounded exclusions kept explicit

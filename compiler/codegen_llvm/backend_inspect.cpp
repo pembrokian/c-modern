@@ -71,6 +71,14 @@ bool LowerInstruction(const mir::Instruction& instruction,
                                                      BackendGlobalName(instruction.target_name));
                 return true;
             }
+            if (instruction.target_kind == mir::Instruction::TargetKind::kField) {
+                const std::string base_name = instruction.target_base_storage == mir::Instruction::StorageBaseKind::kGlobal
+                                                  ? BackendGlobalName(instruction.target_base_name)
+                                                  : instruction.target_base_name;
+                backend_block.instructions.push_back(backend_name + " = local_addr " + FormatTypeInfo(type_info) + " " +
+                                                     base_name + "." + instruction.target_name);
+                return true;
+            }
             const BackendLocal* local = nullptr;
             if (!ResolveLocal(state, instruction.target, function, block, source_path, diagnostics, local)) {
                 return false;

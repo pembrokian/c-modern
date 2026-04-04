@@ -73,10 +73,12 @@ Known limitations
 - the current networking slice is intentionally narrow: IPv4 TCP listen,
   accept, and connect plus a portable poller surface; no UDP, DNS, TLS, async
   runtime, or scheduler claims are made
-- the repository now admits only a narrow hosted `sync` slice: thread spawn or
-  join plus mutex init, lock, and unlock, proved by the shared-counter
-  canonical executable; condvar, atomics, mutex destroy, and broader
-  portability claims remain out of scope
+- the repository now admits a narrow hosted `sync` slice: typed thread spawn
+  or join plus mutex init, lock, unlock, condvar init, wait, signal, and a
+  narrow `MemoryOrder` plus `Atomic<T>` load or store surface proved by the
+  shared-counter, producer-consumer, and atomic-publication canonical
+  executables; atomic read-modify-write operations, condvar or mutex destroy,
+  broadcast, and broader portability claims remain out of scope
 - the repository does not yet claim `hal`, `time`, or `os` as general admitted
   module families beyond the already-narrow current surfaces recorded in the
   phase documents

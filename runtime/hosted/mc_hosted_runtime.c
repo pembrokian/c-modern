@@ -61,12 +61,20 @@ struct mc_sync_mutex {
     uintptr_t raw;
 };
 
+struct mc_sync_condvar {
+    uintptr_t raw;
+};
+
 struct mc_hosted_thread {
     pthread_t thread;
 };
 
 struct mc_hosted_mutex {
     pthread_mutex_t mutex;
+};
+
+struct mc_hosted_condvar {
+    pthread_cond_t cond;
 };
 
 struct mc_hosted_thread_start {
@@ -917,6 +925,49 @@ uintptr_t __mc_sync_mutex_unlock(struct mc_sync_mutex* mu) {
 
     struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) mu->raw;
     const int rc = pthread_mutex_unlock(&handle->mutex);
+    return rc == 0 ? 0 : (uintptr_t) rc;
+}
+
+struct mc_sync_condvar __mc_sync_condvar_init(uintptr_t* out_err) {
+    struct mc_sync_condvar out = {0};
+    mc_store_error(out_err, 0);
+
+    struct mc_hosted_condvar* handle = (struct mc_hosted_condvar*) calloc(1, sizeof(struct mc_hosted_condvar));
+    if (handle == NULL) {
+        mc_store_error(out_err, 1);
+        return out;
+    }
+
+    const int rc = pthread_cond_init(&handle->cond, NULL);
+    if (rc != 0) {
+        free(handle);
+        mc_store_error(out_err, (uintptr_t) rc);
+        return out;
+    }
+
+    out.raw = (uintptr_t) handle;
+    return out;
+}
+
+uintptr_t __mc_sync_condvar_wait(struct mc_sync_condvar* cv,
+                                 struct mc_sync_mutex* mu) {
+    if (cv == NULL || cv->raw == 0 || mu == NULL || mu->raw == 0) {
+        return 1;
+    }
+
+    struct mc_hosted_condvar* cond = (struct mc_hosted_condvar*) cv->raw;
+    struct mc_hosted_mutex* mutex = (struct mc_hosted_mutex*) mu->raw;
+    const int rc = pthread_cond_wait(&cond->cond, &mutex->mutex);
+    return rc == 0 ? 0 : (uintptr_t) rc;
+}
+
+uintptr_t __mc_sync_condvar_signal(struct mc_sync_condvar* cv) {
+    if (cv == NULL || cv->raw == 0) {
+        return 1;
+    }
+
+    struct mc_hosted_condvar* cond = (struct mc_hosted_condvar*) cv->raw;
+    const int rc = pthread_cond_signal(&cond->cond);
     return rc == 0 ? 0 : (uintptr_t) rc;
 }
 

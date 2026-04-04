@@ -3,7 +3,7 @@ Post-Phase-14 Execution Plan And Ranked Backlog
 
 Status
 ------
-PLANNED
+ACTIVE
 
 Purpose
 -------
@@ -74,6 +74,15 @@ Default strategic choice
 Unless near-term repository goals say otherwise, prefer a narrow networking
 foundation before a narrow concurrency foundation.
 
+Current status
+~~~~~~~~~~~~~~
+- this default has now been exercised in order: the repository landed the
+  narrow hosted networking wave first, then the first narrow hosted `sync`
+  wave
+- no third capability family is selected yet; the immediate next work is to
+  close compiler debt and keep planning docs aligned before widening `sync`
+  further or opening a new family
+
 Why this is the default:
 - it unlocks the lead blocked evented-networking canonical entries rather than
   only one family of threaded pressure
@@ -142,12 +151,13 @@ Pick exactly one new Phase 12 capability family for the next expansion wave.
 
 Chosen decision
 ~~~~~~~~~~~~~~~
-- Option A is now the chosen next wave: portable `io` poller plus narrow `net`
-- Option B remains the next fallback after Option A if networking admission
-  stalls or proves less truthful than expected, but it is not started in
-  parallel
+- Option A was the chosen next wave and is now implemented: portable `io`
+  poller plus narrow `net`
+- Option B then became the next admitted follow-up wave and is now
+  repository-implemented as the first narrow hosted `sync` slice
 - Option C remains deferred unless a concrete hardware-boundary consumer moves
-  ahead of both networking and sync pressure
+  ahead of current compiler-debt closeout and remaining sync follow-on
+  pressure
 
 Decision options
 ~~~~~~~~~~~~~~~~
@@ -160,22 +170,31 @@ Required output
 ~~~~~~~~~~~~~~~
 - a short owner document or bounded update to the relevant Phase 12 plan that
   names the consumer matrix, minimal API surface, proof layer, and explicit
-  exclusions for the chosen family
-- this document and the Phase 12 plan now treat Option A as the active next
-  capability family and Option B as queued follow-up work rather than a second
-  simultaneous start
+  exclusions for each admitted family
+- this document and the Phase 12 plan now treat both Option A and the first
+  Option B slice as implemented repository waves, with compiler debt closeout
+  ranked ahead of any new breadth
 
 Hard rule
 ~~~~~~~~~
 - do not start two new capability families in parallel
-- the repository may queue Option B after Option A, but must not implement
-  both waves concurrently
+- that sequencing rule has already been exercised by landing Option A before
+  the first bounded Option B slice; do not open a third capability family
+  until current compiler-debt closeout is under control
 
 Step 3 -- Execute The Chosen Phase 12 Second Wave
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Objective
 ~~~~~~~~~
 Land one narrow new library and runtime family honestly, with proof.
+
+Current status
+~~~~~~~~~~~~~~
+- completed first for networking via `io` poller plus narrow `net`
+- completed again for the first hosted `sync` slice via thread spawn or join
+  plus mutex
+- follow-up work is now about cleanup and honest widening boundaries, not a
+  missing second-wave admission
 
 If networking is chosen
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -227,8 +246,8 @@ Examples
 ~~~~~~~~
 - networking path: evented echo server, then client request-response or a very
   small poll-driven utility
-- sync path: shared counter with mutex, then producer-consumer only if the
-  condvar surface is actually admitted
+- sync path: shared counter with mutex, then producer-consumer with the now-
+  admitted condvar surface while atomic publication remains separate pressure
 - hal path: MMIO register access canonical proof before any broader device-side
   utility
 
@@ -298,45 +317,52 @@ Exit criteria
 Ranked backlog
 --------------
 
-Rank 1 -- Current-core canonical pressure wave
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- owner: Phase 14
-- why now: cheapest leverage; deepens truth without new library breadth
-- first tasks: treat the current-surface wave as closed out and move to the
-  next capability-family decision with the Phase 8 evidence now recorded
-- proof target: consistent closeout between proof artifacts, admission matrix,
-  findings log, and this ranked execution order
+Rank 1 -- Compiler debt from admitted waves
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: compiler owners first, then docs
+- why now: both networking and the first sync wave are already landed, so the
+  highest-leverage next work is to remove the bootstrap-shaped compiler
+  limitations they exposed before widening the surface again
+- first tasks: keep direct field-address lowering honest in MIR, preserve the
+  compiler-owned typed `thread_spawn<T>` rewrite honestly, and narrow the
+  remaining atomic codegen rough edges exposed by the publication proof
+- proof target: focused compiler regressions plus updated planning docs that no
+  longer describe completed waves as future work
 
-Rank 2 -- Narrow poller plus net admission
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- owner: Phase 12
-- why now: best default unlock for blocked canonical entries and a new real
-  utility family
-- status: chosen next capability family
-- first tasks: land the bounded Phase 12 owner plan for portable `io` poller
-  plus narrow `net`, then implement it without starting `sync` work in
-  parallel
-- proof target: evented server or client canonical entry plus focused stdlib
-  and tool regressions
+Rank 2 -- Keep docs and support statements aligned
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: docs plus owning implementation layers
+- why now: stale execution-order text already drifted far enough to misstate
+  the repository posture after the networking and sync admissions
+- status: active
+- first tasks: keep this document, `backlog.txt`, the Phase 12 plan, README,
+  and the hosted support note synchronized when admitted capability boundaries
+  move
+- proof target: no planning doc describes completed networking or first-sync
+  work as still pending
 
-Rank 3 -- Narrow sync admission
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rank 3 -- Narrow sync follow-on pressure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - owner: Phase 12
-- why now: queued fallback after the chosen networking wave if repository
-  pressure later favors local concurrency or if the networking wave stalls
-- status: active next capability family
-- first tasks: land the bounded Phase 12 owner plan for hosted thread spawn or
-  join plus mutex, then prove it through the shared-counter canonical entry
-- proof target: shared counter with mutex canonical proof
+- why now: the mutex-only slice now has one deliberate condvar follow-on proof,
+  so remaining sync growth should stay narrow and pressure-driven rather than
+  widening opportunistically
+- status: mutex, condvar, and atomic-publication proofs implemented
+- first tasks: keep the admitted atomic slice narrow, keep its lifetime limits
+  explicit, and only reopen `sync` again when a real compare-exchange,
+  fetch-add, broadcast, or destroy-surface consumer is ready
+- proof target: the next sync proof should be a new atomic or lifecycle
+  consumer rather than ad hoc widening of the current slice
 
 Rank 4 -- Phase 13 second-wave workflow maturity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - owner: Phase 13
 - why now: the next capability family will expose real project and test-harness
   pressure that the first-wave toolchain slice only partly covers
-- status: implemented for the hosted networking family
-- first tasks: preserve the admitted evented-echo workflow proof as the project
-  surface grows, and route any new multi-module workflow friction back to the
+- status: implemented for the hosted networking family, with run-test-rerun
+  build-directory reuse now covered by the real project proof
+- first tasks: keep extending existing real project proofs when capability
+  families grow, and route any new multi-module workflow friction back to the
   smallest correct Phase 13 owner
 - proof target: new capability-family projects continue to run cleanly through
   `mc run` and `mc test`

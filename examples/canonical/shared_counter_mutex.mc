@@ -60,13 +60,13 @@ func main() i32 {
     worker2_status = 0
 
     t1: sync.Thread
-    t1, err = sync.thread_spawn((uintptr)(worker1), (uintptr)(&worker1_status))
+    t1, err = sync.thread_spawn<i32>(worker1, &worker1_status)
     if !errors.is_ok(err) {
         return 11
     }
 
     t2: sync.Thread
-    t2, err = sync.thread_spawn((uintptr)(worker2), (uintptr)(&worker2_status))
+    t2, err = sync.thread_spawn<i32>(worker2, &worker2_status)
     if !errors.is_ok(err) {
         err = sync.thread_join(t1)
         if !errors.is_ok(err) {

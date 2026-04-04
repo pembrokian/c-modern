@@ -419,8 +419,8 @@ void TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes() {
     const auto lowered = Lower(
         "import sync\n"
         "\n"
-        "func read(atom: *sync.Atomic<i32>, order: sync.MemoryOrder) i32 {\n"
-        "    return sync.atomic_load(atom, order)\n"
+        "func read(atom: *sync.Atomic<i32>) i32 {\n"
+        "    return sync.atomic_load(atom, sync.MemoryOrder.Acquire)\n"
         "}\n",
         options,
         diagnostics);
@@ -433,9 +433,73 @@ void TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes() {
     }
 
     const auto dump = mc::mir::DumpModule(*lowered.module);
-    if (dump.find("*sync.Atomic<i32>") == std::string::npos || dump.find("Local name=order type=sync.MemoryOrder param readonly") == std::string::npos ||
-        dump.find("op=order=order") == std::string::npos) {
-        Fail("imported atomic MIR should preserve qualified imported types and order names");
+    if (dump.find("*sync.Atomic<i32>") == std::string::npos || dump.find("order=sync.MemoryOrder.Acquire") == std::string::npos) {
+        Fail("imported atomic MIR should preserve qualified imported types and imported enum order metadata");
+    }
+}
+
+void TestImportedTypedThreadSpawnLowersToRawHelper() {
+    mc::support::DiagnosticSink diagnostics;
+
+    mc::sema::Module imported_sync;
+    mc::sema::TypeDeclSummary thread_type;
+    thread_type.kind = mc::ast::Decl::Kind::kStruct;
+    thread_type.name = "Thread";
+    thread_type.fields.push_back({"raw", mc::sema::NamedType("uintptr")});
+    imported_sync.type_decls.push_back(std::move(thread_type));
+
+    imported_sync.functions.push_back({
+        .name = "thread_spawn",
+        .type_params = {"T"},
+        .param_types = {mc::sema::ProcedureType({mc::sema::PointerType(mc::sema::NamedType("T"))}, {}),
+                        mc::sema::PointerType(mc::sema::NamedType("T"))},
+        .return_types = {mc::sema::NamedType("Thread")},
+    });
+    imported_sync.functions.push_back({
+        .name = "thread_spawn_raw",
+        .param_types = {mc::sema::NamedType("uintptr"), mc::sema::NamedType("uintptr")},
+        .return_types = {mc::sema::NamedType("Thread")},
+    });
+    mc::sema::BuildModuleLookupMaps(imported_sync);
+
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    imported_modules.emplace("sync", std::move(imported_sync));
+
+    mc::sema::CheckOptions options;
+    options.imported_modules = &imported_modules;
+
+    const auto lowered = Lower(
+        "import sync\n"
+        "\n"
+        "struct Ctx {\n"
+        "    value: i32\n"
+        "}\n"
+        "\n"
+        "func worker(ctx: *Ctx) {\n"
+        "    ignored: uintptr = (uintptr)(ctx)\n"
+        "    if ignored == 99 {\n"
+        "        return\n"
+        "    }\n"
+        "}\n"
+        "\n"
+        "func main() sync.Thread {\n"
+        "    ctx: Ctx = Ctx{ value: 7 }\n"
+        "    return sync.thread_spawn<Ctx>(worker, &ctx)\n"
+        "}\n",
+        options,
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("imported typed thread_spawn lowering should succeed:\n" + diagnostics.Render());
+    }
+    if (!mc::mir::ValidateModule(*lowered.module, "<mir-test>", diagnostics)) {
+        Fail("validator should accept imported typed thread_spawn lowering:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("target=sync.thread_spawn_raw") == std::string::npos ||
+        dump.find("pointer_to_int") == std::string::npos) {
+        Fail("typed thread_spawn should lower through the raw helper with explicit uintptr conversions");
     }
 }
 
@@ -467,7 +531,7 @@ void TestGlobalAddressLoweringUsesExplicitLocalAddr() {
     }
 }
 
-void TestAddressOfFieldFailsCrisplyInMir() {
+void TestAddressOfFieldLowersForDirectAggregateBase() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
         "struct Pair {\n"
@@ -484,11 +548,14 @@ void TestAddressOfFieldFailsCrisplyInMir() {
         "}\n",
         diagnostics);
 
-    if (lowered.ok) {
-        Fail("address-of field lowering should fail crisply until MIR grows an address-producing field form");
+    if (!lowered.ok) {
+        Fail("direct field address lowering should succeed:\n" + diagnostics.Render());
     }
-    if (diagnostics.Render().find("not yet supported in MIR: address-of") == std::string::npos) {
-        Fail("address-of field lowering should explain the unsupported MIR boundary");
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("local_addr %v") == std::string::npos ||
+        dump.find("target=pair.left target_kind=field target_name=left") == std::string::npos) {
+        Fail("direct field address lowering should record explicit field-address metadata");
     }
 }
 
@@ -2818,8 +2885,9 @@ int main() {
     TestImportedModuleSurfaceLowersQualifiedTypesAndTargets();
     TestImportedModuleVariantMatchLowersQualifiedVariants();
     TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes();
+    TestImportedTypedThreadSpawnLowersToRawHelper();
     TestGlobalAddressLoweringUsesExplicitLocalAddr();
-    TestAddressOfFieldFailsCrisplyInMir();
+    TestAddressOfFieldLowersForDirectAggregateBase();
     TestMixedBindingOrAssignmentUsesSemanticClassification();
     TestExplicitConversionLowersToConvert();
     TestNumericConversionLowersToConvertNumeric();

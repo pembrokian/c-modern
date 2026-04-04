@@ -767,6 +767,25 @@ int main(int argc, char** argv) {
                     15,
                     {});
 
+    const std::filesystem::path field_address_source = work_root / "field_address_local.mc";
+    WriteFile(field_address_source,
+              "struct Pair {\n"
+              "    left: i32,\n"
+              "    right: i32,\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    pair: Pair = Pair{ left: 3, right: 7 }\n"
+              "    right_ptr: *i32 = &pair.right\n"
+              "    *right_ptr = 19\n"
+              "    return pair.left + pair.right\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    field_address_source,
+                    work_root / "field_address_local_build",
+                    22,
+                    {});
+
     const std::filesystem::path padded_struct_source = work_root / "padded_header.mc";
     WriteFile(padded_struct_source,
               "struct Header {\n"
@@ -1502,6 +1521,18 @@ int main(int argc, char** argv) {
     RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/shared_counter_mutex.mc",
                     work_root / "phase15_shared_counter_mutex_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/producer_consumer_condvar.mc",
+                    work_root / "phase15_producer_consumer_condvar_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/atomic_flag_publication.mc",
+                    work_root / "phase15_atomic_flag_publication_build",
                     0,
                     {});
 

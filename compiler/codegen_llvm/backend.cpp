@@ -1853,6 +1853,15 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
+            BackendTypeInfo type_info;
+            if (!LowerInstructionType(*state.module,
+                                      instruction.type,
+                                      source_path,
+                                      diagnostics,
+                                      ExecutableFunctionBlockContext("local_addr", state, block),
+                                      type_info)) {
+                return false;
+            }
             if (instruction.target_kind == mir::Instruction::TargetKind::kGlobal) {
                 if (instruction.target_name.empty()) {
                     ReportBackendError(source_path,
@@ -1870,29 +1879,76 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                        diagnostics);
                     return false;
                 }
-                BackendTypeInfo type_info;
-                if (!LowerInstructionType(*state.module,
-                                          instruction.type,
-                                          source_path,
-                                          diagnostics,
-                                          ExecutableFunctionBlockContext("local_addr", state, block),
-                                          type_info)) {
+                RecordExecutableValue(state, instruction.result, global_it->second.backend_name, type_info);
+                return true;
+            }
+            if (instruction.target_kind == mir::Instruction::TargetKind::kField) {
+                if (instruction.target_name.empty()) {
+                    ReportBackendError(source_path,
+                                       "local_addr field target is missing target_name metadata in function '" + state.function->name +
+                                           "' block '" + block.label + "'",
+                                       diagnostics);
                     return false;
                 }
-                RecordExecutableValue(state, instruction.result, global_it->second.backend_name, type_info);
+                if (instruction.target_base_name.empty()) {
+                    ReportBackendError(source_path,
+                                       "local_addr field target is missing base-name metadata in function '" + state.function->name +
+                                           "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+
+                std::string base_slot;
+                if (instruction.target_base_storage == mir::Instruction::StorageBaseKind::kLocal) {
+                    if (!ResolveExecutableLocal(state, instruction.target_base_name, block, source_path, diagnostics, base_slot)) {
+                        return false;
+                    }
+                } else if (instruction.target_base_storage == mir::Instruction::StorageBaseKind::kGlobal) {
+                    const auto global_it = state.globals->find(instruction.target_base_name);
+                    if (global_it == state.globals->end()) {
+                        ReportBackendError(source_path,
+                                           "LLVM bootstrap executable emission references unknown global field-address base '" +
+                                               instruction.target_base_name + "' in function '" + state.function->name + "' block '" +
+                                               block.label + "'",
+                                           diagnostics);
+                        return false;
+                    }
+                    base_slot = global_it->second.backend_name;
+                } else {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission currently supports only direct local/global field addresses in function '" +
+                                           state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+
+                const auto field_index = FindFieldIndex(*state.module, instruction.target_base_type, instruction.target_name);
+                if (!field_index.has_value()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission could not resolve field-address target '" + instruction.target_name +
+                                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+
+                BackendTypeInfo base_type;
+                if (!LowerInstructionType(*state.module,
+                                          instruction.target_base_type,
+                                          source_path,
+                                          diagnostics,
+                                          ExecutableFunctionBlockContext("local_addr field base", state, block),
+                                          base_type)) {
+                    return false;
+                }
+
+                const std::string field_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".field.addr";
+                output_lines.push_back(field_ptr + " = getelementptr inbounds " + base_type.backend_name + ", ptr " + base_slot + ", i32 0, i32 " +
+                                       std::to_string(*field_index));
+                RecordExecutableValue(state, instruction.result, field_ptr, type_info);
                 return true;
             }
             std::string local_slot;
             if (!ResolveExecutableLocal(state, instruction.target, block, source_path, diagnostics, local_slot)) {
-                return false;
-            }
-            BackendTypeInfo type_info;
-            if (!LowerInstructionType(*state.module,
-                                      instruction.type,
-                                      source_path,
-                                      diagnostics,
-                                      ExecutableFunctionBlockContext("local_addr", state, block),
-                                      type_info)) {
                 return false;
             }
             RecordExecutableValue(state, instruction.result, local_slot, type_info);
