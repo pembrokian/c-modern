@@ -1,4 +1,4 @@
-export { Thread, Mutex, Condvar, MemoryOrder, Atomic, thread_spawn, thread_join, mutex_init, mutex_destroy, mutex_lock, mutex_unlock, condvar_init, condvar_destroy, condvar_wait, condvar_signal, atomic_load, atomic_store }
+export { Thread, Mutex, Condvar, MemoryOrder, Atomic, thread_spawn_raw, thread_spawn, thread_join, mutex_init, mutex_destroy, mutex_lock, mutex_unlock, condvar_init, condvar_destroy, condvar_wait, condvar_signal, atomic_load, atomic_store }
 
 import errors
 

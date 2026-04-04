@@ -3,7 +3,7 @@ Phase 20 -- Real Sync Project Pressure On The Admitted Hosted Slice
 
 Status
 ------
-PLANNED
+COMPLETED (repository-bounded real sync project pressure)
 
 Purpose
 -------
@@ -16,26 +16,25 @@ after Phase 8.
 
 Repository status note
 ----------------------
-- The repository already admits a narrow hosted `sync` slice covering typed
+- The repository already admitted a narrow hosted `sync` slice covering typed
   thread spawn or join, mutex, condvar, destroy, and atomic load or store
-  publication, proved today by direct-source canonical executables.
-- Phase 18 did not choose a broader `sync` follow-on as the immediate next
-  plateau because the repository lacked a second real consumer strong enough to
-  justify additional concurrency breadth.
-- The current planning gap is therefore not missing low-level proof. The gap
-  is missing project-mode pressure that uses the admitted `sync` surface as a
-  real multi-module workflow consumer.
+  publication through direct-source canonical executables.
+- Phase 18 deliberately chose workflow hardening before any broader `sync`
+  widening because the repository still lacked one real project-mode consumer
+  for the already-admitted `sync` surface.
+- Phase 20 therefore targeted project pressure only, not a new `sync` API
+  family.
 
 Problem being solved
 --------------------
-- The admitted `sync` slice is currently strongest at the direct-source
-  canonical-program layer.
-- Without one ordinary project consumer, it remains too easy to debate future
-  `sync` widening from isolated canonical proofs instead of from a real
-  project's graph, tests, helper modules, and workflow behavior.
-- The repository needs one concurrency-shaped project that either justifies a
-  second consumer for broader compiler work or proves that the current admitted
-  slice is sufficient for now.
+- The admitted `sync` slice was strongest only at the direct-source canonical
+  program layer.
+- Without one ordinary project consumer, future `sync` widening could still be
+  debated from isolated canonical proofs instead of from a real project's
+  module graph, helper modules, tests, and build-directory reuse behavior.
+- The repository needed one bounded threaded project that either exposed a real
+  owner-local gap or proved that the current admitted slice was already enough
+  for one honest project-mode consumer.
 
 Core rule
 ---------
@@ -49,77 +48,62 @@ Core rule
 
 Chosen project shape
 --------------------
-Preferred candidate: one bounded threaded worker or queue project under
-`/Users/ro/dev/c_modern/examples/real/`.
+Landed project: one bounded worker queue under
+`/Users/ro/dev/c_modern/examples/real/worker_queue/`.
 
-The project should:
-- use ordinary project modules instead of a single-file concurrency demo
-- exercise `thread_spawn`, `thread_join`, mutex, condvar, and optionally the
-  already-admitted atomic publication surface only where the workflow actually
-  needs it
-- keep deterministic completion and reviewable tests as the main goal rather
-  than benchmark-style throughput claims
-- avoid reopening compare-exchange, fetch-add, condvar broadcast, or scheduler
-  semantics that the current admitted slice does not own
+The landed project:
+- uses ordinary project modules instead of a single-file concurrency demo
+- exercises `thread_spawn`, `thread_join`, mutex, condvar, and destroy without
+  pulling in broader `sync` breadth that the workflow does not need
+- keeps deterministic completion and reviewable ordinary tests as the main goal
+  rather than throughput or scheduler claims
+- avoids compare-exchange, fetch-add, condvar broadcast, and any broader async
+  or scheduler model
 
-Candidate pressure shapes
+What landed in this phase
 -------------------------
-1. A bounded worker queue with one producer thread and one or more worker
-   threads coordinated by one mutex and one condvar.
-2. A small threaded job runner that publishes work items explicitly and joins
-   deterministically before process exit.
-3. A narrow sync-backed pipeline utility only if it pressures ordinary project
-   modules more clearly than the worker-queue shape.
+- the real project `examples/real/worker_queue/` with a thin main module, one
+  shared-state helper module, and ordinary checked tests
+- a bounded producer-or-worker queue that uses one producer thread, one worker
+  thread, one mutex, and one condition variable with deterministic shutdown
+- Phase 7 tool regressions proving `mc run --project ...`, `mc test --project ...`,
+  run-test-rerun reuse, and test-run-retest reuse on shared build directories
+- documentation updates that move the bounded threaded project from deferred or
+  blocked status into admitted repository truth
 
-Preferred implementation bias
------------------------------
-- prefer one reviewable project whose concurrency story is obvious from the
-  source over a more feature-rich utility with ambiguous scheduling behavior
-- keep ordinary tests deterministic and serializable under `mc test`
-- make the project useful enough to pressure imports, helper-module layout,
-  and test organization, but not so large that example complexity hides the
-  actual `sync` pressure
+What the project exposed
+------------------------
+- The admitted hosted `sync` slice is now sufficient for one honest multi-
+  module producer-or-worker queue under the ordinary project workflow.
+- No new `sync` breadth was required beyond the already-admitted surface.
+- The project did not justify broader imported generic procedure-call lowering:
+  it stays within the already-admitted `thread_spawn<T>` path rather than
+  creating a second independent generic-call pressure family.
 
-Deliverables
-------------
-- one new real project under `/Users/ro/dev/c_modern/examples/real/` that uses
-  the admitted hosted `sync` slice honestly
+Delivered outputs
+-----------------
+- one new real project under `/Users/ro/dev/c_modern/examples/real/` using the
+  admitted hosted `sync` slice honestly
 - focused project workflow proof through `mc run --project ...` and
   `mc test --project ...`
 - bounded tool regressions in
   `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` proving ordinary
   run, test, and deterministic reuse on the new project
-- updates to `/Users/ro/dev/c_modern/docs/plan/phase8_admission_matrix.txt`
-  and `/Users/ro/dev/c_modern/docs/plan/phase8_findings.txt` so the bounded
-  threaded project stops living as a deferred candidate once it is admitted or
-  is explicitly re-deferred with a sharper owner-local reason
-- decision-log or backlog updates if the project exposes a real second
-  consumer for broader imported generic procedure-call lowering or another
-  named compiler follow-up
-
-Suggested execution order
--------------------------
-1. Choose exactly one bounded threaded project shape and document the explicit
-   exclusions up front.
-2. Land the narrow project modules and direct ordinary tests without adding
-   new `sync` surface area.
-3. Add `mc run --project ...` proof first, then `mc test --project ...` proof,
-   then deterministic build-directory reuse checks.
-4. Route any exposed compiler or workflow gap immediately to the owning later
-   phase instead of normalizing it inside the example.
-5. Reassess whether the repository now has a real second consumer for broader
-   imported generic procedure-call lowering.
+- updates to `/Users/ro/dev/c_modern/docs/plan/phase8_admission_matrix.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/phase8_findings.txt`, and the repository
+  summary docs so the bounded threaded project no longer lives as a deferred
+  candidate
 
 Exit criteria
 -------------
-- the repository has one admitted real sync project rather than only
+- the repository now has one admitted real sync project rather than only
   direct-source canonical concurrency proofs
 - the project proves ordinary multi-module workflow pressure on the current
   hosted `sync` slice without widening that slice opportunistically
-- any newly exposed concurrency-related compiler debt is named precisely and
-  handed to the correct owner
-- the repository can make a sharper decision about future `sync` widening from
-  real project pressure instead of from abstract completeness arguments
+- no new concurrency-related compiler debt needed to be normalized into the
+  example
+- the repository can make future `sync` widening decisions from real project
+  pressure instead of from abstract completeness arguments alone
 
 Non-goals
 ---------
@@ -136,3 +120,12 @@ Acceptance criteria for this document
   admitted hosted `sync` slice.
 - The phase is explicit that project pressure, not API breadth, is its main
   purpose.
+
+Closeout statement
+------------------
+Phase 20 is complete. The repository now includes one honest project-mode
+consumer of the admitted hosted `sync` slice in
+`examples/real/worker_queue/`, together with deterministic `mc run` and
+`mc test` proof plus build-directory reuse coverage. The project closes the
+old deferred bounded-threaded-project gap without reopening broader `sync`
+breadth, broader imported generic lowering, or scheduler semantics.

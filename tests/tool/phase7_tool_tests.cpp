@@ -503,6 +503,57 @@ void ExpectPartialWriteTestOutput(std::string_view output,
                          context_prefix + ": should print the target verdict");
 }
 
+std::string RunWorkerQueueProjectAndExpectSuccess(const std::filesystem::path& mc_path,
+                                                  const std::filesystem::path& project_path,
+                                                  const std::filesystem::path& build_dir,
+                                                  std::string_view output_name,
+                                                  const std::string& context) {
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "run",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string()},
+                                                     build_dir / std::string(output_name),
+                                                     context);
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail(context + " should pass:\n" + output);
+    }
+    return output;
+}
+
+void ExpectWorkerQueueRunOutput(std::string_view output,
+                                const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "worker-queue-ok\n",
+                         context_prefix + ": should print the deterministic success line");
+}
+
+void ExpectWorkerQueueTestOutput(std::string_view output,
+                                 const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "testing target worker-queue",
+                         context_prefix + ": should announce the target under test");
+    ExpectOutputContains(output,
+                         "ordinary tests target worker-queue: 2 cases, mode=checked, timeout=5000 ms",
+                         context_prefix + ": should print ordinary test scope");
+    ExpectOutputContains(output,
+                         "PASS expected_sum_test.test_expected_sum",
+                         context_prefix + ": should include expected-sum coverage");
+    ExpectOutputContains(output,
+                         "PASS next_slot_test.test_next_slot",
+                         context_prefix + ": should include slot-wrap coverage");
+    ExpectOutputContains(output,
+                         "2 tests, 2 passed, 0 failed",
+                         context_prefix + ": should print the deterministic summary");
+    ExpectOutputContains(output,
+                         "PASS ordinary tests for target worker-queue (2 cases)",
+                         context_prefix + ": should print the ordinary test verdict");
+    ExpectOutputContains(output,
+                         "PASS target worker-queue",
+                         context_prefix + ": should print the target verdict");
+}
+
 void ExerciseProjectRunTestRerunSequence(const std::filesystem::path& mc_path,
                                          const std::filesystem::path& project_path,
                                          const std::filesystem::path& build_dir,
@@ -1888,6 +1939,65 @@ void TestRealArenaExprToolProject(const std::filesystem::path& source_root,
                          "phase8 arena expr test summary should be deterministic");
 }
 
+void TestRealWorkerQueueProject(const std::filesystem::path& source_root,
+                                const std::filesystem::path& binary_root,
+                                const std::filesystem::path& mc_path) {
+    const std::filesystem::path worker_queue_project_path = source_root / "examples/real/worker_queue/build.toml";
+    const std::filesystem::path worker_queue_run_test_rerun_build_dir = binary_root / "phase20_worker_queue_run_test_rerun_build";
+    std::filesystem::remove_all(worker_queue_run_test_rerun_build_dir);
+
+    std::string worker_queue_run_output = RunWorkerQueueProjectAndExpectSuccess(mc_path,
+                                                                                worker_queue_project_path,
+                                                                                worker_queue_run_test_rerun_build_dir,
+                                                                                "phase20_worker_queue_run_output.txt",
+                                                                                "phase20 worker queue run before tests");
+    ExpectWorkerQueueRunOutput(worker_queue_run_output,
+                               "phase20 worker queue run before tests");
+
+    std::string worker_queue_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                          worker_queue_project_path,
+                                                                          worker_queue_run_test_rerun_build_dir,
+                                                                          "phase20_worker_queue_test_output.txt",
+                                                                          "phase20 worker queue test after run");
+    ExpectWorkerQueueTestOutput(worker_queue_test_output,
+                                "phase20 worker queue test after run");
+
+    worker_queue_run_output = RunWorkerQueueProjectAndExpectSuccess(mc_path,
+                                                                    worker_queue_project_path,
+                                                                    worker_queue_run_test_rerun_build_dir,
+                                                                    "phase20_worker_queue_rerun_output.txt",
+                                                                    "phase20 worker queue rerun after tests");
+    ExpectWorkerQueueRunOutput(worker_queue_run_output,
+                               "phase20 worker queue rerun after tests");
+
+    const std::filesystem::path worker_queue_test_run_rerun_build_dir = binary_root / "phase20_worker_queue_test_run_rerun_build";
+    std::filesystem::remove_all(worker_queue_test_run_rerun_build_dir);
+
+    worker_queue_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                              worker_queue_project_path,
+                                                              worker_queue_test_run_rerun_build_dir,
+                                                              "phase20_worker_queue_initial_test_output.txt",
+                                                              "phase20 worker queue initial test");
+    ExpectWorkerQueueTestOutput(worker_queue_test_output,
+                                "phase20 worker queue initial test");
+
+    worker_queue_run_output = RunWorkerQueueProjectAndExpectSuccess(mc_path,
+                                                                    worker_queue_project_path,
+                                                                    worker_queue_test_run_rerun_build_dir,
+                                                                    "phase20_worker_queue_run_after_test_output.txt",
+                                                                    "phase20 worker queue run after tests");
+    ExpectWorkerQueueRunOutput(worker_queue_run_output,
+                               "phase20 worker queue run after tests");
+
+    worker_queue_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                              worker_queue_project_path,
+                                                              worker_queue_test_run_rerun_build_dir,
+                                                              "phase20_worker_queue_retest_output.txt",
+                                                              "phase20 worker queue retest after run");
+    ExpectWorkerQueueTestOutput(worker_queue_test_output,
+                                "phase20 worker queue retest after run");
+}
+
 void TestRealEventedEchoProject(const std::filesystem::path& source_root,
                                 const std::filesystem::path& binary_root,
                                 const std::filesystem::path& mc_path) {
@@ -2007,6 +2117,7 @@ int main(int argc, char** argv) {
     TestRealFileWalkerProject(source_root, binary_root, mc_path);
     TestRealHashToolProject(source_root, binary_root, mc_path);
     TestRealArenaExprToolProject(source_root, binary_root, mc_path);
+    TestRealWorkerQueueProject(source_root, binary_root, mc_path);
     TestRealEventedEchoProject(source_root, binary_root, mc_path);
     return 0;
 }

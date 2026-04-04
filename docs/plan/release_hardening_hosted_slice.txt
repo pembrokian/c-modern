@@ -74,8 +74,9 @@ Known limitations
   or join plus mutex init, destroy, lock, unlock, condvar init, destroy,
   wait, signal, and a narrow `MemoryOrder` plus `Atomic<T>` load or store
   surface proved by the shared-counter, producer-consumer, and atomic-
-  publication canonical executables; atomic read-modify-write operations,
-  condvar broadcast, and broader portability claims remain out of scope
+  publication canonical executables plus the real `examples/real/worker_queue/`
+  project; atomic read-modify-write operations, condvar broadcast, and broader
+  portability claims remain out of scope
 - the repository does not yet claim `hal`, `time`, or `os` as general admitted
   module families beyond the already-narrow current surfaces recorded in the
   phase documents

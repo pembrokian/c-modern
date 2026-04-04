@@ -1,0 +1,21 @@
+schema = 1
+project = "worker-queue"
+default = "worker-queue"
+
+[targets.worker-queue]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.worker-queue.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.worker-queue.runtime]
+startup = "default"
+
+[targets.worker-queue.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

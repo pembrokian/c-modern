@@ -408,15 +408,17 @@ parsing and arena-backed utilities
 
 concurrency
 ~~~~~~~~~~~
-- Current status: blocked family
-- Current proof: none admitted yet
-- Candidate next-wave utility: bounded threaded example only after `sync` and
-	hosted threading are admitted honestly
+- Current status: implemented family
+- Current proof: direct-source shared-counter, producer-consumer, and atomic-
+	publication executables plus the project-mode `examples/real/worker_queue/`
+	proof
+- Candidate next-wave utility: no further utility required for the admitted
+	slice today
 - Distinct pressure sought: thread spawn and join, mutex or condvar
 	coordination, deterministic ordinary-test proof, and explicit shared-state
 	synchronization without language-level concurrency syntax
-- Current owner gates: `sync` module admission, hosted runtime threading, and
-	test-proof discipline belong to Phase 6 and Phase 7 enabling work
+- Current owner gates: broader scheduler claims, condvar broadcast, and
+	atomic read-modify-write surfaces remain explicit Phase 12 follow-on work
 
 networking
 ~~~~~~~~~~
@@ -483,12 +485,19 @@ diagnostic parser utility
 
 bounded threaded worker tool
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked candidate
+- Status: implemented
 - Intended family: concurrency
-- Pressure focus: one reviewable thread-based workflow such as shared counter,
-	work queue, or producer-consumer coordination
-- Admission rule: only admit after `sync` and hosted threading are repository-
-	owned surfaces with deterministic proof hooks
+- Packaging: dedicated build.toml project
+- Intended proof: project build plus deterministic run output, ordinary tests,
+	and run/test/rerun build-directory reuse checks
+- Pressure focus: one producer thread, one worker thread, a bounded queue,
+	mutex plus condvar coordination, deterministic shutdown, and project-owned
+	ordinary tests under the explicit project workflow
+- Proof artifact: `examples/real/worker_queue/build.toml` plus tool-level
+	`mc run` or `mc test` reuse coverage in `tests/tool/phase7_tool_tests.cpp`
+- Resolution note: the admitted hosted `sync` slice now supports one honest
+	multi-module work-queue consumer without widening into compare-exchange,
+	fetch-add, condvar broadcast, or scheduler claims
 
 bounded network probe
 ~~~~~~~~~~~~~~~~~~~~~
@@ -537,7 +546,13 @@ arena-backed parser utility
 
 bounded threaded example
 ~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: deferred
+- Status: implemented
 - Packaging: dedicated build.toml project
-- Intended proof: project build plus deterministic behavior checks
-- Reason: only admit once the current runtime and sync surface can support it honestly
+- Intended proof: project build plus deterministic run-output and ordinary-
+	test checks on shared build directories
+- Proof artifact: `examples/real/worker_queue/build.toml` exercised by the
+	Phase 20 `mc run` or `mc test` regressions in
+	`tests/tool/phase7_tool_tests.cpp`
+- Pressure focus: producer or worker queue coordination on the admitted hosted
+	`sync` surface using ordinary project modules rather than direct-source-only
+	canonical programs

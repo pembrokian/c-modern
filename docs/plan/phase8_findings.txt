@@ -335,7 +335,7 @@ poller, net, and sync as enabling boundaries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Programs: evented echo server, partial-write response state machine,
 	evented TCP client, shared counter, producer-consumer, atomic flag
-	publication, and the deferred bounded threaded example
+	publication, and the admitted worker-queue project
 - Current classification: admitted bounded capability slices with explicit
 	owner-local follow-on work, not ambiguous future work
 - Owner: Phase 12 stdlib and runtime maturity for any deeper networking or
@@ -374,3 +374,7 @@ Real utility candidates
 - arena-backed utility finding: the admitted arena surface is sufficient for pointer-stable AST construction, but the real utility still needs to keep token text borrowed from the original file buffer because the bootstrap slice does not yet expose richer arena string helpers
 - Classification: stdlib surface limitation documented, not blocking
 - Resolution: landed a narrow expression normalizer that stores AST nodes in an arena while borrowing token slices from the owned file buffer; this keeps allocator pairing and tree construction honest without widening mem prematurely
+- Status: worker-queue implemented as the next explicit admitted real-project consumer of the hosted `sync` slice
+- worker-queue finding: the admitted mutex, condvar, destroy, and typed `thread_spawn<T>` surfaces are now sufficient for one honest bounded producer-or-worker queue under ordinary project workflow, so the repository no longer needs to treat threaded project pressure as merely deferred
+- Classification: admitted capability pressure closed without new compiler follow-up
+- Resolution: landed `examples/real/worker_queue/` with a thin main module, one shared-state helper module, deterministic ordinary tests, and Phase 20 run-test-rerun plus test-run-retest tool coverage; the project stays inside the already-admitted `sync` surface and does not justify broader imported generic procedure-call lowering beyond the existing `thread_spawn<T>` admission

@@ -42,9 +42,10 @@ Current repository-specific notes:
   bootstrap surface for deterministic utilities rather than a final richer API
 - `testing` is admitted only as a narrow toolchain companion module for the
   ordinary project-test path; it is not yet a broader assertion or fixture API
-- `sync` is admitted only as the first hosted concurrency slice: thread spawn
-  or join plus mutex init, lock, and unlock; condition variables, atomics, and
-  mutex destruction remain deferred
+- `sync` is admitted as a narrow hosted concurrency slice: thread spawn or
+  join plus mutex init, destroy, lock, unlock, condvar init, destroy, wait,
+  signal, and narrow `Atomic<T>` load or store publication; compare-exchange,
+  fetch-add, condvar broadcast, and broader scheduler claims remain deferred
 
 Still deferred in this repository:
 

@@ -32,12 +32,12 @@ What landed
 - A narrow hosted directory traversal surface through `fs.is_dir(...)` and sorted `fs.list_dir(...)`, plus the real file walker project under `examples/real/file_walker/`.
 - A bounded whole-file checksum utility under `examples/real/hash_tool/` proving `fs.read_all`, byte-wise integer processing, explicit fixed-width hex formatting, and deterministic project-owned tests without widening into streaming I/O.
 - A bounded arena-backed parser utility under `examples/real/arena_expr/` proving arena allocator pairing, pointer-stable AST nodes, borrowed token slices from an owned file buffer, recursive descent parsing, and deterministic normalized output.
+- A bounded threaded worker-queue utility under `examples/real/worker_queue/` proving one real project-mode consumer of the admitted hosted `sync` slice through deterministic `mc run` and `mc test` workflow plus build-directory reuse sequences.
 - Tool-level Phase 8 workflow proof in `tests/tool/phase7_tool_tests.cpp` covering `mc run` and `mc test` for grep-lite, file walker, hash tool, and the arena-backed parser utility.
 - Documentation updates in the top-level README and `examples/README.md` so the admitted Phase 8 slice and its example workflows are discoverable without reading the implementation history.
 
 What did not land in this slice
 -------------------------------
-- The bounded threaded example remains deferred because the current runtime and `sync` surface do not yet support honest pressure-testing in this repository slice.
 - Later canonical evented-networking entries remain deferred because the repository still does not admit the required poller and networking boundary.
 - MMIO, `hal`, richer allocator-protocol pressure, and broader concurrency
 	canonical entries remain blocked or deferred behind named enabling gaps;
@@ -49,7 +49,7 @@ What did not land in this slice
 Repository proof added
 ----------------------
 - `tests/codegen/codegen_executable_tests.cpp` covers the admitted canonical executable proofs, including the arena-backed AST example and recursive evaluator.
-- `tests/tool/phase7_tool_tests.cpp` now exercises the real utility project workflows for grep-lite, file walker, the bounded hash tool, and the arena-backed parser utility.
+- `tests/tool/phase7_tool_tests.cpp` now exercises the real utility project workflows for grep-lite, file walker, the bounded hash tool, the arena-backed parser utility, and the worker-queue sync project.
 - The Phase 14 follow-up did not admit new executable or project proofs by
 	itself; instead it tightened the repository rule that no additional
 	canonical or real program should be treated as admitted without matching
