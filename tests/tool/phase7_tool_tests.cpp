@@ -431,6 +431,121 @@ void ExercisePartialWriteRoundTrip(const std::filesystem::path& mc_path,
     ExpectBackgroundProcessSuccess(run_process, 3000, "wait for " + context);
 }
 
+std::string RunProjectTestAndExpectSuccess(const std::filesystem::path& mc_path,
+                                           const std::filesystem::path& project_path,
+                                           const std::filesystem::path& build_dir,
+                                           std::string_view output_name,
+                                           const std::string& context) {
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "test",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string()},
+                                                     build_dir / std::string(output_name),
+                                                     context);
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail(context + " should pass:\n" + output);
+    }
+    return output;
+}
+
+void ExpectEventedEchoTestOutput(std::string_view output,
+                                 const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "testing target echo",
+                         context_prefix + ": should announce the target under test");
+    ExpectOutputContains(output,
+                         "ordinary tests target echo: 3 cases, mode=checked, timeout=5000 ms",
+                         context_prefix + ": should print ordinary test scope");
+    ExpectOutputContains(output,
+                         "PASS parse_valid_port_test.test_parse_valid_port",
+                         context_prefix + ": should include valid-port coverage");
+    ExpectOutputContains(output,
+                         "PASS parse_zero_port_test.test_parse_zero_port",
+                         context_prefix + ": should include zero-port coverage");
+    ExpectOutputContains(output,
+                         "PASS parse_invalid_port_test.test_parse_invalid_port",
+                         context_prefix + ": should include invalid-port coverage");
+    ExpectOutputContains(output,
+                         "3 tests, 3 passed, 0 failed",
+                         context_prefix + ": should print the deterministic summary");
+    ExpectOutputContains(output,
+                         "PASS ordinary tests for target echo (3 cases)",
+                         context_prefix + ": should print the ordinary test verdict");
+    ExpectOutputContains(output,
+                         "PASS target echo",
+                         context_prefix + ": should print the target verdict");
+}
+
+void ExpectPartialWriteTestOutput(std::string_view output,
+                                  const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "testing target partial-write",
+                         context_prefix + ": should announce the target under test");
+    ExpectOutputContains(output,
+                         "ordinary tests target partial-write: 2 cases, mode=checked, timeout=5000 ms",
+                         context_prefix + ": should print ordinary test scope");
+    ExpectOutputContains(output,
+                         "PASS fill_response_pattern_test.test_fill_response_pattern",
+                         context_prefix + ": should include response-pattern coverage");
+    ExpectOutputContains(output,
+                         "PASS write_chunk_len_test.test_write_chunk_len",
+                         context_prefix + ": should include write-window coverage");
+    ExpectOutputContains(output,
+                         "2 tests, 2 passed, 0 failed",
+                         context_prefix + ": should print the deterministic summary");
+    ExpectOutputContains(output,
+                         "PASS ordinary tests for target partial-write (2 cases)",
+                         context_prefix + ": should print the ordinary test verdict");
+    ExpectOutputContains(output,
+                         "PASS target partial-write",
+                         context_prefix + ": should print the target verdict");
+}
+
+void ExerciseProjectRunTestRerunSequence(const std::filesystem::path& mc_path,
+                                         const std::filesystem::path& project_path,
+                                         const std::filesystem::path& build_dir,
+                                         const std::function<void(uint16_t, std::string_view, const std::string&)>& run_round_trip,
+                                         const std::function<void(std::string_view, const std::string&)>& verify_test_output,
+                                         std::string_view first_run_output_name,
+                                         std::string_view test_output_name,
+                                         std::string_view second_run_output_name,
+                                         const std::string& context_prefix) {
+    run_round_trip(ReserveLoopbackPort(), first_run_output_name, context_prefix + " run before tests");
+    const std::string test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                   project_path,
+                                                                   build_dir,
+                                                                   test_output_name,
+                                                                   context_prefix + " test after run");
+    verify_test_output(test_output, context_prefix + " test after run");
+    run_round_trip(ReserveLoopbackPort(), second_run_output_name, context_prefix + " rerun after tests");
+}
+
+void ExerciseProjectTestRunRerunSequence(const std::filesystem::path& mc_path,
+                                         const std::filesystem::path& project_path,
+                                         const std::filesystem::path& build_dir,
+                                         const std::function<void(uint16_t, std::string_view, const std::string&)>& run_round_trip,
+                                         const std::function<void(std::string_view, const std::string&)>& verify_test_output,
+                                         std::string_view first_test_output_name,
+                                         std::string_view run_output_name,
+                                         std::string_view second_test_output_name,
+                                         const std::string& context_prefix) {
+    const std::string first_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                         project_path,
+                                                                         build_dir,
+                                                                         first_test_output_name,
+                                                                         context_prefix + " initial test");
+    verify_test_output(first_test_output, context_prefix + " initial test");
+    run_round_trip(ReserveLoopbackPort(), run_output_name, context_prefix + " run after tests");
+    const std::string second_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                          project_path,
+                                                                          build_dir,
+                                                                          second_test_output_name,
+                                                                          context_prefix + " retest after run");
+    verify_test_output(second_test_output, context_prefix + " retest after run");
+}
+
 void TestHelpMentionsRun(const std::filesystem::path& binary_root,
                          const std::filesystem::path& mc_path) {
     const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(), "--help"},
@@ -525,9 +640,18 @@ void TestProjectTestCommandSucceeds(const std::filesystem::path& binary_root,
     }
 
     ExpectOutputContains(output, "testing target app", "mc test should announce the target under test");
+    ExpectOutputContains(output,
+                         "ordinary tests target app: 2 cases, mode=checked, timeout=5000 ms",
+                         "mc test should print the ordinary test scope");
     ExpectOutputContains(output, "PASS alpha_test.test_alpha_pass", "ordinary tests should report passing cases");
     ExpectOutputContains(output, "PASS beta_test.test_beta_pass", "ordinary tests should be discovered deterministically");
     ExpectOutputContains(output, "2 tests, 2 passed, 0 failed", "ordinary test summary should be printed");
+    ExpectOutputContains(output,
+                         "PASS ordinary tests for target app (2 cases)",
+                         "ordinary tests should print a target-scoped verdict");
+    ExpectOutputContains(output,
+                         "compiler regressions target app: 4 cases, timeout=5000 ms",
+                         "compiler regressions should print their scope");
     ExpectOutputContains(output,
                          "PASS check-pass " + (project_root / "tests/regressions/check_ok.mc").generic_string(),
                          "compiler regression check-pass should run");
@@ -540,6 +664,12 @@ void TestProjectTestCommandSucceeds(const std::filesystem::path& binary_root,
     ExpectOutputContains(output,
                          "PASS mir " + (project_root / "tests/regressions/mir_ok.mc").generic_string(),
                          "compiler regression MIR fixture should run");
+    ExpectOutputContains(output,
+                         "PASS compiler regressions for target app (4 cases)",
+                         "compiler regressions should print a target-scoped verdict");
+    ExpectOutputContains(output,
+                         "PASS target app",
+                         "mc test should print the overall target verdict");
 }
 
 void TestProjectTestCommandFailsOnOrdinaryFailure(const std::filesystem::path& binary_root,
@@ -572,8 +702,175 @@ void TestProjectTestCommandFailsOnOrdinaryFailure(const std::filesystem::path& b
         Fail("mc test failure project should return a non-zero exit status:\n" + output);
     }
 
+    ExpectOutputContains(output,
+                         "ordinary tests target app: 1 cases, mode=checked, timeout=5000 ms",
+                         "ordinary failure should still print the ordinary test scope");
     ExpectOutputContains(output, "FAIL failing_test.test_failure", "ordinary test failure should be reported");
     ExpectOutputContains(output, "1 tests, 0 passed, 1 failed", "ordinary test failure summary should be printed");
+    ExpectOutputContains(output,
+                         "FAIL ordinary tests for target app (1 cases)",
+                         "ordinary failure should print a target-scoped verdict");
+    ExpectOutputContains(output,
+                         "FAIL target app",
+                         "mc test should print the overall target failure verdict");
+}
+
+void TestMixedDirectSourceAndProjectOptionsFail(const std::filesystem::path& binary_root,
+                                                const std::filesystem::path& mc_path) {
+    const std::filesystem::path source_path = binary_root / "phase19_mixed_mode.mc";
+    WriteFile(source_path,
+              "func main() i32 {\n"
+              "    return 0\n"
+              "}\n");
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "check",
+                                                      source_path.generic_string(),
+                                                      "--target",
+                                                      "app"},
+                                                     binary_root / "phase19_mixed_mode_output.txt",
+                                                     "phase19 mixed direct-source and project-mode check");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("mixed direct-source and project-only options should fail");
+    }
+    ExpectOutputContains(output,
+                         "cannot mix a direct source path with project-only options; choose direct-source mode or --project mode",
+                         "mixed invocation should fail with a clear mode diagnostic");
+}
+
+void TestProjectTestRejectsDirectSourceInvocation(const std::filesystem::path& binary_root,
+                                                  const std::filesystem::path& mc_path) {
+    const std::filesystem::path source_path = binary_root / "phase19_direct_source_test_reject.mc";
+    WriteFile(source_path,
+              "func main() i32 {\n"
+              "    return 0\n"
+              "}\n");
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "test",
+                                                      source_path.generic_string()},
+                                                     binary_root / "phase19_direct_source_test_reject_output.txt",
+                                                     "phase19 direct-source test rejection");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("mc test should reject direct-source invocation");
+    }
+    ExpectOutputContains(output,
+                         "mc test does not accept a direct source path; use --project <build.toml>",
+                         "mc test should explain that it is project-only");
+}
+
+void TestUnknownTargetListsAvailableTargets(const std::filesystem::path& binary_root,
+                                            const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase19_unknown_target_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase19-unknown-target\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n"
+              "\n"
+              "[targets.tool]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/tool.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.tool.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.tool.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(project_root / "src/main.mc", "func main() i32 { return 0 }\n");
+    WriteFile(project_root / "src/tool.mc", "func main() i32 { return 0 }\n");
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      (project_root / "build.toml").generic_string(),
+                                                      "--target",
+                                                      "missing"},
+                                                     binary_root / "phase19_unknown_target_output.txt",
+                                                     "phase19 unknown target build");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("unknown target should fail project selection");
+    }
+    ExpectOutputContains(output,
+                         "unknown target in project file: missing; available targets: app, tool",
+                         "unknown target should list the available targets");
+}
+
+void TestDisabledTestTargetListsEnabledTargets(const std::filesystem::path& binary_root,
+                                               const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase19_disabled_test_target_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase19-disabled-test-target\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n"
+              "\n"
+              "[targets.unit]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/unit.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.unit.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.unit.runtime]\n"
+              "startup = \"default\"\n"
+              "\n"
+              "[targets.unit.tests]\n"
+              "enabled = true\n"
+              "roots = [\"tests\"]\n"
+              "mode = \"checked\"\n"
+              "timeout_ms = 5000\n");
+    WriteFile(project_root / "src/main.mc", "func main() i32 { return 0 }\n");
+    WriteFile(project_root / "src/unit.mc", "func main() i32 { return 0 }\n");
+    WriteFile(project_root / "tests/sample_test.mc",
+              "export { test_ok }\n"
+              "\n"
+              "func test_ok() *i32 {\n"
+              "    return nil\n"
+              "}\n");
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "test",
+                                                      "--project",
+                                                      (project_root / "build.toml").generic_string(),
+                                                      "--target",
+                                                      "app"},
+                                                     binary_root / "phase19_disabled_test_target_output.txt",
+                                                     "phase19 disabled test target selection");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("mc test should fail when the selected target has tests disabled");
+    }
+    ExpectOutputContains(output,
+                         "tests are not enabled for target 'app'; enabled test targets: unit",
+                         "disabled test target diagnostic should list enabled test targets");
 }
 
 void TestProjectBuildAndMciEmission(const std::filesystem::path& binary_root,
@@ -1182,7 +1479,7 @@ void TestMissingDefaultTargetFails(const std::filesystem::path& binary_root,
         Fail("project without default target should fail when no --target is provided");
     }
     ExpectOutputContains(missing_default_output,
-                         "project file does not declare a default target; pass --target <name>",
+                         "project file does not declare a default target; available targets: first, second; pass --target <name>",
                          "missing default target diagnostic");
 
     const std::filesystem::path explicit_target_build_dir = binary_root / "phase7_explicit_target_build";
@@ -1325,8 +1622,17 @@ void TestProjectTestTimeoutFailsDeterministically(const std::filesystem::path& b
         Fail("mc test with a hanging ordinary test should fail");
     }
     ExpectOutputContains(output,
+                         "ordinary tests target app: 1 cases, mode=checked, timeout=100 ms",
+                         "ordinary timeout should still print the ordinary test scope");
+    ExpectOutputContains(output,
                          "TIMEOUT ordinary tests for target app after 100 ms",
                          "ordinary test timeout should be reported deterministically");
+    ExpectOutputContains(output,
+                         "FAIL ordinary tests for target app (timeout)",
+                         "ordinary timeout should print a target-scoped failure verdict");
+    ExpectOutputContains(output,
+                         "FAIL target app",
+                         "mc test should print the overall target failure verdict on timeout");
 }
 
 void TestDuplicateTargetRootsFailEarly(const std::filesystem::path& binary_root,
@@ -1586,91 +1892,82 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
                                 const std::filesystem::path& binary_root,
                                 const std::filesystem::path& mc_path) {
     const std::filesystem::path project_path = source_root / "examples/real/evented_echo/build.toml";
-    const std::filesystem::path build_dir = binary_root / "phase13_evented_echo_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path run_test_rerun_build_dir = binary_root / "phase19_evented_echo_run_test_rerun_build";
+    std::filesystem::remove_all(run_test_rerun_build_dir);
+    ExerciseProjectRunTestRerunSequence(mc_path,
+                                        project_path,
+                                        run_test_rerun_build_dir,
+                                        [&](uint16_t port, std::string_view output_name, const std::string& context) {
+                                            ExerciseEventedEchoRoundTrip(mc_path,
+                                                                         project_path,
+                                                                         run_test_rerun_build_dir,
+                                                                         port,
+                                                                         output_name,
+                                                                         context);
+                                        },
+                                        ExpectEventedEchoTestOutput,
+                                        "phase19_evented_echo_run_output.txt",
+                                        "phase19_evented_echo_test_output.txt",
+                                        "phase19_evented_echo_rerun_output.txt",
+                                        "phase19 evented echo run-test-rerun");
 
-    ExerciseEventedEchoRoundTrip(mc_path,
-                                 project_path,
-                                 build_dir,
-                                 ReserveLoopbackPort(),
-                                 "phase13_evented_echo_run_output.txt",
-                                 "phase13 evented echo run");
-
-    const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                "test",
-                                                                "--project",
-                                                                project_path.generic_string(),
-                                                                "--build-dir",
-                                                                build_dir.generic_string()},
-                                                               build_dir / "phase13_evented_echo_test_output.txt",
-                                                               "phase13 evented echo test");
-    if (!test_outcome.exited || test_outcome.exit_code != 0) {
-        Fail("phase13 evented echo tests should pass:\n" + test_output);
-    }
-    ExpectOutputContains(test_output,
-                         "testing target echo",
-                         "phase13 evented echo test should announce the target under test");
-    ExpectOutputContains(test_output,
-                         "PASS parse_valid_port_test.test_parse_valid_port",
-                         "phase13 evented echo ordinary tests should include valid-port coverage");
-    ExpectOutputContains(test_output,
-                         "PASS parse_zero_port_test.test_parse_zero_port",
-                         "phase13 evented echo ordinary tests should include zero-port coverage");
-    ExpectOutputContains(test_output,
-                         "PASS parse_invalid_port_test.test_parse_invalid_port",
-                         "phase13 evented echo ordinary tests should include invalid-port coverage");
-    ExpectOutputContains(test_output,
-                         "3 tests, 3 passed, 0 failed",
-                         "phase13 evented echo test summary should be deterministic");
-
-    ExerciseEventedEchoRoundTrip(mc_path,
-                                 project_path,
-                                 build_dir,
-                                 ReserveLoopbackPort(),
-                                 "phase13_evented_echo_rerun_output.txt",
-                                 "phase13 evented echo rerun after tests");
+    const std::filesystem::path test_run_rerun_build_dir = binary_root / "phase19_evented_echo_test_run_rerun_build";
+    std::filesystem::remove_all(test_run_rerun_build_dir);
+    ExerciseProjectTestRunRerunSequence(mc_path,
+                                        project_path,
+                                        test_run_rerun_build_dir,
+                                        [&](uint16_t port, std::string_view output_name, const std::string& context) {
+                                            ExerciseEventedEchoRoundTrip(mc_path,
+                                                                         project_path,
+                                                                         test_run_rerun_build_dir,
+                                                                         port,
+                                                                         output_name,
+                                                                         context);
+                                        },
+                                        ExpectEventedEchoTestOutput,
+                                        "phase19_evented_echo_initial_test_output.txt",
+                                        "phase19_evented_echo_run_after_test_output.txt",
+                                        "phase19_evented_echo_retest_output.txt",
+                                        "phase19 evented echo test-run-rerun");
 
     const std::filesystem::path partial_write_project_path = source_root / "examples/real/evented_partial_write/build.toml";
-    const std::filesystem::path partial_write_build_dir = binary_root / "phase16_evented_partial_write_build";
-    std::filesystem::remove_all(partial_write_build_dir);
+    const std::filesystem::path partial_write_run_test_rerun_build_dir = binary_root / "phase19_evented_partial_write_run_test_rerun_build";
+    std::filesystem::remove_all(partial_write_run_test_rerun_build_dir);
+    ExerciseProjectRunTestRerunSequence(mc_path,
+                                        partial_write_project_path,
+                                        partial_write_run_test_rerun_build_dir,
+                                        [&](uint16_t port, std::string_view output_name, const std::string& context) {
+                                            ExercisePartialWriteRoundTrip(mc_path,
+                                                                          partial_write_project_path,
+                                                                          partial_write_run_test_rerun_build_dir,
+                                                                          port,
+                                                                          output_name,
+                                                                          context);
+                                        },
+                                        ExpectPartialWriteTestOutput,
+                                        "phase19_evented_partial_write_run_output.txt",
+                                        "phase19_evented_partial_write_test_output.txt",
+                                        "phase19_evented_partial_write_rerun_output.txt",
+                                        "phase19 evented partial-write run-test-rerun");
 
-    ExercisePartialWriteRoundTrip(mc_path,
-                                  partial_write_project_path,
-                                  partial_write_build_dir,
-                                  ReserveLoopbackPort(),
-                                  "phase16_evented_partial_write_run_output.txt",
-                                  "phase16 evented partial-write run");
-
-    const auto [partial_write_test_outcome, partial_write_test_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                                             "test",
-                                                                                             "--project",
-                                                                                             partial_write_project_path.generic_string(),
-                                                                                             "--build-dir",
-                                                                                             partial_write_build_dir.generic_string()},
-                                                                                            partial_write_build_dir / "phase18_evented_partial_write_test_output.txt",
-                                                                                            "phase18 evented partial-write test");
-    if (!partial_write_test_outcome.exited || partial_write_test_outcome.exit_code != 0) {
-        Fail("phase18 evented partial-write tests should pass:\n" + partial_write_test_output);
-    }
-    ExpectOutputContains(partial_write_test_output,
-                         "testing target partial-write",
-                         "phase18 evented partial-write test should announce the target under test");
-    ExpectOutputContains(partial_write_test_output,
-                         "PASS fill_response_pattern_test.test_fill_response_pattern",
-                         "phase18 evented partial-write ordinary tests should include response-pattern coverage");
-    ExpectOutputContains(partial_write_test_output,
-                         "PASS write_chunk_len_test.test_write_chunk_len",
-                         "phase18 evented partial-write ordinary tests should include write-window coverage");
-    ExpectOutputContains(partial_write_test_output,
-                         "2 tests, 2 passed, 0 failed",
-                         "phase18 evented partial-write test summary should be deterministic");
-
-    ExercisePartialWriteRoundTrip(mc_path,
-                                  partial_write_project_path,
-                                  partial_write_build_dir,
-                                  ReserveLoopbackPort(),
-                                  "phase18_evented_partial_write_rerun_output.txt",
-                                  "phase18 evented partial-write rerun after tests");
+    const std::filesystem::path partial_write_test_run_rerun_build_dir = binary_root / "phase19_evented_partial_write_test_run_rerun_build";
+    std::filesystem::remove_all(partial_write_test_run_rerun_build_dir);
+    ExerciseProjectTestRunRerunSequence(mc_path,
+                                        partial_write_project_path,
+                                        partial_write_test_run_rerun_build_dir,
+                                        [&](uint16_t port, std::string_view output_name, const std::string& context) {
+                                            ExercisePartialWriteRoundTrip(mc_path,
+                                                                          partial_write_project_path,
+                                                                          partial_write_test_run_rerun_build_dir,
+                                                                          port,
+                                                                          output_name,
+                                                                          context);
+                                        },
+                                        ExpectPartialWriteTestOutput,
+                                        "phase19_evented_partial_write_initial_test_output.txt",
+                                        "phase19_evented_partial_write_run_after_test_output.txt",
+                                        "phase19_evented_partial_write_retest_output.txt",
+                                        "phase19 evented partial-write test-run-rerun");
 }
 
 }  // namespace
@@ -1696,6 +1993,10 @@ int main(int argc, char** argv) {
     TestRunExitCodeAndArgs(binary_root, mc_path);
     TestProjectTestCommandSucceeds(binary_root, mc_path);
     TestProjectTestCommandFailsOnOrdinaryFailure(binary_root, mc_path);
+    TestMixedDirectSourceAndProjectOptionsFail(binary_root, mc_path);
+    TestProjectTestRejectsDirectSourceInvocation(binary_root, mc_path);
+    TestUnknownTargetListsAvailableTargets(binary_root, mc_path);
+    TestDisabledTestTargetListsEnabledTargets(binary_root, mc_path);
     TestMissingDefaultTargetFails(binary_root, mc_path);
     TestProjectMissingImportRootFails(source_root, binary_root, mc_path);
     TestProjectAmbiguousImportFails(source_root, binary_root, mc_path);

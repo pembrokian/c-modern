@@ -1,5 +1,6 @@
 #include "compiler/driver/driver.h"
 
+#include <array>
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -198,6 +199,64 @@ void PrintUsage(std::ostream& stream) {
     stream << kUsage;
 }
 
+std::string JoinNames(const std::vector<std::string>& names) {
+    std::string text;
+    for (std::size_t index = 0; index < names.size(); ++index) {
+        if (index > 0) {
+            text += ", ";
+        }
+        text += names[index];
+    }
+    return text;
+}
+
+std::vector<std::string> CollectEnabledTestTargetNames(const ProjectFile& project) {
+    std::vector<std::string> names;
+    for (const auto& [name, target] : project.targets) {
+        if (target.tests.enabled) {
+            names.push_back(name);
+        }
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+bool UsesProjectOnlyOptions(const CommandOptions& options) {
+    return options.project_path.has_value() || options.target_name.has_value() || options.mode_override.has_value() ||
+           options.env_override.has_value();
+}
+
+bool ValidateInvocationForCommand(std::string_view command,
+                                  const CommandOptions& options,
+                                  std::ostream& errors) {
+    if (command == "test") {
+        if (!options.source_path.empty()) {
+            errors << "mc test does not accept a direct source path; use --project <build.toml>\n";
+            return false;
+        }
+        return true;
+    }
+
+    if (command == "dump-paths") {
+        if (UsesProjectOnlyOptions(options)) {
+            errors << "mc dump-paths only supports direct-source mode; remove project-only options\n";
+            return false;
+        }
+        if (options.source_path.empty()) {
+            errors << "mc dump-paths requires a source path\n";
+            return false;
+        }
+        return true;
+    }
+
+    if (!options.source_path.empty() && UsesProjectOnlyOptions(options)) {
+        errors << "cannot mix a direct source path with project-only options; choose direct-source mode or --project mode\n";
+        return false;
+    }
+
+    return true;
+}
+
 std::optional<CommandOptions> ParseCommandOptions(int argc,
                                                   const char* argv[],
                                                   int start_index,
@@ -243,7 +302,7 @@ std::optional<CommandOptions> ParseCommandOptions(int argc,
         bool matched_flag = false;
         for (const auto& flag : bool_flags) {
             if (argument == flag.name) {
-                options.*(flag.member) = true;
+                (options.*(flag.member)) = true;
                 matched_flag = true;
                 break;
             }
@@ -1937,6 +1996,14 @@ bool RunOrdinaryTestsForTarget(const ProjectFile& project,
                                const std::filesystem::path& build_dir) {
     const std::filesystem::path generated_root = build_dir / "generated_tests" / target.name;
     const std::filesystem::path runner_path = generated_root / "__mc_test_runner.mc";
+    const std::string test_mode = options.mode_override.value_or(target.tests.mode);
+
+    std::cout << "ordinary tests target " << target.name << ": " << ordinary_tests.size()
+              << " cases, mode=" << test_mode;
+    if (target.tests.timeout_ms.has_value()) {
+        std::cout << ", timeout=" << *target.tests.timeout_ms << " ms";
+    }
+    std::cout << '\n';
 
     support::DiagnosticSink diagnostics;
     if (!WriteTextArtifact(runner_path, BuildOrdinaryRunnerSource(ordinary_tests), "test runner source", diagnostics)) {
@@ -1965,9 +2032,14 @@ bool RunOrdinaryTestsForTarget(const ProjectFile& project,
     }
     if (run_result.timed_out) {
         std::cout << "TIMEOUT ordinary tests for target " << target.name << " after " << target.tests.timeout_ms.value_or(0) << " ms" << '\n';
+        std::cout << "FAIL ordinary tests for target " << target.name << " (timeout)" << '\n';
         return false;
     }
-    return run_result.exited && run_result.exit_code == 0;
+
+    const bool ok = run_result.exited && run_result.exit_code == 0;
+    std::cout << (ok ? "PASS ordinary tests for target " : "FAIL ordinary tests for target ") << target.name
+              << " (" << ordinary_tests.size() << " cases)" << '\n';
+    return ok;
 }
 
 CapturedCommandResult RunExecutableCapture(const std::filesystem::path& executable_path,
@@ -2225,7 +2297,8 @@ std::vector<const ProjectTarget*> SelectTestTargets(const ProjectFile& project,
                     .file_path = project.path,
                     .span = support::kDefaultSourceSpan,
                     .severity = support::DiagnosticSeverity::kError,
-                    .message = "tests are not enabled for target '" + target->name + "'",
+                    .message = "tests are not enabled for target '" + target->name +
+                               "'; enabled test targets: " + JoinNames(CollectEnabledTestTargetNames(project)),
                 });
             } else {
                 targets.push_back(target);
@@ -2612,14 +2685,23 @@ int RunTest(const CommandOptions& options) {
         }
         if (!discovered->regression_cases.empty()) {
             const auto import_roots = ComputeProjectImportRoots(*project, *target, options.import_roots);
-            target_ok = RunCompilerRegressionCases(discovered->regression_cases,
-                                                  import_roots,
-                                                  graph->compile_graph.build_dir,
-                                                  target->tests.timeout_ms) && target_ok;
+            std::cout << "compiler regressions target " << target->name << ": " << discovered->regression_cases.size() << " cases";
+            if (target->tests.timeout_ms.has_value()) {
+                std::cout << ", timeout=" << *target->tests.timeout_ms << " ms";
+            }
+            std::cout << '\n';
+            const bool regressions_ok = RunCompilerRegressionCases(discovered->regression_cases,
+                                                                   import_roots,
+                                                                   graph->compile_graph.build_dir,
+                                                                   target->tests.timeout_ms);
+            std::cout << (regressions_ok ? "PASS compiler regressions for target " : "FAIL compiler regressions for target ")
+                      << target->name << " (" << discovered->regression_cases.size() << " cases)" << '\n';
+            target_ok = regressions_ok && target_ok;
         }
         if (discovered->ordinary_tests.empty() && discovered->regression_cases.empty()) {
-            std::cout << "no tests discovered for target " << target->name << '\n';
+            std::cout << "SKIP target " << target->name << " (no tests discovered)" << '\n';
         }
+        std::cout << (target_ok ? "PASS target " : "FAIL target ") << target->name << '\n';
         ok = ok && target_ok;
     }
 
@@ -2649,7 +2731,7 @@ int Run(int argc, const char* argv[]) {
 
     if (command == "check") {
         const auto options = ParseCommandOptions(argc, argv, 2, std::cerr);
-        if (!options.has_value()) {
+        if (!options.has_value() || !ValidateInvocationForCommand(command, *options, std::cerr)) {
             PrintUsage(std::cerr);
             return 1;
         }
@@ -2659,7 +2741,7 @@ int Run(int argc, const char* argv[]) {
 
     if (command == "build") {
         const auto options = ParseCommandOptions(argc, argv, 2, std::cerr);
-        if (!options.has_value()) {
+        if (!options.has_value() || !ValidateInvocationForCommand(command, *options, std::cerr)) {
             PrintUsage(std::cerr);
             return 1;
         }
@@ -2669,7 +2751,7 @@ int Run(int argc, const char* argv[]) {
 
     if (command == "run") {
         const auto options = ParseCommandOptions(argc, argv, 2, std::cerr);
-        if (!options.has_value()) {
+        if (!options.has_value() || !ValidateInvocationForCommand(command, *options, std::cerr)) {
             PrintUsage(std::cerr);
             return 1;
         }
@@ -2679,7 +2761,7 @@ int Run(int argc, const char* argv[]) {
 
     if (command == "test") {
         const auto options = ParseCommandOptions(argc, argv, 2, std::cerr);
-        if (!options.has_value()) {
+        if (!options.has_value() || !ValidateInvocationForCommand(command, *options, std::cerr)) {
             PrintUsage(std::cerr);
             return 1;
         }
@@ -2689,7 +2771,7 @@ int Run(int argc, const char* argv[]) {
 
     if (command == "dump-paths") {
         const auto options = ParseCommandOptions(argc, argv, 2, std::cerr);
-        if (!options.has_value()) {
+        if (!options.has_value() || !ValidateInvocationForCommand(command, *options, std::cerr)) {
             PrintUsage(std::cerr);
             return 1;
         }

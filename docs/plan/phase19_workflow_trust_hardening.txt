@@ -3,7 +3,7 @@ Phase 19 -- Workflow Trust Hardening On The Admitted Hosted Slice
 
 Status
 ------
-PLANNED
+COMPLETED (repository-bounded workflow trust hardening wave)
 
 Purpose
 -------
@@ -134,3 +134,18 @@ Acceptance criteria for this document
   the Phase 18 plateau decision.
 - The phase keeps its proof surface on already-admitted real projects rather
   than abstract tool-only cleanup.
+
+Implemented slice
+-----------------
+- `mc test` now prints explicit target-scoped ordinary-test and compiler-
+  regression scopes or verdicts so PASS, FAIL, and timeout outcomes are easier
+  to review without inferring which layer produced them.
+- mixed direct-source and project-mode invocations now fail early with a clear
+  diagnostic instead of silently drifting into the wrong artifact model, and
+  `mc test` remains explicitly project-only.
+- project target-selection diagnostics now list available or enabled targets so
+  invalid target names and test-disabled target selections fail more
+  specifically.
+- the admitted networking fixtures now prove both `run -> test -> rerun` and
+  `test -> run -> rerun` reuse sequences on the same build directories for
+  `evented_echo` and `evented_partial_write`.

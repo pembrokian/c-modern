@@ -123,6 +123,28 @@ std::string StripComment(std::string_view line) {
     return output;
 }
 
+std::string JoinSortedNames(const std::vector<std::string>& names) {
+    std::string text;
+    for (std::size_t index = 0; index < names.size(); ++index) {
+        if (index > 0) {
+            text += ", ";
+        }
+        text += names[index];
+    }
+    return text;
+}
+
+std::vector<std::string> SortedTargetNames(const ProjectFile& project) {
+    std::vector<std::string> names;
+    names.reserve(project.targets.size());
+    for (const auto& [name, target] : project.targets) {
+        (void)target;
+        names.push_back(name);
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
 std::optional<std::string> ParseQuotedString(std::string_view text) {
     if (text.size() < 2 || text.front() != '"' || text.back() != '"') {
         return std::nullopt;
@@ -718,7 +740,8 @@ const ProjectTarget* SelectProjectTarget(const ProjectFile& project,
             .file_path = project.path,
             .span = mc::support::kDefaultSourceSpan,
             .severity = DiagnosticSeverity::kError,
-            .message = "unknown target in project file: " + *explicit_target,
+            .message = "unknown target in project file: " + *explicit_target +
+                       "; available targets: " + JoinSortedNames(SortedTargetNames(project)),
         });
         return nullptr;
     }
@@ -735,7 +758,8 @@ const ProjectTarget* SelectProjectTarget(const ProjectFile& project,
         .file_path = project.path,
         .span = mc::support::kDefaultSourceSpan,
         .severity = DiagnosticSeverity::kError,
-        .message = "project file does not declare a default target; pass --target <name>",
+        .message = "project file does not declare a default target; available targets: " +
+                   JoinSortedNames(SortedTargetNames(project)) + "; pass --target <name>",
     });
     return nullptr;
 }
