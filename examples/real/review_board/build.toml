@@ -1,0 +1,39 @@
+schema = 1
+project = "review-board"
+default = "audit"
+
+[targets.audit]
+kind = "exe"
+root = "src/audit_main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.audit.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.audit.runtime]
+startup = "default"
+
+[targets.audit.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000
+
+[targets.focus]
+kind = "exe"
+root = "src/focus_main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.focus.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.focus.runtime]
+startup = "default"
+
+[targets.focus.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

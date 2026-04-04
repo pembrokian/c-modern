@@ -3,7 +3,7 @@ Phase 22 -- Project Graph And Separate-Compilation Pressure
 
 Status
 ------
-PLANNED
+COMPLETED (repository-bounded richer project-graph proof)
 
 Purpose
 -------
@@ -151,3 +151,20 @@ Acceptance criteria for this document
   admitted hosted slice.
 - The phase is explicit that real project graph proof, not abstract build-tool
   completeness, is its main purpose.
+
+Implemented slice
+-----------------
+- the repository now includes `/Users/ro/dev/c_modern/examples/real/review_board/`,
+  one admitted richer hosted project graph with two executable targets,
+  shared ordinary modules, and checked ordinary tests in the same manifest
+- the new `review_board` proof keeps the admitted slice narrow by staying on
+  the existing hosted file-I/O path while making target selection and
+  shared-module reuse observable through normal `mc run --project ...` and
+  `mc test --project ...` commands
+- `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` now proves default
+  versus explicit target selection, same-build-dir run or test or rerun reuse,
+  and separate-compilation behavior on that richer graph
+- the rebuild regressions now distinguish implementation-only edits in a deep
+  shared module from interface-visible edits in a direct shared dependency, so
+  the admitted separate-compilation contract is proven on a richer real project
+  rather than only on synthetic generated fixtures
