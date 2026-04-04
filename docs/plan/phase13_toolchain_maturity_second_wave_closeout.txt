@@ -1,0 +1,60 @@
+Phase 13 -- Toolchain Maturity Second-Wave Closeout
+===================================================
+
+Status
+------
+COMPLETED (repository-bounded second wave)
+
+Purpose
+-------
+Record the concrete second Phase 13 slice now admitted in the repository so
+the workflow pressure created by the hosted networking family is captured as
+implementation truth rather than left implied by plan updates alone.
+
+This is a repository closeout note, not a new architecture phase.
+It records the bounded Step 5 execution from
+`/Users/ro/dev/c_modern/docs/plan/admin/post_phase14_execution_plan.txt`
+without claiming that every long-term Phase 7 obligation from `plan.txt` is
+complete.
+
+What landed
+-----------
+- the hosted `examples/real/evented_echo/` project now runs through normal
+  `mc run --project ...` workflow proof rather than relying only on the
+  executable-only C++ harness
+- the same project now carries ordinary checked tests under `tests/` that
+  import a real project module through configured roots, so `mc test` exercises
+  the actual project graph instead of a duplicated test-only copy
+- the evented-echo project now includes a small exported helper module
+  `echo_core` so the networking family pressures the ordinary multi-module
+  workflow honestly without reintroducing the earlier imported-stdlib-wrapper
+  bootstrap workaround into the test surface
+- the Phase 7 tool regression suite now proves deterministic networking
+  project workflow for the new capability family by:
+  - starting the server through `mc run --project ...`
+  - performing a real loopback request-response roundtrip
+  - reusing the same build directory for `mc test --project ...`
+  - checking deterministic PASS lines and test summary output
+
+Bounded exclusions kept explicit
+--------------------------------
+- this closeout does not claim the earlier project-mode imported-stdlib-wrapper
+  duplication limiter is fully removed; the admitted evented-echo project still
+  uses local hosted ABI declarations for its runtime boundary
+- this closeout does not claim broader target-model expansion beyond hosted
+  executables plus hosted checked tests
+- this closeout does not replace the focused executable harness; it adds the
+  normal `mc` workflow proof that the second-wave capability family now needs
+
+Validation
+----------
+- focused tool regression proof via `mc_phase7_tool_unit`
+- broader repository regression proof via the full current CTest suite
+
+Closeout statement
+------------------
+The repository-bounded second Phase 13 wave is complete. The hosted networking
+family now pressures the ordinary project workflow through real `mc run` and
+`mc test` paths, ordinary tests import the real project modules they claim to
+cover, and project-mode behavior remains deterministic while the capability
+plateau grows.

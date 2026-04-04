@@ -40,6 +40,10 @@ inline bool IsPointerLikeType(const Type& type) {
     return type.kind == Type::Kind::kPointer;
 }
 
+inline bool IsUintPtrConvertibleType(const Type& type) {
+    return type.kind == Type::Kind::kPointer || type.kind == Type::Kind::kProcedure;
+}
+
 inline bool IsUintPtrType(const Type& type) {
     return type.kind == Type::Kind::kNamed && type.name == "uintptr";
 }

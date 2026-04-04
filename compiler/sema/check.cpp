@@ -441,6 +441,26 @@ Type StripType(Type type, const Module& module, TypeStripMode mode) {
     return StripTypeInternal(std::move(type), module, mode, active_names);
 }
 
+Type ResolveCallableShell(Type type, const Module& module) {
+    std::unordered_set<std::string> active_names;
+    while (type.kind == Type::Kind::kNamed) {
+        const TypeDeclSummary* type_decl = FindTypeDecl(module, type.name);
+        if (type_decl == nullptr || type_decl->kind != Decl::Kind::kTypeAlias) {
+            break;
+        }
+        if (!active_names.insert(type.name).second) {
+            break;
+        }
+
+        Type expanded = type_decl->aliased_type;
+        if (!type_decl->type_params.empty()) {
+            expanded = SubstituteTypeParams(std::move(expanded), type_decl->type_params, type.subtypes);
+        }
+        type = std::move(expanded);
+    }
+    return type;
+}
+
 TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,
                                         std::string_view module_name,
                                         const std::unordered_set<std::string>& local_type_names) {
@@ -456,6 +476,47 @@ TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,
     }
     qualified.aliased_type = RewriteImportedTypeNames(std::move(qualified.aliased_type), module_name, local_type_names, qualified.type_params);
     return qualified;
+}
+
+bool EquivalentLayoutInfo(const LayoutInfo& left, const LayoutInfo& right) {
+    return left.valid == right.valid && left.size == right.size && left.alignment == right.alignment &&
+           left.field_offsets == right.field_offsets;
+}
+
+bool EquivalentVariantSummary(const VariantSummary& left, const VariantSummary& right) {
+    if (left.name != right.name || left.payload_fields.size() != right.payload_fields.size()) {
+        return false;
+    }
+    for (std::size_t index = 0; index < left.payload_fields.size(); ++index) {
+        if (left.payload_fields[index].first != right.payload_fields[index].first ||
+            !(left.payload_fields[index].second == right.payload_fields[index].second)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool EquivalentTypeDeclSummary(const TypeDeclSummary& left, const TypeDeclSummary& right) {
+    if (left.kind != right.kind || left.name != right.name || left.type_params != right.type_params ||
+        left.is_packed != right.is_packed || left.is_abi_c != right.is_abi_c ||
+        !(left.aliased_type == right.aliased_type) || !EquivalentLayoutInfo(left.layout, right.layout) ||
+        left.fields.size() != right.fields.size() || left.variants.size() != right.variants.size()) {
+        return false;
+    }
+
+    for (std::size_t index = 0; index < left.fields.size(); ++index) {
+        if (left.fields[index].first != right.fields[index].first ||
+            !(left.fields[index].second == right.fields[index].second)) {
+            return false;
+        }
+    }
+
+    for (std::size_t index = 0; index < left.variants.size(); ++index) {
+        if (!EquivalentVariantSummary(left.variants[index], right.variants[index])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 Module RewriteImportedModuleSurfaceTypesInternal(const Module& module, std::string_view module_name) {
@@ -521,6 +582,10 @@ bool IsBoolType(const Type& type, const Module& module) {
 
 bool IsPointerLikeType(const Type& type, const Module& module) {
     return mc::sema::IsPointerLikeType(StripType(type, module, TypeStripMode::kAliasesOnly));
+}
+
+bool IsUintPtrConvertibleType(const Type& type, const Module& module) {
+    return mc::sema::IsUintPtrConvertibleType(StripType(type, module, TypeStripMode::kAliasesOnly));
 }
 
 bool IsUintPtrType(const Type& type, const Module& module) {
@@ -614,8 +679,8 @@ bool IsExplicitlyConvertible(const Type& expected, const Type& actual, const Mod
         }
     }
 
-    if ((IsPointerLikeType(stripped_expected, module) && IsUintPtrType(stripped_actual, module)) ||
-        (IsUintPtrType(stripped_expected, module) && IsPointerLikeType(stripped_actual, module))) {
+    if ((IsUintPtrConvertibleType(stripped_expected, module) && IsUintPtrType(stripped_actual, module)) ||
+        (IsUintPtrType(stripped_expected, module) && IsUintPtrConvertibleType(stripped_actual, module))) {
         return true;
     }
 
@@ -828,6 +893,19 @@ class Checker {
             }
             case ast::TypeExpr::Kind::kParen:
                 return SemanticTypeFromAst(type_expr->inner.get(), type_params);
+            case ast::TypeExpr::Kind::kProcedure: {
+                std::vector<Type> params;
+                params.reserve(type_expr->params.size());
+                for (const auto& param : type_expr->params) {
+                    params.push_back(SemanticTypeFromAst(param.get(), type_params));
+                }
+                std::vector<Type> returns;
+                returns.reserve(type_expr->returns.size());
+                for (const auto& ret : type_expr->returns) {
+                    returns.push_back(SemanticTypeFromAst(ret.get(), type_params));
+                }
+                return ProcedureType(std::move(params), std::move(returns));
+            }
         }
 
         return UnknownType();
@@ -941,6 +1019,10 @@ class Checker {
             for (const auto& type_decl : imported_module->type_decls) {
                 TypeDeclSummary qualified_type = RewriteImportedTypeDecl(type_decl, import_decl.module_name, imported_type_names);
                 if (!type_symbols_.emplace(qualified_type.name, qualified_type.kind).second) {
+                    const TypeDeclSummary* existing_type = FindTypeDecl(*module_, qualified_type.name);
+                    if (existing_type != nullptr && EquivalentTypeDeclSummary(*existing_type, qualified_type)) {
+                        continue;
+                    }
                     Report(import_decl.span, "duplicate imported type symbol: " + qualified_type.name);
                     continue;
                 }
@@ -1149,6 +1231,14 @@ class Checker {
                 ValidateTypeExpr(type_expr->inner.get(), type_params, type_expr->span);
                 if (type_expr->length_expr != nullptr && !EvaluateArrayLength(type_expr->length_expr.get(), true).has_value()) {
                     Report(type_expr->length_expr->span, "array length must be an integer compile-time constant");
+                }
+                return;
+            case ast::TypeExpr::Kind::kProcedure:
+                for (const auto& param : type_expr->params) {
+                    ValidateTypeExpr(param.get(), type_params, param->span);
+                }
+                for (const auto& ret : type_expr->returns) {
+                    ValidateTypeExpr(ret.get(), type_params, ret->span);
                 }
                 return;
         }
@@ -1794,7 +1884,7 @@ class Checker {
             return variant_ctor_type;
         }
 
-        const Type stripped_callee = StripType(callee_type, *module_, TypeStripMode::kAliasesAndDistinct);
+        const Type stripped_callee = ResolveCallableShell(callee_type, *module_);
         if (stripped_callee.kind != Type::Kind::kProcedure) {
             Report(expr.left->span, "call target must have procedure type");
             return UnknownType();
@@ -2478,6 +2568,17 @@ std::unique_ptr<ast::SourceFile> ParseFile(const std::filesystem::path& path, su
 }
 
 Module BuildExportedModuleSurfaceInternal(const Module& module, const ast::SourceFile& source_file) {
+    const auto collect_referenced_named_types = [&](const auto& self,
+                                                    const Type& type,
+                                                    std::unordered_set<std::string>& needed_type_names) -> void {
+        for (const auto& subtype : type.subtypes) {
+            self(self, subtype, needed_type_names);
+        }
+        if (type.kind == Type::Kind::kNamed) {
+            needed_type_names.insert(type.name);
+        }
+    };
+
     Module exported;
     exported.imports = module.imports;
     if (!source_file.has_export_block) {
@@ -2485,14 +2586,16 @@ Module BuildExportedModuleSurfaceInternal(const Module& module, const ast::Sourc
     }
 
     std::unordered_set<std::string> exported_names(source_file.export_block.names.begin(), source_file.export_block.names.end());
+    std::unordered_set<std::string> needed_type_names;
     for (const auto& function : module.functions) {
         if (exported_names.contains(function.name)) {
             exported.functions.push_back(function);
-        }
-    }
-    for (const auto& type_decl : module.type_decls) {
-        if (exported_names.contains(type_decl.name)) {
-            exported.type_decls.push_back(type_decl);
+            for (const auto& param_type : function.param_types) {
+                collect_referenced_named_types(collect_referenced_named_types, param_type, needed_type_names);
+            }
+            for (const auto& return_type : function.return_types) {
+                collect_referenced_named_types(collect_referenced_named_types, return_type, needed_type_names);
+            }
         }
     }
     for (const auto& global : module.globals) {
@@ -2509,6 +2612,37 @@ Module BuildExportedModuleSurfaceInternal(const Module& module, const ast::Sourc
         }
         if (!filtered.names.empty()) {
             exported.globals.push_back(std::move(filtered));
+            collect_referenced_named_types(collect_referenced_named_types, global.type, needed_type_names);
+        }
+    }
+
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& type_decl : module.type_decls) {
+            if (!exported_names.contains(type_decl.name) && !needed_type_names.contains(type_decl.name)) {
+                continue;
+            }
+            const auto already_exported = std::find_if(exported.type_decls.begin(),
+                                                       exported.type_decls.end(),
+                                                       [&](const TypeDeclSummary& existing) {
+                                                           return existing.name == type_decl.name;
+                                                       });
+            if (already_exported != exported.type_decls.end()) {
+                continue;
+            }
+
+            exported.type_decls.push_back(type_decl);
+            changed = true;
+            collect_referenced_named_types(collect_referenced_named_types, type_decl.aliased_type, needed_type_names);
+            for (const auto& field : type_decl.fields) {
+                collect_referenced_named_types(collect_referenced_named_types, field.second, needed_type_names);
+            }
+            for (const auto& variant : type_decl.variants) {
+                for (const auto& payload_field : variant.payload_fields) {
+                    collect_referenced_named_types(collect_referenced_named_types, payload_field.second, needed_type_names);
+                }
+            }
         }
     }
     BuildModuleLookupMaps(exported);

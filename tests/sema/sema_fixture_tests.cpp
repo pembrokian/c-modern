@@ -160,6 +160,8 @@ int main(int argc, char** argv) {
         {"noalias_signature_ok.mc", "noalias_signature_ok.sema.txt", {}, true},
         {"tuple_return_ok.mc", "tuple_return_ok.sema.txt", {}, true},
         {"array_length_non_constant_bad.mc", "array_length_non_constant_bad.errors.txt", {}, false},
+        {"distinct_type_safety_ok.mc", "distinct_type_safety_ok.sema.txt", {}, true},
+        {"distinct_cross_conversion_bad.mc", "distinct_cross_conversion_bad.errors.txt", {}, false},
         {"distinct_implicit_conversion_bad.mc", "distinct_implicit_conversion_bad.errors.txt", {}, false},
         {"distinct_non_scalar_bad.mc", "distinct_non_scalar_bad.errors.txt", {}, false},
         {"error_return_order_bad.mc", "error_return_order_bad.errors.txt", {}, false},

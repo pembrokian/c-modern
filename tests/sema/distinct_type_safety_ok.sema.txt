@@ -1,0 +1,8 @@
+SemanticModule
+  TypeDecl name=UserId kind=distinct
+    AliasedType=i32
+  TypeDecl name=GroupId kind=distinct
+    AliasedType=i32
+  Function name=parse_user params=[i32] returns=[UserId]
+  Function name=store_group params=[GroupId] returns=[i32]
+  Function name=main params=[] returns=[i32]

@@ -39,6 +39,30 @@ std::string RenderTypeInline(const ast::TypeExpr& type) {
                    (type.inner != nullptr ? RenderTypeInline(*type.inner) : std::string("<?>"));
         case ast::TypeExpr::Kind::kParen:
             return "(" + (type.inner != nullptr ? RenderTypeInline(*type.inner) : std::string("<?>")) + ")";
+        case ast::TypeExpr::Kind::kProcedure: {
+            std::ostringstream stream;
+            stream << "func(";
+            for (std::size_t index = 0; index < type.params.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                stream << RenderTypeInline(*type.params[index]);
+            }
+            stream << ')';
+            if (type.returns.size() == 1) {
+                stream << ' ' << RenderTypeInline(*type.returns.front());
+            } else if (!type.returns.empty()) {
+                stream << " (";
+                for (std::size_t index = 0; index < type.returns.size(); ++index) {
+                    if (index > 0) {
+                        stream << ", ";
+                    }
+                    stream << RenderTypeInline(*type.returns[index]);
+                }
+                stream << ')';
+            }
+            return stream.str();
+        }
     }
 
     return "<?>";
@@ -290,6 +314,19 @@ Type TypeFromAst(const ast::TypeExpr* type_expr) {
                              type_expr->length_expr != nullptr ? RenderExprInline(*type_expr->length_expr) : std::string("?"));
         case ast::TypeExpr::Kind::kParen:
             return TypeFromAst(type_expr->inner.get());
+        case ast::TypeExpr::Kind::kProcedure: {
+            std::vector<Type> params;
+            params.reserve(type_expr->params.size());
+            for (const auto& param : type_expr->params) {
+                params.push_back(TypeFromAst(param.get()));
+            }
+            std::vector<Type> returns;
+            returns.reserve(type_expr->returns.size());
+            for (const auto& ret : type_expr->returns) {
+                returns.push_back(TypeFromAst(ret.get()));
+            }
+            return ProcedureType(std::move(params), std::move(returns));
+        }
     }
 
     return UnknownType();

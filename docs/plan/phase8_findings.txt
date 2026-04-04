@@ -119,15 +119,22 @@ Deferred canonical networking entries
 
 single-threaded evented echo server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Classification: stdlib or runtime gap
-- Enabling gap: no admitted portable `io` poller API, no admitted portable
-	`net` module, and no repository-owned hosted proof path for scalable
-	readiness-based I/O
-- Owner: Phase 6 stdlib and runtime boundary maturity, not Phase 8 examples or
-	driver-local workarounds
-- Phase 14B decision: retain as the lead evented-networking canonical entry
-	and do not weaken it into a synchronous surrogate
+- Status: implemented
+- Classification: admitted canonical networking pressure
+- Resolution: the repository now has a project-mode hosted proof path through
+	`examples/real/evented_echo/` plus the executable harness loopback driver,
+	so the former Phase 6 owner gap is closed for the lead evented echo entry
+- What it exposed: the first honest hosted networking slice currently works
+	best with plain `i32` handles and caller-owned parallel poller output
+	buffers rather than the cleaner long-term `File` plus `Event` surface, and
+	project-mode imported stdlib wrappers still duplicate `errors.is_ok` in MIR
+	for this path
+- Owner: Phase 6 `io` and `net` boundary work landed the needed runtime and
+	stdlib support; the remaining project-mode imported-wrapper duplication is a
+	compiler owner issue rather than an example-local problem
+- Proof: `examples/real/evented_echo/build.toml` exercised by
+	`phase14_evented_echo_project_build` in
+	`tests/codegen/codegen_executable_tests.cpp`
 
 partial-write response state machine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -167,14 +174,16 @@ Concurrency canonical entries
 
 shared counter with mutex
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Classification: stdlib or runtime gap
-- Enabling gap: `sync` remains deferred, hosted thread spawn and join are not
-	admitted, and there is no repository-owned mutex proof surface for ordinary
-	programs
-- Owner: Phase 6 `sync` admission and hosted runtime boundary work
-- Phase 14B decision: treat this as the first honest thread-based canonical
-	pressure target once `sync` exists, not as a vague future threaded example
+- Status: implemented
+- Classification: executable proof landed
+- Resolution: admitted a narrow hosted `sync` slice with thread spawn or join
+	plus mutex init, lock, and unlock, then proved shared-state coordination in
+	a direct-source canonical executable that increments one protected counter
+	from two worker threads and checks the final total after deterministic joins
+- Proof: examples/canonical/shared_counter_mutex.mc now builds and runs in
+	tests/codegen/codegen_executable_tests.cpp
+- Remaining limit: this closes only the first mutex-based concurrency entry;
+	condvar and atomic follow-on entries remain explicitly separate blocked work
 
 producer-consumer with condition variable
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -202,44 +211,51 @@ Deferred next-wave canonical candidates
 
 bounded ring buffer
 ~~~~~~~~~~~~~~~~~~~
-- Status: deferred candidate
-- Classification: admission sequencing choice
-- Current posture: likely expressible on the current admitted core, but not
-	yet chosen as a repository-owned canonical executable proof
-- Phase 14B decision: keep as a plausible next-wave candidate for container
-	and arithmetic pressure after the admission matrix refresh, rather than
-	auto-admitting it without proof wiring
+- Status: implemented
+- Classification: executable proof landed
+- Resolution: added one direct-source canonical program that keeps the ring as
+	a fixed-capacity value type, proves wraparound through `%` arithmetic,
+	preserves explicit `head` and `len` invariants, and validates logical FIFO
+	order through wrapped slice indexing without introducing concurrency or new
+	stdlib surface
+- Proof: examples/canonical/bounded_ring_buffer.mc now builds and runs in
+	tests/codegen/codegen_executable_tests.cpp
 
 distinct type safety
 ~~~~~~~~~~~~~~~~~~~~
-- Status: deferred candidate
-- Classification: admission sequencing choice
-- Current posture: sema and MIR already support the underlying feature set,
-	but this exact canonical program is not yet tracked as an admitted executable
-	artifact
-- Phase 14B decision: keep as a focused semantic-pressure candidate for a
-	later executable wave rather than inferring Phase 8 closure from lower-layer
-	support
+- Status: implemented
+- Classification: sema authority confirmed
+- Resolution: added a positive sema admission fixture for distinct boundary
+	use and a negative cross-distinct rejection fixture so Phase 8 now proves
+	logical type separation directly instead of inferring it from lower-layer
+	support alone
+- Proof: tests/sema/distinct_type_safety_ok.mc and
+	tests/sema/distinct_cross_conversion_bad.mc, with
+	tests/mir/explicit_conversion.mc retained as explicit-conversion lowering
+	reinforcement
 
 fixed array, slice, and buffer conversion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: deferred candidate
-- Classification: admission sequencing choice
-- Current posture: lower-layer conversion fixtures exist, but the fuller
-	canonical program is not yet admitted as a repository-owned executable proof
-- Phase 14B decision: keep explicit as a next-wave candidate for container
-	model pressure rather than assuming MIR coverage is sufficient
+- Status: implemented
+- Classification: executable proof landed
+- Resolution: added one direct-source canonical program that exercises
+	fixed-array to slice conversion, writable buffer-backed slice use through the
+	admitted mem helpers, and explicit buffer-to-slice conversion in a normal
+	executable path
+- Proof: examples/canonical/fixed_array_slice_buffer_conversion.mc now builds
+	and runs in tests/codegen/codegen_executable_tests.cpp, while the existing
+	MIR fixtures keep the lowered conversion forms explicit
 
 hosted default allocator use
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: deferred candidate
-- Classification: admission sequencing choice
-- Current posture: the necessary `mem` surface exists and is already exercised
-	indirectly, but the standalone allocator-convention canonical program is not
-	yet an admitted artifact
-- Phase 14B decision: keep as a small executable candidate for a future wave
-	if the repository wants a clearer default-allocator proof separate from file
-	loading and arena usage
+- Status: implemented
+- Classification: executable proof landed
+- Resolution: added one direct-source canonical program that isolates hosted
+	default-allocator use from fs, arena, and conversion pressure by acquiring
+	the default allocator explicitly, allocating ordinary buffers through it, and
+	proving ordinary cleanup and length checks on the hosted path
+- Proof: examples/canonical/hosted_default_allocator_use.mc now builds and runs
+	in tests/codegen/codegen_executable_tests.cpp
 
 arena allocator through the common protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

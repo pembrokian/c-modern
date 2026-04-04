@@ -1,0 +1,388 @@
+Post-Phase-14 Execution Plan And Ranked Backlog
+===============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Turn the current repository posture after the Phase 14 closeout into one
+concrete execution order with an explicit ranked backlog.
+
+This document is intentionally cross-phase.
+It does not introduce a new architecture phase after Phase 8.
+It sequences the next repository work across the already-established owners:
+
+- Phase 12 ownership for stdlib and runtime maturity
+- Phase 13 ownership for toolchain and workflow maturity
+- Phase 14 ownership for pressure-program expansion and routing
+- the original bootstrap-plan Phase 9 release-hardening work only after the
+  repository decides where to pause capability growth for a first public cut
+
+Repository status note
+----------------------
+- The repository-specific semantic-authority closure is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase9_semantic_authority_expansion.txt`.
+- The repository-specific MIR-authority closure is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase10_mir_authority_expansion.txt`.
+- The repository-specific backend-deepening closure is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase11_backend_deepening_closeout.txt`.
+- The repository-bounded first Phase 12 stdlib/runtime maturity wave is
+  recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase12_stdlib_runtime_maturity_closeout.txt`.
+- The repository-bounded first Phase 13 toolchain maturity wave is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_closeout.txt`.
+- The repository-bounded first Phase 14 pressure-program hardening wave is
+  recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase14_pressure_program_expansion_closeout.txt`.
+- The repository-bounded second Phase 13 workflow tightening wave is recorded
+  in
+  `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_second_wave_closeout.txt`.
+- The current hosted release-hardening support statement is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`.
+- The repository therefore needs an explicit "what next" plan more than it
+  needs another closeout note.
+
+Problem being solved
+--------------------
+- The repository now has a real hosted compiler and toolchain slice, plus
+  explicit pressure evidence, but the main remaining growth is no longer basic
+  bring-up.
+- The next work is spread across stdlib/runtime maturity, toolchain maturity,
+  and pressure-program admission, so priority can drift unless one ranked
+  sequence is written down.
+- The main risk is not lack of ideas, but loss of leverage:
+  - landing more examples before the owning library or workflow layer is honest
+  - widening library breadth before current boundaries are pressure-tested
+  - starting release hardening before the next capability stop-point is chosen
+  - treating blocked networking, sync, or MMIO pressure as vague future work
+    instead of named owner work
+
+Core rule
+---------
+- Expand breadth only where the owning lower layer is already honest enough to
+  support it.
+- Use Phase 14 pressure to expose gaps, not to hide them.
+- Prefer one narrow newly admitted capability family with real proof over many
+  half-admitted module shells.
+- Do not start the original bootstrap-plan release-hardening pass until the
+  repository intentionally chooses the capability plateau it wants to ship.
+
+Default strategic choice
+------------------------
+Unless near-term repository goals say otherwise, prefer a narrow networking
+foundation before a narrow concurrency foundation.
+
+Why this is the default:
+- it unlocks the lead blocked evented-networking canonical entries rather than
+  only one family of threaded pressure
+- it exercises Phase 12 stdlib/runtime boundaries and Phase 13 project-mode
+  workflow together
+- it creates room for a bounded real utility family beyond the current text,
+  traversal, hashing, and parser utilities
+
+When to override the default:
+- if current repository goals need local thread or atomic pressure sooner than
+  networked I/O pressure
+- if a credible hosted poller and net surface cannot be stated narrowly enough
+  yet, while a narrow `sync` surface can
+
+Execution order
+---------------
+
+Step 1 -- Close One More Current-Surface Pressure Wave
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Deepen confidence in the already-admitted core before opening a new module
+family.
+
+Scope
+~~~~~
+Close out any remaining next-wave canonical programs that require no new Phase
+12 module family.
+
+Preferred candidates
+~~~~~~~~~~~~~~~~~~~~
+- none remaining
+
+Current status
+~~~~~~~~~~~~~~
+- bounded ring buffer is now implemented with executable proof
+- distinct type safety is now implemented with sema-backed proof
+- fixed array, slice, and buffer conversion is now implemented with executable
+  proof plus existing MIR reinforcement
+- hosted default allocator use is now implemented as a standalone executable
+  proof
+- the repository has now landed the named current-surface candidates tracked in
+  this Step 1 wave and can treat the current-surface closeout as complete
+
+Deliverables
+~~~~~~~~~~~~
+- deterministic executable or sema-backed proof for each newly admitted
+  candidate in the current-surface wave
+- updates to `phase8_admission_matrix.txt`, `phase8_findings.txt`, and the
+  relevant test layers
+
+Exit criteria
+~~~~~~~~~~~~~
+- the admitted current-surface entries are recorded consistently across proof,
+  admission matrix, and findings log without new Phase 12 breadth
+- the repository can move to Step 2 without leaving any named current-surface
+  candidate as ambient deferred work
+- any rejected candidate is recorded with a concrete owner-local reason rather
+  than left as ambient future work
+
+Step 2 -- Freeze The Next Capability Family
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Pick exactly one new Phase 12 capability family for the next expansion wave.
+
+Chosen decision
+~~~~~~~~~~~~~~~
+- Option A is now the chosen next wave: portable `io` poller plus narrow `net`
+- Option B remains the next fallback after Option A if networking admission
+  stalls or proves less truthful than expected, but it is not started in
+  parallel
+- Option C remains deferred unless a concrete hardware-boundary consumer moves
+  ahead of both networking and sync pressure
+
+Decision options
+~~~~~~~~~~~~~~~~
+- Option A: portable `io` poller plus narrow `net`
+- Option B: narrow `sync` plus hosted thread boundary
+- Option C: narrow `hal` admission if an actual hardware-boundary consumer now
+  exists
+
+Required output
+~~~~~~~~~~~~~~~
+- a short owner document or bounded update to the relevant Phase 12 plan that
+  names the consumer matrix, minimal API surface, proof layer, and explicit
+  exclusions for the chosen family
+- this document and the Phase 12 plan now treat Option A as the active next
+  capability family and Option B as queued follow-up work rather than a second
+  simultaneous start
+
+Hard rule
+~~~~~~~~~
+- do not start two new capability families in parallel
+- the repository may queue Option B after Option A, but must not implement
+  both waves concurrently
+
+Step 3 -- Execute The Chosen Phase 12 Second Wave
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Land one narrow new library and runtime family honestly, with proof.
+
+If networking is chosen
+~~~~~~~~~~~~~~~~~~~~~~~
+- admit the smallest truthful poller surface needed for readiness-based I/O
+- admit the smallest truthful `net` surface needed for one server path and one
+  client path
+- keep handle ownership, close behavior, and readiness transitions explicit
+- keep unsupported portability or scaling claims out of scope
+
+If sync is chosen
+~~~~~~~~~~~~~~~~~
+- admit the smallest truthful hosted thread spawn and join path
+- admit mutex first, then condvar or atomic surfaces only if required by the
+  chosen pressure proofs
+- keep memory-order and blocking semantics explicit in the public surface
+
+If hal is chosen
+~~~~~~~~~~~~~~~~
+- admit only the narrow MMIO boundary needed by the chosen proof
+- keep hardware-facing semantics in `hal`, not in examples or backend-local
+  conventions
+
+Deliverables
+~~~~~~~~~~~~
+- implementation under `stdlib/` and `runtime/hosted/` as needed
+- focused library and executable regressions under `tests/stdlib/`,
+  `tests/codegen/`, and `tests/tool/`
+- closeout-worthy documentation updates once the wave is stable
+
+Exit criteria
+~~~~~~~~~~~~~
+- one new capability family is implemented, documented, and proven narrowly
+- blocked Phase 8 entries tied to that family can now move forward honestly
+
+Step 4 -- Re-open Phase 14 Against The New Capability Family
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Convert newly honest owner support into real pressure-program admission.
+
+Expected work
+~~~~~~~~~~~~~
+- admit the lead blocked canonical entry unlocked by the chosen family
+- add one bounded real utility only if it pressures something distinct from the
+  canonical proof
+- route all findings back to the smallest correct owner immediately
+
+Examples
+~~~~~~~~
+- networking path: evented echo server, then client request-response or a very
+  small poll-driven utility
+- sync path: shared counter with mutex, then producer-consumer only if the
+  condvar surface is actually admitted
+- hal path: MMIO register access canonical proof before any broader device-side
+  utility
+
+Exit criteria
+~~~~~~~~~~~~~
+- at least one previously blocked canonical entry becomes implemented and
+  proven
+- the findings log records what the new pressure actually exposed
+
+Step 5 -- Phase 13 Second-Wave Workflow Tightening
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Deepen the ordinary multi-module workflow only after the next capability wave
+creates real pressure on it.
+
+Current status
+~~~~~~~~~~~~~~
+- implemented for the hosted networking family
+- `examples/real/evented_echo/` now proves normal `mc run --project ...`
+  workflow in the Phase 7 tool harness via real loopback roundtrip pressure
+- the same project now proves normal `mc test --project ...` workflow with
+  ordinary checked tests that import the real project helper module through the
+  configured graph
+
+Scope
+~~~~~
+- ordinary test ergonomics
+- richer deterministic reporting
+- more graph and target validation around larger project fixtures
+- rebuild and invalidation trust for the new capability family and its proofs
+
+Exit criteria
+~~~~~~~~~~~~~
+- the new project-scale proofs rely on the normal `mc` workflow without ad hoc
+  fixture glue
+- project-mode behavior remains deterministic as the examples grow
+
+Step 6 -- Original Bootstrap-Plan Phase 9 Release Hardening
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective
+~~~~~~~~~
+Only after the repository intentionally pauses capability growth, perform the
+release-hardening pass from the original bootstrap plan.
+
+Current status
+~~~~~~~~~~~~~~
+- implemented for the current hosted plateau via
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`
+- README now carries the supported hosted slice, build-from-source path,
+  common workflow commands, and known limitations for the admitted repository
+  surface
+
+Scope
+~~~~~
+- tighten diagnostics and error messages
+- document supported host target set
+- publish installation and usage docs
+- audit checked versus release behavior at the chosen capability plateau
+- publish a known-limitations list
+
+Exit criteria
+~~~~~~~~~~~~~
+- the repository can honestly describe the supported hosted slice and its
+  limits without promising the blocked next-wave items
+
+Ranked backlog
+--------------
+
+Rank 1 -- Current-core canonical pressure wave
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: Phase 14
+- why now: cheapest leverage; deepens truth without new library breadth
+- first tasks: treat the current-surface wave as closed out and move to the
+  next capability-family decision with the Phase 8 evidence now recorded
+- proof target: consistent closeout between proof artifacts, admission matrix,
+  findings log, and this ranked execution order
+
+Rank 2 -- Narrow poller plus net admission
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: Phase 12
+- why now: best default unlock for blocked canonical entries and a new real
+  utility family
+- status: chosen next capability family
+- first tasks: land the bounded Phase 12 owner plan for portable `io` poller
+  plus narrow `net`, then implement it without starting `sync` work in
+  parallel
+- proof target: evented server or client canonical entry plus focused stdlib
+  and tool regressions
+
+Rank 3 -- Narrow sync admission
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: Phase 12
+- why now: queued fallback after the chosen networking wave if repository
+  pressure later favors local concurrency or if the networking wave stalls
+- status: active next capability family
+- first tasks: land the bounded Phase 12 owner plan for hosted thread spawn or
+  join plus mutex, then prove it through the shared-counter canonical entry
+- proof target: shared counter with mutex canonical proof
+
+Rank 4 -- Phase 13 second-wave workflow maturity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: Phase 13
+- why now: the next capability family will expose real project and test-harness
+  pressure that the first-wave toolchain slice only partly covers
+- status: implemented for the hosted networking family
+- first tasks: preserve the admitted evented-echo workflow proof as the project
+  surface grows, and route any new multi-module workflow friction back to the
+  smallest correct Phase 13 owner
+- proof target: new capability-family projects continue to run cleanly through
+  `mc run` and `mc test`
+
+Rank 5 -- Text and allocation realism follow-up
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: Phase 12
+- why now: repeated parser, hashing, and future networking utilities will keep
+  exposing owned-text and buffer-helper friction
+- first tasks: audit repeated owned-text or allocator boilerplate before adding
+  any new helper surface
+- proof target: narrow stdlib regressions and one utility simplification that
+  removes real boilerplate without hiding ownership
+
+Rank 6 -- Narrow hal or MMIO admission
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: Phase 12
+- why now: meaningful only if a real hardware-boundary consumer exists; still
+  worth keeping explicit so the capability does not vanish from view
+- first tasks: confirm consumer matrix and minimal API spelling
+- proof target: MMIO register access canonical proof
+
+Rank 7 -- Release hardening and first public cut
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- owner: original bootstrap-plan Phase 9 work
+- why now: needed for a public cut, but only after the desired capability
+  plateau is chosen
+- status: repository-bounded hosted support note published
+- first tasks: keep the supported-host statement, known limitations, and usage
+  docs aligned with the currently admitted slice as follow-on capability work
+  lands
+- proof target: reproducible documented workflow for the chosen supported slice
+
+Parked until later
+------------------
+- multiple backend targets before the first hosted target is deeper
+- package management or remote dependency fetching
+- self-hosting
+- broad stdlib shells without a consumer matrix
+- replacing the current C++ proof harness wholesale
+
+Acceptance criteria for this document
+-------------------------------------
+- The repository has one explicit post-Phase-14 execution order rather than
+  relying on closeout notes to imply priority.
+- The next work is ranked by leverage and owner rather than by whichever
+  example or subsystem happens to be nearby.
+- The plan keeps the repository focused on one new capability family at a time
+  while still using Phase 14 pressure to validate each deeper layer.

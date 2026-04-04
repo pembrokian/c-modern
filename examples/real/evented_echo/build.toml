@@ -1,0 +1,21 @@
+schema = 1
+project = "evented-echo"
+default = "echo"
+
+[targets.echo]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.echo.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.echo.runtime]
+startup = "default"
+
+[targets.echo.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

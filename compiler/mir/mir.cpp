@@ -219,6 +219,30 @@ std::string RenderTypeExprInline(const ast::TypeExpr& type) {
                    (type.inner != nullptr ? RenderTypeExprInline(*type.inner) : std::string("<?>"));
         case ast::TypeExpr::Kind::kParen:
             return "(" + (type.inner != nullptr ? RenderTypeExprInline(*type.inner) : std::string("<?>")) + ")";
+        case ast::TypeExpr::Kind::kProcedure: {
+            std::ostringstream stream;
+            stream << "func(";
+            for (std::size_t index = 0; index < type.params.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                stream << RenderTypeExprInline(*type.params[index]);
+            }
+            stream << ')';
+            if (type.returns.size() == 1) {
+                stream << ' ' << RenderTypeExprInline(*type.returns.front());
+            } else if (!type.returns.empty()) {
+                stream << " (";
+                for (std::size_t index = 0; index < type.returns.size(); ++index) {
+                    if (index > 0) {
+                        stream << ", ";
+                    }
+                    stream << RenderTypeExprInline(*type.returns[index]);
+                }
+                stream << ')';
+            }
+            return stream.str();
+        }
     }
     return "<?>";
 }
@@ -364,6 +388,10 @@ bool IsMemoryOrderType(const Module& module, const sema::Type& type) {
 
 bool IsPointerLikeType(const Module& module, const sema::Type& type) {
     return sema::IsPointerLikeType(CanonicalMirType(module, type));
+}
+
+bool IsUintPtrConvertibleType(const Module& module, const sema::Type& type) {
+    return sema::IsUintPtrConvertibleType(CanonicalMirType(module, type));
 }
 
 bool IsUintPtrType(const Module& module, const sema::Type& type) {
@@ -611,10 +639,10 @@ ExplicitConversionKind ClassifyMirConversion(const Module& module, const sema::T
 
     const sema::Type stripped_source = StripMirAliasOrDistinct(module, source_type);
     const sema::Type stripped_target = StripMirAliasOrDistinct(module, target_type);
-    if (sema::IsPointerLikeType(stripped_source) && sema::IsUintPtrType(stripped_target)) {
+    if (sema::IsUintPtrConvertibleType(stripped_source) && sema::IsUintPtrType(stripped_target)) {
         return ExplicitConversionKind::kPointerToInt;
     }
-    if (sema::IsUintPtrType(stripped_source) && sema::IsPointerLikeType(stripped_target)) {
+    if (sema::IsUintPtrType(stripped_source) && sema::IsUintPtrConvertibleType(stripped_target)) {
         return ExplicitConversionKind::kIntToPointer;
     }
     const bool source_wrapped = stripped_source != source_type;
@@ -3843,7 +3871,7 @@ bool ValidateModule(const Module& module,
                             ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kPointerToInt) {
                             report("pointer_to_int must encode a pointer-to-uintptr conversion family in function " + function.name);
                         }
-                        if (operand_types.size() == 1 && (!IsPointerLikeType(module, operand_types.front()) || !IsUintPtrType(module, instruction.type))) {
+                        if (operand_types.size() == 1 && (!IsUintPtrConvertibleType(module, operand_types.front()) || !IsUintPtrType(module, instruction.type))) {
                             report("pointer_to_int requires pointer source and uintptr target in function " + function.name);
                         }
                         break;
@@ -3864,7 +3892,7 @@ bool ValidateModule(const Module& module,
                             ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kIntToPointer) {
                             report("int_to_pointer must encode a uintptr-to-pointer conversion family in function " + function.name);
                         }
-                        if (operand_types.size() == 1 && (!IsUintPtrType(module, operand_types.front()) || !IsPointerLikeType(module, instruction.type))) {
+                        if (operand_types.size() == 1 && (!IsUintPtrType(module, operand_types.front()) || !IsUintPtrConvertibleType(module, instruction.type))) {
                             report("int_to_pointer requires uintptr source and pointer target in function " + function.name);
                         }
                         break;

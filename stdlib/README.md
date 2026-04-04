@@ -8,6 +8,7 @@ Implemented bootstrap modules:
 - `mem.mc`
 - `io.mc`
 - `fs.mc`
+- `sync.mc`
 - `strings.mc`
 - `utf8.mc`
 - `testing.mc`
@@ -40,10 +41,12 @@ Current repository-specific notes:
   bootstrap surface for deterministic utilities rather than a final richer API
 - `testing` is admitted only as a narrow toolchain companion module for the
   ordinary project-test path; it is not yet a broader assertion or fixture API
+- `sync` is admitted only as the first hosted concurrency slice: thread spawn
+  or join plus mutex init, lock, and unlock; condition variables, atomics, and
+  mutex destruction remain deferred
 
 Still deferred in this repository:
 
-- `sync`
 - `time`
 - `os`
 - `hal`

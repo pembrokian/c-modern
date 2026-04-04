@@ -153,20 +153,32 @@ Deferred later canonical entries
 --------------------------------
 
 single-threaded evented echo server
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Packaging: dedicated project fixture once portable poller and networking surface are admitted
-- Pressure focus: readiness-based poller surface, explicit event buffers,
-	fallible handle closure, and one portable `File` handle across `io` and
-	`net`
-- Enabling gap: no admitted portable `io` poller surface and no admitted
-	portable `net` module on the current hosted slice; Phase 6 owns the missing
-	library boundary, not examples or the driver
-- Phase 14A note: this remains the lead evented-networking canonical entry and
-	should not be silently replaced by a weaker surrogate
+- Status: implemented
+- Packaging: dedicated hosted project fixture
+- Pressure focus: readiness-based poller surface, caller-owned poller output
+	buffers, fallible handle closure, one admitted hosted TCP echo path, and the
+	current project-mode pressure around imported wrapper handling
+- Proof artifact: `examples/real/evented_echo/build.toml` with
+	`examples/real/evented_echo/src/main.mc`, exercised by
+	`phase14_evented_echo_project_build` in
+	`tests/codegen/codegen_executable_tests.cpp`
+- Library surface: `io.read`, `io.write_file`, `io.close`, `io.poller_new`,
+	`io.poller_add`, `io.poller_set`, `io.poller_remove`, `io.poller_wait`,
+	`io.poller_close`, `net.tcp_listen`, `net.accept`
+- Observable behavior: a hosted project-mode executable listens on a loopback
+	TCP port, accepts one connection through the admitted poller boundary,
+	echoes the received payload, and exits cleanly without thread or scheduler
+	machinery
+- Bootstrap limitation: the project fixture currently binds the admitted hosted
+	ABI symbols directly inside the project root because the cleaner imported
+	stdlib-wrapper path still triggers duplicate MIR functions for
+	`errors.is_ok` in project mode
+- Phase 14A note: admitted as the lead evented-networking canonical entry now
+	that the portable owner slice is real; further networking pressure should
+	build on this project fixture rather than replace it
 
 partial-write response state machine
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Status: blocked
 - Packaging: dedicated project fixture once writable readiness and interest updates exist
 - Pressure focus: partial writes, caller-owned connection state, and poller
@@ -205,54 +217,63 @@ MMIO register access
 
 bounded ring buffer
 ~~~~~~~~~~~~~~~~~~~
-- Status: deferred
-- Packaging: direct-source executable or sema-level proof once selected as a
-	next-wave canonical pressure artifact
+- Status: implemented
+- Packaging: direct-source executable proof
 - Pressure focus: wraparound arithmetic, slice indexing, and explicit
 	invariants without concurrency
-- Current posture: the repository likely has enough admitted core language and
-	container support to express this shape, but it has not yet been admitted as
-	a repository-owned Phase 8 executable proof
-- Phase 14A note: keep this explicit as a plausible next-wave canonical entry
-	rather than assuming it is already proven by broader language fixtures
+- Library surface: none required beyond the existing core array and slice
+	surface
+- Proof artifact: examples/canonical/bounded_ring_buffer.mc built and run by
+	tests/codegen/codegen_executable_tests.cpp
+- Observable behavior: maintains bounded FIFO order across wraparound,
+	preserves explicit `head` and `len` invariants, and validates logical access
+	through wrapped slice indexing without concurrency
 
 distinct type safety
 ~~~~~~~~~~~~~~~~~~~~
-- Status: deferred
-- Packaging: direct-source executable or sema-heavy canonical proof once
-	selected for a next executable pressure wave
+- Status: implemented
+- Packaging: direct-source sema proof with existing MIR reinforcement
 - Pressure focus: zero-cost logical type separation and explicit conversion at
 	real boundaries only
-- Current posture: distinct-type support is present and proven in sema and MIR
-	layers, but this specific canonical program is not yet recorded as an
-	admitted Phase 8 executable artifact
-- Phase 14A note: defer as a likely next-wave semantic-pressure candidate
-	rather than claiming it from lower-layer support alone
+- Library surface: none required beyond the existing distinct-type language
+	surface
+- Proof artifact: tests/sema/distinct_type_safety_ok.mc and
+	tests/sema/distinct_cross_conversion_bad.mc now provide deterministic
+	positive and negative admission proof, with tests/mir/explicit_conversion.mc
+	retained as lowered explicit-conversion reinforcement
+- Observable behavior: named scalar wrappers stay distinct across function
+	boundaries, require explicit conversion at representation-preserving
+	boundaries, and reject implicit cross-distinct return flow
 
 fixed array, slice, and buffer conversion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: deferred
-- Packaging: direct-source executable or sema and MIR backed canonical proof
+- Status: implemented
+- Packaging: direct-source executable proof with existing MIR reinforcement
 - Pressure focus: explicit array-to-slice and buffer-to-slice conversion
 	points, ownership clarity, and helper spelling stability
-- Current posture: array-to-slice and buffer-to-slice conversions already have
-	MIR fixture coverage, but this fuller canonical program is not yet admitted
-	as a repository-owned Phase 8 executable proof
-- Phase 14A note: suitable next-wave canonical pressure once the repository
-	wants a fuller container-model executable proof
+- Library surface: mem.default_allocator, mem.buffer_new, mem.buffer_free,
+	mem.slice_from_buffer
+- Proof artifact: examples/canonical/fixed_array_slice_buffer_conversion.mc
+	built and run by tests/codegen/codegen_executable_tests.cpp, with
+	tests/mir/array_to_slice_conversion.mc and
+	tests/mir/buffer_to_slice_conversion.mc retained as lowering proof
+- Observable behavior: fixed arrays convert directly to slices, owned buffers
+	produce writable slices, and buffer-to-slice use stays explicit at the
+	consumer boundary
 
 hosted default allocator use
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: deferred
+- Status: implemented
 - Packaging: direct-source executable proof
 - Pressure focus: explicit hosted allocator access through `mem.default_allocator()`
 	and ordinary `Buffer<T>` ownership flow
-- Current posture: the necessary `mem` surface exists and is already used by
-	other admitted programs, but this specific canonical shape has not been
-	admitted as a named Phase 8 artifact
-- Phase 14A note: explicit next-wave candidate if the repository wants a
-	smaller allocator-convention executable proof separate from file I/O or
-	arena pressure
+- Library surface: mem.default_allocator, mem.buffer_new, mem.buffer_len,
+	mem.buffer_free
+- Proof artifact: examples/canonical/hosted_default_allocator_use.mc built and
+	run by tests/codegen/codegen_executable_tests.cpp
+- Observable behavior: acquires the hosted default allocator, performs ordinary
+	buffer allocation and cleanup through that allocator, and validates stable
+	capacity-derived lengths without pulling in fs, arena, or conversion pressure
 
 arena allocator through the common protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -269,16 +290,17 @@ arena allocator through the common protocol
 
 shared counter with mutex
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Packaging: dedicated project fixture once `sync` and hosted threading are
-	admitted
-- Pressure focus: thread spawn and join, mutex initialization, and DRF-SC
-	shared-state coordination without language-level concurrency syntax
-- Enabling gap: `sync` remains explicitly deferred in the current Phase 6
-	posture, and the hosted runtime does not yet admit the required threading
-	boundary
-- Phase 14A note: keep this explicit as the first thread-based canonical
-	pressure entry instead of collapsing it into a vague future threaded example
+- Status: implemented
+- Packaging: direct-source canonical executable under
+	`examples/canonical/shared_counter_mutex.mc`
+- Pressure focus: thread spawn and join, mutex initialization, mutex lock or
+	unlock, and DRF-SC shared-state coordination without language-level
+	concurrency syntax
+- Admitted slice: hosted pthread-backed runtime support under `runtime/hosted/`
+	plus the narrow `stdlib/sync.mc` API for `Thread`, `Mutex`, `thread_spawn`,
+	`thread_join`, `mutex_init`, `mutex_lock`, and `mutex_unlock`
+- Phase 14A note: this first sync admission intentionally stops at the mutex
+	proof and leaves condvar or atomic pressure as separate follow-on work
 
 producer-consumer with condition variable
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

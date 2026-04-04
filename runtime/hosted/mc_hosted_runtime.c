@@ -1,11 +1,18 @@
 #include <alloca.h>
 #include <dirent.h>
 #include <errno.h>
+#include <poll.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <unistd.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 struct mc_string {
     const char* ptr;
@@ -33,6 +40,38 @@ struct mc_arena {
 struct mc_slice_cstr {
     struct mc_string* ptr;
     int64_t len;
+};
+
+struct mc_slice_u8 {
+    uint8_t* ptr;
+    int64_t len;
+};
+
+struct mc_io_poller {
+    struct pollfd* entries;
+    size_t len;
+    size_t cap;
+};
+
+struct mc_sync_thread {
+    uintptr_t raw;
+};
+
+struct mc_sync_mutex {
+    uintptr_t raw;
+};
+
+struct mc_hosted_thread {
+    pthread_t thread;
+};
+
+struct mc_hosted_mutex {
+    pthread_mutex_t mutex;
+};
+
+struct mc_hosted_thread_start {
+    uintptr_t entry;
+    uintptr_t ctx;
 };
 
 extern int32_t __mc_hosted_entry(struct mc_slice_cstr args);
@@ -85,6 +124,74 @@ static void mc_free_dir_entries(struct mc_dir_entry* entries, size_t count) {
     free(entries);
 }
 
+static uintptr_t mc_error_code_from_errno(void) {
+    return (uintptr_t) (errno == 0 ? 1 : errno);
+}
+
+static void mc_store_error(uintptr_t* out_err, uintptr_t err) {
+    if (out_err != NULL) {
+        *out_err = err;
+    }
+}
+
+static short mc_poll_events_from_mask(uint32_t interests) {
+    short events = 0;
+    if ((interests & 1u) != 0u) {
+        events |= POLLIN;
+    }
+    if ((interests & 2u) != 0u) {
+        events |= POLLOUT;
+    }
+    return events;
+}
+
+static struct pollfd* mc_find_pollfd(struct mc_io_poller* poller, int32_t file) {
+    if (poller == NULL) {
+        return NULL;
+    }
+
+    for (size_t index = 0; index < poller->len; ++index) {
+        if (poller->entries[index].fd == file) {
+            return &poller->entries[index];
+        }
+    }
+    return NULL;
+}
+
+static int mc_grow_poller(struct mc_io_poller* poller) {
+    const size_t next_cap = poller->cap == 0 ? 8u : poller->cap * 2u;
+    struct pollfd* next_entries = (struct pollfd*) realloc(poller->entries, next_cap * sizeof(struct pollfd));
+    if (next_entries == NULL) {
+        return 0;
+    }
+    poller->entries = next_entries;
+    poller->cap = next_cap;
+    return 1;
+}
+
+static void mc_fill_ipv4_sockaddr(struct sockaddr_in* addr,
+                                  uint8_t a,
+                                  uint8_t b,
+                                  uint8_t c,
+                                  uint8_t d,
+                                  uint16_t port) {
+    memset(addr, 0, sizeof(*addr));
+    addr->sin_family = AF_INET;
+    addr->sin_port = htons(port);
+    addr->sin_addr.s_addr = htonl(((uint32_t) a << 24u) |
+                                  ((uint32_t) b << 16u) |
+                                  ((uint32_t) c << 8u) |
+                                  (uint32_t) d);
+}
+
+static void mc_configure_stream_socket(int fd) {
+    const int enabled = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(enabled));
+#ifdef SO_NOSIGPIPE
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
+#endif
+}
+
 static char* mc_join_path(const char* base, size_t base_len, const char* name, size_t name_len) {
     const int needs_separator = base_len > 0 && base[base_len - 1] != '/';
     const size_t total_len = base_len + (needs_separator ? 1u : 0u) + name_len;
@@ -118,6 +225,21 @@ static int mc_compare_dir_entries(const void* lhs, const void* rhs) {
         return name_cmp;
     }
     return right->is_dir - left->is_dir;
+}
+
+static void* mc_thread_entry_shim(void* opaque) {
+    struct mc_hosted_thread_start* start = (struct mc_hosted_thread_start*) opaque;
+    void (*entry)(void*) = NULL;
+    void* ctx = NULL;
+    if (start != NULL) {
+        entry = (void (*)(void*)) (uintptr_t) start->entry;
+        ctx = (void*) start->ctx;
+        free(start);
+    }
+    if (entry != NULL) {
+        entry(ctx);
+    }
+    return NULL;
 }
 
 struct mc_allocator* __mc_mem_default_allocator(void) {
@@ -220,6 +342,164 @@ int32_t __mc_io_write_line(struct mc_string text) {
         return 1;
     }
     return 0;
+}
+
+int64_t __mc_io_read(int32_t file, struct mc_slice_u8 bytes, uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    if (bytes.len < 0) {
+        mc_store_error(out_err, 1);
+        return 0;
+    }
+    if (bytes.len == 0) {
+        return 0;
+    }
+
+    errno = 0;
+    const ssize_t read_size = read(file, bytes.ptr, (size_t) bytes.len);
+    if (read_size < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return 0;
+    }
+    return (int64_t) read_size;
+}
+
+int64_t __mc_io_write_file(int32_t file, struct mc_slice_u8 bytes, uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    if (bytes.len < 0) {
+        mc_store_error(out_err, 1);
+        return 0;
+    }
+    if (bytes.len == 0) {
+        return 0;
+    }
+
+    errno = 0;
+#ifdef MSG_NOSIGNAL
+    const ssize_t write_size = send(file, bytes.ptr, (size_t) bytes.len, MSG_NOSIGNAL);
+#else
+    const ssize_t write_size = write(file, bytes.ptr, (size_t) bytes.len);
+#endif
+    if (write_size < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return 0;
+    }
+    return (int64_t) write_size;
+}
+
+uintptr_t __mc_io_close(int32_t file) {
+    errno = 0;
+    if (close(file) != 0) {
+        return mc_error_code_from_errno();
+    }
+    return 0;
+}
+
+struct mc_io_poller* __mc_io_poller_new(uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    struct mc_io_poller* poller = (struct mc_io_poller*) calloc(1, sizeof(struct mc_io_poller));
+    if (poller == NULL) {
+        mc_store_error(out_err, 1);
+        return NULL;
+    }
+    return poller;
+}
+
+uintptr_t __mc_io_poller_add(struct mc_io_poller* poller, int32_t file, uint32_t interests) {
+    if (poller == NULL) {
+        return 1;
+    }
+    if (mc_find_pollfd(poller, file) != NULL) {
+        return (uintptr_t) EEXIST;
+    }
+    if (poller->len == poller->cap && !mc_grow_poller(poller)) {
+        return 1;
+    }
+
+    poller->entries[poller->len].fd = file;
+    poller->entries[poller->len].events = mc_poll_events_from_mask(interests);
+    poller->entries[poller->len].revents = 0;
+    ++poller->len;
+    return 0;
+}
+
+uintptr_t __mc_io_poller_set(struct mc_io_poller* poller, int32_t file, uint32_t interests) {
+    struct pollfd* entry = mc_find_pollfd(poller, file);
+    if (entry == NULL) {
+        return (uintptr_t) ENOENT;
+    }
+
+    entry->events = mc_poll_events_from_mask(interests);
+    entry->revents = 0;
+    return 0;
+}
+
+uintptr_t __mc_io_poller_remove(struct mc_io_poller* poller, int32_t file) {
+    if (poller == NULL) {
+        return 1;
+    }
+
+    for (size_t index = 0; index < poller->len; ++index) {
+        if (poller->entries[index].fd == file) {
+            const size_t tail = poller->len - 1;
+            if (index != tail) {
+                poller->entries[index] = poller->entries[tail];
+            }
+            --poller->len;
+            return 0;
+        }
+    }
+    return (uintptr_t) ENOENT;
+}
+
+int64_t __mc_io_poller_wait(struct mc_io_poller* poller,
+                            int32_t* files,
+                            uint8_t* readable,
+                            uint8_t* writable,
+                            uint8_t* failed,
+                            int64_t capacity,
+                            int32_t timeout_ms,
+                            uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    if (poller == NULL || capacity < 0) {
+        mc_store_error(out_err, 1);
+        return 0;
+    }
+
+    const int timeout = timeout_ms < 0 ? -1 : timeout_ms;
+    errno = 0;
+    const int ready = poll(poller->entries, poller->len, timeout);
+    if (ready < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return 0;
+    }
+
+    const size_t event_capacity = (size_t) capacity;
+    size_t emitted = 0;
+    if (event_capacity == 0 || ready == 0) {
+        return 0;
+    }
+
+    for (size_t index = 0; index < poller->len && emitted < event_capacity; ++index) {
+        const short revents = poller->entries[index].revents;
+        if (revents == 0) {
+            continue;
+        }
+
+        files[emitted] = poller->entries[index].fd;
+        readable[emitted] = (uint8_t) ((revents & (POLLIN | POLLHUP)) != 0 ? 1 : 0);
+        writable[emitted] = (uint8_t) ((revents & POLLOUT) != 0 ? 1 : 0);
+        failed[emitted] = (uint8_t) ((revents & (POLLERR | POLLNVAL)) != 0 ? 1 : 0);
+        ++emitted;
+    }
+    return (int64_t) emitted;
+}
+
+void __mc_io_poller_close(struct mc_io_poller* poller) {
+    if (poller == NULL) {
+        return;
+    }
+    free(poller->entries);
+    free(poller);
 }
 
 int32_t __mc_strings_eq(struct mc_string left, struct mc_string right) {
@@ -472,6 +752,172 @@ struct mc_buffer_u8* __mc_fs_read_all(struct mc_string path, struct mc_allocator
     out->cap = (int64_t) read_size;
     out->alloc = actual_alloc;
     return out;
+}
+
+int32_t __mc_net_tcp_listen(uint8_t a,
+                            uint8_t b,
+                            uint8_t c,
+                            uint8_t d,
+                            uint16_t port,
+                            uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    errno = 0;
+    const int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return -1;
+    }
+    mc_configure_stream_socket(fd);
+
+    struct sockaddr_in addr;
+    mc_fill_ipv4_sockaddr(&addr, a, b, c, d, port);
+    if (bind(fd, (const struct sockaddr*) &addr, sizeof(addr)) != 0) {
+        const uintptr_t err = mc_error_code_from_errno();
+        close(fd);
+        mc_store_error(out_err, err);
+        return -1;
+    }
+
+    if (listen(fd, 16) != 0) {
+        const uintptr_t err = mc_error_code_from_errno();
+        close(fd);
+        mc_store_error(out_err, err);
+        return -1;
+    }
+
+    return fd;
+}
+
+int32_t __mc_net_accept(int32_t listener, uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    errno = 0;
+    const int fd = accept(listener, NULL, NULL);
+    if (fd < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return -1;
+    }
+    mc_configure_stream_socket(fd);
+    return fd;
+}
+
+int32_t __mc_net_connect_tcp(uint8_t a,
+                             uint8_t b,
+                             uint8_t c,
+                             uint8_t d,
+                             uint16_t port,
+                             uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    errno = 0;
+    const int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return -1;
+    }
+    mc_configure_stream_socket(fd);
+
+    struct sockaddr_in addr;
+    mc_fill_ipv4_sockaddr(&addr, a, b, c, d, port);
+    if (connect(fd, (const struct sockaddr*) &addr, sizeof(addr)) != 0) {
+        const uintptr_t err = mc_error_code_from_errno();
+        close(fd);
+        mc_store_error(out_err, err);
+        return -1;
+    }
+
+    return fd;
+}
+
+struct mc_sync_thread __mc_sync_thread_spawn(uintptr_t entry,
+                                             uintptr_t ctx,
+                                             uintptr_t* out_err) {
+    struct mc_sync_thread out = {0};
+    mc_store_error(out_err, 0);
+    if (entry == 0) {
+        mc_store_error(out_err, 1);
+        return out;
+    }
+
+    struct mc_hosted_thread* thread = (struct mc_hosted_thread*) calloc(1, sizeof(struct mc_hosted_thread));
+    if (thread == NULL) {
+        mc_store_error(out_err, 1);
+        return out;
+    }
+
+    struct mc_hosted_thread_start* start = (struct mc_hosted_thread_start*) malloc(sizeof(struct mc_hosted_thread_start));
+    if (start == NULL) {
+        free(thread);
+        mc_store_error(out_err, 1);
+        return out;
+    }
+    start->entry = entry;
+    start->ctx = ctx;
+
+    const int rc = pthread_create(&thread->thread, NULL, mc_thread_entry_shim, start);
+    if (rc != 0) {
+        free(start);
+        free(thread);
+        mc_store_error(out_err, (uintptr_t) rc);
+        return out;
+    }
+
+    out.raw = (uintptr_t) thread;
+    return out;
+}
+
+uintptr_t __mc_sync_thread_join(struct mc_sync_thread thread) {
+    if (thread.raw == 0) {
+        return 1;
+    }
+
+    struct mc_hosted_thread* handle = (struct mc_hosted_thread*) thread.raw;
+    const int rc = pthread_join(handle->thread, NULL);
+    if (rc != 0) {
+        return (uintptr_t) rc;
+    }
+
+    free(handle);
+    return 0;
+}
+
+struct mc_sync_mutex __mc_sync_mutex_init(uintptr_t* out_err) {
+    struct mc_sync_mutex out = {0};
+    mc_store_error(out_err, 0);
+
+    struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) calloc(1, sizeof(struct mc_hosted_mutex));
+    if (handle == NULL) {
+        mc_store_error(out_err, 1);
+        return out;
+    }
+
+    const int rc = pthread_mutex_init(&handle->mutex, NULL);
+    if (rc != 0) {
+        free(handle);
+        mc_store_error(out_err, (uintptr_t) rc);
+        return out;
+    }
+
+    out.raw = (uintptr_t) handle;
+    return out;
+}
+
+uintptr_t __mc_sync_mutex_lock(struct mc_sync_mutex* mu) {
+    if (mu == NULL || mu->raw == 0) {
+        return 1;
+    }
+
+    struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) mu->raw;
+    const int rc = pthread_mutex_lock(&handle->mutex);
+    return rc == 0 ? 0 : (uintptr_t) rc;
+}
+
+uintptr_t __mc_sync_mutex_unlock(struct mc_sync_mutex* mu) {
+    if (mu == NULL || mu->raw == 0) {
+        return 1;
+    }
+
+    struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) mu->raw;
+    const int rc = pthread_mutex_unlock(&handle->mutex);
+    return rc == 0 ? 0 : (uintptr_t) rc;
 }
 
 int main(int argc, char** argv) {

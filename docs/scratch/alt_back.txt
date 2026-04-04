@@ -1,0 +1,3 @@
+The first failure is in the surface syntax, not runtime behavior. The current parser doesn’t accept named parameters inside a function type, so I’m tightening thread_spawn to the parser’s actual procedure-type form and re-running.
+
+The next failure is a known MIR boundary: address-of-field and nested pointer-field mutation are still too narrow for this proof. I’m reshaping the canonical example around globals so the admitted sync slice is proven without pretending that missing MIR field-addressing support is already solved.

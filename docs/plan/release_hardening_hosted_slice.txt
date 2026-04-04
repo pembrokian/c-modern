@@ -1,0 +1,93 @@
+Hosted Slice Release-Hardening Note
+===================================
+
+Status
+------
+PUBLISHED (repository-bounded first public-slice note)
+
+Purpose
+-------
+Record the current supported hosted slice, installation path, usage path,
+checked-versus-release posture, and known limitations for the repository's
+current capability plateau.
+
+This note is the repository-bounded realization of the original bootstrap-plan
+Phase 9 release-hardening work. It is not a claim that the entire language,
+toolchain, or long-term architecture roadmap is finished.
+
+Supported host target set
+-------------------------
+- supported compiler host and executable target: Darwin arm64
+- supported runtime environment: hosted only
+- supported build graph slice: direct-source builds plus `build.toml` project
+  workflows for hosted executable targets and hosted checked test targets
+- unsupported today: non-hosted targets, cross-compilation, static or shared
+  library targets, package management, and multi-platform release claims
+
+Installation and usage
+----------------------
+Build from source on the supported host:
+
+```sh
+cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/debug -j4
+ctest --test-dir build/debug --output-on-failure
+```
+
+The produced compiler entrypoint is:
+
+```sh
+build/debug/mc
+```
+
+Common usage on the supported hosted slice:
+
+```sh
+build/debug/mc check tests/cases/hello.mc
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/stage5_smoke
+build/debug/mc run --project examples/real/grep_lite/build.toml --build-dir build/debug/phase8_grep -- alpha examples/real/grep_lite/tests/sample.txt
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase13_evented_echo
+```
+
+Checked versus release audit
+----------------------------
+- project executable targets in the admitted real-project fixtures currently
+  default to `mode = "debug"`
+- ordinary tests in admitted real-project fixtures currently run in
+  `mode = "checked"`, matching the repository-owned `mc test` contract
+- the repository currently proves checked-mode behavior most strongly through
+  ordinary tests and focused executable regressions; it does not yet claim a
+  broad release-mode audit across the full canonical-program surface
+- checked behavior is treated as additional runtime validation on top of the
+  same language semantics; it does not redefine release semantics
+- current release-hardening truth is therefore: checked ordinary-test coverage
+  is the preferred proof surface for safety-sensitive workflow validation,
+  while debug executable builds remain the main admitted project run mode
+
+Known limitations
+-----------------
+- the supported host target set is still one hosted platform: Darwin arm64
+- the current project-mode evented networking example still uses local hosted
+  ABI declarations because imported stdlib wrapper duplication in that path is
+  not yet fully removed
+- the current networking slice is intentionally narrow: IPv4 TCP listen,
+  accept, and connect plus a portable poller surface; no UDP, DNS, TLS, async
+  runtime, or scheduler claims are made
+- the repository now admits only a narrow hosted `sync` slice: thread spawn or
+  join plus mutex init, lock, and unlock, proved by the shared-counter
+  canonical executable; condvar, atomics, mutex destroy, and broader
+  portability claims remain out of scope
+- the repository does not yet claim `hal`, `time`, or `os` as general admitted
+  module families beyond the already-narrow current surfaces recorded in the
+  phase documents
+- the repository does not yet claim self-hosting, package management, or a
+  stable public distribution format beyond build-from-source on the supported
+  host
+
+Practical support statement
+---------------------------
+The current repository can honestly be used as a hosted Darwin arm64 bootstrap
+compiler and toolchain slice for direct-source programs, bounded project-mode
+workflows, deterministic checked ordinary tests, and the admitted real-project
+examples. Everything outside that slice should be treated as explicitly
+unsupported until a narrower owner document and proof layer admit it.

@@ -45,6 +45,7 @@ struct TypeExpr : Node {
         kConst,
         kArray,
         kParen,
+        kProcedure,
     };
 
     Kind kind = Kind::kNamed;
@@ -52,6 +53,8 @@ struct TypeExpr : Node {
     std::vector<std::unique_ptr<TypeExpr>> type_args;
     std::unique_ptr<TypeExpr> inner;
     std::unique_ptr<Expr> length_expr;
+    std::vector<std::unique_ptr<TypeExpr>> params;
+    std::vector<std::unique_ptr<TypeExpr>> returns;
 };
 
 struct NamePattern : Node {

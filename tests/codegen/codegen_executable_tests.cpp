@@ -1,13 +1,23 @@
 #include <cstdlib>
+#include <cerrno>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <signal.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include "compiler/support/dump_paths.h"
 
@@ -18,6 +28,11 @@ struct CommandOutcome {
     int exit_code = -1;
     bool signaled = false;
     int signal_number = -1;
+};
+
+struct BackgroundProcess {
+    pid_t pid = -1;
+    std::filesystem::path output_path;
 };
 
 void Fail(const std::string& message) {
@@ -178,6 +193,327 @@ void WriteFile(const std::filesystem::path& path,
     }
 }
 
+void CloseFd(int fd) {
+    if (fd >= 0) {
+        close(fd);
+    }
+}
+
+uint16_t ReserveLoopbackPort() {
+    const int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        Fail("unable to create loopback probe socket");
+    }
+
+    const int enabled = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(enabled));
+
+    sockaddr_in addr {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+        const int saved_errno = errno;
+        CloseFd(fd);
+        Fail("unable to reserve loopback port: errno=" + std::to_string(saved_errno));
+    }
+
+    sockaddr_in bound_addr {};
+    socklen_t bound_len = sizeof(bound_addr);
+    if (getsockname(fd, reinterpret_cast<sockaddr*>(&bound_addr), &bound_len) != 0) {
+        const int saved_errno = errno;
+        CloseFd(fd);
+        Fail("unable to read reserved loopback port: errno=" + std::to_string(saved_errno));
+    }
+
+    const uint16_t port = ntohs(bound_addr.sin_port);
+    CloseFd(fd);
+    return port;
+}
+
+int CreateLoopbackListener(uint16_t* out_port) {
+    const int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        Fail("unable to create loopback listener socket");
+    }
+
+    const int enabled = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(enabled));
+
+    sockaddr_in addr {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(0);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+        const int saved_errno = errno;
+        CloseFd(fd);
+        Fail("unable to bind loopback listener: errno=" + std::to_string(saved_errno));
+    }
+    if (listen(fd, 8) != 0) {
+        const int saved_errno = errno;
+        CloseFd(fd);
+        Fail("unable to listen on loopback listener: errno=" + std::to_string(saved_errno));
+    }
+
+    sockaddr_in bound_addr {};
+    socklen_t bound_len = sizeof(bound_addr);
+    if (getsockname(fd, reinterpret_cast<sockaddr*>(&bound_addr), &bound_len) != 0) {
+        const int saved_errno = errno;
+        CloseFd(fd);
+        Fail("unable to read loopback listener port: errno=" + std::to_string(saved_errno));
+    }
+
+    *out_port = ntohs(bound_addr.sin_port);
+    return fd;
+}
+
+BackgroundProcess SpawnBackgroundExecutable(const std::filesystem::path& executable,
+                                           const std::vector<std::string>& args,
+                                           const std::filesystem::path& output_path,
+                                           const std::string& context) {
+    std::filesystem::create_directories(output_path.parent_path());
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        Fail(context + ": fork failed");
+    }
+
+    if (pid == 0) {
+        const int output_fd = open(output_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        if (output_fd < 0) {
+            _exit(127);
+        }
+        if (dup2(output_fd, STDOUT_FILENO) < 0 || dup2(output_fd, STDERR_FILENO) < 0) {
+            close(output_fd);
+            _exit(127);
+        }
+        close(output_fd);
+
+        std::vector<std::string> argv_storage;
+        argv_storage.reserve(args.size() + 1);
+        argv_storage.push_back(executable.generic_string());
+        argv_storage.insert(argv_storage.end(), args.begin(), args.end());
+
+        std::vector<char*> argv_ptrs;
+        argv_ptrs.reserve(argv_storage.size() + 1);
+        for (std::string& value : argv_storage) {
+            argv_ptrs.push_back(value.data());
+        }
+        argv_ptrs.push_back(nullptr);
+
+        execv(executable.c_str(), argv_ptrs.data());
+        _exit(127);
+    }
+
+    return {.pid = pid, .output_path = output_path};
+}
+
+CommandOutcome WaitForProcessExit(pid_t pid,
+                                  int timeout_ms,
+                                  const std::string& context) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    for (;;) {
+        int status = 0;
+        const pid_t result = waitpid(pid, &status, WNOHANG);
+        if (result == pid) {
+#ifdef WIFEXITED
+            if (WIFEXITED(status)) {
+                return {.exited = true, .exit_code = WEXITSTATUS(status)};
+            }
+#endif
+#ifdef WIFSIGNALED
+            if (WIFSIGNALED(status)) {
+                return {.signaled = true, .signal_number = WTERMSIG(status)};
+            }
+#endif
+            Fail(context + ": child exited with unknown status");
+        }
+        if (result < 0) {
+            Fail(context + ": waitpid failed");
+        }
+        if (std::chrono::steady_clock::now() >= deadline) {
+            kill(pid, SIGKILL);
+            waitpid(pid, nullptr, 0);
+            Fail(context + ": timed out waiting for child process");
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
+
+int ConnectLoopbackWithRetry(uint16_t port,
+                             int timeout_ms,
+                             const std::string& context) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    for (;;) {
+        const int fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (fd < 0) {
+            Fail(context + ": unable to create client socket");
+        }
+
+        timeval timeout {};
+        timeout.tv_sec = timeout_ms / 1000;
+        timeout.tv_usec = (timeout_ms % 1000) * 1000;
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
+        sockaddr_in addr {};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (connect(fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0) {
+            return fd;
+        }
+
+        CloseFd(fd);
+        if (std::chrono::steady_clock::now() >= deadline) {
+            const int saved_errno = errno;
+            Fail(context + ": unable to connect to loopback server: errno=" + std::to_string(saved_errno));
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
+
+int AcceptLoopbackClient(int listener_fd,
+                         int timeout_ms,
+                         const std::string& context) {
+    pollfd poll_entry {};
+    poll_entry.fd = listener_fd;
+    poll_entry.events = POLLIN;
+    const int ready = poll(&poll_entry, 1, timeout_ms);
+    if (ready <= 0) {
+        Fail(context + ": timed out waiting for client connection");
+    }
+
+    const int fd = accept(listener_fd, nullptr, nullptr);
+    if (fd < 0) {
+        const int saved_errno = errno;
+        Fail(context + ": accept failed: errno=" + std::to_string(saved_errno));
+    }
+
+    timeval timeout {};
+    timeout.tv_sec = timeout_ms / 1000;
+    timeout.tv_usec = (timeout_ms % 1000) * 1000;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    return fd;
+}
+
+void WriteAllToSocket(int fd,
+                      std::string_view data,
+                      const std::string& context) {
+    size_t offset = 0;
+    while (offset < data.size()) {
+        const ssize_t written = send(fd, data.data() + offset, data.size() - offset, 0);
+        if (written <= 0) {
+            const int saved_errno = errno;
+            Fail(context + ": send failed: errno=" + std::to_string(saved_errno));
+        }
+        offset += static_cast<size_t>(written);
+    }
+}
+
+std::string ReadExactFromSocket(int fd,
+                                size_t expected_size,
+                                const std::string& context) {
+    std::string data(expected_size, '\0');
+    size_t offset = 0;
+    while (offset < expected_size) {
+        const ssize_t read_size = recv(fd, data.data() + offset, expected_size - offset, 0);
+        if (read_size <= 0) {
+            const int saved_errno = errno;
+            Fail(context + ": recv failed: errno=" + std::to_string(saved_errno));
+        }
+        offset += static_cast<size_t>(read_size);
+    }
+    return data;
+}
+
+void ExpectBackgroundProcessSuccess(const BackgroundProcess& process,
+                                    int timeout_ms,
+                                    const std::string& context) {
+    const CommandOutcome outcome = WaitForProcessExit(process.pid, timeout_ms, context);
+    if (!outcome.exited || outcome.exit_code != 0) {
+        const std::string output = ReadFile(process.output_path);
+        Fail(context + ": child exited with code " + std::to_string(outcome.exit_code) +
+             ", output='" + output + "'");
+    }
+}
+
+void RunBuiltNetworkEchoServerFixture(const std::filesystem::path& mc_path,
+                                      const std::filesystem::path& source_path,
+                                      const std::filesystem::path& build_dir,
+                                      std::string_view request,
+                                      std::string_view expected_reply) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          source_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build " + source_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
+    const uint16_t port = ReserveLoopbackPort();
+    const BackgroundProcess process = SpawnBackgroundExecutable(
+        artifacts.executable,
+        {std::to_string(port)},
+        build_dir / "server_output.txt",
+        "spawn background network echo server");
+
+    const int client_fd = ConnectLoopbackWithRetry(port, 2000, "connect to built network echo server");
+    WriteAllToSocket(client_fd, request, "write request to built network echo server");
+    const std::string reply = ReadExactFromSocket(client_fd, expected_reply.size(), "read reply from built network echo server");
+    CloseFd(client_fd);
+
+    if (reply != expected_reply) {
+        Fail("network echo server returned unexpected payload: '" + reply + "'");
+    }
+
+    ExpectBackgroundProcessSuccess(process, 2000, "wait for built network echo server");
+}
+
+void RunBuiltNetworkClientFixture(const std::filesystem::path& mc_path,
+                                  const std::filesystem::path& source_path,
+                                  const std::filesystem::path& build_dir,
+                                  std::string_view expected_request,
+                                  std::string_view response) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          source_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build " + source_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
+    uint16_t port = 0;
+    const int listener_fd = CreateLoopbackListener(&port);
+
+    const BackgroundProcess process = SpawnBackgroundExecutable(
+        artifacts.executable,
+        {std::to_string(port)},
+        build_dir / "client_output.txt",
+        "spawn background network client");
+
+    const int conn_fd = AcceptLoopbackClient(listener_fd, 2000, "accept built network client");
+    CloseFd(listener_fd);
+
+    const std::string request = ReadExactFromSocket(conn_fd, expected_request.size(), "read request from built network client");
+    if (request != expected_request) {
+        CloseFd(conn_fd);
+        Fail("network client sent unexpected payload: '" + request + "'");
+    }
+
+    WriteAllToSocket(conn_fd, response, "write response to built network client");
+    CloseFd(conn_fd);
+
+    ExpectBackgroundProcessSuccess(process, 2000, "wait for built network client");
+}
+
 void RunBuiltFixture(const std::filesystem::path& mc_path,
                      const std::filesystem::path& source_path,
                      const std::filesystem::path& build_dir,
@@ -332,6 +668,43 @@ void RunBuiltProjectFixture(const std::filesystem::path& mc_path,
                          run_args,
                          expected_exit_code,
                          "run built executable " + artifacts.executable.generic_string());
+}
+
+void RunBuiltProjectNetworkEchoFixture(const std::filesystem::path& mc_path,
+                                       const std::filesystem::path& project_path,
+                                       const std::filesystem::path& root_source_path,
+                                       const std::filesystem::path& build_dir,
+                                       std::string_view request,
+                                       std::string_view expected_reply) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          "--project",
+                          project_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build --project " + project_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(root_source_path, build_dir);
+    const uint16_t port = ReserveLoopbackPort();
+    const BackgroundProcess process = SpawnBackgroundExecutable(
+        artifacts.executable,
+        {std::to_string(port)},
+        build_dir / "project_server_output.txt",
+        "spawn built project network echo server");
+
+    const int client_fd = ConnectLoopbackWithRetry(port, 2000, "connect to built project network echo server");
+    WriteAllToSocket(client_fd, request, "write request to built project network echo server");
+    const std::string reply = ReadExactFromSocket(client_fd, expected_reply.size(), "read reply from built project network echo server");
+    CloseFd(client_fd);
+
+    if (reply != expected_reply) {
+        Fail("project network echo server returned unexpected payload: '" + reply + "'");
+    }
+
+    ExpectBackgroundProcessSuccess(process, 2000, "wait for built project network echo server");
 }
 
 }  // namespace
@@ -747,7 +1120,7 @@ int main(int argc, char** argv) {
     RunBuildFailureFixture(mc_path,
                            low_level_dynamic_order_source,
                            work_root / "low_level_dynamic_order_fail_build",
-                           "requires constant MemoryOrder metadata for 'atomic_load'");
+                           "requires supported constant MemoryOrder metadata for 'atomic_load'");
 
     const std::filesystem::path bounds_index_source = work_root / "bounds_index_oob.mc";
     WriteFile(bounds_index_source,
@@ -942,6 +1315,18 @@ int main(int argc, char** argv) {
                     0,
                     {});
 
+    RunBuiltNetworkEchoServerFixture(mc_path,
+                                     source_root / "tests/stdlib/poller_echo_server.mc",
+                                     work_root / "phase12_poller_echo_server_build",
+                                     "hello",
+                                     "hello");
+
+    RunBuiltNetworkClientFixture(mc_path,
+                                 source_root / "tests/stdlib/poller_connect_roundtrip.mc",
+                                 work_root / "phase12_poller_connect_roundtrip_build",
+                                 "ping",
+                                 "pong");
+
     RunBuiltOutputFixture(mc_path,
                           source_root / "examples/canonical/hello_stdout.mc",
                           work_root / "phase8_hello_stdout_build",
@@ -1077,6 +1462,13 @@ int main(int argc, char** argv) {
                            30,
                            {});
 
+    RunBuiltProjectNetworkEchoFixture(mc_path,
+                                      source_root / "examples/real/evented_echo/build.toml",
+                                      source_root / "examples/real/evented_echo/src/main.mc",
+                                      work_root / "phase14_evented_echo_project_build",
+                                      "hello",
+                                      "hello");
+
     RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/arena_ast_build.mc",
                     work_root / "phase8_arena_ast_build",
@@ -1086,6 +1478,30 @@ int main(int argc, char** argv) {
     RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/recursive_evaluator.mc",
                     work_root / "phase8_recursive_evaluator_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/fixed_array_slice_buffer_conversion.mc",
+                    work_root / "phase15_fixed_array_slice_buffer_conversion_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/hosted_default_allocator_use.mc",
+                    work_root / "phase15_hosted_default_allocator_use_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/bounded_ring_buffer.mc",
+                    work_root / "phase15_bounded_ring_buffer_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/shared_counter_mutex.mc",
+                    work_root / "phase15_shared_counter_mutex_build",
                     0,
                     {});
 

@@ -405,6 +405,42 @@ class Parser {
         return result;
     }
 
+    bool IsTypeExprStart(TokenKind kind) const {
+        return kind == TokenKind::kConst || kind == TokenKind::kStar || kind == TokenKind::kLBracket ||
+               kind == TokenKind::kLParen || kind == TokenKind::kIdentifier || kind == TokenKind::kFunc;
+    }
+
+    std::vector<std::unique_ptr<TypeExpr>> ParseProcedureParamTypes(std::size_t depth) {
+        std::vector<std::unique_ptr<TypeExpr>> params;
+        Consume(TokenKind::kLParen, "expected '(' after 'func' in procedure type");
+        if (!Check(TokenKind::kRParen)) {
+            do {
+                params.push_back(ParseTypeExpr(depth + 1));
+            } while (Match(TokenKind::kComma));
+        }
+        Consume(TokenKind::kRParen, "expected ')' after procedure parameter types");
+        return params;
+    }
+
+    std::vector<std::unique_ptr<TypeExpr>> ParseProcedureReturnTypes(std::size_t depth) {
+        std::vector<std::unique_ptr<TypeExpr>> returns;
+        if (!IsTypeExprStart(Current().kind)) {
+            return returns;
+        }
+        if (Match(TokenKind::kLParen)) {
+            if (!Check(TokenKind::kRParen)) {
+                do {
+                    returns.push_back(ParseTypeExpr(depth + 1));
+                } while (Match(TokenKind::kComma));
+            }
+            Consume(TokenKind::kRParen, "expected ')' after procedure return types");
+            return returns;
+        }
+
+        returns.push_back(ParseTypeExpr(depth + 1));
+        return returns;
+    }
+
     std::optional<Decl> ParseStructDecl(std::vector<Attribute> attributes, mc::support::SourcePosition start) {
         Decl decl;
         decl.kind = Decl::Kind::kStruct;
@@ -583,6 +619,16 @@ class Parser {
             type->span.begin = Previous().span.begin;
             type->inner = ParseTypeExpr(depth + 1);
             type->span.end = type->inner != nullptr ? type->inner->span.end : Previous().span.end;
+            return type;
+        }
+
+        if (Match(TokenKind::kFunc)) {
+            auto type = std::make_unique<TypeExpr>();
+            type->kind = TypeExpr::Kind::kProcedure;
+            type->span.begin = Previous().span.begin;
+            type->params = ParseProcedureParamTypes(depth);
+            type->returns = ParseProcedureReturnTypes(depth);
+            type->span.end = Previous().span.end;
             return type;
         }
 
@@ -1277,6 +1323,57 @@ class Parser {
                     return std::nullopt;
                 }
                 return *inner + 1;
+            }
+            case TokenKind::kFunc: {
+                if (nesting >= kMaxTypeExprDepth || Peek(offset + 1).kind != TokenKind::kLParen) {
+                    return std::nullopt;
+                }
+
+                std::size_t next = offset + 2;
+                if (Peek(next).kind != TokenKind::kRParen) {
+                    while (true) {
+                        const auto param_end = SkipTypeExprLookahead(next, true, nesting + 1);
+                        if (!param_end.has_value()) {
+                            return std::nullopt;
+                        }
+                        next = *param_end;
+                        if (Peek(next).kind == TokenKind::kComma) {
+                            ++next;
+                            continue;
+                        }
+                        if (Peek(next).kind != TokenKind::kRParen) {
+                            return std::nullopt;
+                        }
+                        break;
+                    }
+                }
+                ++next;
+
+                if (!IsTypeExprStart(Peek(next).kind)) {
+                    return next;
+                }
+                if (Peek(next).kind == TokenKind::kLParen) {
+                    ++next;
+                    if (Peek(next).kind != TokenKind::kRParen) {
+                        while (true) {
+                            const auto ret_end = SkipTypeExprLookahead(next, true, nesting + 1);
+                            if (!ret_end.has_value()) {
+                                return std::nullopt;
+                            }
+                            next = *ret_end;
+                            if (Peek(next).kind == TokenKind::kComma) {
+                                ++next;
+                                continue;
+                            }
+                            if (Peek(next).kind != TokenKind::kRParen) {
+                                return std::nullopt;
+                            }
+                            break;
+                        }
+                    }
+                    return next + 1;
+                }
+                return SkipTypeExprLookahead(next, true, nesting + 1);
             }
             case TokenKind::kIdentifier: {
                 std::size_t next = offset + 1;

@@ -11,6 +11,10 @@ Current execution note
   across all five workstreams. See
   `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_closeout.txt`
   for the admitted implementation truth.
+- The repository also now includes a repository-bounded second-wave workflow
+  closeout for the hosted networking family. See
+  `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_second_wave_closeout.txt`
+  for the Step 5 implementation truth.
 - That landed slice covers:
   - 13A: project builds fail on malformed or metadata-mismatched existing
     `.mci` artifacts instead of silently repairing them
@@ -22,6 +26,10 @@ Current execution note
   - 13B: duplicate target root modules now fail during target validation, and
     hosted `kind = "test"` targets are now admitted as executable-like
     bootstrap artifacts
+- The second-wave closeout adds normal `mc run --project` and
+  `mc test --project` proof for the hosted evented-networking project path,
+  including ordinary tests that import real project modules through the
+  configured graph.
 - This closeout is repository-bounded, not evidence that every long-term Phase
   7 architecture obligation is fully closed.
 

@@ -151,6 +151,171 @@ Current repository posture
   rather than by the steadier long-term ownership intended by the architecture
   texts.
 
+Current Step 2 decision
+-----------------------
+- The repository has completed the current-surface Phase 8 closeout work that
+  preceded the next Phase 12 breadth decision.
+- The chosen next capability family is Option A from
+  `/Users/ro/dev/c_modern/docs/plan/admin/post_phase14_execution_plan.txt`:
+  portable `io` poller plus narrow `net`.
+- Narrow `sync` plus hosted thread boundary remains the next fallback after
+  Option A if networking stalls or repository goals change, but it is not to
+  be implemented in parallel with the chosen networking wave.
+
+Current Step 3 follow-up decision
+---------------------------------
+- The repository has now completed the narrow hosted networking wave and its
+  first workflow-tightening follow-up.
+- The next admitted capability family is now the first narrow `sync` slice:
+  hosted thread spawn and join plus mutex.
+- Condition variables and atomics remain explicitly deferred until the mutex
+  proof and owner slice are stable.
+
+Chosen narrow sync consumer matrix
+----------------------------------
+- lead canonical proof: shared counter with mutex
+- deferred follow-on once mutex semantics are honest: producer-consumer with
+  condition variable
+- separately deferred follow-on: atomic flag publication after a narrow
+  ordinary `Atomic<T>` surface is stated honestly
+
+Chosen narrow sync API surface
+------------------------------
+- `struct Thread`
+- `struct Mutex`
+- `func thread_spawn(entry: uintptr, ctx: uintptr) (Thread, Error)`
+- `func thread_join(thread: Thread) Error`
+- `func mutex_init() (Mutex, Error)`
+- `func mutex_lock(mu: *Mutex) Error`
+- `func mutex_unlock(mu: *Mutex) Error`
+
+First-wave hosted ownership notes
+---------------------------------
+- the first repository-owned sync slice is hosted only and is expected to map
+  to pthread-backed runtime support under `runtime/hosted/`
+- thread entrypoints remain ordinary language functions, but the current
+  bootstrap surface passes them through explicit `uintptr` casts at the
+  callsite because imported generic function signatures with procedure-typed
+  parameters are not yet honest enough for the admitted slice
+- mutex initialization and lock or unlock stay explicit API calls; the first
+  admitted slice does not rely on zero-initialized mutex state
+- condvars and portable atomics are intentionally out of scope for this first
+  sync wave so the shared-counter proof stays focused on thread spawn, join,
+  and mutex happens-before edges
+
+Chosen proof layer for the sync wave
+------------------------------------
+- focused executable canonical proof for shared counter with mutex under
+  `/Users/ro/dev/c_modern/examples/canonical/` plus deterministic execution in
+  `/Users/ro/dev/c_modern/tests/codegen/`
+- focused stdlib proof only if the admitted `sync` API exposes behavior that
+  can be isolated more narrowly than the full canonical program
+- no broader project-mode or condvar proof in the first sync slice
+
+Explicit exclusions for the narrow sync wave
+--------------------------------------------
+- no `Condvar` admission in parallel with the first mutex wave
+- no `Atomic<T>` surface in parallel with the first mutex wave
+- no scheduler, async runtime, green threads, or task abstraction
+- no thread-local storage or OS-facing process control grab bag under `sync`
+- no claim of non-hosted or multi-platform threading support in this wave
+
+Current implemented bootstrap sync slice
+----------------------------------------
+- the repository now admits `stdlib/sync.mc` for hosted thread spawn or join
+  plus mutex init, lock, and unlock
+- the admitted proof layer is the direct-source canonical executable
+  `/Users/ro/dev/c_modern/examples/canonical/shared_counter_mutex.mc`, wired
+  into deterministic executable coverage under
+  `/Users/ro/dev/c_modern/tests/codegen/codegen_executable_tests.cpp`
+- the current bootstrap implementation stores opaque hosted pointers in
+  `Thread` and `Mutex`; thread backing allocations are released on join, while
+  mutex backing allocations currently remain process-lifetime because the
+  repository has not yet justified a broader destroy API
+- condition variables and portable atomics remain separate deferred follow-on
+  work rather than implicit parts of this first sync admission
+
+Chosen next-wave consumer matrix
+--------------------------------
+- lead canonical proof: single-threaded evented echo server
+- second canonical proof: evented TCP client request-response
+- follow-on pressure once the base poller is honest: partial-write response
+  state machine
+- toolchain pressure: project-mode fixtures that prove ordinary multi-module
+  networking builds, deterministic runner behavior, and rebuild trust for the
+  chosen family
+
+Chosen minimal API surface
+--------------------------
+Portable `io` poller
+~~~~~~~~~~~~~~~~~~~~
+- current bootstrap implementation uses plain `i32` handles across `io` and
+  `net` so the first hosted networking slice can pass cleanly through current
+  parser, sema, and backend limits without lying about what is implemented
+- `type EventMask = u32`
+- `const EVENT_READABLE: EventMask`
+- `const EVENT_WRITABLE: EventMask`
+- `struct Poller`
+- `func poller_new() (*Poller, Error)`
+- `func poller_add(p: *Poller, file: i32, interests: EventMask) Error`
+- `func poller_set(p: *Poller, file: i32, interests: EventMask) Error`
+- `func poller_remove(p: *Poller, file: i32) Error`
+- `func poller_wait(p: *Poller, files: *i32, readable: *u8, writable: *u8, failed: *u8, cap: usize, timeout_ms: i32) (usize, Error)`
+- `func poller_close(p: *Poller)`
+- owned output buffers remain explicit: the caller passes parallel file and
+  readiness buffers, and the runtime writes into them without hidden
+  allocation
+
+Narrow `net`
+~~~~~~~~~~~~
+- `struct IpAddr`
+- `struct IpEndpoint`
+- `func tcp_listen(bind: IpEndpoint) (i32, Error)`
+- `func accept(listener: i32) (i32, Error)`
+- `func connect_tcp(remote: IpEndpoint) (i32, Error)`
+
+Current implemented bootstrap slice
+----------------------------------
+- hosted runtime support now exists for `io.read`, `io.write_file`,
+  `io.close`, `io.poller_*`, `net.tcp_listen`, `net.accept`, and
+  `net.connect_tcp`
+- focused Step 3 proofs now live in
+  `/Users/ro/dev/c_modern/tests/stdlib/poller_echo_server.mc` and
+  `/Users/ro/dev/c_modern/tests/stdlib/poller_connect_roundtrip.mc`, driven by
+  hosted loopback orchestration in
+  `/Users/ro/dev/c_modern/tests/codegen/codegen_executable_tests.cpp`
+- the current slice proves one evented server path and one evented client
+  request-response path on the hosted target without starting `sync` or
+  widening `net` beyond narrow IPv4 TCP admission
+- the next networking-pressure target remains the partial-write response state
+  machine once the handle and poller surface stabilizes
+
+Chosen proof layer
+------------------
+- focused stdlib regressions under `/Users/ro/dev/c_modern/tests/stdlib/` for
+  poller lifecycle, caller-owned event buffers, close behavior, and narrow
+  network handle operations
+- executable proofs under `/Users/ro/dev/c_modern/tests/codegen/` or
+  `/Users/ro/dev/c_modern/tests/tool/` for the lead evented canonical entries
+- project-mode tool proofs under `/Users/ro/dev/c_modern/tests/tool/` for
+  ordinary multi-module networking builds and deterministic workflow behavior
+- bounded real utility admission only after the canonical networking proof has
+  already exposed distinct additional pressure
+
+Explicit exclusions for the chosen wave
+---------------------------------------
+- no `sync` admission in parallel with the networking wave
+- no UDP, DNS resolution, TLS, or socket-option grab bag in the first narrow
+  `net` slice
+- no async runtime, scheduler, futures, coroutines, or language-level async
+  model hidden behind the poller API
+- no raw backend-specific queue semantics in the portable surface; `epoll`,
+  `kqueue`, `io_uring`, and similar mechanisms remain implementation details
+- no split portable handle taxonomy beyond the single first-wave `File` handle
+  unless concrete proof forces it
+- no project-graph expansion beyond the deterministic tool pressure needed to
+  prove the chosen family honestly
+
 Phase 12 execution waves
 ------------------------
 Phase 12A -- Existing Module API Honesty

@@ -24,6 +24,8 @@ std::string_view ToString(TypeExpr::Kind kind) {
             return "ArrayType";
         case TypeExpr::Kind::kParen:
             return "ParenType";
+        case TypeExpr::Kind::kProcedure:
+            return "ProcedureType";
     }
 
     MC_UNREACHABLE("unhandled TypeExpr::Kind in ToString");
@@ -233,6 +235,20 @@ void DumpType(const TypeExpr& type, std::ostringstream& stream, Indent indent, i
     if (type.inner != nullptr) {
         WriteLine(stream, indent + 1, "inner:");
         DumpType(*type.inner, stream, indent + 2, depth + 1);
+    }
+
+    if (!type.params.empty()) {
+        WriteLine(stream, indent + 1, "params:");
+        for (const auto& param : type.params) {
+            DumpType(*param, stream, indent + 2, depth + 1);
+        }
+    }
+
+    if (!type.returns.empty()) {
+        WriteLine(stream, indent + 1, "returns:");
+        for (const auto& ret : type.returns) {
+            DumpType(*ret, stream, indent + 2, depth + 1);
+        }
     }
 }
 
