@@ -3,31 +3,38 @@ Phase 18 -- Workflow Hardening And Plateau Decision
 
 Status
 ------
-PLANNED
+COMPLETED (repository-bounded workflow hardening and plateau decision)
 
 Purpose
 -------
 Use the richer project and pressure artifacts from Phase 16 and Phase 17 to
-choose the next plateau deliberately: deeper Phase 13 maturity, narrow `sync`
+choose one next plateau deliberately: deeper Phase 13 maturity, narrow `sync`
 follow-on, narrow `hal` admission, or pause for release hardening.
 
-This document is a repository planning phase, not a new architecture phase
-after Phase 8.
+This document is a repository execution and closeout note, not a new
+architecture phase after Phase 8.
 
 Repository status note
 ----------------------
-- By the time this phase begins, the repository should have one more admitted
-  networking pressure artifact and a clearer picture of whether the current
-  compiler compromises are still materially shaping public APIs.
-- The remaining major choice should then be about the next plateau, not about
-  discovering yet another broad family opportunistically.
+- Phase 16 landed one more networking-pressure artifact and a real project
+  sibling in `examples/real/evented_partial_write/`, so the repository now has
+  multiple admitted networking projects instead of a single evented-echo proof.
+- Phase 17 removed the highest-leverage typed-surface flattening in the hosted
+  networking boundary and sharpened the remaining compiler deferral around
+  aggregate-bool ABI cleanup rather than leaving it as general cleanup prose.
+- The next question is therefore not which new capability family exists in the
+  abstract, but which next work best converts the current hosted slice into a
+  more trusted ordinary development plateau.
 
 Problem being solved
 --------------------
-- After another networking wave and targeted compiler widening, the repository
-  needs an evidence-based decision about where the next leverage lies.
-- Without a dedicated plateau-decision phase, the backlog risks turning into a
-  rotating list of loosely justified ideas instead of one clear next stop-point.
+- After the additional networking pressure and compiler widening, the repo's
+  most credible remaining friction is workflow trust around richer real
+  projects: ordinary-test proof, deterministic build-directory reuse, manifest
+  ergonomics, and sharper `mc test` reporting.
+- Without an explicit plateau decision, the backlog would risk reopening
+  `sync`, `hal`, or release hardening opportunistically before the current
+  admitted project workflow is strong enough to deserve that breadth.
 
 Core rule
 ---------
@@ -37,65 +44,79 @@ Core rule
 - Keep non-chosen options explicit in backlog or decision-log form rather than
   letting them disappear.
 
-Scope
------
-- finish the highest-leverage remaining Phase 13 items that a larger project
-  fixture exposes, especially manifest ergonomics, deterministic rebuild
-  correctness, and any remaining reporting sharpness around `mc test`
-- evaluate whether a real consumer now justifies one narrow `sync` follow-on,
-  such as compare-exchange, fetch-add, or condvar broadcast
-- evaluate whether a real consumer now justifies narrow `hal` admission for
-  MMIO register access
-- choose whether the repository should stop capability growth for a first
-  stronger hosted plateau and route effort into the existing release-hardening
-  note instead of opening another family
+What landed in this phase
+-------------------------
+- the richer networking project fixture
+  `/Users/ro/dev/c_modern/examples/real/evented_partial_write/` now carries
+  ordinary checked tests instead of proving only `mc run --project ...`
+- the Phase 7 tool regression suite now hardens that richer fixture the same
+  way the earlier evented-echo project was hardened: run, `mc test`, and rerun
+  on the same build directory with deterministic PASS and summary checks
+- the backlog and decision log now record one explicit plateau choice and keep
+  the non-chosen follow-on options visible with bounded revisit triggers
 
-Decision gate
--------------
-Choose exactly one of the following outcomes at the end of Phase 18:
+Plateau decision
+----------------
+Chosen outcome: Option A.
 
-- Option A: continue with Phase 13 trust and reporting hardening as the next
-  highest-leverage work for the current capability plateau
-- Option B: reopen `sync` for one narrowly justified new consumer and one new
-  proof artifact only
-- Option C: admit narrow `hal` for the MMIO register-access canonical proof if
-  the hardware-boundary consumer matrix is now real
-- Option D: freeze the capability plateau and execute the hosted release-
-  hardening pass for a more public repository cut
+The repository will continue with Phase 13 trust and reporting hardening as
+the next highest-leverage plateau for the current admitted hosted slice.
 
-Deliverables
-------------
-- one explicit plateau decision document or bounded update to the relevant
-  Phase 12, Phase 13, or release-hardening note
-- focused tool regressions for any workflow gaps exposed by the richer project
-  fixtures
+Why Option A won
+----------------
+- the admitted evented-echo and evented-partial-write projects now expose real
+  workflow pressure on `mc test`, reporting, and build-directory reuse without
+  needing a third capability family to justify that work
+- Phase 17 already narrowed the most visible compiler-shaped networking API
+  compromise, so the next leverage lies more in workflow trust than in another
+  immediate compiler widening slice
+- the release-hardening note already exists, but the richer project fixtures
+  still expose workflow-shaped pressure strongly enough that stopping capability
+  growth for a harder public cut would be premature
+
+Why the other options were not chosen
+-------------------------------------
+- Option B (`sync` follow-on) was not chosen because no second real consumer
+  currently justifies compare-exchange, fetch-add, condvar broadcast, or
+  broader imported generic-call widening beyond the already-admitted slice
+- Option C (`hal`) was not chosen because the repository still lacks a real
+  MMIO consumer matrix strong enough to justify even a narrow hardware-boundary
+  admission
+- Option D (release hardening now) was not chosen because richer real-project
+  workflow pressure is still exposing higher-leverage trust work inside the
+  currently admitted slice
+
+Delivered outputs
+-----------------
+- one explicit plateau decision recorded here
+- focused tool regressions for the workflow gap exposed by the richer partial-
+  write project fixture
 - updated backlog and decision-log entries so the non-chosen options remain
   explicit rather than vanishing from the plan
-
-Suggested execution order
--------------------------
-1. Review the evidence produced by Phase 16 and Phase 17.
-2. Close the highest-leverage remaining workflow gaps that are already clearly
-   justified by the richer project fixtures.
-3. Choose one plateau outcome only.
-4. Record the non-chosen options explicitly in backlog or decision-log form.
 
 Exit criteria
 -------------
 - the repository has a chosen next plateau rather than a loose list of options
-- the next family or hardening pass is justified by landed pressure rather than
-  abstract completeness goals
-- the planning set no longer requires the combined Phase 16 to 18 overview
-  alone to explain current priorities
+- the next work is justified by landed pressure from admitted project fixtures
+  rather than abstract completeness goals
+- the planning set no longer needs the combined Phase 16 to 18 overview alone
+  to explain current priorities
 
 Non-goals
 ---------
 - opening several follow-on families in parallel
 - broad `sync` or `hal` expansion without a real consumer matrix
 - starting release hardening before the capability plateau is intentionally
-  chosen
+  stronger on ordinary project workflow trust
 
 Acceptance criteria for this document
 -------------------------------------
-- Phase 18 stands alone as the plateau-decision and workflow-hardening plan.
+- Phase 18 stands alone as the plateau-decision and workflow-hardening note.
 - The phase ends with one explicit next-step choice.
+
+Closeout statement
+------------------
+Phase 18 is complete. The repository used the richer networking fixtures to
+close one more real workflow gap, then chose the next plateau explicitly:
+deeper Phase 13 trust and reporting hardening on the admitted hosted slice,
+with `sync`, `hal`, and broader release hardening left explicit but deferred.

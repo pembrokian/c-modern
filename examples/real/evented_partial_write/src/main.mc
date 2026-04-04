@@ -4,11 +4,10 @@ import echo_core
 import errors
 import io
 import net
-import strings
+import partial_write_core
 
 const REQUEST_LEN: usize = 4
 const RESPONSE_LEN: usize = 1536
-const WRITE_LIMIT: usize = 128
 const STATE_READ_REQUEST: i32 = 0
 const STATE_WRITE_RESPONSE: i32 = 1
 const STATE_READ_ACK: i32 = 2
@@ -26,15 +25,6 @@ func poller_remove_ignored(poller: *io.Poller, file: io.File) {
 
 func loopback(port: u16) net.IpEndpoint {
     return net.IpEndpoint{ addr: net.IpAddr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
-}
-
-func fill_response(bytes: Slice<u8>) {
-    pattern: Slice<u8> = strings.bytes("phase16-partial-write-state|")
-    index: usize = 0
-    while index < bytes.len {
-        bytes[index] = pattern[index % pattern.len]
-        index = index + 1
-    }
 }
 
 func main(args: Slice<cstr>) i32 {
@@ -75,7 +65,7 @@ func main(args: Slice<cstr>) i32 {
 
     response_buf: [1536]u8
     response: Slice<u8> = (Slice<u8>)(response_buf)
-    fill_response(response)
+    partial_write_core.fill_response(response)
 
     events: [4]io.Event
     conn: io.File = 0
@@ -209,8 +199,9 @@ func main(args: Slice<cstr>) i32 {
                 }
 
                 remaining: Slice<u8> = response[written:response.len]
-                if remaining.len > WRITE_LIMIT {
-                    remaining = remaining[0:WRITE_LIMIT]
+                chunk_len: usize = partial_write_core.write_chunk_len(remaining.len)
+                if chunk_len < remaining.len {
+                    remaining = remaining[0:chunk_len]
                 }
 
                 nwritten: usize

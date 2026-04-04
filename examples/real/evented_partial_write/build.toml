@@ -13,3 +13,9 @@ modules = ["src", "../evented_echo/src", "../../../stdlib"]
 
 [targets.partial-write.runtime]
 startup = "default"
+
+[targets.partial-write.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

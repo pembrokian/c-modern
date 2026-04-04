@@ -1640,6 +1640,37 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
                                   ReserveLoopbackPort(),
                                   "phase16_evented_partial_write_run_output.txt",
                                   "phase16 evented partial-write run");
+
+    const auto [partial_write_test_outcome, partial_write_test_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                                             "test",
+                                                                                             "--project",
+                                                                                             partial_write_project_path.generic_string(),
+                                                                                             "--build-dir",
+                                                                                             partial_write_build_dir.generic_string()},
+                                                                                            partial_write_build_dir / "phase18_evented_partial_write_test_output.txt",
+                                                                                            "phase18 evented partial-write test");
+    if (!partial_write_test_outcome.exited || partial_write_test_outcome.exit_code != 0) {
+        Fail("phase18 evented partial-write tests should pass:\n" + partial_write_test_output);
+    }
+    ExpectOutputContains(partial_write_test_output,
+                         "testing target partial-write",
+                         "phase18 evented partial-write test should announce the target under test");
+    ExpectOutputContains(partial_write_test_output,
+                         "PASS fill_response_pattern_test.test_fill_response_pattern",
+                         "phase18 evented partial-write ordinary tests should include response-pattern coverage");
+    ExpectOutputContains(partial_write_test_output,
+                         "PASS write_chunk_len_test.test_write_chunk_len",
+                         "phase18 evented partial-write ordinary tests should include write-window coverage");
+    ExpectOutputContains(partial_write_test_output,
+                         "2 tests, 2 passed, 0 failed",
+                         "phase18 evented partial-write test summary should be deterministic");
+
+    ExercisePartialWriteRoundTrip(mc_path,
+                                  partial_write_project_path,
+                                  partial_write_build_dir,
+                                  ReserveLoopbackPort(),
+                                  "phase18_evented_partial_write_rerun_output.txt",
+                                  "phase18 evented partial-write rerun after tests");
 }
 
 }  // namespace
