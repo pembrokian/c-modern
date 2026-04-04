@@ -169,39 +169,56 @@ single-threaded evented echo server
 	TCP port, accepts one connection through the admitted poller boundary,
 	echoes the received payload, and exits cleanly without thread or scheduler
 	machinery
-- Bootstrap limitation: the project fixture currently binds the admitted hosted
-	ABI symbols directly inside the project root because the cleaner imported
-	stdlib-wrapper path still triggers duplicate MIR functions for
-	`errors.is_ok` in project mode
-- Phase 14A note: admitted as the lead evented-networking canonical entry now
-	that the portable owner slice is real; further networking pressure should
-	build on this project fixture rather than replace it
+- Phase 15 note: ordinary project code now uses the admitted imported stdlib
+	wrappers directly; the earlier project-mode imported-wrapper duplication is
+	closed compiler debt rather than a continuing example-local workaround
+- Phase 16 note: remains the lead evented-networking project artifact; deeper
+	networking pressure should extend this proof path or a closely related
+	sibling rather than replacing it
 
 partial-write response state machine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Packaging: dedicated project fixture once writable readiness and interest updates exist
+- Status: implemented
+- Packaging: dedicated project fixture with supporting direct-source regression
 - Pressure focus: partial writes, caller-owned connection state, and poller
 	interest updates after state transitions
-- Enabling gap: no admitted `io.poller_set(...)` style writable-interest API,
-	and no admitted portable poller or `net` surface to prove partial-write
-	handling honestly
-- Phase 14A note: remains blocked behind the same Phase 6 ownership gap as the
-	evented echo server, with the added requirement for writable-interest update
-	support
+- Proof artifact: `examples/real/evented_partial_write/build.toml` with
+	`examples/real/evented_partial_write/src/main.mc`, exercised by
+	`phase16_evented_partial_write_project_build` in
+	`tests/codegen/codegen_executable_tests.cpp` and by `mc run --project ...`
+	coverage in `tests/tool/phase7_tool_tests.cpp`; direct-source reinforcement
+	also lives in `tests/stdlib/poller_partial_write_response.mc`
+- Library surface: `io.read`, `io.write_file`, `io.close`, `io.poller_new`,
+	`io.poller_add`, `io.poller_set`, `io.poller_remove`, `io.poller_wait`,
+	`io.poller_close`, `net.tcp_listen`, `net.accept`
+- Observable behavior: a hosted server reads one request, queues a fixed-size
+	response, flushes it across multiple writable iterations with caller-owned
+	offset tracking, then returns to readable interest for a final client ack
+	before exit
+- Phase 16 note: the repository-owned proof forces deterministic multi-step
+	flush behavior with an explicit per-iteration write budget on the current
+	hosted runtime; if a later runtime admission standardizes kernel-driven short
+	writes more strongly, that tightening belongs to the Phase 12 `io` and
+	runtime owners rather than to example-local shims
 
 evented TCP client request-response
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Packaging: dedicated project fixture once client-side networking and poller updates exist
+- Status: implemented
+- Packaging: direct-source executable proof
 - Pressure focus: client-side `connect_tcp`, readiness transitions, and the
 	ordinary fallible `io.close` rule in a normal network flow
-- Enabling gap: no admitted portable `net.connect_tcp(...)`, no admitted
-	poller surface, and no project-proven portable networking boundary on the
-	current hosted slice
-- Phase 14A note: blocked for the same Phase 6 owner reasons as the server
-	entries; Phase 8 should admit it only after the underlying portable network
-	surface is real
+- Proof artifact: `tests/stdlib/poller_connect_roundtrip.mc`, exercised by
+	`phase12_poller_connect_roundtrip_build` in
+	`tests/codegen/codegen_executable_tests.cpp`
+- Library surface: `io.read`, `io.write_file`, `io.close`, `io.poller_new`,
+	`io.poller_add`, `io.poller_set`, `io.poller_wait`, `io.poller_close`,
+	`net.connect_tcp`
+- Observable behavior: a hosted loopback client connects through the admitted
+	portable `net` surface, waits for writable readiness, sends one request,
+	switches to readable interest, validates the reply, and closes cleanly
+- Phase 16 note: this is now the admitted client-side counterpart at the
+	direct-source proof layer; any later project-mode client pressure should
+	build on it rather than re-open already-closed networking prerequisites
 
 MMIO register access
 ~~~~~~~~~~~~~~~~~~~~

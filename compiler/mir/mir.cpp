@@ -3720,6 +3720,10 @@ AtomicOrderKind ClassifyAtomicOrder(std::string_view order_name) {
     return AtomicOrderKind::kInvalid;
 }
 
+bool IsConstantAtomicOrderMetadata(std::string_view order_name) {
+    return ClassifyAtomicOrder(order_name) != AtomicOrderKind::kInvalid;
+}
+
 bool AtomicOrderAllowedForInstruction(Instruction::Kind kind, std::string_view order_name) {
     const AtomicOrderKind order = ClassifyAtomicOrder(order_name);
     switch (kind) {
@@ -3794,14 +3798,18 @@ void ValidateAtomicInstruction(const Instruction& instruction, const ValidationC
         report("atomic_compare_exchange must record success/failure order metadata in function " + function.name);
     }
     if ((is_load || is_store || is_exchange || is_fetch_add) && HasAtomicOrderMetadata(instruction) &&
+        IsConstantAtomicOrderMetadata(instruction.atomic_order) &&
         !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
         report(std::string(ToString(instruction.kind)) + " uses unsupported MemoryOrder metadata in function " + function.name);
     }
     if (is_compare_exchange && HasCompareExchangeOrderMetadata(instruction)) {
-        if (!AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_success_order)) {
+        if (IsConstantAtomicOrderMetadata(instruction.atomic_success_order) &&
+            !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_success_order)) {
             report("atomic_compare_exchange uses unsupported success MemoryOrder metadata in function " + function.name);
         }
-        if (!AtomicCompareExchangeFailureOrderAllowed(instruction.atomic_success_order, instruction.atomic_failure_order)) {
+        if (IsConstantAtomicOrderMetadata(instruction.atomic_success_order) &&
+            IsConstantAtomicOrderMetadata(instruction.atomic_failure_order) &&
+            !AtomicCompareExchangeFailureOrderAllowed(instruction.atomic_success_order, instruction.atomic_failure_order)) {
             report("atomic_compare_exchange uses unsupported failure MemoryOrder metadata in function " + function.name);
         }
     }

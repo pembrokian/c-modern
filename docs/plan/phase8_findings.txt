@@ -127,7 +127,6 @@ single-threaded evented echo server
 - What it exposed: the first honest hosted networking slice currently works
 	best with plain `i32` handles and caller-owned parallel poller output
 	buffers rather than the cleaner long-term `File` plus `Event` surface
-
 - Owner: Phase 6 `io` and `net` boundary work landed the needed runtime and
 	stdlib support; the project-mode imported-wrapper duplication that first
 	appeared here is now closed as compiler debt rather than remaining an
@@ -138,25 +137,42 @@ single-threaded evented echo server
 
 partial-write response state machine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Classification: stdlib gap
-- Enabling gap: no admitted writable-interest update surface such as
-	`io.poller_set(...)`, and no admitted portable poller or `net` layer to
-	prove partial-write state transitions honestly
-- Owner: Phase 6 `io` and `net` boundary work
-- Phase 14B decision: keep blocked behind explicit writable-readiness and
-	interest-update requirements rather than treating it as covered by the echo
-	server entry
+- Status: implemented
+- Classification: admitted networking pressure with bounded runtime-shape note
+- Resolution: added one direct-source regression plus one closely related
+	project-mode sibling that read a request, switch interest from readable to
+	writable, flush a fixed-size response through caller-owned offset tracking,
+	then switch back to readable for a final ack before exit
+- What it exposed: the current hosted runtime still configures ordinary
+	blocking stream sockets, so the repository-owned proof forces deterministic
+	multi-step flushing with an explicit per-iteration write budget rather than
+	claiming kernel-driven short writes as an admitted runtime contract today
+- Owner: the Phase 14 pressure layer now proves the state machine honestly;
+	any future tightening around nonblocking or kernel-short-write behavior
+	routes to the Phase 12 `io` and hosted runtime owners instead of back into
+	example-local shims
+- Proof: `tests/stdlib/poller_partial_write_response.mc` plus
+	`examples/real/evented_partial_write/build.toml`, exercised by
+	`phase16_poller_partial_write_response_build` and
+	`phase16_evented_partial_write_project_build` in
+	`tests/codegen/codegen_executable_tests.cpp`, with `mc run --project ...`
+	coverage in `tests/tool/phase7_tool_tests.cpp`
 
 evented TCP client request-response
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Status: blocked
-- Classification: stdlib or runtime gap
-- Enabling gap: no admitted `net.connect_tcp(...)`, no admitted portable
-	poller surface, and no repository-owned client-side networking proof path
-- Owner: Phase 6 portable networking and poller admission
-- Phase 14B decision: keep explicit as the client-side counterpart to the
-	server entries so future admission pressure does not stay server-only
+- Status: implemented
+- Classification: admitted canonical networking pressure at the direct-source
+	proof layer
+- Resolution: the hosted loopback client roundtrip now stands as the admitted
+	client-side counterpart, proving `net.connect_tcp(...)` plus writable-to-
+	readable interest transition through the same `io.poller_set(...)` surface
+	used by server-side flows
+- Owner: Phase 6 portable networking and poller admission has landed for this
+	bounded slice; any later project-mode client deepening is follow-on pressure,
+	not a missing prerequisite
+- Proof: `tests/stdlib/poller_connect_roundtrip.mc`, exercised by
+	`phase12_poller_connect_roundtrip_build` in
+	`tests/codegen/codegen_executable_tests.cpp`
 
 MMIO register access
 --------------------
@@ -320,12 +336,14 @@ poller, net, and sync as enabling boundaries
 - Programs: evented echo server, partial-write response state machine,
 	evented TCP client, shared counter, producer-consumer, atomic flag
 	publication, and the deferred bounded threaded example
-- Current classification: named enabling gaps, not ambiguous future work
-- Owner: Phase 12 stdlib and runtime maturity, with Phase 13 proof-path follow-
-	up where project or ordinary-test workflow becomes part of admission
-- Current repository decision: treat these as blocked library and runtime
-	boundaries until admitted honestly; do not approximate them with host-
-	specific helpers or example-local shims
+- Current classification: admitted bounded capability slices with explicit
+	owner-local follow-on work, not ambiguous future work
+- Owner: Phase 12 stdlib and runtime maturity for any deeper networking or
+	`sync` widening, Phase 13 when project workflow becomes part of admission,
+	and compiler owners only when admitted consumers expose typed-surface debt
+- Current repository decision: build new pressure on the admitted `io`, `net`,
+	and `sync` slices directly; do not reintroduce host-specific helpers or
+	example-local shims to bypass remaining owner work
 
 volatile and atomics separation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

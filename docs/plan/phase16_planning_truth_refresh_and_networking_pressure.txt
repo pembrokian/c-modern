@@ -1,0 +1,159 @@
+Phase 16 -- Planning Truth Refresh And Networking Pressure Deepening
+===================================================================
+
+Status
+------
+COMPLETED (repository-bounded truth refresh and networking-pressure wave)
+
+Purpose
+-------
+Bring the planning artifacts back into line with repository truth after the
+Phase 15 cleanup wave, then land the next honest networking-pressure artifact
+on top of the already-admitted hosted poller and `net` slice.
+
+This document is intentionally cross-phase in dependency, but Phase 16 itself
+is a concrete repository execution slice rather than a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The repository-bounded post-Phase-14 cleanup wave is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase15_post_phase14_cleanup_closeout.txt`.
+- The current Phase 12 plan already admits `io.poller_set(...)`,
+  `net.connect_tcp(...)`, and a hosted client roundtrip proof.
+- Parts of the current Phase 8 admission and findings docs still lag that
+  truth and therefore understate what networking pressure is now enabled.
+
+Problem being solved
+--------------------
+- The repository has planning drift between the current Phase 12 through Phase
+  15 truth and the explicit Phase 8 pressure records.
+- The next networking-pressure target is already named: partial-write response
+  state machine.
+- Without a dedicated truth-refresh phase, the next execution wave risks being
+  planned from stale blocked-entry wording rather than current owner truth.
+
+Core rule
+---------
+- Re-audit the pressure docs before expanding example breadth.
+- Treat networking pressure as evidence about stdlib, runtime, compiler, and
+  workflow honesty, not as a place to hide remaining owner-local gaps.
+- Extend the existing project-proof path where possible instead of adding new
+  ad hoc networking fixtures.
+
+Scope
+-----
+- re-audit `/Users/ro/dev/c_modern/docs/plan/phase8_admission_matrix.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/phase8_findings.txt` against the landed
+  Phase 12 through Phase 15 truth
+- remove stale wording that still describes the evented-echo workaround and
+  blocked networking prerequisites as current when the owning support has now
+  landed
+- admit the partial-write response state machine as the next canonical or
+  project-mode networking pressure artifact
+- promote the existing client roundtrip proof into the explicit pressure docs
+  at the correct status boundary if it is now considered an admitted canonical
+  client-side counterpart
+
+What landed
+-----------
+- `docs/plan/phase8_admission_matrix.txt` and
+  `docs/plan/phase8_findings.txt` now match the repository truth after the
+  Phase 12 through Phase 15 networking work: evented echo no longer carries
+  stale project-workaround wording, the client roundtrip is admitted at the
+  direct-source proof layer, and the partial-write entry is no longer described
+  as blocked behind already-landed `io.poller_set(...)` or `net.connect_tcp(...)`
+- the repository now has one explicit next-step networking artifact beyond the
+  evented echo server and client roundtrip foundation: the direct-source
+  regression `/Users/ro/dev/c_modern/tests/stdlib/poller_partial_write_response.mc`
+  plus the closely related project fixture
+  `/Users/ro/dev/c_modern/examples/real/evented_partial_write/`
+- the new artifact proves request-read, writable-interest transition,
+  caller-owned response offset tracking, multi-iteration response flush, and a
+  final readable-interest transition for client ack before process exit
+- focused regressions now cover the state transition surface at three proof
+  layers: direct-source stdlib networking, executable codegen harness coverage,
+  and `mc run --project ...` coverage for the real project sibling
+
+Phase 16 finding
+----------------
+- the current hosted runtime still configures ordinary blocking stream sockets,
+  so the repository-owned proof forces deterministic multi-step flushes with an
+  explicit per-iteration write budget rather than claiming that kernel-driven
+  short writes are already part of the admitted runtime contract
+- this is still an honest pressure artifact because the caller-owned write
+  offset and `io.poller_set(...)` transitions are repository truth today, and
+  the same bookkeeping remains correct if a future runtime tightening exposes
+  real short-write behavior more directly
+- if the repository later standardizes stronger nonblocking or short-write
+  runtime semantics, that tightening belongs to the Phase 12 `io` and hosted
+  runtime owners rather than to example-local helpers
+
+Preferred proof shape
+---------------------
+- keep the partial-write artifact as a dedicated project fixture if it depends
+  on project-mode workflow and stateful networking behavior
+- extend the existing evented-echo project or add one closely related sibling
+  fixture rather than creating an unrelated one-off networking harness
+- keep deterministic loopback orchestration in the current proof layers so the
+  artifact remains reviewable and reproducible
+
+Deliverables
+------------
+- refreshed Phase 8 admission matrix aligned with Phase 15 truth
+- refreshed Phase 8 findings log aligned with Phase 15 truth
+- one admitted networking pressure artifact that proves writable-interest
+  transitions and partial-write caller-managed state
+- focused stdlib, codegen, and tool regressions covering the new networking
+  state transition surface
+- bounded updates to README or support notes only if the admitted hosted slice
+  statement changes materially
+
+Suggested execution order
+-------------------------
+1. Re-audit the stale pressure docs before landing additional examples.
+2. Correct any still-open wording around evented-echo and client networking
+   prerequisites.
+3. Land the partial-write networking pressure artifact.
+4. Route any findings immediately to the smallest correct owner.
+
+Exit criteria
+-------------
+- no planning doc still describes already-closed networking blockers as active
+- the repository has one explicit next-step networking proof beyond the echo
+  server and client roundtrip foundation
+- the findings log records what the partial-write pressure exposed and which
+  owner owns any remaining awkwardness
+
+Non-goals
+---------
+- opening a third capability family
+- broad networking API redesign before the next pressure artifact lands
+- widening `sync`, `hal`, or the release-hardening scope during this phase
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 16 stands on its own as a planning-truth and networking-pressure doc
+  instead of remaining embedded inside a combined series note.
+- The phase starts from current repository truth rather than older blocked
+  networking wording.
+
+Validation
+----------
+- focused executable coverage now exercises
+  `/Users/ro/dev/c_modern/tests/stdlib/poller_partial_write_response.mc`
+  and `/Users/ro/dev/c_modern/examples/real/evented_partial_write/` through
+  `/Users/ro/dev/c_modern/tests/codegen/codegen_executable_tests.cpp`
+- the real project proof also runs through the ordinary tool path in
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp`
+- the repository still keeps deterministic loopback orchestration in the
+  existing harness layers instead of hiding networking pressure in ad hoc host
+  scripts
+
+Closeout statement
+------------------
+Phase 16 is complete. The repository used this wave to refresh the explicit
+Phase 8 pressure records against current networking truth, promote the already-
+landed client roundtrip to its proper admitted status boundary, and add one
+honest next-step partial-write state-machine proof on the existing hosted
+poller plus `net` slice without overstating the current runtime contract.

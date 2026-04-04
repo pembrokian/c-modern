@@ -428,6 +428,17 @@ std::string ReadExactFromSocket(int fd,
     return data;
 }
 
+std::string BuildPartialWriteResponse(size_t size) {
+    static constexpr std::string_view kPattern = "phase16-partial-write-state|";
+
+    std::string payload;
+    payload.resize(size);
+    for (size_t index = 0; index < size; ++index) {
+        payload[index] = kPattern[index % kPattern.size()];
+    }
+    return payload;
+}
+
 void ExpectBackgroundProcessSuccess(const BackgroundProcess& process,
                                     int timeout_ms,
                                     const std::string& context) {
@@ -472,6 +483,46 @@ void RunBuiltNetworkEchoServerFixture(const std::filesystem::path& mc_path,
     }
 
     ExpectBackgroundProcessSuccess(process, 2000, "wait for built network echo server");
+}
+
+void RunBuiltPartialWriteServerFixture(const std::filesystem::path& mc_path,
+                                       const std::filesystem::path& source_path,
+                                       const std::filesystem::path& build_dir,
+                                       std::string_view request,
+                                       std::string_view ack,
+                                       std::string_view expected_reply) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          source_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build " + source_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
+    const uint16_t port = ReserveLoopbackPort();
+    const BackgroundProcess process = SpawnBackgroundExecutable(
+        artifacts.executable,
+        {std::to_string(port)},
+        build_dir / "partial_write_server_output.txt",
+        "spawn background partial-write server");
+
+    const int client_fd = ConnectLoopbackWithRetry(port, 2000, "connect to built partial-write server");
+    WriteAllToSocket(client_fd, request, "write request to built partial-write server");
+    const std::string reply = ReadExactFromSocket(client_fd,
+                                                  expected_reply.size(),
+                                                  "read reply from built partial-write server");
+    if (reply != expected_reply) {
+        CloseFd(client_fd);
+        Fail("partial-write server returned unexpected payload");
+    }
+
+    WriteAllToSocket(client_fd, ack, "write ack to built partial-write server");
+    CloseFd(client_fd);
+
+    ExpectBackgroundProcessSuccess(process, 2000, "wait for built partial-write server");
 }
 
 void RunBuiltNetworkClientFixture(const std::filesystem::path& mc_path,
@@ -705,6 +756,48 @@ void RunBuiltProjectNetworkEchoFixture(const std::filesystem::path& mc_path,
     }
 
     ExpectBackgroundProcessSuccess(process, 2000, "wait for built project network echo server");
+}
+
+void RunBuiltProjectPartialWriteFixture(const std::filesystem::path& mc_path,
+                                        const std::filesystem::path& project_path,
+                                        const std::filesystem::path& root_source_path,
+                                        const std::filesystem::path& build_dir,
+                                        std::string_view request,
+                                        std::string_view ack,
+                                        std::string_view expected_reply) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          "--project",
+                          project_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build --project " + project_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(root_source_path, build_dir);
+    const uint16_t port = ReserveLoopbackPort();
+    const BackgroundProcess process = SpawnBackgroundExecutable(
+        artifacts.executable,
+        {std::to_string(port)},
+        build_dir / "project_partial_write_output.txt",
+        "spawn built project partial-write server");
+
+    const int client_fd = ConnectLoopbackWithRetry(port, 2000, "connect to built project partial-write server");
+    WriteAllToSocket(client_fd, request, "write request to built project partial-write server");
+    const std::string reply = ReadExactFromSocket(client_fd,
+                                                  expected_reply.size(),
+                                                  "read reply from built project partial-write server");
+    if (reply != expected_reply) {
+        CloseFd(client_fd);
+        Fail("project partial-write server returned unexpected payload");
+    }
+
+    WriteAllToSocket(client_fd, ack, "write ack to built project partial-write server");
+    CloseFd(client_fd);
+
+    ExpectBackgroundProcessSuccess(process, 2000, "wait for built project partial-write server");
 }
 
 }  // namespace
@@ -1139,7 +1232,7 @@ int main(int argc, char** argv) {
     RunBuildFailureFixture(mc_path,
                            low_level_dynamic_order_source,
                            work_root / "low_level_dynamic_order_fail_build",
-                           "atomic_load uses unsupported MemoryOrder metadata");
+                           "requires supported constant MemoryOrder metadata for 'atomic_load'");
 
     const std::filesystem::path bounds_index_source = work_root / "bounds_index_oob.mc";
     WriteFile(bounds_index_source,
@@ -1346,6 +1439,13 @@ int main(int argc, char** argv) {
                                  "ping",
                                  "pong");
 
+    RunBuiltPartialWriteServerFixture(mc_path,
+                                      source_root / "tests/stdlib/poller_partial_write_response.mc",
+                                      work_root / "phase16_poller_partial_write_response_build",
+                                      "push",
+                                      "!",
+                                      BuildPartialWriteResponse(1536));
+
     RunBuiltOutputFixture(mc_path,
                           source_root / "examples/canonical/hello_stdout.mc",
                           work_root / "phase8_hello_stdout_build",
@@ -1487,6 +1587,14 @@ int main(int argc, char** argv) {
                                       work_root / "phase14_evented_echo_project_build",
                                       "hello",
                                       "hello");
+
+    RunBuiltProjectPartialWriteFixture(mc_path,
+                                       source_root / "examples/real/evented_partial_write/build.toml",
+                                       source_root / "examples/real/evented_partial_write/src/main.mc",
+                                       work_root / "phase16_evented_partial_write_project_build",
+                                       "push",
+                                       "!",
+                                       BuildPartialWriteResponse(1536));
 
     RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/arena_ast_build.mc",

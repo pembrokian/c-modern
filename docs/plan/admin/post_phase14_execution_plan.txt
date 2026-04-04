@@ -41,6 +41,13 @@ Repository status note
   `/Users/ro/dev/c_modern/docs/plan/phase13_toolchain_maturity_second_wave_closeout.txt`.
 - The repository-bounded post-Phase-14 cleanup wave is recorded in
   `/Users/ro/dev/c_modern/docs/plan/phase15_post_phase14_cleanup_closeout.txt`.
+- The proposed next-series handoff after that cleanup wave is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase16_to_phase18_next_series_plan.txt`.
+- The separate Phase 16, Phase 17, and Phase 18 planning docs are recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase16_planning_truth_refresh_and_networking_pressure.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/phase17_compiler_widening_import_visible_typed_surfaces.txt`,
+  and
+  `/Users/ro/dev/c_modern/docs/plan/phase18_workflow_hardening_and_plateau_decision.txt`.
 - The current hosted release-hardening support statement is recorded in
   `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`.
 - The repository therefore needs an explicit "what next" plan more than it

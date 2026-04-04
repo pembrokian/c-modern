@@ -1,0 +1,101 @@
+Phase 18 -- Workflow Hardening And Plateau Decision
+==================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Use the richer project and pressure artifacts from Phase 16 and Phase 17 to
+choose the next plateau deliberately: deeper Phase 13 maturity, narrow `sync`
+follow-on, narrow `hal` admission, or pause for release hardening.
+
+This document is a repository planning phase, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- By the time this phase begins, the repository should have one more admitted
+  networking pressure artifact and a clearer picture of whether the current
+  compiler compromises are still materially shaping public APIs.
+- The remaining major choice should then be about the next plateau, not about
+  discovering yet another broad family opportunistically.
+
+Problem being solved
+--------------------
+- After another networking wave and targeted compiler widening, the repository
+  needs an evidence-based decision about where the next leverage lies.
+- Without a dedicated plateau-decision phase, the backlog risks turning into a
+  rotating list of loosely justified ideas instead of one clear next stop-point.
+
+Core rule
+---------
+- Choose exactly one next plateau outcome.
+- Let landed pressure determine whether the next step is workflow trust,
+  `sync`, `hal`, or release hardening.
+- Keep non-chosen options explicit in backlog or decision-log form rather than
+  letting them disappear.
+
+Scope
+-----
+- finish the highest-leverage remaining Phase 13 items that a larger project
+  fixture exposes, especially manifest ergonomics, deterministic rebuild
+  correctness, and any remaining reporting sharpness around `mc test`
+- evaluate whether a real consumer now justifies one narrow `sync` follow-on,
+  such as compare-exchange, fetch-add, or condvar broadcast
+- evaluate whether a real consumer now justifies narrow `hal` admission for
+  MMIO register access
+- choose whether the repository should stop capability growth for a first
+  stronger hosted plateau and route effort into the existing release-hardening
+  note instead of opening another family
+
+Decision gate
+-------------
+Choose exactly one of the following outcomes at the end of Phase 18:
+
+- Option A: continue with Phase 13 trust and reporting hardening as the next
+  highest-leverage work for the current capability plateau
+- Option B: reopen `sync` for one narrowly justified new consumer and one new
+  proof artifact only
+- Option C: admit narrow `hal` for the MMIO register-access canonical proof if
+  the hardware-boundary consumer matrix is now real
+- Option D: freeze the capability plateau and execute the hosted release-
+  hardening pass for a more public repository cut
+
+Deliverables
+------------
+- one explicit plateau decision document or bounded update to the relevant
+  Phase 12, Phase 13, or release-hardening note
+- focused tool regressions for any workflow gaps exposed by the richer project
+  fixtures
+- updated backlog and decision-log entries so the non-chosen options remain
+  explicit rather than vanishing from the plan
+
+Suggested execution order
+-------------------------
+1. Review the evidence produced by Phase 16 and Phase 17.
+2. Close the highest-leverage remaining workflow gaps that are already clearly
+   justified by the richer project fixtures.
+3. Choose one plateau outcome only.
+4. Record the non-chosen options explicitly in backlog or decision-log form.
+
+Exit criteria
+-------------
+- the repository has a chosen next plateau rather than a loose list of options
+- the next family or hardening pass is justified by landed pressure rather than
+  abstract completeness goals
+- the planning set no longer requires the combined Phase 16 to 18 overview
+  alone to explain current priorities
+
+Non-goals
+---------
+- opening several follow-on families in parallel
+- broad `sync` or `hal` expansion without a real consumer matrix
+- starting release hardening before the capability plateau is intentionally
+  chosen
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 18 stands alone as the plateau-decision and workflow-hardening plan.
+- The phase ends with one explicit next-step choice.

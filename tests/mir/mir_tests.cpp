@@ -438,6 +438,59 @@ void TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes() {
     }
 }
 
+void TestImportedAtomicBoundaryValidationAcceptsDynamicOrderOperand() {
+    mc::support::DiagnosticSink diagnostics;
+
+    mc::sema::Module imported_sync;
+    mc::sema::TypeDeclSummary order_type;
+    order_type.kind = mc::ast::Decl::Kind::kEnum;
+    order_type.name = "MemoryOrder";
+    order_type.variants = {{"Relaxed"}, {"Acquire"}, {"Release"}};
+    imported_sync.type_decls.push_back(std::move(order_type));
+
+    mc::sema::TypeDeclSummary atomic_type;
+    atomic_type.kind = mc::ast::Decl::Kind::kStruct;
+    atomic_type.name = "Atomic";
+    atomic_type.type_params.push_back("T");
+    imported_sync.type_decls.push_back(std::move(atomic_type));
+
+    mc::sema::Type atomic_i32 = mc::sema::NamedType("Atomic");
+    atomic_i32.subtypes.push_back(mc::sema::NamedType("i32"));
+    imported_sync.functions.push_back({
+        .name = "atomic_load",
+        .param_types = {mc::sema::PointerType(atomic_i32), mc::sema::NamedType("MemoryOrder")},
+        .return_types = {mc::sema::NamedType("i32")},
+    });
+    mc::sema::BuildModuleLookupMaps(imported_sync);
+
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    imported_modules.emplace("sync", std::move(imported_sync));
+
+    mc::sema::CheckOptions options;
+    options.imported_modules = &imported_modules;
+
+    const auto lowered = Lower(
+        "import sync\n"
+        "\n"
+        "func read(atom: *sync.Atomic<i32>, order: sync.MemoryOrder) i32 {\n"
+        "    return sync.atomic_load(atom, order)\n"
+        "}\n",
+        options,
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("imported atomic lowering with dynamic order should succeed:\n" + diagnostics.Render());
+    }
+    if (!mc::mir::ValidateModule(*lowered.module, "<mir-test>", diagnostics)) {
+        Fail("validator should accept imported dynamic MemoryOrder operands in MIR:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("type=sync.MemoryOrder") == std::string::npos || dump.find("op=order=order") == std::string::npos) {
+        Fail("imported atomic MIR should preserve dynamic imported MemoryOrder operand metadata");
+    }
+}
+
 void TestImportedTypedThreadSpawnLowersToRawHelper() {
     mc::support::DiagnosticSink diagnostics;
 
@@ -3001,6 +3054,7 @@ int main() {
     TestImportedModuleSurfaceLowersQualifiedTypesAndTargets();
     TestImportedModuleVariantMatchLowersQualifiedVariants();
     TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes();
+    TestImportedAtomicBoundaryValidationAcceptsDynamicOrderOperand();
     TestImportedTypedThreadSpawnLowersToRawHelper();
     TestDeferredImportedTypedThreadSpawnLowersToRawHelper();
     TestGlobalAddressLoweringUsesExplicitLocalAddr();

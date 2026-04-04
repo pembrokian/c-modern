@@ -356,6 +356,17 @@ std::string ReadExactFromSocket(int fd,
     return data;
 }
 
+std::string BuildPartialWriteResponse(size_t size) {
+    static constexpr std::string_view kPattern = "phase16-partial-write-state|";
+
+    std::string payload;
+    payload.resize(size);
+    for (size_t index = 0; index < size; ++index) {
+        payload[index] = kPattern[index % kPattern.size()];
+    }
+    return payload;
+}
+
 void ExerciseEventedEchoRoundTrip(const std::filesystem::path& mc_path,
                                   const std::filesystem::path& project_path,
                                   const std::filesystem::path& build_dir,
@@ -383,6 +394,39 @@ void ExerciseEventedEchoRoundTrip(const std::filesystem::path& mc_path,
     if (reply != request) {
         Fail(context + ": server returned unexpected payload: '" + reply + "'");
     }
+
+    ExpectBackgroundProcessSuccess(run_process, 3000, "wait for " + context);
+}
+
+void ExercisePartialWriteRoundTrip(const std::filesystem::path& mc_path,
+                                   const std::filesystem::path& project_path,
+                                   const std::filesystem::path& build_dir,
+                                   uint16_t port,
+                                   std::string_view output_name,
+                                   const std::string& context) {
+    const BackgroundProcess run_process = SpawnBackgroundCommand({mc_path.generic_string(),
+                                                                  "run",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--",
+                                                                  std::to_string(port)},
+                                                                 build_dir / std::string(output_name),
+                                                                 context);
+
+    const int client_fd = ConnectLoopbackWithRetry(port, 3000, "connect to " + context);
+    WriteAllToSocket(client_fd, "push", "write request to " + context);
+    const std::string reply = ReadExactFromSocket(client_fd,
+                                                  1536,
+                                                  "read reply from " + context);
+    if (reply != BuildPartialWriteResponse(1536)) {
+        CloseFd(client_fd);
+        Fail(context + ": server returned unexpected partial-write payload");
+    }
+
+    WriteAllToSocket(client_fd, "!", "write ack to " + context);
+    CloseFd(client_fd);
 
     ExpectBackgroundProcessSuccess(run_process, 3000, "wait for " + context);
 }
@@ -1585,6 +1629,17 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
                                  ReserveLoopbackPort(),
                                  "phase13_evented_echo_rerun_output.txt",
                                  "phase13 evented echo rerun after tests");
+
+    const std::filesystem::path partial_write_project_path = source_root / "examples/real/evented_partial_write/build.toml";
+    const std::filesystem::path partial_write_build_dir = binary_root / "phase16_evented_partial_write_build";
+    std::filesystem::remove_all(partial_write_build_dir);
+
+    ExercisePartialWriteRoundTrip(mc_path,
+                                  partial_write_project_path,
+                                  partial_write_build_dir,
+                                  ReserveLoopbackPort(),
+                                  "phase16_evented_partial_write_run_output.txt",
+                                  "phase16 evented partial-write run");
 }
 
 }  // namespace

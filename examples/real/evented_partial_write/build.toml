@@ -1,0 +1,15 @@
+schema = 1
+project = "evented-partial-write"
+default = "partial-write"
+
+[targets.partial-write]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.partial-write.search_paths]
+modules = ["src", "../evented_echo/src", "../../../stdlib"]
+
+[targets.partial-write.runtime]
+startup = "default"

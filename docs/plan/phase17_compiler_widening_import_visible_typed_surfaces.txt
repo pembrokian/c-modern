@@ -1,0 +1,118 @@
+Phase 17 -- Compiler Widening For Import-Visible Typed Surfaces
+==============================================================
+
+Status
+------
+IN PROGRESS (first import-visible metadata slice landed)
+
+Purpose
+-------
+Use the admitted networking and `sync` pressure to retire the highest-leverage
+bootstrap-shaped compiler compromises that are now limiting API honesty or
+example cleanliness.
+
+This document does not introduce a new architecture phase after Phase 8.
+It is a repository execution plan for compiler-owner work that should land
+only when real admitted consumers justify it.
+
+Repository status note
+----------------------
+- The decision log records that the networking slice was flattened to plain
+  `i32` handles plus parallel event buffers because imported handle aliases,
+  imported event-record types, and qualified generic event buffers were not
+  yet honest enough.
+- The decision log also records that `sync.thread_spawn<T>` currently preserves
+  its intended public API through a compiler-owned rewrite because imported
+  generic procedure-call lowering is still not broad enough.
+- Phase 16 is expected to provide the next networking-pressure evidence needed
+  to decide which of these compromises should be retired first.
+- The first concrete compiler-widening slice after that pressure is now landed
+  at the MIR boundary: imported `sync.MemoryOrder` operands passed through
+  atomic intrinsics validate as symbolic MIR metadata instead of being rejected
+  prematurely as if the backend's constant-only restriction applied at MIR.
+- That closes a real repository failure in `tests/mir/imported_atomic_ok.mc`,
+  but it does not yet restore the broader networking `File` plus `Event`
+  public surface.
+
+Problem being solved
+--------------------
+- The repository already has truthful end-to-end proof for a bounded hosted
+  networking and `sync` slice, but parts of the public surface still reflect
+  compiler limits rather than the cleaner intended boundary.
+- Widening compiler support here is valuable only when it removes real
+  bootstrap-shaped public API compromises, not when it merely increases
+  theoretical expressiveness.
+
+Core rule
+---------
+- Widen compiler support to serve already-admitted library shapes rather than
+  inventing broader generic or type-system ambition for its own sake.
+- Keep the change owner-local: parser, sema, MIR, and backend work should only
+  land insofar as it is needed to support the admitted import-visible typed
+  surface honestly.
+- Revisit the `thread_spawn<T>` rewrite only if a second real imported generic
+  procedure consumer now exists.
+
+Scope
+-----
+- prioritize imported alias and imported type support, plus qualified event
+  buffer passing, only where this would let the admitted networking surface
+  move from bootstrap-shaped plumbing toward a truer `File` and `Event` style
+  boundary
+- preserve the current bounded `thread_spawn<T>` rewrite unless a second real
+  consumer now justifies broader imported generic procedure-call lowering
+- keep driver, stdlib, and example code free of compensating workarounds once
+  the compiler owner can express the intended truth directly
+
+Preferred implementation bias
+-----------------------------
+- prefer one clean imported type family with deterministic regression coverage
+  over many partially widened cases
+- close one bootstrap compromise completely when possible instead of partially
+  loosening many related constraints at once
+- update the decision log whenever a compromise is narrowed, closed, or given a
+  sharper revisit trigger
+
+Deliverables
+------------
+- focused compiler regressions for imported alias use, imported event-record
+  typing, and any qualified generic event-buffer forms that are newly admitted
+- focused MIR regression coverage for imported enum-typed intrinsic metadata so
+  imported special-call operands do not get rejected before backend lowering
+- bounded Phase 12 updates if the networking public surface is restored from
+  the flattened `i32` and parallel-buffer form toward a more honest typed API
+- decision-log updates that either close a bootstrap compromise or restate the
+  narrower remaining deferral precisely
+- if justified by a second real consumer, a concrete plan or implementation
+  slice for broader imported generic procedure-call lowering
+
+Suggested execution order
+-------------------------
+1. Use the Phase 16 networking artifact to confirm which flattened surface is
+   still materially harmful.
+2. Widen the smallest compiler-owned typed surface needed to remove that
+   compromise.
+3. Promote the cleaner public API only after deterministic compiler and proof
+   coverage exists.
+4. Reassess whether `thread_spawn<T>` still lacks a second real consumer.
+
+Exit criteria
+-------------
+- at least one current bootstrap-shaped imported networking compromise is
+  either removed or narrowed materially
+- examples and project fixtures no longer need the corresponding workaround
+  spelling where the compiler owner truth has landed
+- any remaining deferred compiler compromise is documented with a sharper
+  revisit trigger than "later cleanup"
+
+Non-goals
+---------
+- speculative generic-system expansion without a concrete admitted consumer
+- broad language-surface expansion unrelated to import-visible typed pressure
+- opening multiple compiler-widening tracks in parallel
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 17 stands alone as the compiler-widening plan for admitted typed-surface
+  compromises.
+- The phase is explicitly justified by repository-owned consumer pressure.

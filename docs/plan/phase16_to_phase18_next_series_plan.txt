@@ -1,0 +1,112 @@
+Phase 16 Through Phase 18 -- Next-Series Overview
+================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Turn the repository posture after the Phase 15 cleanup closeout into one short
+overview that points to the separate Phase 16, Phase 17, and Phase 18 planning
+documents.
+
+This document is intentionally cross-phase.
+It does not introduce a new architecture phase after Phase 8.
+It packages the next repository-owned execution series across already-existing
+owners and routes readers to the separate phase-specific docs:
+
+- Phase 12 ownership for stdlib and runtime boundary widening
+- Phase 13 ownership for project workflow and test-harness maturity
+- Phase 14 ownership for canonical and real-program pressure expansion
+- compiler-owner work when admitted library or pressure slices expose bounded
+  parser, sema, MIR, or backend limits that should be fixed at the owning
+  layer instead of normalized in libraries or examples
+
+Phase-specific documents
+------------------------
+- Phase 16: `/Users/ro/dev/c_modern/docs/plan/phase16_planning_truth_refresh_and_networking_pressure.txt`
+- Phase 17: `/Users/ro/dev/c_modern/docs/plan/phase17_compiler_widening_import_visible_typed_surfaces.txt`
+- Phase 18: `/Users/ro/dev/c_modern/docs/plan/phase18_workflow_hardening_and_plateau_decision.txt`
+
+Repository status note
+----------------------
+- The repository-bounded post-Phase-14 cleanup wave is recorded in
+  `/Users/ro/dev/c_modern/docs/plan/phase15_post_phase14_cleanup_closeout.txt`.
+- That closeout intentionally did not choose a third capability family.
+- The repository already has admitted hosted networking and first-wave hosted
+  `sync` slices, plus current-surface canonical closure for the named follow-on
+  candidates.
+- The immediate question is therefore not "what brand-new area exists" but
+  "which next work best converts the current admitted slice into a more honest,
+  less bootstrap-shaped plateau".
+
+Series summary
+--------------
+- Phase 16 refreshes the planning truth and deepens networking pressure with
+  the next partial-write state-machine artifact.
+- Phase 17 uses admitted networking and `sync` pressure to retire the highest-
+  leverage bootstrap-shaped compiler compromises in import-visible typed
+  surfaces.
+- Phase 18 uses the richer project and compiler evidence to choose one next
+  plateau: more workflow maturity, narrow `sync`, narrow `hal`, or release
+  hardening.
+
+Core rule
+---------
+- Do not open a third capability family merely to create motion.
+- Prefer more honest use of the admitted networking and `sync` slices before
+  adding breadth elsewhere.
+- Route repeated friction back to the smallest correct owner immediately.
+
+Recommended execution choice
+----------------------------
+Prefer one more networking-pressure wave, then compiler widening for the
+bootstrap-shaped imported-surface limits that wave still exposes, then a
+plateau decision between deeper toolchain maturity, narrow `sync` follow-on,
+or narrow `hal` admission.
+
+Why this sequence is recommended
+--------------------------------
+- The networking slice is already real enough to carry more pressure.
+- The current admitted networking boundary still carries deliberate bootstrap
+  flattening that is a better compiler-widening target than speculative
+  language-surface expansion.
+- Phase 13 already has ordinary project proof for the real evented-echo
+  project, so the next series can deepen deterministic project behavior using
+  real pressure instead of abstract tool-only cleanup.
+- The remaining `sync` widening and `thread_spawn<T>` rewrite removal remain
+  explicitly conditional on new concrete consumers.
+
+Phase summary
+-------------
+- Phase 16: planning-truth refresh plus the next networking-pressure artifact
+- Phase 17: compiler widening for the admitted import-visible typed-surface
+  compromises that real consumers justify
+- Phase 18: workflow hardening and one explicit plateau decision
+
+Suggested sequencing checkpoints
+--------------------------------
+1. Re-audit the stale pressure docs before landing additional examples.
+2. Land the partial-write networking pressure artifact.
+3. Decide whether the networking public surface still needs flattened bootstrap
+  spelling after that proof is real.
+4. Revisit imported generic procedure-call lowering only if a second consumer
+  now exists beyond `thread_spawn<T>`.
+5. Use the richer project fixtures to choose between more workflow maturity,
+  narrow `sync`, narrow `hal`, or release hardening.
+
+Non-goals for this series
+-------------------------
+- opening multiple new capability families in parallel
+- broad `sync` expansion without a new concrete consumer
+- self-hosting, package management, or additional backend targets
+- using examples to absorb compiler, stdlib, or toolchain gaps that should be
+  fixed at the owning layer
+
+Acceptance criteria for this document
+-------------------------------------
+- The repository has a cross-phase overview plus separate Phase 16, Phase 17,
+  and Phase 18 planning docs.
+- The overview remains short and routing-focused rather than duplicating the
+  phase-specific execution detail.
