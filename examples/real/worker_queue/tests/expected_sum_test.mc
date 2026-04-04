@@ -4,17 +4,21 @@ import testing
 import worker_queue
 
 func test_expected_sum() *i32 {
-    if worker_queue.expected_sum() != 10 {
-        return testing.fail()
+    err: *i32 = testing.expect_i32_eq(worker_queue.expected_sum(), 10)
+    if err != nil {
+        return err
     }
-    if !worker_queue.result_matches_expected(10, worker_queue.job_count()) {
-        return testing.fail()
+    err = testing.expect(worker_queue.result_matches_expected(10, worker_queue.job_count()))
+    if err != nil {
+        return err
     }
-    if worker_queue.result_matches_expected(9, worker_queue.job_count()) {
-        return testing.fail()
+    err = testing.expect_false(worker_queue.result_matches_expected(9, worker_queue.job_count()))
+    if err != nil {
+        return err
     }
-    if worker_queue.result_matches_expected(10, worker_queue.job_count() - 1) {
-        return testing.fail()
+    err = testing.expect_false(worker_queue.result_matches_expected(10, worker_queue.job_count() - 1))
+    if err != nil {
+        return err
     }
     return nil
 }

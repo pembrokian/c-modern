@@ -37,6 +37,10 @@ Repository status note
 - Phase 21 closed the highest-leverage remaining admitted networking compiler
   workaround by restoring real `bool` fields on `io.Event` at the backend
   owner layer.
+- Phase 23 then re-audited the richer Phase 22 project graph and confirmed
+  that no new compiler-owner follow-up was justified, so the bounded
+  `thread_spawn<T>` rewrite remains the one explicit deferred imported generic
+  workaround.
 - The repository therefore no longer needs another generic compiler-cleanup
   wave for its own sake.
 - The strongest remaining open slices are now partial build-graph behavior,
@@ -76,15 +80,17 @@ Why this sequence is recommended
   rather than inventing a fresh capability family.
 - It uses the real project inventory that now exists after the networking,
   workflow, sync, and consumer-driven compiler closeout waves.
-- It gives the repository an honest way to decide whether the remaining
-  `thread_spawn<T>` rewrite should stay deferred or be retired.
+- It gave the repository an honest way to decide that the remaining
+  `thread_spawn<T>` rewrite should stay deferred until a second independent
+  admitted consumer exists.
 - It can justify a narrow `time` or `testing` admission later without forcing
   broader `os` or `hal` breadth prematurely.
 
 Phase summary
 -------------
 - Phase 22: richer project graph and separate-compilation pressure
-- Phase 23: compiler follow-up from Phase 22 pressure if a real gap appears
+- Phase 23: compiler re-audit from Phase 22 pressure; no new follow-up was
+  justified
 - Phase 24: narrow companion-family admission from the same project pressure
 
 Suggested sequencing checkpoints

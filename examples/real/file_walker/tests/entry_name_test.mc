@@ -1,32 +1,16 @@
 export { test_entry_name }
 
-import strings
 import testing
 import walk
 
-func same_text(left: str, right: str) bool {
-    if left.len != right.len {
-        return false
-    }
-
-    left_bytes: Slice<u8> = strings.bytes(left)
-    right_bytes: Slice<u8> = strings.bytes(right)
-    index: usize = 0
-    while index < left.len {
-        if left_bytes[index] != right_bytes[index] {
-            return false
-        }
-        index = index + 1
-    }
-    return true
-}
-
 func test_entry_name() *i32 {
-    if !same_text(walk.entry_name("nested/"), "nested") {
-        return testing.fail()
+    err: *i32 = testing.expect_str_eq(walk.entry_name("nested/"), "nested")
+    if err != nil {
+        return err
     }
-    if !same_text(walk.entry_name("alpha.txt"), "alpha.txt") {
-        return testing.fail()
+    err = testing.expect_str_eq(walk.entry_name("alpha.txt"), "alpha.txt")
+    if err != nil {
+        return err
     }
     return nil
 }

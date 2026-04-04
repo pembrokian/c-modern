@@ -3,7 +3,7 @@ Phase 23 -- Compiler Follow-Up From Phase 22 Pressure
 
 Status
 ------
-PLANNED
+COMPLETED (re-audit found no justified compiler-owner follow-up)
 
 Purpose
 -------
@@ -145,3 +145,35 @@ Acceptance criteria for this document
   pressure.
 - The phase keeps each candidate tied to one named current limitation and one
   admitted consumer trigger rather than abstract completeness goals.
+
+Implemented slice
+-----------------
+- re-audited the landed Phase 22 `review_board` project, its shared-module
+  graph, and the richer multi-target workflow regressions to collect only
+  recurring compiler-owned limitations rather than tooling or project-local
+  friction
+- confirmed that the richer project graph did not land a second real imported
+  generic procedure-call consumer beyond the already-admitted
+  `sync.thread_spawn<T>` path; the project uses ordinary imported generics such
+  as `mem.slice_from_buffer<T>` and `mem.buffer_free<T>`, but no imported
+  generic procedure-typed call site that would justify reopening broader MIR
+  call lowering
+- confirmed that the secondary candidate families also remained theoretical:
+  Phase 22 did not expose a real imported nominal-type-identity break, a real
+  admitted `@noalias` boundary gap, or a materially cleaner admitted project
+  that required tuple or multi-result lowering
+- updated the backlog and decision log so the retained
+  `thread_spawn<T>` rewrite stays explicit as one bounded compiler-owned
+  workaround with a sharper post-Phase-22 revisit trigger instead of ambient
+  cleanup prose
+
+Closeout statement
+------------------
+Phase 23 is complete. The Phase 22 richer project-graph proof did not expose a
+new compiler-owner limitation that materially harmed an admitted consumer, so
+the correct Phase 23 implementation was to re-audit and keep the remaining
+compiler workaround explicit rather than widen the compiler speculatively. The
+bounded imported generic `thread_spawn<T>` rewrite remains deferred because the
+repository still has only one real imported generic procedure-call consumer
+family, and the admitted `review_board` project stayed within ordinary imported
+generic helpers instead of exposing broader call-lowering pressure.

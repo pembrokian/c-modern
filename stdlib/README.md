@@ -41,7 +41,9 @@ Current repository-specific notes:
   entry names with directories marked by a trailing `/`; this remains a narrow
   bootstrap surface for deterministic utilities rather than a final richer API
 - `testing` is admitted only as a narrow toolchain companion module for the
-  ordinary project-test path; it is not yet a broader assertion or fixture API
+  ordinary project-test path; it now includes modest expectation helpers for
+  boolean, integer, and string checks, but it is still not a broader fixture,
+  capture, or compiler-magic API
 - `sync` is admitted as a narrow hosted concurrency slice: thread spawn or
   join plus mutex init, destroy, lock, unlock, condvar init, destroy, wait,
   signal, and narrow `Atomic<T>` load or store publication; compare-exchange,
