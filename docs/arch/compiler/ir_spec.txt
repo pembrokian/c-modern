@@ -1,0 +1,58 @@
+Modern C - Typed MIR Boundary
+
+Purpose
+
+This document freezes the role and contract of Modern C's typed MIR for v0.2.
+It exists so semantic checking, MIR lowering, validation, dumps, and backend lowering all agree on what MIR is responsible for and what it must never redefine.
+
+Authority and scope:
+- language_spec.txt remains the semantic authority for user-visible language behavior
+- types_spec.txt and memory_model_spec.txt remain the authority for semantic type and memory meaning
+- this document freezes MIR ownership, scope, and invariants for v0.2
+
+1. Core Position
+
+Rules:
+- MIR is a typed lowered control-flow representation
+- MIR is owned by the compiler, not by the source language
+- MIR consumes semantic facts; it must not recreate or override them independently
+
+2. MIR Responsibilities
+
+MIR is responsible for:
+- explicit basic-block structured control flow after lowering
+- explicit typed operations over sema-approved values
+- explicit representation of calls, branches, returns, loads, stores, aggregates, and constants in a backend-independent form
+- validation of internal invariants before backend lowering
+
+3. MIR Is Not
+
+Rules:
+- MIR is not a second semantic checker
+- MIR is not a backend-specific IR in disguise
+- MIR is not a place to paper over missing sema rules with target-dependent hacks
+
+4. Invariants
+
+Rules:
+- every MIR value has a resolved semantic type or a compiler-internal control-flow role
+- control-flow edges are explicit
+- memory-affecting operations remain explicit and preserve semantic ordering constraints
+- imported semantic facts such as layout, builtin aggregate shapes, and noalias acceptance must come from sema
+
+5. Determinism
+
+Rules:
+- MIR dumps must be deterministic for the same semantic program and compiler configuration
+- validation should reject malformed MIR rather than allowing backend-specific behavior to decide program meaning
+
+6. Backend Boundary
+
+Rules:
+- backend lowering consumes MIR and target configuration
+- backend lowering may choose representation details required by the target, but must preserve the semantic and MIR-visible program behavior
+- if a source feature is unsupported by the current backend slice, the boundary should fail explicitly instead of silently degrading semantics
+
+Bottom line:
+- MIR is the compiler's typed lowered control-flow layer
+- sema owns language meaning, MIR owns validated lowered structure, and the backend owns target-specific realization

@@ -1,0 +1,54 @@
+Modern C - Constant Expressions
+
+Purpose
+
+This document freezes the v0.2 compile-time constant boundary for Modern C.
+It exists to keep top-level initialization, array lengths, and other compile-time requirements explicit without turning the language into a general compile-time execution system.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- numeric_types_spec.txt remains the authority for arithmetic behavior
+- this document freezes what v0.2 requires to be a compile-time constant and where constant expressions are required
+
+1. Core Rule
+
+Rule:
+- v0.2 has compile-time constant expressions, not general compile-time program execution
+
+Consequences:
+- constant evaluation is intentionally narrow
+- if an expression is not in the admitted constant subset, sema should reject it where a constant is required rather than inventing a hidden evaluator for ordinary runtime code
+
+2. Where Constants Are Required
+
+Compile-time constant requirements include:
+- top-level const initializers
+- top-level var initializers
+- array lengths
+- any other declaration position the grammar or language documents as constant-only
+
+3. Admitted Constant Ingredients
+
+The admitted constant subset includes:
+- literals
+- named constants whose values are already compile-time constants
+- explicit conversions within the admitted constant subset
+- arithmetic and comparison over constant operands where the operator is admitted for constant evaluation
+- aggregate constant construction where every participating element or field is itself constant and the target form is admitted by sema
+
+Rules:
+- constant evaluation obeys the same defined arithmetic rules as runtime evaluation
+- constant evaluation does not invent implicit numeric promotions
+
+4. Exclusions
+
+Not part of v0.2 constant evaluation:
+- arbitrary function execution
+- heap allocation
+- I/O
+- hidden interpreter-style metaprogramming
+- dependence on runtime-only storage or runtime-only addresses
+
+Bottom line:
+- constant evaluation is deliberate and small
+- it exists to support explicit compile-time requirements, not to create a second execution model

@@ -1,0 +1,51 @@
+Modern C - Foreign Function Interface
+
+Purpose
+
+This document freezes the v0.2 FFI stance for Modern C.
+It exists to keep foreign calls, foreign data layout, and ABI boundaries explicit instead of letting ordinary Modern C rules silently pretend to be C interop rules.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- attributes_spec.txt remains the authority for @abi(c)
+- runtime_spec.txt remains the authority for startup and runtime-layer boundaries
+- this document freezes the explicit C-facing FFI boundary for v0.2
+
+1. Core Position
+
+Rules:
+- FFI is explicit
+- C ABI compatibility is opt-in, not the default for ordinary Modern C declarations
+- foreign declarations must spell their ABI boundary visibly
+
+2. Function Boundary
+
+Rules:
+- extern(c) func declares a foreign callable boundary
+- parameter and result types used at that boundary must be representable for the chosen ABI contract
+- the language does not hide errno translation, ownership transfer, or string conversion at the boundary
+
+3. Data Boundary
+
+Rules:
+- default Modern C aggregate layout is not automatically a C layout contract
+- when C-compatible layout matters, declarations must request that boundary explicitly
+- interop-sensitive code should prefer explicit ABI-facing wrapper declarations over assuming ordinary language declarations happen to match foreign layouts
+
+4. String And Pointer Boundary
+
+Rules:
+- str is not a C string
+- null-terminated interop strings remain explicit via cstr or an equivalent documented FFI form
+- integer-pointer casts and raw pointer operations at FFI boundaries are explicit low-level operations
+
+5. Ownership Boundary
+
+Rules:
+- FFI does not create hidden ownership rules
+- allocation and release responsibilities across the boundary must be documented explicitly by the API using the foreign surface
+- a foreign call does not implicitly adopt Modern C allocator conventions unless the API says so
+
+Bottom line:
+- FFI is explicit, ABI-driven, and narrow
+- ordinary Modern C semantics do not silently become C semantics without an explicit boundary marker

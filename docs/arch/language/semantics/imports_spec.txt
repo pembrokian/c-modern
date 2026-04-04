@@ -1,0 +1,45 @@
+Modern C - Imports
+
+Purpose
+
+This document freezes the v0.2 import surface for Modern C.
+It exists to keep module acquisition, visibility, and ambiguity handling explicit and deterministic.
+
+Authority and scope:
+- modules_spec.txt remains the broader module and interface-artifact authority
+- grammar_spec.txt remains the concrete syntax authority for import declarations
+- this document freezes the source-level import rules that ordinary code relies on directly
+
+1. Core Rules
+
+Import rules:
+- imports are explicit
+- imports are acyclic
+- import resolution must produce exactly one module for each import
+- imports do not implicitly reexport imported names
+
+2. Visibility
+
+Rules:
+- importing a module makes only that module's exported surface available
+- private declarations in the imported module remain inaccessible
+- imported names remain qualified according to the language's ordinary member qualification rules
+
+3. Disallowed Features In v0.2
+
+Rules:
+- no wildcard imports
+- no hidden transitive imports
+- no source-level import aliases that rewrite canonical module identity
+- no first-match-wins ambiguity rule
+
+4. Errors
+
+Rules:
+- missing imports are errors
+- duplicate matches are errors
+- import cycles are errors
+
+Bottom line:
+- imports are explicit, deterministic, and narrow
+- the source language does not hide package-manager behavior or namespace rewriting behind import syntax

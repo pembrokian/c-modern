@@ -47,7 +47,7 @@ Modules:
 Execution note:
 - The language does not reserve a special entry function.
 - Hosted and freestanding startup behavior, including conventional entrypoint selection, are defined by the runtime model document.
-- Concrete source syntax for lexer and parser bring-up is defined in `docs/arch/grammar_spec.txt`.
+- Concrete source syntax for lexer and parser bring-up is defined in `docs/arch/language/syntax/grammar_spec.txt`.
 
 Example:
 

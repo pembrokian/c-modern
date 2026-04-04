@@ -1,0 +1,67 @@
+Modern C - Fixed Arrays
+
+Purpose
+
+This document freezes the v0.2 fixed-array model for Modern C.
+It exists to keep owned fixed-size storage distinct from borrowed views and heap-backed containers.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- types_spec.txt remains the authority for general type identity rules
+- containers_spec.txt remains the authority for the relationship among arrays, slices, and buffers
+- this document freezes array type meaning, identity, indexing, and conversion boundaries for v0.2
+
+1. Core Model
+
+Array syntax:
+- [N]T
+
+Meaning:
+- a fixed array is a value type with N elements of T
+- the length N is part of the type identity
+- fixed arrays represent owned fixed-size contiguous storage
+
+Rules:
+- N must be a compile-time integer constant
+- [4]ui8 and [8]ui8 are different types
+- arrays do not carry hidden allocator state or runtime resizing behavior
+
+2. Ownership And Value Semantics
+
+Rules:
+- arrays are value-semantic language values
+- copying an array copies its elements according to the ordinary value rules of the element type
+- arrays are distinct from slices and from Buffer<T>
+
+Consequences:
+- arrays do not imply borrowed-view semantics
+- arrays do not imply heap ownership
+
+3. Indexing And Bounds
+
+Rules:
+- array indexing requires 0 <= index < N
+- array slicing follows the ordinary slice bounds rules when the language admits a slice view formation
+- out-of-bounds access is invalid behavior in release mode and may trap in checked builds
+
+4. Conversion Boundary
+
+Rules:
+- arrays do not implicitly decay to pointers
+- arrays do not implicitly decay to slices
+- forming a pointer or slice view over an array is explicit
+
+Rationale:
+- this keeps ownership and lifetime boundaries visible instead of importing one of C's most error-prone conveniences
+
+5. Initialization
+
+Rules:
+- array initialization is explicit
+- each initialized element must match the array element type under the ordinary explicit-conversion rules
+- the language does not provide hidden array constructors or auto-fill behavior beyond what the aggregate initialization rules admit
+
+Bottom line:
+- [N]T means owned fixed-size contiguous storage
+- length is part of the type
+- arrays do not decay implicitly to pointers or slices

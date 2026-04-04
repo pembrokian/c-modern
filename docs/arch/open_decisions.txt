@@ -4,9 +4,9 @@ Purpose
 
 This file is no longer a first-pass questionnaire.
 The core language semantics now live in:
-- docs/arch/language_spec.txt
-- docs/arch/runtime_spec.txt
-- docs/arch/canonical_programs.txt
+- docs/arch/language/language_spec.txt
+- docs/arch/runtime/runtime_spec.txt
+- docs/arch/language/canonical_programs.txt
 - docs/plan/backlog.txt
 - docs/plan/decision_log.txt
 

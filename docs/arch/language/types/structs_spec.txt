@@ -1,0 +1,60 @@
+Modern C - Structs
+
+Purpose
+
+This document freezes the v0.2 struct model for Modern C.
+It exists to keep nominal aggregate values, field ordering, initialization, and layout intent explicit across sema, MIR, backend lowering, and FFI boundaries.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- types_spec.txt remains the authority for nominal type identity rules
+- attributes_spec.txt remains the authority for @abi(c) and @packed
+- this document freezes struct declaration meaning, field rules, layout commitments, and initialization boundaries for v0.2
+
+1. Core Model
+
+Struct rules:
+- a struct declaration defines one nominal aggregate type
+- fields appear in the order written
+- field names within one struct must be unique
+
+Type identity:
+- two struct declarations are distinct types even if their fields happen to match exactly
+- layout equality is not type equality
+
+2. Field Rules
+
+Rules:
+- each field has a declared type
+- field access uses the declared field name
+- field order is semantically relevant for layout, initialization, diagnostics, and deterministic dumps
+
+3. Initialization
+
+Rules:
+- struct values are initialized explicitly
+- initialization must respect the declared field set and type rules
+- the language does not add hidden constructors, hidden default field initializers, or hidden post-init hooks in v0.2
+
+4. Layout
+
+Default layout rules:
+- field order is preserved exactly as written
+- padding and alignment are implementation-defined but stable for a given target ABI and compiler configuration
+- default struct layout is not promised to match C exactly
+
+Attribute boundaries:
+- @abi(c) requests C ABI compatible layout for the target where admitted
+- @packed is an explicit packed-layout escape hatch
+
+5. Value Semantics
+
+Rules:
+- struct values are ordinary value-semantic values
+- copying a struct copies its fields according to the ordinary value rules of those field types
+- any ownership behavior comes from the field types and API contract, not from struct-ness itself
+
+Bottom line:
+- structs are nominal aggregates with declared field order
+- layout is explicit and stable for a target, but not silently C-compatible by default
+- initialization and ownership stay visible in source and API design

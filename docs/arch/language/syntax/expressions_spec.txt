@@ -1,0 +1,131 @@
+Modern C - Expressions
+
+Purpose
+
+This document freezes the v0.2 expression model for Modern C.
+It exists to keep expression categories, operator meaning, evaluation order, and explicit conversion boundaries stable across parsing, semantic checking, MIR lowering, and code generation.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- grammar_spec.txt remains the concrete syntax authority
+- types_spec.txt remains the authority for semantic type identity
+- references_spec.txt remains the authority for addressability and pointer-oriented access rules
+- this document freezes expression categories, operand evaluation order, operator classes, calls, indexing, slicing, aggregate initialization, and explicit conversion rules for v0.2
+
+1. Core Rules
+
+Expression model:
+- every expression has a syntactic category and, after semantic checking, a value category and type
+- expressions may have side effects only where the expression form explicitly allows them
+- expressions do not hide allocation, hidden propagation, or hidden control-flow transfer
+
+Rules:
+- assignment is a statement-level effect, not a value-producing expression form
+- there is no implicit numeric promotion lattice
+- expression meaning is determined in sema, not invented later in MIR or backend lowering
+
+2. Primary Expression Forms
+
+The admitted primary expression forms are:
+- name expressions
+- qualified name expressions such as module.member
+- literals
+- parenthesized expressions
+- calls
+- field access
+- dereference-field access
+- indexing
+- slicing
+- aggregate initialization
+
+Rules:
+- a qualified name is member qualification, not a package path expression
+- parentheses group expressions; they do not create hidden temporaries with extended lifetime
+- aggregate initialization is explicit syntax and remains visible through semantic checking
+
+3. Calls And Explicit Conversion
+
+Call rules:
+- ordinary call syntax is expr(args)
+- the callee must resolve to a callable value or function declaration
+- arguments are checked against the declared parameter list in order
+- there are no implicit argument conversions beyond the admitted literal-target acceptance rules
+
+Explicit conversion rules:
+- explicit conversions use the parenthesized type-target form (type-expr)(value)
+- bare forms such as T(value) are not conversion syntax in v0.2
+- conversion validity is a semantic rule, not a parser shortcut
+
+Consequences:
+- functions and conversions are distinct surface forms
+- programs must spell cross-type intent explicitly instead of relying on C-style coercion
+
+4. Unary And Binary Operators
+
+Admitted unary operators:
+- !
+- -
+- &
+- *
+
+Admitted binary operator families:
+- logical: || and &&
+- equality: == and !=
+- ordering: < <= > >=
+- arithmetic: + - * / %
+- range formation: ..
+
+Rules:
+- operator applicability is determined by the operand types after ordinary semantic resolution
+- operators must not invent hidden promotions to make an expression type-check
+- pointer, enum, bool, and distinct-type operators follow their explicit semantic rules rather than being silently reclassified as integers
+
+5. Evaluation Order
+
+Evaluation order rules:
+- operand evaluation is left to right
+- function call arguments are evaluated left to right
+- aggregate initializer fields and elements are evaluated left to right
+- field, index, and slice base expressions are evaluated before their selectors or bounds
+- logical && and || short-circuit left to right
+
+Rationale:
+- explicit left-to-right evaluation is simpler to reason about than inherited C sequencing folklore
+- later optimization must preserve the written behavior of defined programs
+
+6. Indexing, Slicing, And Aggregate Access
+
+Indexing rules:
+- base[index] requires an indexable base and an integer index
+- bounds rules are owned by the relevant container and memory-model documents
+- indexing does not decay arrays or recover from bounds failure silently
+
+Slicing rules:
+- base[a:b] forms a view over an admitted sliceable base
+- slicing never transfers ownership by itself
+- a resulting Slice<T> or str remains a borrowed view
+
+Field access rules:
+- base.field accesses a named field or member on an admitted aggregate or builtin aggregate shape
+- base.* is explicit dereference-field syntax and does not imply hidden auto-deref chains
+
+7. Aggregate Initialization
+
+Aggregate initialization rules:
+- aggregates are initialized explicitly through aggregate-init syntax
+- the initializer must provide values compatible with the target type's declared fields or elements
+- omitted members are allowed only where the target declaration and semantic rules permit them
+- aggregate initialization does not imply hidden default constructors or post-initialization hooks
+
+8. Non-Goals
+
+This document does not define:
+- assignment expressions
+- hidden implicit conversions
+- overloaded user-defined operator resolution in v0.2
+- hidden iterator desugaring as an expression feature
+
+Bottom line:
+- expressions are explicit, typed, and evaluated left to right
+- calls and conversions are intentionally distinct
+- operators obey written type boundaries instead of inheriting C's coercion rules

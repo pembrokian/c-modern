@@ -1,0 +1,44 @@
+Modern C - Concurrency Semantics
+
+Purpose
+
+This document freezes the v0.2 concurrency stance for Modern C.
+It exists to keep the language-level concurrency contract small, explicit, and separate from scheduler or framework ambitions.
+
+Authority and scope:
+- memory_model_spec.txt remains the authority for atomic ordering, races, and happens-before consequences
+- runtime_spec.txt remains the authority for runtime-layer boundaries
+- stdlib_spec.txt remains the authority for sync-module packaging
+- this document freezes the language-level concurrency position for v0.2
+
+1. Core Position
+
+Rules:
+- the language adds no mandatory scheduler runtime
+- the language adds no async syntax in v0.2
+- concurrency primitives belong in explicit library surfaces such as sync, not hidden language machinery
+
+2. Data-Race Rule
+
+Rules:
+- data-race-free programs behave as if sequentially consistent
+- conflicting unsynchronized non-atomic accesses from multiple threads are invalid behavior
+- atomics, mutexes, condition variables, thread creation, and join establish synchronization only where their documented contracts say so
+
+3. Atomic Boundary
+
+Rules:
+- atomic operations are explicit
+- volatile and atomic access remain distinct concepts
+- memory order is an explicit part of the atomic contract where exposed
+
+4. No Hidden Concurrency Model
+
+Rules:
+- there is no hidden task system
+- there is no implicit thread-local initialization protocol beyond the ordinary runtime and platform boundary
+- event loops and readiness pollers remain library or application structure, not language semantics
+
+Bottom line:
+- Modern C concurrency is explicit, library-based, and intentionally small
+- there is no hidden scheduler or async runtime in the language contract

@@ -1,0 +1,57 @@
+Modern C - Error Handling
+
+Purpose
+
+This document freezes the v0.2 error-handling model for Modern C.
+It exists to keep failure transport explicit and ordinary instead of letting hidden propagation or exception machinery re-enter the design through convenience features.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- test_spec.txt remains the authority for ordinary test function shapes
+- this document freezes the language-level error-handling discipline and the standard fallible-result conventions used across the reference set
+
+1. Core Position
+
+Rules:
+- errors are ordinary values
+- the language defines no exception system
+- the language defines no hidden propagation operator in v0.2
+
+2. Conventional Result Shapes
+
+The conventional fallible shapes are:
+- func() Error
+- func(...) (T, Error)
+- func(...) (T1, T2, Error)
+
+Rules:
+- the error value appears in the final result position by convention
+- success is represented by nil in the Error position
+- on failure, non-error result positions should contain the zero value of their type unless a narrower API contract says otherwise
+
+3. Use And Discard
+
+Rules:
+- callers must handle or explicitly discard non-void results
+- discarding an Error-bearing result requires explicit _ assignment like any other unused result
+- the language does not silently drop fallible results
+
+4. Library Boundary
+
+Rules:
+- domain-specific failure detail belongs in explicit Error values or explicit result types
+- the standard library should not invent ambient errno-like hidden channels as the primary language error model
+- failure must remain visible in signatures and call sites
+
+5. Non-Goals
+
+This document does not define:
+- try or ? syntax in v0.2
+- exception unwinding
+- hidden panic-based ordinary error transport
+- automatic rollback or retry semantics
+
+Bottom line:
+- error handling is explicit and value-based
+- fallible functions return ordinary values
+- callers must handle or discard failures visibly in source

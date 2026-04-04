@@ -1,0 +1,53 @@
+Modern C - Functions
+
+Purpose
+
+This document freezes the v0.2 function model for Modern C.
+It exists to keep signatures, multi-result returns, parameter contracts, and foreign-declaration boundaries explicit and uniform across sema, MIR, and the build tool.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- grammar_spec.txt remains the concrete syntax authority for declarations and signatures
+- error_handling_spec.txt remains the authority for conventional fallible result shapes
+- ffi_spec.txt remains the authority for foreign function boundaries
+- this document freezes ordinary function declaration and call contracts for v0.2
+
+1. Core Function Model
+
+Rules:
+- a function has a name, an ordered parameter list, and an ordered result list
+- result lists may be empty, single-valued, or multi-valued
+- function signatures are explicit; the language does not infer hidden result or effect types
+
+2. Parameters
+
+Rules:
+- parameter order is semantically relevant
+- each parameter has a declared type
+- parameter attributes, when admitted, are part of the semantic contract
+- there are no implicit argument conversions beyond the admitted literal-target acceptance rules
+
+3. Results
+
+Rules:
+- the result list is part of the function type
+- return statements must match the declared result arity and type compatibility rules
+- multi-result returns preserve source order exactly
+
+4. Entry And Naming
+
+Rules:
+- main is a conventional entry function selected by the toolchain in hosted builds; it is not a reserved keyword
+- ordinary functions follow the same language rules whether or not the build tool treats one as an entrypoint
+
+5. Extern And ABI Boundaries
+
+Rules:
+- extern(c) marks an explicit foreign function boundary
+- foreign declarations remain ordinary signature-bearing declarations subject to the documented ABI contract
+- the language does not hide errno handling, ownership transfer, or string conversion at a foreign boundary
+
+Bottom line:
+- functions are explicit ordered contracts
+- multi-result returns are first-class
+- foreign behavior requires explicit ABI spelling rather than implicit C compatibility

@@ -1,0 +1,73 @@
+Modern C - Primitive Types
+
+Purpose
+
+This document freezes the builtin primitive type inventory for v0.2.
+It exists to keep the language's predeclared scalar and null forms explicit before user-defined aggregates, aliases, and distinct types are layered on top.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- types_spec.txt remains the authority for general type identity rules
+- numeric_types_spec.txt remains the authority for detailed numeric behavior
+- this document freezes the builtin primitive type set and the meaning of the primitive null and boolean forms
+
+1. Primitive Type Set
+
+The builtin primitive types are:
+- bool
+- ui8 ui16 ui32 ui64
+- i8 i16 i32 i64
+- usize isize uintptr
+- f32 f64
+- utf
+
+Rules:
+- these names are builtin language types, not library aliases
+- each builtin primitive type is semantically distinct from the others
+- no user declaration may redefine a builtin primitive name and preserve builtin behavior
+
+2. bool
+
+Boolean rules:
+- bool has exactly two values: true and false
+- boolean conditions require bool values
+- the language does not define a broader truthiness model
+
+Consequences:
+- integers, pointers, enums, slices, and strings do not silently act as booleans
+- conversion to or from bool is explicit where the language admits it
+
+3. Numeric Primitive Families
+
+Numeric primitive families:
+- fixed-width integers
+- pointer-sized integers
+- floating-point types
+- utf as a scalar code-point oriented text type
+
+Rules:
+- detailed arithmetic and conversion behavior for numeric primitives is owned by numeric_types_spec.txt
+- the presence of builtin numeric primitives does not create hidden promotion chains
+
+4. nil
+
+Nil rules:
+- nil is the null pointer value form
+- nil is not a general-purpose Maybe or Option value
+- nil participates only in pointer-like boundaries the language explicitly admits
+
+Consequences:
+- nil is not a substitute for zero values of arbitrary types
+- ordinary absence and failure signaling remain explicit API or type-design concerns
+
+5. Zero Values And Initialization Notes
+
+Rules:
+- top-level var declarations without an initializer are zero-initialized according to their type
+- a zero value does not erase the semantic distinction between primitive types
+- local storage without an initializer is not implicitly initialized by the language unless another document says so
+
+Bottom line:
+- the primitive set is small and explicit
+- bool and nil have narrow meanings
+- numeric primitives remain explicit rather than participating in C-style coercion folklore

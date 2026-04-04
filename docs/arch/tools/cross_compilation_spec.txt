@@ -1,0 +1,42 @@
+Modern C - Cross Compilation Boundary
+
+Purpose
+
+This document freezes the v0.2 stance on cross compilation.
+It exists to state clearly what the long-term build boundary should look like while remaining honest about the current admitted implementation slice.
+
+Authority and scope:
+- build_spec.txt remains the broader build-model authority
+- runtime_spec.txt remains the authority for hosted versus freestanding execution boundaries
+- this document freezes the reference-level cross-compilation position for v0.2
+
+1. Current Bootstrap Status
+
+Rule:
+- the current admitted implementation slice does not claim general cross-compilation support
+
+Consequence:
+- repository examples and tests should not describe cross compilation as implemented unless the build and runtime slices are expanded explicitly
+
+2. Long-Term Boundary
+
+Cross compilation, when admitted, should remain explicit through:
+- target selection in the build model
+- explicit runtime and startup selection
+- explicit sysroot, linker, and external-library configuration where required
+
+Rules:
+- cross compilation must not depend on hidden host-toolchain guesses that the build description cannot express
+- target ABI, runtime, and standard-library availability must remain explicit parts of the build contract
+
+3. Non-Goals For v0.2
+
+Not promised today:
+- transparent multi-target packaging
+- hidden SDK discovery rules
+- automatic remote execution
+- a registry-driven dependency story coupled to cross compilation
+
+Bottom line:
+- the reference docs acknowledge cross compilation as an explicit future build boundary
+- the current bootstrap implementation does not yet claim that surface

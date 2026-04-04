@@ -1,0 +1,43 @@
+Modern C - Concurrency Runtime Boundary
+
+Purpose
+
+This document freezes the v0.2 runtime-layer stance for concurrency support.
+It exists to keep thread and synchronization support honest as thin platform-backed services rather than the seed of a hidden scheduler runtime.
+
+Authority and scope:
+- concurrency_spec.txt remains the language-level concurrency authority
+- memory_model_spec.txt remains the authority for race and ordering semantics
+- stdlib_spec.txt remains the authority for sync-module placement
+- this document freezes the runtime-support expectations for hosted concurrency primitives
+
+1. Core Position
+
+Rules:
+- concurrency support may require runtime and OS bindings
+- that support remains thin platform-backed machinery, not a mandatory language scheduler
+- the runtime layer must not invent task, future, or coroutine semantics in v0.2
+
+2. Thread Support
+
+Rules:
+- thread creation and join are explicit sync or os operations
+- thread entrypoints are ordinary functions adapted to platform thread ABIs by the runtime boundary or standard library
+- thread startup should not require hidden module initialization or hidden heap allocation beyond what the documented implementation explicitly performs
+
+3. Synchronization Support
+
+Rules:
+- mutexes and condition variables are explicit library values with explicit init and destroy rules where the API requires them
+- atomic operations rely on compiler and target support, not on a hidden user-visible scheduler runtime
+- runtime support for synchronization must preserve the documented happens-before guarantees and must not widen them silently
+
+4. Boundary Discipline
+
+Rules:
+- readiness polling and event loops are not part of the concurrency runtime boundary; they belong to explicit I/O surfaces
+- concurrency support must remain separate from error handling, startup, and allocation policy except where an API explicitly joins those concerns
+
+Bottom line:
+- Modern C may rely on thin runtime support for threads and synchronization
+- that support remains explicit, narrow, and separate from any hidden scheduler model

@@ -1,0 +1,43 @@
+Modern C - Call Stack And Unwinding Boundary
+
+Purpose
+
+This document freezes the v0.2 call-stack stance for Modern C.
+It exists to keep ordinary function calls, returns, defer cleanup, and foreign ABI interaction explicit without importing exception-style unwinding requirements.
+
+Authority and scope:
+- runtime_spec.txt remains the broader runtime authority
+- statements_spec.txt remains the authority for source-level defer behavior
+- ffi_spec.txt remains the authority for foreign ABI boundaries
+- this document freezes the runtime-boundary expectations around call frames and unwinding in v0.2
+
+1. Core Position
+
+Rules:
+- ordinary function calls use the target's ordinary call stack and calling convention machinery
+- the language does not require a hidden managed stack, segmented stack, or scheduler-owned stack model
+- the language does not require exception unwinding machinery for ordinary error handling
+
+2. Defer And Scope Exit
+
+Rules:
+- defer cleanup is part of ordinary structured control flow
+- implementations may realize defer cleanup with normal control-flow lowering rather than a hidden unwinding runtime
+- v0.2 does not require cross-language unwinding through foreign frames
+
+3. Foreign Boundary
+
+Rules:
+- foreign calls follow their explicit ABI contract
+- Modern C does not promise that foreign exception or longjmp-style mechanisms compose safely with ordinary Modern C cleanup unless a future spec says so explicitly
+
+4. Debug And Inspection Consequence
+
+Rules:
+- tooling may expose ordinary call stacks and source spans where the toolchain supports that
+- the existence of debug support does not change the language's no-hidden-runtime stance
+
+Bottom line:
+- the ordinary call stack remains ordinary
+- defer is structured cleanup, not exception machinery
+- v0.2 does not standardize cross-language unwinding behavior

@@ -1,0 +1,899 @@
+Modern C Slice Register
+=======================
+
+Status
+------
+WORKING REGISTER
+
+Purpose
+-------
+This file is the broad slice register for Modern C.
+
+It is meant to answer two questions at once:
+
+1. What is the full intended language, compiler, runtime, stdlib, and tool
+   surface described by the current architecture docs?
+2. Which of those slices are already landed, narrowly admitted, only partial,
+   or still deferred in the repository?
+
+This is therefore not just a near-term execution list.
+It is an end-state map for the current documented v0.2 direction, with
+repository status attached.
+
+Scope rule
+----------
+This register follows what is actually described in:
+
+- docs/arch/
+- docs/plan/plan.txt
+- docs/plan/*phase*.txt
+- README.md
+
+It does not invent extra future families that are not present in those docs.
+If a family is intentionally excluded by the architecture, it is listed under
+"explicit non-goals" rather than as missing work.
+
+Reading key
+-----------
+- design: settled | directional | deferred
+- repo status: landed | admitted | partial | deferred | published
+- plan phase: original phase from docs/plan/plan.txt when applicable
+- repo wave: repository-specific phase or closeout wave when applicable
+
+Current position
+----------------
+- The repository has a real admitted hosted slice: parser, sema, typed MIR,
+  LLVM backend on Darwin arm64, deterministic dumps, direct-source and
+  project-mode workflow, narrow networking, narrow sync, and several admitted
+  real projects.
+- The repository does not yet claim the full long-term closure of every slice
+  described by the architecture docs.
+- The main difference between the current repo and the documented end state is
+  no longer only "basic compiler missing pieces". It is also about broader
+  module-family admission, fuller portability, fuller release hardening, and
+  completing some compiler boundaries that still use bounded limited solutions.
+
+Register By Concern
+-------------------
+
+1. Source Syntax And Frontend Surface
+------------------------------------
+
+- Slice: initial contract freeze
+  design: settled
+  plan phase: 0
+  repo status: landed
+  repo wave: foundational bootstrap
+  docs: docs/plan/plan.txt, docs/arch/language/language_spec.txt, docs/arch/runtime/runtime_spec.txt, docs/arch/compiler/build_spec.txt, docs/arch/tools/test_spec.txt, docs/arch/stdlib/stdlib_spec.txt
+  end state: language, runtime, build, test, and stdlib contracts are frozen
+  tightly enough to serve as the implementation target for v0.2.
+
+- Slice: token inventory and newline-sensitive lexer
+  design: settled
+  plan phase: 2
+  repo status: landed
+  repo wave: bootstrap parser bring-up
+  docs: docs/arch/compiler/lexer_spec.txt, docs/arch/language/syntax/grammar_spec.txt
+  end state: explicit lexer with NEWLINE tokens, line comments, longest-match
+  rules, fixed literal forms, and no hidden type-aware lexing.
+
+- Slice: concrete grammar for modules, declarations, statements, and expressions
+  design: settled
+  plan phase: 2
+  repo status: landed
+  repo wave: bootstrap parser bring-up
+  docs: docs/arch/language/syntax/grammar_spec.txt
+  end state: stable v0.2 concrete syntax for source files, export blocks,
+  imports, declarations, blocks, statements, and precedence-driven expressions.
+
+- Slice: attribute and modifier syntax
+  design: settled
+  plan phase: 2 to 3 boundary
+  repo status: partial
+  repo wave: bootstrap parser plus later sema admission
+  docs: docs/arch/language/syntax/grammar_spec.txt
+  end state: top-level attributes, parameter attributes such as @noalias, and
+  extern(c) as explicit syntax rather than ad hoc backend metadata.
+
+- Slice: typed conversion syntax
+  design: settled
+  plan phase: 2 to 3 boundary
+  repo status: landed
+  repo wave: parser plus sema conversion closure
+  docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/key_decisions.txt
+  end state: explicit conversions always use (<type-expr>)(value); bare Foo(x)
+  remains function-call syntax only.
+
+- Slice: AST inventory and deterministic parser dumps
+  design: settled
+  plan phase: 2
+  repo status: landed
+  repo wave: bootstrap parser bring-up
+  docs: docs/arch/compiler/ast_spec.txt
+  end state: deterministic AST representation with stable dump output for
+  parser inspection and fixture testing.
+
+2. Type System And Data Model
+-----------------------------
+
+- Slice: builtin scalar type family
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus Phase 9 sema authority expansion
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/types/types_spec.txt, docs/arch/language/types/numeric_types_spec.txt
+  end state: bool, fixed-width signed and unsigned integers, usize/isize,
+  uintptr, f32/f64, and utf with no implicit numeric conversions.
+
+- Slice: semantic string type
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus stdlib maturity
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/types/types_spec.txt, docs/arch/language/types/strings_spec.txt
+  end state: borrowed UTF-8 text as semantic string type, immutable, explicit,
+  non-owning, and separate from raw byte slices.
+
+- Slice: pointer types, nil, and explicit pointer-int boundaries
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus MIR and backend authority work
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/types/types_spec.txt, docs/arch/language/semantics/memory_model_spec.txt
+  end state: pointer identity includes pointee type, nil is pointer-like only,
+  and integer-pointer casts remain explicit unsafe boundaries.
+
+- Slice: const-qualified type model
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/types/types_spec.txt
+  end state: const is part of the type, applies at the layer written, is deep
+  for reachable aggregate state through that access path, and does not create
+  a separate ownership system.
+
+- Slice: fixed arrays
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus Phase 17 imported typed-surface widening
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/types/types_spec.txt
+  end state: [N]T is a value type, length is part of type identity, and arrays
+  never decay implicitly to pointers or slices.
+
+- Slice: tuple and multi-result types
+  design: settled
+  plan phase: 3
+  repo status: partial
+  repo wave: Phase 3 bootstrap sema and MIR boundary
+  docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/types/types_spec.txt
+  end state: tuples are real semantic grouping forms for multi-result returns,
+  assignments, and bindings.
+
+- Slice: ranges as semantic forms
+  design: settled
+  plan phase: 3
+  repo status: partial
+  repo wave: Phase 3 bootstrap sema
+  docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/types/types_spec.txt
+  end state: range expressions and range semantic types exist as explicit
+  checking and lowering units, not as parser-only sugar.
+
+- Slice: procedure types and callable signatures
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus later imported-surface and sync work
+  docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/types/types_spec.txt
+  end state: procedures carry ordered parameter and result types, can be
+  passed explicitly, and remain language-semantic objects rather than backend
+  conveniences.
+
+- Slice: structs and layout-controlled aggregates
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus Phase 21 aggregate-bool ABI cleanup
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/types/types_spec.txt
+  end state: preserved field order, stable target ABI layout, explicit @abi(c),
+  explicit @packed, and sema-owned aggregate facts consumed downstream.
+
+- Slice: enums and tagged unions
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus MIR authority expansion
+  docs: docs/arch/language/types/enums_spec.txt, docs/arch/language/types/types_spec.txt, docs/arch/language/canonical_programs.txt
+  end state: nominal tagged unions, exhaustive switch pressure, payload
+  destructuring, and no hidden backend reinterpretation of discriminants.
+
+- Slice: distinct scalar types
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus Phase 8 pressure proof
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/types/types_spec.txt, docs/arch/language/canonical_programs.txt
+  end state: zero-cost nominal scalar separation with explicit conversion only.
+
+- Slice: builtin aggregate families
+  design: settled
+  plan phase: 3 to 4 boundary
+  repo status: landed
+  repo wave: key-decision closure, Phase 9, Phase 10, Phase 17
+  docs: docs/arch/key_decisions.txt, docs/arch/language/types/types_spec.txt
+  end state: Slice<T>, Buffer<T>, and the semantic string shape are owned by
+  sema and consumed consistently by MIR and backend.
+
+- Slice: imported named and qualified types
+  design: settled
+  plan phase: 3
+  repo status: admitted
+  repo wave: Phase 17
+  docs: docs/arch/language/types/types_spec.txt, docs/arch/language/semantics/modules_spec.txt, docs/plan/phase17_compiler_widening_import_visible_typed_surfaces.txt
+  end state: imported type identity preserves qualification such as
+  mem.Allocator or io.Event across sema, MIR, backend, and .mci boundaries.
+
+- Slice: generic nominal type arguments
+  design: settled
+  plan phase: 3
+  repo status: partial
+  repo wave: builtin generic aggregate admission plus bounded imported-generic workaround
+  docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/types/types_spec.txt, docs/plan/decision_log.txt
+  end state: type argument lists are part of nominal identity, survive import
+  and interface serialization, and are not reconstructed downstream.
+
+3. Semantic Rules And Execution Semantics
+----------------------------------------
+
+- Slice: module-level semantic authority
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus Phase 9 semantic authority expansion
+  docs: docs/arch/language/types/types_spec.txt, docs/plan/phase3_bootstrap_finish.txt, docs/plan/phase9_semantic_authority_expansion.txt
+  end state: sema owns meaning, later layers consume semantic truth instead of
+  reconstructing it.
+
+- Slice: core function, return, binding, and control-flow semantics
+  design: settled
+  plan phase: 3
+  repo status: admitted
+  repo wave: Phase 3 plus MIR and executable proof
+  docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/language_spec.txt, docs/arch/language/canonical_programs.txt
+  end state: functions, ordered parameters and results, binding rules, return
+  checking, if/switch/for/while semantics, break/continue behavior, and
+  exhaustive tagged-union switching are explicit semantic contracts rather than
+  parser-only structure.
+
+- Slice: name resolution, visibility, and export filtering
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3
+  docs: docs/arch/language/semantics/modules_spec.txt, docs/arch/language/language_spec.txt
+  end state: explicit export block, module-private default, no hidden
+  reexports, no extra package-private visibility tier.
+
+- Slice: import resolution and ambiguity handling
+  design: settled
+  plan phase: 3 and 7 boundary
+  repo status: landed
+  repo wave: Phase 3 plus Phase 7 project workflow
+  docs: docs/arch/language/semantics/modules_spec.txt, docs/arch/compiler/build_spec.txt
+  end state: imports are explicit, acyclic, resolved through configured roots,
+  and ambiguous matches are rejected instead of using first-match-wins.
+
+- Slice: compile-time constant rules
+  design: settled
+  plan phase: 3
+  repo status: partial
+  repo wave: Phase 3 bootstrap sema
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/syntax/grammar_spec.txt
+  end state: top-level const and eligible var initializers must be compile-time
+  constants with deterministic checking.
+
+- Slice: top-level var static-storage initialization semantics
+  design: settled
+  plan phase: 3
+  repo status: partial
+  repo wave: Phase 3 bootstrap sema
+  docs: docs/arch/language/language_spec.txt
+  end state: top-level var declarations are admitted for static storage,
+  top-level var initializers must be compile-time constants, and uninitialized
+  top-level var declarations are zero-initialized deterministically.
+
+- Slice: explicit conversion and no-implicit-coercion policy
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus later sema reinforcement
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/types/types_spec.txt, docs/arch/key_decisions.txt
+  end state: conversions are explicit, numeric coercion chains do not exist,
+  and sema rejects missing or ambiguous conversions before MIR.
+
+- Slice: arithmetic semantics and reduced UB stance
+  design: settled
+  plan phase: 3 to 5 boundary
+  repo status: admitted
+  repo wave: Phase 10, Phase 11, Phase 14, Phase 21
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/canonical_programs.txt
+  end state: integer overflow wraps, divide-by-zero and invalid shifts are
+  checked faults, and common low-level container code does not rely on C-style UB.
+
+- Slice: memory model and lifetime rules
+  design: settled
+  plan phase: 3
+  repo status: admitted
+  repo wave: Phase 9 through Phase 21
+  docs: docs/arch/language/semantics/memory_model_spec.txt, docs/arch/language/types/types_spec.txt
+  end state: explicit storage and lifetime model for locals, globals, heap,
+  literals, slices, borrowed strings, and pointer provenance.
+
+- Slice: aliasing policy and @noalias
+  design: settled
+  plan phase: 3
+  repo status: partial
+  repo wave: bounded sema and interface-artifact support
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/semantics/modules_spec.txt
+  end state: no C-style strict-aliasing UB; non-aliasing assumptions must be
+  explicit; @noalias is part of the semantic and interface contract where admitted.
+
+- Slice: C interoperability subset and cstr boundary
+  design: settled
+  plan phase: 3 to 6 boundary
+  repo status: admitted
+  repo wave: Phase 3 sema baseline plus backend and stdlib/runtime admission
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/canonical_programs.txt, docs/arch/language/syntax/grammar_spec.txt
+  end state: the interoperable C-facing subset is explicit and narrow,
+  including extern(c), @abi(c), cstr, explicit ABI-visible structs, and no
+  hidden dependency on C header parsing or ambient interop magic.
+
+- Slice: error-handling model
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 plus canonical-program proof
+  docs: docs/arch/language/language_spec.txt, docs/arch/open_decisions.txt, docs/arch/language/canonical_programs.txt
+  end state: explicit error returns, no exceptions, no hidden propagation, and
+  real pressure tracked through (value, Error) code rather than a second hidden mechanism.
+
+- Slice: defer and scoped cleanup
+  design: settled
+  plan phase: 3
+  repo status: admitted
+  repo wave: Phase 3 plus MIR and executable proof
+  docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/canonical_programs.txt
+  end state: LIFO scope-exit cleanup with explicit call sites and no hidden
+  lifetime extension.
+
+- Slice: volatile, atomic, and concurrency semantic split
+  design: settled
+  plan phase: 3 to 6 boundary
+  repo status: admitted
+  repo wave: Phase 12, Phase 17, Phase 20, Phase 21
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/semantics/memory_model_spec.txt, docs/arch/language/canonical_programs.txt, docs/arch/stdlib/stdlib_spec.txt
+  end state: volatile and MMIO remain separate from synchronization atomics;
+  memory order stays explicit; no hidden scheduler semantics are introduced.
+
+4. Module, Package, Build, And Test Model
+-----------------------------------------
+
+- Slice: one source file equals one module
+  design: settled
+  plan phase: 3 and 7 boundary
+  repo status: landed
+  repo wave: Phase 3 and Phase 7
+  docs: docs/arch/language/language_spec.txt, docs/arch/language/semantics/modules_spec.txt
+  end state: single-file module unit for import, export, compilation, and .mci emission in v0.2.
+
+- Slice: package model as build-time grouping only
+  design: settled
+  plan phase: 7
+  repo status: partial
+  repo wave: Phase 7 admitted hosted project workflow
+  docs: docs/arch/language/semantics/modules_spec.txt, docs/arch/compiler/build_spec.txt
+  end state: packages are build-time groupings, not a second language-level namespace system.
+
+- Slice: build tool command surface
+  design: settled
+  plan phase: 7
+  repo status: admitted
+  repo wave: Phase 7, Phase 13, Phase 19
+  docs: docs/arch/compiler/build_spec.txt
+  end state: mc build, run, test, check, fmt, and clean as the canonical
+  narrow tool surface.
+
+- Slice: declarative build.toml schema v1
+  design: settled
+  plan phase: 7
+  repo status: admitted
+  repo wave: Phase 7 and Phase 13
+  docs: docs/arch/compiler/build_spec.txt
+  end state: small data-oriented project description for targets, roots,
+  search paths, mode, environment, runtime startup, and test settings.
+
+- Slice: target kinds and broader artifact kinds
+  design: settled
+  plan phase: 7
+  repo status: partial
+  repo wave: Phase 7 admitted slice
+  docs: docs/arch/compiler/build_spec.txt, README.md
+  end state: exe, staticlib, sharedlib, and test are canonical target kinds.
+  current note: the admitted repo slice still centers on hosted executable and
+  checked-test targets; library targets remain outside the supported plateau.
+
+- Slice: deterministic .mci interface artifacts
+  design: settled
+  plan phase: 7
+  repo status: admitted
+  repo wave: Phase 7 and Phase 13
+  docs: docs/arch/compiler/build_spec.txt, docs/arch/language/semantics/modules_spec.txt
+  end state: per-module deterministic textual interface artifacts containing
+  exported semantic facts, layout-relevant data, ABI facts, and rebuild hashes.
+
+- Slice: separate compilation contract
+  design: settled
+  plan phase: 7
+  repo status: partial
+  repo wave: admitted hosted workflow only
+  docs: docs/arch/compiler/build_spec.txt, docs/arch/language/semantics/modules_spec.txt, README.md
+  end state: modules compile independently, dependents rebuild on interface-hash
+  change rather than timestamps, and implementation-only changes do not force
+  downstream semantic rebuild.
+
+- Slice: direct-source workflow
+  design: settled
+  plan phase: 5 to 7 boundary
+  repo status: landed
+  repo wave: Phase 5 through Phase 7
+  docs: docs/arch/compiler/build_spec.txt, README.md
+  end state: direct-source check/build/run remain a first-class path for small
+  programs and compiler inspection.
+
+- Slice: project test discovery and runner generation
+  design: settled
+  plan phase: 7
+  repo status: admitted
+  repo wave: Phase 7, Phase 13, Phase 19
+  docs: docs/arch/tools/test_spec.txt, README.md
+  end state: test_* functions with signature func() Error, discovered under
+  tests roots, executed serially in deterministic order via generated runners.
+
+- Slice: compiler regression test classes
+  design: settled
+  plan phase: 7
+  repo status: admitted
+  repo wave: Phase 7 through Phase 19
+  docs: docs/arch/tools/test_spec.txt, README.md
+  end state: compile-pass, compile-fail, run-output, MIR/lowering, and stdlib
+  test categories with stable expectation strategy.
+
+- Slice: workflow trust hardening and reuse semantics
+  design: settled
+  plan phase: 7 to 9 boundary
+  repo status: admitted
+  repo wave: Phase 18 and Phase 19
+  docs: docs/plan/phase18_workflow_hardening_and_plateau_decision.txt, docs/plan/phase19_workflow_trust_hardening.txt, docs/plan/decision_log.txt
+  end state: predictable project-only mc test boundary, deterministic build-dir
+  reuse, reviewable reporting, and sharper invalid-target diagnostics.
+
+- Slice: package management and remote dependency solving
+  design: deferred
+  plan phase: later than current v0.2 surface
+  repo status: deferred
+  repo wave: none
+  docs: docs/arch/compiler/build_spec.txt, README.md
+  end state: not currently part of the documented v0.2 core build surface.
+
+5. Compiler Pipeline And Internal Boundaries
+-------------------------------------------
+
+- Slice: diagnostics and support layer
+  design: settled
+  plan phase: 1
+  repo status: landed
+  repo wave: foundational bootstrap
+  docs: docs/plan/plan.txt, README.md
+  end state: source loading, stable spans, deterministic dump-path helpers, and
+  a boring support layer used by the whole compiler.
+
+- Slice: lexer
+  design: settled
+  plan phase: 2
+  repo status: landed
+  repo wave: bootstrap parser bring-up
+  docs: docs/arch/compiler/lexer_spec.txt
+  end state: explicit token stream that matches the grammar contract.
+
+- Slice: parser
+  design: settled
+  plan phase: 2
+  repo status: landed
+  repo wave: bootstrap parser bring-up
+  docs: docs/arch/language/syntax/grammar_spec.txt
+  end state: handwritten parser for the concrete grammar, with deterministic AST dumps.
+
+- Slice: semantic analysis
+  design: settled
+  plan phase: 3
+  repo status: landed
+  repo wave: Phase 3 and Phase 9
+  docs: docs/arch/language/types/types_spec.txt, docs/arch/language/semantics/modules_spec.txt, docs/plan/phase3_bootstrap_finish.txt
+  end state: sema owns type meaning, visibility, imports, conversion rules,
+  layout, and exported semantic contracts.
+
+- Slice: semantic completeness beyond current admitted subset
+  design: settled
+  plan phase: 3
+  repo status: partial
+  repo wave: broader long-term closure still open
+  docs: docs/plan/plan.txt, docs/plan/admin/phase3_to_phase8_non_bootstrap_roadmap.txt
+  end state: sema fully owns the whole admitted language contract instead of
+  leaving any bootstrap-shaped holes for higher layers to repair.
+
+- Slice: typed MIR as language-owned lowered truth
+  design: settled
+  plan phase: 4
+  repo status: landed
+  repo wave: Phase 4 and Phase 10
+  docs: docs/plan/plan.txt, docs/plan/phase4_bootstrap_finish.txt, docs/plan/phase10_mir_authority_expansion.txt
+  end state: explicit typed control flow and semantic operations at a layer that
+  is independent of LLVM defaults.
+
+- Slice: MIR validation and deterministic MIR dumps
+  design: settled
+  plan phase: 4
+  repo status: admitted
+  repo wave: Phase 4, Phase 10, Phase 17
+  docs: docs/plan/plan.txt, README.md
+  end state: validators reject malformed typed operations and dumps remain rich
+  enough to debug semantic lowering before backend codegen.
+
+- Slice: imported generic procedure-call lowering
+  design: settled but not fully admitted
+  plan phase: 4 to 5 boundary
+  repo status: partial
+  repo wave: limited solution recorded in Phase 12 and decision_log
+  docs: docs/plan/decision_log.txt
+  end state: broader imported generic call lowering without compiler-owned
+  special rewrites.
+
+- Slice: backend selection rule
+  design: settled
+  plan phase: 4 to 5 boundary
+  repo status: published and effectively chosen for first target
+  repo wave: backend strategy plus Phase 5 onward
+  docs: docs/arch/compiler/backend_strategy.txt
+  end state: backend remains replaceable in principle, but LLVM is the chosen
+  first hosted backend after MIR became real.
+
+- Slice: LLVM backend for first hosted target
+  design: settled as current implementation path
+  plan phase: 5
+  repo status: admitted
+  repo wave: Phase 5, Phase 11, Phase 21
+  docs: docs/arch/compiler/backend_strategy.txt, README.md, docs/plan/phase11_backend_deepening_closeout.txt
+  end state: MIR lowers to LLVM without ceding language semantics to LLVM.
+
+- Slice: backend ABI and representation correctness
+  design: settled as a compiler-owner responsibility
+  plan phase: 5
+  repo status: admitted but still selective
+  repo wave: Phase 11 and Phase 21
+  docs: docs/plan/phase21_compiler_debt_closeout_from_admitted_consumers.txt, docs/plan/decision_log.txt
+  end state: backend realizes sema and MIR truth faithfully for target ABI,
+  including representation-sensitive aggregate cases such as bool fields.
+
+- Slice: non-hosted and multi-target backend support
+  design: directional
+  plan phase: 5 and 9
+  repo status: deferred
+  repo wave: none
+  docs: docs/arch/compiler/backend_strategy.txt, docs/arch/runtime/runtime_spec.txt, README.md
+  end state: broader target support remains part of the larger roadmap, but is
+  not admitted in the current hosted plateau.
+
+6. Runtime, Startup, And Standard Library Families
+--------------------------------------------------
+
+- Slice: no hidden runtime system
+  design: settled
+  plan phase: 0 and 6 boundary
+  repo status: published
+  repo wave: foundational contract carried through all admitted waves
+  docs: docs/arch/runtime/runtime_spec.txt, docs/arch/language/language_spec.txt
+  end state: no GC, no scheduler runtime, no exception unwinding runtime, no
+  hidden init system, and no mandatory reflection metadata.
+
+- Slice: hosted startup shim
+  design: settled
+  plan phase: 5 and 6 boundary
+  repo status: admitted
+  repo wave: Phase 6 and later hosted slice maturity
+  docs: docs/arch/runtime/runtime_spec.txt, docs/arch/stdlib/stdlib_spec.txt, README.md
+  end state: minimal replaceable startup layer bridging platform entrypoint to
+  user main(args: Slice<cstr>) i32 without hidden allocation.
+
+- Slice: freestanding startup and replacement entry
+  design: settled
+  plan phase: 6
+  repo status: deferred
+  repo wave: none
+  docs: docs/arch/runtime/runtime_spec.txt, README.md
+  end state: freestanding mode remains first-class in the architecture, but is
+  not part of the supported repo slice yet.
+
+- Slice: mem module
+  design: settled
+  plan phase: 6
+  repo status: admitted
+  repo wave: Phase 6 and Phase 12
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/language/semantics/allocation_spec.txt, README.md
+  end state: Allocator, Buffer<T>, typed allocation helpers, explicit ownership,
+  buffer and slice helpers, and no hidden allocator policy.
+
+- Slice: utf8 module
+  design: settled
+  plan phase: 6
+  repo status: admitted
+  repo wave: Phase 12
+  docs: docs/arch/stdlib/stdlib_spec.txt
+  end state: explicit UTF-8 validation and encode/decode helpers rather than
+  hidden string-runtime magic.
+
+- Slice: strings module
+  design: settled
+  plan phase: 6
+  repo status: admitted
+  repo wave: Phase 12 plus Phase 8 pressure
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/stdlib/stdlib_design_principles.txt
+  end state: non-allocating text helpers over borrowed string views.
+
+- Slice: io module basic stream surface
+  design: settled
+  plan phase: 6
+  repo status: admitted
+  repo wave: Phase 12 and later pressure waves
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/stdlib/stdlib_design_principles.txt, README.md
+  end state: stdin/stdout/stderr, read/write helpers, explicit close, and no
+  hidden scheduler or buffered-framework model.
+
+- Slice: io poller and readiness-based evented I/O
+  design: settled
+  plan phase: 6 and Phase 8 pressure
+  repo status: admitted
+  repo wave: Phase 12, Phase 16, Phase 17, Phase 21
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/language/canonical_programs.txt, docs/plan/decision_log.txt, README.md
+  end state: portable readiness-based poller surface in io, with explicit
+  caller-owned event buffers and no language-level async syntax.
+
+- Slice: fs module
+  design: settled
+  plan phase: 6
+  repo status: admitted
+  repo wave: Phase 12 and Phase 14 pressure
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/plan/decision_log.txt, README.md
+  end state: file and path operations above raw handles, kept small and explicit.
+
+- Slice: net module
+  design: settled
+  plan phase: 6
+  repo status: admitted
+  repo wave: networking slice plus later typed-surface widening
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/language/canonical_programs.txt, README.md
+  end state: portable networking above raw platform sockets with concrete
+  IpAddr and IpEndpoint values and ordinary File-handle composition with io.
+
+- Slice: sync module narrow baseline
+  design: settled
+  plan phase: 6
+  repo status: admitted
+  repo wave: Phase 12 and Phase 20
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/language/canonical_programs.txt, docs/plan/decision_log.txt, README.md
+  end state: thread spawn/join, mutex, condvar, Atomic<T> load/store, and
+  explicit memory order without a larger runtime framework.
+
+- Slice: time module
+  design: settled
+  plan phase: 6
+  repo status: deferred
+  repo wave: none
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/runtime/runtime_spec.txt
+  end state: clocks, durations, and sleep remain part of the intended stdlib
+  packaging, but are not yet admitted because no strong consumer matrix landed.
+
+- Slice: os module
+  design: settled
+  plan phase: 6
+  repo status: deferred
+  repo wave: none
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/runtime/runtime_spec.txt
+  end state: explicit platform-facing APIs, raw event backends, environment,
+  subprocess, process IDs, and handle escape hatches.
+
+- Slice: hal module
+  design: settled
+  plan phase: 6
+  repo status: deferred
+  repo wave: none
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/language/canonical_programs.txt
+  end state: hardware-facing helpers such as mmio_ptr and volatile load/store
+  for real freestanding or MMIO consumers.
+
+- Slice: testing module
+  design: settled
+  plan phase: 6 and 7 boundary
+  repo status: partial
+  repo wave: minimal admission only
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/tools/test_spec.txt, README.md
+  end state: ordinary toolchain companion library for tests, with helpers but
+  no compiler magic.
+
+7. Pressure Programs, Proof Surfaces, And Release Shape
+------------------------------------------------------
+
+- Slice: canonical pressure programs as design tests
+  design: settled
+  plan phase: 8
+  repo status: admitted
+  repo wave: Phase 8 plus later networking, sync, and compiler-debt closeout waves
+  docs: docs/arch/language/canonical_programs.txt, README.md
+  end state: the language stays honest by proving real systems tasks such as
+  file loading, config parsing, arenas, tagged-union evaluation, evented I/O,
+  MMIO, ring buffers, sync primitives, and distinct-type safety.
+
+- Slice: bounded real utility projects
+  design: settled by plan direction
+  plan phase: 8
+  repo status: admitted
+  repo wave: Phase 8, Phase 14, Phase 16, Phase 20
+  docs: docs/plan/plan.txt, README.md
+  end state: real multi-module projects pressure the language, stdlib, and
+  workflow beyond toy single-file examples.
+
+- Slice: current-surface consumer-driven compiler debt closeout
+  design: settled by repository execution rule
+  plan phase: feedback routed from Phase 8 into owning layers
+  repo status: admitted
+  repo wave: Phase 21
+  docs: docs/plan/phase21_compiler_debt_closeout_from_admitted_consumers.txt, docs/plan/decision_log.txt
+  end state: real consumer pressure closes limited compiler solutions at the
+  correct owner layer instead of normalizing them in libraries or examples.
+
+- Slice: checked-mode test posture
+  design: settled
+  plan phase: 8 to 9 boundary
+  repo status: admitted
+  repo wave: current hosted plateau
+  docs: docs/arch/tools/test_spec.txt, docs/plan/release_hardening_hosted_slice.txt, README.md
+  end state: checked mode is the main safety-validation proof surface for tests,
+  while debug executable runs remain the common project-run path.
+
+- Slice: release-hardening and first public cut
+  design: settled as a plan family
+  plan phase: 9
+  repo status: published but incomplete
+  repo wave: release_hardening_hosted_slice note
+  docs: docs/plan/release_hardening_hosted_slice.txt, docs/plan/plan.txt, README.md
+  end state: explicit supported slice, install path, usage path, checked versus
+  release posture, and known limitations for a disciplined first public cut.
+
+8. Tooling And Auxiliary Surfaces
+---------------------------------
+
+- Slice: dump-path and compiler inspection tooling
+  design: settled
+  plan phase: 1 through 5
+  repo status: landed
+  repo wave: foundational plus parser/MIR/backend bring-up
+  docs: docs/plan/plan.txt, README.md
+  end state: AST, MIR, backend dumps and deterministic dump paths are part of
+  normal compiler inspection rather than accidental internal leftovers.
+
+- Slice: formatter entrypoint
+  design: settled at command-surface level
+  plan phase: 7
+  repo status: deferred
+  repo wave: none
+  docs: docs/arch/compiler/build_spec.txt
+  end state: mc fmt may exist as a standardized tool entry, but it is not yet
+  part of the admitted repository toolchain.
+
+- Slice: debugger support
+  design: directional only
+  plan phase: later tooling follow-on
+  repo status: deferred
+  repo wave: none
+  docs: docs/arch/tools/debugger_spec.txt
+  end state: the docs tree reserves a debugger surface, but no concrete content
+  is frozen yet; treat this as a placeholder family, not a near-term claim.
+
+Explicit Non-Goals And Things Not To Misread As Missing Work
+------------------------------------------------------------
+
+These are intentionally not part of the current documented v0.2 end state and
+therefore should not appear as if the register forgot them:
+
+- hidden runtime services
+- garbage collection
+- arbitrary compile-time execution
+- compile-time reflection systems
+- compile-time allocation or compile-time I/O
+- if comptime style language branching
+- template-style compile-time metaprogramming
+- scheduler or green-thread runtime as a language requirement
+- exceptions or hidden error propagation
+- hidden module initialization hooks
+- hidden prelude or omnibus core module
+- large trait or type-class system
+- test-specific language syntax
+- package registry client as part of the core v0.2 build model
+- remote dependency fetching as part of the core v0.2 build model
+
+Short Gap Summary
+-----------------
+
+The biggest end-state families that remain materially open relative to the
+current admitted repository slice are:
+
+- fuller semantic closure wherever bootstrap-shaped gaps still exist beyond the
+  currently admitted consumers
+- broader imported generic procedure-call lowering beyond the bounded
+  thread_spawn<T> rewrite
+- full use of the broader target-kind and separate-compilation surface already
+  described in the build docs
+- freestanding startup and non-hosted execution support
+- admission of time, os, and hal as honest module families once real consumer
+  matrices exist
+- growth of the testing companion module beyond the current minimal helper path
+- fuller release hardening beyond the current supported-hosted-slice note
+- any later multi-target or broader portability work beyond Darwin arm64
+
+Compact Phase Mapping
+---------------------
+
+Original plan emphasis
+----------------------
+- Plan 0: freeze the initial contract
+- Plan 1: repository skeleton and support layer
+- Plan 2: lexer, parser, AST
+- Plan 3: sema, type rules, layout, modules, conversion policy
+- Plan 4: typed MIR and validators
+- Plan 5: first backend on one hosted target
+- Plan 6: stdlib and runtime boundary
+- Plan 7: build tool, .mci, test harness, project workflow
+- Plan 8: pressure programs and real utilities
+- Plan 9: stabilization and first public cut
+
+Repository reality so far
+-------------------------
+- Repo 3: bootstrap sema boundary
+- Repo 4: bootstrap MIR boundary
+- Repo 5: bootstrap hosted backend
+- Repo 6: minimal stdlib/runtime hosted boundary
+- Repo 7: admitted project workflow baseline
+- Repo 8: first-pass pressure-program admission
+- Repo 9: sema authority expansion
+- Repo 10: MIR authority expansion
+- Repo 11: backend deepening
+- Repo 12: stdlib/runtime maturity plus networking and first sync admission
+- Repo 13: toolchain maturity
+- Repo 14: pressure-program expansion
+- Repo 15: cleanup and planning truth refresh
+- Repo 16: next networking pressure wave
+- Repo 17: import-visible typed-surface widening
+- Repo 18: plateau decision in favor of workflow trust hardening
+- Repo 19: workflow trust hardening
+- Repo 20: real sync project pressure
+- Repo 21: consumer-driven compiler debt closeout
+
+Bottom line
+-----------
+The full picture is larger than the repository's current admitted plateau, but
+it is not vague. The architecture docs already define a fairly complete v0.2
+end-state shape across syntax, types, sema, MIR, backend boundaries, stdlib
+packaging, runtime stance, build and test workflow, and pressure-program proof.
+The remaining work is therefore mostly about bringing the repository from its
+honest admitted hosted slice toward that fuller documented shape without
+smuggling meaning into the wrong owner layer.

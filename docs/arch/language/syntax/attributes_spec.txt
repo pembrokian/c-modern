@@ -1,0 +1,90 @@
+Modern C - Attributes
+
+Purpose
+
+This document freezes the v0.2 attribute model for Modern C.
+It exists to keep layout, ABI, and optimization-adjacent source annotations explicit and narrowly scoped instead of allowing backend-specific behavior to leak into the language unchecked.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- grammar_spec.txt remains the concrete syntax authority for attribute spelling
+- memory_model_spec.txt and types_spec.txt remain the authority for the semantic meaning of the facts an attribute may affect
+- this document freezes the admitted attribute mechanism and the initial standard attributes for v0.2
+
+1. Core Attribute Model
+
+Attribute rules:
+- attributes are explicit source annotations written with @name or @name(args)
+- attributes may appear only in grammar positions that explicitly admit them
+- attributes are part of the language contract only when a spec document defines them
+
+Compiler rule:
+- unknown attributes are errors
+- silently ignoring an unknown attribute is not permitted
+- backend-specific attributes do not become language attributes unless documented here or in another authoritative spec
+
+2. Standard v0.2 Attributes
+
+The admitted standard attributes are:
+- @abi(c)
+- @packed
+- @noalias
+
+3. @abi(c)
+
+Meaning:
+- @abi(c) requests C ABI compatible layout or calling convention behavior where the surrounding declaration kind admits it
+
+Rules:
+- on functions, @abi(c) affects the foreign calling convention boundary
+- on aggregates, @abi(c) requests C-compatible layout expectations for the target ABI
+- @abi(c) is an explicit interop boundary and should be used only where C interop actually matters
+
+Constraint:
+- @abi(c) does not erase ordinary type identity rules
+- a Modern C type with @abi(c) is still a Modern C declaration, not a hidden C typedef
+
+4. @packed
+
+Meaning:
+- @packed requests a packed aggregate layout with reduced or removed padding according to the target's admitted packed-layout rules
+
+Rules:
+- @packed is allowed only on declarations where the layout document admits it
+- @packed is an explicit escape hatch, not a default layout style
+- code that uses @packed accepts the resulting alignment and access constraints explicitly
+
+Constraint:
+- @packed does not imply C ABI compatibility by itself
+- @packed does not weaken the memory model or aliasing rules
+
+5. @noalias
+
+Meaning:
+- @noalias is a per-parameter non-aliasing promise
+
+Rules:
+- @noalias applies to the annotated parameter only
+- the compiler may rely on @noalias only after sema has accepted that placement
+- @noalias does not imply constness, ownership transfer, or lifetime extension
+
+Constraint:
+- @noalias is a semantic contract from the program to the compiler
+- violating the contract produces invalid program behavior even if a particular build does not diagnose it
+
+6. Design Limits
+
+Rules:
+- attributes must remain narrow and explicit
+- attributes must not become a second general-purpose metaprogramming language
+- attributes must not be used to smuggle large semantics that belong in ordinary syntax or library APIs
+
+Non-goals for v0.2:
+- user-defined custom attribute semantics
+- attribute-driven hidden code generation
+- broad optimization hints copied from C and C++ vendor ecosystems
+
+Bottom line:
+- attributes are explicit, standardized, and intentionally few
+- unknown attributes are errors
+- @abi(c), @packed, and @noalias are the only admitted standard attributes in v0.2

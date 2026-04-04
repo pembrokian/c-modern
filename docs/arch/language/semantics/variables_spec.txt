@@ -1,0 +1,63 @@
+Modern C - Variables And Bindings
+
+Purpose
+
+This document freezes the v0.2 rules for variable and constant bindings.
+It exists to keep storage creation, mutability, initialization, shadowing, and explicit discard behavior consistent across sema, MIR, and tests.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- constants_spec.txt remains the authority for compile-time constant expressions
+- memory_model_spec.txt remains the authority for initialization and storage validity consequences
+- this document freezes binding kinds, scope rules, and mutability intent for v0.2
+
+1. Binding Kinds
+
+The admitted binding kinds are:
+- var for mutable bindings
+- const for immutable bindings
+
+Rules:
+- var creates mutable storage or a mutable binding to storage according to the declared type
+- const creates an immutable binding
+- const does not imply hidden allocation, deep ownership transfer, or a second lifetime system
+
+2. Scope Rules
+
+Rules:
+- block scopes are lexical
+- a declaration becomes visible after its declaration point within its scope
+- redeclaring the same name in the same scope is invalid
+- shadowing in a nested scope is allowed only when it remains explicit and unambiguous to the semantic checker
+
+3. Initialization Rules
+
+Top-level rules:
+- top-level const declarations require an initializer
+- top-level var initializers, when present, must be compile-time constants
+- top-level var without an initializer is zero-initialized
+
+Local rules:
+- local const declarations require an initializer
+- local var declarations may omit an initializer
+- reading local storage before it has been initialized is invalid behavior
+
+4. Type Rules
+
+Rules:
+- a binding may carry an explicit type annotation
+- when an initializer is present, the initializer must be semantically compatible with the declared or inferred type under the ordinary explicit-conversion rules
+- multi-result bindings preserve source order exactly
+
+5. Discard
+
+Discard rule:
+- ignoring a produced value requires explicit discard with _
+
+Consequences:
+- failure to use a non-void result is not silently accepted
+- explicit discard keeps intent visible in ordinary code and test code
+
+Bottom line:
+- var and const are the only binding categories in v0.2
+- scopes are lexical, initialization matters, and unused results must be discarded explicitly

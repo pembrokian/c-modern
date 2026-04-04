@@ -1,0 +1,61 @@
+Modern C - Slices
+
+Purpose
+
+This document freezes the v0.2 slice model for Modern C.
+It exists to keep borrowed contiguous views explicit and distinct from arrays, strings, and owning buffers.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- types_spec.txt remains the authority for the builtin aggregate shape of Slice<T>
+- strings_spec.txt remains the authority for str as valid UTF-8 text
+- this document freezes slice ownership meaning, formation, indexing, and conversion boundaries for v0.2
+
+1. Core Model
+
+Canonical shape:
+- Slice<T> is a builtin aggregate shape with ptr: *T and len: usize
+
+Meaning:
+- Slice<T> is a borrowed non-owning view over contiguous elements of T
+- a slice does not own the underlying storage
+- a slice does not extend the lifetime of the underlying storage
+
+2. Formation Rules
+
+Slices may be formed explicitly from:
+- fixed arrays
+- Buffer<T>
+- pointer-plus-length pairs where the language or library admits that boundary
+
+Rules:
+- slice formation is explicit
+- slice formation never transfers ownership by itself
+- a mutable slice requires mutable reachable storage of compatible element type
+
+3. Indexing And Slicing
+
+Rules:
+- slice[index] requires 0 <= index < slice.len
+- slice[a:b] requires 0 <= a <= b <= slice.len
+- slicing a slice yields another borrowed view
+- indexing and slicing do not allocate or copy implicitly
+
+4. Lifetime And Invalidity
+
+Rules:
+- using a slice after the underlying storage becomes invalid is invalid behavior
+- freeing or ending the lifetime of the underlying storage invalidates every slice into that storage
+- returning a slice into temporary internal storage is invalid API design
+
+5. Conversion Boundary
+
+Rules:
+- slices are distinct from arrays and buffers
+- conversion between Slice<T> and Slice<const T> follows the ordinary explicit const rules the language admits
+- converting from raw byte slices to str is valid only when the UTF-8 invariant is satisfied explicitly
+
+Bottom line:
+- Slice<T> is the language's borrowed contiguous view type
+- slices are cheap, explicit, and non-owning
+- lifetime remains the caller's responsibility

@@ -1,0 +1,124 @@
+Modern C - Statements And Control Flow
+
+Purpose
+
+This document freezes the v0.2 statement and control-flow model for Modern C.
+It exists to keep block structure, binding statements, branches, loops, defer behavior, and function-exit rules explicit and consistent across parser, sema, MIR, and tests.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- grammar_spec.txt remains the concrete syntax authority
+- expressions_spec.txt remains the authority for expression categories and evaluation order
+- this document freezes the admitted statement forms and their semantic intent for v0.2
+
+1. Core Rules
+
+Statement model:
+- statements execute in source order unless a control-flow statement says otherwise
+- blocks create lexical scopes
+- there is no hidden semicolon insertion model in v0.2
+
+Rules:
+- control flow must remain visible in source
+- statement forms must not introduce hidden allocation, hidden propagation, or hidden scheduler behavior
+- sema owns reachability, return-shape, and branch-validity checking; MIR consumes that result
+
+2. Block Structure
+
+Block rules:
+- a block is a sequence of zero or more statements enclosed by braces
+- a block introduces a new lexical scope
+- names declared in a block are visible from their declaration point to the end of that block unless shadowed by a nested declaration
+
+Statement-separation rules:
+- statement boundaries are determined by the grammar's brace and newline structure
+- the language does not rely on C-style expression-statement ambiguity plus semicolon recovery
+
+3. Binding And Assignment Statements
+
+Admitted binding forms:
+- var declarations
+- const declarations
+- ordinary binding statements using the same explicit initialization rules as declarations
+
+Rules:
+- var introduces mutable storage
+- const introduces an immutable binding
+- multi-result bindings preserve result order exactly
+- ignoring a produced value requires explicit discard with _
+
+Assignment rules:
+- assignment is a statement, not an expression
+- targets must be addressable according to references_spec.txt
+- assignment does not trigger hidden conversions beyond admitted explicit or literal-target rules
+
+4. Branching
+
+If rules:
+- if evaluates its condition expression
+- the then branch executes only when the condition is true
+- else, when present, executes only when the condition is false
+- conditions are boolean-valued; there is no implicit truthiness lattice
+
+Switch rules:
+- switch selects among explicit cases
+- case selection is determined by the switch expression and the declared case form
+- no implicit fallthrough is permitted
+- enum switches are expected to be exhaustive unless a future spec says otherwise
+
+5. Loops
+
+The admitted loop families are:
+- while-style condition loops
+- for condition loops
+- for-in iteration loops over admitted iterable values
+- for-in range loops over explicit range expressions
+
+Rules:
+- loop semantics must remain explicit in source and deterministic in lowering
+- break exits the nearest enclosing loop or switch
+- continue advances the nearest enclosing loop
+- using break or continue outside an admitted enclosing statement is invalid
+
+Iteration boundary rule:
+- v0.2 does not standardize a hidden trait-based iterator protocol
+- any admitted for-in lowering must be defined by sema as an explicit language rule, not guessed by the backend
+
+6. Return And Function Exit
+
+Return rules:
+- return exits the current function
+- returned values must match the function's declared result list in arity and type compatibility
+- empty return is valid only for functions with no result values
+- multi-result returns preserve result ordering exactly
+
+7. Defer
+
+Defer rules:
+- defer schedules an explicit expression or call to run when the current scope exits normally or through an early return
+- multiple defers in the same scope run in last-in, first-out order
+- defer belongs to ordinary control flow; it is not exception unwinding machinery
+
+Consequences:
+- defer is suitable for cleanup that should stay visible in source
+- defer does not imply hidden heap allocation or a mandatory runtime stack object model
+
+8. Reachability And Determinism
+
+Semantic rules:
+- sema should reject statically provable invalid control-flow uses such as missing required returns or unreachable branch forms where the language requires diagnosis
+- MIR control-flow graphs must preserve the structured meaning of the source program after semantic checking
+
+9. Non-Goals
+
+This document does not define:
+- goto
+- hidden fallthrough
+- exception handling
+- coroutine or async statement forms
+- macro-based test-only control flow
+
+Bottom line:
+- statements execute in source order inside explicit blocks
+- conditions are boolean, not truthy
+- loops, return, break, continue, and defer remain visible source-level control-flow mechanisms

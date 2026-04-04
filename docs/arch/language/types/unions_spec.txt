@@ -1,0 +1,48 @@
+Modern C - Raw Unions
+
+Purpose
+
+This document freezes the v0.2 stance on raw untagged unions.
+It exists so the reference set is explicit about what Modern C does not admit yet, rather than leaving a gap that different compiler layers might fill inconsistently.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- enums_spec.txt remains the authority for the admitted tagged-union surface
+- ffi_spec.txt remains the authority for explicit foreign-layout boundaries
+- this document defines the v0.2 position on raw untagged unions
+
+1. v0.2 Status
+
+Rule:
+- raw untagged union declarations are not part of the admitted v0.2 language surface
+
+Consequences:
+- the language does not provide a first-class user-defined union declaration form in ordinary source
+- the compiler must not invent a hidden union type model for user code just because the backend or FFI layer can represent one
+
+2. Recommended Alternatives
+
+For variant values with active-tag semantics:
+- use enum as defined in enums_spec.txt
+
+For exact foreign layouts:
+- use explicit FFI-facing declarations and ABI boundaries documented by ffi_spec.txt
+- model the foreign contract directly instead of pretending the ordinary source language already has a full raw-union feature
+
+3. Design Reasoning
+
+Rationale:
+- tagged and untagged unions have meaningfully different safety and layout contracts
+- leaving raw unions half-specified would blur semantic checking, MIR ownership, and FFI rules
+- it is better to state that the feature is absent than to let different layers improvise it differently
+
+4. Future Direction Constraint
+
+If raw unions are admitted later:
+- they must be introduced with an explicit layout, initialization, and active-member contract
+- they must not silently inherit C's loosely specified union folklore without a Modern C specific semantic contract
+
+Bottom line:
+- tagged unions are admitted through enum
+- raw untagged unions are not part of v0.2
+- foreign union needs should stay at explicit ABI boundaries for now

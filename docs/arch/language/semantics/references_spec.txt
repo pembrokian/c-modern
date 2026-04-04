@@ -1,0 +1,57 @@
+Modern C - References, Pointers, And Addressability
+
+Purpose
+
+This document freezes the v0.2 addressability and pointer-access model for Modern C.
+It exists to keep address-taking, dereference, and field access rules explicit without introducing a separate hidden reference type system.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- memory_model_spec.txt remains the authority for pointer validity and lifetime
+- expressions_spec.txt remains the authority for operator categories and evaluation order
+- this document freezes the source-level addressability rules and pointer-oriented access forms for v0.2
+
+1. Core Model
+
+Rules:
+- Modern C has pointer types, not hidden reference types
+- address-taking and dereference are explicit operations
+- addressability is a semantic property of certain expressions, not a parser trick
+
+2. Addressable Expressions
+
+Admitted addressable categories include:
+- named variables with storage
+- array elements
+- struct fields of addressable bases
+- dereferenced pointer targets when the pointer is valid
+
+Rules:
+- taking the address of a non-addressable temporary is invalid
+- taking a pointer into temporary storage does not extend that storage's lifetime
+
+3. Operators
+
+Rules:
+- & forms a pointer to an addressable value
+- * dereferences a pointer value
+- . selects a field from an aggregate value or view
+- .* is explicit dereference-field access; it does not imply automatic repeated dereference
+
+4. Const And Mutation Boundaries
+
+Rules:
+- pointer constness is part of the type and must be written at the pointer layer
+- a pointer does not bypass const rules just because it exists
+- references and pointers do not imply ownership transfer by themselves
+
+5. No Hidden Borrowing System
+
+Rules:
+- v0.2 does not add hidden reference categories, lifetime inference, or borrow-checking syntax
+- lifetime validity remains a semantic and API responsibility rather than a separate reference-kind lattice
+
+Bottom line:
+- address-taking and dereference are explicit
+- pointer use depends on addressability and lifetime validity
+- Modern C does not hide a second reference system behind ordinary expressions

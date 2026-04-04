@@ -1,0 +1,47 @@
+Modern C - Debugging And Inspection Surface
+
+Purpose
+
+This document freezes the v0.2 debugging stance for Modern C.
+It exists to keep debugging support aligned with the language's explicit, inspectable philosophy without turning the language or toolchain into a debugger-specific runtime framework.
+
+Authority and scope:
+- runtime_spec.txt remains the authority for runtime-layer boundaries
+- ir_spec.txt remains the authority for compiler inspection through MIR
+- this document freezes the expected debugging and inspection surface for v0.2
+
+1. Core Position
+
+Rules:
+- debugging support is desirable, but it must not require a hidden language runtime
+- source locations, stack frames, MIR dumps, and deterministic diagnostics are the primary inspection surfaces in v0.2
+- debugger friendliness must not justify changing ordinary language semantics behind the programmer's back
+
+2. Compiler Inspection Surfaces
+
+The canonical inspection surfaces are:
+- stable diagnostics with source spans
+- AST dumps
+- MIR dumps
+- backend dumps where supported by the current toolchain slice
+
+Rules:
+- these outputs should be deterministic
+- inspection outputs are tool surfaces, not part of the source language
+
+3. Native Debugger Boundary
+
+Rules:
+- generated programs should cooperate with ordinary platform debuggers when the host toolchain emits suitable debug information
+- debug-info quality may improve over time, but the language does not require a special managed debugging runtime to make that possible
+
+4. Non-Goals
+
+This document does not define:
+- a custom managed debugger protocol built into the language runtime
+- hidden reflection metadata required in all binaries
+- debugger-only alternate semantics for ownership, aliasing, or error handling
+
+Bottom line:
+- Modern C debugging should rely on explicit compiler artifacts and ordinary platform debugger support
+- inspection must remain compatible with the language's no-hidden-runtime stance

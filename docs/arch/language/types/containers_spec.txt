@@ -1,0 +1,68 @@
+Modern C - Container Model
+
+Purpose
+
+This document freezes the first-pass container model for Modern C.
+It exists to keep owned fixed storage, borrowed views, and owned dynamic contiguous storage visibly distinct instead of collapsing them into one fuzzy sequence type.
+
+Authority and scope:
+- language_spec.txt remains the primary semantic authority
+- arrays_spec.txt remains the authority for [N]T
+- slices_spec.txt remains the authority for Slice<T>
+- strings_spec.txt remains the authority for str
+- stdlib_spec.txt remains the authority for Buffer<T> packaging under the standard library boundary
+- this document freezes how the major container categories relate to one another in v0.2
+
+1. Core Container Set
+
+The canonical contiguous container categories are:
+- [N]T for owned fixed-size storage
+- Slice<T> for borrowed non-owning views
+- Buffer<T> for owning dynamically sized contiguous storage
+- str for borrowed immutable valid UTF-8 text
+
+Rules:
+- these categories are intentionally distinct
+- APIs should use the category that matches their ownership and mutation contract instead of relying on decay or implicit adaptation
+
+2. Owned Versus Borrowed Boundary
+
+Owned categories:
+- [N]T
+- Buffer<T>
+
+Borrowed categories:
+- Slice<T>
+- str
+
+Rules:
+- borrowed containers do not extend lifetime
+- owning containers are responsible for release according to their owning module's API
+- conversion from owning to borrowed forms is explicit and does not transfer ownership
+
+3. Mutation Boundary
+
+Rules:
+- mutability is expressed through the element type and binding constness rules, not by silently changing the container category
+- str is immutable borrowed text
+- raw mutable byte ranges use Slice<ui8> or Buffer<ui8>, not str
+
+4. No Hidden Decay Or Protocol Magic
+
+Rules:
+- arrays do not implicitly decay to slices or pointers
+- buffers do not implicitly masquerade as slices without an explicit view boundary
+- v0.2 does not define a hidden iterator trait or container protocol that rewrites ordinary operations behind the scenes
+
+5. API Design Guidance
+
+Guidance:
+- use [N]T when size is fixed by the type
+- use Slice<T> for borrowed read or write views over caller-managed storage
+- use Buffer<T> when the result owns dynamic contiguous storage
+- use str only for valid UTF-8 text
+
+Bottom line:
+- Modern C has a small explicit container model
+- ownership and text-versus-bytes meaning stay visible in types
+- there is no single magical sequence type that hides these differences

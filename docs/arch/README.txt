@@ -1,61 +1,57 @@
 docs/arch/
+├── README.txt
+├── key_decisions.txt
+├── open_decisions.txt
+├── positions_agent.txt
 ├── language/
+│   ├── language_spec.txt
+│   ├── canonical_programs.txt
 │   ├── syntax/
 │   │   ├── grammar_spec.txt
-│   │   ├── statements_spec.txt
 │   │   ├── expressions_spec.txt
+│   │   ├── statements_spec.txt
 │   │   └── attributes_spec.txt
-│   │
 │   ├── types/
+│   │   ├── types_spec.txt
 │   │   ├── primitives_spec.txt
-│   │   ├── strings_spec.txt
+│   │   ├── numeric_types_spec.txt
 │   │   ├── arrays_spec.txt
 │   │   ├── slices_spec.txt
+│   │   ├── strings_spec.txt
 │   │   ├── containers_spec.txt
-│   │   ├── iterators_spec.txt
 │   │   ├── structs_spec.txt
-│   │   ├── unions_spec.txt
 │   │   ├── enums_spec.txt
-│   │   ├── generics_spec.txt
-│   │   └── traits_spec.txt
-│   │
-│   ├── semantics/
-│   │   ├── variables_spec.txt
-│   │   ├── functions_spec.txt
-│   │   ├── operator_overloading_spec.txt
-│   │   ├── references_spec.txt
-│   │   ├── constants_spec.txt
-│   │   ├── modules_spec.txt
-│   │   ├── imports_spec.txt
-│   │   ├── concurrency_spec.txt
-│   │   └── memory_model_spec.txt
-│
+│   │   └── unions_spec.txt
+│   └── semantics/
+│       ├── variables_spec.txt
+│       ├── functions_spec.txt
+│       ├── references_spec.txt
+│       ├── constants_spec.txt
+│       ├── modules_spec.txt
+│       ├── imports_spec.txt
+│       ├── allocation_spec.txt
+│       ├── error_handling_spec.txt
+│       ├── concurrency_spec.txt
+│       └── memory_model_spec.txt
 ├── compiler/
 │   ├── lexer_spec.txt
 │   ├── ast_spec.txt
 │   ├── ir_spec.txt
-│   ├── backend_strategy.txt
-│   ├── allocation_spec.txt
 │   ├── build_spec.txt
-│   ├── canonical_programs.txt
-│   ├── open_decisions.txt
+│   ├── backend_strategy.txt
 │   └── compiler_design_ideas.txt
-│
 ├── runtime/
 │   ├── runtime_spec.txt
-│   ├── gc_strategy.txt
-│   ├── concurrency_runtime.txt
 │   ├── ffi_spec.txt
+│   ├── concurrency_runtime.txt
 │   └── call_stack_spec.txt
-│
 ├── stdlib/
 │   ├── stdlib_spec.txt
-│   ├── stdlib_examples.txt
-│   └── json_spec.txt
-│
+│   ├── stdlib_design_principles.txt
+│   └── stdlib_examples.txt
 └── tools/
     ├── debugger_spec.txt
-    ├── testing_spec.txt
-    ├── testing_examples.txt
-    ├── documentation_tooling.txt
+    ├── test_spec.txt
+    ├── test_design_principles.txt
+    ├── test_examples.txt
     └── cross_compilation_spec.txt
