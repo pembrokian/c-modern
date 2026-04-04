@@ -53,6 +53,13 @@ struct mc_io_poller {
     size_t cap;
 };
 
+struct mc_io_event {
+    int32_t file;
+    uint8_t readable;
+    uint8_t writable;
+    uint8_t failed;
+};
+
 struct mc_sync_thread {
     uintptr_t raw;
 };
@@ -460,10 +467,7 @@ uintptr_t __mc_io_poller_remove(struct mc_io_poller* poller, int32_t file) {
 }
 
 int64_t __mc_io_poller_wait(struct mc_io_poller* poller,
-                            int32_t* files,
-                            uint8_t* readable,
-                            uint8_t* writable,
-                            uint8_t* failed,
+                            struct mc_io_event* events,
                             int64_t capacity,
                             int32_t timeout_ms,
                             uintptr_t* out_err) {
@@ -493,10 +497,10 @@ int64_t __mc_io_poller_wait(struct mc_io_poller* poller,
             continue;
         }
 
-        files[emitted] = poller->entries[index].fd;
-        readable[emitted] = (uint8_t) ((revents & (POLLIN | POLLHUP)) != 0 ? 1 : 0);
-        writable[emitted] = (uint8_t) ((revents & POLLOUT) != 0 ? 1 : 0);
-        failed[emitted] = (uint8_t) ((revents & (POLLERR | POLLNVAL)) != 0 ? 1 : 0);
+        events[emitted].file = poller->entries[index].fd;
+        events[emitted].readable = (uint8_t) ((revents & (POLLIN | POLLHUP)) != 0 ? 1 : 0);
+        events[emitted].writable = (uint8_t) ((revents & POLLOUT) != 0 ? 1 : 0);
+        events[emitted].failed = (uint8_t) ((revents & (POLLERR | POLLNVAL)) != 0 ? 1 : 0);
         ++emitted;
     }
     return (int64_t) emitted;

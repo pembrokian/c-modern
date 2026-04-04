@@ -17,14 +17,14 @@ func main(args: Slice<cstr>) i32 {
     return run(args[1])
 }
 
-func close_ignored(file: i32) {
+func close_ignored(file: io.File) {
     ignored: errors.Error = io.close(file)
     if !errors.is_ok(ignored) {
         return
     }
 }
 
-func poller_remove_ignored(poller: *io.Poller, file: i32) {
+func poller_remove_ignored(poller: *io.Poller, file: io.File) {
     ignored: errors.Error = io.poller_remove(poller, file)
     if !errors.is_ok(ignored) {
         return
@@ -40,7 +40,7 @@ func run(port_text: str) i32 {
     }
 
     bind: net.IpEndpoint = net.IpEndpoint{ addr: net.IpAddr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
-    listener: i32
+    listener: io.File
     err: errors.Error
     listener, err = net.tcp_listen(bind)
     if !errors.is_ok(err) {
@@ -60,20 +60,13 @@ func run(port_text: str) i32 {
         return 13
     }
 
-    files: [4]i32
-    readable: [4]u8
-    writable: [4]u8
-    failed: [4]u8
-    conn: i32 = 0
+    events: [4]io.Event
+    conn: io.File = 0
     accepted: bool = false
 
     while true {
         ready: usize
-        files_ptr: *i32 = (*i32)((uintptr)(&files))
-        readable_ptr: *u8 = (*u8)((uintptr)(&readable))
-        writable_ptr: *u8 = (*u8)((uintptr)(&writable))
-        failed_ptr: *u8 = (*u8)((uintptr)(&failed))
-        ready, err = io.poller_wait(poller, files_ptr, readable_ptr, writable_ptr, failed_ptr, 4, 2000)
+        ready, err = io.poller_wait(poller, (Slice<io.Event>)(events), 2000)
         if !errors.is_ok(err) {
             if accepted {
                 close_ignored(conn)
@@ -89,15 +82,16 @@ func run(port_text: str) i32 {
 
         index: usize = 0
         while index < ready {
-            if failed[index] != 0 {
+            event: io.Event = events[index]
+            if event.failed != 0 {
                 if accepted {
                     close_ignored(conn)
                 }
                 return 16
             }
 
-            if files[index] == listener {
-                if readable[index] == 0 {
+            if event.file == listener {
+                if event.readable == 0 {
                     if accepted {
                         close_ignored(conn)
                     }
@@ -130,11 +124,11 @@ func run(port_text: str) i32 {
             if !accepted {
                 return 21
             }
-            if files[index] != conn {
+            if event.file != conn {
                 close_ignored(conn)
                 return 22
             }
-            if readable[index] == 0 {
+            if event.readable == 0 {
                 close_ignored(conn)
                 return 23
             }

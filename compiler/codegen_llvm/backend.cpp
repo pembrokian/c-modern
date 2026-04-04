@@ -71,6 +71,7 @@ bool ValidateBootstrapTarget(const TargetConfig& target,
 struct ExecutableValue {
     std::string text;
     BackendTypeInfo type;
+    std::optional<std::string> storage_slot;
 };
 
 struct ExecutableStringConstant {
@@ -619,10 +620,12 @@ std::optional<sema::Type> ResolveExecutableFieldBaseType(const mir::Module& modu
 void RecordExecutableValue(ExecutableFunctionState& state,
                            const std::string& result_name,
                            const std::string& text,
-                           const BackendTypeInfo& type) {
+                           const BackendTypeInfo& type,
+                           std::optional<std::string> storage_slot = std::nullopt) {
     state.values[result_name] = {
         .text = text,
         .type = type,
+        .storage_slot = std::move(storage_slot),
     };
 }
 
@@ -2086,7 +2089,11 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
             output_lines.push_back(temp + " = load " + LLVMTypeName(type_info) + ", ptr " + local_slot + ", align " +
                                    std::to_string(type_info.alignment));
-            RecordExecutableValue(state, instruction.result, temp, type_info);
+            RecordExecutableValue(state,
+                                  instruction.result,
+                                  temp,
+                                  type_info,
+                                  IsAggregateType(type_info) ? std::optional<std::string>(local_slot) : std::nullopt);
             return true;
         }
 
@@ -3026,12 +3033,14 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 return false;
             }
 
-            const std::string array_slot = EmitAggregateStackSlot(base,
-                                                                  function_index,
-                                                                  block_index,
-                                                                  instruction_index,
-                                                                  "array",
-                                                                  output_lines);
+            const std::string array_slot = base.storage_slot.has_value()
+                                               ? *base.storage_slot
+                                               : EmitAggregateStackSlot(base,
+                                                                        function_index,
+                                                                        block_index,
+                                                                        instruction_index,
+                                                                        "array",
+                                                                        output_lines);
             const std::string ptr_temp = LLVMTempName(function_index, block_index, instruction_index) + ".ptr";
             const std::string init_temp = LLVMTempName(function_index, block_index, instruction_index) + ".init";
             const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);

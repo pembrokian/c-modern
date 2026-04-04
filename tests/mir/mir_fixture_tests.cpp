@@ -245,6 +245,7 @@ int main(int argc, char** argv) {
         {"explicit_conversion.mc", "explicit_conversion.mir.txt", true, "", {}, {}},
         {"import_root_ok_main.mc", "import_root_ok_main.mir.txt", true, "", {"tests/mir/import_roots"}, {}},
         {"imported_atomic_ok.mc", "imported_atomic_ok.mir.txt", true, "", {}, {{"sync", "import_roots/sync_module.mc"}}},
+        {"imported_event_buffer_ok.mc", "imported_event_buffer_ok.mir.txt", true, "", {"tests/mir/import_roots"}, {}},
         {"pointer_int_conversion.mc", "pointer_int_conversion.mir.txt", true, "", {}, {}},
         {"semantic_boundary_intrinsics.mc", "semantic_boundary_intrinsics.mir.txt", true, "", {}, {}},
         {"loop_iteration_defer.mc", "loop_iteration_defer.mir.txt", true, "", {}, {}},

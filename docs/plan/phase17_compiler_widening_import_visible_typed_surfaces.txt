@@ -3,7 +3,7 @@ Phase 17 -- Compiler Widening For Import-Visible Typed Surfaces
 
 Status
 ------
-IN PROGRESS (first import-visible metadata slice landed)
+IN PROGRESS (import-visible metadata slice and typed networking surface slice landed)
 
 Purpose
 -------
@@ -31,8 +31,12 @@ Repository status note
   atomic intrinsics validate as symbolic MIR metadata instead of being rejected
   prematurely as if the backend's constant-only restriction applied at MIR.
 - That closes a real repository failure in `tests/mir/imported_atomic_ok.mc`,
-  but it does not yet restore the broader networking `File` plus `Event`
-  public surface.
+  and the next concrete slice is now also landed for networking: the admitted
+  `io` plus `net` proof surface again uses `io.File`, `io.Event`, and
+  `poller_wait(..., Slice<Event>, ...)` instead of parallel event arrays.
+- To keep the hosted ABI honest without opening a broader backend refactor,
+  the restored `Event` readiness flags remain `u8`-shaped in this slice rather
+  than bool-typed aggregate fields.
 
 Problem being solved
 --------------------
@@ -104,6 +108,15 @@ Exit criteria
   spelling where the compiler owner truth has landed
 - any remaining deferred compiler compromise is documented with a sharper
   revisit trigger than "later cleanup"
+
+Current progress note
+---------------------
+- The repository has now removed the flattened poller-output workaround.
+- Real networking examples and proofs consume caller-provided `Slice<io.Event>`
+  storage and `io.File` handles directly.
+- The remaining sharper deferral in this area is aggregate bool ABI cleanup;
+  until a broader admitted consumer needs it, `io.Event` keeps byte-shaped
+  readiness flags.
 
 Non-goals
 ---------

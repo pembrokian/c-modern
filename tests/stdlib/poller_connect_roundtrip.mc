@@ -4,7 +4,7 @@ import errors
 import io
 import net
 
-func close_ignored(file: i32) {
+func close_ignored(file: io.File) {
     _ = io.close(file)
 }
 
@@ -50,7 +50,7 @@ func main(args: Slice<cstr>) i32 {
         return 31
     }
 
-    conn: i32
+    conn: io.File
     conn, err = net.connect_tcp(loopback(port))
     if !errors.is_ok(err) {
         return 32
@@ -69,19 +69,12 @@ func main(args: Slice<cstr>) i32 {
         return 34
     }
 
-    files: [4]i32
-    readable: [4]u8
-    writable: [4]u8
-    failed: [4]u8
+    events: [4]io.Event
     sent: bool = false
 
     while true {
         ready: usize
-        files_ptr: *i32 = (*i32)((uintptr)(&files))
-        readable_ptr: *u8 = (*u8)((uintptr)(&readable))
-        writable_ptr: *u8 = (*u8)((uintptr)(&writable))
-        failed_ptr: *u8 = (*u8)((uintptr)(&failed))
-        ready, err = io.poller_wait(poller, files_ptr, readable_ptr, writable_ptr, failed_ptr, 4, 2000)
+        ready, err = io.poller_wait(poller, (Slice<io.Event>)(events), 2000)
         if !errors.is_ok(err) {
             return 35
         }
@@ -91,12 +84,13 @@ func main(args: Slice<cstr>) i32 {
 
         index: usize = 0
         while index < ready {
-            if failed[index] != 0 {
+            event: io.Event = events[index]
+            if event.failed != 0 {
                 return 37
             }
 
             if !sent {
-                if writable[index] == 0 {
+                if event.writable == 0 {
                     index = index + 1
                     continue
                 }
@@ -120,7 +114,7 @@ func main(args: Slice<cstr>) i32 {
                 continue
             }
 
-            if readable[index] == 0 {
+            if event.readable == 0 {
                 index = index + 1
                 continue
             }

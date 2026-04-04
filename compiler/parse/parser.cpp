@@ -1377,6 +1377,9 @@ class Parser {
             }
             case TokenKind::kIdentifier: {
                 std::size_t next = offset + 1;
+                while (Peek(next).kind == TokenKind::kDot && Peek(next + 1).kind == TokenKind::kIdentifier) {
+                    next += 2;
+                }
                 if (Peek(next).kind == TokenKind::kLt) {
                     return SkipTypeArgListLookahead(next, nesting);
                 }

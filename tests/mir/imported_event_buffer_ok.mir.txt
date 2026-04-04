@@ -1,0 +1,30 @@
+Module
+  Import name=helper_events
+  TypeDecl kind=alias name=helper_events.File
+    AliasedType=i32
+  TypeDecl kind=struct name=helper_events.Event
+    Field name=file type=helper_events.File
+    Field name=readable type=u8
+    Field name=writable type=u8
+    Field name=failed type=u8
+  Function name=main returns=[i32]
+    Local name=events type=[1]helper_events.Event
+    Local name=first type=helper_events.File
+    Block label=entry0
+      const %v0:int_literal op=7
+      const %v1:int_literal op=1
+      const %v2:int_literal op=0
+      const %v3:int_literal op=0
+      aggregate_init %v4:helper_events.Event target=helper_events.Event operands=[%v0, %v1, %v2, %v3] fields=[file, readable, writable, failed]
+      load_local %v5:[1]helper_events.Event target=events
+      const %v6:int_literal op=0
+      const %v7:usize op=1
+      bounds_check op=index operands=[%v6, %v7]
+      store_target target=events[0] target_kind=index target_base=[1]helper_events.Event operands=[%v4, %v5, %v6] target_types=[int_literal]
+      load_local %v8:[1]helper_events.Event target=events
+      array_to_slice %v9:Slice<helper_events.Event> target=Slice<helper_events.Event> operands=[%v8]
+      symbol_ref %v10:proc(Slice<helper_events.Event>)->helper_events.File target=helper_events.first_file target_kind=function target_name=helper_events.first_file
+      call %v11:helper_events.File target=helper_events.first_file target_kind=function target_name=helper_events.first_file operands=[%v10, %v9]
+      store_local target=first operands=[%v11]
+      load_local %v12:helper_events.File target=first
+      terminator return values=[%v12]

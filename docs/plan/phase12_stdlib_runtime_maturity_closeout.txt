@@ -53,6 +53,14 @@ What landed
 - Phase 12C: repository truth now treats `testing` as the already-admitted
   narrow toolchain companion module used by the Phase 7 ordinary-test path,
   while `time`, `os`, `sync`, and `hal` remain explicitly deferred.
+- Phase 17 follow-up on the admitted networking slice: `io` and `net` now
+  restore a typed `io.File` plus `io.Event` poller surface, and
+  `poller_wait` again writes into caller-provided `Slice<Event>` storage
+  instead of the earlier parallel `files` or `readable` or `writable` or
+  `failed` buffers.
+- That follow-up keeps readiness flags byte-shaped in the current hosted ABI
+  instead of reopening a broader bool-in-aggregate backend change during the
+  same slice.
 
 What remains deferred
 ---------------------
