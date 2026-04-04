@@ -1,0 +1,148 @@
+Phase 24 -- Narrow Companion-Family Admission From Project Pressure
+==================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Admit one small next companion family only if the richer project pressure from
+Phase 22 and the cleaner baseline after any justified Phase 23 follow-up prove
+that the current admitted hosted slice is materially missing that family.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The slice register keeps `time`, `os`, and `hal` explicit as documented end-
+  state module families, but still deferred because no admitted consumer matrix
+  has justified them yet.
+- The `testing` companion module is only partial, with the intended end state
+  still being a helper library rather than compiler magic.
+- Phase 18 explicitly deferred `hal` because the repository still lacked a
+  real MMIO consumer matrix.
+- The recommended next-series order now puts richer project pressure and any
+  justified compiler follow-up ahead of new module-family breadth.
+
+Problem being solved
+--------------------
+- The repository has enough admitted hosted breadth to build and test real
+  projects, but some next ordinary development needs may now sit just outside
+  the admitted slice.
+- Without an explicit companion-family admission plan, richer projects could
+  begin to grow ad hoc helpers or test-local shims that hide a real missing
+  stdlib or testing boundary.
+- The repository needs a narrow rule for deciding whether the next leverage is
+  a small `time` surface, modest `testing` helper growth, or continued
+  deferral of broader platform-facing families.
+
+Core rule
+---------
+- Admit one small companion family only when real projects or tests justify it.
+- Prefer `time` before broader `os` or `hal` breadth on the admitted hosted
+  slice.
+- Prefer helper-library growth in `testing` before inventing test-specific
+  language or tool magic.
+- Keep `os` and `hal` deferred unless a concrete consumer matrix exists first.
+
+Preferred candidate order
+-------------------------
+1. Narrow hosted `time` admission.
+2. Modest `testing` helper growth.
+3. Keep broader `os` and `hal` deferred by default.
+
+Why `time` is the primary candidate
+-----------------------------------
+- The documented stdlib end state already includes clocks, durations, and sleep
+  operations when standardized.
+- A narrow `time` surface can support richer deadlines, retries, and timeout-
+  aware project behavior without immediately opening raw platform escape
+  hatches.
+- It can make ordinary project tests more honest when timeout or delay logic
+  belongs in the admitted slice rather than in shell wrappers or host-side test
+  scaffolding.
+
+When `testing` helper growth should win instead
+-----------------------------------------------
+- If the landed projects primarily expose repeated test-helper patterns rather
+  than real runtime timekeeping needs.
+- If the current minimal `testing` companion path is now forcing duplicated
+  assertion, fixture, or timeout helpers across admitted project tests.
+- If helper growth can close that gap without widening runtime or platform
+  claims.
+
+Why `os` and `hal` stay deferred by default
+-------------------------------------------
+- `os` can widen the public surface quickly into environment, subprocess, raw
+  handles, and other platform-facing escape hatches that do not strengthen the
+  current admitted plateau unless a concrete consumer matrix exists.
+- `hal` remains tied to MMIO, volatile, and freestanding pressure that the
+  repository still has not admitted honestly.
+- Opening either family from abstract completeness arguments would bypass the
+  evidence-first rule that Phase 18, Phase 20, and Phase 21 reinforced.
+
+Admission rule for candidate work
+---------------------------------
+- A candidate should land only if at least one admitted real project or test
+  surface is materially cleaner, more honest, or more deterministic after the
+  new family is admitted.
+- If a family is still only theoretically useful, keep it explicit in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`, or the slice register
+  rather than admitting it preemptively.
+
+Deliverables
+------------
+- one narrow stdlib or testing-companion implementation slice under
+  `/Users/ro/dev/c_modern/stdlib/` and any required hosted runtime support
+  under `/Users/ro/dev/c_modern/runtime/hosted/`
+- one admitted real project or ordinary checked-test proof that consumes the
+  new surface honestly
+- focused deterministic tool, stdlib, or executable regressions proving the
+  admitted surface at the narrowest meaningful layer
+- documentation updates in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`, and
+  `/Users/ro/dev/c_modern/README.md` if the supported hosted slice changes
+  materially
+
+Suggested execution order
+-------------------------
+1. Re-audit the landed Phase 22 project and any Phase 23 follow-up to identify
+   whether the strongest recurring missing boundary is `time`, `testing`, or
+   neither.
+2. Choose the smallest admitted surface that closes a real project or test
+   gap honestly.
+3. Land the narrow stdlib or testing helper truth before updating projects or
+   tests to depend on it broadly.
+4. Add focused deterministic proof for the new surface under ordinary project
+   and test workflow.
+5. Record any still-deferred `os` or `hal` work explicitly rather than letting
+   it re-enter planning as vague future breadth.
+
+Exit criteria
+-------------
+- the repository either admits one narrow companion family justified by real
+  project pressure or records that no such admission was yet warranted
+- any newly admitted surface has one honest project or test proof rather than
+  only abstract documentation support
+- `os` and `hal` remain either explicitly deferred with concrete reasons or are
+  reopened only through a separate consumer-matrix document
+- the repository can choose its next plateau from a stronger admitted hosted
+  slice without hiding missing library boundaries under example-local helpers
+
+Non-goals
+---------
+- broad `os` admission without a concrete consumer matrix
+- `hal` admission without a real MMIO or freestanding proof surface
+- test-specific language syntax or special compiler magic
+- using this phase as a back door to widen unrelated workflow or compiler work
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 24 stands alone as the narrow companion-family admission plan after the
+  project-graph and possible compiler follow-up waves.
+- The phase is explicit that `time` and modest `testing` growth are the first
+  credible candidates, while broader `os` and `hal` remain deferred by default.

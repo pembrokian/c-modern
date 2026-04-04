@@ -1,0 +1,153 @@
+Phase 22 -- Project Graph And Separate-Compilation Pressure
+===========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Add one richer hosted project shape that pressures package grouping,
+multi-target reviewability, and separate-compilation behavior on the admitted
+hosted slice before the repository reopens broader compiler or module-family
+work.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 19 hardened workflow trust on the admitted networking project family.
+- Phase 20 proved one honest real project-mode consumer for the admitted
+  hosted `sync` slice.
+- Phase 21 removed the highest-leverage remaining admitted networking backend
+  workaround instead of widening language or stdlib breadth speculatively.
+- The slice register now shows package grouping, broader target kinds, and the
+  separate-compilation contract as partial rather than absent.
+- The backlog still keeps broader project-manifest ergonomics and multi-target
+  workflow reviewability explicit, but only for a future wave when a richer
+  real project exposes that pressure concretely.
+
+Problem being solved
+--------------------
+- The repository can now compile, run, and test honest hosted projects, but it
+  still has only limited pressure on shared-module graphs, multiple targets,
+  and interface-sensitive rebuild behavior.
+- Without one richer project shape, future discussion about package grouping,
+  target breadth, or separate-compilation truth could drift back into abstract
+  build-tool completeness arguments.
+- The repository needs one admitted project that either proves the current
+  partial build-graph surface is already honest enough or exposes one clearly
+  owned tooling limitation at the correct boundary.
+
+Core rule
+---------
+- Add one richer project graph, not a broad new capability family.
+- Stay inside the admitted hosted slice unless a newly exposed gap clearly
+  belongs to a named owner and deserves follow-up there.
+- Use real module sharing, real target selection, and real rebuild reuse to
+  expose pressure honestly rather than by synthetic driver-only probes.
+- Keep compiler meaning in compiler owners; this phase pressures project graph,
+  build behavior, and reviewability rather than moving semantic truth into the
+  driver.
+
+Chosen project shape
+--------------------
+Targeted proof shape: one real hosted project with shared ordinary modules,
+two small executable targets, and ordinary checked tests in the same build
+graph.
+
+The planned project should:
+- exercise more than one target without introducing a broad new runtime or
+  module family
+- share helper modules across the targets so interface-hash and implementation-
+  only rebuild behavior become observable
+- remain reviewable and deterministic under `mc run --project ...` and
+  `mc test --project ...`
+- be small enough that project-graph behavior stays more important than raw
+  program complexity
+
+Candidate shapes that fit this plan
+-----------------------------------
+- one service-plus-tool project where both executables share parsing or I/O
+  helper modules
+- one project with a reusable helper package plus a small executable and a
+  checked test target
+- one project pair that differs only in an exported interface edit versus an
+  implementation-only edit to prove rebuild behavior sharply
+
+What this phase should try to prove
+-----------------------------------
+- implementation-only module edits do not force avoidable downstream rebuilds
+- interface-visible changes do force the correct deterministic rebuilds
+- project manifests remain reviewable when a real project has multiple targets
+- target selection and build-directory reuse stay predictable on the richer
+  graph
+- the current admitted package and project model is either already honest for a
+  richer build graph or exposes one clearly owned tooling gap
+
+Preferred pressure points
+-------------------------
+1. Multi-target manifest reviewability on one real hosted project.
+2. Shared-module rebuild behavior after implementation-only edits.
+3. Shared-module rebuild behavior after exported-interface edits.
+4. Deterministic `run`, `test`, and rerun sequences on the same build
+   directory.
+5. Clear diagnostics when target selection or project layout is invalid on the
+   richer graph.
+
+Deliverables
+------------
+- one new real project under `/Users/ro/dev/c_modern/examples/real/` that uses
+  shared modules and at least two targets honestly
+- focused tool regressions under
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` proving target
+  selection, deterministic reuse, and rebuild behavior on that project
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` if a currently partial
+  build-graph behavior is either closed or given a sharper revisit trigger
+- documentation updates only if the admitted hosted project-workflow statement
+  changes materially in `/Users/ro/dev/c_modern/README.md` or
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`
+
+Suggested execution order
+-------------------------
+1. Choose one real project shape that adds shared-module and multi-target
+   pressure without opening a fresh capability family.
+2. Land the project first so its build graph, tests, and reuse behavior become
+   real before changing driver logic.
+3. Add deterministic tool regressions for run, test, rerun, target selection,
+   and build-directory reuse on the new graph.
+4. Probe implementation-only versus interface-visible edits so rebuild truth is
+   documented by real pressure rather than assumed from architecture docs.
+5. Record any still-partial package, target-kind, or separate-compilation gap
+   explicitly instead of letting it remain ambient cleanup.
+
+Exit criteria
+-------------
+- the repository has one admitted richer hosted project graph rather than only
+  single-target or simpler project shapes
+- the project proves deterministic target selection and build-directory reuse
+  on a shared-module multi-target graph
+- separate-compilation behavior is either shown to be honest enough for the
+  admitted slice or narrowed to one clearly owned follow-up limitation
+- the repository can decide whether Phase 23 should reopen compiler-owner work
+  from real project pressure rather than from abstract completeness goals
+
+Non-goals
+---------
+- admitting broad new stdlib module families during this phase
+- broad target-model widening into `staticlib` or `sharedlib` merely because
+  the build docs describe them
+- reopening broader `sync`, `os`, or `hal` work to make the project more
+  impressive
+- treating build-graph complexity itself as progress if it does not expose a
+  clearer repository truth
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 22 stands alone as the plan for richer project-graph pressure on the
+  admitted hosted slice.
+- The phase is explicit that real project graph proof, not abstract build-tool
+  completeness, is its main purpose.

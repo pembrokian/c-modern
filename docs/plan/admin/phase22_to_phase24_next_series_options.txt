@@ -1,0 +1,117 @@
+Phase 22 Through Phase 24 -- Next-Series Overview
+=================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Turn the repository posture after the Phase 21 compiler-debt closeout into one
+short overview that points to the separate Phase 22, Phase 23, and Phase 24
+planning documents.
+
+This document is intentionally cross-phase.
+It does not introduce a new architecture phase after Phase 8.
+It packages one recommended next execution series across already-existing
+owners and routes readers to the phase-specific plans:
+
+- Phase 22 ownership for richer project-graph and separate-compilation
+  pressure on the admitted hosted slice
+- Phase 23 ownership for compiler follow-up only if that new project pressure
+  exposes a justified owner-local gap
+- Phase 24 ownership for narrow companion-family admission only if the same
+  projects prove a concrete need
+
+Phase-specific documents
+------------------------
+- Phase 22: `/Users/ro/dev/c_modern/docs/plan/phase22_project_graph_and_separate_compilation_pressure.txt`
+- Phase 23: `/Users/ro/dev/c_modern/docs/plan/phase23_compiler_followup_from_phase22_pressure.txt`
+- Phase 24: `/Users/ro/dev/c_modern/docs/plan/phase24_narrow_companion_family_admission_from_project_pressure.txt`
+
+Repository status note
+----------------------
+- Phase 19 hardened workflow trust on the admitted networking project family.
+- Phase 20 added one honest project-mode consumer for the admitted hosted
+  `sync` slice.
+- Phase 21 closed the highest-leverage remaining admitted networking compiler
+  workaround by restoring real `bool` fields on `io.Event` at the backend
+  owner layer.
+- The repository therefore no longer needs another generic compiler-cleanup
+  wave for its own sake.
+- The strongest remaining open slices are now partial build-graph behavior,
+  one still-bounded imported generic compiler workaround, and deferred module
+  or helper families that still lack an admitted consumer matrix.
+
+Series summary
+--------------
+- Phase 22 deepens pressure on package grouping, multi-target reviewability,
+  and separate-compilation truth through one richer hosted project shape.
+- Phase 23 reopens compiler-owner work only if the richer project graph exposes
+  a clearly justified owner-local limitation, with the bounded
+  `thread_spawn<T>` rewrite as the most credible candidate.
+- Phase 24 admits one narrow next companion family only if the same project
+  pressure makes that need real, with `time` ahead of broader `os` or `hal`
+  breadth.
+
+Core rule
+---------
+- Do not widen compiler, language, stdlib, or tooling surfaces speculatively.
+- Prefer admitted projects, canonical proofs, and explicit revisit triggers to
+  abstract completeness arguments.
+- Keep parser, sema, MIR, backend, stdlib, runtime, and tooling ownership
+  boundaries intact.
+- Use the richer project graph to decide whether the next leverage is build-
+  workflow truth, compiler follow-up, or a narrow companion family.
+
+Recommended execution choice
+----------------------------
+Prefer one richer build-graph pressure wave first, then compiler follow-up only
+if that pressure exposes a real owner-local gap, then one narrow companion-
+family admission only if the same projects prove the need concretely.
+
+Why this sequence is recommended
+--------------------------------
+- It stays inside already documented partial or deferred repository slices
+  rather than inventing a fresh capability family.
+- It uses the real project inventory that now exists after the networking,
+  workflow, sync, and consumer-driven compiler closeout waves.
+- It gives the repository an honest way to decide whether the remaining
+  `thread_spawn<T>` rewrite should stay deferred or be retired.
+- It can justify a narrow `time` or `testing` admission later without forcing
+  broader `os` or `hal` breadth prematurely.
+
+Phase summary
+-------------
+- Phase 22: richer project graph and separate-compilation pressure
+- Phase 23: compiler follow-up from Phase 22 pressure if a real gap appears
+- Phase 24: narrow companion-family admission from the same project pressure
+
+Suggested sequencing checkpoints
+--------------------------------
+1. Land one richer project shape that exercises multiple targets or interface-
+   sensitive rebuild behavior.
+2. Use that proof to decide whether package grouping and separate compilation
+   are already honest enough or expose a clearly owned tooling gap.
+3. Revisit broader imported generic procedure-call lowering only if a second
+   independent consumer appears beyond the current `thread_spawn<T>` path.
+4. Admit `time` or grow `testing` only if deadlines, retries, timeout-aware
+   tests, or broader test-helper pressure become part of the landed proof
+   surface.
+5. Keep `os` and `hal` deferred unless a concrete consumer matrix is written
+   down first.
+
+Non-goals for this series
+-------------------------
+- broad compiler widening with no new admitted pressure
+- broad `sync` expansion without a second real consumer family
+- admitting `os` or `hal` from abstract completeness arguments alone
+- self-hosting, package registry work, additional backend targets, or broad
+  portability claims
+
+Acceptance criteria for this document
+-------------------------------------
+- the repository has a short post-Phase-21 overview plus separate Phase 22,
+  Phase 23, and Phase 24 planning docs
+- the overview remains routing-focused rather than duplicating the detailed
+  execution plans

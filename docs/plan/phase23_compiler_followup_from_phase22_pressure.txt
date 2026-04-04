@@ -1,0 +1,147 @@
+Phase 23 -- Compiler Follow-Up From Phase 22 Pressure
+====================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Reopen compiler-owner work only if the richer project graph from Phase 22
+exposes one still-bounded limitation sharply enough that the correct next step
+is a compiler fix rather than another example-local or driver-local workaround.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 17 removed the highest-leverage networking-shaped typed-surface
+  flattening and preserved the remaining imported generic compromise as one
+  explicit bounded rewrite.
+- Phase 21 closed the admitted networking aggregate-bool ABI workaround in the
+  backend at the correct owner layer.
+- The backlog and decision log still keep the compiler-owned
+  `thread_spawn<T>` rewrite explicit, with a sharper revisit trigger: a second
+  real imported generic procedure-call consumer beyond the current sync path.
+- Phase 22 is expected to produce the next richer shared-module and multi-
+  target pressure strong enough to determine whether any remaining compiler gap
+  is still theoretical or materially harming admitted consumers.
+
+Problem being solved
+--------------------
+- The repository no longer needs compiler widening for its own sake.
+- The remaining compiler work is now about one small set of explicit limited
+  solutions that should reopen only if new admitted consumers prove they are
+  distorting real projects.
+- Without a gated compiler follow-up plan, richer projects could begin to
+  normalize compiler debt through helper wrappers, alternate API shapes, or
+  driver-local special handling instead of forcing the correct owner-local fix.
+
+Core rule
+---------
+- Fix compiler-owned limitations only when Phase 22 pressure justifies them.
+- Prefer one closed limited solution over several partially loosened families.
+- Keep parser, sema, MIR, backend, and driver ownership boundaries intact.
+- If no new compiler gap is materially exposed, do not force this phase into a
+  speculative widening exercise.
+
+Primary candidate
+-----------------
+Retire the compiler-owned imported generic `thread_spawn<T>` rewrite only if
+Phase 22 lands a second real, independent imported generic procedure-call
+consumer beyond the current hosted `sync` surface.
+
+Why this candidate is primary
+-----------------------------
+- It is the sharpest remaining compiler workaround already named in the
+  decision log and backlog.
+- It already has a clear revisit trigger rather than a vague "later cleanup"
+  note.
+- Removing it would close a real bootstrap-shaped compiler compromise instead
+  of widening a new feature family speculatively.
+
+Secondary acceptable candidates if Phase 22 exposes them directly
+-----------------------------------------------------------------
+- fuller preservation of generic nominal type-argument identity across import
+  and interface paths
+- fuller accepted `@noalias` contract handling where a real imported API or
+  ABI boundary needs it
+- tuple or multi-result lowering work only if a real project or canonical
+  proof becomes materially cleaner and more honest with that support
+
+Admission rule for candidate work
+---------------------------------
+- A candidate should land only if at least one admitted real project or
+  canonical proof is materially cleaner, more honest, or more deterministic
+  after the compiler-owner change.
+- If the limitation is still only theoretical, keep it explicit in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt` or
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` rather than widening it
+  preemptively.
+
+Preferred implementation bias
+-----------------------------
+- close one limited solution fully when possible instead of broadening a whole
+  family in half-finished form
+- add the narrowest deterministic sema, MIR, backend, or executable proof that
+  demonstrates the newly owned compiler truth directly
+- update the decision log whenever a retained workaround gets a sharper revisit
+  trigger or is removed entirely
+
+Deliverables
+------------
+- one focused compiler-owner implementation slice under
+  `/Users/ro/dev/c_modern/compiler/sema/`,
+  `/Users/ro/dev/c_modern/compiler/mir/`, or
+  `/Users/ro/dev/c_modern/compiler/codegen_llvm/` as required by the chosen
+  candidate
+- deterministic sema, MIR, backend, executable, or tool regressions at the
+  narrowest proof layer that demonstrates the owner-local fix
+- bounded updates to the real projects or canonical proofs only after the
+  compiler owner truth lands
+- documentation updates in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` so any remaining limited
+  solutions are explicit and sharper than generic cleanup notes
+
+Suggested execution order
+-------------------------
+1. Re-audit the Phase 22 project findings and collect only the recurring
+   compiler-owned limitations.
+2. Check first whether a second real imported generic procedure-call consumer
+   now exists beyond `thread_spawn<T>`.
+3. Choose the smallest high-leverage compiler candidate whose removal cleans up
+   a real admitted consumer noticeably.
+4. Land the compiler-owner fix with narrow deterministic regressions before
+   touching any library or example surface that benefits from it.
+5. Reassess whether any remaining compiler limitation still has a concrete
+   admitted consumer or should remain deferred.
+
+Exit criteria
+-------------
+- at least one active compiler-owned limited solution affecting admitted Phase
+  22 consumers is closed or materially narrowed, or the repository records that
+  no such follow-up was justified after re-audit
+- real projects or canonical proofs no longer need the corresponding
+  workaround spelling where compiler truth has landed
+- any still-deferred compiler limitation has a sharper revisit trigger than
+  ambient cleanup prose
+- the repository is in a position to choose whether Phase 24 should admit a
+  narrow companion family from a cleaner baseline
+
+Non-goals
+---------
+- speculative compiler generalization without a concrete admitted consumer
+- broad language-surface expansion unrelated to a named project or canonical
+  proof trigger
+- moving stdlib, runtime, or driver responsibilities into the compiler
+- manufacturing a second consumer just to justify removing the
+  `thread_spawn<T>` rewrite
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 23 stands alone as the compiler follow-up plan gated by Phase 22
+  pressure.
+- The phase keeps each candidate tied to one named current limitation and one
+  admitted consumer trigger rather than abstract completeness goals.
