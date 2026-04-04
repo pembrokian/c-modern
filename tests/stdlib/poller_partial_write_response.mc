@@ -122,7 +122,7 @@ func main(args: Slice<cstr>) i32 {
         index: usize = 0
         while index < ready {
             event: io.Event = events[index]
-            if event.failed != 0 {
+            if event.failed {
                 if accepted {
                     close_ignored(conn)
                 }
@@ -130,7 +130,7 @@ func main(args: Slice<cstr>) i32 {
             }
 
             if event.file == listener {
-                if event.readable == 0 {
+                if !event.readable {
                     if accepted {
                         close_ignored(conn)
                     }
@@ -169,7 +169,7 @@ func main(args: Slice<cstr>) i32 {
             }
 
             if conn_state == STATE_READ_REQUEST {
-                if event.readable == 0 {
+                if !event.readable {
                     index = index + 1
                     continue
                 }
@@ -223,7 +223,7 @@ func main(args: Slice<cstr>) i32 {
             }
 
             if conn_state == STATE_WRITE_RESPONSE {
-                if event.writable == 0 {
+                if !event.writable {
                     index = index + 1
                     continue
                 }
@@ -261,7 +261,7 @@ func main(args: Slice<cstr>) i32 {
                 continue
             }
 
-            if event.readable == 0 {
+            if !event.readable {
                 index = index + 1
                 continue
             }

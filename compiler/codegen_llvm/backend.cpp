@@ -197,6 +197,34 @@ std::string LLVMZeroValue(const BackendTypeInfo& type_info) {
     return "0";
 }
 
+bool EmitValueRepresentationCoercion(const ExecutableValue& value,
+                                     const BackendTypeInfo& target_type,
+                                     std::size_t function_index,
+                                     std::size_t block_index,
+                                     std::size_t instruction_index,
+                                     std::string_view suffix,
+                                     std::vector<std::string>& output_lines,
+                                     std::string& coerced) {
+    if (value.type.backend_name == target_type.backend_name) {
+        coerced = value.text;
+        return true;
+    }
+
+    const std::string temp = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix);
+    if (value.type.backend_name == "i1" && target_type.backend_name == "i8") {
+        output_lines.push_back(temp + " = zext i1 " + value.text + " to i8");
+        coerced = temp;
+        return true;
+    }
+    if (value.type.backend_name == "i8" && target_type.backend_name == "i1") {
+        output_lines.push_back(temp + " = icmp ne i8 " + value.text + ", 0");
+        coerced = temp;
+        return true;
+    }
+
+    return false;
+}
+
 bool IsAggregateType(const BackendTypeInfo& type_info) {
     return !type_info.backend_name.empty() &&
            (type_info.backend_name.front() == '{' || type_info.backend_name.front() == '[' || type_info.backend_name.front() == '<');
@@ -1251,16 +1279,15 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
         }
         const auto& fields = type_decl != nullptr ? type_decl->fields : builtin_fields;
         for (const auto& field : fields) {
-            BackendTypeInfo field_type;
-            if (!LowerInstructionType(*state.module,
-                                      field.second,
-                                      source_path,
-                                      diagnostics,
-                                      FunctionBlockContext("aggregate_init field", state.function->name, block),
-                                      field_type)) {
+            const auto lowered_field = LowerAggregateFieldStorageType(*state.module, instruction.type, field.first);
+            if (!lowered_field.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not lower aggregate_init storage for field '" + field.first +
+                                       "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
                 return false;
             }
-            field_types.push_back(std::move(field_type));
+            field_types.push_back(*lowered_field);
         }
     } else {
         ReportBackendError(source_path,
@@ -1277,11 +1304,31 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
             return false;
         }
 
+        std::string coerced_operand = operand.text;
+        if ((operand.type.backend_name == "i1" && field_types[index].backend_name == "i8") ||
+            (operand.type.backend_name == "i8" && field_types[index].backend_name == "i1")) {
+            if (!EmitValueRepresentationCoercion(operand,
+                                                 field_types[index],
+                                                 function_index,
+                                                 block_index,
+                                                 instruction_index,
+                                                 "agg_coerce" + std::to_string(index),
+                                                 output_lines,
+                                                 coerced_operand)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not coerce aggregate_init operand " +
+                                       std::to_string(index) + " in function '" + state.function->name + "' block '" +
+                                       block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+        }
+
         const std::string next_value = index + 1 == instruction.operands.size()
                                            ? LLVMTempName(function_index, block_index, instruction_index)
                                            : LLVMTempName(function_index, block_index, instruction_index) + ".agg" + std::to_string(index);
         output_lines.push_back(next_value + " = insertvalue " + aggregate_type.backend_name + " " + current_value + ", " +
-                               field_types[index].backend_name + " " + operand.text + ", " + std::to_string(index));
+                               field_types[index].backend_name + " " + coerced_operand + ", " + std::to_string(index));
         current_value = next_value;
     }
 
@@ -2465,10 +2512,20 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 const auto field_index = base_type.has_value()
                                              ? FindFieldIndex(*state.module, *base_type, instruction.target_name)
                                              : std::nullopt;
+                const auto field_storage_type = base_type.has_value()
+                                                    ? LowerAggregateFieldStorageType(*state.module, *base_type, instruction.target_name)
+                                                    : std::nullopt;
                 if (!field_index.has_value()) {
                     ReportBackendError(source_path,
                                        "LLVM bootstrap executable emission could not resolve store_target field '" + instruction.target_name +
                                            "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+                if (!field_storage_type.has_value()) {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission could not lower store_target field storage for '" +
+                                           instruction.target_name + "' in function '" + state.function->name + "' block '" + block.label + "'",
                                        diagnostics);
                     return false;
                 }
@@ -2482,9 +2539,29 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                     return false;
                 }
 
+                std::string coerced_value = stored_value.text;
+                if ((stored_value.type.backend_name == "i1" && field_storage_type->backend_name == "i8") ||
+                    (stored_value.type.backend_name == "i8" && field_storage_type->backend_name == "i1")) {
+                    if (!EmitValueRepresentationCoercion(stored_value,
+                                                         *field_storage_type,
+                                                         function_index,
+                                                         block_index,
+                                                         instruction_index,
+                                                         "store_field",
+                                                         output_lines,
+                                                         coerced_value)) {
+                        ReportBackendError(source_path,
+                                           "LLVM bootstrap executable emission could not coerce store_target field value for '" +
+                                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                                               block.label + "'",
+                                           diagnostics);
+                        return false;
+                    }
+                }
+
                 const std::string updated_value = LLVMTempName(function_index, block_index, instruction_index) + ".field";
                 output_lines.push_back(updated_value + " = insertvalue " + base.type.backend_name + " " + base.text + ", " +
-                                       stored_value.type.backend_name + " " + stored_value.text + ", " +
+                                       field_storage_type->backend_name + " " + coerced_value + ", " +
                                        std::to_string(*field_index));
 
                 if (instruction.target_base_storage == mir::Instruction::StorageBaseKind::kLocal) {
@@ -3254,10 +3331,42 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 return false;
             }
 
-            const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
-            output_lines.push_back(temp + " = extractvalue " + base.type.backend_name + " " + base.text + ", " +
+            const auto storage_type = field_base_type.has_value()
+                                          ? LowerAggregateFieldStorageType(*state.module, *field_base_type, field_name)
+                                          : std::nullopt;
+            if (!storage_type.has_value()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not lower field storage for '" + field_name +
+                                       "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            const std::string extracted = LLVMTempName(function_index, block_index, instruction_index) + ".field";
+            output_lines.push_back(extracted + " = extractvalue " + base.type.backend_name + " " + base.text + ", " +
                                    std::to_string(*field_index));
-            RecordExecutableValue(state, instruction.result, temp, field_type);
+
+            ExecutableValue extracted_value {
+                .text = extracted,
+                .type = *storage_type,
+            };
+            std::string coerced_value;
+            if (!EmitValueRepresentationCoercion(extracted_value,
+                                                 field_type,
+                                                 function_index,
+                                                 block_index,
+                                                 instruction_index,
+                                                 "field_value",
+                                                 output_lines,
+                                                 coerced_value)) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission could not coerce extracted field '" + field_name +
+                                       "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            RecordExecutableValue(state, instruction.result, coerced_value, field_type);
             return true;
         }
 

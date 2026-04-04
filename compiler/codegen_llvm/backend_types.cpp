@@ -7,6 +7,10 @@ namespace mc::codegen_llvm {
 
 namespace {
 
+std::optional<BackendTypeInfo> LowerTypeInfoImpl(const mir::Module& module,
+                                                 const sema::Type& type,
+                                                 bool aggregate_field_storage);
+
 std::size_t AlignTo(std::size_t value,
                     std::size_t alignment) {
     if (alignment == 0) {
@@ -37,7 +41,7 @@ std::optional<BackendTypeInfo> LowerStructTypeInfo(const mir::Module& module,
     std::size_t size = 0;
     std::size_t alignment = 1;
     for (std::size_t index = 0; index < type_decl.fields.size(); ++index) {
-        const auto lowered_field = LowerTypeInfo(module, type_decl.fields[index].second);
+        const auto lowered_field = LowerTypeInfoImpl(module, type_decl.fields[index].second, true);
         if (!lowered_field.has_value()) {
             return std::nullopt;
         }
@@ -64,6 +68,140 @@ std::optional<BackendTypeInfo> LowerStructTypeInfo(const mir::Module& module,
     info.alignment = alignment;
     info.size = type_decl.is_packed ? size : AlignTo(size, alignment);
     return info;
+}
+
+std::optional<BackendTypeInfo> LowerTypeInfoImpl(const mir::Module& module,
+                                                 const sema::Type& type,
+                                                 bool aggregate_field_storage) {
+    BackendTypeInfo info {
+        .source_name = sema::FormatType(type),
+    };
+
+    const auto use_backend_type = [&](std::string backend_name,
+                                      std::size_t size,
+                                      std::size_t alignment) -> std::optional<BackendTypeInfo> {
+        info.backend_name = std::move(backend_name);
+        info.size = size;
+        info.alignment = alignment;
+        return info;
+    };
+
+    switch (type.kind) {
+        case sema::Type::Kind::kBool:
+            return use_backend_type(aggregate_field_storage ? "i8" : "i1", 1, 1);
+        case sema::Type::Kind::kString:
+            return use_backend_type("{ptr, i64}", 16, 8);
+        case sema::Type::Kind::kIntLiteral:
+            return use_backend_type("i64", 8, 8);
+        case sema::Type::Kind::kFloatLiteral:
+            return use_backend_type("double", 8, 8);
+        case sema::Type::Kind::kNamed:
+            if (type.name == "bool") {
+                return use_backend_type(aggregate_field_storage ? "i8" : "i1", 1, 1);
+            }
+            if (type.name == "i8" || type.name == "u8") {
+                return use_backend_type("i8", 1, 1);
+            }
+            if (type.name == "i16" || type.name == "u16") {
+                return use_backend_type("i16", 2, 2);
+            }
+            if (type.name == "i32" || type.name == "u32") {
+                return use_backend_type("i32", 4, 4);
+            }
+            if (type.name == "i64" || type.name == "u64" || type.name == "isize" || type.name == "usize" ||
+                type.name == "uintptr") {
+                return use_backend_type("i64", 8, 8);
+            }
+            if (type.name == "f32") {
+                return use_backend_type("float", 4, 4);
+            }
+            if (type.name == "f64") {
+                return use_backend_type("double", 8, 8);
+            }
+            if (type.name == "str" || type.name == "string" || type.name == "cstr") {
+                return use_backend_type("{ptr, i64}", 16, 8);
+            }
+            if (type.name == "Slice") {
+                return use_backend_type("{ptr, i64}", 16, 8);
+            }
+            if (type.name == "Buffer") {
+                return use_backend_type("{ptr, i64, i64, ptr}", 32, 8);
+            }
+            if (const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name)) {
+                if (type_decl->kind == mir::TypeDecl::Kind::kAlias || type_decl->kind == mir::TypeDecl::Kind::kDistinct) {
+                    auto lowered = LowerTypeInfoImpl(module, type_decl->aliased_type, aggregate_field_storage);
+                    if (!lowered.has_value()) {
+                        return std::nullopt;
+                    }
+                    lowered->source_name = info.source_name;
+                    return lowered;
+                }
+                if (type_decl->kind == mir::TypeDecl::Kind::kStruct) {
+                    return LowerStructTypeInfo(module, *type_decl, type);
+                }
+                if (type_decl->kind == mir::TypeDecl::Kind::kEnum) {
+                    auto lowered = LowerEnumLayout(module, *type_decl, type);
+                    if (!lowered.has_value()) {
+                        return std::nullopt;
+                    }
+                    return lowered->aggregate_type;
+                }
+            }
+            return std::nullopt;
+        case sema::Type::Kind::kPointer:
+            return use_backend_type("ptr", 8, 8);
+        case sema::Type::Kind::kConst: {
+            if (type.subtypes.empty()) {
+                return std::nullopt;
+            }
+            auto lowered = LowerTypeInfoImpl(module, type.subtypes.front(), aggregate_field_storage);
+            if (!lowered.has_value()) {
+                return std::nullopt;
+            }
+            lowered->source_name = info.source_name;
+            return lowered;
+        }
+        case sema::Type::Kind::kArray: {
+            if (type.subtypes.empty()) {
+                return std::nullopt;
+            }
+            auto element = LowerTypeInfoImpl(module, type.subtypes.front(), aggregate_field_storage);
+            const auto length = mc::support::ParseArrayLength(type.metadata);
+            if (!element.has_value() || !length.has_value()) {
+                return std::nullopt;
+            }
+            return use_backend_type("[" + std::to_string(*length) + " x " + element->backend_name + "]",
+                                    element->size * *length,
+                                    element->alignment);
+        }
+        case sema::Type::Kind::kTuple: {
+            std::ostringstream backend_name;
+            backend_name << '{';
+            std::size_t size = 0;
+            std::size_t alignment = 1;
+            for (std::size_t index = 0; index < type.subtypes.size(); ++index) {
+                auto lowered_field = LowerTypeInfoImpl(module, type.subtypes[index], aggregate_field_storage);
+                if (!lowered_field.has_value()) {
+                    return std::nullopt;
+                }
+                if (index > 0) {
+                    backend_name << ", ";
+                }
+                backend_name << lowered_field->backend_name;
+                size = AlignTo(size, lowered_field->alignment);
+                size += lowered_field->size;
+                alignment = std::max(alignment, lowered_field->alignment);
+            }
+            backend_name << '}';
+            return use_backend_type(backend_name.str(), AlignTo(size, alignment), alignment);
+        }
+        case sema::Type::Kind::kProcedure:
+            return use_backend_type("ptr", 8, 8);
+        case sema::Type::Kind::kNil:
+            return use_backend_type("ptr", 8, 8);
+        default:
+            return std::nullopt;
+    }
 }
 
 }  // namespace
@@ -183,135 +321,38 @@ std::optional<EnumBackendLayout> LowerEnumLayout(const mir::Module& module,
 
 std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
                                              const sema::Type& type) {
-    BackendTypeInfo info {
-        .source_name = sema::FormatType(type),
-    };
+    return LowerTypeInfoImpl(module, type, false);
+}
 
-    const auto use_backend_type = [&](std::string backend_name,
-                                      std::size_t size,
-                                      std::size_t alignment) -> std::optional<BackendTypeInfo> {
-        info.backend_name = std::move(backend_name);
-        info.size = size;
-        info.alignment = alignment;
-        return info;
-    };
-
-    switch (type.kind) {
-        case sema::Type::Kind::kBool:
-            return use_backend_type("i1", 1, 1);
-        case sema::Type::Kind::kString:
-            return use_backend_type("{ptr, i64}", 16, 8);
-        case sema::Type::Kind::kIntLiteral:
-            return use_backend_type("i64", 8, 8);
-        case sema::Type::Kind::kFloatLiteral:
-            return use_backend_type("double", 8, 8);
-        case sema::Type::Kind::kNamed:
-            if (type.name == "bool") {
-                return use_backend_type("i1", 1, 1);
+std::optional<BackendTypeInfo> LowerAggregateFieldStorageType(const mir::Module& module,
+                                                              const sema::Type& aggregate_type,
+                                                              std::string_view field_name) {
+    const auto builtin_fields = sema::BuiltinAggregateFields(aggregate_type);
+    if (!builtin_fields.empty()) {
+        for (const auto& field : builtin_fields) {
+            if (field.first == field_name) {
+                return LowerTypeInfoImpl(module, field.second, true);
             }
-            if (type.name == "i8" || type.name == "u8") {
-                return use_backend_type("i8", 1, 1);
-            }
-            if (type.name == "i16" || type.name == "u16") {
-                return use_backend_type("i16", 2, 2);
-            }
-            if (type.name == "i32" || type.name == "u32") {
-                return use_backend_type("i32", 4, 4);
-            }
-            if (type.name == "i64" || type.name == "u64" || type.name == "isize" || type.name == "usize" ||
-                type.name == "uintptr") {
-                return use_backend_type("i64", 8, 8);
-            }
-            if (type.name == "f32") {
-                return use_backend_type("float", 4, 4);
-            }
-            if (type.name == "f64") {
-                return use_backend_type("double", 8, 8);
-            }
-            if (type.name == "str" || type.name == "string" || type.name == "cstr") {
-                return use_backend_type("{ptr, i64}", 16, 8);
-            }
-            if (type.name == "Slice") {
-                return use_backend_type("{ptr, i64}", 16, 8);
-            }
-            if (type.name == "Buffer") {
-                return use_backend_type("{ptr, i64, i64, ptr}", 32, 8);
-            }
-            if (const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name)) {
-                if (type_decl->kind == mir::TypeDecl::Kind::kAlias || type_decl->kind == mir::TypeDecl::Kind::kDistinct) {
-                    auto lowered = LowerTypeInfo(module, type_decl->aliased_type);
-                    if (!lowered.has_value()) {
-                        return std::nullopt;
-                    }
-                    lowered->source_name = info.source_name;
-                    return lowered;
-                }
-                if (type_decl->kind == mir::TypeDecl::Kind::kStruct) {
-                    return LowerStructTypeInfo(module, *type_decl, type);
-                }
-                if (type_decl->kind == mir::TypeDecl::Kind::kEnum) {
-                    auto lowered = LowerEnumLayout(module, *type_decl, type);
-                    if (!lowered.has_value()) {
-                        return std::nullopt;
-                    }
-                    return lowered->aggregate_type;
-                }
-            }
-            return std::nullopt;
-        case sema::Type::Kind::kPointer:
-            return use_backend_type("ptr", 8, 8);
-        case sema::Type::Kind::kConst: {
-            if (type.subtypes.empty()) {
-                return std::nullopt;
-            }
-            auto lowered = LowerTypeInfo(module, type.subtypes.front());
-            if (!lowered.has_value()) {
-                return std::nullopt;
-            }
-            lowered->source_name = info.source_name;
-            return lowered;
         }
-        case sema::Type::Kind::kArray: {
-            if (type.subtypes.empty()) {
-                return std::nullopt;
-            }
-            auto element = LowerTypeInfo(module, type.subtypes.front());
-            const auto length = mc::support::ParseArrayLength(type.metadata);
-            if (!element.has_value() || !length.has_value()) {
-                return std::nullopt;
-            }
-            return use_backend_type("[" + std::to_string(*length) + " x " + element->backend_name + "]",
-                                    element->size * *length,
-                                    element->alignment);
-        }
-        case sema::Type::Kind::kTuple: {
-            std::ostringstream backend_name;
-            backend_name << '{';
-            std::size_t size = 0;
-            std::size_t alignment = 1;
-            for (std::size_t index = 0; index < type.subtypes.size(); ++index) {
-                auto lowered_field = LowerTypeInfo(module, type.subtypes[index]);
-                if (!lowered_field.has_value()) {
-                    return std::nullopt;
-                }
-                if (index > 0) {
-                    backend_name << ", ";
-                }
-                backend_name << lowered_field->backend_name;
-                size = AlignTo(size, lowered_field->alignment);
-                size += lowered_field->size;
-                alignment = std::max(alignment, lowered_field->alignment);
-            }
-            backend_name << '}';
-            return use_backend_type(backend_name.str(), AlignTo(size, alignment), alignment);
-        }
-        case sema::Type::Kind::kProcedure:
-            return use_backend_type("ptr", 8, 8);
-        case sema::Type::Kind::kNil:
-            return use_backend_type("ptr", 8, 8);
-        default:
-            return std::nullopt;
+        return std::nullopt;
     }
+
+    if (aggregate_type.kind != sema::Type::Kind::kNamed) {
+        return std::nullopt;
+    }
+
+    const mir::TypeDecl* type_decl = FindTypeDecl(module, aggregate_type.name);
+    if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kStruct) {
+        return std::nullopt;
+    }
+
+    for (const auto& field : type_decl->fields) {
+        if (field.first == field_name) {
+            return LowerTypeInfoImpl(module, field.second, true);
+        }
+    }
+
+    return std::nullopt;
 }
 
 std::string FormatTypeInfo(const BackendTypeInfo& type_info) {

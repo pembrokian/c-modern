@@ -3,7 +3,7 @@ Phase 21 -- Compiler Debt Closeout From Admitted Consumer Pressure
 
 Status
 ------
-PLANNED
+COMPLETED (repository-bounded compiler debt closeout)
 
 Purpose
 -------
@@ -19,9 +19,12 @@ Repository status note
 - Phase 17 already removed the highest-leverage typed networking surface
   flattening and narrowed the remaining deferral in that area to aggregate-bool
   ABI cleanup.
-- The backlog still carries direct aggregate field-address lowering and the
-  bounded compiler-owned imported generic `thread_spawn<T>` rewrite as active
-  follow-on items.
+- Direct local or global field-address lowering had already been closed and
+  proven earlier through focused MIR plus executable coverage, so it was not a
+  live Phase 21 implementation target anymore.
+- The bounded compiler-owned imported generic `thread_spawn<T>` rewrite remains
+  an explicit deferred item, but Phase 20 did not provide a second independent
+  admitted consumer that justified reopening that broader call-lowering family.
 - A stronger workflow plateau from Phase 19 and a real sync project from Phase
   20 would give the repository better evidence about which remaining compiler
   limitations are still merely theoretical and which ones are now materially
@@ -46,14 +49,33 @@ Core rule
 - Do not widen language surface or stdlib breadth merely to work around a
   compiler limitation that belongs in the compiler.
 
-Priority candidate set
-----------------------
-1. Direct local or global aggregate field-address lowering so admitted proofs
-   no longer need awkward `&value.field` rewrites.
-2. Aggregate-bool ABI cleanup for the restored typed networking `Event` surface
-   if admitted consumers now justify that backend work.
-3. Broader imported generic procedure-call lowering only if Phase 20 provides
-   a real second consumer beyond the existing `thread_spawn<T>` rewrite.
+Chosen candidate
+----------------
+Aggregate-bool ABI cleanup for the restored typed networking `Event` surface.
+
+Why this candidate landed
+-------------------------
+- Phase 20 and the admitted networking projects gave the repository multiple
+  real consumers of `io.Event` under ordinary `mc run` or `mc test` workflow.
+- The direct field-address item was already closed, so keeping it in this phase
+  would have been stale bookkeeping rather than real implementation work.
+- The imported generic `thread_spawn<T>` rewrite still has only one admitted
+  consumer family, so reopening broader imported generic procedure-call
+  lowering would have violated the admission rule.
+
+What landed
+-----------
+- the LLVM backend now distinguishes ordinary bool register values from
+  byte-shaped aggregate storage for struct bool fields, matching the hosted C
+  ABI without changing MIR or sema bool semantics
+- the admitted `io.Event` surface now uses `bool` readiness flags instead of
+  the temporary `u8` spelling
+- the hosted runtime poller event struct now matches that restored bool-shaped
+  surface directly
+- the admitted networking projects and stdlib executable proofs now consume
+  `event.readable`, `event.writable`, and `event.failed` as actual bool fields
+- focused executable regression coverage now includes ordinary struct bool field
+  aggregate-init and field extraction proof
 
 Admission rule for candidate work
 ---------------------------------
@@ -128,3 +150,15 @@ Acceptance criteria for this document
   consumer pressure.
 - The phase keeps each candidate tied to a named current limitation and a real
   consumer trigger rather than abstract completeness goals.
+
+Closeout statement
+------------------
+Phase 21 is complete. The repository used admitted networking consumer pressure
+to close the remaining aggregate-bool ABI workaround on the restored `io.Event`
+surface at the correct owner layer: the LLVM backend now preserves `bool` as
+ordinary scalar truth while storing struct bool fields in the byte-shaped form
+required by the hosted C ABI. The admitted networking projects, stdlib tests,
+and compiler-owned executable regressions now use real bool event flags again.
+The bounded imported generic `thread_spawn<T>` rewrite remains explicitly
+deferred because Phase 20 did not provide a second consumer that justifies
+broader imported generic call lowering.

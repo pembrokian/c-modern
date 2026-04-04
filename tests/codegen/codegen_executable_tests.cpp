@@ -1633,6 +1633,12 @@ int main(int argc, char** argv) {
                     {});
 
     RunBuiltFixture(mc_path,
+                    source_root / "tests/codegen/bool_struct_fields.mc",
+                    work_root / "phase21_bool_struct_fields_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/shared_counter_mutex.mc",
                     work_root / "phase15_shared_counter_mutex_build",
                     0,

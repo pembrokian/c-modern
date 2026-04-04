@@ -13,6 +13,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 
 struct mc_string {
     const char* ptr;
@@ -55,9 +56,9 @@ struct mc_io_poller {
 
 struct mc_io_event {
     int32_t file;
-    uint8_t readable;
-    uint8_t writable;
-    uint8_t failed;
+    bool readable;
+    bool writable;
+    bool failed;
 };
 
 struct mc_sync_thread {
@@ -498,9 +499,9 @@ int64_t __mc_io_poller_wait(struct mc_io_poller* poller,
         }
 
         events[emitted].file = poller->entries[index].fd;
-        events[emitted].readable = (uint8_t) ((revents & (POLLIN | POLLHUP)) != 0 ? 1 : 0);
-        events[emitted].writable = (uint8_t) ((revents & POLLOUT) != 0 ? 1 : 0);
-        events[emitted].failed = (uint8_t) ((revents & (POLLERR | POLLNVAL)) != 0 ? 1 : 0);
+        events[emitted].readable = (revents & (POLLIN | POLLHUP)) != 0;
+        events[emitted].writable = (revents & POLLOUT) != 0;
+        events[emitted].failed = (revents & (POLLERR | POLLNVAL)) != 0;
         ++emitted;
     }
     return (int64_t) emitted;

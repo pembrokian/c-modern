@@ -85,12 +85,12 @@ func main(args: Slice<cstr>) i32 {
         index: usize = 0
         while index < ready {
             event: io.Event = events[index]
-            if event.failed != 0 {
+            if event.failed {
                 return 37
             }
 
             if !sent {
-                if event.writable == 0 {
+                if !event.writable {
                     index = index + 1
                     continue
                 }
@@ -114,7 +114,7 @@ func main(args: Slice<cstr>) i32 {
                 continue
             }
 
-            if event.readable == 0 {
+            if !event.readable {
                 index = index + 1
                 continue
             }

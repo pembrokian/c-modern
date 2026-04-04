@@ -4,17 +4,17 @@ Module
     AliasedType=i32
   TypeDecl kind=struct name=helper_events.Event
     Field name=file type=helper_events.File
-    Field name=readable type=u8
-    Field name=writable type=u8
-    Field name=failed type=u8
+    Field name=readable type=bool
+    Field name=writable type=bool
+    Field name=failed type=bool
   Function name=main returns=[i32]
     Local name=events type=[1]helper_events.Event
     Local name=first type=helper_events.File
     Block label=entry0
       const %v0:int_literal op=7
-      const %v1:int_literal op=1
-      const %v2:int_literal op=0
-      const %v3:int_literal op=0
+      const %v1:bool op=true
+      const %v2:bool op=false
+      const %v3:bool op=false
       aggregate_init %v4:helper_events.Event target=helper_events.Event operands=[%v0, %v1, %v2, %v3] fields=[file, readable, writable, failed]
       load_local %v5:[1]helper_events.Event target=events
       const %v6:int_literal op=0

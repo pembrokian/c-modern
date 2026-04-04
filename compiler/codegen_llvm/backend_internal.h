@@ -42,6 +42,10 @@ std::optional<std::size_t> ParseBackendArrayLength(std::string_view text);
 std::optional<BackendTypeInfo> LowerTypeInfo(const mir::Module& module,
                                              const sema::Type& type);
 
+std::optional<BackendTypeInfo> LowerAggregateFieldStorageType(const mir::Module& module,
+                                                              const sema::Type& aggregate_type,
+                                                              std::string_view field_name);
+
 std::optional<EnumBackendLayout> LowerEnumLayout(const mir::Module& module,
                                                  const mir::TypeDecl& type_decl,
                                                  const sema::Type& original_type);

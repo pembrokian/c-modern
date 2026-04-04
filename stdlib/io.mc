@@ -11,9 +11,9 @@ const EVENT_WRITABLE: EventMask = 2
 
 struct Event {
     file: File
-    readable: u8
-    writable: u8
-    failed: u8
+    readable: bool
+    writable: bool
+    failed: bool
 }
 
 struct Poller {
