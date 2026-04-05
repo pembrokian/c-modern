@@ -4,8 +4,9 @@ BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_fam
     Block source=entry0 backend=bb0_0.entry0
       %t0_0_0 = load i32 [repr=i32, size=4, align=4] %local.value
       %t0_0_1 = const int_literal [repr=i64, size=8, align=8] 1
-      %t0_0_2 = binary wrap + i32 [repr=i32, size=4, align=4] %t0_0_0, %t0_0_1
-      ret i32 [repr=i32, size=4, align=4] %t0_0_2
+      %t0_0_2 = convert_numeric i32 [repr=i32, size=4, align=4] %t0_0_1
+      %t0_0_3 = binary wrap + i32 [repr=i32, size=4, align=4] %t0_0_0, %t0_0_2
+      ret i32 [repr=i32, size=4, align=4] %t0_0_3
   Function source=choose backend=@choose returns=[i32 [repr=i32, size=4, align=4]]
     Local source=flag backend=%local.flag type=bool [repr=i1, size=1, align=1] param readonly
     Block source=entry0 backend=bb1_0.entry0

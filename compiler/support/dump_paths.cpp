@@ -48,6 +48,7 @@ BuildArtifactTargets ComputeBuildArtifactTargets(const std::filesystem::path& so
         .llvm_ir = build_dir / "dumps" / "backend" / (stem + ".ll"),
         .object = build_dir / "obj" / (stem + ".o"),
         .executable = build_dir / "bin" / stem,
+        .static_library = build_dir / "lib" / ("lib" + stem + ".a"),
     };
 }
 

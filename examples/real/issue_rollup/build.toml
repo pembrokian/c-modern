@@ -2,14 +2,27 @@ schema = 1
 project = "issue-rollup"
 default = "issue-rollup"
 
+[targets.issue-rollup-core]
+kind = "staticlib"
+root = "src/core/rollup_core.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.issue-rollup-core.search_paths]
+modules = ["src/core", "src/model", "src/parse", "src/render", "../../../stdlib"]
+
+[targets.issue-rollup-core.runtime]
+startup = "default"
+
 [targets.issue-rollup]
 kind = "exe"
 root = "src/app/main.mc"
 mode = "debug"
 env = "hosted"
+links = ["issue-rollup-core"]
 
 [targets.issue-rollup.search_paths]
-modules = ["src/app", "src/model", "src/parse", "src/render", "../../../stdlib"]
+modules = ["src/app", "src/core", "src/model", "src/parse", "src/render", "../../../stdlib"]
 
 [targets.issue-rollup.runtime]
 startup = "default"

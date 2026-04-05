@@ -58,17 +58,18 @@ Module
     Block label=range_body6
       load_local %v22:i32 target=total
       load_local %v23:int_literal target=idx
-      binary %v24:i32 op=+ arithmetic=wrap operands=[%v22, %v23]
-      store_local target=total operands=[%v24]
+      convert_numeric %v24:i32 target=i32 operands=[%v23]
+      binary %v25:i32 op=+ arithmetic=wrap operands=[%v22, %v24]
+      store_local target=total operands=[%v25]
       terminator branch target=range_step7
     Block label=range_step7
-      load_local %v25:int_literal target=idx
-      const %v26:int_literal op=1
-      binary %v27:int_literal op=+ operands=[%v25, %v26]
-      store_local target=idx operands=[%v27]
+      load_local %v26:int_literal target=idx
+      const %v27:int_literal op=1
+      binary %v28:int_literal op=+ operands=[%v26, %v27]
+      store_local target=idx operands=[%v28]
       terminator branch target=range_cond5
     Block label=range_exit8
-      load_local %v28:i32 target=total
-      load_local %v29:proc()->void target=%hidden.defer_callee0
-      call target=cleanup target_kind=function target_name=cleanup operands=[%v29]
-      terminator return values=[%v28]
+      load_local %v29:i32 target=total
+      load_local %v30:proc()->void target=%hidden.defer_callee0
+      call target=cleanup target_kind=function target_name=cleanup operands=[%v30]
+      terminator return values=[%v29]

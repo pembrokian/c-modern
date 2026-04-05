@@ -22,7 +22,8 @@ Module
       call target=inner target_kind=function target_name=inner operands=[%v4]
       load_local %v5:i32 target=total
       const %v6:int_literal op=1
-      binary %v7:i32 op=+ arithmetic=wrap operands=[%v5, %v6]
-      store_local target=total operands=[%v7]
-      load_local %v8:i32 target=total
-      terminator return values=[%v8]
+      convert_numeric %v7:i32 target=i32 operands=[%v6]
+      binary %v8:i32 op=+ arithmetic=wrap operands=[%v5, %v7]
+      store_local target=total operands=[%v8]
+      load_local %v9:i32 target=total
+      terminator return values=[%v9]

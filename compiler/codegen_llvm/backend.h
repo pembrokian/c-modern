@@ -105,6 +105,7 @@ struct ObjectBuildResult {
 struct LinkOptions {
     TargetConfig target;
     std::vector<std::filesystem::path> object_paths;
+    std::vector<std::filesystem::path> library_paths;
     std::optional<std::filesystem::path> runtime_source_path;
     std::filesystem::path runtime_object_path;
     std::filesystem::path executable_path;
@@ -113,6 +114,17 @@ struct LinkOptions {
 struct LinkResult {
     std::filesystem::path runtime_object_path;
     std::filesystem::path executable_path;
+    bool ok = false;
+};
+
+struct ArchiveOptions {
+    TargetConfig target;
+    std::vector<std::filesystem::path> object_paths;
+    std::filesystem::path archive_path;
+};
+
+struct ArchiveResult {
+    std::filesystem::path archive_path;
     bool ok = false;
 };
 
@@ -142,6 +154,10 @@ ObjectBuildResult BuildObjectFile(const mir::Module& module,
 LinkResult LinkExecutable(const std::filesystem::path& source_path,
                           const LinkOptions& options,
                           support::DiagnosticSink& diagnostics);
+
+ArchiveResult ArchiveStaticLibrary(const std::filesystem::path& source_path,
+                                   const ArchiveOptions& options,
+                                   support::DiagnosticSink& diagnostics);
 
 BuildResult BuildExecutable(const mir::Module& module,
                             const std::filesystem::path& source_path,

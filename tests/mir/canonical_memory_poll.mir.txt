@@ -40,23 +40,25 @@ Module
       load_local %v1:*i32 target=status
       volatile_load %v2:i32 target=volatile_load target_kind=function target_name=volatile_load operands=[%v1]
       const %v3:int_literal op=0
-      binary %v4:bool op=== operands=[%v2, %v3]
-      terminator cond value=%v4 true=loop_body2 false=loop_exit3
+      convert_numeric %v4:i32 target=i32 operands=[%v3]
+      binary %v5:bool op=== operands=[%v2, %v4]
+      terminator cond value=%v5 true=loop_body2 false=loop_exit3
     Block label=loop_body2
-      load_local %v5:*Atomic<i32> target=counter
-      const %v6:int_literal op=1
-      symbol_ref %v7:MemoryOrder target=MemoryOrder.Relaxed target_kind=other target_name=MemoryOrder.Relaxed
-      atomic_fetch_add %v8:i32 op=order=MemoryOrder.Relaxed target=atomic_fetch_add target_kind=function target_name=atomic_fetch_add operands=[%v5, %v6, %v7]
-      load_local %v9:i32 target=attempts
-      const %v10:int_literal op=1
-      binary %v11:i32 op=+ arithmetic=wrap operands=[%v9, %v10]
-      store_local target=attempts operands=[%v11]
+      load_local %v6:*Atomic<i32> target=counter
+      const %v7:int_literal op=1
+      symbol_ref %v8:MemoryOrder target=MemoryOrder.Relaxed target_kind=other target_name=MemoryOrder.Relaxed
+      atomic_fetch_add %v9:i32 op=order=MemoryOrder.Relaxed target=atomic_fetch_add target_kind=function target_name=atomic_fetch_add operands=[%v6, %v7, %v8]
+      load_local %v10:i32 target=attempts
+      const %v11:int_literal op=1
+      convert_numeric %v12:i32 target=i32 operands=[%v11]
+      binary %v13:i32 op=+ arithmetic=wrap operands=[%v10, %v12]
+      store_local target=attempts operands=[%v13]
       terminator branch target=loop_cond1
     Block label=loop_exit3
-      load_local %v12:*i32 target=status
-      load_local %v13:i32 target=attempts
-      volatile_store target=volatile_store target_kind=function target_name=volatile_store operands=[%v12, %v13]
-      load_local %v14:*Atomic<i32> target=counter
-      symbol_ref %v15:MemoryOrder target=MemoryOrder.Acquire target_kind=other target_name=MemoryOrder.Acquire
-      atomic_load %v16:i32 op=order=MemoryOrder.Acquire target=atomic_load target_kind=function target_name=atomic_load operands=[%v14, %v15]
-      terminator return values=[%v16]
+      load_local %v14:*i32 target=status
+      load_local %v15:i32 target=attempts
+      volatile_store target=volatile_store target_kind=function target_name=volatile_store operands=[%v14, %v15]
+      load_local %v16:*Atomic<i32> target=counter
+      symbol_ref %v17:MemoryOrder target=MemoryOrder.Acquire target_kind=other target_name=MemoryOrder.Acquire
+      atomic_load %v18:i32 op=order=MemoryOrder.Acquire target=atomic_load target_kind=function target_name=atomic_load operands=[%v16, %v17]
+      terminator return values=[%v18]

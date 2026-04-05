@@ -392,6 +392,7 @@ void PrintArtifactTargets(const support::DumpTargets& dump_targets,
     stream << "llvm: " << build_targets.llvm_ir.generic_string() << '\n';
     stream << "object: " << build_targets.object.generic_string() << '\n';
     stream << "executable: " << build_targets.executable.generic_string() << '\n';
+    stream << "staticlib: " << build_targets.static_library.generic_string() << '\n';
 }
 
 struct BuildUnit {
@@ -435,6 +436,7 @@ struct CompileGraph {
     std::filesystem::path build_dir;
     std::string mode;
     std::string env;
+    bool wrap_entry_main = true;
     mc::codegen_llvm::TargetConfig target_config;
     std::vector<CompileNode> nodes;
 };
@@ -443,6 +445,7 @@ struct TargetBuildGraph {
     ProjectFile project;
     ProjectTarget target;
     CompileGraph compile_graph;
+    std::vector<TargetBuildGraph> linked_targets;
 };
 
 std::filesystem::path DefaultProjectPath() {
@@ -460,6 +463,14 @@ bool IsSupportedMode(std::string_view mode) {
 
 bool IsSupportedEnv(std::string_view env) {
     return env == "hosted";
+}
+
+bool IsExecutableTargetKind(std::string_view kind) {
+    return kind == "exe" || kind == "test";
+}
+
+bool IsStaticLibraryTargetKind(std::string_view kind) {
+    return kind == "staticlib";
 }
 
 std::string HexU64(std::uint64_t value) {
@@ -800,6 +811,7 @@ bool SupportsBootstrapTarget(const ProjectTarget& target,
 bool DiscoverModuleGraphRecursive(const std::string& module_name,
                                   const std::filesystem::path& source_path,
                                   const std::vector<std::filesystem::path>& import_roots,
+                                  const std::unordered_set<std::string>& external_module_paths,
                                   support::DiagnosticSink& diagnostics,
                                   std::unordered_set<std::string>& visiting,
                                   std::unordered_set<std::string>& visited,
@@ -842,9 +854,14 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
             return false;
         }
         node.imports.push_back({import_decl.module_name, *import_path});
+        const std::string import_key = std::filesystem::absolute(*import_path).lexically_normal().generic_string();
+        if (external_module_paths.contains(import_key)) {
+            continue;
+        }
         if (!DiscoverModuleGraphRecursive(import_decl.module_name,
                                           *import_path,
                                           import_roots,
+                                          external_module_paths,
                                           diagnostics,
                                           visiting,
                                           visited,
@@ -863,10 +880,12 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
 std::optional<CompileGraph> DiscoverModuleGraph(
     const std::filesystem::path& entry_source_path,
     const std::vector<std::filesystem::path>& import_roots,
+    const std::unordered_set<std::string>& external_module_paths,
     const std::filesystem::path& build_dir,
     const mc::codegen_llvm::TargetConfig& target_config,
     std::string mode,
     std::string env,
+    bool wrap_entry_main,
     support::DiagnosticSink& diagnostics) {
     const std::filesystem::path normalized_entry =
         std::filesystem::absolute(entry_source_path).lexically_normal();
@@ -876,6 +895,7 @@ std::optional<CompileGraph> DiscoverModuleGraph(
         .build_dir = build_dir,
         .mode = std::move(mode),
         .env = std::move(env),
+        .wrap_entry_main = wrap_entry_main,
         .target_config = target_config,
     };
     std::unordered_set<std::string> visiting;
@@ -883,6 +903,7 @@ std::optional<CompileGraph> DiscoverModuleGraph(
     if (!DiscoverModuleGraphRecursive(normalized_entry.stem().string(),
                                       normalized_entry,
                                       import_roots,
+                                      external_module_paths,
                                       diagnostics,
                                       visiting,
                                       visited,
@@ -907,13 +928,166 @@ void AssertCompileGraphTopologicalOrder(const CompileGraph& graph) {
             const std::string import_key = std::filesystem::absolute(import_path).lexically_normal().generic_string();
             const auto found = node_indices.find(import_key);
             if (found == node_indices.end()) {
-                MC_UNREACHABLE("compile graph is missing an imported module node");
+                continue;
             }
             (void)import_name;
             assert(found->second < index && "compile graph nodes must be topologically ordered");
         }
     }
 #endif
+}
+
+void CollectOwnedSourcePathsForLink(const TargetBuildGraph& graph,
+                                    std::string_view owner_name,
+                                    std::unordered_set<std::string>& owned_paths,
+                                    std::unordered_map<std::string, std::string>& owners,
+                                    const ProjectTarget& consumer_target,
+                                    const ProjectFile& project,
+                                    support::DiagnosticSink& diagnostics) {
+    for (const auto& node : graph.compile_graph.nodes) {
+        const std::string key = node.source_path.generic_string();
+        const auto [it, inserted] = owners.emplace(key, std::string(owner_name));
+        if (!inserted && it->second != owner_name) {
+            diagnostics.Report({
+                .file_path = project.path,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "target '" + consumer_target.name + "' links static libraries '" + it->second +
+                           "' and '" + std::string(owner_name) + "' that both provide module source: " + key,
+            });
+            continue;
+        }
+        owned_paths.insert(key);
+    }
+
+    for (const auto& linked_graph : graph.linked_targets) {
+        CollectOwnedSourcePathsForLink(linked_graph,
+                                       owner_name,
+                                       owned_paths,
+                                       owners,
+                                       consumer_target,
+                                       project,
+                                       diagnostics);
+    }
+}
+
+mc::codegen_llvm::TargetConfig ResolveProjectTargetConfig(const ProjectFile& project,
+                                                          const ProjectTarget& target,
+                                                          support::DiagnosticSink& diagnostics) {
+    mc::codegen_llvm::TargetConfig target_config = mc::codegen_llvm::BootstrapTargetConfig();
+    target_config.hosted = target.env == "hosted";
+    if (!target.target.empty() && target.target == target_config.triple) {
+        target_config.triple = target.target;
+    }
+    (void)project;
+    (void)diagnostics;
+    return target_config;
+}
+
+std::optional<TargetBuildGraph> BuildResolvedTargetGraph(const ProjectFile& project,
+                                                         const ProjectTarget& target,
+                                                         const std::vector<std::filesystem::path>& cli_import_roots,
+                                                         support::DiagnosticSink& diagnostics,
+                                                         std::unordered_set<std::string>& visiting_targets) {
+    if (!SupportsBootstrapTarget(target, project, diagnostics)) {
+        return std::nullopt;
+    }
+    if (!IsExecutableTargetKind(target.kind) && !IsStaticLibraryTargetKind(target.kind)) {
+        diagnostics.Report({
+            .file_path = project.path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "target '" + target.name + "' uses unsupported bootstrap build target kind: " + target.kind,
+        });
+        return std::nullopt;
+    }
+
+    if (!visiting_targets.insert(target.name).second) {
+        diagnostics.Report({
+            .file_path = project.path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "target link cycle detected involving target '" + target.name + "'",
+        });
+        return std::nullopt;
+    }
+
+    std::vector<TargetBuildGraph> linked_targets;
+    linked_targets.reserve(target.links.size());
+    for (const auto& link_name : target.links) {
+        const auto linked_it = project.targets.find(link_name);
+        if (linked_it == project.targets.end()) {
+            diagnostics.Report({
+                .file_path = project.path,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "target '" + target.name + "' links unsupported external library or unknown target: " + link_name,
+            });
+            continue;
+        }
+
+        ProjectTarget linked_target = linked_it->second;
+        linked_target.mode = target.mode;
+        linked_target.env = target.env;
+        if (!IsStaticLibraryTargetKind(linked_target.kind)) {
+            diagnostics.Report({
+                .file_path = project.path,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "target '" + target.name + "' can only link static libraries, but '" + linked_target.name +
+                           "' has kind '" + linked_target.kind + "'",
+            });
+            continue;
+        }
+
+        auto linked_graph = BuildResolvedTargetGraph(project, linked_target, cli_import_roots, diagnostics, visiting_targets);
+        if (!linked_graph.has_value()) {
+            visiting_targets.erase(target.name);
+            return std::nullopt;
+        }
+        linked_targets.push_back(std::move(*linked_graph));
+    }
+    visiting_targets.erase(target.name);
+
+    if (diagnostics.HasErrors()) {
+        return std::nullopt;
+    }
+
+    std::unordered_set<std::string> external_module_paths;
+    std::unordered_map<std::string, std::string> external_owners;
+    for (const auto& linked_graph : linked_targets) {
+        CollectOwnedSourcePathsForLink(linked_graph,
+                                       linked_graph.target.name,
+                                       external_module_paths,
+                                       external_owners,
+                                       target,
+                                       project,
+                                       diagnostics);
+    }
+    if (diagnostics.HasErrors()) {
+        return std::nullopt;
+    }
+
+    const auto import_roots = ComputeProjectImportRoots(project, target, cli_import_roots);
+    auto compile_graph = DiscoverModuleGraph(target.root,
+                                             import_roots,
+                                             external_module_paths,
+                                             project.build_dir,
+                                             ResolveProjectTargetConfig(project, target, diagnostics),
+                                             target.mode,
+                                             target.env,
+                                             IsExecutableTargetKind(target.kind),
+                                             diagnostics);
+    if (!compile_graph.has_value()) {
+        return std::nullopt;
+    }
+
+    return TargetBuildGraph {
+        .project = project,
+        .target = target,
+        .compile_graph = std::move(*compile_graph),
+        .linked_targets = std::move(linked_targets),
+    };
 }
 
 std::optional<TargetBuildGraph> BuildTargetGraph(const CommandOptions& options,
@@ -927,10 +1101,6 @@ std::optional<TargetBuildGraph> BuildTargetGraph(const CommandOptions& options,
     if (target == nullptr || diagnostics.HasErrors()) {
         return std::nullopt;
     }
-    if (!SupportsBootstrapTarget(*target, *project, diagnostics)) {
-        return std::nullopt;
-    }
-
     const std::string mode = options.mode_override.value_or(target->mode);
     const std::string env = options.env_override.value_or(target->env);
 
@@ -957,29 +1127,17 @@ std::optional<TargetBuildGraph> BuildTargetGraph(const CommandOptions& options,
         ? std::filesystem::absolute(options.build_dir).lexically_normal()
         : std::filesystem::absolute(project->build_dir / mode).lexically_normal();
 
-    mc::codegen_llvm::TargetConfig target_config = mc::codegen_llvm::BootstrapTargetConfig();
-    target_config.hosted = env == "hosted";
-    if (!target->target.empty() && target->target == target_config.triple) {
-        target_config.triple = target->target;
-    }
-
-    const auto import_roots = ComputeProjectImportRoots(*project, *target, options.import_roots);
-    auto compile_graph = DiscoverModuleGraph(
-        target->root, import_roots, build_dir, target_config, mode, env, diagnostics);
-    if (!compile_graph.has_value()) {
-        return std::nullopt;
-    }
-
     ProjectFile resolved_project = *project;
     resolved_project.build_dir = build_dir;
     ProjectTarget resolved_target = *target;
     resolved_target.mode = mode;
     resolved_target.env = env;
-    return TargetBuildGraph {
-        .project = std::move(resolved_project),
-        .target = std::move(resolved_target),
-        .compile_graph = std::move(*compile_graph),
-    };
+    std::unordered_set<std::string> visiting_targets;
+    return BuildResolvedTargetGraph(resolved_project,
+                                    resolved_target,
+                                    options.import_roots,
+                                    diagnostics,
+                                    visiting_targets);
 }
 
 mc::mci::InterfaceArtifact MakeModuleInterfaceArtifact(const std::filesystem::path& source_path,
@@ -1091,7 +1249,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
             .env = graph.env,
             .source_hash = HashText(*source_text),
             .interface_hash = interface_hash,
-            .wrap_hosted_main = node.source_path == graph.entry_source_path,
+            .wrap_hosted_main = graph.wrap_entry_main && node.source_path == graph.entry_source_path,
             .imported_interface_hashes = imported_data->interface_hashes,
         };
         std::sort(current_state.imported_interface_hashes.begin(), current_state.imported_interface_hashes.end());
@@ -1131,7 +1289,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         if (emit_objects && mir_result.ok && !imported_data->modules.empty()) {
             AddImportedExternDeclarations(*mir_result.module, imported_data->modules);
         }
-        if (mir_result.ok && node.source_path != graph.entry_source_path) {
+        if (mir_result.ok && (node.source_path != graph.entry_source_path || !graph.wrap_entry_main)) {
             NamespaceImportedBuildUnit(*mir_result.module, node.source_path.stem().string());
         }
         if (!mir_result.ok || !mc::mir::ValidateModule(*mir_result.module, node.source_path, diagnostics)) {
@@ -1187,6 +1345,19 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
     }
 
     return units;
+}
+
+bool PrepareLinkedTargetInterfaces(std::vector<TargetBuildGraph>& linked_targets,
+                                   support::DiagnosticSink& diagnostics) {
+    for (auto& linked_graph : linked_targets) {
+        if (!PrepareLinkedTargetInterfaces(linked_graph.linked_targets, diagnostics)) {
+            return false;
+        }
+        if (!CompileModuleGraph(linked_graph.compile_graph, diagnostics, false).has_value()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::string QualifyImportedSymbol(std::string_view module_name,
@@ -1528,7 +1699,15 @@ std::optional<BuildUnit> CompileToMir(const CommandOptions& options,
     const auto import_roots = ComputeEffectiveImportRoots(entry_path, options.import_roots);
     const auto bootstrap_config = mc::codegen_llvm::BootstrapTargetConfig();
     auto graph = DiscoverModuleGraph(
-        entry_path, import_roots, options.build_dir, bootstrap_config, "debug", "hosted", diagnostics);
+        entry_path,
+        import_roots,
+        {},
+        options.build_dir,
+        bootstrap_config,
+        "debug",
+        "hosted",
+        true,
+        diagnostics);
     if (!graph.has_value()) {
         return std::nullopt;
     }
@@ -1586,6 +1765,7 @@ bool IsOutputOlderThan(const std::filesystem::path& output_path,
 bool ShouldRelinkProjectExecutable(const std::filesystem::path& executable_path,
                                    const std::filesystem::path& runtime_object_path,
                                    const std::optional<std::filesystem::path>& runtime_source_path,
+                                   const std::vector<std::filesystem::path>& library_paths,
                                    const std::vector<BuildUnit>& units) {
     if (!std::filesystem::exists(executable_path) || !std::filesystem::exists(runtime_object_path)) {
         return true;
@@ -1601,12 +1781,32 @@ bool ShouldRelinkProjectExecutable(const std::filesystem::path& executable_path,
             return true;
         }
     }
+    for (const auto& library_path : library_paths) {
+        if (IsOutputOlderThan(executable_path, library_path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ShouldArchiveProjectStaticLibrary(const std::filesystem::path& archive_path,
+                                      const std::vector<BuildUnit>& units) {
+    if (!std::filesystem::exists(archive_path)) {
+        return true;
+    }
+    for (const auto& unit : units) {
+        if (!unit.reused_object || IsOutputOlderThan(archive_path, unit.object_path)) {
+            return true;
+        }
+    }
     return false;
 }
 
 struct ProjectBuildResult {
     std::vector<BuildUnit> units;
-    std::filesystem::path executable_path;
+    std::optional<std::filesystem::path> executable_path;
+    std::optional<std::filesystem::path> static_library_path;
+    std::vector<std::filesystem::path> link_library_paths;
 };
 
 struct OrdinaryTestCase {
@@ -1648,6 +1848,9 @@ CapturedCommandResult RunExecutableCapture(const std::filesystem::path& executab
                                           const std::vector<std::string>& arguments,
                                           const std::filesystem::path& output_path,
                                           const std::optional<int>& timeout_ms);
+
+std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
+                                                     support::DiagnosticSink& diagnostics);
 
 int RunBuild(const CommandOptions& options);
 
@@ -1949,6 +2152,12 @@ std::vector<std::filesystem::path> BuildTestImportRoots(const ProjectFile& proje
     for (const auto& root : ComputeProjectImportRoots(project, target, cli_import_roots)) {
         append(root);
     }
+    if (const auto repo_root = DiscoverRepositoryRoot(generated_root); repo_root.has_value()) {
+        const std::filesystem::path stdlib_root = *repo_root / "stdlib";
+        if (std::filesystem::exists(stdlib_root)) {
+            append(stdlib_root);
+        }
+    }
     return roots;
 }
 
@@ -2011,19 +2220,39 @@ bool RunOrdinaryTestsForTarget(const ProjectFile& project,
         return false;
     }
 
-    CommandOptions runner_options;
-    runner_options.source_path = runner_path;
-    runner_options.build_dir = build_dir;
-    runner_options.build_dir_explicit = true;
-    runner_options.import_roots = BuildTestImportRoots(project, target, options.import_roots, test_roots, generated_root);
+    ProjectFile runner_project = project;
+    runner_project.build_dir = build_dir;
 
-    if (RunBuild(runner_options) != 0) {
+    ProjectTarget runner_target;
+    runner_target.name = target.name + "-tests";
+    runner_target.kind = "exe";
+    runner_target.root = runner_path;
+    runner_target.mode = test_mode;
+    runner_target.env = options.env_override.value_or(target.env);
+    runner_target.target = target.target;
+    runner_target.links = target.links;
+    runner_target.module_search_paths = BuildTestImportRoots(project, target, options.import_roots, test_roots, generated_root);
+    runner_target.runtime_startup = "default";
+
+    std::unordered_set<std::string> visiting_targets;
+    auto runner_graph = BuildResolvedTargetGraph(runner_project,
+                                                 runner_target,
+                                                 {},
+                                                 diagnostics,
+                                                 visiting_targets);
+    if (!runner_graph.has_value()) {
+        std::cerr << diagnostics.Render() << '\n';
         return false;
     }
 
-    const auto artifacts = support::ComputeBuildArtifactTargets(runner_path, build_dir);
+    auto build_result = BuildProjectTarget(*runner_graph, diagnostics);
+    if (!build_result.has_value() || !build_result->executable_path.has_value()) {
+        std::cerr << diagnostics.Render() << '\n';
+        return false;
+    }
+
     const auto output_path = generated_root / "runner.stdout.txt";
-    const auto run_result = RunExecutableCapture(artifacts.executable, {}, output_path, target.tests.timeout_ms);
+    const auto run_result = RunExecutableCapture(*build_result->executable_path, {}, output_path, target.tests.timeout_ms);
     if (!run_result.output.empty()) {
         std::cout << run_result.output;
         if (run_result.output.back() != '\n') {
@@ -2326,8 +2555,32 @@ std::vector<const ProjectTarget*> SelectTestTargets(const ProjectFile& project,
     return targets;
 }
 
+void AppendUniquePaths(std::vector<std::filesystem::path>& destination,
+                       const std::vector<std::filesystem::path>& paths) {
+    std::unordered_set<std::string> seen;
+    seen.reserve(destination.size() + paths.size());
+    for (const auto& path : destination) {
+        seen.insert(path.generic_string());
+    }
+    for (const auto& path : paths) {
+        if (seen.insert(path.generic_string()).second) {
+            destination.push_back(path);
+        }
+    }
+}
+
 std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
                                                      support::DiagnosticSink& diagnostics) {
+    std::vector<std::filesystem::path> linked_library_paths;
+    linked_library_paths.reserve(graph.linked_targets.size());
+    for (auto& linked_graph : graph.linked_targets) {
+        auto linked_result = BuildProjectTarget(linked_graph, diagnostics);
+        if (!linked_result.has_value()) {
+            return std::nullopt;
+        }
+        AppendUniquePaths(linked_library_paths, linked_result->link_library_paths);
+    }
+
     auto units = CompileModuleGraph(graph.compile_graph, diagnostics, true);
     if (!units.has_value() || units->empty()) {
         return std::nullopt;
@@ -2335,10 +2588,44 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
 
     const BuildUnit& entry_unit = units->back();
     const auto build_targets = support::ComputeBuildArtifactTargets(entry_unit.source_path, graph.compile_graph.build_dir);
+
+    if (IsStaticLibraryTargetKind(graph.target.kind)) {
+        if (ShouldArchiveProjectStaticLibrary(build_targets.static_library, *units)) {
+            std::vector<std::filesystem::path> object_paths;
+            object_paths.reserve(units->size());
+            for (const auto& unit : *units) {
+                object_paths.push_back(unit.object_path);
+            }
+
+            const auto archive_result = mc::codegen_llvm::ArchiveStaticLibrary(entry_unit.source_path,
+                                                                               {
+                                                                                   .target = graph.compile_graph.target_config,
+                                                                                   .object_paths = object_paths,
+                                                                                   .archive_path = build_targets.static_library,
+                                                                               },
+                                                                               diagnostics);
+            if (!archive_result.ok) {
+                return std::nullopt;
+            }
+        }
+
+        std::vector<std::filesystem::path> link_paths {build_targets.static_library};
+        AppendUniquePaths(link_paths, linked_library_paths);
+        return ProjectBuildResult {
+            .units = std::move(*units),
+            .static_library_path = build_targets.static_library,
+            .link_library_paths = std::move(link_paths),
+        };
+    }
+
     const auto runtime_object_path = ComputeRuntimeObjectPath(entry_unit.source_path, graph.compile_graph.build_dir);
     const auto runtime_source_path = DiscoverHostedRuntimeSupportSource(entry_unit.source_path);
 
-    if (ShouldRelinkProjectExecutable(build_targets.executable, runtime_object_path, runtime_source_path, *units)) {
+    if (ShouldRelinkProjectExecutable(build_targets.executable,
+                                      runtime_object_path,
+                                      runtime_source_path,
+                                      linked_library_paths,
+                                      *units)) {
         std::vector<std::filesystem::path> object_paths;
         object_paths.reserve(units->size());
         for (const auto& unit : *units) {
@@ -2349,6 +2636,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
                                                                   {
                                                                       .target = graph.compile_graph.target_config,
                                                                       .object_paths = object_paths,
+                                                                      .library_paths = linked_library_paths,
                                                                       .runtime_source_path = runtime_source_path,
                                                                       .runtime_object_path = runtime_object_path,
                                                                       .executable_path = build_targets.executable,
@@ -2362,6 +2650,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
     return ProjectBuildResult {
         .units = std::move(*units),
         .executable_path = build_targets.executable,
+        .link_library_paths = std::move(linked_library_paths),
     };
 }
 
@@ -2421,6 +2710,10 @@ int RunCheck(const CommandOptions& options) {
 
     auto graph = BuildTargetGraph(options, diagnostics);
     if (!graph.has_value()) {
+        std::cerr << diagnostics.Render() << '\n';
+        return 1;
+    }
+    if (!PrepareLinkedTargetInterfaces(graph->linked_targets, diagnostics)) {
         std::cerr << diagnostics.Render() << '\n';
         return 1;
     }
@@ -2602,9 +2895,15 @@ int RunBuild(const CommandOptions& options) {
         }
     }
 
+    const std::filesystem::path primary_artifact = build_result->static_library_path.has_value()
+        ? *build_result->static_library_path
+        : *build_result->executable_path;
     std::cout << "built target " << graph->target.name << " -> "
-              << build_result->executable_path.generic_string()
-              << " (bootstrap phase 7 project graph)" << '\n';
+              << primary_artifact.generic_string()
+              << (build_result->static_library_path.has_value()
+                      ? " (bootstrap phase 29 static library path)"
+                      : " (bootstrap phase 7 project graph)")
+              << '\n';
 
     if (options.emit_dump_paths) {
         PrintArtifactTargets(dump_targets, build_targets, std::cout);
@@ -2628,14 +2927,25 @@ int RunRun(const CommandOptions& options) {
         std::cerr << diagnostics.Render() << '\n';
         return 1;
     }
-
-    auto build_result = BuildProjectTarget(*graph, diagnostics);
-    if (!build_result.has_value()) {
+    if (!IsExecutableTargetKind(graph->target.kind)) {
+        diagnostics.Report({
+            .file_path = graph->project.path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "target '" + graph->target.name + "' has kind '" + graph->target.kind +
+                       "' and cannot be run; choose an executable target or use mc build",
+        });
         std::cerr << diagnostics.Render() << '\n';
         return 1;
     }
 
-    return RunExecutableCommand(build_result->executable_path, options.run_arguments);
+    auto build_result = BuildProjectTarget(*graph, diagnostics);
+    if (!build_result.has_value() || !build_result->executable_path.has_value()) {
+        std::cerr << diagnostics.Render() << '\n';
+        return 1;
+    }
+
+    return RunExecutableCommand(*build_result->executable_path, options.run_arguments);
 }
 
 int RunTest(const CommandOptions& options) {

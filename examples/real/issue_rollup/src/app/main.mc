@@ -2,9 +2,7 @@ export { main }
 
 import fs
 import mem
-import rollup_model
-import rollup_parse
-import rollup_render
+import rollup_core
 
 func main(args: Slice<cstr>) i32 {
     if args.len != 2 {
@@ -19,6 +17,5 @@ func main(args: Slice<cstr>) i32 {
 
     bytes: Slice<u8> = mem.slice_from_buffer<u8>(buf)
     text: str = str{ ptr: bytes.ptr, len: bytes.len }
-    summary: rollup_model.Summary = rollup_parse.summarize_text(text)
-    return rollup_render.write_rollup(summary)
+    return rollup_core.write_text_rollup(text)
 }

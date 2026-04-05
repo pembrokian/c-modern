@@ -4301,6 +4301,9 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
     for (const auto& object_path : options.object_paths) {
         link_command.push_back(object_path.generic_string());
     }
+    for (const auto& library_path : options.library_paths) {
+        link_command.push_back(library_path.generic_string());
+    }
     link_command.push_back(options.runtime_object_path.generic_string());
     link_command.push_back("-o");
     link_command.push_back(options.executable_path.generic_string());
@@ -4315,6 +4318,45 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
     return {
         .runtime_object_path = options.runtime_object_path,
         .executable_path = options.executable_path,
+        .ok = true,
+    };
+}
+
+ArchiveResult ArchiveStaticLibrary(const std::filesystem::path& source_path,
+                                   const ArchiveOptions& options,
+                                   support::DiagnosticSink& diagnostics) {
+    if (!ValidateBootstrapTarget(options.target, source_path, diagnostics)) {
+        return {};
+    }
+
+    std::filesystem::create_directories(options.archive_path.parent_path());
+    if (options.object_paths.empty()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend cannot archive an empty static library",
+                           diagnostics);
+        return {};
+    }
+
+    std::vector<std::string> archive_command = {
+        "xcrun",
+        "libtool",
+        "-static",
+        "-o",
+        options.archive_path.generic_string(),
+    };
+    for (const auto& object_path : options.object_paths) {
+        archive_command.push_back(object_path.generic_string());
+    }
+
+    if (!RunHostCommand(archive_command,
+                        source_path,
+                        diagnostics,
+                        "archive a hosted static library")) {
+        return {};
+    }
+
+    return {
+        .archive_path = options.archive_path,
         .ok = true,
     };
 }
@@ -4344,6 +4386,7 @@ BuildResult BuildExecutable(const mir::Module& module,
                                             {
                                                 .target = options.target,
                                                 .object_paths = {options.artifacts.object_path},
+                                                .library_paths = {},
                                                 .runtime_source_path = options.runtime_source_path,
                                                 .runtime_object_path = runtime_object_path,
                                                 .executable_path = options.artifacts.executable_path,

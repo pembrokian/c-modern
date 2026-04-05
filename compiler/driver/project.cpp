@@ -14,7 +14,7 @@ namespace {
 using mc::support::DiagnosticSeverity;
 
 bool IsSupportedBootstrapTargetKind(std::string_view kind) {
-    return kind == "exe" || kind == "test";
+    return kind == "exe" || kind == "test" || kind == "staticlib";
 }
 
 struct ParsedValue {
@@ -630,7 +630,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                 .file_path = project.path,
                 .span = mc::support::kDefaultSourceSpan,
                 .severity = DiagnosticSeverity::kError,
-                .message = "target '" + name + "' uses unsupported Phase 7 kind: " + target.kind,
+                .message = "target '" + name + "' uses unsupported bootstrap target kind: " + target.kind,
             });
         }
         if (target.root.empty()) {

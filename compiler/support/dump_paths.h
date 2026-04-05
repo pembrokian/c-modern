@@ -17,6 +17,7 @@ struct BuildArtifactTargets {
     std::filesystem::path llvm_ir;
     std::filesystem::path object;
     std::filesystem::path executable;
+    std::filesystem::path static_library;
 };
 
 DumpTargets ComputeDumpTargets(const std::filesystem::path& source_path,

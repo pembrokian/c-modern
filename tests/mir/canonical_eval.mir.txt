@@ -20,8 +20,8 @@ Module
       variant_match %v1:bool target=Expr.Int target_name=Int target_base=Expr operands=[%v0]
       terminator cond value=%v1 true=switch_case5 false=switch_test3
     Block label=switch_default2
-      const %v20:int_literal op=0
-      terminator return values=[%v20]
+      const %v21:int_literal op=0
+      terminator return values=[%v21]
     Block label=switch_test3
       variant_match %v4:bool target=Expr.Add target_name=Add target_base=Expr operands=[%v0]
       terminator cond value=%v4 true=switch_case6 false=switch_test4
@@ -49,17 +49,18 @@ Module
       store_local target=div_right operands=[%v12]
       load_local %v13:i32 target=div_right
       const %v14:int_literal op=0
-      binary %v15:bool op=== operands=[%v13, %v14]
-      terminator cond value=%v15 true=if_then8 false=if_merge9
+      convert_numeric %v15:i32 target=i32 operands=[%v14]
+      binary %v16:bool op=== operands=[%v13, %v15]
+      terminator cond value=%v16 true=if_then8 false=if_merge9
     Block label=if_then8
-      const %v16:int_literal op=0
-      terminator return values=[%v16]
+      const %v17:int_literal op=0
+      terminator return values=[%v17]
     Block label=if_merge9
-      load_local %v17:i32 target=div_left
-      load_local %v18:i32 target=div_right
-      div_check op=/ operands=[%v17, %v18]
-      binary %v19:i32 op=/ operands=[%v17, %v18]
-      terminator return values=[%v19]
+      load_local %v18:i32 target=div_left
+      load_local %v19:i32 target=div_right
+      div_check op=/ operands=[%v18, %v19]
+      binary %v20:i32 op=/ operands=[%v18, %v19]
+      terminator return values=[%v20]
     Block label=dead10
-      const %v21:int_literal op=0
-      terminator return values=[%v21]
+      const %v22:int_literal op=0
+      terminator return values=[%v22]
