@@ -59,8 +59,10 @@ target_include_directories(mc_codegen_llvm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_codegen_llvm PUBLIC mc_mir mc_support)
 
 add_executable(mc
+    compiler/driver/builder.cpp
     compiler/driver/project.cpp
     compiler/driver/driver.cpp
+    compiler/driver/ops.cpp
     compiler/driver/main.cpp
 )
 
