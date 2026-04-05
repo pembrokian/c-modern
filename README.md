@@ -18,6 +18,7 @@ What is in place:
 - the admitted repository-bounded follow-on networking slice with hosted `io` poller plus narrow `net`, direct-source evented server or client executable proof, the real `examples/real/evented_echo/` project fixture, and normal `mc run` or `mc test` workflow proof for that project
 - the admitted repository-bounded hosted `sync` slice with typed `thread_spawn`, `thread_join`, mutex init or destroy or lock or unlock, condvar init or destroy or wait or signal, and narrow `MemoryOrder` plus `Atomic<T>` load or store support, proved by the direct-source shared-counter, producer-consumer, and atomic-publication canonical executables
 - the admitted repository-bounded real sync project slice with `examples/real/worker_queue/`, exercising one bounded producer or worker queue through the ordinary project `mc run` or `mc test` workflow on the admitted hosted `sync` surface
+- the admitted repository-bounded Lane B package-grouping slice with `examples/real/issue_rollup/`, proving one library-first hosted project layout with grouped internal module roots beyond one source root while keeping the admitted executable-only target surface unchanged
 - parser, sema, MIR, and tool smoke tests wired through CTest and exposed through the same `make` command path used for local development
 
 Supported hosted slice:
@@ -67,6 +68,8 @@ build/debug/mc run --project examples/real/worker_queue/build.toml --build-dir b
 build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase20_worker_queue
 build/debug/mc run --project examples/real/evented_echo/build.toml --build-dir build/debug/phase13_evented_echo -- 4040
 build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase13_evented_echo
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase28_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase28_issue_rollup
 ```
 
 Checked versus release note:
@@ -85,6 +88,7 @@ Notes:
 - target-driven `mc check --project ...` and `mc build --project ...` now read a narrow `build.toml` schema v1 slice, resolve imports through ordered `search_paths.modules`, and emit deterministic `.mci` files under the active build directory.
 - the current project-driven Phase 7 slice admits hosted executable targets only; `mc run`, `mc test`, and interface-hash-driven project rebuild reuse are implemented, while non-default runtime startup, non-hosted targets, and non-executable target kinds remain out of the admitted bootstrap slice.
 - the admitted repository-specific first-pass Phase 8 slice now includes deterministic canonical program proof and four bounded real utility projects under `examples/real/`; the follow-on hosted networking slice now additionally admits the bounded `examples/real/evented_echo/` project and its normal project workflow proof, and the hosted `sync` slice now admits the shared-counter, producer-consumer, and atomic-publication executables plus the real `examples/real/worker_queue/` project without widening into broader scheduler or atomic read-modify-write claims.
+- the admitted project-workflow slice now also includes one grouped multi-root library-first proof through `examples/real/issue_rollup/`; this widens internal package organization truth inside the existing executable-plus-checked-test manifest model without admitting new target kinds or package-management scope.
 - bootstrap `mc test` discovers `_test.mc` files under `tests.roots`, builds one deterministic runner per enabled target, executes tests serially, prints explicit target-scoped ordinary-test and compiler-regression scopes or verdicts, rejects direct-source invocation, and also supports a narrow compiler-regression manifest path for `check-pass`, `check-fail`, `run-output`, and `mir` cases.
 - the repository-owned bootstrap ordinary test contract currently accepts `func() *T` or `func() Error`; `stdlib/testing.mc` now provides a still-bounded companion helper surface with `testing.fail()`, boolean expectations, typed integer equality checks, and string equality checks for ordinary project tests while the broader spec-level testing surface remains incomplete.
 - imported stdlib values now use module-qualified access such as `io.write_line(...)`.

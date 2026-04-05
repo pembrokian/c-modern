@@ -1,0 +1,152 @@
+Phase 30 -- Separate-Compilation And Cross-Target Workflow Hardening
+===================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Use the richer Lane B project proof from Phase 28 and any narrow target-kind
+admission from Phase 29 to harden rebuild correctness, cross-target workflow
+clarity, and ordinary project trust without widening into broader capability
+families.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 13 already tightened the first toolchain trust boundary around `.mci`
+  validation, timeout reporting, target validation, and deterministic module
+  state.
+- Phase 22 then proved richer dual-executable project workflow and reuse on
+  the admitted hosted slice.
+- Phase 28 is intended to deepen package grouping and library-first project
+  pressure, and Phase 29 may or may not admit one bounded `staticlib` target.
+- The slice register still keeps the separate-compilation contract as partial:
+  the repository proves key hosted reuse properties, but fuller cross-target
+  rebuild truth and broader artifact coordination remain open.
+
+Problem being solved
+--------------------
+- As the admitted build graph becomes richer, the cost of silent rebuild drift,
+  cross-target invalidation mistakes, or unclear workflow boundaries grows.
+- The repository already has enough graph depth that future trust work should
+  target reuse correctness and reviewability directly, not just add more graph
+  shapes.
+- Lane B therefore needs one hardening phase that answers whether the current
+  admitted project workflow is trustworthy under richer grouped packages and,
+  if Phase 29 landed, under one library target too.
+
+Core rule
+---------
+- Harden the admitted build graph before widening it again.
+- Treat `.mci` hashes, object reuse, and target rebuild behavior as semantic
+  trust boundaries, not optimization details.
+- Prefer real multi-target project proof over isolated driver-only tests.
+- Keep the workflow explicit and deterministic; do not hide target behavior
+  behind convenience heuristics.
+- If a broader workflow idea lacks a real admitted consumer, record it as
+  deferred instead of folding it into this hardening wave.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one admitted richer project graph, ideally the Phase 28
+project and any Phase 29 follow-through, used to prove rebuild correctness and
+cross-target workflow clarity across executable, checked-test, and possibly one
+`staticlib` target.
+
+The planned hardening should:
+- re-audit implementation-only versus exported-interface invalidation across
+  grouped packages and target boundaries
+- verify that unchanged dependents are reused deterministically while affected
+  dependents rebuild predictably
+- keep `mc build`, `mc run`, and `mc test` behavior reviewable under repeated
+  same-build-dir use
+- tighten diagnostics for ambiguous target requests, invalid dependency shapes,
+  and stale or inconsistent build-state situations exposed by the richer graph
+
+What this phase should try to prove
+-----------------------------------
+- the admitted separate-compilation contract is trustworthy on the richer Lane
+  B graph, not only on earlier simpler project fixtures
+- cross-target invalidation remains sharp: only affected targets rebuild after
+  interface changes, while unrelated targets do not churn unnecessarily
+- implementation-only changes in shared grouped packages preserve downstream
+  reuse when the semantic interface is unchanged
+- repeated `build`, `run`, `test`, and rerun flows on one build directory stay
+  deterministic and reviewable on the richer graph
+- any remaining build-graph trust hole is small enough to describe as one
+  clearly owned tooling follow-up rather than ambient workflow unease
+
+Preferred pressure points
+-------------------------
+1. Implementation-only edit versus exported-interface edit across grouped
+   packages with more than one consuming target.
+2. Deterministic same-build-dir reuse across build, run, test, and rerun.
+3. If Phase 29 lands, downstream invalidation and reuse around one admitted
+   `staticlib` target.
+4. Clear diagnostics for stale state, inconsistent artifacts, or invalid
+   cross-target dependency shapes.
+5. Sharp documentation of what the hosted workflow now guarantees and what it
+   still intentionally does not.
+
+Deliverables
+------------
+- focused tool regressions under
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` proving grouped-
+  package and cross-target rebuild correctness on one admitted real project
+- any required tightening in tooling or project-graph validation to keep reuse
+  deterministic and semantically correct
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`,
+  `/Users/ro/dev/c_modern/README.md`, and
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt` if
+  the supported hosted workflow guarantees become materially sharper
+- one short next-step note stating whether Lane B is now sufficiently proven to
+  pause, whether Lane C `time` has become the next honest consumer-driven wave,
+  or whether Lane D release hardening should take priority
+
+Suggested execution order
+-------------------------
+1. Re-audit the richest admitted Lane B project graph after Phase 28 and any
+   Phase 29 outcome.
+2. Add deterministic edit-and-rerun proofs that distinguish implementation-only
+   from interface-visible changes across grouped packages and targets.
+3. Tighten validation or rebuild metadata only where the real project proof
+   exposes drift.
+4. Refresh workflow documentation so the admitted guarantees match the new
+   proven behavior.
+5. Use the hardened result to choose the next plateau instead of widening Lane
+   B indefinitely.
+
+Exit criteria
+-------------
+- the repository has real proof that separate-compilation and target reuse are
+  trustworthy on the richest admitted Lane B project graph
+- any remaining workflow trust limitation is reduced to a named tooling follow-
+  up rather than a general lack of confidence in the build surface
+- the supported hosted workflow statement is sharper and more defensible than
+  before the Lane B series began
+- the repository can choose the next plateau from clearer evidence: continue
+  Lane B narrowly, move to Lane C `time`, or prioritize Lane D release
+  hardening
+
+Non-goals
+---------
+- new stdlib family admission
+- broader target-kind growth beyond the Phase 29 decision point
+- package management, cross-compilation, or non-hosted workflow claims
+- collapsing all C++ fixture coverage into `mc test`
+- opening a new compiler-owner wave unless the hardening proof exposes one
+  newly dominant, clearly owned compiler limitation
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 30 stands alone as the Lane B hardening capstone after package
+  grouping and the narrow target-kind decision point.
+- The phase is explicit that trusted rebuild behavior and cross-target
+  workflow clarity, not more breadth for its own sake, determine the next
+  plateau after the Lane B series.

@@ -20,7 +20,9 @@ Supported host target set
 - supported compiler host and executable target: Darwin arm64
 - supported runtime environment: hosted only
 - supported build graph slice: direct-source builds plus `build.toml` project
-  workflows for hosted executable targets and hosted checked test targets
+  workflows for hosted executable targets and hosted checked test targets,
+  including grouped multi-root internal package layouts inside one project
+  manifest
 - unsupported today: non-hosted targets, cross-compilation, static or shared
   library targets, package management, and multi-platform release claims
 
@@ -88,6 +90,8 @@ Practical support statement
 ---------------------------
 The current repository can honestly be used as a hosted Darwin arm64 bootstrap
 compiler and toolchain slice for direct-source programs, bounded project-mode
-workflows, deterministic checked ordinary tests, and the admitted real-project
-examples. Everything outside that slice should be treated as explicitly
+workflows, deterministic checked ordinary tests, grouped internal package
+layouts inside the executable-only project model, and the admitted real-
+project examples. Everything outside that slice should be treated as
+explicitly
 unsupported until a narrower owner document and proof layer admit it.

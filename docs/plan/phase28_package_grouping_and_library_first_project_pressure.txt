@@ -1,0 +1,186 @@
+Phase 28 -- Package Grouping And Library-First Project Pressure
+===============================================================
+
+Status
+------
+COMPLETED (repository-bounded grouped-package proof)
+
+Purpose
+-------
+Start Lane B with one bounded build-surface widening wave that pressures
+package grouping beyond one source root and a more library-first real project
+shape without yet admitting broader target kinds or package-management scope.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 22 already proved one honest richer multi-target hosted project with
+  shared modules, deterministic target selection, and separate-compilation
+  reuse on the admitted executable-only slice.
+- Phase 25 through Phase 27 then completed the chosen Lane A series and ended
+  with a re-audit that closed the strongest admitted semantic distortions
+  rather than reopening broader compiler work speculatively.
+- The remaining explicit compiler-owned imported-generic procedure-call
+  limitation is still deferred behind its existing second-consumer trigger.
+- The strongest next open workflow family is now Lane B: package grouping,
+  broader target-surface truth, and fuller separate-compilation pressure.
+- The repository still does not support `staticlib`, `sharedlib`, package
+  management, cross-compilation, or non-hosted targets, and this phase should
+  not claim them early.
+
+Problem being solved
+--------------------
+- The admitted project workflow can now prove richer shared-module executable
+  graphs, but it still stops short of one common next shape: a project whose
+  internal core is organized as more than one source-root package family.
+- Without a new real proof, discussion about package grouping or library-first
+  organization would fall back into architecture-level end-state arguments
+  instead of showing whether the current build graph already handles that
+  narrower pressure honestly.
+- The repository needs one bounded real project whose structure is closer to a
+  reusable internal library layout, while still staying inside the current
+  executable-only admitted slice.
+
+Core rule
+---------
+- Widen one build-surface truth at a time.
+- Prefer package grouping and project reviewability before admitting a new
+  artifact kind.
+- Keep packages build-time only; do not slide into package-management or
+  dependency-distribution work.
+- Use a real project graph to expose build-graph truth rather than synthetic
+  manifest-only probes.
+- If the pressure still does not justify a broader target kind afterward,
+  record that explicitly instead of forcing `staticlib` next.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one real hosted project with a library-first internal
+layout that spans more than one source-root package grouping, plus at least
+one executable target and ordinary checked-test proof on the same manifest.
+
+The planned project should:
+- keep the public admitted target kinds unchanged for this phase
+- organize shared code into clearer internal package groupings than the
+  current single-root richer examples
+- exercise import resolution, target reviewability, and deterministic rebuild
+  behavior across those grouped source roots
+- stay small enough that package and build-surface truth remain more important
+  than application novelty
+
+Candidate project shapes that fit this plan
+-------------------------------------------
+- a small tool-suite project with one executable target and one checked test
+  target sharing an internal parsing or data-model package plus a separate I/O
+  or formatting package
+- a review or indexing utility whose internal core is split into `model`,
+  `parse`, and `render` package groups under distinct source roots
+- a worker-style project whose reusable queue or task logic is intentionally
+  separated from the executable entry package without reopening `time` or
+  broader runtime families
+
+What this phase should try to prove
+-----------------------------------
+- package grouping beyond one source root remains reviewable in `build.toml`
+  and deterministic in normal `mc build`, `mc run`, and `mc test` workflow
+- grouped internal packages reuse separate-compilation artifacts honestly
+  instead of collapsing back into whole-project rebuild behavior
+- implementation-only edits inside one grouped package do not force avoidable
+  downstream rebuilds
+- exported-interface edits inside one grouped package do trigger the correct
+  downstream rebuilds
+- the next build-surface step after this phase is chosen from real pressure:
+  either a broader target kind such as `staticlib`, more separate-compilation
+  hardening, or explicit continued deferral
+
+Preferred pressure points
+-------------------------
+1. Package grouping beyond one source root on one real hosted project.
+2. Library-first internal project organization without new artifact kinds.
+3. Shared grouped-package rebuild behavior after implementation-only edits.
+4. Shared grouped-package rebuild behavior after exported-interface edits.
+5. Deterministic `run`, `test`, and rerun behavior on the same build
+   directory for the richer grouped project.
+
+Deliverables
+------------
+- one new real project under `/Users/ro/dev/c_modern/examples/real/` with a
+  library-first internal layout and grouped package roots that are honest on
+  the admitted hosted slice
+- focused tool regressions under
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` proving manifest
+  reviewability, target selection, deterministic build-directory reuse, and
+  grouped-package rebuild behavior
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` if Phase 28 closes a
+  package-grouping limitation or sharpens the next revisit trigger for broader
+  target kinds
+- documentation updates only if the admitted hosted project-workflow statement
+  changes materially in `/Users/ro/dev/c_modern/README.md` or
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`
+
+Suggested execution order
+-------------------------
+1. Choose one real project whose natural internal organization needs grouped
+   packages beyond one source root, without requiring a new stdlib family.
+2. Land the grouped project shape first so the pressure artifact is real before
+   widening driver or manifest handling.
+3. Add deterministic `run`, `test`, and rerun coverage that matches the richer
+   workflow parity already expected for admitted real project fixtures.
+4. Probe implementation-only versus exported-interface edits across grouped
+   packages so separate-compilation truth is demonstrated, not assumed.
+5. Use the result to decide whether Phase 29 should admit one broader target
+   kind, harden separate-compilation further, or keep broader target kinds
+   deferred explicitly.
+
+Exit criteria
+-------------
+- the repository has one admitted real project proving package grouping beyond
+  one source root on the hosted executable-only slice
+- the project proves deterministic target selection, build-directory reuse,
+  and grouped-package rebuild behavior through normal project workflow
+- the repository can state clearly whether the next Lane B step is a broader
+  target kind, more separate-compilation hardening, or continued deferral
+- no package-management, portability, or non-hosted claim is implied by this
+  proof
+
+Non-goals
+---------
+- admitting `staticlib` or `sharedlib` in the same phase just because the
+  architecture docs name them
+- package registries, remote dependencies, vendoring policy, or version
+  selection work
+- reopening Lane A compiler widening without a new admitted consumer trigger
+- using a flashy real project that hides build-surface questions under program
+  complexity
+- widening `time`, `os`, or `hal` to support the chosen project shape
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 28 stands alone as the first Lane B owner document after the completed
+  Lane A series.
+- The phase is explicit that package grouping and library-first project proof,
+  not immediate target-kind growth, is the first honest build-surface widening
+  step.
+
+Implemented slice
+-----------------
+- the repository now includes `/Users/ro/dev/c_modern/examples/real/issue_rollup/`,
+  one admitted hosted real project with a library-first internal layout split
+  across grouped `app`, `model`, `parse`, and `render` module roots inside one
+  executable-plus-checked-test manifest
+- the grouped-root project keeps the admitted surface narrow by staying on the
+  existing hosted file-I/O and testing path while proving that package
+  grouping beyond one source root is already reviewable in `build.toml`
+- `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` now proves normal
+  `mc run`, `mc test`, and rerun reuse on that grouped project and then clones
+  it to verify no-op reuse, implementation-only parse-package rebuild behavior,
+  and interface-visible render-package rebuild behavior through ordinary build
+  artifacts and `.mci` timestamps
+- the stronger next-step truth after this proof remains: internal package
+  grouping is now admitted on the hosted executable-only slice, while broader
+  target kinds such as `staticlib` or `sharedlib` stay deferred until a real
+  project needs reusable library artifacts rather than internal grouped reuse

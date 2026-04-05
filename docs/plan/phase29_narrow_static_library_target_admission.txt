@@ -1,0 +1,159 @@
+Phase 29 -- Narrow Static Library Target Admission
+==================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Use the real project and package-grouping proof from Phase 28 to decide
+whether one broader target kind, specifically `staticlib`, is now the
+narrowest honest next Lane B admission.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 22 already proved a richer executable-only project graph with shared
+  modules and deterministic reuse.
+- Phase 28 is the first Lane B owner wave and is intended to prove package
+  grouping plus one more library-first internal project shape while keeping the
+  admitted target kinds unchanged.
+- The slice register still marks broader artifact kinds as partial: `exe`,
+  `staticlib`, `sharedlib`, and `test` are the architectural end state, but
+  the repository-owned hosted plateau still centers on executable and checked-
+  test targets.
+- If Phase 28 does not expose a real artifact-boundary need, this phase should
+  remain deferred rather than inventing `staticlib` support from end-state
+  completeness pressure.
+
+Problem being solved
+--------------------
+- The repository can organize and build richer executable-only projects, but it
+  still cannot prove whether one reusable build artifact boundary is now worth
+  admitting on the hosted slice.
+- Without a bounded target-kind decision, Lane B risks oscillating between
+  abstract package-graph discussion and premature artifact growth.
+- The repository needs one narrow artifact-kind checkpoint: either admit
+  `staticlib` because a real project now needs it, or record clearly that the
+  admitted build surface is still better served by executable-only workflows.
+
+Core rule
+---------
+- Admit at most one new artifact kind in this phase.
+- Prefer `staticlib` before `sharedlib` because it adds a reusable artifact
+  boundary without immediately widening runtime loading, install naming, or
+  dynamic-link policy.
+- Keep the proof hosted, deterministic, and inspectable.
+- Do not widen package-management, portability, or installation scope just to
+  make the new target kind look more complete.
+- If the library artifact does not materially improve a real admitted project,
+  stop and record continued deferral explicitly.
+
+Chosen candidate slice
+----------------------
+Primary candidate: `kind = "staticlib"` for one bounded hosted project that
+already has a natural internal core proven by Phase 28.
+
+The planned admission should:
+- prove one real library-first project shape where a static archive is clearer
+  than keeping everything as executable-owned module graphs
+- preserve deterministic `.mci`, object, and archive production under the
+  current build-directory model
+- keep linking explicit through ordinary host tooling on Darwin arm64
+- leave `sharedlib`, plugin loading, install rules, and distribution policy
+  deferred
+
+Candidate proof shapes that fit this plan
+-----------------------------------------
+- one project with an internal core emitted as `staticlib`, then linked by one
+  small executable target and one checked test target
+- one reusable parsing, indexing, or formatting core shared by multiple small
+  tools where the archive boundary makes dependency and rebuild behavior more
+  reviewable than duplicated object reuse alone
+- one project where the executable target is intentionally thin enough that the
+  static archive boundary becomes the central proof artifact
+
+What this phase should try to prove
+-----------------------------------
+- `staticlib` is the narrowest honest next artifact kind after the grouped
+  package proof from Phase 28
+- archive production, naming, and consumption are deterministic inside the
+  existing build-directory conventions
+- interface-hash and implementation-only rebuild rules remain correct when a
+  consumer target links against a library artifact
+- project validation and diagnostics stay clear for invalid library roots,
+  invalid dependency shapes, or impossible target combinations
+- `sharedlib` remains explicitly deferred because the real admitted pressure is
+  still static reuse rather than runtime loading
+
+Preferred pressure points
+-------------------------
+1. One real project where a static archive is materially clearer than keeping
+   all code under executable targets.
+2. Deterministic build, link, run, and test workflow with one admitted
+   `staticlib` target.
+3. Rebuild correctness after implementation-only edits in library-owned
+   modules.
+4. Rebuild correctness after exported-interface edits that should invalidate
+   downstream consumers.
+5. Clear diagnostics for unsupported or invalid broader target-model cases.
+
+Deliverables
+------------
+- one new or updated real project under `/Users/ro/dev/c_modern/examples/real/`
+  proving a bounded `staticlib` target on the hosted Darwin arm64 slice
+- focused tool regressions under
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` covering library
+  target validation, deterministic artifact naming, consumer linking, and
+  rebuild behavior
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`, and
+  `/Users/ro/dev/c_modern/README.md` if the supported hosted slice now admits
+  a static library target
+- updates to
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt` only
+  if the supported hosted statement materially changes
+
+Suggested execution order
+-------------------------
+1. Re-check the landed Phase 28 project and decide whether its internal core
+   wants a true archive boundary or only better executable-only reuse proof.
+2. If the answer is yes, implement the narrowest `staticlib` path first and do
+   not open `sharedlib` support in the same wave.
+3. Add deterministic project-tool regressions for build, run, and test flows
+   that consume the archive normally.
+4. Probe invalid manifests and invalid dependency combinations so target-model
+   diagnostics stay explicit.
+5. Record the remaining deferred artifact families sharply instead of allowing
+   them to linger as ambient future work.
+
+Exit criteria
+-------------
+- the repository either admits one bounded hosted `staticlib` target honestly
+  or records that the Lane B proof still does not justify it
+- any admitted `staticlib` slice has one real project consumer, deterministic
+  artifact behavior, and focused validation coverage
+- the repository preserves explicit deferral of `sharedlib`, package
+  management, cross-compilation, and non-hosted target claims
+- the next Lane B step after this phase is clearer from evidence: more
+  separate-compilation hardening, cross-target workflow hardening, or pause
+
+Non-goals
+---------
+- admitting `sharedlib`, runtime loading, plugin APIs, or install-tree policy
+- reopening Lane C `time` work or Lane D release hardening to compensate for
+  weak project proof
+- broad packaging or distribution semantics
+- treating archive emission alone as progress if no real consumer becomes
+  clearer because of it
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 29 stands alone as the narrow target-kind decision point in the Lane B
+  series.
+- The phase is explicit that `staticlib` is conditional on real project proof,
+  not an automatic follow-on from package grouping.

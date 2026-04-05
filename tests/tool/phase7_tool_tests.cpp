@@ -581,6 +581,42 @@ void ExpectReviewBoardTestOutput(std::string_view output,
                          context_prefix + ": should print the target verdict");
 }
 
+void ExpectIssueRollupRunOutput(std::string_view output,
+                                std::string_view expected_line,
+                                const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         expected_line,
+                         context_prefix + ": should print the deterministic grouped-package result");
+}
+
+void ExpectIssueRollupTestOutput(std::string_view output,
+                                 const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "testing target issue-rollup",
+                         context_prefix + ": should announce the grouped-root target under test");
+    ExpectOutputContains(output,
+                         "ordinary tests target issue-rollup: 3 cases, mode=checked, timeout=5000 ms",
+                         context_prefix + ": should print the ordinary test scope");
+    ExpectOutputContains(output,
+                         "PASS model_total_items_test.test_model_total_items",
+                         context_prefix + ": should include model-package coverage");
+    ExpectOutputContains(output,
+                         "PASS parse_summary_test.test_parse_summary",
+                         context_prefix + ": should include parse-package coverage");
+    ExpectOutputContains(output,
+                         "PASS render_kind_test.test_render_kind",
+                         context_prefix + ": should include render-package coverage");
+    ExpectOutputContains(output,
+                         "3 tests, 3 passed, 0 failed",
+                         context_prefix + ": should print the deterministic summary");
+    ExpectOutputContains(output,
+                         "PASS ordinary tests for target issue-rollup (3 cases)",
+                         context_prefix + ": should print the ordinary-test verdict");
+    ExpectOutputContains(output,
+                         "PASS target issue-rollup",
+                         context_prefix + ": should print the target verdict");
+}
+
 void ExpectEventedEchoTestOutput(std::string_view output,
                                  const std::string& context_prefix) {
     ExpectOutputContains(output,
@@ -2707,6 +2743,379 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     }
 }
 
+void TestRealIssueRollupProject(const std::filesystem::path& source_root,
+                                const std::filesystem::path& binary_root,
+                                const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = source_root / "examples/real/issue_rollup";
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path sample_path = project_root / "tests/sample.txt";
+
+    const std::filesystem::path run_test_rerun_build_dir = binary_root / "phase28_issue_rollup_run_test_rerun_build";
+    std::filesystem::remove_all(run_test_rerun_build_dir);
+
+    std::string run_output = RunProjectTargetAndExpectSuccess(mc_path,
+                                                              project_path,
+                                                              run_test_rerun_build_dir,
+                                                              "",
+                                                              sample_path,
+                                                              "phase28_issue_rollup_run_output.txt",
+                                                              "phase28 issue rollup run before tests");
+    ExpectIssueRollupRunOutput(run_output,
+                               "issue-rollup-steady\n",
+                               "phase28 issue rollup run before tests");
+
+    std::string test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                             project_path,
+                                                             run_test_rerun_build_dir,
+                                                             "phase28_issue_rollup_test_output.txt",
+                                                             "phase28 issue rollup test after run");
+    ExpectIssueRollupTestOutput(test_output,
+                                "phase28 issue rollup test after run");
+
+    run_output = RunProjectTargetAndExpectSuccess(mc_path,
+                                                  project_path,
+                                                  run_test_rerun_build_dir,
+                                                  "",
+                                                  sample_path,
+                                                  "phase28_issue_rollup_rerun_output.txt",
+                                                  "phase28 issue rollup rerun after tests");
+    ExpectIssueRollupRunOutput(run_output,
+                               "issue-rollup-steady\n",
+                               "phase28 issue rollup rerun after tests");
+
+    const std::filesystem::path test_run_rerun_build_dir = binary_root / "phase28_issue_rollup_test_run_rerun_build";
+    std::filesystem::remove_all(test_run_rerun_build_dir);
+
+    test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                 project_path,
+                                                 test_run_rerun_build_dir,
+                                                 "phase28_issue_rollup_initial_test_output.txt",
+                                                 "phase28 issue rollup initial test");
+    ExpectIssueRollupTestOutput(test_output,
+                                "phase28 issue rollup initial test");
+
+    run_output = RunProjectTargetAndExpectSuccess(mc_path,
+                                                  project_path,
+                                                  test_run_rerun_build_dir,
+                                                  "",
+                                                  sample_path,
+                                                  "phase28_issue_rollup_run_after_test_output.txt",
+                                                  "phase28 issue rollup run after tests");
+    ExpectIssueRollupRunOutput(run_output,
+                               "issue-rollup-steady\n",
+                               "phase28 issue rollup run after tests");
+
+    test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                 project_path,
+                                                 test_run_rerun_build_dir,
+                                                 "phase28_issue_rollup_retest_output.txt",
+                                                 "phase28 issue rollup retest after run");
+    ExpectIssueRollupTestOutput(test_output,
+                                "phase28 issue rollup retest after run");
+
+    const std::filesystem::path cloned_project_root = binary_root / "phase28_issue_rollup_clone";
+    CopyDirectoryTree(project_root, cloned_project_root);
+    WriteFile(cloned_project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"issue-rollup\"\n"
+              "default = \"issue-rollup\"\n"
+              "\n"
+              "[targets.issue-rollup]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/app/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.issue-rollup.search_paths]\n"
+              "modules = [\"src/app\", \"src/model\", \"src/parse\", \"src/render\", \"" +
+                  (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.issue-rollup.runtime]\n"
+              "startup = \"default\"\n"
+              "\n"
+              "[targets.issue-rollup.tests]\n"
+              "enabled = true\n"
+              "roots = [\"tests\"]\n"
+              "mode = \"checked\"\n"
+              "timeout_ms = 5000\n");
+    const std::filesystem::path cloned_project_path = cloned_project_root / "build.toml";
+    const std::filesystem::path cloned_sample_path = cloned_project_root / "tests/sample.txt";
+    const std::filesystem::path rebuild_build_dir = binary_root / "phase28_issue_rollup_rebuild_build";
+    std::filesystem::remove_all(rebuild_build_dir);
+
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       cloned_project_path,
+                                       rebuild_build_dir,
+                                       "",
+                                       "phase28_issue_rollup_initial_build.txt",
+                                       "phase28 issue rollup initial build");
+
+    const auto rollup_model_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/model/rollup_model.mc",
+                                                                              rebuild_build_dir)
+                                         .object;
+    const auto rollup_parse_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/parse/rollup_parse.mc",
+                                                                              rebuild_build_dir)
+                                         .object;
+    const auto rollup_render_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/render/rollup_render.mc",
+                                                                               rebuild_build_dir)
+                                          .object;
+    const auto app_main_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/app/main.mc",
+                                                                          rebuild_build_dir)
+                                     .object;
+    const auto rollup_model_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/model/rollup_model.mc",
+                                                                  rebuild_build_dir)
+                                      .mci;
+    const auto rollup_parse_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/parse/rollup_parse.mc",
+                                                                  rebuild_build_dir)
+                                      .mci;
+    const auto rollup_render_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/render/rollup_render.mc",
+                                                                   rebuild_build_dir)
+                                       .mci;
+    const auto issue_rollup_executable = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/app/main.mc",
+                                                                                  rebuild_build_dir)
+                                             .executable;
+
+    const auto rollup_model_object_time_1 = RequireWriteTime(rollup_model_object);
+    const auto rollup_parse_object_time_1 = RequireWriteTime(rollup_parse_object);
+    const auto rollup_render_object_time_1 = RequireWriteTime(rollup_render_object);
+    const auto app_main_object_time_1 = RequireWriteTime(app_main_object);
+    const auto rollup_model_mci_time_1 = RequireWriteTime(rollup_model_mci);
+    const auto rollup_parse_mci_time_1 = RequireWriteTime(rollup_parse_mci);
+    const auto rollup_render_mci_time_1 = RequireWriteTime(rollup_render_mci);
+    const auto issue_rollup_executable_time_1 = RequireWriteTime(issue_rollup_executable);
+
+    SleepForTimestampTick();
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       cloned_project_path,
+                                       rebuild_build_dir,
+                                       "",
+                                       "phase28_issue_rollup_noop_build.txt",
+                                       "phase28 issue rollup no-op build");
+
+    if (RequireWriteTime(rollup_model_object) != rollup_model_object_time_1 ||
+        RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_1 ||
+        RequireWriteTime(rollup_render_object) != rollup_render_object_time_1 ||
+        RequireWriteTime(app_main_object) != app_main_object_time_1 ||
+        RequireWriteTime(rollup_model_mci) != rollup_model_mci_time_1 ||
+        RequireWriteTime(rollup_parse_mci) != rollup_parse_mci_time_1 ||
+        RequireWriteTime(rollup_render_mci) != rollup_render_mci_time_1 ||
+        RequireWriteTime(issue_rollup_executable) != issue_rollup_executable_time_1) {
+        Fail("phase28 no-op build should reuse grouped-package objects, interface artifacts, and executable outputs");
+    }
+
+    SleepForTimestampTick();
+    WriteFile(cloned_project_root / "src/parse/rollup_parse.mc",
+              "export { summarize_text }\n"
+              "\n"
+              "import rollup_model\n"
+              "import strings\n"
+              "\n"
+              "func line_kind(bytes: Slice<u8>, start: usize, newline: usize) u8 {\n"
+              "    if newline <= start {\n"
+              "        return 0\n"
+              "    }\n"
+              "    return bytes[start]\n"
+              "}\n"
+              "\n"
+              "func line_is_priority(bytes: Slice<u8>, start: usize, newline: usize) bool {\n"
+              "    kind: u8 = line_kind(bytes, start, newline)\n"
+              "    if kind == 66 {\n"
+              "        return true\n"
+              "    }\n"
+              "    if newline <= start + 1 {\n"
+              "        return false\n"
+              "    }\n"
+              "    return bytes[start + 1] == 33\n"
+              "}\n"
+              "\n"
+              "func summarize_text(text: str) rollup_model.Summary {\n"
+              "    bytes: Slice<u8> = strings.bytes(text)\n"
+              "    open_items: usize = 0\n"
+              "    closed_items: usize = 0\n"
+              "    blocked_items: usize = 0\n"
+              "    priority_items: usize = 0\n"
+              "    start: usize = 0\n"
+              "    while start < text.len {\n"
+              "        newline: usize = start\n"
+              "        while newline < text.len {\n"
+              "            if bytes[newline] == 10 {\n"
+              "                break\n"
+              "            }\n"
+              "            newline = newline + 1\n"
+              "        }\n"
+              "\n"
+              "        kind: u8 = line_kind(bytes, start, newline)\n"
+              "        if kind == 79 {\n"
+              "            open_items = open_items + 1\n"
+              "        }\n"
+              "        if kind == 67 {\n"
+              "            closed_items = closed_items + 1\n"
+              "        }\n"
+              "        if kind == 66 {\n"
+              "            blocked_items = blocked_items + 1\n"
+              "        }\n"
+              "        if line_is_priority(bytes, start, newline) {\n"
+              "            priority_items = priority_items + 1\n"
+              "        }\n"
+              "\n"
+              "        if newline == text.len {\n"
+              "            break\n"
+              "        }\n"
+              "        start = newline + 1\n"
+              "    }\n"
+              "\n"
+              "    return rollup_model.Summary{ open_items: open_items, closed_items: closed_items, blocked_items: blocked_items, priority_items: priority_items }\n"
+              "}\n");
+
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       cloned_project_path,
+                                       rebuild_build_dir,
+                                       "",
+                                       "phase28_issue_rollup_impl_build.txt",
+                                       "phase28 issue rollup implementation-only parse rebuild");
+
+    const auto rollup_model_object_time_2 = RequireWriteTime(rollup_model_object);
+    const auto rollup_parse_object_time_2 = RequireWriteTime(rollup_parse_object);
+    const auto rollup_render_object_time_2 = RequireWriteTime(rollup_render_object);
+    const auto app_main_object_time_2 = RequireWriteTime(app_main_object);
+    const auto rollup_model_mci_time_2 = RequireWriteTime(rollup_model_mci);
+    const auto rollup_parse_mci_time_2 = RequireWriteTime(rollup_parse_mci);
+    const auto rollup_render_mci_time_2 = RequireWriteTime(rollup_render_mci);
+    const auto issue_rollup_executable_time_2 = RequireWriteTime(issue_rollup_executable);
+
+    if (rollup_model_object_time_2 != rollup_model_object_time_1) {
+        Fail("phase28 implementation-only parse edit should not rebuild the model package object");
+    }
+    if (!(rollup_parse_object_time_2 > rollup_parse_object_time_1)) {
+        Fail("phase28 implementation-only parse edit should rebuild the parse package object");
+    }
+    if (rollup_render_object_time_2 != rollup_render_object_time_1) {
+        Fail("phase28 implementation-only parse edit should not rebuild the render package object");
+    }
+    if (app_main_object_time_2 != app_main_object_time_1) {
+        Fail("phase28 implementation-only parse edit should not rebuild the app root object");
+    }
+    if (rollup_model_mci_time_2 != rollup_model_mci_time_1) {
+        Fail("phase28 implementation-only parse edit should preserve the model interface artifact");
+    }
+    if (rollup_parse_mci_time_2 != rollup_parse_mci_time_1) {
+        Fail("phase28 implementation-only parse edit should preserve the parse interface artifact");
+    }
+    if (rollup_render_mci_time_2 != rollup_render_mci_time_1) {
+        Fail("phase28 implementation-only parse edit should preserve the render interface artifact");
+    }
+    if (!(issue_rollup_executable_time_2 > issue_rollup_executable_time_1)) {
+        Fail("phase28 implementation-only parse edit should relink the executable");
+    }
+
+    const auto [impl_outcome, impl_output] = RunCommandCapture({issue_rollup_executable.generic_string(),
+                                                                cloned_sample_path.generic_string()},
+                                                               rebuild_build_dir / "phase28_issue_rollup_impl_run.txt",
+                                                               "phase28 issue rollup implementation-only executable run");
+    if (!impl_outcome.exited || impl_outcome.exit_code != 0) {
+        Fail("phase28 implementation-only executable run should pass:\n" + impl_output);
+    }
+    ExpectIssueRollupRunOutput(impl_output,
+                               "issue-rollup-attention\n",
+                               "phase28 issue rollup implementation-only executable run");
+
+    SleepForTimestampTick();
+    WriteFile(cloned_project_root / "src/render/rollup_render.mc",
+              "export { helper_version, rollup_kind, write_rollup }\n"
+              "\n"
+              "import io\n"
+              "import rollup_model\n"
+              "\n"
+              "const ROLLUP_EMPTY: i32 = 0\n"
+              "const ROLLUP_STEADY: i32 = 1\n"
+              "const ROLLUP_BUSY: i32 = 2\n"
+              "const ROLLUP_ATTENTION: i32 = 3\n"
+              "\n"
+              "func helper_version() i32 {\n"
+              "    return 28\n"
+              "}\n"
+              "\n"
+              "func rollup_kind(summary: rollup_model.Summary) i32 {\n"
+              "    if rollup_model.total_items(summary) == 0 {\n"
+              "        return ROLLUP_EMPTY\n"
+              "    }\n"
+              "    if rollup_model.has_priority(summary) {\n"
+              "        return ROLLUP_ATTENTION\n"
+              "    }\n"
+              "    if summary.open_items > summary.closed_items {\n"
+              "        return ROLLUP_BUSY\n"
+              "    }\n"
+              "    return ROLLUP_STEADY\n"
+              "}\n"
+              "\n"
+              "func write_rollup(summary: rollup_model.Summary) i32 {\n"
+              "    kind: i32 = rollup_kind(summary)\n"
+              "    if kind == ROLLUP_EMPTY {\n"
+              "        return io.write_line(\"issue-rollup-empty\")\n"
+              "    }\n"
+              "    if kind == ROLLUP_ATTENTION {\n"
+              "        return io.write_line(\"issue-rollup-escalate\")\n"
+              "    }\n"
+              "    if kind == ROLLUP_BUSY {\n"
+              "        return io.write_line(\"issue-rollup-busy\")\n"
+              "    }\n"
+              "    return io.write_line(\"issue-rollup-steady\")\n"
+              "}\n");
+
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       cloned_project_path,
+                                       rebuild_build_dir,
+                                       "",
+                                       "phase28_issue_rollup_interface_build.txt",
+                                       "phase28 issue rollup interface-changing render rebuild");
+
+    const auto rollup_model_object_time_3 = RequireWriteTime(rollup_model_object);
+    const auto rollup_parse_object_time_3 = RequireWriteTime(rollup_parse_object);
+    const auto rollup_render_object_time_3 = RequireWriteTime(rollup_render_object);
+    const auto app_main_object_time_3 = RequireWriteTime(app_main_object);
+    const auto rollup_model_mci_time_3 = RequireWriteTime(rollup_model_mci);
+    const auto rollup_parse_mci_time_3 = RequireWriteTime(rollup_parse_mci);
+    const auto rollup_render_mci_time_3 = RequireWriteTime(rollup_render_mci);
+    const auto issue_rollup_executable_time_3 = RequireWriteTime(issue_rollup_executable);
+
+    if (rollup_model_object_time_3 != rollup_model_object_time_2) {
+        Fail("phase28 interface-changing render edit should not rebuild the model package object");
+    }
+    if (rollup_parse_object_time_3 != rollup_parse_object_time_2) {
+        Fail("phase28 interface-changing render edit should not rebuild the parse package object");
+    }
+    if (!(rollup_render_object_time_3 > rollup_render_object_time_2)) {
+        Fail("phase28 interface-changing render edit should rebuild the render package object");
+    }
+    if (!(app_main_object_time_3 > app_main_object_time_2)) {
+        Fail("phase28 interface-changing render edit should rebuild the app root object");
+    }
+    if (rollup_model_mci_time_3 != rollup_model_mci_time_2) {
+        Fail("phase28 interface-changing render edit should preserve the model interface artifact");
+    }
+    if (rollup_parse_mci_time_3 != rollup_parse_mci_time_2) {
+        Fail("phase28 interface-changing render edit should preserve the parse interface artifact");
+    }
+    if (!(rollup_render_mci_time_3 > rollup_render_mci_time_2)) {
+        Fail("phase28 interface-changing render edit should rewrite the render interface artifact");
+    }
+    if (!(issue_rollup_executable_time_3 > issue_rollup_executable_time_2)) {
+        Fail("phase28 interface-changing render edit should relink the executable");
+    }
+
+    const auto [interface_outcome, interface_output] = RunCommandCapture({issue_rollup_executable.generic_string(),
+                                                                          cloned_sample_path.generic_string()},
+                                                                         rebuild_build_dir /
+                                                                             "phase28_issue_rollup_interface_run.txt",
+                                                                         "phase28 issue rollup interface-changing executable run");
+    if (!interface_outcome.exited || interface_outcome.exit_code != 0) {
+        Fail("phase28 interface-changing executable run should pass:\n" + interface_output);
+    }
+    ExpectIssueRollupRunOutput(interface_output,
+                               "issue-rollup-escalate\n",
+                               "phase28 issue rollup interface-changing executable run");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -2747,5 +3156,6 @@ int main(int argc, char** argv) {
     TestRealWorkerQueueProject(source_root, binary_root, mc_path);
     TestRealEventedEchoProject(source_root, binary_root, mc_path);
     TestRealReviewBoardProject(source_root, binary_root, mc_path);
+    TestRealIssueRollupProject(source_root, binary_root, mc_path);
     return 0;
 }
