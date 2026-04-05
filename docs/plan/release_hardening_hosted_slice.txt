@@ -3,30 +3,34 @@ Hosted Slice Release-Hardening Note
 
 Status
 ------
-PUBLISHED (repository-bounded first public-slice note)
+PUBLISHED (repository-bounded support-matrix freeze)
 
 Purpose
 -------
-Record the current supported hosted slice, installation path, usage path,
-checked-versus-release posture, and known limitations for the repository's
-current capability plateau.
+Record the current supported hosted slice, frozen support matrix, installation
+path, usage path, checked-versus-release posture, and known limitations for
+the repository's current capability plateau.
 
 This note is the repository-bounded realization of the original bootstrap-plan
 Phase 9 release-hardening work. It is not a claim that the entire language,
 toolchain, or long-term architecture roadmap is finished.
 
-Supported host target set
--------------------------
-- supported compiler host and executable target: Darwin arm64
+Frozen support matrix
+---------------------
+- supported compiler host and produced executable target: Darwin arm64 only
 - supported runtime environment: hosted only
-- supported build graph slice: direct-source builds plus `build.toml` project
-  workflows for hosted executable targets, one admitted hosted `staticlib`
-  target kind, and hosted checked test targets, including grouped multi-root
-  internal package layouts inside one project manifest with deterministic
-  selected-target reuse on the admitted richer project proofs
+- supported direct-source commands: `mc check` and `mc build`
+- supported project commands: `mc check`, `mc build`, `mc run`, and `mc test`
+- admitted project target boundary: hosted `exe` targets, hosted checked-test
+  targets, and one admitted hosted `staticlib` target consumed inside one
+  project by executable targets and ordinary tests
+- admitted richer real-project proof set: `examples/real/issue_rollup/`,
+  `examples/real/worker_queue/`, and `examples/real/evented_echo/`
+- supported workflow guarantee on the admitted richer proof: deterministic
+  selected-target same-build-dir reuse without non-selected-target churn
 - unsupported today: non-hosted targets, cross-compilation, shared library
   targets, external system-library links in project manifests, package
-  management, and multi-platform release claims
+  management, and any portability claim beyond Darwin arm64
 
 Installation and usage
 ----------------------
@@ -44,13 +48,15 @@ The produced compiler entrypoint is:
 build/debug/mc
 ```
 
-Common usage on the supported hosted slice:
+Phase 31 smoke audit on the supported hosted slice:
 
 ```sh
 build/debug/mc check tests/cases/hello.mc
-build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/stage5_smoke
-build/debug/mc run --project examples/real/grep_lite/build.toml --build-dir build/debug/phase8_grep -- alpha examples/real/grep_lite/tests/sample.txt
-build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase13_evented_echo
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase31_smoke_return_zero
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase31_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase31_issue_rollup
+build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase31_worker_queue
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase31_evented_echo
 ```
 
 Checked versus release audit

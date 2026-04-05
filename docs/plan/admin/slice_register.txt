@@ -773,9 +773,9 @@ Register By Concern
 - Slice: release-hardening and first public cut
   design: settled as a plan family
   plan phase: 9
-  repo status: published but incomplete
-  repo wave: release_hardening_hosted_slice note
-  docs: docs/plan/release_hardening_hosted_slice.txt, docs/plan/plan.txt, README.md
+  repo status: partial
+  repo wave: release_hardening_hosted_slice note plus Phase 31 support-matrix freeze
+  docs: docs/plan/release_hardening_hosted_slice.txt, docs/plan/phase31_supported_slice_audit_and_support_matrix_freeze.txt, docs/plan/plan.txt, README.md
   end state: explicit supported slice, install path, usage path, checked versus
   release posture, and known limitations for a disciplined first public cut.
 

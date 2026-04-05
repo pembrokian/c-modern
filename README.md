@@ -25,10 +25,14 @@ What is in place:
 
 Supported hosted slice:
 
-- supported compiler host and executable target: Darwin arm64
+- supported compiler host and produced executable target: Darwin arm64 only
 - supported runtime environment: hosted only
-- supported project workflow: direct-source `check` or `build`, hosted project `build` for executable or `staticlib` targets, and hosted project `run` or `test` for executable and checked-test targets that may link admitted in-project static libraries, including deterministic same-build-dir selected-target reuse on the admitted real project proofs
-- unsupported today: non-hosted targets, cross-compilation, shared libraries, package management, external system-library links in project manifests, and any public portability claim beyond Darwin arm64
+- supported direct-source commands: `mc check` and `mc build`
+- supported project commands: `mc check`, `mc build`, `mc run`, and `mc test`
+- admitted project target boundary: hosted `exe` targets, hosted checked-test targets, and one admitted in-project hosted `staticlib` target consumed by executable targets and ordinary tests
+- admitted richer real-project proof set: `examples/real/issue_rollup/`, `examples/real/worker_queue/`, and `examples/real/evented_echo/`
+- supported workflow guarantee on the admitted richer proof: deterministic same-build-dir selected-target reuse without non-selected-target churn
+- unsupported today: non-hosted targets, cross-compilation, shared libraries, external system-library links in project manifests, package management, and any public portability claim beyond Darwin arm64
 
 Build from source:
 
@@ -42,6 +46,17 @@ Compiler entrypoint:
 
 ```sh
 build/debug/mc
+```
+
+Phase 31 support-matrix smoke audit:
+
+```sh
+build/debug/mc check tests/cases/hello.mc
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase31_smoke_return_zero
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase31_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase31_issue_rollup
+build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase31_worker_queue
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase31_evented_echo
 ```
 
 Bootstrap commands:

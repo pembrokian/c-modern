@@ -3,7 +3,7 @@ Phase 30 -- Separate-Compilation And Cross-Target Workflow Hardening
 
 Status
 ------
-COMPLETED (repository-bounded separate-compilation and cross-target workflow hardening)
+PLANNED
 
 Purpose
 -------
@@ -22,8 +22,8 @@ Repository status note
   state.
 - Phase 22 then proved richer dual-executable project workflow and reuse on
   the admitted hosted slice.
-- Phase 28 deepened package grouping and library-first project pressure, and
-  Phase 29 then admitted one bounded hosted `staticlib` target.
+- Phase 28 is intended to deepen package grouping and library-first project
+  pressure, and Phase 29 may or may not admit one bounded `staticlib` target.
 - The slice register still keeps the separate-compilation contract as partial:
   the repository proves key hosted reuse properties, but fuller cross-target
   rebuild truth and broader artifact coordination remain open.
@@ -150,34 +150,3 @@ Acceptance criteria for this document
 - The phase is explicit that trusted rebuild behavior and cross-target
   workflow clarity, not more breadth for its own sake, determine the next
   plateau after the Lane B series.
-
-Implemented slice
------------------
-- `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` now extends the
-  real `examples/real/issue_rollup/` proof with a second executable consumer
-  target linked against the admitted `issue-rollup-core` static library,
-  keeping the Phase 30 pressure on the same real project instead of inventing
-  a separate synthetic graph.
-- The Phase 29 `issue_rollup` rebuild proof now additionally shows selected-
-  target sharpness under one reused build directory: implementation-only and
-  interface-changing edits in the shared library path rebuild the selected
-  executable target, preserve the non-selected sibling executable and its root
-  object until that target is explicitly built, and then rebuild only the
-  newly selected target work that is semantically required.
-- The landed proof therefore covers all four workflow shapes Phase 30 cared
-  about on the richer admitted graph: deterministic no-op reuse, same-build-
-  dir `build` or `run` or `test` or rerun behavior, implementation-only
-  library edits across a target boundary, and interface-visible library edits
-  across more than one executable consumer.
-- The supported hosted workflow statement is now sharper: the repository can
-  honestly claim deterministic selected-target reuse and cross-target
-  non-churn on the admitted hosted project graph, while broader artifact
-  coordination, external libraries, `sharedlib`, package management, and
-  non-hosted workflows remain deferred.
-
-Next-step note
---------------
-Lane B no longer lacks general trust in the admitted build surface. The next
-honest plateau should now be chosen from clearer evidence: either pause Lane B,
-move to Lane C `time` only if a real consumer justifies it, or prioritize the
-next release-hardening step instead of widening project workflow breadth again.

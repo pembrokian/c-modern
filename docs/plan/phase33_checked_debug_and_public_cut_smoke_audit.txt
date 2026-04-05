@@ -1,0 +1,128 @@
+Phase 33 -- Checked, Debug, And Public-Cut Smoke Audit
+======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Cap the Lane D series with one bounded audit of checked-versus-debug posture,
+ repeatable smoke validation, and the exact first public-cut claim the
+ repository can defend after the completed Lane B and documentation-hardening
+ waves.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The current hosted plateau already treats checked ordinary tests as the main
+  safety-validation proof surface while real-project executable runs usually
+  stay in debug mode.
+- The release-hardening note publishes that posture, but it still stops short
+  of a broader explicit audit across admitted examples and ordinary workflow.
+- Phase 31 and Phase 32 are intended to freeze the supported slice and sharpen
+  the first-user command path, so Phase 33 can focus on operational truth
+  instead of wording drift.
+
+Problem being solved
+--------------------
+- The repository can describe its checked-versus-debug posture, but it still
+  needs one clear audit showing what each mode currently proves and what the
+  first public-cut claim actually covers.
+- Without this audit, release-hardening risks ending at documentation cleanup
+  rather than a defensible supported operational statement.
+- The repository therefore needs one bounded smoke and mode-discipline wave
+  over the admitted hosted examples and tests.
+
+Core rule
+---------
+- Audit the current checked and debug posture as it really exists; do not
+  redefine semantics or invent a release-mode completeness claim.
+- Use admitted examples, ordinary tests, and focused smoke commands as proof.
+- Prefer a narrower honest public-cut statement over a broad but weak audit.
+- Keep the result specific to Darwin arm64 hosted workflow.
+- Do not widen into portability, optimizer, packaging, or self-hosting scope.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one focused audit across the admitted real-project
+ examples, ordinary test workflow, and documented smoke commands to establish
+ what debug-mode project runs prove, what checked-mode ordinary tests prove,
+ and what the repository can responsibly call its first public-cut hosted
+ slice.
+
+The audit should answer:
+- which admitted real projects are part of the public-cut smoke set
+- which workflows are expected to pass in debug mode versus checked mode
+- how the project should describe checked validation without implying a broad
+  release-mode audit across the whole language surface
+- what remains explicitly outside the first public-cut claim
+
+What this phase should try to prove
+-----------------------------------
+- the checked-versus-debug statement in README and release docs matches real
+  repeatable workflow on the admitted examples
+- the repository has one documented smoke set that demonstrates the supported
+  hosted slice end to end
+- the first public-cut statement is specific enough to be defended and narrow
+  enough to stay honest
+- any remaining release-facing uncertainty is reduced to one named follow-up
+  rather than broad ambiguity about the supported plateau
+
+Preferred pressure points
+-------------------------
+1. Checked ordinary-test proof versus debug executable-run proof.
+2. Repeatable smoke commands across the admitted real projects.
+3. Explicit first public-cut statement for the hosted plateau.
+4. Sharp list of what is still outside the public-cut claim.
+5. Documentation alignment between README, release-hardening note, and any
+   public-cut summary language.
+
+Deliverables
+------------
+- a refreshed checked-versus-debug audit in
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`
+  and `/Users/ro/dev/c_modern/README.md`
+- one documented public-cut smoke command set covering the admitted hosted
+  slice at the narrowest honest level
+- any focused regression or smoke additions needed to keep the audited claims
+  repeatable
+- bounded updates to backlog or decision-log docs only if the audit exposes a
+  consciously limited public-cut compromise worth preserving
+
+Suggested execution order
+-------------------------
+1. Choose the smallest honest admitted smoke set across direct-source,
+   project-mode, networking, sync, and the richer Lane B project proof.
+2. Re-audit the current checked-versus-debug wording against those proofs.
+3. Tighten the first public-cut statement to match the actual smoke set and
+   supported workflows.
+4. Add or refresh focused smoke validation where the audited claim needs a more
+   repeatable proof surface.
+5. Record anything still excluded from the public-cut posture explicitly.
+
+Exit criteria
+-------------
+- the repository can state one defensible first public-cut hosted slice backed
+  by repeatable smoke proof
+- checked-mode and debug-mode claims are both explicit and non-overstated
+- README and the release-hardening note align on the public-cut posture
+- the next plateau after Lane D is chosen from a cleaner public statement
+  rather than from ambiguous release claims
+
+Non-goals
+---------
+- broad release-mode certification across the full canonical-program surface
+- optimizer, portability, package-management, or self-hosting work
+- new target kinds, new module families, or broader linker policy
+- converting the repository into a general release-engineering project beyond
+  the admitted hosted slice
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 33 stands alone as the checked-versus-debug and public-cut capstone of
+  the Lane D series.
+- The phase is explicit that disciplined supported claims, not aspirational
+  release breadth, determine completion.

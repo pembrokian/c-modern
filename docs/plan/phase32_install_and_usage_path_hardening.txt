@@ -1,0 +1,129 @@
+Phase 32 -- Install And Usage Path Hardening
+===========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Take the frozen supported slice from Phase 31 and turn it into a clearer first-
+ user installation and usage path on the supported Darwin arm64 hosted slice,
+ without widening into distribution, package management, or portability claims.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The repository now has a stronger admitted hosted plateau than the original
+  published release note covered: grouped package roots, one in-project
+  `staticlib` target, and deterministic selected-target reuse all exist on the
+  supported host.
+- Phase 31 is intended to freeze that supported boundary into one explicit
+  support matrix.
+- After that freeze, the next release-hardening leverage is no longer "what is
+  supported?" but "how does a first user build, invoke, and verify it without
+  depending on repository folklore?"
+
+Problem being solved
+--------------------
+- The repository already documents build-from-source and common commands, but
+  the install and usage path still reads as accumulated developer guidance more
+  than a deliberate first public-cut flow.
+- Without one install-path hardening wave, the project can have an accurate
+  support statement while still being awkward to approach or easy to misuse.
+- The repository therefore needs one bounded phase focused on command path,
+  artifact expectations, and supported-host workflow clarity.
+
+Core rule
+---------
+- Harden the supported usage path only for the admitted host and workflow.
+- Prefer explicit manual steps over hidden installers or distribution claims.
+- Keep build-from-source the only supported installation story unless a later
+  owner document admits more.
+- Make ordinary usage reproducible from documented commands, not from implied
+  repository familiarity.
+- Do not use this phase to back-door broader platform or packaging scope.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one documentation and smoke-validation wave covering the
+ supported build-from-source path, compiler entrypoint, canonical command
+ patterns, artifact expectations, and common failure boundaries on Darwin
+ arm64.
+
+The hardened path should clarify:
+- prerequisite host assumptions and command path
+- how `build/debug/mc` is produced and invoked
+- what direct-source and project-mode commands are supported on the admitted
+  slice
+- where build artifacts live and which ones are disposable
+- which common expectations are explicitly unsupported, such as shared
+  libraries, external links in manifests, or package installation flows
+
+What this phase should try to prove
+-----------------------------------
+- a new contributor can follow one documented command path from clone to build
+  to smoke validation on the supported host
+- the documented usage path matches the actual admitted command surface after
+  Phase 30
+- the supported workflow is reviewable enough that failure states feel like
+  unsupported boundaries, not mystery behavior
+- the repository's practical first-user posture improves without changing the
+  underlying supported slice
+
+Preferred pressure points
+-------------------------
+1. Build-from-source command path on Darwin arm64.
+2. Compiler entrypoint and ordinary direct-source versus project-mode command
+   examples.
+3. Build-directory expectations and disposable artifact policy.
+4. Clear statement of unsupported usage expectations.
+5. Focused smoke validation for the documented path.
+
+Deliverables
+------------
+- refreshed installation and usage sections in `/Users/ro/dev/c_modern/README.md`
+  that match the frozen Phase 31 support matrix
+- matching updates in
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`
+  where install-path or usage-path wording sharpens materially
+- focused smoke commands proving the documented build-and-run path on the
+  supported host
+- bounded updates to backlog or decision-log docs only if the install-path
+  audit exposes a deliberately limited compromise worth preserving
+
+Suggested execution order
+-------------------------
+1. Re-read the frozen supported-slice note from Phase 31 and derive one clear
+   build-from-source and usage path from it.
+2. Tighten README installation, command examples, and limitation wording.
+3. Align the hosted release-hardening note to the same first-user flow.
+4. Add or refresh a small documented smoke-validation sequence.
+5. Record any remaining install-path awkwardness explicitly if it is accepted
+   for the current public-cut plateau.
+
+Exit criteria
+-------------
+- the repository documents one clear supported path from clone to build to
+  smoke validation on Darwin arm64
+- the documented command surface matches the actual admitted hosted workflow
+- unsupported expectations are stated clearly enough to prevent accidental
+  overreading of the docs
+- the repository can proceed to checked-versus-debug discipline from a sharper
+  first-user path
+
+Non-goals
+---------
+- binary distribution, package registries, or installer tooling
+- cross-platform installation guidance
+- new capability admission in the compiler, stdlib, runtime, or build graph
+- speculative release engineering beyond the current hosted slice
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 32 stands alone as the install and usage path hardening step in the
+  Lane D series.
+- The phase is explicit that clearer first-user workflow, not more capability,
+  is the main leverage.

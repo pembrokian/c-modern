@@ -1,0 +1,99 @@
+Phase 31 -- Supported Slice Audit And Support Matrix Freeze
+==========================================================
+
+Status
+------
+COMPLETED (repository-bounded supported-slice freeze)
+
+Purpose
+-------
+Record the exact hosted Darwin arm64 supported slice after the completed Lane
+ B series, so the repository's first public-cut posture is frozen from real
+ proof instead of accumulated README prose.
+
+This document is a repository closeout note, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 28 through Phase 30 now prove grouped package layouts, one admitted
+  hosted `staticlib` target, and deterministic selected-target same-build-dir
+  reuse on the richer real project graph.
+- The hosted release-hardening note already existed, but before this phase the
+  supported boundary was still spread across several docs and older examples.
+- The slice register still carried release hardening as an incomplete family
+  rather than a re-audited support-matrix freeze.
+- The current repository has enough admitted breadth that the highest-leverage
+  next step was no longer capability growth by default; it was sharper truth
+  about what the supported slice really is and where it intentionally stops.
+
+What landed
+-----------
+- The hosted release-hardening note now freezes one explicit support matrix for
+  the current admitted slice: Darwin arm64 compiler host and produced
+  executable target, hosted runtime only, direct-source `mc check` and
+  `mc build`, project `mc check`, `mc build`, `mc run`, and `mc test`, one
+  admitted in-project hosted `staticlib` boundary, and deterministic same-
+  build-dir selected-target reuse on the admitted richer project proofs.
+- `README.md` now matches the same support matrix instead of mixing older
+  growth-history bullets with the current public support boundary.
+- The explicit unsupported list is now frozen at the same boundary in the
+  release note and README: non-hosted targets, cross-compilation, shared
+  libraries, external system-library links in project manifests, package
+  management, and portability claims beyond Darwin arm64.
+- The strongest real proof set for the frozen slice is now stated directly:
+  `examples/real/issue_rollup/` for grouped packages, one admitted `staticlib`,
+  and deterministic selected-target reuse; `examples/real/worker_queue/` for
+  the admitted hosted `sync` workflow; and `examples/real/evented_echo/` for
+  the admitted hosted networking workflow.
+- The release-hardening slice entry in the slice register is now recorded as a
+  partial family with a completed Phase 31 support-matrix freeze rather than
+  as an imprecise published-only note.
+
+What did not land
+-----------------
+- This phase did not admit any new compiler, runtime, stdlib, project-graph,
+  or target-kind capability.
+- This phase did not broaden the supported host set, runtime boundary, or
+  linker policy.
+- This phase did not perform the first-user install-path cleanup planned for
+  Phase 32.
+- This phase did not perform the broader checked-versus-debug and public-cut
+  smoke audit planned for Phase 33.
+- This phase did not require backlog or decision-log additions because the
+  audit exposed no new release-facing compromise beyond already-documented
+  unsupported boundaries.
+
+Frozen support matrix
+---------------------
+- supported compiler host and produced executable target: Darwin arm64 only
+- supported runtime boundary: hosted only
+- supported direct-source commands: `mc check` and `mc build`
+- supported project commands: `mc check`, `mc build`, `mc run`, and `mc test`
+- admitted project target boundary: hosted `exe` targets, hosted checked-test
+  targets, and one admitted in-project hosted `staticlib` target consumed by
+  executable targets and ordinary tests
+- strongest admitted real-project proofs: `examples/real/issue_rollup/`,
+  `examples/real/worker_queue/`, and `examples/real/evented_echo/`
+- supported workflow guarantee on the admitted richer proofs: deterministic
+  same-build-dir selected-target reuse without non-selected-target churn
+- unsupported today: non-hosted targets, cross-compilation, shared libraries,
+  external system-library links in project manifests, package management, and
+  any portability claim beyond Darwin arm64
+
+Validation
+----------
+- `build/debug/mc check tests/cases/hello.mc`
+- `build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase31_smoke_return_zero`
+- `build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase31_issue_rollup -- examples/real/issue_rollup/tests/sample.txt`
+- `build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase31_issue_rollup`
+- `build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase31_worker_queue`
+- `build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase31_evented_echo`
+
+Closeout statement
+------------------
+The repository-bounded Phase 31 wave is complete. The repository now has one
+re-audited, sharply bounded supported-hosted-slice statement for the current
+Darwin arm64 plateau, aligned across the release note, README, and slice
+register, with explicit unsupported boundaries and a small repeatable smoke
+set to justify the frozen support matrix.

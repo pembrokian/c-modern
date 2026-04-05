@@ -3,7 +3,7 @@ Phase 29 -- Narrow Static Library Target Admission
 
 Status
 ------
-COMPLETED (repository-bounded hosted static-library admission)
+PLANNED
 
 Purpose
 -------
@@ -157,29 +157,3 @@ Acceptance criteria for this document
   series.
 - The phase is explicit that `staticlib` is conditional on real project proof,
   not an automatic follow-on from package grouping.
-
-Implemented slice
------------------
-- the repository now admits one bounded hosted `staticlib` target kind inside
-  `build.toml` schema v1 and proves it through
-  `/Users/ro/dev/c_modern/examples/real/issue_rollup/`, where
-  `targets.issue-rollup-core` builds a deterministic archive consumed by the
-  thin executable target `issue-rollup`
-- `/Users/ro/dev/c_modern/compiler/driver/project.cpp` now admits `kind =
-  "staticlib"`, while `/Users/ro/dev/c_modern/compiler/driver/driver.cpp`
-  resolves linked static-library targets recursively, treats their modules as
-  interface providers for downstream checking, archives their compiled objects,
-  and relinks executable consumers only when their own objects, runtime
-  support, or linked archives changed
-- ordinary `mc test` workflow now routes generated runner builds through the
-  same project target graph, so the admitted archive boundary is exercised by
-  normal `build`, `run`, and `test` commands rather than only by explicit
-  `mc build --target issue-rollup-core`
-- `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` now covers the
-  explicit static-library build path, static-library run rejection,
-  executable-to-static-library link validation, deterministic run or test or
-  rerun workflow on the real project, implementation-only archive rebuilds,
-  and downstream consumer invalidation after an interface-visible library edit
-- the supported hosted slice remains narrow: `sharedlib`, external
-  system-library links in project manifests, package management,
-  cross-compilation, and non-hosted targets remain deferred explicitly
