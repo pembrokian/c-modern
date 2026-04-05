@@ -20,6 +20,9 @@ add_library(mc_frontend_stub STATIC
     compiler/ast/ast.cpp
     compiler/lex/lexer.cpp
     compiler/parse/parser.cpp
+    compiler/parse/parser_decls.cpp
+    compiler/parse/parser_expr.cpp
+    compiler/parse/parser_statements.cpp
 )
 
 target_include_directories(mc_frontend_stub PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
