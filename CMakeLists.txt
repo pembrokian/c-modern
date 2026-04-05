@@ -42,6 +42,12 @@ target_link_libraries(mc_mci PUBLIC mc_sema_bootstrap mc_support)
 
 add_library(mc_mir STATIC
     compiler/mir/mir.cpp
+    compiler/mir/mir_dump.cpp
+    compiler/mir/mir_lower.cpp
+    compiler/mir/mir_text.cpp
+    compiler/mir/mir_type_utils.cpp
+    compiler/mir/mir_validate_flow.cpp
+    compiler/mir/mir_validate.cpp
 )
 
 target_include_directories(mc_mir PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
