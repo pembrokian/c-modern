@@ -178,6 +178,20 @@ std::string LLVMTypeName(const BackendTypeInfo& type_info) {
     return type_info.backend_name;
 }
 
+std::string RenderLLVMParameter(const BackendTypeInfo& type_info,
+                                const mir::Local& param,
+                                bool include_name) {
+    std::ostringstream stream;
+    stream << type_info.backend_name;
+    if (param.is_noalias) {
+        stream << " noalias";
+    }
+    if (include_name) {
+        stream << " " << LLVMParamName(param.name);
+    }
+    return stream.str();
+}
+
 std::string LLVMZeroValue(const BackendTypeInfo& type_info) {
     if (type_info.backend_name == "float") {
         return "0.0";
@@ -3716,7 +3730,7 @@ bool RenderExecutableFunction(const mir::Module& module,
         if (index > 0) {
             stream << ", ";
         }
-        stream << param_types[index].backend_name << " " << LLVMParamName(params[index]->name);
+        stream << RenderLLVMParameter(param_types[index], *params[index], true);
     }
     stream << ") {\n";
     stream << "entry.alloca:\n";
@@ -3863,7 +3877,7 @@ bool RenderExternFunctionDeclaration(const mir::Module& module,
         if (index > 0) {
             stream << ", ";
         }
-        stream << param_types[index].backend_name;
+        stream << RenderLLVMParameter(param_types[index], *params[index], false);
     }
     stream << ")\n";
     return true;

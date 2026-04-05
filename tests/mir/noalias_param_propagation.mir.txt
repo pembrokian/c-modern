@@ -1,0 +1,7 @@
+Module
+  Function name=read returns=[i32]
+    Local name=ptr type=*i32 param noalias readonly
+    Block label=entry0
+      load_local %v0:*i32 target=ptr
+      unary %v1:i32 op=* operands=[%v0]
+      terminator return values=[%v1]

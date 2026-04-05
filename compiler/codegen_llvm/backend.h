@@ -38,6 +38,7 @@ struct BackendLocal {
     sema::Type type;
     BackendTypeInfo lowered_type;
     bool is_parameter = false;
+    bool is_noalias = false;
     bool is_mutable = true;
 };
 

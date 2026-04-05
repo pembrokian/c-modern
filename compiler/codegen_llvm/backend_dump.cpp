@@ -62,6 +62,9 @@ std::string DumpModule(const BackendModule& module) {
                        << " type=" << FormatTypeInfo(local.lowered_type);
             if (local.is_parameter) {
                 local_line << " param";
+                if (local.is_noalias) {
+                    local_line << " noalias";
+                }
             }
             if (!local.is_mutable) {
                 local_line << " readonly";

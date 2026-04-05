@@ -333,8 +333,8 @@ Register By Concern
 - Slice: aliasing policy and @noalias
   design: settled
   plan phase: 3
-  repo status: partial
-  repo wave: bounded sema and interface-artifact support
+  repo status: admitted
+  repo wave: Phase 26 noalias boundary closure
   docs: docs/arch/language/language_spec.txt, docs/arch/language/semantics/modules_spec.txt
   end state: no C-style strict-aliasing UB; non-aliasing assumptions must be
   explicit; @noalias is part of the semantic and interface contract where admitted.

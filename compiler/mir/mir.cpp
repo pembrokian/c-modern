@@ -894,6 +894,7 @@ class FunctionLowerer {
                 .name = decl_.params[index].name,
                 .type = type,
                 .is_parameter = true,
+                .is_noalias = signature != nullptr && index < signature->param_is_noalias.size() && signature->param_is_noalias[index],
                 .is_mutable = false,
             });
             local_types_[decl_.params[index].name] = type;
@@ -3158,21 +3159,31 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
 
     for (const auto& decl : source_file.decls) {
         if (decl.kind == Decl::Kind::kExternFunc) {
+            const sema::FunctionSignature* signature = sema::FindFunctionSignature(sema_module, decl.name);
             Function function;
             function.name = decl.name;
             function.is_extern = true;
             function.extern_abi = decl.extern_abi;
             function.type_params = decl.type_params;
-            for (const auto& param : decl.params) {
+            for (std::size_t index = 0; index < decl.params.size(); ++index) {
+                const sema::Type type =
+                    (signature != nullptr && index < signature->param_types.size())
+                        ? signature->param_types[index]
+                        : sema::TypeFromAst(decl.params[index].type.get());
                 function.locals.push_back({
-                    .name = param.name,
-                    .type = sema::TypeFromAst(param.type.get()),
+                    .name = decl.params[index].name,
+                    .type = type,
                     .is_parameter = true,
+                    .is_noalias = signature != nullptr && index < signature->param_is_noalias.size() && signature->param_is_noalias[index],
                     .is_mutable = false,
                 });
             }
-            for (const auto& return_type : decl.return_types) {
-                function.return_types.push_back(sema::TypeFromAst(return_type.get()));
+            if (signature != nullptr && !signature->return_types.empty()) {
+                function.return_types = signature->return_types;
+            } else {
+                for (const auto& return_type : decl.return_types) {
+                    function.return_types.push_back(sema::TypeFromAst(return_type.get()));
+                }
             }
             module->functions.push_back(std::move(function));
             continue;
@@ -5081,6 +5092,9 @@ std::string DumpModule(const Module& module) {
             local_line << "Local name=" << local.name << " type=" << sema::FormatType(local.type);
             if (local.is_parameter) {
                 local_line << " param";
+                if (local.is_noalias) {
+                    local_line << " noalias";
+                }
             }
             if (!local.is_mutable) {
                 local_line << " readonly";

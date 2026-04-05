@@ -48,6 +48,7 @@ struct Local {
     std::string name;
     sema::Type type;
     bool is_parameter = false;
+    bool is_noalias = false;
     bool is_mutable = true;
 };
 

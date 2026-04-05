@@ -3,7 +3,7 @@ Phase 26 -- Selected Semantic Surface Widening
 
 Status
 ------
-PLANNED
+COMPLETED
 
 Purpose
 -------
@@ -82,6 +82,18 @@ Chosen implementation bias
 - If neither imported-boundary pressure nor a cleaner tuple or range proof
   exists, keep this phase narrow and record the sharpened revisit trigger
   rather than widening speculatively.
+
+Chosen slice
+------------
+- `@noalias` won this phase.
+- The repository already had parser, sema, sema-dump, and `.mci` preservation
+  for parameter-level `@noalias`, but the accepted promise was still dropped at
+  the MIR and executable LLVM boundary.
+- Tuple and range forms were already materially deeper than parser-only sugar,
+  so they were not the cleanest remaining Lane A owner gap.
+- Generic nominal identity remains a real candidate, but this phase preferred
+  closing the narrower admitted imported or ABI-boundary truth that was
+  already claimed by the language docs and partially preserved by `.mci`.
 
 Target outcomes for the preferred candidates
 --------------------------------------------
@@ -162,6 +174,30 @@ Non-goals
   second-consumer trigger
 - treating parser-only syntax admission as progress when later layers still do
   not own the meaning
+
+Implemented slice
+-----------------
+- preserved parameter-level `@noalias` from sema signatures into MIR parameter
+  locals so the compiler-owned lowered boundary stops dropping the admitted
+  contract after semantic checking
+- preserved the same flag on extern and non-extern parameter surfaces instead
+  of only on sema dumps and `.mci` serialization
+- exposed the preserved flag in deterministic MIR and backend dumps so the
+  contract is reviewable in ordinary fixture tests
+- emitted LLVM parameter `noalias` attributes for admitted pointer-shaped
+  parameters in both function definitions and extern declarations
+- proved the slice with a focused MIR fixture, a backend fixture, the existing
+  `.mci` round-trip coverage, and an executable LLVM IR assertion that checks
+  the emitted `define i32 @load(ptr noalias %arg.ptr)` surface
+
+Closeout statement
+------------------
+Phase 26 is complete. The repository now carries admitted `@noalias` contract
+truth through sema, `.mci`, MIR, backend inspectability, and executable LLVM
+parameter emission for the current hosted slice. Generic nominal identity
+remains the strongest remaining imported-boundary Lane A candidate, while
+tuple or range widening stays pressure-driven and broader imported generic
+procedure-call lowering remains gated on its existing second-consumer trigger.
 
 Acceptance criteria for this document
 -------------------------------------

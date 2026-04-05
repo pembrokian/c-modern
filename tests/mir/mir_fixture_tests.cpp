@@ -249,6 +249,7 @@ int main(int argc, char** argv) {
         {"pointer_int_conversion.mc", "pointer_int_conversion.mir.txt", true, "", {}, {}},
         {"semantic_boundary_intrinsics.mc", "semantic_boundary_intrinsics.mir.txt", true, "", {}, {}},
         {"loop_iteration_defer.mc", "loop_iteration_defer.mir.txt", true, "", {}, {}},
+        {"noalias_param_propagation.mc", "noalias_param_propagation.mir.txt", true, "", {}, {}},
         {"packed_struct.mc", "packed_struct.mir.txt", true, "", {}, {}},
         {"qualified_variant_import_root_ok.mc", "qualified_variant_import_root_ok.mir.txt", true, "", {}, {{"color_module", "import_roots/color_module.mc"}}},
         {"scoped_defer.mc", "scoped_defer.mir.txt", true, "", {}, {}},

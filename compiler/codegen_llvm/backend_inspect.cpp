@@ -1000,6 +1000,7 @@ bool LowerFunction(const mir::Module& module,
             .type = local.type,
             .lowered_type = lowered_type,
             .is_parameter = local.is_parameter,
+            .is_noalias = local.is_noalias,
             .is_mutable = local.is_mutable,
         };
         state.locals.emplace(local.name, backend_local);

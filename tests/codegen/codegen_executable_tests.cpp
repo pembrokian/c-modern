@@ -638,6 +638,42 @@ void RunBuiltFailureFixture(const std::filesystem::path& mc_path,
                             "run built executable " + artifacts.executable.generic_string());
 }
 
+void RunBuiltFixtureWithIrSnippets(const std::filesystem::path& mc_path,
+                                   const std::filesystem::path& source_path,
+                                   const std::filesystem::path& build_dir,
+                                   int expected_exit_code,
+                                   const std::vector<std::string>& run_args,
+                                   const std::vector<std::string>& required_ir_snippets) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          source_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build " + source_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
+    if (!std::filesystem::exists(artifacts.llvm_ir) ||
+        !std::filesystem::exists(artifacts.object) ||
+        !std::filesystem::exists(artifacts.executable)) {
+        Fail("expected build artifacts for fixture: " + source_path.generic_string());
+    }
+
+    const std::string llvm_ir = ReadFile(artifacts.llvm_ir);
+    for (const auto& snippet : required_ir_snippets) {
+        if (llvm_ir.find(snippet) == std::string::npos) {
+            Fail("expected LLVM IR snippet '" + snippet + "' in " + artifacts.llvm_ir.generic_string());
+        }
+    }
+
+    ExpectExecutableExit(artifacts.executable,
+                         run_args,
+                         expected_exit_code,
+                         "run built executable " + artifacts.executable.generic_string());
+}
+
 void RunBuildFailureFixture(const std::filesystem::path& mc_path,
                            const std::filesystem::path& source_path,
                            const std::filesystem::path& build_dir,
@@ -1687,6 +1723,23 @@ int main(int argc, char** argv) {
                     work_root / "buffer_to_slice_supported_build",
                     0,
                     {});
+
+    const std::filesystem::path noalias_param_source = work_root / "noalias_param_ir.mc";
+    WriteFile(noalias_param_source,
+              "func load(@noalias ptr: *i32) i32 {\n"
+              "    return *ptr\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    value: i32 = 7\n"
+              "    return load(&value)\n"
+              "}\n");
+    RunBuiltFixtureWithIrSnippets(mc_path,
+                                  noalias_param_source,
+                                  work_root / "phase26_noalias_param_ir_build",
+                                  7,
+                                  {},
+                                  {"define i32 @load(ptr noalias %arg.ptr)", "call i32 @load(ptr %local.value)"});
 
     return 0;
 }
