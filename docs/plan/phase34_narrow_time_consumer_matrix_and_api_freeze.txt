@@ -3,7 +3,7 @@ Phase 34 -- Narrow Time Consumer Matrix And API Freeze
 
 Status
 ------
-PLANNED
+COMPLETED (consumer-matrix audit closed; Lane C remains deferred)
 
 Purpose
 -------
@@ -101,6 +101,18 @@ Deliverables
   recorded reason
 - one short next-step statement saying either that Phase 35 is authorized for
   a narrow `time` slice or that Lane C remains deferred
+
+Delivered outcome
+-----------------
+- the strongest current candidate and final judgment were audited and recorded
+  in this document, and no admitted real project crossed the bar for a narrow
+  hosted `time` admission
+- the backlog, decision log, and hosted-slice note were sharpened to record
+  the continued Lane C deferral reason instead of forcing a premature API
+  freeze
+- next-step statement: Lane C remains deferred until an admitted project needs
+  monotonic elapsed time, shared deadline values across multiple operations, or
+  sleep or retry behavior that is not already owned by an admitted subsystem
 
 Suggested execution order
 -------------------------

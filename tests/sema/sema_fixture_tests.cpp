@@ -162,6 +162,7 @@ int main(int argc, char** argv) {
         {"const_wraparound_ok.mc", "const_wraparound_ok.sema.txt", {}, true},
         {"global_zero_initialized_ok.mc", "global_zero_initialized_ok.sema.txt", {}, true},
         {"generic_box_ok.mc", "generic_box_ok.sema.txt", {}, true},
+        {"import_aggregate_const_ok_main.mc", "import_aggregate_const_ok_main.sema.txt", {}, true},
         {"import_alias_ok_main.mc", "import_alias_ok_main.sema.txt", {}, true},
         {"import_const_array_ok_main.mc", "import_const_array_ok_main.sema.txt", {}, true},
         {"import_ok_main.mc", "import_ok_main.sema.txt", {}, true},

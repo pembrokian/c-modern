@@ -1,0 +1,141 @@
+Phase 37 -- Post-Phase-34 Plateau Re-Audit And Deferred-Frontier Alignment
+===========================================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Start the next active series after the blocked Lane C gate by re-auditing the
+current plateau, aligning the planning surface, and making the deferred
+frontier explicit now that Phase 34 closed without authorizing `time`.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 34 completed and explicitly kept Lane C deferred.
+- Phase 35 and Phase 36 remain preserved future-owner docs, but they are
+  blocked behind the Phase 34 revisit trigger and should not be treated as the
+  next active implementation phases.
+- The admitted repository slice now includes the completed Lane B and Lane D
+  work, while the remaining outward-growth families are still consumer-gated:
+  broader imported generic procedure-call lowering, broader `time`, and
+  broader linker or shared-library surface.
+- The repository therefore needs a short truth-refresh plateau before opening
+  a new active capability wave.
+
+Problem being solved
+--------------------
+- The repository has several preserved deferred fronts, but not all planning
+  summary docs yet reflect the current reality: Phase 34 closed, Phase 35 and
+  Phase 36 are blocked, and the next active work should start at Phase 37.
+- Without one re-audit and alignment wave, future planning could drift back
+  into stale next-series wording or accidentally imply that blocked Lane C
+  work is still the current execution path.
+- The repository needs one explicit plateau note that reconciles backlog,
+  overview docs, release-facing notes, and deferred future-owner docs.
+
+Core rule
+---------
+- Preserve blocked or deferred owner docs; do not archive useful future plans
+  just because they are not active.
+- Distinguish clearly between completed, blocked, deferred, and active-next
+  work.
+- Prefer updating central planning summaries over scattering status notes into
+  many unrelated phase docs.
+- Keep revisit triggers sharp enough that blocked families can reopen from
+  real pressure rather than memory.
+- Do not use this phase to introduce new capability work.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one planning-truth refresh across the backlog, the main
+next-series overview notes, the slice register where needed, and any narrow
+release-facing summaries that still imply an outdated next step.
+
+The refresh should state explicitly:
+- Phase 34 completed and kept Lane C deferred
+- Phase 35 and Phase 36 remain reserved blocked follow-ons rather than active
+  next work
+- the next active series begins at Phase 37
+- the remaining outward-growth fronts are still gated by named revisit
+  triggers, not ambient completeness pressure
+
+What this phase should try to prove
+-----------------------------------
+- the planning surface says the same thing everywhere about the current
+  deferred frontier
+- blocked Lane C follow-ons are preserved without confusing the active phase
+  sequence
+- the next active maintenance plateau is documented as a deliberate choice,
+  not as a numbering accident
+- future reopening triggers for Lane A, Lane B, and Lane C are still easy to
+  find and interpret
+
+Preferred pressure points
+-------------------------
+1. Backlog alignment after the completed Phase 34 gate.
+2. Overview-note alignment for the next active series.
+3. Clear status relationship between Phase 34, Phase 35, and Phase 36.
+4. Explicit statement that active planning resumes at Phase 37.
+5. Preservation of revisit triggers for blocked capability families.
+
+Deliverables
+------------
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt`
+- bounded updates to the relevant next-series overview note or notes under
+  `/Users/ro/dev/c_modern/docs/plan/admin/`
+- slice-register or hosted-slice wording updates only if they still imply
+  that a blocked Lane C follow-through is the current next step
+- one short plateau note stating what remains blocked, what remains deferred,
+  and why the next active work starts at Phase 37
+
+Delivered outcome
+-----------------
+- the backlog and the main surviving next-series overview notes now agree
+  that Phase 34 completed, Lane C remains deferred, and Phase 35 and Phase 36
+  are preserved blocked future-owner docs rather than the active next steps
+- this document now serves as the explicit plateau note recording why active
+  work resumes at Phase 37 instead of flowing directly into Lane C follow-ons
+- the slice register and hosted-slice summary did not require edits because
+  they already described the current supported slice without implying that
+  blocked Lane C work remained the live next step
+- the aligned planning surface now provides the baseline for the Phase 38 and
+  Phase 39 maintenance follow-through work
+
+Suggested execution order
+-------------------------
+1. Re-audit the current planning summaries against the completed Phase 34 doc
+   and the blocked Phase 35 and Phase 36 follow-ons.
+2. Update backlog and overview notes first.
+3. Add a short explicit statement that Phase 35 and Phase 36 remain preserved
+   but blocked.
+4. Refresh any release-facing wording only if it still implies a live Lane C
+   follow-through.
+5. Use the aligned result as the baseline for the next active implementation
+   plateau.
+
+Exit criteria
+-------------
+- the planning surface is aligned around the post-Phase-34 deferred frontier
+- Phase 35 and Phase 36 are preserved as blocked follow-ons without obscuring
+  the next active work
+- the next active series is stated clearly as starting at Phase 37
+- no new capability work is implied by the alignment itself
+
+Non-goals
+---------
+- reopening Lane C despite the completed Phase 34 deferral decision
+- archiving or deleting blocked future-owner docs
+- opening a new compiler, runtime, or linker capability family
+- treating numbering cleanup alone as enough without updating the summary docs
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 37 stands alone as the planning-truth refresh after the blocked Lane C
+  gate.
+- The phase is explicit that preserved blocked docs are part of the planning
+  history and revisit surface, not clutter to be hidden.

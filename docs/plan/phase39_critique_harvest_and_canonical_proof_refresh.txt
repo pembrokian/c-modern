@@ -1,0 +1,289 @@
+Phase 39 -- Critique Harvest And Canonical Proof Refresh
+========================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Cap the maintenance plateau by harvesting the highest-value still-relevant
+critique items across the current codebase and refreshing proof or planning
+docs so every remaining deferred limitation still has a clear owner and revisit
+trigger.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The repository has accumulated critique material from earlier phases when
+  several core subsystems were structurally rougher than they are today.
+- After Phase 38, the driver and tooling boundaries should be cleaner, but the
+  broader repository still benefits from a selective critique harvest rather
+  than letting old reviews become dead literature.
+- The planning system also relies on explicit proof and explicit deferral, so
+  critique follow-through should refresh canonical proof or planning truth where
+  appropriate instead of touching code only.
+
+Problem being solved
+--------------------
+- Older critique notes still mix landed items, obsolete items, still-relevant
+  low-risk fixes, and larger architectural concerns.
+- Without one selective harvest phase, the repository risks either ignoring
+  useful review findings or reopening broad architectural work without proof.
+- The repository needs one bounded pass that closes the most valuable remaining
+  small or medium issues and refreshes proof docs where those closures change
+  the documented state.
+
+Core rule
+---------
+- Harvest only critique items that are still relevant to the current codebase.
+- Prefer correctness, determinism, clarity, and owner-boundary fixes over
+  cosmetic cleanup.
+- Update proof or planning docs when a critique closure materially changes what
+  is still deferred or what is already trusted.
+- Leave large architectural redesigns deferred unless a new real blocker makes
+  them the narrowest honest next step.
+- Keep the public capability slice unchanged in this phase.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one cross-cutting cleanup wave that re-audits older
+critiques against the current code, closes the best still-relevant small or
+medium issues, and refreshes the narrowest relevant proof or planning docs.
+
+Strong candidate harvest areas
+------------------------------
+- deterministic helper behavior that still relies on historical assumptions
+- documentation gaps where invariants are important and still underexplained
+- low-risk asserts or validation tightening in internal compiler layers
+- planning or proof docs that still mention stale blockers or outdated owner
+  assumptions after recent landing work
+
+What this phase should try to prove
+-----------------------------------
+- older critique material has been converted into current repository truth
+  rather than ignored or blindly followed
+- remaining deferred architecture work is sharper and smaller after the
+  harvest
+- proof and planning docs still describe the current plateau honestly
+- the repository exits the maintenance plateau with cleaner deferred boundaries
+  and less stale internal review debt
+
+Preferred pressure points
+-------------------------
+1. Still-relevant critique findings with correctness or determinism impact.
+2. Invariant documentation where subtle behavior remains easy to misread.
+3. Narrow validator or assert tightening in internal compiler layers.
+4. Canonical or planning doc refresh where recent work invalidated old notes.
+5. Explicit preservation of larger deferred redesign items for later proof.
+
+Deliverables
+------------
+- targeted fixes for the highest-value still-relevant critique items at the
+  narrowest correct owners
+- focused tests or proof refresh where touched behavior is externally visible
+  or determinism-sensitive
+- bounded updates to planning or proof docs that now need fresher owner truth
+- one short next-step note stating whether the repository should next reopen a
+  blocked capability lane or continue with further maintenance only if a new
+  real pressure appears
+
+Delivered outcome
+-----------------
+- the highest-value still-live small critique item closed in this phase was the
+  backend-side malformed numeric metadata path: executable emission no longer
+  relies on exception-throwing numeric parsing for backend integer-width or
+  `variant_extract` payload-index decoding
+- malformed `variant_extract` payload metadata now fails with a direct backend
+  diagnostic instead of risking process termination, and the proof lives in the
+  focused `mc_codegen_llvm_unit` regression coverage
+- one still-important invariant doc gap was also tightened at the current
+  owner boundary: imported build-unit namespacing now carries an explicit
+  comment explaining that every symbol-bearing MIR field must be rewritten in
+  the namespacing helper when new instruction fields are added
+- the older Phase 8 critique action plan now records which findings were later
+  harvested by Phases 38 and 39, so those items stop reading like untouched
+  debt while larger architectural findings remain explicitly deferred
+- next-step statement: do not reopen a blocked capability lane yet; the
+  maintenance plateau can now end, and the next active capability wave should
+  open only when a new admitted consumer or correctness pressure makes one lane
+  the narrowest honest next step
+
+Suggested execution order
+-------------------------
+1. Re-audit older critique notes against current code, marking obsolete items
+   mentally before choosing any implementation work.
+2. Land the still-relevant small or medium fixes with the clearest proof value.
+3. Refresh any planning or proof docs made stale by those closures.
+4. Record any still-deferred larger redesigns explicitly instead of letting
+   them masquerade as unreviewed debt.
+5. Use the cleaner result to choose the next plateau from evidence.
+
+Exit criteria
+-------------
+- the repository has converted the best remaining critique findings into
+  current code or current documented deferral
+- stale blockers or stale owner assumptions no longer linger in proof docs
+- remaining larger redesigns are still explicit but sharper than before
+- the maintenance plateau ends with a cleaner foundation for the next real
+  capability pressure wave
+
+Non-goals
+---------
+- broad subsystem rewrites justified only by old critique scale
+- reopening blocked capability families without new admitted consumer pressure
+- turning every historical review note into mandatory implementation work
+- expanding the public supported slice during the critique harvest
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 39 stands alone as the critique-harvest and proof-refresh capstone for
+  the post-Phase-34 maintenance plateau.
+- The phase is explicit that selective current-value follow-through, not total
+  historical cleanup, is the goal.Phase 39 -- Critique Harvest And Canonical Proof Refresh
+========================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Cap the maintenance plateau by harvesting the highest-value still-relevant
+critique items across the current codebase and refreshing proof or planning
+docs so every remaining deferred limitation still has a clear owner and revisit
+trigger.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The repository has accumulated critique material from earlier phases when
+  several core subsystems were structurally rougher than they are today.
+- After Phase 38, the driver and tooling boundaries should be cleaner, but the
+  broader repository still benefits from a selective critique harvest rather
+  than letting old reviews become dead literature.
+- The planning system also relies on explicit proof and explicit deferral, so
+  critique follow-through should refresh canonical proof or planning truth where
+  appropriate instead of touching code only.
+
+Problem being solved
+--------------------
+- Older critique notes still mix landed items, obsolete items, still-relevant
+  low-risk fixes, and larger architectural concerns.
+- Without one selective harvest phase, the repository risks either ignoring
+  useful review findings or reopening broad architectural work without proof.
+- The repository needs one bounded pass that closes the most valuable remaining
+  small or medium issues and refreshes proof docs where those closures change
+  the documented state.
+
+Core rule
+---------
+- Harvest only critique items that are still relevant to the current codebase.
+- Prefer correctness, determinism, clarity, and owner-boundary fixes over
+  cosmetic cleanup.
+- Update proof or planning docs when a critique closure materially changes what
+  is still deferred or what is already trusted.
+- Leave large architectural redesigns deferred unless a new real blocker makes
+  them the narrowest honest next step.
+- Keep the public capability slice unchanged in this phase.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one cross-cutting cleanup wave that re-audits older
+critiques against the current code, closes the best still-relevant small or
+medium issues, and refreshes the narrowest relevant proof or planning docs.
+
+Strong candidate harvest areas
+------------------------------
+- deterministic helper behavior that still relies on historical assumptions
+- documentation gaps where invariants are important and still underexplained
+- low-risk asserts or validation tightening in internal compiler layers
+- planning or proof docs that still mention stale blockers or outdated owner
+  assumptions after recent landing work
+
+What this phase should try to prove
+-----------------------------------
+- older critique material has been converted into current repository truth
+  rather than ignored or blindly followed
+- remaining deferred architecture work is sharper and smaller after the
+  harvest
+- proof and planning docs still describe the current plateau honestly
+- the repository exits the maintenance plateau with cleaner deferred boundaries
+  and less stale internal review debt
+
+Preferred pressure points
+-------------------------
+1. Still-relevant critique findings with correctness or determinism impact.
+2. Invariant documentation where subtle behavior remains easy to misread.
+3. Narrow validator or assert tightening in internal compiler layers.
+4. Canonical or planning doc refresh where recent work invalidated old notes.
+5. Explicit preservation of larger deferred redesign items for later proof.
+
+Deliverables
+------------
+- targeted fixes for the highest-value still-relevant critique items at the
+  narrowest correct owners
+- focused tests or proof refresh where touched behavior is externally visible
+  or determinism-sensitive
+- bounded updates to planning or proof docs that now need fresher owner truth
+- one short next-step note stating whether the repository should next reopen a
+  blocked capability lane or continue with further maintenance only if a new
+  real pressure appears
+
+Delivered outcome
+-----------------
+- the highest-value still-live small critique item closed in this phase was the
+  backend-side malformed numeric metadata path: executable emission no longer
+  relies on exception-throwing numeric parsing for backend integer-width or
+  `variant_extract` payload-index decoding
+- malformed `variant_extract` payload metadata now fails with a direct backend
+  diagnostic instead of risking process termination, and the proof lives in the
+  focused `mc_codegen_llvm_unit` regression coverage
+- one still-important invariant doc gap was also tightened at the current
+  owner boundary: imported build-unit namespacing now carries an explicit
+  comment explaining that every symbol-bearing MIR field must be rewritten in
+  the namespacing helper when new instruction fields are added
+- the older Phase 8 critique action plan now records which findings were later
+  harvested by Phases 38 and 39, so those items stop reading like untouched
+  debt while larger architectural findings remain explicitly deferred
+- next-step statement: do not reopen a blocked capability lane yet; the
+  maintenance plateau can now end, and the next active capability wave should
+  open only when a new admitted consumer or correctness pressure makes one lane
+  the narrowest honest next step
+
+Suggested execution order
+-------------------------
+1. Re-audit older critique notes against current code, marking obsolete items
+   mentally before choosing any implementation work.
+2. Land the still-relevant small or medium fixes with the clearest proof value.
+3. Refresh any planning or proof docs made stale by those closures.
+4. Record any still-deferred larger redesigns explicitly instead of letting
+   them masquerade as unreviewed debt.
+5. Use the cleaner result to choose the next plateau from evidence.
+
+Exit criteria
+-------------
+- the repository has converted the best remaining critique findings into
+  current code or current documented deferral
+- stale blockers or stale owner assumptions no longer linger in proof docs
+- remaining larger redesigns are still explicit but sharper than before
+- the maintenance plateau ends with a cleaner foundation for the next real
+  capability pressure wave
+
+Non-goals
+---------
+- broad subsystem rewrites justified only by old critique scale
+- reopening blocked capability families without new admitted consumer pressure
+- turning every historical review note into mandatory implementation work
+- expanding the public supported slice during the critique harvest
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 39 stands alone as the critique-harvest and proof-refresh capstone for
+  the post-Phase-34 maintenance plateau.
+- The phase is explicit that selective current-value follow-through, not total
+  historical cleanup, is the goal.

@@ -1,0 +1,119 @@
+Phase 41 -- Second Imported Generic Consumer Follow-Through
+===========================================================
+
+Status
+------
+PLANNED (conditional on Phase 40 choosing the compiler-owned frontier)
+
+Purpose
+-------
+If Phase 40 lands a second independent imported generic procedure-typed
+consumer, use that proof to reopen the deferred imported generic procedure-call
+lowering frontier at the correct compiler owner.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The current admitted typed `sync.thread_spawn<T>` surface remains honest only
+  through a narrower compiler-owned rewrite.
+- That broader imported generic procedure-call frontier has been intentionally
+  deferred since earlier re-audits because no second admitted consumer existed.
+- Phase 40 is the required discovery gate: this phase should run only if it
+  identifies a second real imported generic procedure-typed consumer beyond the
+  current sync path.
+- If Phase 40 chooses a different owner frontier, this phase remains preserved
+  but inactive.
+
+Problem being solved
+--------------------
+- The repository still carries one explicit imported generic procedure-call
+  limitation, but until now it has not had enough consumer pressure to justify
+  broadening the MIR or compiler path that supports it.
+- Once a second consumer exists, the old narrow rewrite becomes a stronger sign
+  that the remaining limitation is real rather than theoretical.
+- The repository then needs one bounded compiler-owner follow-through wave that
+  broadens support only as far as those admitted consumers require.
+
+Core rule
+---------
+- Reopen this frontier only if Phase 40 proves a second admitted consumer.
+- Fix the limitation at the owning compiler boundary rather than by adding
+  consumer-local shims.
+- Broaden only the minimum imported generic procedure-call behavior required by
+  the admitted consumers.
+- Preserve deterministic MIR, backend, and `.mci` proof as the path widens.
+- Keep unrelated generic or template-like breadth out of scope.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: two admitted imported generic procedure-typed consumer
+surfaces, including the existing `sync.thread_spawn<T>` path and the new
+pressure artifact chosen by Phase 40, both working honestly without a
+consumer-specific special rewrite boundary.
+
+What this phase should try to prove
+-----------------------------------
+- the deferred imported generic procedure-call limitation is now a real admitted
+  compiler gap instead of a hypothetical one
+- the chosen widening sits at the correct owner boundary in sema, MIR, or
+  lowering rather than in driver or example code
+- the admitted consumers both survive through MIR and backend proof without
+  consumer-specific exceptions
+- remaining generic breadth is still sharply bounded after the follow-through
+
+Preferred pressure points
+-------------------------
+1. The existing typed `sync.thread_spawn<T>` path.
+2. One second imported generic procedure-typed consumer from Phase 40.
+3. Deterministic MIR and backend proof for the widened path.
+4. Explicit removal or narrowing of consumer-specific rewrite logic.
+5. Clear documentation of any generic call shapes that still remain deferred.
+
+Deliverables
+------------
+- the narrowest compiler-owner implementation changes needed to support the
+  now-justified broader imported generic procedure-call path
+- focused sema, MIR, backend, and real-project or canonical proof for both
+  admitted consumers
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` recording what part of
+  the old deferred frontier is now closed and what remains deferred
+- documentation refresh only if the admitted hosted or compiler slice changes
+  materially
+
+Suggested execution order
+-------------------------
+1. Reconfirm the two admitted consumers and isolate the exact owning compiler
+   boundary that still forces the narrow rewrite.
+2. Land the smallest compiler-owner widening that removes the admitted
+   distortion.
+3. Prove both consumers through deterministic MIR and backend coverage.
+4. Remove or sharply narrow the older consumer-specific workaround.
+5. Record any remaining generic breadth as still deferred with a new sharper
+   trigger.
+
+Exit criteria
+-------------
+- the repository honestly supports the two admitted imported generic
+  procedure-typed consumers without relying on a one-consumer workaround
+- the widening remains bounded to the admitted pressure rather than expanding
+  generic semantics broadly
+- remaining generic call limitations are fewer and more sharply named than
+  before this phase
+
+Non-goals
+---------
+- general generic-function completion unrelated to the admitted consumers
+- broad type-system or parser widening
+- reopening blocked `time` or broader linker work in the same phase
+- adding consumer-local special cases instead of fixing the owning compiler
+  boundary
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 41 stands alone as the conditional compiler-owner follow-through for a
+  second imported generic procedure-typed consumer.
+- The phase is explicit that it only activates if Phase 40 chooses this
+  frontier.

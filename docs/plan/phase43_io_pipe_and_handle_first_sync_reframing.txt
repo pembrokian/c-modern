@@ -1,0 +1,162 @@
+Phase 43 -- io.pipe Admission And Handle-First Concurrency Proof
+===============================================================
+
+Status
+------
+IMPLEMENTED (repository-bounded admitted slice)
+
+Purpose
+-------
+Admit the narrowest honest portable `io.pipe` surface and one bounded proof
+program that demonstrates the preferred execution-plus-handles communication
+model without widening into channels, schedulers, async syntax, or a larger
+runtime policy story.
+
+This document is a repository execution plan, not a claim that the broader
+long-term concurrency roadmap is complete.
+
+Repository status note
+----------------------
+- The current hosted `io` plus `net` slice already follows a handle-first
+  design: one portable `File` type, fallible `read` or `write` or `close`,
+  and readiness polling in `io` rather than `sync`.
+- The current hosted `sync` slice remains broader than the preferred portable
+  communication model because it also admits mutexes, condition variables, and
+  narrow atomic publication.
+- The real `examples/real/worker_queue/` project is currently an honest
+  low-level shared-memory proof on the admitted `sync` surface, not evidence
+  that shared-memory coordination should be the primary portable story.
+- The repository now has a portable `io.Pipe` plus `io.pipe()` primitive in
+  `stdlib/io.mc`, hosted runtime support in `runtime/hosted/mc_hosted_runtime.c`,
+  and the real `examples/real/pipe_handoff/` project proving that model
+  directly through the ordinary workflow path.
+
+What landed
+-----------
+- `stdlib/io.mc` now exports `Pipe` plus `pipe()` beside the existing handle,
+  byte-I/O, and poller surface.
+- `runtime/hosted/mc_hosted_runtime.c` now implements `__mc_io_pipe(...)` and
+  uses ordinary descriptor writes in `__mc_io_write_file(...)` so the same API
+  composes honestly across sockets and pipe endpoints.
+- `examples/real/pipe_handoff/` now proves one bounded thread-plus-pipe
+  handoff through ordinary project `mc run` or `mc test` workflow.
+- `examples/real/pipe_ready/` now proves one bounded thread-plus-pipe
+  readiness workflow over `io.poller_wait(...)`, showing that the admitted
+  portable poller composes honestly with pipe endpoints.
+- `tests/tool/phase7_tool_tests.cpp` now covers deterministic run-test-rerun
+  and test-run-retest sequences for both pipe projects.
+
+Validation run
+--------------
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build -R mc_phase7_tool_unit --output-on-failure`
+
+Problem that was solved
+-----------------------
+- The repository stated that portable communication should prefer explicit
+  execution plus handles plus readiness waiting, but that direction is not yet
+  backed by an admitted pipe-style primitive or proof artifact.
+- Without `io.pipe`, the preferred communication model remained rhetorical while
+  the strongest admitted real sync project still demonstrates shared-memory
+  coordination.
+- The honest follow-through was therefore not to remove the current
+  low-level `sync` surface, but to add the missing minimal handle-based
+  communication primitive and prove it through one bounded project.
+
+Core rules
+----------
+- Keep the primitive in `io`, not `sync`.
+- Keep endpoints as ordinary `io.File` handles so they compose directly with
+  `read`, `write`, `close`, and `poller_*`.
+- Do not admit channels, actors, futures, promises, or scheduler-driven
+  runtime policy as part of this phase.
+- Preserve `examples/real/worker_queue/` as an admitted low-level shared-
+  memory proof rather than treating it as mistaken or obsolete.
+- Land the narrowest real proof that demonstrates handle-based communication
+  between independent execution contexts.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+- minimal portable `io.Pipe` plus `io.pipe()` admission
+- one bounded project-mode proof using `sync.thread_spawn`, `io.pipe`, and
+  ordinary `io.read` or `io.write`
+- optional `io.poller_*` use only if the proof genuinely needs readiness
+  waiting rather than blocking handoff alone
+
+What this phase should try to prove
+-----------------------------------
+- the repository can support one honest portable pipe-style communication path
+  without widening into a richer concurrency framework
+- `io` remains the owner of communication handles and coordination-by-
+  readiness while `sync` remains the owner of execution
+- the admitted real-project example story can distinguish preferred
+  handle-based communication from explicit low-level shared-memory escape
+  hatches
+- the current low-level shared-memory proof remains admitted without being
+  mistaken for the primary portable model
+
+Preferred pressure points
+-------------------------
+1. `io.pipe()` returning a small concrete `Pipe` record with `read_end` and
+   `write_end` fields of type `io.File`.
+2. Runtime-hosted support that maps the pipe primitive onto the admitted host
+   platform without widening the portable surface.
+3. One bounded real project such as a thread handoff, line relay, or worker
+   notification tool that uses `sync.thread_spawn` plus `io.pipe` rather than
+   mutex plus condvar coordination.
+4. Deterministic project `mc run` or `mc test` proof for the admitted pipe
+   project through the ordinary workflow path.
+5. Documentation refresh that keeps `worker_queue` as the low-level shared-
+  memory proof and the new pipe projects as the preferred handle-first proof
+  pair.
+
+Deliverables
+------------
+- minimal stdlib `io` API additions for `Pipe` and `pipe()`
+- the narrowest hosted runtime support required by that API on Darwin arm64
+- one bounded real project proof under `examples/real/`
+- focused tool or stdlib coverage for build, run, and ordinary-test workflow
+  on the admitted project
+- bounded updates to `README.md`, `examples/README.md`, and the Phase 8
+  evidence docs so the example taxonomy stays honest
+
+Suggested execution order
+-------------------------
+1. Freeze the exact portable `io.Pipe` and `io.pipe()` signature in stdlib and
+   spec docs.
+2. Land the narrowest hosted runtime implementation that returns ordinary
+   `io.File` endpoints.
+3. Add one bounded real project proving thread-plus-pipe communication.
+4. Extend tool or project workflow coverage to include deterministic run or
+   test proof for the new project.
+5. Refresh the public and Phase 8 docs so the example story distinguishes the
+   preferred handle-first proof from the retained low-level shared-memory proof.
+
+Exit criteria
+-------------
+- the repository admits a portable `io.pipe()` primitive that composes through
+  ordinary `io.File` operations
+- one bounded real project proves handle-based communication between
+  independent execution contexts through the ordinary project workflow
+- `worker_queue` remains explicitly admitted as the low-level shared-memory
+  proof rather than the primary portable communication example
+- no broader scheduler, async, channel, actor, or promise surface is admitted
+  as collateral scope
+
+Non-goals
+---------
+- replacing or deleting the current hosted `sync` surface
+- broadening atomics beyond the current narrow publication slice
+- admitting non-blocking pipe semantics, general subprocesses, or a broader
+  `os` family in the same wave
+- adding multi-producer queue frameworks, channel libraries, or task
+  schedulers under the name of pipe support
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 43 stands alone as the repository plan for `io.pipe` plus one
+  handle-first communication proof.
+- The document is explicit that the phase preserves the current low-level
+  shared-memory sync proof while changing which real project is treated as the
+  preferred communication example.

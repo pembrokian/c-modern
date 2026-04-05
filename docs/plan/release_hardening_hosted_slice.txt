@@ -25,7 +25,12 @@ Frozen support matrix
   targets, and one admitted hosted `staticlib` target consumed inside one
   project by executable targets and ordinary tests
 - admitted richer real-project proof set: `examples/real/issue_rollup/`,
-  `examples/real/worker_queue/`, and `examples/real/evented_echo/`
+  `examples/real/worker_queue/`, `examples/real/pipe_handoff/`,
+  `examples/real/pipe_ready/`, and `examples/real/evented_echo/`, with
+  `worker_queue` scoped as the low-level shared-memory sync proof,
+  `pipe_handoff` as the direct handle-first communication proof,
+  `pipe_ready` as the poller-coupled pipe-readiness proof, and
+  `evented_echo` as the stronger networking proof over the same handle model
 - supported workflow guarantee on the admitted richer proof: deterministic
   selected-target same-build-dir reuse without non-selected-target churn
 - unsupported today: non-hosted targets, cross-compilation, shared library
@@ -107,6 +112,8 @@ build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/
 build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
 build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup
 build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase33_worker_queue
+build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
+build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/phase43_pipe_ready
 build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase33_evented_echo
 ```
 
@@ -117,7 +124,12 @@ This smoke set proves, at the narrowest honest level:
 - debug-mode project executable run through the admitted grouped-package and
   in-project `staticlib` boundary
 - checked ordinary-test workflow on the richer grouped project proof
-- checked ordinary-test workflow on the admitted hosted `sync` project proof
+- checked ordinary-test workflow on the admitted low-level shared-memory
+  hosted `sync` project proof
+- checked ordinary-test workflow on the admitted direct handle-first
+  communication proof over `io.pipe()`
+- checked ordinary-test workflow on the admitted poller-coupled pipe-readiness
+  proof over `io.pipe()` plus `io.poller_*`
 - checked ordinary-test workflow on the admitted hosted networking project
   proof
 
@@ -129,7 +141,11 @@ build, project-mode debug executable runs, checked ordinary tests, grouped
 internal package layouts, one admitted in-project static-library archive
 boundary, deterministic selected-target same-build-dir reuse without non-
 selected-target churn on the admitted richer project proof, and the admitted
-real `issue_rollup`, `worker_queue`, and `evented_echo` examples.
+real `issue_rollup`, `worker_queue`, `pipe_handoff`, `pipe_ready`, and
+`evented_echo` examples, with `worker_queue` scoped as the low-level
+shared-memory sync proof, `pipe_handoff` as the direct handle-first
+communication proof, and `pipe_ready` as the poller-coupled pipe-readiness
+proof.
 
 It does not honestly claim broad release-mode certification across the full
 canonical-program surface, portability beyond Darwin arm64, package
@@ -142,13 +158,20 @@ Known limitations
 - the current networking slice is intentionally narrow: IPv4 TCP listen,
   accept, and connect plus a portable poller surface; no UDP, DNS, TLS, async
   runtime, or scheduler claims are made
+- the current portable I/O surface now also includes a minimal blocking
+  `io.Pipe` plus `io.pipe()` admission proved by `examples/real/pipe_handoff/`;
+  it also now proves poller-coupled pipe readiness through
+  `examples/real/pipe_ready/`; channel libraries, richer IPC policy,
+  non-blocking pipe semantics beyond the current readiness proof, and
+  subprocess piping remain out of scope
 - the repository now admits a narrow hosted `sync` slice: typed thread spawn
   or join plus mutex init, destroy, lock, unlock, condvar init, destroy,
   wait, signal, and a narrow `MemoryOrder` plus `Atomic<T>` load or store
   surface proved by the shared-counter, producer-consumer, and atomic-
   publication canonical executables plus the real `examples/real/worker_queue/`
-  project; atomic read-modify-write operations, condvar broadcast, and broader
-  portability claims remain out of scope
+  project as an explicit low-level shared-memory proof; atomic read-modify-
+  write operations, condvar broadcast, and broader portability claims remain
+  out of scope
 - the repository does not yet claim `hal`, `time`, or `os` as general admitted
   module families beyond the already-narrow current surfaces recorded in the
   phase documents

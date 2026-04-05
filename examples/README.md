@@ -14,7 +14,9 @@ Current repository-specific admitted real projects:
 - `real/file_walker/` for deterministic recursive file traversal
 - `real/hash_tool/` for bounded whole-file checksum output
 - `real/arena_expr/` for arena-backed expression parsing and normalization
-- `real/worker_queue/` for bounded producer-or-worker queue pressure on the admitted hosted `sync` slice
+- `real/worker_queue/` for bounded producer-or-worker queue pressure on the admitted hosted `sync` slice as an explicit low-level shared-memory proof rather than the preferred portable communication model
+- `real/pipe_handoff/` for the admitted handle-first thread-plus-pipe communication proof on the minimal `io.pipe()` surface
+- `real/pipe_ready/` for the admitted poller-coupled pipe-readiness proof on `io.pipe()` plus `io.poller_*`
 - `real/evented_echo/` for the admitted hosted networking project proof
 - `real/evented_partial_write/` for the admitted partial-write networking follow-on
 
@@ -26,8 +28,12 @@ build/debug/mc run --project examples/real/file_walker/build.toml --build-dir bu
 build/debug/mc run --project examples/real/hash_tool/build.toml --build-dir build/debug/phase8_hash -- examples/real/hash_tool/tests/sample.txt
 build/debug/mc run --project examples/real/arena_expr/build.toml --build-dir build/debug/phase8_expr -- examples/real/arena_expr/tests/sample.expr
 build/debug/mc run --project examples/real/worker_queue/build.toml --build-dir build/debug/phase20_worker_queue
+build/debug/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
+build/debug/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/phase43_pipe_ready
 build/debug/mc test --project examples/real/arena_expr/build.toml --build-dir build/debug/phase8_expr_tests
 build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase20_worker_queue
+build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
+build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/phase43_pipe_ready
 ```
 
 These projects are repository-owned proof artifacts for the admitted repository slice, not claims that the broader long-term real-program surface is complete.

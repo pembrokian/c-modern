@@ -63,6 +63,8 @@ Toolchain companion module:
 - examples: readers, writers, `stdin`, `stdout`, `stderr`, `read`, `write`, `write_line`, `close`
 - evented I/O belongs here when it is exposed as a portable readiness surface rather than as a raw platform backend
 - examples: `Poller`, `Event`, `EventMask`, `poller_new`, `poller_add`, `poller_set`, `poller_remove`, `poller_wait`, `poller_close`
+- pipe-style communication between independent execution contexts belongs here when it composes through ordinary handles rather than introducing scheduler policy
+- examples: `Pipe`, `pipe`
 
 `fs`
 - file and path operations above raw platform handles
@@ -74,8 +76,9 @@ Toolchain companion module:
 - rule: `net` exposes ordinary networking operations without leaking raw socket APIs, ioctl-like setup surfaces, or backend-specific queue concepts into portable code
 
 `sync`
-- concurrency primitives only
+- execution primitives plus explicit low-level shared-memory coordination
 - examples: `Thread`, `Mutex`, `Condvar`, `Atomic<T>`, `MemoryOrder`, `thread_spawn`, `thread_join`, `mutex_lock`, `condvar_wait`, atomic operations
+- rule: `sync` should not become the home of channels, async schedulers, or I/O multiplexing abstractions that belong in `io`
 
 `time`
 - clocks, durations, and sleep operations when standardized
@@ -171,6 +174,7 @@ These spellings should now be treated as canonical:
 - `utf8.decode`
 - `utf8.encode`
 - `io.close`
+- `io.pipe`
 - `io.poller_set`
 - `io.write_line`
 - `net.connect_tcp`
@@ -187,7 +191,45 @@ The canonical v0.2 packaging should be:
 
 This is small enough to hold in your head, explicit enough to preserve architectural boundaries, and concrete enough that the docs can now stop speaking about library packaging only in approximate terms.
 
-9. Evented I/O Placement
+9. Concurrency And Communication Model
+
+The portable model should prefer explicit execution plus handle-based
+communication over language-level scheduler policy.
+
+Recommended ownership:
+- `sync` owns thread creation and joining
+- `io` owns byte-stream handles, readiness polling, and any minimal pipe-style
+	communication primitive that composes through ordinary handles
+- `net` owns minimal TCP bootstrap constructors that return `File`
+- mutexes, condition variables, and atomics may remain available as explicit
+	low-level hosted tools, but they are not the primary portable communication
+	model
+
+Rationale:
+- concurrency and networking both reduce to moving data between independent
+	execution contexts
+- a handle-first model keeps the portable surface small without forcing shared
+	memory to be the default coordination story
+- library policy such as channels, actors, futures, promises, and hidden
+	schedulers should remain above this boundary rather than inside it
+
+Execution rule:
+- `sync.thread_spawn` and `sync.thread_join` provide explicit execution without
+	implying scheduler policy, task semantics, or async lowering
+
+Shared-memory rule:
+- mutexes, condition variables, and atomics are low-level hosted tools for
+	shared-memory coordination
+- their presence does not redefine the primary portable communication model
+	away from handle-based I/O and pipes
+- portable library design should prefer handle-based composition when shared
+	memory is not required by the problem
+
+Non-goal rule:
+- the standard surface should not add async syntax, futures, promises, actors,
+	channels, or hidden runtime scheduling as part of this model
+
+10. Evented I/O Placement
 
 If v0.2 or an early follow-up standardizes scalable non-blocking I/O, the portable surface should be a small readiness-based poller API.
 
@@ -207,6 +249,13 @@ Recommended minimal surface:
 distinct File = i32
 
 func close(file: File) Error
+
+struct Pipe {
+	read_end: File
+	write_end: File
+}
+
+func pipe() (Pipe, Error)
 
 distinct EventMask = ui32
 
@@ -249,6 +298,11 @@ Handle rule:
 - `fs` and `net` should distinguish capabilities through constructors and operations rather than through separate `File`, `Socket`, and `Listener` handle types in the first portable surface
 - splitting handles too early would force duplicate `read`, `write`, `close`, and poller APIs or require a trait or capability system that the language does not have
 
+Pipe rule:
+- `pipe` is the minimal portable communication primitive for connecting independent execution contexts
+- pipe endpoints are ordinary `File` handles and therefore compose directly with `read`, `write`, `close`, and `poller_*`
+- higher-level channels, message queues, RPC layers, and scheduler-driven abstractions remain library policy above this surface
+
 Portability rule:
 - Linux implementations may use `epoll` or `io_uring`
 - BSD and macOS implementations may use `kqueue`
@@ -259,7 +313,7 @@ Non-goal rule:
 - standardizing a poller does not imply language-level async or a mandatory runtime event loop
 - programs remain free to use blocking I/O, explicit threads from `sync`, or platform-specific `os` facilities when needed
 
-10. Networking Surface
+11. Networking Surface
 
 If the standard library includes portable networking, it should sit beside `fs` rather than under `os`.
 

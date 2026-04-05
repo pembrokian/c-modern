@@ -9,6 +9,7 @@
 #include "compiler/mci/mci.h"
 #include "compiler/parse/parser.h"
 #include "compiler/sema/check.h"
+#include "compiler/sema/const_eval.h"
 #include "compiler/support/diagnostics.h"
 #include "compiler/support/dump_paths.h"
 #include "compiler/support/source_manager.h"
@@ -126,6 +127,26 @@ void TestMciRoundTrip() {
     global.zero_initialized_values = {false};
     module.globals.push_back(std::move(global));
 
+    mc::sema::GlobalSummary aggregate_global;
+    aggregate_global.is_const = true;
+    aggregate_global.names = {"default_pair"};
+    aggregate_global.type = mc::sema::NamedType("Pair");
+    aggregate_global.type.subtypes = {mc::sema::NamedType("i32")};
+    mc::sema::ConstValue aggregate_value;
+    aggregate_value.kind = mc::sema::ConstValue::Kind::kAggregate;
+    aggregate_value.field_names = {"left", "right"};
+    aggregate_value.elements = {
+        mc::sema::MakeConstValue(static_cast<std::int64_t>(7)),
+        mc::sema::ConstValue {
+            .kind = mc::sema::ConstValue::Kind::kNil,
+            .text = "nil",
+        },
+    };
+    aggregate_value.text = mc::sema::RenderConstValue(aggregate_value);
+    aggregate_global.constant_values = {aggregate_value};
+    aggregate_global.zero_initialized_values = {false};
+    module.globals.push_back(std::move(aggregate_global));
+
     mc::support::DiagnosticSink diagnostics;
     const auto temp_path = std::filesystem::temp_directory_path() / "c_modern_phase7_roundtrip.mci";
     const mc::mci::InterfaceArtifact artifact {
@@ -163,13 +184,23 @@ void TestMciRoundTrip() {
         Expect(loaded->module.type_decls[0].fields.size() == 2 && loaded->module.type_decls[0].fields[0].second == mc::sema::NamedType("T") &&
              loaded->module.type_decls[0].fields[1].second == mc::sema::PointerType(mc::sema::NamedType("T")),
             "mci loader should preserve generic field types");
-           Expect(loaded->module.globals.size() == 1 && loaded->module.globals[0].constant_values.size() == 1 &&
-               loaded->module.globals[0].constant_values[0].has_value() &&
-               loaded->module.globals[0].constant_values[0]->kind == mc::sema::ConstValue::Kind::kInteger &&
-               loaded->module.globals[0].constant_values[0]->integer_value == 42 &&
-               loaded->module.globals[0].zero_initialized_values.size() == 1 &&
-               !loaded->module.globals[0].zero_initialized_values[0],
-            "mci loader should preserve exported compile-time constant values");
+        Expect(loaded->module.globals.size() == 2,
+               "mci loader should preserve exported global count");
+        Expect(loaded->module.globals[0].constant_values.size() == 1 && loaded->module.globals[0].constant_values[0].has_value() &&
+                   loaded->module.globals[0].constant_values[0]->kind == mc::sema::ConstValue::Kind::kInteger &&
+                   loaded->module.globals[0].constant_values[0]->integer_value == 42 &&
+                   loaded->module.globals[0].zero_initialized_values.size() == 1 && !loaded->module.globals[0].zero_initialized_values[0],
+               "mci loader should preserve exported scalar compile-time constant values");
+        Expect(loaded->module.globals[1].constant_values.size() == 1 && loaded->module.globals[1].constant_values[0].has_value() &&
+                   loaded->module.globals[1].constant_values[0]->kind == mc::sema::ConstValue::Kind::kAggregate &&
+                   loaded->module.globals[1].constant_values[0]->field_names.size() == 2 &&
+                   loaded->module.globals[1].constant_values[0]->field_names[0] == "left" &&
+                   loaded->module.globals[1].constant_values[0]->field_names[1] == "right" &&
+                   loaded->module.globals[1].constant_values[0]->elements.size() == 2 &&
+                   loaded->module.globals[1].constant_values[0]->elements[0].kind == mc::sema::ConstValue::Kind::kInteger &&
+                   loaded->module.globals[1].constant_values[0]->elements[0].integer_value == 7 &&
+                   loaded->module.globals[1].constant_values[0]->elements[1].kind == mc::sema::ConstValue::Kind::kNil,
+               "mci loader should preserve exported structural compile-time constant values");
     Expect(!loaded->interface_hash.empty(), "mci loader should preserve interface hashes");
 
     std::filesystem::remove(temp_path);

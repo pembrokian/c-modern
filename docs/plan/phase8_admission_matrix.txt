@@ -411,14 +411,19 @@ concurrency
 - Current status: implemented family
 - Current proof: direct-source shared-counter, producer-consumer, and atomic-
 	publication executables plus the project-mode `examples/real/worker_queue/`
-	proof
+	low-level shared-memory proof, `examples/real/pipe_handoff/` blocking
+	handle-first proof, and `examples/real/pipe_ready/` poller-coupled
+	pipe-readiness proof
 - Candidate next-wave utility: no further utility required for the admitted
-	slice today
+	slice today beyond the current low-level shared-memory, blocking pipe, and
+	pipe-readiness proof set
 - Distinct pressure sought: thread spawn and join, mutex or condvar
-	coordination, deterministic ordinary-test proof, and explicit shared-state
-	synchronization without language-level concurrency syntax
-- Current owner gates: broader scheduler claims, condvar broadcast, and
-	atomic read-modify-write surfaces remain explicit Phase 12 follow-on work
+	coordination for the current shared-memory proof, plus a handle-based
+	communication path that does not require shared-memory synchronization for
+	one bounded admitted project
+- Current owner gates: broader scheduler claims, condvar broadcast, atomic
+	read-modify-write surfaces, richer non-blocking or half-close pipe policy,
+	and richer IPC abstractions remain explicit follow-on work
 
 networking
 ~~~~~~~~~~
@@ -496,8 +501,38 @@ bounded threaded worker tool
 - Proof artifact: `examples/real/worker_queue/build.toml` plus tool-level
 	`mc run` or `mc test` reuse coverage in `tests/tool/phase7_tool_tests.cpp`
 - Resolution note: the admitted hosted `sync` slice now supports one honest
-	multi-module work-queue consumer without widening into compare-exchange,
-	fetch-add, condvar broadcast, or scheduler claims
+	multi-module low-level shared-memory work-queue consumer without widening
+	into compare-exchange, fetch-add, condvar broadcast, or scheduler claims;
+	the preferred future communication follow-through should land through
+	`io.pipe` rather than by expanding this shared-memory example family
+
+bounded pipe handoff tool
+~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: implemented
+- Intended family: concurrency
+- Pressure focus: one thread-to-thread or thread-to-main handoff through
+	ordinary `io.File` endpoints returned by the admitted portable `io.pipe()`
+	surface, without requiring shared-memory synchronization or a channel-style
+	runtime abstraction
+- Proof artifact: `examples/real/pipe_handoff/build.toml` plus tool-level
+	`mc run` or `mc test` reuse coverage in `tests/tool/phase7_tool_tests.cpp`
+- Resolution note: the admitted `io` surface now supports one honest blocking
+	thread-plus-pipe communication proof without widening into channels,
+	schedulers, or non-blocking pipe policy
+
+bounded pipe readiness tool
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Status: implemented
+- Intended family: concurrency
+- Pressure focus: one thread-to-main readiness handoff through ordinary
+	`io.File` endpoints returned by the admitted `io.pipe()` surface and waited
+	on through `io.poller_*`
+- Proof artifact: `examples/real/pipe_ready/build.toml` plus tool-level
+	`mc run` or `mc test` reuse coverage in `tests/tool/phase7_tool_tests.cpp`
+- Resolution note: the admitted `io` surface now proves that pipe endpoints
+	compose honestly with the existing portable readiness poller without
+	widening into richer non-blocking policy, half-close rules, or scheduler
+	semantics
 
 bounded network probe
 ~~~~~~~~~~~~~~~~~~~~~
@@ -553,6 +588,6 @@ bounded threaded example
 - Proof artifact: `examples/real/worker_queue/build.toml` exercised by the
 	Phase 20 `mc run` or `mc test` regressions in
 	`tests/tool/phase7_tool_tests.cpp`
-- Pressure focus: producer or worker queue coordination on the admitted hosted
-	`sync` surface using ordinary project modules rather than direct-source-only
-	canonical programs
+- Pressure focus: low-level shared-memory producer or worker queue
+	coordination on the admitted hosted `sync` surface using ordinary project
+	modules rather than direct-source-only canonical programs

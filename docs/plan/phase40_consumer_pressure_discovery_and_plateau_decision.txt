@@ -1,0 +1,176 @@
+Phase 40 -- Consumer Pressure Discovery And Plateau Decision
+============================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Open the next active capability-era planning wave after the completed Phase 39
+maintenance plateau by landing one new admitted pressure artifact whose main
+job is to reveal which remaining deferred frontier is now the narrowest honest
+next owner.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 34 kept Lane C deferred, so broader `time` remains blocked behind a
+  stronger consumer trigger.
+- Phase 37 through Phase 39 then completed a maintenance plateau that aligned
+  planning truth, tightened driver and tooling boundaries after the split, and
+  harvested still-relevant critique items.
+- The remaining larger outward-growth fronts are now clearer but still gated:
+  broader imported generic procedure-call lowering, structural aggregate
+  constant serialization across `.mci`, and broader linker or artifact surface
+  beyond the current hosted `staticlib` proof.
+- The repository therefore needs discovery before it needs commitment.
+
+Problem being solved
+--------------------
+- Several deferred fronts remain credible, but none is yet the obvious next
+  active capability wave from admitted consumer pressure alone.
+- Picking one prematurely would risk reopening a deferred family from abstract
+  completeness arguments instead of from a real admitted need.
+- The repository needs one explicit discovery phase that lands or re-audits a
+  new pressure artifact and then routes the next series to the correct owner.
+
+Core rule
+---------
+- Use one real pressure artifact to choose the next frontier.
+- Do not commit to compiler, artifact, or stdlib widening before the artifact
+  makes the owner-local gap concrete.
+- Prefer admitted real projects or canonical refreshes over synthetic probes.
+- Keep pressure honest: the new artifact should become a real repository proof
+  surface, not a throwaway experiment.
+- If the artifact does not expose a new frontier strongly enough, record that
+  explicitly and stop rather than forcing a follow-on phase.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one new or refreshed admitted pressure artifact that can
+stress one of three remaining deferred fronts most plausibly:
+- a second imported generic procedure-typed consumer
+- an imported aggregate compile-time constant consumer across `.mci`
+- a project that genuinely needs broader linking or artifact behavior than the
+  current hosted `staticlib` proof
+
+Candidate pressure directions
+-----------------------------
+- a real project or canonical refresh with a second independent imported
+  generic procedure-typed call path beyond `sync.thread_spawn<T>`
+- a project that wants exported structural constant data across module or
+  project boundaries, not just scalar constants plus zero-init globals
+- a project that needs behavior beyond the current one-manifest hosted
+  `staticlib` plus selected-target hardening proof, such as broader linking or
+  runtime-loaded artifact coordination
+
+What this phase should try to prove
+-----------------------------------
+- which deferred frontier now causes the largest real distortion in an admitted
+  pressure artifact
+- whether the next active owner should be MIR or compiler lowering,
+  sema-plus-`.mci` constant serialization, or tooling-plus-linker surface
+- whether any remaining candidate front is still too theoretical to reopen
+- whether the repository should proceed to a conditional Phase 41 or Phase 42
+  follow-on, or remain in discovery mode longer
+
+Preferred pressure points
+-------------------------
+1. A second imported generic procedure-typed consumer.
+2. Imported structural aggregate constants across module boundaries.
+3. Linking or artifact needs beyond the current hosted `staticlib` plateau.
+4. One real project or canonical proof surface rather than multiple weaker
+   probes.
+5. Explicit route-to-owner decision at the end of the phase.
+
+Deliverables
+------------
+- one admitted or clearly bounded pressure artifact under
+  `/Users/ro/dev/c_modern/examples/real/`,
+  `/Users/ro/dev/c_modern/examples/canonical/`, or the narrowest relevant test
+  layer
+- deterministic proof showing what the artifact stresses and where the current
+  admitted repository slice still distorts it
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` recording the chosen
+  next owner or continued deferral
+- one explicit next-step statement routing the repository to the correct
+  conditional follow-on phase
+
+Suggested execution order
+-------------------------
+1. Choose the strongest new pressure artifact candidate from the remaining
+   deferred fronts.
+2. Land the artifact first so the pressure is real before choosing the next
+   owner document.
+3. Determine whether the distortion belongs to compiler lowering,
+   sema-plus-`.mci`, or tooling-plus-linker surface.
+4. Record non-winning fronts as still deferred with their existing revisit
+   triggers.
+5. Proceed only to the follow-on phase that matches the winning pressure.
+
+Exit criteria
+-------------
+- the repository has one real pressure artifact that identifies the narrowest
+  honest next deferred frontier
+- the next owner after Phase 40 is chosen from evidence rather than from
+  ranking prose alone
+- the other deferred fronts remain explicit and intentionally unopened
+- the repository can justify whether Phase 41 or Phase 42 should actually run
+
+Non-goals
+---------
+- reopening several deferred fronts in parallel
+- speculative API design before the pressure artifact lands
+- broad platform or module-family growth unrelated to the chosen pressure
+- treating synthetic probes as equivalent to admitted real proof
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 40 stands alone as the post-maintenance discovery and plateau-decision
+  phase.
+- The phase is explicit that evidence chooses the next owner, not ambient
+  completeness pressure.
+
+Implemented slice
+-----------------
+- refreshed the admitted `issue_rollup` proof as a bounded pressure artifact in
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` rather than
+  destabilizing the admitted example itself: the Phase 40 regression clones the
+  real project, exports `rollup_model.DEFAULT_SUMMARY`, and then makes the
+  dependent executable target declare
+  `const DEFAULT_SUMMARY_COPY: rollup_model.Summary = rollup_model.DEFAULT_SUMMARY`
+- proved that the refreshed artifact fails in project `check` mode with the
+  deterministic diagnostic `top-level const initializer must be a compile-time
+  constant`, which isolates the current distortion to imported aggregate
+  compile-time facts rather than to target selection, library linkage, or other
+  workflow behavior
+- deliberately kept the proof in project `check` rather than `build` so the new
+  artifact measures the sema-plus-`.mci` frontier directly instead of conflating
+  it with the separate backend limitation around emitting top-level aggregate
+  constants as LLVM globals
+- re-audited the non-winning fronts against current admitted pressure:
+  `review_board` and the broader repository still do not provide a second real
+  imported generic procedure-typed consumer beyond `sync.thread_spawn<T>`, and
+  the admitted `issue_rollup` plus selected-target hardening proof still does
+  not require `sharedlib`, external system-library links, install policy, or
+  other broader linker-surface behavior
+- next-step statement: route the repository to Phase 42 on the structural
+  aggregate constants branch, while keeping Phase 41 and the broader linking
+  frontier deferred behind their existing revisit triggers
+
+Closeout statement
+------------------
+Phase 40 is complete. The strongest new admitted pressure artifact is the
+refreshed `issue_rollup` project proof that asks one consumer target to treat
+an imported aggregate constant as a compile-time fact. That artifact fails in a
+way that belongs to sema-plus-`.mci` ownership rather than to MIR, generic-call
+lowering, or tooling-plus-linker policy, so the correct follow-through is the
+structural aggregate constant branch of Phase 42. The broader imported generic
+procedure-call frontier remains deferred because the repository still has only
+one admitted procedure-typed imported generic consumer family, and the broader
+linker frontier remains deferred because no admitted project yet needs behavior
+beyond the current hosted `staticlib` plus selected-target hardening plateau.

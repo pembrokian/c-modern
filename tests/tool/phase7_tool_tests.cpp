@@ -540,6 +540,62 @@ std::string BuildProjectTargetAndExpectFailure(const std::filesystem::path& mc_p
     return output;
 }
 
+std::string CheckProjectTargetAndExpectFailure(const std::filesystem::path& mc_path,
+                                               const std::filesystem::path& project_path,
+                                               const std::filesystem::path& build_dir,
+                                               std::string_view target_name,
+                                               std::string_view output_name,
+                                               const std::string& context) {
+    std::vector<std::string> args {
+        mc_path.generic_string(),
+        "check",
+        "--project",
+        project_path.generic_string(),
+    };
+    if (!target_name.empty()) {
+        args.push_back("--target");
+        args.push_back(std::string(target_name));
+    }
+    args.push_back("--build-dir");
+    args.push_back(build_dir.generic_string());
+
+    const auto [outcome, output] = RunCommandCapture(args,
+                                                     build_dir / std::string(output_name),
+                                                     context);
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail(context + " should fail:\n" + output);
+    }
+    return output;
+}
+
+std::string CheckProjectTargetAndExpectSuccess(const std::filesystem::path& mc_path,
+                                               const std::filesystem::path& project_path,
+                                               const std::filesystem::path& build_dir,
+                                               std::string_view target_name,
+                                               std::string_view output_name,
+                                               const std::string& context) {
+    std::vector<std::string> args {
+        mc_path.generic_string(),
+        "check",
+        "--project",
+        project_path.generic_string(),
+    };
+    if (!target_name.empty()) {
+        args.push_back("--target");
+        args.push_back(std::string(target_name));
+    }
+    args.push_back("--build-dir");
+    args.push_back(build_dir.generic_string());
+
+    const auto [outcome, output] = RunCommandCapture(args,
+                                                     build_dir / std::string(output_name),
+                                                     context);
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail(context + " should pass:\n" + output);
+    }
+    return output;
+}
+
 std::string RunProjectTargetAndExpectSuccess(const std::filesystem::path& mc_path,
                                              const std::filesystem::path& project_path,
                                              const std::filesystem::path& build_dir,
@@ -773,6 +829,44 @@ std::string RunWorkerQueueProjectAndExpectSuccess(const std::filesystem::path& m
     return output;
 }
 
+std::string RunPipeHandoffProjectAndExpectSuccess(const std::filesystem::path& mc_path,
+                                                  const std::filesystem::path& project_path,
+                                                  const std::filesystem::path& build_dir,
+                                                  std::string_view output_name,
+                                                  const std::string& context) {
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "run",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string()},
+                                                     build_dir / std::string(output_name),
+                                                     context);
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail(context + " should pass:\n" + output);
+    }
+    return output;
+}
+
+std::string RunPipeReadyProjectAndExpectSuccess(const std::filesystem::path& mc_path,
+                                                const std::filesystem::path& project_path,
+                                                const std::filesystem::path& build_dir,
+                                                std::string_view output_name,
+                                                const std::string& context) {
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "run",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string()},
+                                                     build_dir / std::string(output_name),
+                                                     context);
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail(context + " should pass:\n" + output);
+    }
+    return output;
+}
+
 void ExpectWorkerQueueRunOutput(std::string_view output,
                                 const std::string& context_prefix) {
     ExpectOutputContains(output,
@@ -802,6 +896,70 @@ void ExpectWorkerQueueTestOutput(std::string_view output,
                          context_prefix + ": should print the ordinary test verdict");
     ExpectOutputContains(output,
                          "PASS target worker-queue",
+                         context_prefix + ": should print the target verdict");
+}
+
+void ExpectPipeHandoffRunOutput(std::string_view output,
+                                const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "pipe-handoff-ok\n",
+                         context_prefix + ": should print the deterministic success line");
+}
+
+void ExpectPipeHandoffTestOutput(std::string_view output,
+                                 const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "testing target pipe-handoff",
+                         context_prefix + ": should announce the target under test");
+    ExpectOutputContains(output,
+                         "ordinary tests target pipe-handoff: 2 cases, mode=checked, timeout=5000 ms",
+                         context_prefix + ": should print ordinary test scope");
+    ExpectOutputContains(output,
+                         "PASS message_len_test.test_message_len",
+                         context_prefix + ": should include message-length coverage");
+    ExpectOutputContains(output,
+                         "PASS message_matches_test.test_message_matches",
+                         context_prefix + ": should include message-match coverage");
+    ExpectOutputContains(output,
+                         "2 tests, 2 passed, 0 failed",
+                         context_prefix + ": should print the deterministic summary");
+    ExpectOutputContains(output,
+                         "PASS ordinary tests for target pipe-handoff (2 cases)",
+                         context_prefix + ": should print the ordinary-test verdict");
+    ExpectOutputContains(output,
+                         "PASS target pipe-handoff",
+                         context_prefix + ": should print the target verdict");
+}
+
+void ExpectPipeReadyRunOutput(std::string_view output,
+                              const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "pipe-ready-ok\n",
+                         context_prefix + ": should print the deterministic success line");
+}
+
+void ExpectPipeReadyTestOutput(std::string_view output,
+                               const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         "testing target pipe-ready",
+                         context_prefix + ": should announce the target under test");
+    ExpectOutputContains(output,
+                         "ordinary tests target pipe-ready: 2 cases, mode=checked, timeout=5000 ms",
+                         context_prefix + ": should print ordinary test scope");
+    ExpectOutputContains(output,
+                         "PASS message_len_test.test_message_len",
+                         context_prefix + ": should include message-length coverage");
+    ExpectOutputContains(output,
+                         "PASS message_matches_test.test_message_matches",
+                         context_prefix + ": should include message-match coverage");
+    ExpectOutputContains(output,
+                         "2 tests, 2 passed, 0 failed",
+                         context_prefix + ": should print the deterministic summary");
+    ExpectOutputContains(output,
+                         "PASS ordinary tests for target pipe-ready (2 cases)",
+                         context_prefix + ": should print the ordinary-test verdict");
+    ExpectOutputContains(output,
+                         "PASS target pipe-ready",
                          context_prefix + ": should print the target verdict");
 }
 
@@ -2312,6 +2470,124 @@ void TestRealWorkerQueueProject(const std::filesystem::path& source_root,
                                 "phase20 worker queue retest after run");
 }
 
+void TestRealPipeHandoffProject(const std::filesystem::path& source_root,
+                                const std::filesystem::path& binary_root,
+                                const std::filesystem::path& mc_path) {
+    const std::filesystem::path pipe_handoff_project_path = source_root / "examples/real/pipe_handoff/build.toml";
+    const std::filesystem::path pipe_handoff_run_test_rerun_build_dir = binary_root / "phase43_pipe_handoff_run_test_rerun_build";
+    std::filesystem::remove_all(pipe_handoff_run_test_rerun_build_dir);
+
+    std::string pipe_handoff_run_output = RunPipeHandoffProjectAndExpectSuccess(mc_path,
+                                                                                pipe_handoff_project_path,
+                                                                                pipe_handoff_run_test_rerun_build_dir,
+                                                                                "phase43_pipe_handoff_run_output.txt",
+                                                                                "phase43 pipe handoff run before tests");
+    ExpectPipeHandoffRunOutput(pipe_handoff_run_output,
+                               "phase43 pipe handoff run before tests");
+
+    std::string pipe_handoff_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                          pipe_handoff_project_path,
+                                                                          pipe_handoff_run_test_rerun_build_dir,
+                                                                          "phase43_pipe_handoff_test_output.txt",
+                                                                          "phase43 pipe handoff test after run");
+    ExpectPipeHandoffTestOutput(pipe_handoff_test_output,
+                                "phase43 pipe handoff test after run");
+
+    pipe_handoff_run_output = RunPipeHandoffProjectAndExpectSuccess(mc_path,
+                                                                    pipe_handoff_project_path,
+                                                                    pipe_handoff_run_test_rerun_build_dir,
+                                                                    "phase43_pipe_handoff_rerun_output.txt",
+                                                                    "phase43 pipe handoff rerun after tests");
+    ExpectPipeHandoffRunOutput(pipe_handoff_run_output,
+                               "phase43 pipe handoff rerun after tests");
+
+    const std::filesystem::path pipe_handoff_test_run_rerun_build_dir = binary_root / "phase43_pipe_handoff_test_run_rerun_build";
+    std::filesystem::remove_all(pipe_handoff_test_run_rerun_build_dir);
+
+    pipe_handoff_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                              pipe_handoff_project_path,
+                                                              pipe_handoff_test_run_rerun_build_dir,
+                                                              "phase43_pipe_handoff_initial_test_output.txt",
+                                                              "phase43 pipe handoff initial test");
+    ExpectPipeHandoffTestOutput(pipe_handoff_test_output,
+                                "phase43 pipe handoff initial test");
+
+    pipe_handoff_run_output = RunPipeHandoffProjectAndExpectSuccess(mc_path,
+                                                                    pipe_handoff_project_path,
+                                                                    pipe_handoff_test_run_rerun_build_dir,
+                                                                    "phase43_pipe_handoff_run_after_test_output.txt",
+                                                                    "phase43 pipe handoff run after tests");
+    ExpectPipeHandoffRunOutput(pipe_handoff_run_output,
+                               "phase43 pipe handoff run after tests");
+
+    pipe_handoff_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                              pipe_handoff_project_path,
+                                                              pipe_handoff_test_run_rerun_build_dir,
+                                                              "phase43_pipe_handoff_retest_output.txt",
+                                                              "phase43 pipe handoff retest after run");
+    ExpectPipeHandoffTestOutput(pipe_handoff_test_output,
+                                "phase43 pipe handoff retest after run");
+}
+
+void TestRealPipeReadyProject(const std::filesystem::path& source_root,
+                              const std::filesystem::path& binary_root,
+                              const std::filesystem::path& mc_path) {
+    const std::filesystem::path pipe_ready_project_path = source_root / "examples/real/pipe_ready/build.toml";
+    const std::filesystem::path pipe_ready_run_test_rerun_build_dir = binary_root / "phase43_pipe_ready_run_test_rerun_build";
+    std::filesystem::remove_all(pipe_ready_run_test_rerun_build_dir);
+
+    std::string pipe_ready_run_output = RunPipeReadyProjectAndExpectSuccess(mc_path,
+                                                                            pipe_ready_project_path,
+                                                                            pipe_ready_run_test_rerun_build_dir,
+                                                                            "phase43_pipe_ready_run_output.txt",
+                                                                            "phase43 pipe ready run before tests");
+    ExpectPipeReadyRunOutput(pipe_ready_run_output,
+                             "phase43 pipe ready run before tests");
+
+    std::string pipe_ready_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                        pipe_ready_project_path,
+                                                                        pipe_ready_run_test_rerun_build_dir,
+                                                                        "phase43_pipe_ready_test_output.txt",
+                                                                        "phase43 pipe ready test after run");
+    ExpectPipeReadyTestOutput(pipe_ready_test_output,
+                              "phase43 pipe ready test after run");
+
+    pipe_ready_run_output = RunPipeReadyProjectAndExpectSuccess(mc_path,
+                                                                pipe_ready_project_path,
+                                                                pipe_ready_run_test_rerun_build_dir,
+                                                                "phase43_pipe_ready_rerun_output.txt",
+                                                                "phase43 pipe ready rerun after tests");
+    ExpectPipeReadyRunOutput(pipe_ready_run_output,
+                             "phase43 pipe ready rerun after tests");
+
+    const std::filesystem::path pipe_ready_test_run_rerun_build_dir = binary_root / "phase43_pipe_ready_test_run_rerun_build";
+    std::filesystem::remove_all(pipe_ready_test_run_rerun_build_dir);
+
+    pipe_ready_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                            pipe_ready_project_path,
+                                                            pipe_ready_test_run_rerun_build_dir,
+                                                            "phase43_pipe_ready_initial_test_output.txt",
+                                                            "phase43 pipe ready initial test");
+    ExpectPipeReadyTestOutput(pipe_ready_test_output,
+                              "phase43 pipe ready initial test");
+
+    pipe_ready_run_output = RunPipeReadyProjectAndExpectSuccess(mc_path,
+                                                                pipe_ready_project_path,
+                                                                pipe_ready_test_run_rerun_build_dir,
+                                                                "phase43_pipe_ready_run_after_test_output.txt",
+                                                                "phase43 pipe ready run after tests");
+    ExpectPipeReadyRunOutput(pipe_ready_run_output,
+                             "phase43 pipe ready run after tests");
+
+    pipe_ready_test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                            pipe_ready_project_path,
+                                                            pipe_ready_test_run_rerun_build_dir,
+                                                            "phase43_pipe_ready_retest_output.txt",
+                                                            "phase43 pipe ready retest after run");
+    ExpectPipeReadyTestOutput(pipe_ready_test_output,
+                              "phase43 pipe ready retest after run");
+}
+
 void TestRealEventedEchoProject(const std::filesystem::path& source_root,
                                 const std::filesystem::path& binary_root,
                                 const std::filesystem::path& mc_path) {
@@ -3478,6 +3754,109 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                "phase30 issue rollup interface-changing report-target executable run");
 }
 
+void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& source_root,
+                                                   const std::filesystem::path& binary_root,
+                                                   const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = source_root / "examples/real/issue_rollup";
+    const std::filesystem::path cloned_project_root = binary_root / "phase40_issue_rollup_aggregate_const_clone";
+    CopyDirectoryTree(project_root, cloned_project_root);
+    WriteFile(cloned_project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"issue-rollup\"\n"
+              "default = \"issue-rollup\"\n"
+              "\n"
+              "[targets.issue-rollup-core]\n"
+              "kind = \"staticlib\"\n"
+              "root = \"src/core/rollup_core.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.issue-rollup-core.search_paths]\n"
+              "modules = [\"src/core\", \"src/model\", \"src/parse\", \"src/render\", \"" +
+                  (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.issue-rollup-core.runtime]\n"
+              "startup = \"default\"\n"
+              "\n"
+              "[targets.issue-rollup]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/app/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "links = [\"issue-rollup-core\"]\n"
+              "\n"
+              "[targets.issue-rollup.search_paths]\n"
+              "modules = [\"src/app\", \"src/core\", \"src/model\", \"src/parse\", \"src/render\", \"" +
+                  (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.issue-rollup.runtime]\n"
+              "startup = \"default\"\n"
+              "\n"
+              "[targets.issue-rollup.tests]\n"
+              "enabled = true\n"
+              "roots = [\"tests\"]\n"
+              "mode = \"checked\"\n"
+              "timeout_ms = 5000\n");
+    WriteFile(cloned_project_root / "src/model/rollup_model.mc",
+              "export { DEFAULT_SUMMARY, Summary, has_priority, total_items }\n"
+              "\n"
+              "struct Summary {\n"
+              "    open_items: usize\n"
+              "    closed_items: usize\n"
+              "    blocked_items: usize\n"
+              "    priority_items: usize\n"
+              "}\n"
+              "\n"
+              "const DEFAULT_SUMMARY: Summary = Summary{ open_items: 1, closed_items: 1, blocked_items: 0, priority_items: 0 }\n"
+              "\n"
+              "func total_items(summary: Summary) usize {\n"
+              "    return summary.open_items + summary.closed_items + summary.blocked_items\n"
+              "}\n"
+              "\n"
+              "func has_priority(summary: Summary) bool {\n"
+              "    return summary.priority_items > 0\n"
+              "}\n");
+    WriteFile(cloned_project_root / "src/app/main.mc",
+              "export { main }\n"
+              "\n"
+              "import fs\n"
+              "import mem\n"
+              "import rollup_core\n"
+              "import rollup_model\n"
+              "\n"
+              "const DEFAULT_SUMMARY_COPY: rollup_model.Summary = rollup_model.DEFAULT_SUMMARY\n"
+              "\n"
+              "func main(args: Slice<cstr>) i32 {\n"
+              "    if args.len != 2 {\n"
+              "        return 64\n"
+              "    }\n"
+              "\n"
+              "    buf: *Buffer<u8> = fs.read_all(args[1], mem.default_allocator())\n"
+              "    if buf == nil {\n"
+              "        return 92\n"
+              "    }\n"
+              "    defer mem.buffer_free<u8>(buf)\n"
+              "\n"
+              "    bytes: Slice<u8> = mem.slice_from_buffer<u8>(buf)\n"
+              "    text: str = str{ ptr: bytes.ptr, len: bytes.len }\n"
+              "    return rollup_core.write_text_rollup(text)\n"
+              "}\n");
+
+    const std::filesystem::path cloned_project_path = cloned_project_root / "build.toml";
+    const std::filesystem::path check_build_dir = binary_root / "phase40_issue_rollup_aggregate_const_check_build";
+    std::filesystem::remove_all(check_build_dir);
+
+    const std::string output = CheckProjectTargetAndExpectSuccess(mc_path,
+                                                                  cloned_project_path,
+                                                                  check_build_dir,
+                                                                  "",
+                                                                  "phase40_issue_rollup_aggregate_const_check_output.txt",
+                                                                  "phase42 issue rollup imported aggregate const pressure");
+    ExpectOutputContains(output,
+                         "checked target issue-rollup",
+                         "phase42 issue rollup imported aggregate const pressure should succeed through project check");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -3517,8 +3896,11 @@ int main(int argc, char** argv) {
     TestRealHashToolProject(source_root, binary_root, mc_path);
     TestRealArenaExprToolProject(source_root, binary_root, mc_path);
     TestRealWorkerQueueProject(source_root, binary_root, mc_path);
+    TestRealPipeHandoffProject(source_root, binary_root, mc_path);
+    TestRealPipeReadyProject(source_root, binary_root, mc_path);
     TestRealEventedEchoProject(source_root, binary_root, mc_path);
     TestRealReviewBoardProject(source_root, binary_root, mc_path);
     TestRealIssueRollupProject(source_root, binary_root, mc_path);
+    TestIssueRollupImportedAggregateConstPressure(source_root, binary_root, mc_path);
     return 0;
 }

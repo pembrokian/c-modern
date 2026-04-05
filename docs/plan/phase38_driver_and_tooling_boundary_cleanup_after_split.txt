@@ -1,0 +1,293 @@
+Phase 38 -- Driver And Tooling Boundary Cleanup After Split
+===========================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Use the stabilized post-Phase-33 hosted workflow and the now-landed driver
+split to tighten driver and tooling ownership boundaries without widening the
+admitted repository slice.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The driver has already been simplified and split into separate files, so the
+  repository now has a better structural base for targeted boundary cleanup.
+- Older critique notes still contain a mix of landed issues, low-risk cleanup
+  items, and larger deferred architectural follow-ons tied to the old monolith.
+- The supported hosted workflow and project graph are now stable enough that
+  boundary cleanup can proceed without simultaneously redefining public surface.
+- This makes Phase 38 an internal-quality and ownership phase, not a capability
+  widening phase.
+
+Problem being solved
+--------------------
+- The repository has already harvested some value from the driver split, but
+  older critique items and historical assumptions still risk leaving command
+  plumbing, build-graph logic, target identity, and utility helpers wider or
+  more entangled than they need to be.
+- Without one dedicated cleanup phase, the new file structure could preserve
+  old boundary confusion under smaller source files rather than actually
+  tightening ownership.
+- The repository needs one bounded internal phase that consolidates the split
+  into clearer module responsibilities and stronger tooling invariants.
+
+Core rule
+---------
+- Treat `compiler/driver/` as command, project, and pipeline orchestration
+  only.
+- Move shared helper truth out of the driver when a narrower owner already
+  exists or should exist.
+- Prefer small, targeted cleanups over a wholesale driver redesign.
+- Preserve deterministic workflow behavior and existing admitted commands while
+  tightening internal structure.
+- Keep capability breadth unchanged in this phase.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one driver-and-tooling cleanup wave over the already
+split `compiler/driver/` area and closely related helper code, guided by the
+remaining critique items that still fit the current architecture.
+
+Strong candidate cleanup areas
+------------------------------
+- shared target-identity and bootstrap triple constants
+- remaining order-sensitive or dead-branch workflow helpers in project reuse
+  logic
+- documentation or invariants for namespacing and build-unit merge rules that
+  still matter after the split
+- helper extraction where command plumbing still owns non-command policy by
+  habit rather than necessity
+
+What this phase should try to prove
+-----------------------------------
+- the driver split produces real architectural tightening, not just smaller
+  files
+- remaining low-risk critique items can be closed without widening the public
+  tool surface
+- the command surface stays deterministic while ownership becomes easier to
+  read and maintain
+- any still-deferred larger driver refactors are reduced to sharper future
+  triggers rather than lingering as vague unease
+
+Preferred pressure points
+-------------------------
+1. Shared target or bootstrap identity ownership.
+2. Project-reuse and incremental-state helper correctness or determinism.
+3. Dead-branch or duplicated helper cleanup that survived from the old driver.
+4. Explicit comments or invariants where split files still rely on subtle
+   behavior.
+5. Focused tool regressions that prove no workflow drift.
+
+Deliverables
+------------
+- targeted code cleanup under `/Users/ro/dev/c_modern/compiler/driver/` and
+  the narrowest supporting owners
+- focused tool or unit regressions proving workflow behavior is unchanged where
+  relevant
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` only
+  if a consciously limited structural compromise remains after the cleanup
+- optional critique-note or repo-map refresh only if the current structure has
+  materially diverged from the older monolithic references
+
+Delivered outcome
+-----------------
+- duplicated build-unit merge logic was collapsed into one shared internal
+  helper, so direct-source and project builds now rely on the same ownership
+  rule instead of carrying split copies in both `driver.cpp` and `builder.cpp`
+- the internal helper contract now records the merge invariant explicitly:
+  dependency units merge ahead of the entry unit while entry-defined non-extern
+  symbols continue to win over duplicate dependency definitions
+- stale driver-side bootstrap target identity plumbing was removed, and the
+  remaining builder-side bootstrap target-name checks now read directly from
+  support-owned bootstrap target constants instead of reaching into backend
+  configuration just to compare names
+- focused validation passed through the existing build and driver-facing test
+  surface: `mc_bootstrap_unit`, `mc_phase7_tool_unit`, `mc_help_smoke`,
+  `mc_build_smoke`, and `mc_dump_paths_smoke`
+- no decision-log update was needed because the cleanup closed low-risk split
+  fallout without introducing a new consciously limited compromise
+
+Suggested execution order
+-------------------------
+1. Re-audit the remaining driver-related critique items against the current
+   split code rather than the older monolithic file layout.
+2. Close the smallest still-relevant low-risk items first.
+3. Extract or centralize shared helper truth only where ownership is clearly
+   wrong today.
+4. Add or refresh focused workflow regressions for touched paths.
+5. Record any larger still-deferred driver architecture work explicitly instead
+   of smearing it across unrelated cleanup commits.
+
+Exit criteria
+-------------
+- the split driver has tighter ownership boundaries than before this phase
+- the remaining relevant low-risk critique items are either closed or narrowed
+  to sharper future triggers
+- tool workflow behavior stays deterministic and unchanged at the public level
+- no new capability family is implied by the cleanup
+
+Non-goals
+---------
+- large graph-and-compile architecture redesign
+- new target kinds, new command modes, or broader workflow breadth
+- capability work in `time`, `os`, `hal`, or broader linking
+- using the split as an excuse for broad unrelated refactors
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 38 stands alone as the driver and tooling boundary cleanup wave after
+  the driver split.
+- The phase is explicit that the goal is architectural tightening inside the
+  existing admitted tool surface, not surface growth.Phase 38 -- Driver And Tooling Boundary Cleanup After Split
+===========================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Use the stabilized post-Phase-33 hosted workflow and the now-landed driver
+split to tighten driver and tooling ownership boundaries without widening the
+admitted repository slice.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The driver has already been simplified and split into separate files, so the
+  repository now has a better structural base for targeted boundary cleanup.
+- Older critique notes still contain a mix of landed issues, low-risk cleanup
+  items, and larger deferred architectural follow-ons tied to the old monolith.
+- The supported hosted workflow and project graph are now stable enough that
+  boundary cleanup can proceed without simultaneously redefining public surface.
+- This makes Phase 38 an internal-quality and ownership phase, not a capability
+  widening phase.
+
+Problem being solved
+--------------------
+- The repository has already harvested some value from the driver split, but
+  older critique items and historical assumptions still risk leaving command
+  plumbing, build-graph logic, target identity, and utility helpers wider or
+  more entangled than they need to be.
+- Without one dedicated cleanup phase, the new file structure could preserve
+  old boundary confusion under smaller source files rather than actually
+  tightening ownership.
+- The repository needs one bounded internal phase that consolidates the split
+  into clearer module responsibilities and stronger tooling invariants.
+
+Core rule
+---------
+- Treat `compiler/driver/` as command, project, and pipeline orchestration
+  only.
+- Move shared helper truth out of the driver when a narrower owner already
+  exists or should exist.
+- Prefer small, targeted cleanups over a wholesale driver redesign.
+- Preserve deterministic workflow behavior and existing admitted commands while
+  tightening internal structure.
+- Keep capability breadth unchanged in this phase.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one driver-and-tooling cleanup wave over the already
+split `compiler/driver/` area and closely related helper code, guided by the
+remaining critique items that still fit the current architecture.
+
+Strong candidate cleanup areas
+------------------------------
+- shared target-identity and bootstrap triple constants
+- remaining order-sensitive or dead-branch workflow helpers in project reuse
+  logic
+- documentation or invariants for namespacing and build-unit merge rules that
+  still matter after the split
+- helper extraction where command plumbing still owns non-command policy by
+  habit rather than necessity
+
+What this phase should try to prove
+-----------------------------------
+- the driver split produces real architectural tightening, not just smaller
+  files
+- remaining low-risk critique items can be closed without widening the public
+  tool surface
+- the command surface stays deterministic while ownership becomes easier to
+  read and maintain
+- any still-deferred larger driver refactors are reduced to sharper future
+  triggers rather than lingering as vague unease
+
+Preferred pressure points
+-------------------------
+1. Shared target or bootstrap identity ownership.
+2. Project-reuse and incremental-state helper correctness or determinism.
+3. Dead-branch or duplicated helper cleanup that survived from the old driver.
+4. Explicit comments or invariants where split files still rely on subtle
+   behavior.
+5. Focused tool regressions that prove no workflow drift.
+
+Deliverables
+------------
+- targeted code cleanup under `/Users/ro/dev/c_modern/compiler/driver/` and
+  the narrowest supporting owners
+- focused tool or unit regressions proving workflow behavior is unchanged where
+  relevant
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` only
+  if a consciously limited structural compromise remains after the cleanup
+- optional critique-note or repo-map refresh only if the current structure has
+  materially diverged from the older monolithic references
+
+Delivered outcome
+-----------------
+- duplicated build-unit merge logic was collapsed into one shared internal
+  helper, so direct-source and project builds now rely on the same ownership
+  rule instead of carrying split copies in both `driver.cpp` and `builder.cpp`
+- the internal helper contract now records the merge invariant explicitly:
+  dependency units merge ahead of the entry unit while entry-defined non-extern
+  symbols continue to win over duplicate dependency definitions
+- stale driver-side bootstrap target identity plumbing was removed, and the
+  remaining builder-side bootstrap target-name checks now read directly from
+  support-owned bootstrap target constants instead of reaching into backend
+  configuration just to compare names
+- focused validation passed through the existing build and driver-facing test
+  surface: `mc_bootstrap_unit`, `mc_phase7_tool_unit`, `mc_help_smoke`,
+  `mc_build_smoke`, and `mc_dump_paths_smoke`
+- no decision-log update was needed because the cleanup closed low-risk split
+  fallout without introducing a new consciously limited compromise
+
+Suggested execution order
+-------------------------
+1. Re-audit the remaining driver-related critique items against the current
+   split code rather than the older monolithic file layout.
+2. Close the smallest still-relevant low-risk items first.
+3. Extract or centralize shared helper truth only where ownership is clearly
+   wrong today.
+4. Add or refresh focused workflow regressions for touched paths.
+5. Record any larger still-deferred driver architecture work explicitly instead
+   of smearing it across unrelated cleanup commits.
+
+Exit criteria
+-------------
+- the split driver has tighter ownership boundaries than before this phase
+- the remaining relevant low-risk critique items are either closed or narrowed
+  to sharper future triggers
+- tool workflow behavior stays deterministic and unchanged at the public level
+- no new capability family is implied by the cleanup
+
+Non-goals
+---------
+- large graph-and-compile architecture redesign
+- new target kinds, new command modes, or broader workflow breadth
+- capability work in `time`, `os`, `hal`, or broader linking
+- using the split as an excuse for broad unrelated refactors
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 38 stands alone as the driver and tooling boundary cleanup wave after
+  the driver split.
+- The phase is explicit that the goal is architectural tightening inside the
+  existing admitted tool surface, not surface growth.

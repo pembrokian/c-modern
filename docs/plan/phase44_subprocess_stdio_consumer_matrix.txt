@@ -1,0 +1,130 @@
+Phase 44 -- Subprocess And Stdio Consumer Matrix
+===============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Start the next sequence after the admitted `io.pipe()` proof pair by deciding
+whether the current handle-first communication plateau now justifies a narrow
+hosted subprocess or stdio surface inside `os`.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 43 admitted a minimal `io.Pipe` plus `io.pipe()` surface and proved it
+  through both blocking and readiness-based real project workflows.
+- The repository still keeps broader `os` deferred until a real consumer matrix
+  exists, and earlier planning explicitly treated subprocesses as part of that
+  deferred platform-facing family rather than as an automatic next step.
+- The current pipe proof pair now creates a plausible new question: whether
+  pipe-backed stdio or child-process orchestration is finally the narrowest
+  honest next consumer, or whether pipes should remain bounded without opening
+  `os` yet.
+- The answer should come from admitted project pressure, not from the mere
+  existence of pipe handles.
+
+Problem being solved
+--------------------
+- The repository now proves handle-first communication between threads, but it
+  still lacks evidence for the next adjacent platform-facing step.
+- Without a consumer-matrix phase, subprocess work could sprawl quickly into a
+  broad `os` family covering environment, shell invocation, signals, cwd, and
+  platform policy that the repository still cannot support honestly.
+- The repository therefore needs one gatekeeper phase that determines whether a
+  narrow subprocess or stdio surface is now justified at all.
+
+Core rule
+---------
+- Admit `os` only if a real admitted consumer becomes materially cleaner with a
+  child-process or stdio boundary.
+- Prefer explicit spawned-command plus stdio-pipe pressure over broad process
+  control or shell convenience.
+- Keep the candidate surface Darwin arm64 hosted-only and reviewable.
+- If the matrix shows no real consumer, keep `os` deferred explicitly and stop.
+- Do not let the existence of `io.pipe()` alone force subprocess scope.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one consumer-matrix audit across admitted real projects,
+existing examples, and one bounded candidate utility shape to determine whether
+the next honest step is:
+- a narrow child-process spawn plus wait surface with stdio pipe redirection
+- a still-deferred `os` family because no admitted consumer actually needs it
+- or a different pipe-adjacent follow-up that still belongs in `io`, not `os`
+
+Candidate consumer directions
+-----------------------------
+- a bounded text-filter or line-relay utility that becomes materially cleaner
+  if it can spawn one child process with explicit pipe-backed stdin or stdout
+- a bounded test or tooling-adjacent project that needs child-process capture
+  without requiring shells, environments, or general-purpose process control
+- a real project proving that the current pipe pair is already sufficient and
+  that subprocess admission is still premature
+
+What this phase should try to prove
+-----------------------------------
+- whether an admitted consumer now needs child-process stdio composition rather
+  than thread-plus-pipe composition alone
+- whether the smallest honest `os` slice is spawn plus wait plus optional
+  stdin/stdout pipe wiring, or whether even that remains too broad today
+- whether the new pressure belongs in `os`, `io`, or still nowhere inside the
+  admitted slice
+- whether the repository should proceed to Phase 45 or keep subprocess work
+  deferred
+
+Preferred pressure points
+-------------------------
+1. One bounded child-process consumer more honest than thread-only pipe proof.
+2. Pipe-backed stdin or stdout wiring without shell semantics.
+3. Explicit spawn plus wait need, not general process management.
+4. Separation between `io` handle ownership and `os` process ownership.
+5. Explicit continued deferral if no admitted consumer crosses the bar.
+
+Deliverables
+------------
+- one consumer-matrix write-up naming the candidate subprocess consumers and
+  stating whether a narrow `os` subprocess slice is justified
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` recording either the new
+  authorization or explicit continued deferral
+- one short next-step statement saying whether Phase 45 is authorized or the
+  repository should keep subprocess work deferred
+
+Suggested execution order
+-------------------------
+1. Re-audit the admitted `pipe_handoff` and `pipe_ready` proofs to determine
+   what they still do not cover.
+2. Evaluate one bounded child-process utility shape against that gap.
+3. Separate true subprocess pressure from workflow or test-harness convenience.
+4. Freeze the smallest candidate API only if the consumer becomes materially
+   cleaner because of it.
+5. Proceed to Phase 45 only if the matrix authorizes a narrow subprocess slice.
+
+Exit criteria
+-------------
+- the repository either has a justified narrow subprocess or stdio candidate
+  or an explicit continued deferral decision backed by admitted-project
+  evidence
+- the strongest candidate consumer is named concretely rather than abstractly
+- any future `os` subprocess work is scoped from real consumer pressure rather
+  than from ambient completeness arguments
+
+Non-goals
+---------
+- implementing subprocess support in this phase before the consumer matrix is
+  closed
+- admitting shells, environment APIs, cwd mutation, signals, or process groups
+- widening pipe semantics and subprocess semantics together in the same step
+- treating developer convenience alone as sufficient consumer pressure
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 44 stands alone as the gatekeeper for any narrow subprocess or stdio
+  admission after the landed `io.pipe()` proof pair.
+- The phase is explicit that broader `os` work begins only if an admitted
+  consumer justifies it.

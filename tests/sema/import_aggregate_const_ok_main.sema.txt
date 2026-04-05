@@ -1,0 +1,10 @@
+SemanticModule
+  Import name=helper_summary
+  TypeDecl name=helper_summary.Summary kind=struct
+    Field name=open_items type=usize
+    Field name=closed_items type=usize
+    Field name=blocked_items type=usize
+    Field name=priority_items type=usize
+    Layout size=32 align=8 offsets=[0, 8, 16, 24]
+  Const names=[DEFAULT_SUMMARY_COPY] type=helper_summary.Summary values=[{open_items: 1, closed_items: 1, blocked_items: 0, priority_items: 0}]
+  Function name=main params=[] returns=[i32]

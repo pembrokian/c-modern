@@ -1,0 +1,21 @@
+schema = 1
+project = "pipe-handoff"
+default = "pipe-handoff"
+
+[targets.pipe-handoff]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.pipe-handoff.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.pipe-handoff.runtime]
+startup = "default"
+
+[targets.pipe-handoff.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

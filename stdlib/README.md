@@ -40,14 +40,26 @@ Current repository-specific notes:
   `fs.list_dir(...)`, where directory listings are returned as newline-delimited
   entry names with directories marked by a trailing `/`; this remains a narrow
   bootstrap surface for deterministic utilities rather than a final richer API
+- `io` is the primary portable I/O and communication boundary: it owns
+  `File`, `read`, `write`, `close`, readiness polling, and the admitted
+  `Pipe` plus `pipe()` primitive used to connect independent execution
+  contexts without introducing scheduler policy
+- `net` remains a narrow portable constructor layer above `io`; TCP listen,
+  accept, and connect operations return `io.File` so ordinary networking
+  composes directly with `io.read`, `io.write`, `io.close`, and `io.poller_*`
 - `testing` is admitted only as a narrow toolchain companion module for the
   ordinary project-test path; it now includes modest expectation helpers for
   boolean, integer, and string checks, but it is still not a broader fixture,
   capture, or compiler-magic API
-- `sync` is admitted as a narrow hosted concurrency slice: thread spawn or
-  join plus mutex init, destroy, lock, unlock, condvar init, destroy, wait,
-  signal, and narrow `Atomic<T>` load or store publication; compare-exchange,
-  fetch-add, condvar broadcast, and broader scheduler claims remain deferred
+- `sync` is the hosted execution and low-level shared-memory boundary: thread
+  spawn or join remain part of the primary execution model, while mutexes,
+  condition variables, and narrow `Atomic<T>` load or store publication remain
+  explicit low-level hosted tools rather than the preferred portable
+  communication model; compare-exchange, fetch-add, condvar broadcast, and
+  broader scheduler claims remain deferred
+- the repository does not admit async syntax, futures, channels, actors, or
+  hidden scheduler semantics; the preferred portable model remains explicit
+  execution plus handle-based communication plus readiness waiting
 
 Still deferred in this repository:
 

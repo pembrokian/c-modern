@@ -397,6 +397,75 @@ class Checker {
                 const Type target_type = SemanticTypeFromAst(expr.type_target.get(), CurrentTypeParams());
                 return ConvertConstValue(target_type, *operand);
             }
+            case Expr::Kind::kAggregateInit: {
+                Type aggregate_type = UnknownType();
+                if (expr.left != nullptr && (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {
+                    aggregate_type = NamedOrBuiltinType(CombineQualifiedName(*expr.left));
+                    for (const auto& type_arg : expr.left->type_args) {
+                        ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
+                        aggregate_type.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
+                    }
+                }
+
+                const Type resolved_aggregate = StripType(aggregate_type, *module_, TypeStripMode::kAliasesOnly);
+                const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
+                const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
+                const auto instantiated_fields =
+                    type_decl != nullptr ? InstantiateTypeDeclFields(*type_decl, resolved_aggregate)
+                                         : std::vector<std::pair<std::string, Type>> {};
+                const auto& field_source = type_decl != nullptr ? instantiated_fields : builtin_fields;
+                if (type_decl == nullptr && field_source.empty()) {
+                    return std::nullopt;
+                }
+
+                std::vector<std::optional<ConstValue>> ordered_values(field_source.size());
+                std::vector<std::string> ordered_names(field_source.size());
+                for (std::size_t index = 0; index < field_source.size(); ++index) {
+                    ordered_names[index] = field_source[index].first;
+                }
+
+                for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
+                    const auto& field_init = expr.field_inits[index];
+                    if (field_init.value == nullptr) {
+                        return std::nullopt;
+                    }
+                    const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
+                    if (!field_value.has_value()) {
+                        return std::nullopt;
+                    }
+
+                    std::size_t target_index = index;
+                    if (field_init.has_name) {
+                        const auto found = std::find_if(field_source.begin(), field_source.end(), [&](const auto& field) {
+                            return field.first == field_init.name;
+                        });
+                        if (found == field_source.end()) {
+                            return std::nullopt;
+                        }
+                        target_index = static_cast<std::size_t>(std::distance(field_source.begin(), found));
+                    } else if (target_index >= field_source.size()) {
+                        return std::nullopt;
+                    }
+
+                    if (target_index >= ordered_values.size() || ordered_values[target_index].has_value()) {
+                        return std::nullopt;
+                    }
+                    ordered_values[target_index] = *field_value;
+                }
+
+                ConstValue result;
+                result.kind = ConstValue::Kind::kAggregate;
+                result.field_names = std::move(ordered_names);
+                result.elements.reserve(ordered_values.size());
+                for (const auto& field_value : ordered_values) {
+                    if (!field_value.has_value()) {
+                        return std::nullopt;
+                    }
+                    result.elements.push_back(*field_value);
+                }
+                result.text = RenderConstValue(result);
+                return result;
+            }
             case Expr::Kind::kParen:
                 return expr.left != nullptr ? EvaluateConstExpr(*expr.left, report_errors, active_names) : std::nullopt;
             default:

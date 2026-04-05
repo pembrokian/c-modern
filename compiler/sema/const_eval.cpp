@@ -197,6 +197,21 @@ std::string RenderConstValue(const ConstValue& value) {
             return value.text;
         case ConstValue::Kind::kNil:
             return "nil";
+        case ConstValue::Kind::kAggregate: {
+            std::ostringstream stream;
+            stream << '{';
+            for (std::size_t index = 0; index < value.elements.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                if (index < value.field_names.size() && !value.field_names[index].empty()) {
+                    stream << value.field_names[index] << ": ";
+                }
+                stream << RenderConstValue(value.elements[index]);
+            }
+            stream << '}';
+            return stream.str();
+        }
     }
 
     return "?";

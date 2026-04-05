@@ -1,0 +1,138 @@
+Phase 45 -- Minimal Subprocess And Stdio Pipe Admission
+=======================================================
+
+Status
+------
+PLANNED (conditional on Phase 44 authorization)
+
+Purpose
+-------
+If Phase 44 authorizes subprocess work, admit the smallest honest hosted `os`
+surface needed to spawn one child process and optionally wire its stdin or
+stdout through the already admitted `io.Pipe` handle model.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 43 already proves direct pipe communication and pipe plus readiness
+  composition without requiring child processes.
+- Phase 44 is the required consumer-matrix gate and must identify a real
+  admitted consumer that becomes materially cleaner with child-process stdio.
+- The repository still has no honest basis for broad `os` scope; the smallest
+  plausible first step is a subprocess surface that composes with existing
+  `io.File` handles and remains hosted-only.
+- If Phase 44 does not authorize it, this phase remains preserved but inactive.
+
+Problem being solved
+--------------------
+- Once a real consumer needs child-process stdio composition, the repository
+  needs an owned subprocess boundary rather than shelling out through tests or
+  driver-local behavior.
+- Without a narrow first slice, subprocess work could explode into platform
+  policy questions the repository still cannot support honestly.
+- The repository therefore needs one bounded `os` phase centered on spawn,
+  wait, and pipe-backed stdio wiring only.
+
+Core rule
+---------
+- Admit only the smallest subprocess surface authorized by Phase 44.
+- Keep process ownership in `os` and handle ownership in `io`.
+- Prefer explicit argv-style spawning over shell command strings.
+- Keep environment mutation, cwd control, signals, stderr policy, and broader
+  process management explicitly deferred unless the chosen consumer proves a
+  narrower need.
+- Prove the slice through one real project consumer, not just runtime tests.
+
+Chosen slice for this phase
+---------------------------
+Primary candidate slice:
+- one hosted child-process spawn API using explicit argument vectors
+- one wait or completion API
+- the narrowest stdin or stdout pipe-redirection support needed by the chosen
+  consumer
+
+The planned admission should:
+- compose with existing `io.File` endpoints and `io.pipe()` rather than invent
+  special process-only stream types
+- stay Darwin arm64 hosted-only in implementation while keeping the public API
+  as small as possible
+- avoid shell quoting semantics and external command-language policy
+- stop short of broad `os` family claims beyond bounded child-process use
+
+Candidate proof shapes that fit this plan
+-----------------------------------------
+- a bounded filter or relay utility that spawns one child process and reads its
+  stdout through a pipe
+- a bounded pipeline-style utility that feeds a child process from stdin via a
+  pipe without requiring general shell pipelines
+- an ordinary checked-test proof that validates explicit spawn plus wait plus
+  pipe-backed stdio composition at the narrowest meaningful layer
+
+What this phase should try to prove
+-----------------------------------
+- the chosen admitted consumer is materially cleaner with explicit child-
+  process stdio composition than with thread-only pipe proof or host-side test
+  scaffolding
+- the first admitted subprocess surface stays narrow enough that broader `os`
+  questions remain deferred
+- `os` and `io` ownership boundaries remain explicit and reviewable
+- the repository can decide honestly whether Phase 46 should apply the new
+  subprocess slice to one fuller real utility follow-through
+
+Preferred pressure points
+-------------------------
+1. One admitted project with explicit child-process stdio need.
+2. Explicit argv-based spawn semantics.
+3. Pipe-backed stdin or stdout wiring through existing `io.File` handles.
+4. Focused runtime and project proof on Darwin arm64 hosted.
+5. Explicit deferral of broader process-management policy.
+
+Deliverables
+------------
+- one narrow `stdlib/os.mc` subprocess slice and any required hosted runtime
+  support under `/Users/ro/dev/c_modern/runtime/hosted/`
+- one admitted real project or ordinary checked-test proof that consumes the
+  new subprocess slice honestly
+- focused deterministic regressions at the runtime, stdlib, or project layer
+  proving the admitted surface
+- documentation updates in `/Users/ro/dev/c_modern/README.md`,
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` if the supported hosted
+  slice changes materially
+
+Suggested execution order
+-------------------------
+1. Implement the minimum spawn plus wait plus stdio-pipe surface authorized by
+   Phase 44.
+2. Land focused low-level proof first, then update the chosen admitted project
+   to consume the new slice.
+3. Keep shell semantics, env mutation, and broader process control out of the
+   first wave unless the consumer proves they are inseparable.
+4. Add deterministic regressions under the narrowest meaningful layer.
+5. Use the landed proof to decide whether Phase 46 should broaden only the
+   consumer-facing project proof, not the public API.
+
+Exit criteria
+-------------
+- the repository admits one narrow hosted subprocess slice centered on spawn,
+  wait, and bounded stdio pipe composition
+- one admitted consumer uses the slice honestly
+- broader `os` process features remain explicitly deferred
+- the next subprocess decision is sharper: consumer follow-through only or
+  pause
+
+Non-goals
+---------
+- shell command parsing or quoting APIs
+- environment APIs, cwd mutation, signals, job control, or process groups
+- subprocess trees, general daemon control, or broad platform process policy
+- any `time` or broader IPC expansion in the same phase
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 45 stands alone as the first admitted subprocess or stdio slice.
+- The phase is explicit that explicit spawn plus wait plus stdio composition,
+  not general `os` breadth, is the first honest boundary.

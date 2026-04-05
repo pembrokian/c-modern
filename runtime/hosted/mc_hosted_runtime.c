@@ -54,6 +54,11 @@ struct mc_io_poller {
     size_t cap;
 };
 
+struct mc_io_pipe {
+    int32_t read_end;
+    int32_t write_end;
+};
+
 struct mc_io_event {
     int32_t file;
     bool readable;
@@ -390,11 +395,7 @@ int64_t __mc_io_write_file(int32_t file, struct mc_slice_u8 bytes, uintptr_t* ou
     }
 
     errno = 0;
-#ifdef MSG_NOSIGNAL
-    const ssize_t write_size = send(file, bytes.ptr, (size_t) bytes.len, MSG_NOSIGNAL);
-#else
     const ssize_t write_size = write(file, bytes.ptr, (size_t) bytes.len);
-#endif
     if (write_size < 0) {
         mc_store_error(out_err, mc_error_code_from_errno());
         return 0;
@@ -408,6 +409,22 @@ uintptr_t __mc_io_close(int32_t file) {
         return mc_error_code_from_errno();
     }
     return 0;
+}
+
+struct mc_io_pipe __mc_io_pipe(uintptr_t* out_err) {
+    struct mc_io_pipe out = { .read_end = -1, .write_end = -1 };
+    mc_store_error(out_err, 0);
+
+    int fds[2] = { -1, -1 };
+    errno = 0;
+    if (pipe(fds) != 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return out;
+    }
+
+    out.read_end = fds[0];
+    out.write_end = fds[1];
+    return out;
 }
 
 struct mc_io_poller* __mc_io_poller_new(uintptr_t* out_err) {

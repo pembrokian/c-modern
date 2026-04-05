@@ -1,5 +1,6 @@
 #include "compiler/mci/mci.h"
 
+#include "compiler/sema/const_eval.h"
 #include "compiler/sema/type_predicates.h"
 
 #include <algorithm>
@@ -16,7 +17,7 @@ namespace {
 
 using mc::support::DiagnosticSeverity;
 
-constexpr int kFormatVersion = 4;
+constexpr int kFormatVersion = 5;
 
 bool ParseBoolField(std::string_view text, bool& value);
 
@@ -95,6 +96,36 @@ std::string JoinEscaped(const std::vector<std::string>& values) {
     return stream.str();
 }
 
+void AppendLengthPrefixed(std::string& output,
+                          std::string_view value) {
+    output += std::to_string(value.size());
+    output.push_back(':');
+    output.append(value);
+}
+
+std::optional<std::size_t> ParseLengthPrefix(std::string_view& text) {
+    const std::size_t separator = text.find(':');
+    if (separator == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const auto parsed = mc::support::ParseArrayLength(text.substr(0, separator));
+    if (!parsed.has_value()) {
+        return std::nullopt;
+    }
+    text.remove_prefix(separator + 1);
+    return *parsed;
+}
+
+std::optional<std::string_view> ConsumeLengthPrefixed(std::string_view& text) {
+    const auto length = ParseLengthPrefix(text);
+    if (!length.has_value() || *length > text.size()) {
+        return std::nullopt;
+    }
+    const std::string_view value = text.substr(0, *length);
+    text.remove_prefix(*length);
+    return value;
+}
+
 std::string SerializeConstValue(const std::optional<sema::ConstValue>& value) {
     if (!value.has_value()) {
         return {};
@@ -110,6 +141,17 @@ std::string SerializeConstValue(const std::optional<sema::ConstValue>& value) {
             return "s:" + value->text;
         case sema::ConstValue::Kind::kNil:
             return "n:";
+        case sema::ConstValue::Kind::kAggregate: {
+            std::string encoded = "a:" + std::to_string(value->elements.size()) + ':';
+            for (std::size_t index = 0; index < value->elements.size(); ++index) {
+                const std::string_view field_name = index < value->field_names.size() ? std::string_view(value->field_names[index])
+                                                                                       : std::string_view {};
+                AppendLengthPrefixed(encoded, field_name);
+                const std::string child = SerializeConstValue(value->elements[index]);
+                AppendLengthPrefixed(encoded, child);
+            }
+            return encoded;
+        }
     }
     return {};
 }
@@ -289,6 +331,34 @@ std::optional<sema::ConstValue> ParseConstValue(std::string_view text) {
             value.kind = sema::ConstValue::Kind::kNil;
             value.text = "nil";
             return value;
+        case 'a': {
+            std::string_view payload = text.substr(2);
+            const auto field_count = ParseLengthPrefix(payload);
+            if (!field_count.has_value()) {
+                return std::nullopt;
+            }
+            value.kind = sema::ConstValue::Kind::kAggregate;
+            value.field_names.reserve(*field_count);
+            value.elements.reserve(*field_count);
+            for (std::size_t index = 0; index < *field_count; ++index) {
+                const auto field_name = ConsumeLengthPrefixed(payload);
+                const auto child_text = ConsumeLengthPrefixed(payload);
+                if (!field_name.has_value() || !child_text.has_value()) {
+                    return std::nullopt;
+                }
+                const auto child = ParseConstValue(*child_text);
+                if (!child.has_value()) {
+                    return std::nullopt;
+                }
+                value.field_names.push_back(std::string(*field_name));
+                value.elements.push_back(*child);
+            }
+            if (!payload.empty()) {
+                return std::nullopt;
+            }
+            value.text = sema::RenderConstValue(value);
+            return value;
+        }
         default:
             return std::nullopt;
     }
@@ -1212,7 +1282,7 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
         return std::nullopt;
     }
 
-    if (artifact.format_version != 1 && artifact.format_version != 2 && artifact.format_version != 3 &&
+    if (artifact.format_version != 1 && artifact.format_version != 2 && artifact.format_version != 3 && artifact.format_version != 4 &&
         artifact.format_version != kFormatVersion) {
         diagnostics.Report({
             .file_path = path,

@@ -1,8 +1,13 @@
-export { write, write_line, read, write_file, close, File, EventMask, EVENT_READABLE, EVENT_WRITABLE, Event, Poller, poller_new, poller_add, poller_set, poller_remove, poller_wait, poller_close }
+export { write, write_line, read, write_file, close, File, Pipe, pipe, EventMask, EVENT_READABLE, EVENT_WRITABLE, Event, Poller, poller_new, poller_add, poller_set, poller_remove, poller_wait, poller_close }
 
 import errors
 
 type File = i32
+
+struct Pipe {
+    read_end: File
+    write_end: File
+}
 
 type EventMask = u32
 
@@ -25,6 +30,7 @@ extern(c) func __mc_io_write_line(text: str) i32
 extern(c) func __mc_io_read(file: File, bytes: Slice<u8>, err: *errors.Error) usize
 extern(c) func __mc_io_write_file(file: File, bytes: Slice<u8>, err: *errors.Error) usize
 extern(c) func __mc_io_close(file: File) errors.Error
+extern(c) func __mc_io_pipe(err: *errors.Error) Pipe
 extern(c) func __mc_io_poller_new(err: *errors.Error) *Poller
 extern(c) func __mc_io_poller_add(p: *Poller, file: File, interests: EventMask) errors.Error
 extern(c) func __mc_io_poller_set(p: *Poller, file: File, interests: EventMask) errors.Error
@@ -54,6 +60,12 @@ func write_file(file: File, bytes: Slice<u8>) (usize, errors.Error) {
 
 func close(file: File) errors.Error {
     return __mc_io_close(file)
+}
+
+func pipe() (Pipe, errors.Error) {
+    err: errors.Error = errors.ok()
+    conn: Pipe = __mc_io_pipe(&err)
+    return conn, err
 }
 
 func poller_new() (*Poller, errors.Error) {

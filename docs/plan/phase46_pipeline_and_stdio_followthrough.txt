@@ -1,0 +1,129 @@
+Phase 46 -- Pipeline And Stdio Follow-Through
+============================================
+
+Status
+------
+PLANNED (conditional on Phase 45 landing)
+
+Purpose
+-------
+Use the narrow subprocess slice from Phase 45 to land one real consumer-facing
+follow-through wave: a bounded pipeline, relay, or filter utility that proves
+why subprocess plus stdio composition belongs in the admitted hosted slice.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 44 must authorize subprocess admission through a real consumer matrix.
+- Phase 45 must then land the minimal spawn plus wait plus stdio-pipe slice.
+- The repository still should not assume that broader process policy is part of
+  the first `os` admission; it must be justified by the chosen consumer
+  follow-through.
+- This phase is therefore about proving the landed subprocess slice through one
+  real utility or project, not about broadening `os` for its own sake.
+
+Problem being solved
+--------------------
+- A narrow subprocess API only becomes meaningful if a real admitted project
+  uses it to close an actual handle-first workflow gap.
+- Without a follow-through phase, the repository could land spawn plus wait and
+  pipe-backed stdio yet still fail to prove why they belong in the admitted
+  slice.
+- The repository needs one concrete consumer outcome: a bounded pipeline,
+  filter, relay, or capture utility that is clearer with subprocess stdio than
+  without it.
+
+Core rule
+---------
+- Land one real subprocess or stdio consumer follow-through, not several broad
+  `os` features.
+- Prefer a small filter or relay utility with explicit pipe ownership before
+  broader subprocess frameworks.
+- Keep behavior explicit in project or stdlib code rather than hiding it in
+  tooling.
+- Record any remaining broader `os` desires as deferred instead of widening the
+  family opportunistically.
+- Preserve the handle-first story established by the admitted `io.pipe()`
+  slice.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one admitted real project gains honest pipeline or stdio
+behavior using the Phase 45 subprocess slice.
+
+Strong candidate follow-through shapes
+--------------------------------------
+- a bounded line-filter relay that spawns one child process, feeds it explicit
+  stdin, and reads stdout back through ordinary `io.File` handles
+- a tiny pipeline utility proving one child-process composition step without
+  opening shell-language semantics
+- a capture-style helper utility only if it demonstrates the intended handle-
+  first subprocess API more honestly than the filter or relay candidates
+
+What this phase should try to prove
+-----------------------------------
+- the chosen project is materially more honest with subprocess stdio than with
+  thread-only pipe proof or host-side scripting
+- the subprocess API remains explicit and reviewable
+- broader process policy stays deferred
+- the repository can say clearly what its admitted hosted `os` slice now covers
+  and what it still does not
+
+Preferred pressure points
+-------------------------
+1. One admitted project with real child-process stdio composition.
+2. Explicit separation between handle ownership in `io` and process ownership
+   in `os`.
+3. Deterministic project and ordinary-test proof for the new behavior.
+4. Documentation updates that keep the hosted support statement honest.
+5. Explicit preservation of deferred broader `os` features.
+
+Deliverables
+------------
+- one admitted real project updated or added to use the Phase 45 subprocess
+  slice honestly
+- focused deterministic regressions proving the pipeline or stdio behavior at
+  the project and ordinary-test layers
+- documentation updates in `/Users/ro/dev/c_modern/README.md`,
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` if the admitted hosted
+  `os` slice changes materially
+- one short next-step note stating whether the subprocess slice should pause
+  after this bounded admission or continue only when another concrete consumer
+  appears
+
+Suggested execution order
+-------------------------
+1. Choose the strongest admitted consumer authorized by Phase 44.
+2. Apply the minimal Phase 45 subprocess slice to that project before widening
+   the API surface further.
+3. Land deterministic project and ordinary-test coverage for the new behavior.
+4. Refresh public docs so the supported hosted slice states the new subprocess
+   boundary clearly.
+5. Record any still-deferred broader `os` desires explicitly.
+
+Exit criteria
+-------------
+- one admitted project now proves the hosted subprocess slice through honest
+  stdio composition
+- the repository can describe the admitted subprocess surface concretely and
+  narrowly
+- any broader `os` growth remains explicit and deferred rather than implied
+- the next plateau after this subprocess wave is chosen from clearer evidence
+
+Non-goals
+---------
+- shells, pipelines as language syntax, or general command interpreters
+- environment management, cwd mutation, signals, or broader process control
+- expanding into package-management, daemon control, or job supervision
+- turning build-tool execution helpers into the public subprocess API
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 46 stands alone as the real-consumer follow-through capstone for a
+  first narrow subprocess and stdio admission.
+- The phase is explicit that real utility proof, not family breadth, determines
+  completion.

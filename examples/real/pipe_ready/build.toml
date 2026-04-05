@@ -1,0 +1,21 @@
+schema = 1
+project = "pipe-ready"
+default = "pipe-ready"
+
+[targets.pipe-ready]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.pipe-ready.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.pipe-ready.runtime]
+startup = "default"
+
+[targets.pipe-ready.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

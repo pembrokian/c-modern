@@ -1,0 +1,166 @@
+Phase 42 -- Imported Aggregate Constants Or Broader Linking Follow-Through
+==========================================================================
+
+Status
+------
+COMPLETED (structural aggregate constants branch)
+
+Purpose
+-------
+If Phase 40 identifies either imported structural aggregate constant pressure
+or broader linking or artifact pressure as the narrowest honest next frontier,
+use this phase to open the correct owner-local follow-through without reviving
+unrelated deferred work.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- One deferred sema-plus-`.mci` frontier remains explicit: structural aggregate
+  constant serialization across module or project boundaries.
+- One deferred tooling frontier also remains explicit: behavior beyond the
+  current hosted `staticlib` plus selected-target hardening proof, including
+  broader linking or artifact coordination.
+- Phase 40 is the required discovery gate and must choose which of these two
+  fronts, if either, is now the strongest admitted pressure.
+- If Phase 40 instead chooses the imported generic compiler frontier, this
+  phase remains preserved but inactive.
+
+Problem being solved
+--------------------
+- The repository still has more than one credible deferred frontier outside the
+  compiler-owned generic-call case, but they belong to different owners and
+  should not be pursued together speculatively.
+- Once Phase 40 identifies a winning pressure artifact, the repository needs a
+  bounded follow-through that respects that owner boundary and keeps the
+  non-winning frontier deferred.
+- This phase therefore exists as a conditional branch point rather than as one
+  guaranteed implementation shape.
+
+Core rule
+---------
+- Choose one owner only: sema-plus-`.mci` structural constants or
+  tooling-plus-linker broader artifact behavior.
+- Fix the chosen distortion at its correct owner boundary.
+- Keep the non-chosen frontier explicitly deferred.
+- Use the admitted pressure artifact from Phase 40 as the main proof surface.
+- Avoid widening unrelated language, stdlib, or runtime families.
+
+Conditional branch A -- Structural aggregate constants
+------------------------------------------------------
+Use this branch only if Phase 40 proves that an admitted imported or project
+workflow needs aggregate compile-time values across `.mci` boundaries.
+
+Primary goals
+-------------
+- design the narrowest structural constant artifact shape at the sema and
+  `.mci` owner boundary
+- preserve deterministic serialization and import consumption
+- prove one admitted consumer that is materially cleaner than scalar-only
+  constants plus zero-init storage facts
+
+Conditional branch B -- Broader linking or artifact behavior
+------------------------------------------------------------
+Use this branch only if Phase 40 proves that a real admitted project needs
+behavior beyond the current hosted `staticlib` plus selected-target hardening
+plateau.
+
+Primary goals
+-------------
+- choose the smallest honest tooling follow-through, such as external
+  system-library linking semantics, sharper artifact coordination, or another
+  narrowly bounded linker-facing behavior
+- keep `sharedlib`, installation policy, and broader distribution claims
+  deferred unless the Phase 40 artifact proves one of them directly
+- preserve deterministic hosted workflow proof on the chosen narrower surface
+
+What this phase should try to prove
+-----------------------------------
+- the winning non-compiler frontier from Phase 40 can now be closed or narrowed
+  at the correct owner boundary
+- the admitted pressure artifact becomes materially cleaner through that
+  owner-local follow-through
+- the non-winning frontier remains explicit and deferred instead of being
+  dragged in opportunistically
+- the repository exits the phase with one narrower deferred frontier, not a
+  wider set of half-opened capabilities
+
+Preferred pressure points
+-------------------------
+1. One admitted pressure artifact from Phase 40.
+2. Exact owner choice: sema-plus-`.mci` or tooling-plus-linker.
+3. Deterministic proof at the narrowest meaningful layer.
+4. Explicit preservation of the non-chosen frontier as deferred.
+5. Documentation updates that keep the supported slice honest.
+
+Deliverables
+------------
+- the narrowest implementation and proof work required by the chosen branch
+- focused regressions and proof surfaces tied to the Phase 40 artifact
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` recording the chosen
+  owner follow-through and the still-deferred non-winning frontier
+- README or release-hardening note updates only if the admitted supported
+  slice changes materially
+
+Suggested execution order
+-------------------------
+1. Reconfirm the Phase 40 winner and reject the non-winning branch explicitly.
+2. Land the smallest owner-local follow-through for the winning branch.
+3. Prove the admitted pressure artifact through deterministic regressions.
+4. Refresh planning docs so the still-deferred frontier remains visible.
+5. Re-evaluate the remaining deferred fronts only after the chosen branch lands.
+
+Exit criteria
+-------------
+- one non-compiler deferred frontier is honestly advanced or sharply narrowed
+  from real admitted pressure
+- the non-chosen frontier remains explicitly deferred with its existing or
+  sharper revisit trigger
+- the repository can state more clearly which major deferred fronts remain and
+  why
+
+Non-goals
+---------
+- pursuing both structural constants and broader linking in parallel
+- reopening blocked Lane C `time` work without a new authorized consumer matrix
+- broad shared-library, package-management, or general constant-evaluation
+  expansion beyond the chosen pressure artifact
+- speculative cleanup unrelated to the winning frontier
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 42 stands alone as the conditional non-compiler follow-through branch
+  from the Phase 40 discovery wave.
+- The phase is explicit that only one owner-local frontier should activate.
+
+Implemented slice
+-----------------
+- chose the structural aggregate constants branch explicitly from the Phase 40
+  `issue_rollup` proof and left the broader linker branch deferred unchanged
+- widened sema-owned compile-time constant representation from scalar-only
+  payloads to recursive structural values so aggregate initializers whose
+  members are themselves compile-time constants now produce owned semantic
+  constant facts instead of succeeding only as shape checks
+- extended `.mci` interface artifacts with deterministic recursive structural
+  constant encoding so imported module surfaces can preserve aggregate constant
+  facts across project boundaries rather than collapsing them to `nullopt`
+- proved the change at three layers: direct sema fixture coverage for
+  `helper_summary.DEFAULT_SUMMARY`, `.mci` round-trip coverage in
+  `bootstrap_tests.cpp`, and the refreshed real `issue_rollup` project check
+  proof in `phase7_tool_tests.cpp`
+- kept executable top-level aggregate-const global emission out of this phase:
+  the LLVM backend still lowers global initializers from literal text only, so
+  the admitted proof for this wave is project `check` and interface transport,
+  not full executable build support for aggregate const globals
+
+Closeout statement
+------------------
+Phase 42 is complete on the structural aggregate constants branch. Imported
+aggregate compile-time constants now survive sema and `.mci` boundaries
+honestly, which closes the winning Phase 40 distortion at its correct owner.
+The non-winning broader-linker frontier remains deferred. A narrower residual
+backend limitation stays explicit: executable emission of top-level aggregate
+const globals is still a separate follow-up and was not folded into this sema-
+plus-`.mci` wave.

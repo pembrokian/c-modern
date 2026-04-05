@@ -58,6 +58,7 @@ struct ConstValue {
         kFloat,
         kString,
         kNil,
+        kAggregate,
     };
 
     Kind kind = Kind::kInteger;
@@ -65,6 +66,8 @@ struct ConstValue {
     double float_value = 0.0;
     bool bool_value = false;
     std::string text;
+    std::vector<std::string> field_names;
+    std::vector<ConstValue> elements;
 };
 
 struct GlobalSummary {
