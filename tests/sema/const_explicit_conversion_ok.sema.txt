@@ -1,0 +1,4 @@
+SemanticModule
+  Const names=[COUNT] type=usize values=[3]
+  Const names=[SCALE] type=f64 values=[3]
+  Function name=main params=[] returns=[i32]

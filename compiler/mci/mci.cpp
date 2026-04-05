@@ -16,7 +16,7 @@ namespace {
 
 using mc::support::DiagnosticSeverity;
 
-constexpr int kFormatVersion = 3;
+constexpr int kFormatVersion = 4;
 
 bool ParseBoolField(std::string_view text, bool& value);
 
@@ -132,6 +132,30 @@ std::string JoinBoolFlags(const std::vector<bool>& values) {
         stream << (values[index] ? '1' : '0');
     }
     return stream.str();
+}
+
+std::optional<std::vector<bool>> ParseBoolFlags(std::string_view text) {
+    if (text.empty()) {
+        return std::vector<bool> {};
+    }
+
+    std::vector<bool> values;
+    std::string_view remaining = text;
+    while (true) {
+        const std::size_t separator = remaining.find(';');
+        const std::string_view field = separator == std::string_view::npos ? remaining : remaining.substr(0, separator);
+        bool value = false;
+        if (!ParseBoolField(field, value)) {
+            return std::nullopt;
+        }
+        values.push_back(value);
+        if (separator == std::string_view::npos) {
+            break;
+        }
+        remaining.remove_prefix(separator + 1);
+    }
+
+    return values;
 }
 
 std::string JoinEscapedPaths(const std::vector<std::size_t>& values) {
@@ -822,6 +846,7 @@ std::string SerializeArtifactWithoutHash(const InterfaceArtifact& artifact) {
                << '\t' << JoinEscaped(global.names)
                << '\t' << EscapeText(sema::FormatType(global.type))
                << '\t' << JoinConstValues(global.constant_values)
+               << '\t' << JoinBoolFlags(global.zero_initialized_values)
                << '\n';
     }
 
@@ -1135,7 +1160,8 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
             continue;
         }
         if (fields[0] == "global") {
-            if (fields.size() != 4 && fields.size() != 5) {
+            if ((artifact.format_version >= 4 && fields.size() != 6) ||
+                (artifact.format_version < 4 && fields.size() != 4 && fields.size() != 5)) {
                 ReportMciError(path, line_number, "invalid global record in interface artifact", diagnostics);
                 return std::nullopt;
             }
@@ -1143,12 +1169,18 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
             const auto names = SplitEscaped(fields[2]);
             const auto type_text = UnescapeText(fields[3]);
             const auto type = type_text.has_value() ? ParseTypeText(*type_text) : std::nullopt;
-            const auto constant_values = fields.size() == 5
-                                             ? (artifact.format_version == 2 ? ParseLegacyConstValues(*type, fields[4]) : ParseConstValues(fields[4]))
-                                             : std::optional<std::vector<std::optional<sema::ConstValue>>> {
-                                                   std::vector<std::optional<sema::ConstValue>> {}
-                                               };
-            if (!names.has_value() || !type.has_value() || !constant_values.has_value() || !ParseBoolField(fields[1], global.is_const)) {
+            const auto constant_values = fields.size() == 6
+                                             ? ParseConstValues(fields[4])
+                                             : (fields.size() == 5
+                                                    ? (artifact.format_version == 2 ? ParseLegacyConstValues(*type, fields[4])
+                                                                                    : ParseConstValues(fields[4]))
+                                                    : std::optional<std::vector<std::optional<sema::ConstValue>>> {
+                                                          std::vector<std::optional<sema::ConstValue>> {}
+                                                      });
+            const auto zero_initialized_values = fields.size() == 6 ? ParseBoolFlags(fields[5])
+                                                                    : std::optional<std::vector<bool>> {std::vector<bool> {}};
+            if (!names.has_value() || !type.has_value() || !constant_values.has_value() || !zero_initialized_values.has_value() ||
+                !ParseBoolField(fields[1], global.is_const)) {
                 ReportMciError(path, line_number, "invalid global payload in interface artifact", diagnostics);
                 return std::nullopt;
             }
@@ -1158,7 +1190,12 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
                 ReportMciError(path, line_number, "global constant value count does not match bound name count", diagnostics);
                 return std::nullopt;
             }
+            if (!zero_initialized_values->empty() && zero_initialized_values->size() != global.names.size()) {
+                ReportMciError(path, line_number, "global zero-init flag count does not match bound name count", diagnostics);
+                return std::nullopt;
+            }
             global.constant_values = *constant_values;
+            global.zero_initialized_values = *zero_initialized_values;
             artifact.module.globals.push_back(std::move(global));
             continue;
         }
@@ -1175,7 +1212,8 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
         return std::nullopt;
     }
 
-    if (artifact.format_version != 1 && artifact.format_version != 2 && artifact.format_version != kFormatVersion) {
+    if (artifact.format_version != 1 && artifact.format_version != 2 && artifact.format_version != 3 &&
+        artifact.format_version != kFormatVersion) {
         diagnostics.Report({
             .file_path = path,
             .span = mc::support::kDefaultSourceSpan,

@@ -115,6 +115,7 @@ void TestMciRoundTrip() {
         .integer_value = 42,
         .text = "42",
     }};
+    global.zero_initialized_values = {false};
     module.globals.push_back(std::move(global));
 
     mc::support::DiagnosticSink diagnostics;
@@ -145,7 +146,9 @@ void TestMciRoundTrip() {
            Expect(loaded->module.globals.size() == 1 && loaded->module.globals[0].constant_values.size() == 1 &&
                loaded->module.globals[0].constant_values[0].has_value() &&
                loaded->module.globals[0].constant_values[0]->kind == mc::sema::ConstValue::Kind::kInteger &&
-               loaded->module.globals[0].constant_values[0]->integer_value == 42,
+               loaded->module.globals[0].constant_values[0]->integer_value == 42 &&
+               loaded->module.globals[0].zero_initialized_values.size() == 1 &&
+               !loaded->module.globals[0].zero_initialized_values[0],
             "mci loader should preserve exported compile-time constant values");
     Expect(!loaded->interface_hash.empty(), "mci loader should preserve interface hashes");
 

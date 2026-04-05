@@ -1,0 +1,131 @@
+Phase 27 -- Lane A Pressure Proof And Re-Audit
+==============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Use one bounded real proof wave after the Phase 25 and Phase 26 semantic-owner
+work to determine which Lane A gaps are now truly closed, which ones still
+matter to admitted consumers, and which should stay deferred explicitly.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Lane A is intentionally ordered to land owner-local semantic truth before
+  broader workflow widening or new module-family breadth.
+- Phase 25 targets compile-time and top-level static-storage authority first.
+- Phase 26 targets one additional bounded semantic family rather than several
+  speculative surface expansions.
+- The repository still needs one pressure wave after those owner changes so the
+  next plateau is chosen from real proof instead of from the existence of open
+  slice-register entries alone.
+
+Problem being solved
+--------------------
+- Closing sema or MIR partials in isolation is not enough; the repository must
+  show that the chosen work removes a real distortion in examples, canonical
+  proofs, or admitted project workflow.
+- Without a post-closure re-audit, Lane A could widen semantics but still fail
+  to clarify whether the next honest move is more compiler work, a build-surface
+  wave, narrow `time`, or release hardening.
+- The repository therefore needs one bounded pressure and review wave that uses
+  the new semantic truths but keeps the ownership boundaries explicit.
+
+Core rule
+---------
+- Use real proof to validate Lane A work, not synthetic completeness claims.
+- Prefer one bounded real utility, canonical refresh, or admitted project
+  follow-up that pressures the newly closed semantic surface directly.
+- Route any newly exposed limitation back to the smallest correct owner: sema,
+  MIR, backend, stdlib, runtime, or tooling.
+- If no remaining Lane A item is materially harming admitted proof surfaces,
+  stop and record that explicitly instead of forcing another compiler wave.
+
+Preferred proof shapes
+----------------------
+Preferred order:
+
+1. One bounded real utility under `/Users/ro/dev/c_modern/examples/real/` that
+   uses the Phase 25 and Phase 26 truths honestly.
+2. One canonical-program refresh where the chosen semantic family now removes a
+   named workaround or awkward spelling.
+3. Focused project-workflow or `.mci` proof only if the Lane A winner touched
+   imported contract truth directly.
+
+Candidate proof directions
+--------------------------
+- a config or table-driven utility that uses honest top-level constant tables
+  and static defaults rather than runtime setup glue
+- an expression, evaluator, or query-style utility if tuple or multi-result
+  semantics became the chosen Phase 26 winner
+- a range-heavy iteration proof only if range semantics became the chosen
+  winner and the proof stays clearer than the current explicit-loop form
+- an imported-API or interface-sensitive proof if `@noalias` or generic nominal
+  identity became the chosen Phase 26 winner
+
+What this phase should decide
+-----------------------------
+- whether the newly closed Lane A work materially cleaned up a real proof
+  surface
+- whether any remaining Lane A item still distorts an admitted consumer enough
+  to justify another compiler-owner wave
+- whether the next plateau should now shift to build-surface widening, narrow
+  `time`, or release hardening instead of continuing Lane A
+
+Deliverables
+------------
+- one bounded real proof surface under `/Users/ro/dev/c_modern/examples/real/`,
+  `/Users/ro/dev/c_modern/examples/canonical/`, or the narrowest relevant test
+  layer
+- deterministic regressions proving the new semantic-owner truth through normal
+  project or compiler workflow
+- explicit documentation updates in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/admin/slice_register.txt` showing which
+  Lane A partials are now landed, still partial, or intentionally deferred
+- one short next-step note or update to the existing overview stating whether
+  the next series should remain compiler-facing or move to another lane
+
+Suggested execution order
+-------------------------
+1. Choose one proof surface that directly exercises the specific semantic truth
+   closed in Phase 25 and Phase 26.
+2. Land that proof with deterministic regressions before writing a new next-
+   series choice.
+3. Re-audit the slice-register Lane A partials and decision-log workarounds
+   against the new proof.
+4. Record only the remaining distortions that still materially harm admitted
+   proof surfaces.
+5. Choose the next plateau from that re-audit rather than from abstract
+   end-state completeness.
+
+Exit criteria
+-------------
+- one real proof surface uses the Lane A semantic closures honestly
+- any remaining Lane A compiler or semantic gaps have sharper revisit triggers
+  than generic future cleanup
+- the repository can state clearly whether Lane A should continue or whether
+  the next best leverage has moved to Lane B, Lane C, or Lane D
+- the planning posture after Phase 27 is based on real proof rather than open
+  register entries alone
+
+Non-goals
+---------
+- opening a new module family just to make the proof more impressive
+- broad workflow widening unrelated to the chosen Lane A semantic truth
+- self-hosting, portability, non-hosted execution, or package-management work
+- forcing another compiler wave if the re-audit says the remaining Lane A items
+  are still theoretical
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 27 stands alone as the pressure-proof and re-audit capstone for the
+  chosen Lane A series.
+- The phase is explicit that real proof, not ambient completeness pressure, is
+  what determines the next plateau after Lane A.

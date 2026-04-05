@@ -1,1 +1,0 @@
-top-level const initializer must be a compile-time constant

@@ -3,6 +3,7 @@
 
 #include <bit>
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -42,28 +43,16 @@ enum class VisitState {
 
 using ImportedModules = std::unordered_map<std::string, Module>;
 
-std::optional<std::int64_t> CheckedAddInt64(std::int64_t lhs, std::int64_t rhs) {
-    std::int64_t result = 0;
-    if (__builtin_add_overflow(lhs, rhs, &result)) {
-        return std::nullopt;
-    }
-    return result;
+std::int64_t WrapAddInt64(std::int64_t lhs, std::int64_t rhs) {
+    return std::bit_cast<std::int64_t>(std::bit_cast<std::uint64_t>(lhs) + std::bit_cast<std::uint64_t>(rhs));
 }
 
-std::optional<std::int64_t> CheckedSubInt64(std::int64_t lhs, std::int64_t rhs) {
-    std::int64_t result = 0;
-    if (__builtin_sub_overflow(lhs, rhs, &result)) {
-        return std::nullopt;
-    }
-    return result;
+std::int64_t WrapSubInt64(std::int64_t lhs, std::int64_t rhs) {
+    return std::bit_cast<std::int64_t>(std::bit_cast<std::uint64_t>(lhs) - std::bit_cast<std::uint64_t>(rhs));
 }
 
-std::optional<std::int64_t> CheckedMulInt64(std::int64_t lhs, std::int64_t rhs) {
-    std::int64_t result = 0;
-    if (__builtin_mul_overflow(lhs, rhs, &result)) {
-        return std::nullopt;
-    }
-    return result;
+std::int64_t WrapMulInt64(std::int64_t lhs, std::int64_t rhs) {
+    return std::bit_cast<std::int64_t>(std::bit_cast<std::uint64_t>(lhs) * std::bit_cast<std::uint64_t>(rhs));
 }
 
 std::optional<std::int64_t> CheckedNegateInt64(std::int64_t value) {
@@ -176,15 +165,27 @@ std::optional<ConstValue> ParseLiteralConstValue(const Expr& expr) {
 
 using CheckedIntBinaryOp = std::optional<std::int64_t> (*)(std::int64_t, std::int64_t);
 
+std::optional<std::int64_t> WrapAddInt64Checked(std::int64_t lhs, std::int64_t rhs) {
+    return WrapAddInt64(lhs, rhs);
+}
+
+std::optional<std::int64_t> WrapSubInt64Checked(std::int64_t lhs, std::int64_t rhs) {
+    return WrapSubInt64(lhs, rhs);
+}
+
+std::optional<std::int64_t> WrapMulInt64Checked(std::int64_t lhs, std::int64_t rhs) {
+    return WrapMulInt64(lhs, rhs);
+}
+
 struct IntBinaryOpEntry {
     std::string_view op;
     CheckedIntBinaryOp evaluate;
 };
 
 constexpr IntBinaryOpEntry kConstIntegerBinaryOps[] = {
-    {"+", CheckedAddInt64},
-    {"-", CheckedSubInt64},
-    {"*", CheckedMulInt64},
+    {"+", WrapAddInt64Checked},
+    {"-", WrapSubInt64Checked},
+    {"*", WrapMulInt64Checked},
     {"/", CheckedDivideInt64},
     {"%", CheckedRemainderInt64},
     {"<<", CheckedShiftLeftInt64},
@@ -940,6 +941,65 @@ class Checker {
         return value;
     }
 
+    std::optional<ConstValue> ConvertConstValue(Type target_type, const ConstValue& value) {
+        const Type canonical_target = CanonicalizeBuiltinType(StripType(std::move(target_type), *module_, TypeStripMode::kAliasesAndDistinct));
+        if (canonical_target.kind == Type::Kind::kBool) {
+            return value.kind == ConstValue::Kind::kBool ? std::optional<ConstValue>(value) : std::nullopt;
+        }
+        if (canonical_target.kind == Type::Kind::kString) {
+            return value.kind == ConstValue::Kind::kString ? std::optional<ConstValue>(value) : std::nullopt;
+        }
+        if (canonical_target.kind == Type::Kind::kPointer) {
+            return value.kind == ConstValue::Kind::kNil ? std::optional<ConstValue>(value) : std::nullopt;
+        }
+        if (canonical_target.kind == Type::Kind::kNamed && IsFloatTypeName(canonical_target.name)) {
+            if (value.kind == ConstValue::Kind::kFloat) {
+                return value;
+            }
+            if (value.kind == ConstValue::Kind::kInteger) {
+                return MakeConstValue(static_cast<double>(value.integer_value));
+            }
+            return std::nullopt;
+        }
+        if (canonical_target.kind == Type::Kind::kNamed && IsIntegerTypeName(canonical_target.name)) {
+            if (value.kind == ConstValue::Kind::kInteger) {
+                return value;
+            }
+            if (value.kind == ConstValue::Kind::kFloat) {
+                if (!std::isfinite(value.float_value)) {
+                    return std::nullopt;
+                }
+                if (value.float_value < static_cast<double>(std::numeric_limits<std::int64_t>::min()) ||
+                    value.float_value > static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
+                    return std::nullopt;
+                }
+                return MakeConstValue(static_cast<std::int64_t>(value.float_value));
+            }
+            return std::nullopt;
+        }
+        return std::nullopt;
+    }
+
+    bool IsConstExpr(const Expr& expr, bool report_errors, std::unordered_set<std::string>& active_names) {
+        if (EvaluateConstExpr(expr, report_errors, active_names).has_value()) {
+            return true;
+        }
+
+        switch (expr.kind) {
+            case Expr::Kind::kAggregateInit:
+                for (const auto& field_init : expr.field_inits) {
+                    if (field_init.value == nullptr || !IsConstExpr(*field_init.value, report_errors, active_names)) {
+                        return false;
+                    }
+                }
+                return true;
+            case Expr::Kind::kParen:
+                return expr.left != nullptr && IsConstExpr(*expr.left, report_errors, active_names);
+            default:
+                return false;
+        }
+    }
+
     std::optional<ConstValue> EvaluateConstExpr(const Expr& expr, bool report_errors,
                                                 std::unordered_set<std::string>& active_names) {
         switch (expr.kind) {
@@ -968,12 +1028,41 @@ class Checker {
                 if (expr.left == nullptr || expr.right == nullptr) {
                     return std::nullopt;
                 }
+                if (expr.text == "&&" || expr.text == "||") {
+                    const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
+                    if (!left.has_value() || left->kind != ConstValue::Kind::kBool) {
+                        return std::nullopt;
+                    }
+                    if (expr.text == "&&" && !left->bool_value) {
+                        return MakeConstValue(false);
+                    }
+                    if (expr.text == "||" && left->bool_value) {
+                        return MakeConstValue(true);
+                    }
+                    const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
+                    if (!right.has_value()) {
+                        return std::nullopt;
+                    }
+                    return EvaluateConstBinaryOp(expr.text, *left, *right);
+                }
                 const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
                 const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
                 if (!left.has_value() || !right.has_value()) {
                     return std::nullopt;
                 }
                 return EvaluateConstBinaryOp(expr.text, *left, *right);
+            }
+            case Expr::Kind::kCall: {
+                if (expr.type_target == nullptr || expr.args.size() != 1) {
+                    return std::nullopt;
+                }
+                const auto operand = EvaluateConstExpr(*expr.args.front(), report_errors, active_names);
+                if (!operand.has_value()) {
+                    return std::nullopt;
+                }
+                ValidateTypeExpr(expr.type_target.get(), CurrentTypeParams(), expr.type_target->span);
+                const Type target_type = SemanticTypeFromAst(expr.type_target.get(), CurrentTypeParams());
+                return ConvertConstValue(target_type, *operand);
             }
             case Expr::Kind::kParen:
                 return expr.left != nullptr ? EvaluateConstExpr(*expr.left, report_errors, active_names) : std::nullopt;
@@ -1467,9 +1556,19 @@ class Checker {
             if (global_index < module_->globals.size()) {
                 module_->globals[global_index].type = declared_type;
                 module_->globals[global_index].constant_values.assign(module_->globals[global_index].names.size(), std::nullopt);
+                module_->globals[global_index].zero_initialized_values.assign(module_->globals[global_index].names.size(), false);
             }
             if (decl.has_initializer && decl.pattern.names.size() != decl.values.size()) {
                 Report(decl.span, "binding requires one initializer per bound name");
+                ++global_index;
+                continue;
+            }
+            if (!decl.has_initializer && decl.kind == Decl::Kind::kVar) {
+                if (global_index < module_->globals.size()) {
+                    for (std::size_t index = 0; index < module_->globals[global_index].zero_initialized_values.size(); ++index) {
+                        module_->globals[global_index].zero_initialized_values[index] = true;
+                    }
+                }
                 ++global_index;
                 continue;
             }
@@ -1487,6 +1586,9 @@ class Checker {
                 std::unordered_set<std::string> active_names;
                 const auto const_value = EvaluateConstExpr(*decl.values[index], true, active_names);
                 if (!const_value.has_value()) {
+                    active_names.clear();
+                }
+                if (!const_value.has_value() && !IsConstExpr(*decl.values[index], true, active_names)) {
                     Report(decl.values[index]->span,
                            std::string("top-level ") + (decl.kind == Decl::Kind::kConst ? "const" : "var") +
                                " initializer must be a compile-time constant");
@@ -2623,11 +2725,15 @@ Module BuildExportedModuleSurfaceInternal(const Module& module, const ast::Sourc
         GlobalSummary filtered = global;
         filtered.names.clear();
         filtered.constant_values.clear();
+        filtered.zero_initialized_values.clear();
         for (std::size_t index = 0; index < global.names.size(); ++index) {
             if (exported_names.contains(global.names[index])) {
                 filtered.names.push_back(global.names[index]);
                 if (index < global.constant_values.size()) {
                     filtered.constant_values.push_back(global.constant_values[index]);
+                }
+                if (index < global.zero_initialized_values.size()) {
+                    filtered.zero_initialized_values.push_back(global.zero_initialized_values[index]);
                 }
             }
         }
@@ -2935,28 +3041,30 @@ std::string DumpModule(const Module& module) {
             line << global.names[index];
         }
         line << "] type=" << FormatType(global.type);
-        if (!global.constant_values.empty()) {
-            bool has_any_value = false;
-            for (const auto& value : global.constant_values) {
-                if (value.has_value()) {
-                    has_any_value = true;
-                    break;
+        bool has_any_value = false;
+        for (std::size_t index = 0; index < global.names.size(); ++index) {
+            const bool has_value = index < global.constant_values.size() && global.constant_values[index].has_value();
+            const bool zero_init = index < global.zero_initialized_values.size() && global.zero_initialized_values[index];
+            if (has_value || zero_init) {
+                has_any_value = true;
+                break;
+            }
+        }
+        if (has_any_value) {
+            line << " values=[";
+            for (std::size_t index = 0; index < global.names.size(); ++index) {
+                if (index > 0) {
+                    line << ", ";
+                }
+                if (index < global.zero_initialized_values.size() && global.zero_initialized_values[index]) {
+                    line << "zero";
+                } else if (index < global.constant_values.size() && global.constant_values[index].has_value()) {
+                    line << RenderConstValue(*global.constant_values[index]);
+                } else {
+                    line << "?";
                 }
             }
-            if (has_any_value) {
-                line << " values=[";
-                for (std::size_t index = 0; index < global.names.size(); ++index) {
-                    if (index > 0) {
-                        line << ", ";
-                    }
-                    if (index < global.constant_values.size() && global.constant_values[index].has_value()) {
-                        line << RenderConstValue(*global.constant_values[index]);
-                    } else {
-                        line << "?";
-                    }
-                }
-                line << ']';
-            }
+            line << ']';
         }
         WriteLine(stream, 1, line.str());
     }

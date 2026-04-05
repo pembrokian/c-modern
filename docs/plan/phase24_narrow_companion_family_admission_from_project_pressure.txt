@@ -3,7 +3,7 @@ Phase 24 -- Narrow Companion-Family Admission From Project Pressure
 
 Status
 ------
-COMPLETED (repository-bounded testing companion growth)
+COMPLETED (repository-bounded modest testing-helper admission)
 
 Purpose
 -------
@@ -19,14 +19,23 @@ Repository status note
 - The slice register keeps `time`, `os`, and `hal` explicit as documented end-
   state module families, but still deferred because no admitted consumer matrix
   has justified them yet.
-- The `testing` companion module is only partial, with the intended end state
-  still being a helper library rather than compiler magic.
+- The `testing` companion module remains partial, but Phase 24 is now complete
+  through modest helper growth rather than a new runtime-facing family.
 - Phase 18 explicitly deferred `hal` because the repository still lacked a
   real MMIO consumer matrix.
 - The recommended next-series order now reflects that richer project pressure
   landed first, Phase 23 did not justify new compiler work, and the next
   decision is therefore about narrow companion-family breadth rather than
   pending compiler debt.
+
+What landed in this phase
+-------------------------
+- modest `stdlib/testing.mc` helper growth for repeated ordinary-test patterns
+  rather than a new `time`, `os`, or `hal` family
+- documentation updates keeping `time`, `os`, and `hal` deferred until a real
+  consumer matrix exists
+- a sharper repository posture for the next series: compiler and build-surface
+  widening now compete more directly with a future narrow `time` admission
 
 Problem being solved
 --------------------
@@ -148,38 +157,3 @@ Acceptance criteria for this document
   project-graph and possible compiler follow-up waves.
 - The phase is explicit that `time` and modest `testing` growth are the first
   credible candidates, while broader `os` and `hal` remain deferred by default.
-
-Implemented slice
------------------
-- re-audited the landed Phase 22 `review_board` project, the admitted ordinary
-  test inventory under `examples/real/`, and the completed Phase 23 re-audit to
-  identify the strongest recurring missing boundary on the current hosted slice
-- chose modest `testing` helper growth over `time` admission because admitted
-  project tests were repeatedly open-coding boolean expectations, integer
-  equality checks, nil checks, and local string-equality helpers, while no
-  equally strong admitted runtime pressure for clocks, sleep, deadlines, or
-  retries had yet emerged
-- expanded `/Users/ro/dev/c_modern/stdlib/testing.mc` from a fail-only helper
-  into a still-bounded companion surface with `expect`, `expect_false`,
-  `expect_i32_eq`, `expect_usize_eq`, and `expect_str_eq`
-- updated representative real project ordinary tests under
-  `/Users/ro/dev/c_modern/examples/real/review_board/`,
-  `/Users/ro/dev/c_modern/examples/real/hash_tool/`,
-  `/Users/ro/dev/c_modern/examples/real/file_walker/`, and
-  `/Users/ro/dev/c_modern/examples/real/worker_queue/` so the new helper
-  surface is proven through the normal `mc test --project ...` workflow rather
-  than only through abstract library code
-- kept `time`, `os`, and `hal` deferred because the repository still lacks a
-  stronger admitted consumer matrix for runtime timekeeping or broader
-  platform-facing families
-
-Closeout statement
-------------------
-Phase 24 is complete. The strongest honest follow-up after the Phase 22 richer
-project graph and the Phase 23 compiler re-audit was not a narrow `time`
-runtime slice but modest growth in the `testing` companion module. The
-repository now admits small expectation helpers that remove repeated test-local
-boilerplate across real project ordinary tests while keeping `testing` firmly
-as a normal library companion rather than compiler magic. `time`, `os`, and
-`hal` remain explicitly deferred until a concrete admitted consumer matrix
-justifies them.

@@ -1,0 +1,170 @@
+Phase 26 -- Selected Semantic Surface Widening
+==============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Use the cleaner sema baseline after Phase 25 to close one more bounded Lane A
+partial that materially improves the documented language contract without
+opening several unfinished semantic families at once.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 25 is intended to remove the most foundational sema-owned ambiguity in
+  compile-time and top-level static truth.
+- The slice register still leaves several additional Lane A items partial:
+  `@noalias`, generic nominal type-argument preservation, tuple or multi-result
+  types, ranges as semantic forms, and broader imported generic procedure-call
+  lowering.
+- Those remaining items are not all equal: some deepen module and interface
+  truth directly, while others widen surface forms that should reopen only if a
+  real pressure proof becomes materially cleaner.
+
+Problem being solved
+--------------------
+- If the repository tries to close every remaining Lane A partial together, it
+  will blur the distinction between sema-authority work, MIR-owner work, and
+  pressure-driven surface widening.
+- If it closes none of them after Phase 25, Lane A risks stopping at a
+  foundational cleanup without converting that stronger baseline into a more
+  complete semantic contract.
+- The repository therefore needs one bounded second Lane A wave with a clear
+  ranking rule among the remaining semantic-surface candidates.
+
+Core rule
+---------
+- Close one bounded semantic family fully when possible instead of loosening
+  multiple partials halfway.
+- Prefer imported contract and interface truth before broader surface-form
+  expansion.
+- Reopen tuple, multi-result, or range semantics only when a real proof shape
+  becomes cleaner and more honest with them.
+- Reopen broader imported generic procedure-call lowering only if a second
+  admitted consumer appears beyond `sync.thread_spawn<T>`.
+
+Candidate ranking for this phase
+--------------------------------
+Preferred order:
+
+1. `@noalias` contract handling where a real imported API, ABI boundary, or
+   interface artifact needs the promise explicitly.
+2. Generic nominal type-argument preservation across sema, `.mci`, MIR, and
+   backend boundaries where a real imported surface exposes drift.
+3. Tuple or multi-result semantics only if the chosen proof becomes materially
+   clearer with them than with the current explicit coding style.
+4. Range semantics only if the chosen proof becomes materially clearer with a
+   real range object than with the current explicit loops.
+5. Broader imported generic procedure-call lowering only if the existing
+   revisit trigger is satisfied by a second real consumer.
+
+Why this ranking is recommended
+-------------------------------
+- `@noalias` and generic nominal identity deepen interface truth without
+  requiring the repository to widen user-facing syntax much beyond what the
+  docs already describe.
+- Tuple and range work can be valuable, but they should stay pressure-driven
+  instead of becoming abstract completion work.
+- Imported generic procedure-call widening remains real but still has the
+  sharpest existing revisit trigger, so it should not be reopened early.
+
+Chosen implementation bias
+--------------------------
+- Start by auditing the admitted real projects and any new Lane A proof from
+  Phase 25 for imported-boundary pressure first.
+- If imported-boundary pressure is weak, choose exactly one of tuple or range
+  semantics based on which proof surface becomes materially cleaner.
+- If neither imported-boundary pressure nor a cleaner tuple or range proof
+  exists, keep this phase narrow and record the sharpened revisit trigger
+  rather than widening speculatively.
+
+Target outcomes for the preferred candidates
+--------------------------------------------
+If `@noalias` wins:
+- parameter-level `@noalias` is semantically preserved and validated where the
+  admitted surface already claims it
+- the promise survives export or import boundaries rather than becoming parser-
+  only spelling
+
+If generic nominal identity wins:
+- type arguments are preserved as part of imported nominal identity across
+  interface, MIR, and executable paths
+- later layers stop reconstructing or guessing nominal type arguments
+
+If tuple or multi-result wins:
+- sema owns result grouping, binding, and assignment truth explicitly
+- MIR lowering and validation reflect the chosen grouped-result surface without
+  backend-shaped call hacks
+
+If range wins:
+- ranges become real sema-owned forms rather than parser-only sugar
+- checking and lowering use an explicit semantic shape that survives to MIR
+
+Suggested proof shapes
+----------------------
+- sema fixtures for accepted and rejected forms at the narrowest layer that
+  proves the chosen semantic family directly
+- MIR fixtures only if the chosen family introduces a new typed boundary that
+  sema dumps alone cannot make reviewable
+- one bounded real utility or canonical proof that benefits materially from the
+  chosen family and does not require a new stdlib admission
+- targeted `.mci` or project-workflow regressions if imported contract truth is
+  the chosen owner gap
+
+Deliverables
+------------
+- one focused implementation slice under
+  `/Users/ro/dev/c_modern/compiler/sema/`,
+  `/Users/ro/dev/c_modern/compiler/mir/`, or
+  `/Users/ro/dev/c_modern/compiler/codegen_llvm/` as required by the chosen
+  semantic family
+- deterministic regressions at the narrowest proof layer that demonstrate the
+  newly owned semantic truth directly
+- bounded updates to real proofs or utilities only after the owner-local truth
+  lands
+- documentation updates in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/admin/slice_register.txt`
+
+Suggested execution order
+-------------------------
+1. Audit the Phase 25 proof consumer and current admitted projects for the next
+   strongest Lane A semantic distortion.
+2. Check first whether imported-boundary pressure now justifies `@noalias` or
+   generic nominal identity closure.
+3. If not, choose exactly one of tuple or range semantics using the narrowest
+   real proof that becomes cleaner with it.
+4. Land the owner-local semantic truth and deterministic regressions before
+   broadening any example or project to rely on it.
+5. Record any still-deferred Lane A partial with a sharper revisit trigger.
+
+Exit criteria
+-------------
+- one bounded remaining Lane A semantic family is either closed or narrowed to
+  a sharper revisit trigger
+- the chosen family is proved by deterministic sema, MIR, `.mci`, project, or
+  executable regressions at the correct owner layer
+- the repository does not accumulate multiple half-admitted semantic families
+  at once
+- the next Lane A phase can use real proof instead of abstract completion goals
+
+Non-goals
+---------
+- widening multiple remaining Lane A families in the same phase
+- reopening `time`, `os`, `hal`, or broader build-surface work here
+- reopening imported generic procedure-call lowering without the existing
+  second-consumer trigger
+- treating parser-only syntax admission as progress when later layers still do
+  not own the meaning
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 26 stands alone as the second Lane A owner document.
+- The phase is explicit about ranking the remaining semantic-surface candidates
+  instead of trying to close them all at once.

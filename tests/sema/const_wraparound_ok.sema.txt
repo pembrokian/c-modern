@@ -1,0 +1,3 @@
+SemanticModule
+  Const names=[WRAPPED] type=i64 values=[-9223372036854775808]
+  Function name=main params=[] returns=[i32]

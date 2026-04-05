@@ -72,6 +72,7 @@ struct GlobalSummary {
     std::vector<std::string> names;
     Type type;
     std::vector<std::optional<ConstValue>> constant_values;
+    std::vector<bool> zero_initialized_values;
 };
 
 struct ExprTypeFact {

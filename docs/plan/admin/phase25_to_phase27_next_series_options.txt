@@ -1,0 +1,254 @@
+Phase 25 Through Phase 27 -- Next-Series Options After Phase 24
+================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Turn the repository posture after the completed Phase 24 testing-helper wave
+into one short options document that names the strongest next areas of
+development without pretending the next plateau is already chosen.
+
+Chosen next-series direction
+----------------------------
+- Lane A is now the selected planning direction for the next series.
+- Phase-specific planning docs for that chosen lane are:
+  - `/Users/ro/dev/c_modern/docs/plan/phase25_compile_time_and_static_storage_semantic_closure.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase26_selected_semantic_surface_widening.txt`
+  - `/Users/ro/dev/c_modern/docs/plan/phase27_lane_a_pressure_proof_and_reaudit.txt`
+
+This document is intentionally cross-phase.
+It does not introduce a new architecture phase after Phase 8.
+It packages the strongest next-series candidates across already-existing
+owners and gives a recommended ordering bias for choosing among them.
+
+Repository status note
+----------------------
+- Phase 22 proved a richer multi-target project shape under the admitted hosted
+  slice.
+- Phase 23 re-audited compiler-owner follow-up and intentionally found no new
+  justified widening beyond the still-bounded imported generic workaround.
+- Phase 24 then completed the modest `testing` helper path rather than opening
+  `time`, `os`, or `hal`.
+- The slice register now shows the largest materially open families as:
+  fuller sema closure, selected compiler completion beyond bootstrap-shaped
+  gaps, broader build-surface truth, narrow `time` only if a real consumer
+  matrix appears, and fuller release hardening.
+
+Problem being solved
+--------------------
+- The repository no longer lacks ideas; it lacks one explicit next-series order
+  after the completed Phase 24 wave.
+- Several next steps are now credible at once: language-surface completion,
+  compiler widening, richer project or artifact workflows, more pressure
+  programs, or hosted-slice hardening.
+- Without one routing note, future work could drift into abstract completeness
+  arguments instead of choosing the next narrow leverage point from evidence.
+
+Core rule
+---------
+- Prefer deeper truth at the owning layer over breadth for its own sake.
+- Treat the slice register's partial entries as candidate pressure points, not
+  as a mandate to finish every open family in parallel.
+- Do not admit `os` or `hal` without a concrete consumer matrix.
+- Do not widen compiler internals speculatively when a real admitted consumer
+  still does not justify the work.
+- If a new example or project is used to justify the next phase, it must expose
+  a real owner-local gap rather than carry example-local shims.
+
+Candidate lane A -- Non-bootstrap language and compiler closure
+---------------------------------------------------------------
+Why this lane is strong now
+---------------------------
+- The slice register still marks several Phase 3 and Phase 4 families as only
+  partial: tuple or multi-result types, ranges as semantic forms, compile-time
+  constant rules, top-level var static-storage semantics, `@noalias`, generic
+  nominal type-argument preservation, and broader imported generic procedure-
+  call lowering.
+- The non-bootstrap roadmap still ranks sema closure as the highest-leverage
+  long-term gap after bootstrap admission.
+- This lane deepens the documented language contract without opening a fresh
+  module family.
+
+Strong candidate slices inside this lane
+----------------------------------------
+- compile-time constant rules plus top-level static-storage truth
+- tuple or multi-result semantics only if one real pressure program becomes
+  materially cleaner with them
+- range semantics only if the chosen proof is better with real range objects
+  than with current explicit loops
+- `@noalias` contract handling when a real imported API or ABI boundary needs
+  it
+- broader imported generic procedure-call lowering only if a second admitted
+  consumer appears beyond `sync.thread_spawn<T>`
+
+Good proof shapes
+-----------------
+- narrow sema and MIR fixture expansion for the chosen semantic family
+- one bounded real utility or canonical-program refresh that becomes cleaner
+  without inventing a new stdlib family
+- one compiler-owner follow-up only after sema truth is explicit enough that
+  MIR or backend work is clearly downstream ownership
+
+Example project ideas
+---------------------
+- a small config or table-processing utility that benefits from stronger
+  compile-time constants and top-level data declarations
+- a richer expression or query evaluator that would justify tuple-return or
+  multi-result bindings honestly
+- a review-style project follow-up that pressures imported generic identity
+  without widening `sync`
+
+Candidate lane B -- Build and project-surface widening
+------------------------------------------------------
+Why this lane is strong now
+---------------------------
+- The slice register still marks package grouping, broader target kinds, and
+  the fuller separate-compilation contract as partial.
+- Phase 22 proved that richer shared-module multi-target workflow is real, but
+  it still stopped short of broader artifact kinds and fuller package-model
+  truth.
+- This lane would widen the normal developer workflow instead of the language
+  surface.
+
+Strong candidate slices inside this lane
+----------------------------------------
+- package grouping beyond one source root while keeping packages build-time only
+- one additional target kind such as `staticlib` before wider artifact growth
+- fuller separate-compilation truth where implementation-only edits do not force
+  avoidable downstream rebuild work
+- sharper cross-target test coordination only if one richer project actually
+  needs it
+
+Good proof shapes
+-----------------
+- one real multi-target project family sharing internal modules or a reusable
+  library target
+- deterministic project-tool regressions proving rebuild behavior and target
+  selection clearly
+- no package management, remote dependency work, or broad artifact explosion
+
+Example project ideas
+---------------------
+- a small tool-suite project with two executables sharing one internal core
+  library boundary more heavily than the current review-board shape
+- a library-first project shape that proves `staticlib` output is the narrowest
+  honest next artifact kind
+- a project with one generated or checked helper target only if it sharpens the
+  separate-compilation contract rather than adding workflow novelty
+
+Candidate lane C -- Narrow hosted time admission
+------------------------------------------------
+Why this lane is credible but not automatic
+-------------------------------------------
+- Phase 24 chose `testing` growth because the strongest landed pressure was in
+  repeated test helpers, not runtime timekeeping.
+- The slice register still keeps `time` as a documented end-state family and it
+  remains the next plausible companion module before broader `os` or `hal`
+  breadth.
+- If the next admitted projects need deadlines, retries, or sleep semantics,
+  `time` can become the honest next narrow module family.
+
+Strong candidate slices inside this lane
+----------------------------------------
+- `Duration` and one monotonic clock source
+- narrow sleep support only if a landed consumer needs it
+- timeout-aware helpers that keep runtime behavior explicit rather than folding
+  it into `mc test` magic
+
+Good proof shapes
+-----------------
+- timeout-aware project tests for an admitted real project
+- deadline or retry logic in a networking or worker-queue style project
+- explicit deferral of broader `os` facilities such as subprocesses,
+  environment, or raw-handle escape hatches
+
+Example project ideas
+---------------------
+- add client timeout and retry behavior to a bounded networking project
+- add deadline-based shutdown or backoff behavior to the worker-queue family
+- add a tiny timer-driven utility only if it exposes the intended `time` API
+  more honestly than test scaffolding would
+
+Candidate lane D -- Release hardening and first public-cut discipline
+--------------------------------------------------------------------
+Why this lane is real
+---------------------
+- The release-hardening note is published but explicitly incomplete.
+- The slice register still names fuller release hardening as an open end-state
+  family.
+- A disciplined supported-slice audit may now deliver more leverage than a new
+  capability family if near-term goals are usability and trust rather than
+  breadth.
+
+Strong candidate slices inside this lane
+----------------------------------------
+- checked versus debug audit across admitted examples and ordinary tests
+- install or usage-path cleanup for the supported Darwin arm64 hosted slice
+- deterministic support-matrix documentation and focused smoke validation
+
+Good proof shapes
+-----------------
+- explicit support statement updates backed by repeatable smoke commands
+- focused audit fixtures rather than broad speculative portability work
+- no cross-platform claims, self-hosting work, or package-registry scope
+
+Recommended ordering bias
+-------------------------
+If no external product goal overrides it, prefer this order:
+
+1. Lane A first: one sema-owned or compiler-owned closure wave on already-
+   documented partial language families.
+2. Lane B second: broader project or build truth once the admitted language and
+   compiler surface is not still carrying the highest-leverage partials.
+3. Lane C third: narrow `time` admission only if a concrete consumer matrix now
+   exists.
+4. Lane D either after Lane A or instead of Lane C when the repository wants a
+   more disciplined public hosted slice sooner than another capability family.
+
+Why this ordering is recommended
+--------------------------------
+- It matches the non-bootstrap roadmap's bias toward deeper semantic authority
+  before broader surface growth.
+- It uses the slice register's current partials as the main evidence rather
+  than reopening deferred families prematurely.
+- It keeps `time` available as the next narrow runtime family without treating
+  it as mandatory just because Phase 24 named it as a candidate.
+- It gives release hardening a legitimate path without forcing portability or
+  distribution claims the repository still does not support.
+
+Suggested next decision checkpoint
+----------------------------------
+Choose the next series by answering one question:
+
+- Which of these would remove the biggest current distortion in the admitted
+  repository slice: a sema or compiler gap, a build or artifact gap, a missing
+  narrow `time` surface, or a lack of supported-slice hardening?
+
+If the answer is still unclear, prefer one more short audit across the admitted
+real projects and the slice register's partial entries before writing separate
+Phase 25, Phase 26, and Phase 27 owner documents.
+
+That checkpoint is now resolved for the immediate next series: the repository
+will proceed with Lane A first, while keeping the remaining lanes explicit for
+the later plateau decision after the Lane A wave lands.
+
+Non-goals for this overview
+---------------------------
+- choosing multiple new capability families in parallel
+- reopening `os` or `hal` without a named consumer matrix
+- broad portability, cross-compilation, or non-hosted execution claims
+- self-hosting or package-management work
+- treating this options note as if the next owner documents already exist
+
+Acceptance criteria for this document
+-------------------------------------
+- the repository has one explicit post-Phase-24 options note instead of an
+  implicit planning vacuum
+- the strongest next areas of development are named across language surface,
+  compiler widening, example or project pressure, workflow widening, and
+  release hardening
+- the note recommends an order while still leaving the final Phase 25 through
+  Phase 27 choice evidence-driven

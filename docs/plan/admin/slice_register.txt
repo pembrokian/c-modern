@@ -287,8 +287,8 @@ Register By Concern
 - Slice: compile-time constant rules
   design: settled
   plan phase: 3
-  repo status: partial
-  repo wave: Phase 3 bootstrap sema
+  repo status: landed
+  repo wave: Phase 3 bootstrap sema plus Phase 25 semantic closure
   docs: docs/arch/language/language_spec.txt, docs/arch/language/syntax/grammar_spec.txt
   end state: top-level const and eligible var initializers must be compile-time
   constants with deterministic checking.
@@ -296,8 +296,8 @@ Register By Concern
 - Slice: top-level var static-storage initialization semantics
   design: settled
   plan phase: 3
-  repo status: partial
-  repo wave: Phase 3 bootstrap sema
+  repo status: landed
+  repo wave: Phase 3 bootstrap sema plus Phase 25 semantic closure
   docs: docs/arch/language/language_spec.txt
   end state: top-level var declarations are admitted for static storage,
   top-level var initializers must be compile-time constants, and uninitialized
@@ -725,7 +725,7 @@ Register By Concern
   design: settled
   plan phase: 6 and 7 boundary
   repo status: partial
-  repo wave: minimal admission only
+  repo wave: minimal admission plus Phase 24 helper growth
   docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/tools/test_spec.txt, README.md
   end state: ordinary toolchain companion library for tests, with helpers but
   no compiler magic.

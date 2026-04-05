@@ -1,0 +1,180 @@
+Phase 25 -- Compile-Time And Static-Storage Semantic Closure
+============================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Close the highest-leverage remaining sema-owned partials that distort the
+documented language contract even before any broader language-surface widening
+is considered.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 24 completed modest `testing` helper growth and left the next series
+  free to prefer deeper language truth over another companion-family admission.
+- The slice register previously marked compile-time constant rules and top-
+  level var static-storage initialization semantics as partial even though they
+  sat near the center of sema authority.
+- The non-bootstrap roadmap still ranks sema closure as the highest-leverage
+  open family after the bootstrap-era admissions.
+- Current admitted projects mostly avoid the missing cases rather than proving
+  they are fully owned, which is useful for honesty but not a stable stopping
+  point.
+
+Problem being solved
+--------------------
+- The repository can check and run an admitted hosted slice, but compile-time
+  and top-level storage truth are still narrower than the documented semantic
+  contract.
+- Without an explicit closure wave here, future pressure programs may begin to
+  encode configuration data, lookup tables, or default state through local
+  runtime setup only because sema-owned static truth is still incomplete.
+- This gap weakens the intended owner boundary: sema should decide which values
+  are compile-time constants and which top-level objects are legal static
+  declarations before MIR, backend, or example code has to compensate.
+
+Core rule
+---------
+- Prefer sema-owned deterministic truth over runtime or backend-shaped
+  workarounds.
+- Close compile-time and static-storage rules before widening tuple, range, or
+  other optional surface forms.
+- Keep literal acceptance aligned with the lexer and keep invalid constant
+  forms as sema diagnostics rather than latent runtime behavior.
+- Do not invent new library families or driver behavior to make up for missing
+  top-level semantic ownership.
+
+Chosen candidate set
+--------------------
+1. Compile-time constant rules for the admitted expression subset.
+2. Top-level var static-storage initialization semantics.
+
+Why this candidate set is first
+-------------------------------
+- Both slices are already documented end-state language truth, not new design.
+- Both are sema-owned foundations that improve later pressure work without
+  forcing wider syntax or runtime claims.
+- Both can be proved narrowly through sema fixtures and one bounded real
+  consumer instead of requiring a large new project family.
+
+Target semantic outcomes
+------------------------
+- top-level const declarations accept the intended admitted compile-time
+  expression subset and reject everything else deterministically
+- eligible top-level var initializers are checked as compile-time expressions
+  rather than being accepted accidentally through later pipeline behavior
+- uninitialized top-level var declarations receive deterministic zero-
+  initialization where the language contract already requires it
+- invalid constant expressions and invalid shift counts fail as sema
+  diagnostics instead of depending on host-language undefined behavior or
+  backend accidents, while integer arithmetic itself now follows the language's
+  defined wrap semantics during constant evaluation
+- module export and import facts for top-level constants and static values stay
+  precise enough that later `.mci` work is serialization rather than meaning
+  reconstruction
+
+Preferred implementation bias
+-----------------------------
+- land sema truth first in `/Users/ro/dev/c_modern/compiler/sema/`
+- widen MIR or backend work only if the new sema-owned truths expose a real
+  downstream representation gap
+- keep compile-time evaluation aligned with accepted literal forms from the
+  lexer, including numeric spelling that is already admitted lexically
+- add deterministic pass and fail fixtures before attempting a broader real-
+  project refresh
+
+Suggested proof shapes
+----------------------
+- focused `tests/sema/` pass fixtures for top-level const expressions, static
+  lookup tables, and zero-initialized top-level vars
+- focused `tests/sema/` fail fixtures for non-constant top-level initializers,
+  invalid shifts, overflow in the admitted const-eval subset, and other forms
+  that must stay rejected deterministically
+- MIR fixtures only if the newly admitted static forms require a sharper typed
+  lowering contract than current sema dumps can show
+- one bounded real utility or canonical-program refresh that becomes cleaner by
+  using honest top-level data rather than runtime assembly of the same data
+
+Candidate proof consumers
+-------------------------
+- a small config or table-driven utility under `/Users/ro/dev/c_modern/examples/real/`
+  that uses top-level constant tables honestly
+- a canonical-program refresh where deterministic top-level static truth is the
+  real missing owner rather than a broader library boundary
+
+Deliverables
+------------
+- one focused sema implementation slice under
+  `/Users/ro/dev/c_modern/compiler/sema/` for compile-time and static-storage
+  ownership
+- deterministic sema regressions at the narrowest layer that prove the new
+  constant-evaluation and top-level storage rules directly
+- bounded MIR or backend regressions only if the newly admitted semantic forms
+  expose a real downstream owner-local gap
+- documentation updates in
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/admin/slice_register.txt` so the closed or
+  remaining partials stay explicit
+
+Suggested execution order
+-------------------------
+1. Re-audit the current sema fixtures and the slice-register partials for
+   compile-time constants and top-level static storage.
+2. Land deterministic constant-evaluation diagnostics before broadening any
+   real project to depend on them.
+3. Land top-level var static-storage truth, including zero-initialization and
+   compile-time initializer checking, at the sema owner layer.
+4. Add one narrow real consumer only after the sema rules are stable enough to
+   avoid example-local workarounds.
+5. Reassess which remaining Lane A partial is now the strongest next owner gap.
+
+Exit criteria
+-------------
+- compile-time constant checking and top-level static-storage semantics are no
+  longer only bootstrap-shaped partials in the admitted repository slice
+- invalid constant forms fail deterministically in sema rather than through
+  runtime accidents or backend behavior
+- at least one real consumer or canonical proof uses the newly honest top-
+  level semantic surface without local workaround code
+- the repository can move to the next Lane A phase from a cleaner sema-owned
+  baseline
+
+Non-goals
+---------
+- broad tuple, range, or imported generic widening during the same phase
+- widening `time`, `os`, `hal`, or other stdlib families
+- putting constant-evaluation policy into MIR, backend, or driver code
+- claiming full long-term semantic completion beyond the named candidate set
+
+Implemented slice
+-----------------
+- widened sema-owned compile-time evaluation for the admitted scalar subset so
+  top-level constants and eligible top-level var initializers cover scalar
+  literals, named constants, explicit scalar conversions, short-circuit logic,
+  and defined wraparound integer arithmetic
+- kept invalid shift counts and non-constant top-level initializers as sema
+  diagnostics rather than backend accidents
+- made top-level var static storage explicit in the semantic module by marking
+  uninitialized declarations as deterministic zero-initialized storage facts
+- carried those zero-init facts through exported module surfaces and `.mci`
+  artifacts instead of leaving them as backend-only behavior
+- proved the slice with focused sema regressions for wraparound constants,
+  explicit conversion constants, zero-initialized top-level vars, and
+  non-constant top-level var rejection, plus the existing executable proof that
+  relies on a zero-initialized global aggregate
+
+Closeout statement
+------------------
+Phase 25 is complete. Compile-time scalar constant checking and top-level
+static-storage semantics are now owned explicitly by sema for the admitted
+repository slice, and zero-initialized top-level vars are represented as
+deterministic semantic and interface facts rather than only as backend default
+behavior. Structural aggregate constant serialization remains intentionally out
+of scope until an admitted imported consumer needs it.
