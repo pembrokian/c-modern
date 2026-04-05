@@ -1,0 +1,136 @@
+Phase 34 -- Narrow Time Consumer Matrix And API Freeze
+======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Start Lane C with one bounded audit that determines whether the admitted real
+projects now justify a narrow hosted `time` surface and, only if they do,
+freeze the smallest honest API slice for that admission.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 31 through Phase 33 hardened the supported hosted slice, install path,
+  and first public-cut smoke posture without opening new capability families.
+- The repository still keeps `time`, `os`, and `hal` deferred until a real
+  consumer matrix exists.
+- Existing real projects already carry host-side timeout settings in
+  `build.toml`, but that alone is workflow control, not proof that runtime
+  timekeeping belongs in the admitted language or stdlib slice.
+- The next honest capability question is therefore not "how should `time`
+  look?" but "do admitted consumers now need any `time` surface at all?"
+
+Problem being solved
+--------------------
+- After the completed Lane D series, the repository can describe and defend
+  its current hosted slice more clearly, but it still needs a disciplined way
+  to decide whether a new runtime-facing companion family is justified.
+- Without a consumer-matrix phase, the repository could admit clocks, sleep,
+  or timeout helpers based on plausible future usefulness rather than actual
+  admitted project pressure.
+- The repository needs one explicit gate that either authorizes narrow `time`
+  admission or records continued deferral cleanly.
+
+Core rule
+---------
+- Admit `time` only if a real admitted consumer becomes materially cleaner,
+  more honest, or more deterministic because of it.
+- Treat harness-level `tests.timeout_ms` as insufficient evidence by itself.
+- Prefer the smallest runtime-facing slice that closes a real project need.
+- Keep `os` and `hal` deferred unless the consumer matrix proves they are the
+  true owners instead.
+- If the matrix does not justify runtime timekeeping, stop and record that
+  explicitly instead of forcing the series forward.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one consumer-matrix audit across admitted real projects,
+especially networking, sync, and richer project-workflow proofs, to determine
+whether runtime deadlines, retries, backoff, monotonic elapsed time, or sleep
+now belong inside the supported hosted slice.
+
+Candidate pressure projects to audit
+------------------------------------
+- `/Users/ro/dev/c_modern/examples/real/evented_echo/` for client timeout,
+  retry, or deadline-controlled connection behavior
+- `/Users/ro/dev/c_modern/examples/real/worker_queue/` for bounded shutdown,
+  wait timeout, or retry or backoff pressure
+- `/Users/ro/dev/c_modern/examples/real/issue_rollup/` only if a timer-driven
+  utility path is more honest than deadline logic in networking or sync
+
+The matrix should rank whether the strongest justified candidate is:
+- `Duration` plus one monotonic clock source
+- narrow sleep support in addition to monotonic elapsed time
+- timeout or retry helpers expressed through ordinary library code
+- or no runtime `time` admission yet
+
+What this phase should try to prove
+-----------------------------------
+- whether any admitted project now has a real runtime-facing timekeeping gap
+- whether the smallest honest `time` API is `Duration` plus monotonic clock,
+  or whether sleep also has a real first consumer
+- whether timeout logic belongs in project code, stdlib helper code, or still
+  outside the admitted slice
+- whether the repository should proceed to Phase 35 or record continued
+  deferral of Lane C instead
+
+Preferred pressure points
+-------------------------
+1. Networking client timeout or retry behavior on a real admitted project.
+2. Worker-queue deadline, bounded wait, or shutdown pressure.
+3. Distinguishing runtime timekeeping needs from host-side test harness timeouts.
+4. The narrowest API that keeps runtime behavior explicit.
+5. Explicit continued deferral if no admitted project gains enough from `time`.
+
+Deliverables
+------------
+- one consumer-matrix write-up naming the admitted projects audited, the real
+  timekeeping pressure they do or do not expose, and the smallest justified API
+  candidate if one exists
+- bounded updates to
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`
+  only if the supported slice changes or continued deferral needs a sharper
+  recorded reason
+- one short next-step statement saying either that Phase 35 is authorized for
+  a narrow `time` slice or that Lane C remains deferred
+
+Suggested execution order
+-------------------------
+1. Re-audit admitted real projects after the completed Phase 33 public-cut
+   smoke set, focusing on runtime-facing timeout, retry, backoff, and elapsed-
+   time needs.
+2. Separate harness-only timeout configuration from true runtime timekeeping
+   pressure.
+3. Freeze the smallest candidate API only if one admitted project becomes
+   materially cleaner because of it.
+4. Record explicit continued deferral if no candidate crosses that bar.
+5. Proceed to Phase 35 only if the consumer matrix authorizes it.
+
+Exit criteria
+-------------
+- the repository either has a justified narrow `time` API candidate or an
+  explicit continued deferral decision backed by admitted-project evidence
+- the strongest candidate consumer is named concretely rather than generically
+- any future `time` work is scoped from real project pressure instead of from
+  end-state completeness arguments
+
+Non-goals
+---------
+- implementing `time` in this phase before the consumer matrix is closed
+- admitting `os`, subprocesses, environment access, or raw platform handles
+- widening `testing` helpers as a substitute for unresolved runtime questions
+- treating manifest timeout fields as sufficient proof for runtime timekeeping
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 34 stands alone as the gatekeeper for any future Lane C admission.
+- The phase is explicit that runtime `time` work begins only if admitted
+  consumer pressure justifies it.

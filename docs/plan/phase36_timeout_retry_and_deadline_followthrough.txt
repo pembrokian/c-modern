@@ -1,0 +1,124 @@
+Phase 36 -- Timeout, Retry, And Deadline Follow-Through
+=======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Use the narrow elapsed-time slice from Phase 35 to land one real consumer-
+facing follow-through wave: timeout, retry, backoff, or deadline behavior on
+the admitted project that justified Lane C.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 34 must authorize Lane C through a real consumer matrix.
+- Phase 35 must then land the minimal `Duration` plus monotonic-clock slice.
+- The repository still should not assume that sleep is part of the first `time`
+  admission; it must be justified by the chosen consumer follow-through.
+- This phase is therefore about applying the admitted time slice to one real
+  project honestly, not about broadening the `time` family for its own sake.
+
+Problem being solved
+--------------------
+- A narrow time API only becomes meaningful if a real admitted project uses it
+  to close an actual runtime-facing gap.
+- Without a follow-through phase, the repository could land `Duration` and a
+  monotonic clock yet still fail to prove why they belong in the admitted slice.
+- The repository needs one concrete consumer outcome: retry budget, elapsed
+  deadline, bounded wait, or backoff logic that is clearer with `time` than
+  without it.
+
+Core rule
+---------
+- Land one real consumer follow-through, not several unrelated time features.
+- Prefer deadline or retry logic expressed through elapsed-time comparison
+  before admitting sleep.
+- Add narrow sleep only if the chosen consumer cannot stay honest without it.
+- Keep behavior explicit in project or stdlib code rather than hiding it in
+  tooling.
+- Record any remaining broader `time` desires as deferred instead of widening
+  the family opportunistically.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one admitted project gains honest timeout, retry,
+backoff, or deadline behavior using the Phase 35 time slice.
+
+Strong candidate follow-through shapes
+--------------------------------------
+- `/Users/ro/dev/c_modern/examples/real/evented_echo/` gains bounded client
+  timeout and retry behavior driven by elapsed monotonic budget
+- `/Users/ro/dev/c_modern/examples/real/worker_queue/` gains bounded shutdown
+  or wait logic driven by elapsed time, with sleep added only if unavoidable
+- a smaller project or ordinary test path only if it demonstrates the intended
+  time API more honestly than the networking or sync candidates
+
+What this phase should try to prove
+-----------------------------------
+- the chosen project is materially more honest with runtime timekeeping than
+  with harness-only timeout controls
+- timeout, retry, backoff, or deadline logic remains explicit and reviewable
+- sleep is either justified narrowly by the consumer or kept deferred
+- the repository can say clearly what its admitted hosted `time` slice now
+  covers and what it still does not
+
+Preferred pressure points
+-------------------------
+1. One admitted project with real runtime deadline or retry logic.
+2. Explicit separation between host-side test timeout control and runtime time.
+3. Narrow sleep only if the chosen project proves it is required.
+4. Deterministic project and ordinary-test proof for the new behavior.
+5. Documentation updates that keep the hosted support statement honest.
+
+Deliverables
+------------
+- one admitted real project updated to use the Phase 35 time slice honestly
+- focused deterministic regressions proving the timeout, retry, backoff, or
+  deadline behavior at the project and ordinary-test layers
+- documentation updates in
+  `/Users/ro/dev/c_modern/README.md`,
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` if the admitted hosted
+  time slice changes materially
+- one short next-step note stating whether Lane C should pause after the narrow
+  admission, continue with a second bounded time slice, or remain frozen until
+  broader consumer pressure appears
+
+Suggested execution order
+-------------------------
+1. Choose the strongest admitted consumer authorized by Phase 34.
+2. Apply the minimal Phase 35 time slice to that project before widening the
+   API surface further.
+3. Add sleep only if the follow-through proof cannot remain honest without it.
+4. Land deterministic project and ordinary-test coverage for the new behavior.
+5. Record any still-deferred broader `time`, `os`, or `hal` desires explicitly.
+
+Exit criteria
+-------------
+- one admitted project now proves the hosted `time` slice through honest
+  timeout, retry, backoff, or deadline behavior
+- the repository can describe the admitted `time` surface concretely and
+  narrowly
+- any broader `time` growth remains explicit and deferred rather than implied
+- the next plateau after Lane C is chosen from clearer evidence, not from the
+  mere existence of a new module family
+
+Non-goals
+---------
+- broad timer facilities, calendars, formatting, or wall-clock APIs
+- scheduler work, async runtime work, or platform escape hatches
+- admitting `os` or `hal` because the chosen project wants convenience helpers
+- turning ordinary test timeouts into runtime semantics implicitly
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 36 stands alone as the real-consumer follow-through capstone for the
+  first narrow Lane C admission.
+- The phase is explicit that real deadline or retry proof, not family breadth,
+  determines completion.

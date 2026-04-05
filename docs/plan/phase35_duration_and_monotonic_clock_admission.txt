@@ -1,0 +1,139 @@
+Phase 35 -- Duration And Monotonic Clock Admission
+==================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+If Phase 34 authorizes Lane C, admit the smallest honest runtime-facing `time`
+slice: `Duration` plus one monotonic clock source for the supported hosted
+Darwin arm64 slice.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 34 is the required consumer-matrix gate for Lane C and must identify a
+  real admitted project that becomes materially cleaner with runtime timekeeping.
+- The existing repository slice already distinguishes harness-level timeout
+  control from runtime behavior; Phase 35 should not blur that boundary.
+- The architecture direction already keeps `time` as the next plausible narrow
+  companion family before broader `os` or `hal` breadth.
+- The smallest candidate slice remains `Duration` plus one monotonic clock
+  source unless Phase 34 proves that sleep is required immediately.
+
+Problem being solved
+--------------------
+- If admitted projects now need elapsed-time measurement for retries,
+  backoff, or bounded waits, they need an owned runtime-facing API instead of
+  local ad hoc counters or host-side scaffolding.
+- Without a minimal first slice, any `time` work risks expanding too quickly
+  into sleep, wall-clock semantics, or broader platform APIs.
+- The repository therefore needs one first `time` wave that is narrow enough
+  to stay honest and broad enough to support one real admitted consumer.
+
+Core rule
+---------
+- Admit only the smallest API authorized by Phase 34.
+- Prefer monotonic elapsed-time semantics over wall-clock or calendar scope.
+- Keep runtime timekeeping explicit in stdlib and runtime owners rather than
+  smuggling it through tests or driver behavior.
+- Avoid sleep in this phase unless the chosen consumer cannot remain honest
+  without it.
+- Keep `os`, wall-clock, timezone, formatting, and broader platform APIs
+  explicitly deferred.
+
+Chosen slice for this phase
+---------------------------
+Primary candidate slice:
+- `time.Duration`
+- one monotonic clock reading surface
+- the minimum arithmetic or comparison support needed by the chosen consumer
+
+The planned admission should:
+- support one real project needing elapsed-time logic
+- remain hosted-only and Darwin arm64-specific in implementation while keeping
+  the public API as narrow as possible
+- preserve explicit runtime ownership in stdlib and hosted runtime code
+- avoid turning `time` into a broad general-purpose calendar or OS wrapper
+
+Candidate proof shapes that fit this plan
+-----------------------------------------
+- an evented client path that measures elapsed retry budget using a monotonic
+  clock and `Duration`
+- a worker-queue control path that enforces a bounded wait or shutdown budget
+  without requiring sleep first
+- an ordinary checked-test proof that verifies elapsed-time comparisons at the
+  narrowest meaningful layer
+
+What this phase should try to prove
+-----------------------------------
+- the chosen admitted project is materially cleaner with `Duration` plus a
+  monotonic clock than it was without runtime timekeeping
+- the new API is narrow enough that broader `os` or wall-clock questions stay
+  deferred
+- runtime and stdlib ownership boundaries remain explicit and reviewable
+- the repository can decide honestly whether Phase 36 should add sleep or only
+  apply the new elapsed-time slice to one real consumer workflow
+
+Preferred pressure points
+-------------------------
+1. One admitted project with real elapsed-time logic.
+2. Explicit `Duration` arithmetic or comparison support only where needed.
+3. Hosted runtime monotonic-clock implementation on Darwin arm64.
+4. Focused tests that keep the API deterministic and reviewable.
+5. Explicit deferral of wall-clock and calendar semantics.
+
+Deliverables
+------------
+- one narrow `stdlib/time.mc` slice and any required hosted runtime support
+  under `/Users/ro/dev/c_modern/runtime/hosted/`
+- one admitted real project or ordinary checked-test proof that consumes the
+  new elapsed-time API honestly
+- focused deterministic regressions at the stdlib, executable, or project
+  layer proving the admitted slice
+- documentation updates in
+  `/Users/ro/dev/c_modern/README.md`,
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` if the supported hosted
+  slice changes materially
+
+Suggested execution order
+-------------------------
+1. Implement the minimum `Duration` and monotonic-clock surfaces authorized by
+   Phase 34.
+2. Land focused low-level proof first, then update the chosen admitted project
+   to consume the new slice.
+3. Keep wall-clock, sleep, and formatting concerns out of the first wave unless
+   the chosen consumer proves they are inseparable.
+4. Add deterministic regressions under the narrowest meaningful layer.
+5. Use the landed proof to decide whether Phase 36 should add narrow sleep or
+   only follow through on timeout or retry behavior.
+
+Exit criteria
+-------------
+- the repository admits one narrow hosted `time` slice centered on `Duration`
+  plus monotonic elapsed time
+- one admitted consumer uses the slice honestly
+- wall-clock, calendar, timezone, and broader platform time APIs remain
+  explicitly deferred
+- the next Lane C decision is sharper: narrow sleep follow-through, timeout or
+  retry follow-through only, or pause
+
+Non-goals
+---------
+- wall-clock timestamps, calendars, or formatting APIs
+- broad sleep, timer, or scheduling facilities unless Phase 34 proved they are
+  required immediately
+- folding runtime timekeeping into `mc test` or driver-specific behavior
+- any `os` or `hal` expansion
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 35 stands alone as the first admitted runtime-facing `time` slice.
+- The phase is explicit that monotonic elapsed time, not general platform time,
+  is the first honest boundary.
