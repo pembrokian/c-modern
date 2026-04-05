@@ -34,32 +34,48 @@ Supported hosted slice:
 - supported workflow guarantee on the admitted richer proof: deterministic same-build-dir selected-target reuse without non-selected-target churn
 - unsupported today: non-hosted targets, cross-compilation, shared libraries, external system-library links in project manifests, package management, and any public portability claim beyond Darwin arm64
 
+Supported host assumptions:
+
+- host platform: Darwin arm64 only
+- runtime boundary: hosted only
+- installation story: build from source only
+- toolchain assumption: CMake plus the ordinary host Clang toolchain
+
 Build from source:
 
 ```sh
 cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/debug -j4
-ctest --test-dir build/debug --output-on-failure
 ```
 
-Compiler entrypoint:
+Compiler entrypoint on the supported path:
 
 ```sh
 build/debug/mc
 ```
 
-Phase 31 support-matrix smoke audit:
+First-use smoke validation:
 
 ```sh
+build/debug/mc --help
 build/debug/mc check tests/cases/hello.mc
-build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase31_smoke_return_zero
-build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase31_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase31_issue_rollup
-build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase31_worker_queue
-build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase31_evented_echo
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase32_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase32_issue_rollup
 ```
 
-Bootstrap commands:
+Supported command patterns:
+
+- direct-source inspection or build: `build/debug/mc check <file.mc>` and `build/debug/mc build <file.mc> --build-dir <dir>`
+- project inspection, build, run, or test: `build/debug/mc check --project <build.toml>`, `build/debug/mc build --project <build.toml> --build-dir <dir>`, `build/debug/mc run --project <build.toml> --build-dir <dir> -- <args>`, and `build/debug/mc test --project <build.toml> --build-dir <dir>`
+
+Artifact expectations:
+
+- `build/debug/mc` is the produced compiler entrypoint for the supported path
+- `build/` is disposable generated state
+- command-local `--build-dir` trees are disposable generated state and should be treated as build outputs, not source inputs
+- `make build` and `make test` are convenience wrappers around the same CMake-based path, not a separate supported installation story
+
+Additional developer commands:
 
 ```sh
 make build
