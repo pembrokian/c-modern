@@ -1724,6 +1724,39 @@ int main(int argc, char** argv) {
                     0,
                     {});
 
+    const std::filesystem::path tuple_return_source = work_root / "tuple_return_roundtrip.mc";
+    WriteFile(tuple_return_source,
+              "func pair() (i32, i32) {\n"
+              "    return 4, 6\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    left: i32 = 0\n"
+              "    right: i32 = 0\n"
+              "    left, right = pair()\n"
+              "    return left + right\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    tuple_return_source,
+                    work_root / "phase27_tuple_return_roundtrip_build",
+                    10,
+                    {});
+
+    const std::filesystem::path range_loop_source = work_root / "range_loop_roundtrip.mc";
+    WriteFile(range_loop_source,
+              "func main() i32 {\n"
+              "    total: i32 = 0\n"
+              "    for idx in 0..5 {\n"
+              "        total = total + idx\n"
+              "    }\n"
+              "    return total\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    range_loop_source,
+                    work_root / "phase27_range_loop_roundtrip_build",
+                    10,
+                    {});
+
     const std::filesystem::path noalias_param_source = work_root / "noalias_param_ir.mc";
     WriteFile(noalias_param_source,
               "func load(@noalias ptr: *i32) i32 {\n"

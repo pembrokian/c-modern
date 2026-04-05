@@ -1,0 +1,8 @@
+BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
+  Function source=read backend=@read returns=[i32 [repr=i32, size=4, align=4]]
+    Local source=box backend=%local.box type=Box<i32> [repr={i32}, size=4, align=4] param readonly
+    Block source=entry0 backend=bb0_0.entry0
+      %t0_0_0 = load Box<i32> [repr={i32}, size=4, align=4] %local.box
+      %t0_0_1 = field i32 [repr=i32, size=4, align=4] target_display=box.value operands=[%t0_0_0]
+      ret i32 [repr=i32, size=4, align=4] %t0_0_1
+

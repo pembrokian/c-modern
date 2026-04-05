@@ -19,6 +19,25 @@
 #include "compiler/parse/parser.h"
 
 namespace mc::sema {
+
+Type SubstituteTypeParams(Type type, const std::vector<std::string>& type_params, const std::vector<Type>& type_args) {
+    for (auto& subtype : type.subtypes) {
+        subtype = SubstituteTypeParams(std::move(subtype), type_params, type_args);
+    }
+
+    if (type.kind != Type::Kind::kNamed) {
+        return type;
+    }
+
+    for (std::size_t index = 0; index < type_params.size() && index < type_args.size(); ++index) {
+        if (type.name == type_params[index]) {
+            return type_args[index];
+        }
+    }
+
+    return type;
+}
+
 namespace {
 
 using mc::ast::Decl;
@@ -383,22 +402,37 @@ Type RewriteImportedTypeNames(Type type,
     return type;
 }
 
-Type SubstituteTypeParams(Type type, const std::vector<std::string>& type_params, const std::vector<Type>& type_args) {
-    for (auto& subtype : type.subtypes) {
-        subtype = SubstituteTypeParams(std::move(subtype), type_params, type_args);
+Type InstantiateTypeDeclAliasedType(const TypeDeclSummary& type_decl, const Type& instantiated_type) {
+    Type aliased_type = type_decl.aliased_type;
+    if (!type_decl.type_params.empty()) {
+        aliased_type = SubstituteTypeParams(std::move(aliased_type), type_decl.type_params, instantiated_type.subtypes);
     }
+    return aliased_type;
+}
 
-    if (type.kind != Type::Kind::kNamed) {
-        return type;
+std::vector<std::pair<std::string, Type>> InstantiateTypeDeclFields(const TypeDeclSummary& type_decl,
+                                                                    const Type& instantiated_type) {
+    std::vector<std::pair<std::string, Type>> fields = type_decl.fields;
+    if (type_decl.type_params.empty()) {
+        return fields;
     }
-
-    for (std::size_t index = 0; index < type_params.size() && index < type_args.size(); ++index) {
-        if (type.name == type_params[index]) {
-            return type_args[index];
-        }
+    for (auto& field : fields) {
+        field.second = SubstituteTypeParams(std::move(field.second), type_decl.type_params, instantiated_type.subtypes);
     }
+    return fields;
+}
 
-    return type;
+VariantSummary InstantiateVariantSummary(const VariantSummary& variant,
+                                         const TypeDeclSummary& type_decl,
+                                         const Type& instantiated_type) {
+    VariantSummary instantiated = variant;
+    if (type_decl.type_params.empty()) {
+        return instantiated;
+    }
+    for (auto& payload_field : instantiated.payload_fields) {
+        payload_field.second = SubstituteTypeParams(std::move(payload_field.second), type_decl.type_params, instantiated_type.subtypes);
+    }
+    return instantiated;
 }
 
 enum class TypeStripMode {
@@ -1306,6 +1340,19 @@ class Checker {
             case ast::TypeExpr::Kind::kNamed:
                 if (!IsKnownTypeName(type_expr->name, type_params)) {
                     Report(span, "unknown type: " + type_expr->name);
+                } else if (const auto* type_decl = FindTypeDecl(*module_, type_expr->name); type_decl != nullptr) {
+                    const std::size_t expected = type_decl->type_params.size();
+                    const std::size_t actual = type_expr->type_args.size();
+                    if (expected == 0 && actual != 0) {
+                        Report(span, "type " + type_expr->name + " does not accept type arguments");
+                    } else if (expected != 0 && actual != expected) {
+                        Report(span,
+                               "generic type " + type_expr->name + " expects " + std::to_string(expected) +
+                                   " type arguments but got " + std::to_string(actual));
+                    }
+                } else if (std::find(type_params.begin(), type_params.end(), type_expr->name) != type_params.end() &&
+                           !type_expr->type_args.empty()) {
+                    Report(span, "type parameter " + type_expr->name + " does not accept type arguments");
                 }
                 for (const auto& type_arg : type_expr->type_args) {
                     ValidateTypeExpr(type_arg.get(), type_params, type_arg->span);
@@ -1490,7 +1537,7 @@ class Checker {
         }
 
         if (type_decl->kind == Decl::Kind::kDistinct || type_decl->kind == Decl::Kind::kTypeAlias) {
-            return ComputeTypeLayout(type_decl->aliased_type, span, active_types);
+            return ComputeTypeLayout(InstantiateTypeDeclAliasedType(*type_decl, type), span, active_types);
         }
 
         if (type_decl->kind != Decl::Kind::kStruct) {
@@ -1498,12 +1545,13 @@ class Checker {
             return {};
         }
 
-        if (type_decl->layout.valid) {
+        if (type_decl->type_params.empty() && type_decl->layout.valid) {
             return type_decl->layout;
         }
 
-        if (!active_types.insert(type_decl->name).second) {
-            Report(span, "type layout cycle requires indirection: " + type_decl->name);
+        const std::string active_key = FormatType(type);
+        if (!active_types.insert(active_key).second) {
+            Report(span, "type layout cycle requires indirection: " + active_key);
             return {};
         }
 
@@ -1511,10 +1559,11 @@ class Checker {
         layout.valid = true;
         layout.alignment = type_decl->is_packed ? 1 : 0;
         std::size_t size = 0;
-        for (const auto& field : type_decl->fields) {
+        const auto instantiated_fields = InstantiateTypeDeclFields(*type_decl, type);
+        for (const auto& field : instantiated_fields) {
             const LayoutInfo field_layout = ComputeTypeLayout(field.second, span, active_types);
             if (!field_layout.valid) {
-                active_types.erase(type_decl->name);
+                active_types.erase(active_key);
                 return {};
             }
             const std::size_t field_alignment = type_decl->is_packed ? 1 : field_layout.alignment;
@@ -1525,8 +1574,10 @@ class Checker {
         }
         layout.size = AlignTo(size, layout.alignment);
 
-        active_types.erase(type_decl->name);
-        type_decl->layout = layout;
+        active_types.erase(active_key);
+        if (type_decl->type_params.empty()) {
+            type_decl->layout = layout;
+        }
         return layout;
     }
 
@@ -1534,6 +1585,9 @@ class Checker {
         std::unordered_set<std::string> active_types;
         for (auto& type_decl : module_->type_decls) {
             if (type_decl.kind != Decl::Kind::kStruct) {
+                continue;
+            }
+            if (!type_decl.type_params.empty()) {
                 continue;
             }
             if (type_decl.layout.valid) {
@@ -1821,7 +1875,8 @@ class Checker {
 
         const TypeDeclSummary* type_decl = LookupStructType(raw_base);
         if (type_decl != nullptr) {
-            for (const auto& field : type_decl->fields) {
+            const auto instantiated_fields = InstantiateTypeDeclFields(*type_decl, stripped_base);
+            for (const auto& field : instantiated_fields) {
                 if (field.first == member_name) {
                     return field.second;
                 }
@@ -1890,15 +1945,15 @@ class Checker {
         return UnknownType();
     }
 
-    const VariantSummary* LookupVariant(const Type& selector_type, std::string_view variant_name) const {
+    std::optional<VariantSummary> LookupVariant(const Type& selector_type, std::string_view variant_name) const {
         const Type stripped_selector = StripType(selector_type, *module_, TypeStripMode::kAliasesOnly);
         if (stripped_selector.kind != Type::Kind::kNamed) {
-            return nullptr;
+            return std::nullopt;
         }
 
         const TypeDeclSummary* type_decl = FindTypeDecl(*module_, stripped_selector.name);
         if (type_decl == nullptr) {
-            return nullptr;
+            return std::nullopt;
         }
 
         // Split on the last '.' so both Foo.Bar and mod.Foo.Bar work:
@@ -1909,16 +1964,16 @@ class Checker {
                                                                                 : std::string(variant_name.substr(0, separator));
         const std::string leaf_name = separator == std::string_view::npos ? std::string(variant_name) : std::string(variant_name.substr(separator + 1));
         if (!qualified_type.empty() && qualified_type != stripped_selector.name) {
-            return nullptr;
+            return std::nullopt;
         }
 
         for (const auto& variant : type_decl->variants) {
             if (variant.name == leaf_name) {
-                return &variant;
+                return InstantiateVariantSummary(variant, *type_decl, stripped_selector);
             }
         }
 
-        return nullptr;
+        return std::nullopt;
     }
 
     Type AnalyzeVariantConstructorCall(const Expr& expr,
@@ -1928,8 +1983,8 @@ class Checker {
             return UnknownType();
         }
 
-        const VariantSummary* variant = LookupVariant(callee_type, expr.left->secondary_text);
-        if (variant == nullptr) {
+        const auto variant = LookupVariant(callee_type, expr.left->secondary_text);
+        if (!variant.has_value()) {
             return UnknownType();
         }
 
@@ -2228,7 +2283,9 @@ class Checker {
                 const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
                 if (type_decl != nullptr || !builtin_fields.empty()) {
                     std::unordered_map<std::string, Type> fields;
-                    const auto& field_source = type_decl != nullptr ? type_decl->fields : builtin_fields;
+                    const auto instantiated_fields =
+                        type_decl != nullptr ? InstantiateTypeDeclFields(*type_decl, resolved_aggregate) : std::vector<std::pair<std::string, Type>> {};
+                    const auto& field_source = type_decl != nullptr ? instantiated_fields : builtin_fields;
                     for (const auto& field : field_source) {
                         fields[field.first] = field.second;
                     }
@@ -2518,8 +2575,8 @@ class Checker {
                     Report(switch_case.pattern.span, "switch case pattern type does not match selector type");
                 }
             } else if (switch_case.pattern.kind == mc::ast::CasePattern::Kind::kVariant) {
-                const VariantSummary* variant = LookupVariant(selector, switch_case.pattern.variant_name);
-                if (variant == nullptr) {
+                const auto variant = LookupVariant(selector, switch_case.pattern.variant_name);
+                if (!variant.has_value()) {
                     Report(switch_case.pattern.span, "unknown switch case variant: " + switch_case.pattern.variant_name);
                 } else {
                     if (switch_case.pattern.bindings.size() != variant->payload_fields.size()) {

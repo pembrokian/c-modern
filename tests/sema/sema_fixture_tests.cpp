@@ -35,6 +35,13 @@ std::string ReadTextFile(const std::filesystem::path& path) {
     return buffer.str();
 }
 
+std::string NormalizeFixtureText(std::string text) {
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) {
+        text.pop_back();
+    }
+    return text;
+}
+
 mc::parse::ParseResult ParseText(const std::string& source,
                                  const std::filesystem::path& path,
                                  mc::support::DiagnosticSink& diagnostics) {
@@ -48,7 +55,7 @@ void RunFixture(const std::filesystem::path& source_root, const std::filesystem:
 
     mc::support::DiagnosticSink diagnostics;
     const auto source_text = ReadTextFile(source_path);
-    const auto expected_text = ReadTextFile(expected_path);
+    const auto expected_text = NormalizeFixtureText(ReadTextFile(expected_path));
 
     const auto lexed = mc::lex::Lex(source_text, source_path.generic_string(), diagnostics);
     const auto parsed = mc::parse::Parse(lexed, source_path, diagnostics);
@@ -67,7 +74,7 @@ void RunFixture(const std::filesystem::path& source_root, const std::filesystem:
             Fail("fixture should pass semantic checking: " + source_path.generic_string() + "\n" + diagnostics.Render());
         }
 
-        const auto actual_dump = mc::sema::DumpModule(*checked.module);
+        const auto actual_dump = NormalizeFixtureText(mc::sema::DumpModule(*checked.module));
         if (actual_dump != expected_text) {
             std::cerr << "fixture mismatch for " << source_path.generic_string() << "\n";
             std::cerr << "expected:\n" << expected_text << "\n";
@@ -154,6 +161,7 @@ int main(int argc, char** argv) {
         {"const_explicit_conversion_ok.mc", "const_explicit_conversion_ok.sema.txt", {}, true},
         {"const_wraparound_ok.mc", "const_wraparound_ok.sema.txt", {}, true},
         {"global_zero_initialized_ok.mc", "global_zero_initialized_ok.sema.txt", {}, true},
+        {"generic_box_ok.mc", "generic_box_ok.sema.txt", {}, true},
         {"import_alias_ok_main.mc", "import_alias_ok_main.sema.txt", {}, true},
         {"import_const_array_ok_main.mc", "import_const_array_ok_main.sema.txt", {}, true},
         {"import_ok_main.mc", "import_ok_main.sema.txt", {}, true},

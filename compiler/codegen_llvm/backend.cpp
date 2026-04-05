@@ -174,6 +174,26 @@ std::vector<const mir::Local*> ParameterLocals(const mir::Function& function) {
     return params;
 }
 
+sema::Type InstantiateAliasedType(const mir::TypeDecl& type_decl, const sema::Type& instantiated_type) {
+    sema::Type aliased_type = type_decl.aliased_type;
+    if (!type_decl.type_params.empty()) {
+        aliased_type = sema::SubstituteTypeParams(std::move(aliased_type), type_decl.type_params, instantiated_type.subtypes);
+    }
+    return aliased_type;
+}
+
+std::vector<std::pair<std::string, sema::Type>> InstantiateFields(const mir::TypeDecl& type_decl,
+                                                                  const sema::Type& instantiated_type) {
+    std::vector<std::pair<std::string, sema::Type>> fields = type_decl.fields;
+    if (type_decl.type_params.empty()) {
+        return fields;
+    }
+    for (auto& field : fields) {
+        field.second = sema::SubstituteTypeParams(std::move(field.second), type_decl.type_params, instantiated_type.subtypes);
+    }
+    return fields;
+}
+
 std::string LLVMTypeName(const BackendTypeInfo& type_info) {
     return type_info.backend_name;
 }
@@ -274,8 +294,9 @@ std::optional<std::size_t> FindFieldIndex(const mir::Module& module,
     const sema::Type lowered_base = sema::CanonicalizeBuiltinType(base_type);
     if (lowered_base.kind == sema::Type::Kind::kNamed) {
         if (const auto* type_decl = FindTypeDecl(module, lowered_base.name)) {
-            for (std::size_t index = 0; index < type_decl->fields.size(); ++index) {
-                if (type_decl->fields[index].first == field_name) {
+            const auto fields = InstantiateFields(*type_decl, lowered_base);
+            for (std::size_t index = 0; index < fields.size(); ++index) {
+                if (fields[index].first == field_name) {
                     return index;
                 }
             }
@@ -296,7 +317,8 @@ std::optional<sema::Type> FindFieldType(const mir::Module& module,
     const sema::Type canonical_base = sema::CanonicalizeBuiltinType(base_type);
     if (canonical_base.kind == sema::Type::Kind::kNamed) {
         if (const auto* type_decl = FindTypeDecl(module, canonical_base.name)) {
-            for (const auto& field : type_decl->fields) {
+            const auto fields = InstantiateFields(*type_decl, canonical_base);
+            for (const auto& field : fields) {
                 if (field.first == field_name) {
                     return field.second;
                 }
@@ -331,7 +353,7 @@ sema::Type StripMirAliasOrDistinct(const mir::Module& module, sema::Type type) {
         if (!visited.insert(type.name).second) {
             break;
         }
-        type = type_decl->aliased_type;
+        type = InstantiateAliasedType(*type_decl, type);
     }
     return type;
 }

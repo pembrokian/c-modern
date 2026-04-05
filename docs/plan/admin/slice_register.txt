@@ -165,8 +165,8 @@ Register By Concern
 - Slice: tuple and multi-result types
   design: settled
   plan phase: 3
-  repo status: partial
-  repo wave: Phase 3 bootstrap sema and MIR boundary
+  repo status: admitted
+  repo wave: Phase 3 plus Phase 27 proof re-audit
   docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/types/types_spec.txt
   end state: tuples are real semantic grouping forms for multi-result returns,
   assignments, and bindings.
@@ -174,8 +174,8 @@ Register By Concern
 - Slice: ranges as semantic forms
   design: settled
   plan phase: 3
-  repo status: partial
-  repo wave: Phase 3 bootstrap sema
+  repo status: admitted
+  repo wave: Phase 3 plus Phase 27 proof re-audit
   docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/types/types_spec.txt
   end state: range expressions and range semantic types exist as explicit
   checking and lowering units, not as parser-only sugar.
@@ -237,8 +237,8 @@ Register By Concern
 - Slice: generic nominal type arguments
   design: settled
   plan phase: 3
-  repo status: partial
-  repo wave: builtin generic aggregate admission plus bounded imported-generic workaround
+  repo status: admitted
+  repo wave: Phase 27 sema-first instantiated nominal closure
   docs: docs/arch/language/syntax/grammar_spec.txt, docs/arch/language/types/types_spec.txt, docs/plan/decision_log.txt
   end state: type argument lists are part of nominal identity, survive import
   and interface serialization, and are not reconstructed downstream.

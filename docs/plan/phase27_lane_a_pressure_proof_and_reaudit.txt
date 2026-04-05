@@ -3,7 +3,7 @@ Phase 27 -- Lane A Pressure Proof And Re-Audit
 
 Status
 ------
-PLANNED
+COMPLETED
 
 Purpose
 -------
@@ -129,3 +129,33 @@ Acceptance criteria for this document
   chosen Lane A series.
 - The phase is explicit that real proof, not ambient completeness pressure, is
   what determines the next plateau after Lane A.
+
+Closeout
+--------
+- Phase 27 used generic nominal type-argument identity as the remaining Lane A
+  admitted imported-boundary pressure point after Phase 26 `@noalias`.
+- The real blocker was sema-owned instantiated nominal truth, not parser
+  syntax or generic call breadth: raw generic struct layout, field lookup,
+  alias stripping, and variant payload consumers were still seeing `T` instead
+  of the concrete instantiated type arguments.
+- The repository now substitutes nominal type arguments at the owning sema
+  boundary and preserves that instantiated truth through MIR field and alias
+  consumers, LLVM backend type lowering, imported aggregate use, and `.mci`
+  round-trip coverage.
+- Focused proof landed in sema, MIR, backend, and bootstrap `.mci` tests,
+  including an imported `helper_box.Box<i32>` aggregate path.
+- The follow-through re-audit then rechecked tuple or multi-result and range
+  slices against real proof instead of the older partial label alone.
+- Tuple and range now have honest admitted proof through semantic checking,
+  MIR lowering, bootstrap `.mci` round-trip coverage, and executable codegen
+  regressions, including tuple-return destructuring and range-loop execution.
+- The range re-audit also exposed one real MIR boundary hole: literal-backed
+  numeric operands still needed explicit coercion to the sema-selected binary
+  expression type before LLVM emission. That conversion path is now preserved
+  in MIR instead of being guessed downstream by the backend.
+- Broader imported generic procedure-call lowering remains the next deferred
+  imported-generic item, but only behind the existing second-consumer trigger.
+- The Phase 27 re-audit therefore closes the tuple and range partial labels and
+  leaves broader imported generic procedure-call lowering as the remaining
+  explicit compiler-owned deferred item rather than continuing Lane A widening
+  speculatively.

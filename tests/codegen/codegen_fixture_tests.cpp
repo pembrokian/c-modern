@@ -114,6 +114,7 @@ int main(int argc, char** argv) {
         {"direct_call_add.mc", "direct_call_add.backend.txt"},
         {"enum_payload_layout.mc", "enum_payload_layout.backend.txt"},
         {"explicit_conversion.mc", "explicit_conversion.backend.txt"},
+        {"generic_box_i32.mc", "generic_box_i32.backend.txt"},
         {"low_level_intrinsics.mc", "low_level_intrinsics.backend.txt"},
         {"noalias_param.mc", "noalias_param.backend.txt"},
         {"pointer_int_conversion.mc", "pointer_int_conversion.backend.txt"},

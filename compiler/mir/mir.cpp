@@ -33,7 +33,46 @@ struct ValuePiece {
 };
 
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name);
+const VariantDecl* FindMirVariantDecl(const TypeDecl& type_decl, std::string_view variant_name);
 sema::Type StripMirAliasOrDistinct(const Module& module, sema::Type type);
+
+sema::Type InstantiateMirAliasedType(const TypeDecl& type_decl, const sema::Type& instantiated_type) {
+    sema::Type aliased_type = type_decl.aliased_type;
+    if (!type_decl.type_params.empty()) {
+        aliased_type = sema::SubstituteTypeParams(std::move(aliased_type), type_decl.type_params, instantiated_type.subtypes);
+    }
+    return aliased_type;
+}
+
+std::vector<std::pair<std::string, sema::Type>> InstantiateMirFields(const TypeDecl& type_decl,
+                                                                     const sema::Type& instantiated_type) {
+    std::vector<std::pair<std::string, sema::Type>> fields = type_decl.fields;
+    if (type_decl.type_params.empty()) {
+        return fields;
+    }
+    for (auto& field : fields) {
+        field.second = sema::SubstituteTypeParams(std::move(field.second), type_decl.type_params, instantiated_type.subtypes);
+    }
+    return fields;
+}
+
+std::optional<VariantDecl> InstantiateMirVariantDecl(const TypeDecl& type_decl,
+                                                     const sema::Type& instantiated_type,
+                                                     std::string_view variant_name) {
+    const VariantDecl* variant = FindMirVariantDecl(type_decl, variant_name);
+    if (variant == nullptr) {
+        return std::nullopt;
+    }
+    VariantDecl instantiated = *variant;
+    if (type_decl.type_params.empty()) {
+        return instantiated;
+    }
+    for (auto& payload_field : instantiated.payload_fields) {
+        payload_field.second =
+            sema::SubstituteTypeParams(std::move(payload_field.second), type_decl.type_params, instantiated_type.subtypes);
+    }
+    return instantiated;
+}
 
 constexpr std::string_view kTypeDeclKindNames[] = {"struct", "enum", "distinct", "alias"};
 constexpr std::size_t kTypeDeclKindCount = static_cast<std::size_t>(TypeDecl::Kind::kAlias) + 1;
@@ -514,7 +553,7 @@ sema::Type StripMirAliasOrDistinct(const Module& module, sema::Type type) {
         if (!visited.insert(type.name).second) {
             break;
         }
-        type = type_decl->aliased_type;
+        type = InstantiateMirAliasedType(*type_decl, type);
     }
     return type;
 }
@@ -762,7 +801,8 @@ std::optional<sema::Type> FindMirFieldType(const Module& module,
     const sema::Type canonical_base = StripMirAliasOrDistinct(module, sema::CanonicalizeBuiltinType(base_type));
     if (canonical_base.kind == sema::Type::Kind::kNamed) {
         if (const auto* type_decl = FindMirTypeDecl(module, canonical_base.name)) {
-            for (const auto& field : type_decl->fields) {
+            const auto fields = InstantiateMirFields(*type_decl, canonical_base);
+            for (const auto& field : fields) {
                 if (field.first == field_name) {
                     return field.second;
                 }
@@ -1756,6 +1796,14 @@ class FunctionLowerer {
         return {value, target_type};
     }
 
+    ValueInfo CoerceBinaryOperand(const ValueInfo& operand,
+                                  const sema::Type& target_type) {
+        if (sema::IsUnknown(target_type) || operand.type == target_type) {
+            return operand;
+        }
+        return EmitConvertValue(operand, target_type);
+    }
+
     ValueInfo EmitVariantMatchValue(const ValueInfo& selector, const std::string& variant_name) {
         const std::string value = NewValue();
         const std::string canonical_variant_name = CanonicalVariantDisplayName(selector.type, variant_name);
@@ -1863,31 +1911,16 @@ class FunctionLowerer {
             return sema::UnknownType();
         }
 
-        const auto* type_decl = sema::FindTypeDecl(sema_module_, stripped_selector.name);
+        const auto* type_decl = FindMirTypeDecl(module_, stripped_selector.name);
         if (type_decl == nullptr) {
             return sema::UnknownType();
         }
 
-        const std::size_t separator = variant_name.rfind('.');
-        const std::string qualified_name = separator == std::string_view::npos ? stripped_selector.name
-                                                                                : std::string(variant_name.substr(0, separator));
-        const std::string leaf_name = separator == std::string_view::npos ? std::string(variant_name)
-                                                                           : std::string(variant_name.substr(separator + 1));
-        if (!qualified_name.empty() && qualified_name != stripped_selector.name) {
+        const auto variant = InstantiateMirVariantDecl(*type_decl, stripped_selector, variant_name);
+        if (!variant.has_value() || payload_index >= variant->payload_fields.size()) {
             return sema::UnknownType();
         }
-
-        for (const auto& variant : type_decl->variants) {
-            if (variant.name != leaf_name) {
-                continue;
-            }
-            if (payload_index >= variant.payload_fields.size()) {
-                return sema::UnknownType();
-            }
-            return variant.payload_fields[payload_index].second;
-        }
-
-        return sema::UnknownType();
+        return variant->payload_fields[payload_index].second;
     }
 
     ValueInfo LoadLocalValue(const std::string& name) {
@@ -2106,11 +2139,35 @@ class FunctionLowerer {
                 });
                 return {value, type};
             }
-            case Expr::Kind::kBinary:
-                return EmitBinaryValue(expr.text,
-                                       LowerExpr(*expr.left),
-                                       LowerExpr(*expr.right),
-                                       KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "binary expression type"));
+            case Expr::Kind::kBinary: {
+                ValueInfo left = LowerExpr(*expr.left);
+                ValueInfo right = LowerExpr(*expr.right);
+                const sema::Type result_type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "binary expression type");
+
+                if (expr.text == "+" || expr.text == "-" || expr.text == "*" || expr.text == "/" || expr.text == "%" ||
+                    expr.text == "&" || expr.text == "|" || expr.text == "^") {
+                    if (!sema::IsUnknown(result_type) && result_type.kind != sema::Type::Kind::kIntLiteral &&
+                        result_type.kind != sema::Type::Kind::kFloatLiteral) {
+                        left = CoerceBinaryOperand(left, result_type);
+                        right = CoerceBinaryOperand(right, result_type);
+                    }
+                } else if (expr.text == "<<" || expr.text == ">>") {
+                    if (!sema::IsUnknown(result_type) && result_type.kind != sema::Type::Kind::kIntLiteral) {
+                        left = CoerceBinaryOperand(left, result_type);
+                        right = CoerceBinaryOperand(right, result_type);
+                    }
+                } else if ((expr.text == "==" || expr.text == "!=" || expr.text == "<" || expr.text == ">" ||
+                            expr.text == "<=" || expr.text == ">=") &&
+                           left.type != right.type) {
+                    if (left.type.kind == sema::Type::Kind::kIntLiteral || left.type.kind == sema::Type::Kind::kFloatLiteral) {
+                        left = CoerceBinaryOperand(left, right.type);
+                    } else if (right.type.kind == sema::Type::Kind::kIntLiteral || right.type.kind == sema::Type::Kind::kFloatLiteral) {
+                        right = CoerceBinaryOperand(right, left.type);
+                    }
+                }
+
+                return EmitBinaryValue(expr.text, left, right, result_type);
+            }
             case Expr::Kind::kRange: {
                 const auto left = LowerExpr(*expr.left);
                 const auto right = LowerExpr(*expr.right);
@@ -2843,8 +2900,14 @@ class FunctionLowerer {
             return;
         }
 
-        const auto start = LowerExpr(*stmt.exprs.front()->left);
-        const auto end = LowerExpr(*stmt.exprs.front()->right);
+        ValueInfo start = LowerExpr(*stmt.exprs.front()->left);
+        ValueInfo end = LowerExpr(*stmt.exprs.front()->right);
+        if (start.type != loop_type) {
+            start = EmitConvertValue(start, loop_type);
+        }
+        if (end.type != loop_type) {
+            end = EmitConvertValue(end, loop_type);
+        }
         StoreLocal(stmt.loop_name, start.value, loop_type, true);
 
         EnsureCurrentBlock();
@@ -2881,7 +2944,7 @@ class FunctionLowerer {
 
         current_block_ = step_block;
         const auto current_index = LoadLocalValue(stmt.loop_name);
-        const auto one = EmitLiteralValue("1", sema::IntLiteralType());
+        const auto one = EmitLiteralValue("1", loop_type);
         const auto next = EmitBinaryValue("+", current_index, one, loop_type);
         StoreLocal(stmt.loop_name, next.value, loop_type, true);
         function_.blocks[*current_block_].terminator.kind = Terminator::Kind::kBranch;
@@ -3540,7 +3603,9 @@ void ValidateStoreTargetInstruction(const Instruction& instruction, const Valida
                 break;
             }
             bool found_field = false;
-            const auto& fields = type_decl != nullptr ? type_decl->fields : builtin_fields;
+            const auto instantiated_fields =
+                type_decl != nullptr ? InstantiateMirFields(*type_decl, instruction.target_base_type) : std::vector<std::pair<std::string, sema::Type>> {};
+            const auto& fields = type_decl != nullptr ? instantiated_fields : builtin_fields;
             for (const auto& field : fields) {
                 if (field.first == instruction.target_name) {
                     found_field = true;
@@ -4569,8 +4634,9 @@ bool ValidateModule(const Module& module,
                         if (base_type.kind == sema::Type::Kind::kNamed) {
                             const TypeDecl* type_decl = FindMirTypeDecl(module, base_type.name);
                             if (type_decl != nullptr) {
+                                const auto fields = InstantiateMirFields(*type_decl, base_type);
                                 bool found_field = false;
-                                for (const auto& field : type_decl->fields) {
+                                for (const auto& field : fields) {
                                     if (field.first == field_name) {
                                         found_field = true;
                                         if (instruction.type != field.second) {
@@ -4722,24 +4788,26 @@ bool ValidateModule(const Module& module,
                             if (!instruction.target.empty() && !MatchesTargetDisplay(instruction.target, instruction.type)) {
                                 report("aggregate_init target metadata must match result type in function " + function.name);
                             }
+                            const auto fields =
+                                type_decl != nullptr ? InstantiateMirFields(*type_decl, instruction.type) : std::vector<std::pair<std::string, sema::Type>> {};
                             std::unordered_set<std::string> seen_named_fields;
                             for (std::size_t index = 0; index < instruction.field_names.size() && index < operand_types.size(); ++index) {
                                 const std::string& field_name = instruction.field_names[index];
                                 sema::Type expected_type = sema::UnknownType();
                                 if (field_name == "_") {
-                                    const std::size_t field_count = type_decl != nullptr ? type_decl->fields.size() : builtin_fields.size();
+                                    const std::size_t field_count = type_decl != nullptr ? fields.size() : builtin_fields.size();
                                     if (index >= field_count) {
                                         report("aggregate_init has too many positional fields in function " + function.name);
                                         continue;
                                     }
-                                    expected_type = type_decl != nullptr ? type_decl->fields[index].second : builtin_fields[index].second;
+                                    expected_type = type_decl != nullptr ? fields[index].second : builtin_fields[index].second;
                                 } else {
                                     if (!seen_named_fields.insert(field_name).second) {
                                         report("aggregate_init has duplicate named field in function " + function.name + ": " + field_name);
                                         continue;
                                     }
-                                    const auto& fields = type_decl != nullptr ? type_decl->fields : builtin_fields;
-                                    for (const auto& field : fields) {
+                                    const auto& candidate_fields = type_decl != nullptr ? fields : builtin_fields;
+                                    for (const auto& field : candidate_fields) {
                                         if (field.first == field_name) {
                                             expected_type = field.second;
                                             break;
@@ -4782,8 +4850,8 @@ bool ValidateModule(const Module& module,
                             report("variant_init requires enum result type in function " + function.name);
                             break;
                         }
-                        const VariantDecl* variant_decl = FindMirVariantDecl(*type_decl, variant_name);
-                        if (variant_decl == nullptr) {
+                        const auto variant_decl = InstantiateMirVariantDecl(*type_decl, instruction.type, variant_name);
+                        if (!variant_decl.has_value()) {
                             report("variant_init references unknown variant in function " + function.name + ": " + std::string(variant_name));
                             break;
                         }
@@ -4886,8 +4954,8 @@ bool ValidateModule(const Module& module,
                                 report("variant_extract requires enum selector type in function " + function.name);
                                 break;
                             }
-                            const VariantDecl* variant_decl = FindMirVariantDecl(*type_decl, variant_name);
-                            if (variant_decl == nullptr) {
+                            const auto variant_decl = InstantiateMirVariantDecl(*type_decl, selector_type, variant_name);
+                            if (!variant_decl.has_value()) {
                                 report("variant_extract references unknown variant in function " + function.name + ": " + std::string(variant_name));
                                 break;
                             }

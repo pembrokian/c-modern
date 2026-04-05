@@ -166,6 +166,10 @@ Module BuildExportedModuleSurface(const Module& module,
 Module RewriteImportedModuleSurfaceTypes(const Module& module,
                                          std::string_view module_name);
 
+Type SubstituteTypeParams(Type type,
+                          const std::vector<std::string>& type_params,
+                          const std::vector<Type>& type_args);
+
 const FunctionSignature* FindFunctionSignature(const Module& module, std::string_view name);
 const TypeDeclSummary* FindTypeDecl(const Module& module, std::string_view name);
 const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view name);

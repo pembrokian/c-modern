@@ -91,13 +91,21 @@ void TestMciRoundTrip() {
     function.name = "answer";
     function.param_types = {mc::sema::PointerType(mc::sema::NamedType("i32"))};
     function.param_is_noalias = {true};
-    function.return_types = {mc::sema::NamedType("i32")};
+    function.return_types = {mc::sema::NamedType("i32"), mc::sema::RangeType(mc::sema::NamedType("i32"))};
     module.functions.push_back(std::move(function));
+
+    mc::sema::FunctionSignature tuple_user;
+    tuple_user.name = "tuple_user";
+    tuple_user.param_types = {mc::sema::TupleType({mc::sema::NamedType("i32"), mc::sema::NamedType("i32")})};
+    tuple_user.param_is_noalias = {false};
+    tuple_user.return_types = {mc::sema::TupleType({mc::sema::NamedType("i32"), mc::sema::NamedType("i32")})};
+    module.functions.push_back(std::move(tuple_user));
 
     mc::sema::TypeDeclSummary type_decl;
     type_decl.kind = mc::ast::Decl::Kind::kStruct;
     type_decl.name = "Pair";
-    type_decl.fields = {{"left", mc::sema::NamedType("i32")}, {"right", mc::sema::NamedType("i32")}};
+    type_decl.type_params = {"T"};
+    type_decl.fields = {{"left", mc::sema::NamedType("T")}, {"right", mc::sema::PointerType(mc::sema::NamedType("T"))}};
     type_decl.layout = {
         .valid = true,
         .size = 8,
@@ -137,12 +145,24 @@ void TestMciRoundTrip() {
     Expect(loaded->module_name == "helper", "mci loader should preserve the module name");
     Expect(loaded->module.imports.size() == 1 && loaded->module.imports[0] == "helper_dep",
            "mci loader should preserve import lists");
-    Expect(loaded->module.functions.size() == 1 && loaded->module.functions[0].name == "answer",
+        Expect(loaded->module.functions.size() == 2 && loaded->module.functions[0].name == "answer",
            "mci loader should preserve exported function signatures");
         Expect(loaded->module.functions[0].param_is_noalias.size() == 1 && loaded->module.functions[0].param_is_noalias[0],
             "mci loader should preserve exported function parameter attributes");
+        Expect(loaded->module.functions[0].return_types.size() == 2 && loaded->module.functions[0].return_types[1] == mc::sema::RangeType(mc::sema::NamedType("i32")),
+            "mci loader should preserve range return types");
+        Expect(loaded->module.functions.size() == 2 && loaded->module.functions[1].param_types.size() == 1 &&
+             loaded->module.functions[1].param_types[0] == mc::sema::TupleType({mc::sema::NamedType("i32"), mc::sema::NamedType("i32")}) &&
+             loaded->module.functions[1].return_types.size() == 1 &&
+             loaded->module.functions[1].return_types[0] == mc::sema::TupleType({mc::sema::NamedType("i32"), mc::sema::NamedType("i32")}),
+            "mci loader should preserve tuple parameter and return types");
     Expect(loaded->module.type_decls.size() == 1 && loaded->module.type_decls[0].name == "Pair",
            "mci loader should preserve exported type declarations");
+        Expect(loaded->module.type_decls[0].type_params.size() == 1 && loaded->module.type_decls[0].type_params[0] == "T",
+            "mci loader should preserve generic type parameters");
+        Expect(loaded->module.type_decls[0].fields.size() == 2 && loaded->module.type_decls[0].fields[0].second == mc::sema::NamedType("T") &&
+             loaded->module.type_decls[0].fields[1].second == mc::sema::PointerType(mc::sema::NamedType("T")),
+            "mci loader should preserve generic field types");
            Expect(loaded->module.globals.size() == 1 && loaded->module.globals[0].constant_values.size() == 1 &&
                loaded->module.globals[0].constant_values[0].has_value() &&
                loaded->module.globals[0].constant_values[0]->kind == mc::sema::ConstValue::Kind::kInteger &&

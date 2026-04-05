@@ -11,6 +11,26 @@ std::optional<BackendTypeInfo> LowerTypeInfoImpl(const mir::Module& module,
                                                  const sema::Type& type,
                                                  bool aggregate_field_storage);
 
+sema::Type InstantiateAliasedType(const mir::TypeDecl& type_decl, const sema::Type& instantiated_type) {
+    sema::Type aliased_type = type_decl.aliased_type;
+    if (!type_decl.type_params.empty()) {
+        aliased_type = sema::SubstituteTypeParams(std::move(aliased_type), type_decl.type_params, instantiated_type.subtypes);
+    }
+    return aliased_type;
+}
+
+std::vector<std::pair<std::string, sema::Type>> InstantiateFields(const mir::TypeDecl& type_decl,
+                                                                  const sema::Type& instantiated_type) {
+    std::vector<std::pair<std::string, sema::Type>> fields = type_decl.fields;
+    if (type_decl.type_params.empty()) {
+        return fields;
+    }
+    for (auto& field : fields) {
+        field.second = sema::SubstituteTypeParams(std::move(field.second), type_decl.type_params, instantiated_type.subtypes);
+    }
+    return fields;
+}
+
 std::size_t AlignTo(std::size_t value,
                     std::size_t alignment) {
     if (alignment == 0) {
@@ -40,8 +60,9 @@ std::optional<BackendTypeInfo> LowerStructTypeInfo(const mir::Module& module,
 
     std::size_t size = 0;
     std::size_t alignment = 1;
-    for (std::size_t index = 0; index < type_decl.fields.size(); ++index) {
-        const auto lowered_field = LowerTypeInfoImpl(module, type_decl.fields[index].second, true);
+    const auto fields = InstantiateFields(type_decl, original_type);
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        const auto lowered_field = LowerTypeInfoImpl(module, fields[index].second, true);
         if (!lowered_field.has_value()) {
             return std::nullopt;
         }
@@ -129,7 +150,7 @@ std::optional<BackendTypeInfo> LowerTypeInfoImpl(const mir::Module& module,
             }
             if (const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name)) {
                 if (type_decl->kind == mir::TypeDecl::Kind::kAlias || type_decl->kind == mir::TypeDecl::Kind::kDistinct) {
-                    auto lowered = LowerTypeInfoImpl(module, type_decl->aliased_type, aggregate_field_storage);
+                    auto lowered = LowerTypeInfoImpl(module, InstantiateAliasedType(*type_decl, type), aggregate_field_storage);
                     if (!lowered.has_value()) {
                         return std::nullopt;
                     }
@@ -275,7 +296,13 @@ std::optional<EnumBackendLayout> LowerEnumLayout(const mir::Module& module,
     layout.aggregate_type.source_name = sema::FormatType(original_type);
     // Bootstrap enum tags are always lowered as i64. Revisit once the backend
     // models ABI-sized discriminants explicitly.
-    for (const auto& variant : type_decl.variants) {
+    for (const auto& raw_variant : type_decl.variants) {
+        mir::VariantDecl variant = raw_variant;
+        if (!type_decl.type_params.empty()) {
+            for (auto& field : variant.payload_fields) {
+                field.second = sema::SubstituteTypeParams(std::move(field.second), type_decl.type_params, original_type.subtypes);
+            }
+        }
         std::vector<BackendTypeInfo> variant_field_types;
         std::vector<std::size_t> variant_payload_offsets;
         std::size_t variant_size = 0;
@@ -346,7 +373,8 @@ std::optional<BackendTypeInfo> LowerAggregateFieldStorageType(const mir::Module&
         return std::nullopt;
     }
 
-    for (const auto& field : type_decl->fields) {
+    const auto fields = InstantiateFields(*type_decl, aggregate_type);
+    for (const auto& field : fields) {
         if (field.first == field_name) {
             return LowerTypeInfoImpl(module, field.second, true);
         }

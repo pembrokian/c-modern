@@ -51,6 +51,13 @@ std::string ReadTextFile(const std::filesystem::path& path) {
     return buffer.str();
 }
 
+std::string NormalizeFixtureText(std::string text) {
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) {
+        text.pop_back();
+    }
+    return text;
+}
+
 std::string LowerToValidatedDump(const std::string& source_text,
                                  const std::filesystem::path& source_path,
                                  const mc::sema::CheckOptions& options) {
@@ -141,7 +148,7 @@ void RunFixture(const std::filesystem::path& source_root,
 
     mc::support::DiagnosticSink diagnostics;
     const auto source_text = ReadTextFile(source_path);
-    const auto expected_text = ReadTextFile(expected_path);
+    const auto expected_text = NormalizeFixtureText(ReadTextFile(expected_path));
 
     VerifyCanonicalExampleSync(source_root, fixture, source_text);
 
@@ -169,8 +176,8 @@ void RunFixture(const std::filesystem::path& source_root,
     }
 
     if (fixture.should_lower) {
-        const auto actual_dump = LowerToValidatedDump(source_text, source_path, options);
-        const auto second_dump = LowerToValidatedDump(source_text, source_path, options);
+        const auto actual_dump = NormalizeFixtureText(LowerToValidatedDump(source_text, source_path, options));
+        const auto second_dump = NormalizeFixtureText(LowerToValidatedDump(source_text, source_path, options));
         if (actual_dump.find("unknown") != std::string::npos) {
             Fail("supported fixture should not emit unknown MIR types: " + source_path.generic_string() + "\n" + actual_dump);
         }
@@ -243,6 +250,7 @@ int main(int argc, char** argv) {
         {"foreach_range_defer.mc", "foreach_range_defer.mir.txt", true, "", {}, {}},
         {"foreach_non_iterable_fail.mc", "foreach_non_iterable_fail.errors.txt", false, "", {}, {}},
         {"explicit_conversion.mc", "explicit_conversion.mir.txt", true, "", {}, {}},
+        {"imported_generic_box_ok.mc", "imported_generic_box_ok.mir.txt", true, "", {}, {{"helper_box", "import_roots/helper_box.mc"}}},
         {"import_root_ok_main.mc", "import_root_ok_main.mir.txt", true, "", {"tests/mir/import_roots"}, {}},
         {"imported_atomic_ok.mc", "imported_atomic_ok.mir.txt", true, "", {}, {{"sync", "import_roots/sync_module.mc"}}},
         {"imported_event_buffer_ok.mc", "imported_event_buffer_ok.mir.txt", true, "", {"tests/mir/import_roots"}, {}},

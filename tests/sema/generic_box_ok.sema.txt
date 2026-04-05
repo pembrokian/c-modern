@@ -1,0 +1,6 @@
+SemanticModule
+  TypeDecl name=Box kind=struct
+    typeParams=[T]
+    Field name=value type=T
+  Function name=read params=[Box<i32>] returns=[i32]
+
