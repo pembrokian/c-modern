@@ -156,24 +156,20 @@ void ValidateFunctionDominance(const Function& function,
     }
     std::reverse(rpo.begin(), rpo.end());
 
-    std::unordered_map<std::string, int> rpo_index;
-    for (int index = 0; index < static_cast<int>(rpo.size()); ++index) {
-        rpo_index[rpo[index]] = index;
-    }
-
-    std::unordered_map<std::string, std::string> idom;
-    idom[entry_label] = entry_label;
-    auto intersect = [&](std::string first, std::string second) {
-        while (first != second) {
-            while (rpo_index[first] < rpo_index[second]) {
-                first = idom[first];
-            }
-            while (rpo_index[second] < rpo_index[first]) {
-                second = idom[second];
-            }
+    std::unordered_map<std::string, std::unordered_set<std::string>> dominators;
+    for (const auto& label : reachable_blocks) {
+        if (label == entry_label) {
+            dominators.emplace(label, std::unordered_set<std::string> {label});
+            continue;
         }
-        return first;
-    };
+
+        std::unordered_set<std::string> all_blocks;
+        all_blocks.reserve(reachable_blocks.size());
+        for (const auto& reachable : reachable_blocks) {
+            all_blocks.insert(reachable);
+        }
+        dominators.emplace(label, std::move(all_blocks));
+    }
 
     bool changed = true;
     while (changed) {
@@ -182,24 +178,37 @@ void ValidateFunctionDominance(const Function& function,
             if (label == entry_label) {
                 continue;
             }
-            std::string new_idom;
+
+            std::unordered_set<std::string> new_dominators;
+            bool have_pred_dominators = false;
             for (const auto& pred : preds[label]) {
-                if (idom.contains(pred)) {
-                    new_idom = pred;
-                    break;
-                }
-            }
-            if (new_idom.empty()) {
-                continue;
-            }
-            for (const auto& pred : preds[label]) {
-                if (pred == new_idom || !idom.contains(pred)) {
+                const auto found = dominators.find(pred);
+                if (found == dominators.end()) {
                     continue;
                 }
-                new_idom = intersect(pred, new_idom);
+
+                if (!have_pred_dominators) {
+                    new_dominators = found->second;
+                    have_pred_dominators = true;
+                    continue;
+                }
+
+                for (auto it = new_dominators.begin(); it != new_dominators.end();) {
+                    if (!found->second.contains(*it)) {
+                        it = new_dominators.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
             }
-            if (!idom.contains(label) || idom[label] != new_idom) {
-                idom[label] = new_idom;
+
+            if (!have_pred_dominators) {
+                continue;
+            }
+
+            new_dominators.insert(label);
+            if (dominators[label] != new_dominators) {
+                dominators[label] = std::move(new_dominators);
                 changed = true;
             }
         }
@@ -221,17 +230,8 @@ void ValidateFunctionDominance(const Function& function,
         if (def_block == use_block) {
             return true;
         }
-        if (!idom.contains(use_block)) {
-            return false;
-        }
-        std::string cursor = use_block;
-        while (cursor != entry_label) {
-            cursor = idom[cursor];
-            if (cursor == def_block) {
-                return true;
-            }
-        }
-        return false;
+        const auto found = dominators.find(use_block);
+        return found != dominators.end() && found->second.contains(def_block);
     };
 
     auto check_operand_dominance = [&](const std::string& operand, const std::string& use_block) {
@@ -240,7 +240,7 @@ void ValidateFunctionDominance(const Function& function,
             return;
         }
         if (!dominates(found_def->second, use_block)) {
-            report("MIR operand does not dominate use in function " + function.name + ": " + operand);
+            report("SSA dominance violation in function " + function.name + ": operand " + operand + " does not dominate its use");
         }
     };
 

@@ -27,7 +27,10 @@ target_link_libraries(mc_frontend_stub PUBLIC mc_support)
 
 add_library(mc_sema_bootstrap STATIC
     compiler/sema/check.cpp
+    compiler/sema/const_eval.cpp
+    compiler/sema/module_resolver.cpp
     compiler/sema/type.cpp
+    compiler/sema/type_utils.cpp
 )
 
 target_include_directories(mc_sema_bootstrap PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

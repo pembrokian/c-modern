@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "compiler/sema/type_utils.h"
 #include "compiler/sema/type_predicates.h"
 
 namespace mc::mir {

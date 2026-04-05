@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <sstream>
 
+#include "compiler/sema/type_utils.h"
+
 namespace mc::codegen_llvm {
 
 namespace {

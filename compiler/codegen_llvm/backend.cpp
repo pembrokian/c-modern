@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "compiler/sema/type_utils.h"
 #include "compiler/support/assert.h"
 #include "compiler/support/target.h"
 
