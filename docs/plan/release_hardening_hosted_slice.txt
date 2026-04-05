@@ -3,7 +3,7 @@ Hosted Slice Release-Hardening Note
 
 Status
 ------
-PUBLISHED (repository-bounded support-matrix freeze plus install-path hardening)
+PUBLISHED (repository-bounded support freeze, install-path hardening, and public-cut audit)
 
 Purpose
 -------
@@ -82,20 +82,59 @@ Artifact expectations:
 - `make build` and `make test` remain convenience wrappers around the same
   CMake-based path; they are not a separate supported installation story
 
-Checked versus release audit
-----------------------------
+Checked versus debug audit
+--------------------------
 - project executable targets in the admitted real-project fixtures currently
   default to `mode = "debug"`
 - ordinary tests in admitted real-project fixtures currently run in
   `mode = "checked"`, matching the repository-owned `mc test` contract
-- the repository currently proves checked-mode behavior most strongly through
-  ordinary tests and focused executable regressions; it does not yet claim a
-  broad release-mode audit across the full canonical-program surface
+- debug-mode proof is narrow: it proves the admitted executable-run workflow
+  on the supported hosted slice, not a broad release-mode certification across
+  the whole language surface
+- checked-mode proof is the main safety-validation surface for the current
+  repository: `mc test` ordinary-test coverage is the strongest admitted proof
+  for workflow trust on the supported slice
 - checked behavior is treated as additional runtime validation on top of the
   same language semantics; it does not redefine release semantics
-- current release-hardening truth is therefore: checked ordinary-test coverage
-  is the preferred proof surface for safety-sensitive workflow validation,
-  while debug executable builds remain the main admitted project run mode
+
+Public-cut smoke audit
+----------------------
+The narrowest honest public-cut smoke set for the current hosted plateau is:
+
+```sh
+build/debug/mc check tests/cases/hello.mc
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase33_smoke_return_zero
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup
+build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase33_worker_queue
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase33_evented_echo
+```
+
+This smoke set proves, at the narrowest honest level:
+
+- direct-source semantic check entrypoint
+- direct-source executable build entrypoint
+- debug-mode project executable run through the admitted grouped-package and
+  in-project `staticlib` boundary
+- checked ordinary-test workflow on the richer grouped project proof
+- checked ordinary-test workflow on the admitted hosted `sync` project proof
+- checked ordinary-test workflow on the admitted hosted networking project
+  proof
+
+First public-cut hosted statement
+---------------------------------
+The current repository can honestly claim a hosted Darwin arm64 bootstrap
+compiler and toolchain slice with direct-source semantic check and executable
+build, project-mode debug executable runs, checked ordinary tests, grouped
+internal package layouts, one admitted in-project static-library archive
+boundary, deterministic selected-target same-build-dir reuse without non-
+selected-target churn on the admitted richer project proof, and the admitted
+real `issue_rollup`, `worker_queue`, and `evented_echo` examples.
+
+It does not honestly claim broad release-mode certification across the full
+canonical-program surface, portability beyond Darwin arm64, package
+distribution, non-hosted targets, or broader target-kind and linker-policy
+coverage.
 
 Known limitations
 -----------------

@@ -106,11 +106,28 @@ build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir b
 build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase29_issue_rollup
 ```
 
-Checked versus release note:
+Checked versus debug posture:
 
 - admitted real-project executable targets currently default to `mode = "debug"`
 - admitted project ordinary tests currently run in `mode = "checked"`
-- the repository currently proves checked-mode behavior most strongly through `mc test` ordinary-test coverage and focused executable regressions; it does not yet claim a broad release-mode audit across the entire canonical-program surface
+- debug-mode proof is narrow: it proves the admitted executable-run workflow, not a broad release-mode certification across the whole language surface
+- checked-mode proof is the main safety-validation surface for the current repository: `mc test` ordinary-test coverage is the strongest admitted workflow-trust proof on the supported slice
+
+Public-cut smoke audit:
+
+```sh
+build/debug/mc check tests/cases/hello.mc
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase33_smoke_return_zero
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup
+build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase33_worker_queue
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase33_evented_echo
+```
+
+First public-cut hosted statement:
+
+- the current repository can honestly claim a hosted Darwin arm64 bootstrap compiler and toolchain slice with direct-source semantic check and executable build, project-mode debug executable runs, checked ordinary tests, grouped internal package layouts, one admitted in-project `staticlib`, deterministic selected-target same-build-dir reuse, and the admitted `issue_rollup`, `worker_queue`, and `evented_echo` examples
+- it does not honestly claim broad release-mode certification across the full canonical-program surface, portability beyond Darwin arm64, package distribution, non-hosted targets, shared libraries, or broader linker-policy coverage
 
 Notes:
 

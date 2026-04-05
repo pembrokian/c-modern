@@ -774,7 +774,7 @@ Register By Concern
   design: settled as a plan family
   plan phase: 9
   repo status: partial
-  repo wave: release_hardening_hosted_slice note plus Phase 31 support-matrix freeze and Phase 32 install-path hardening
+  repo wave: release_hardening_hosted_slice note plus Phase 31 support-matrix freeze, Phase 32 install-path hardening, and Phase 33 public-cut audit
   docs: docs/plan/release_hardening_hosted_slice.txt, docs/plan/phase31_supported_slice_audit_and_support_matrix_freeze.txt, docs/plan/plan.txt, README.md
   end state: explicit supported slice, install path, usage path, checked versus
   release posture, and known limitations for a disciplined first public cut.
