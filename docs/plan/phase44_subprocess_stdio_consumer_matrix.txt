@@ -3,7 +3,7 @@ Phase 44 -- Subprocess And Stdio Consumer Matrix
 
 Status
 ------
-PLANNED
+COMPLETED (consumer-matrix audit closed; Phase 45 authorized)
 
 Purpose
 -------
@@ -94,6 +94,19 @@ Deliverables
   authorization or explicit continued deferral
 - one short next-step statement saying whether Phase 45 is authorized or the
   repository should keep subprocess work deferred
+
+Delivered outcome
+-----------------
+- the audit closed with one concrete admitted-consumer shape: a bounded
+  argv-based line-filter relay that feeds one child process through stdin and
+  captures stdout back through ordinary `io.File` handles
+- host-side test harness capture and the existing thread-plus-pipe proofs were
+  judged insufficient because the missing owner was child-process lifetime and
+  stdio redirection rather than handle transport alone
+- next-step statement: the matrix authorized Phase 45 as one narrow hosted
+  `os` subprocess slice centered on explicit argv spawn plus wait plus bounded
+  stdin or stdout pipe composition, with `examples/real/line_filter_relay/`
+  chosen as the planned follow-through consumer
 
 Suggested execution order
 -------------------------

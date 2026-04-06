@@ -5,6 +5,8 @@ import io
 import pipe_ready
 import sync
 
+const PIPE_READY_ERR_UNEXPECTED_EOF: usize = 1
+
 func close_ignored(file: io.File) {
     ignored: errors.Error = io.close(file)
     if !errors.is_ok(ignored) {
@@ -22,7 +24,7 @@ func read_exact(file: io.File, bytes: Slice<u8>) errors.Error {
             return err
         }
         if nread == 0 {
-            return errors.fail_code(1)
+            return errors.fail_io(PIPE_READY_ERR_UNEXPECTED_EOF)
         }
         total = total + nread
     }

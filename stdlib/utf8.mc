@@ -13,12 +13,15 @@ struct Encoded {
     len: usize
 }
 
+const UTF8_ERR_INVALID_BYTES: usize = 1
+const UTF8_ERR_INVALID_CODEPOINT: usize = 2
+
 func invalid_utf8() errors.Error {
-    return errors.fail_code(1)
+    return errors.fail_utf8(UTF8_ERR_INVALID_BYTES)
 }
 
 func invalid_codepoint() errors.Error {
-    return errors.fail_code(2)
+    return errors.fail_utf8(UTF8_ERR_INVALID_CODEPOINT)
 }
 
 func zero_utf8_bytes() [4]u8 {

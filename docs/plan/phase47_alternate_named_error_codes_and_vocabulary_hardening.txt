@@ -1,0 +1,133 @@
+Phase 47 Alternate -- Named Error Codes And Vocabulary Hardening
+================================================================
+
+Status
+------
+PLANNED (conditional on the post-Phase-46 frontier audit choosing stdlib ergonomics)
+
+Purpose
+-------
+If the next frontier audit chooses the narrow stdlib error-API follow-up over a
+remaining compiler-owner gap, land the smallest honest source-level hardening
+wave for the admitted `Error` model: standardized named per-module codes plus a
+small readability vocabulary pass.
+
+This document is a repository execution plan for one alternate next step, not a
+commitment that it outranks the remaining compiler, MIR, or backend fronts.
+
+Repository status note
+----------------------
+- The repository now admits a phase-1 opaque `Error` surface in
+  `/Users/ro/dev/c_modern/stdlib/errors.mc` with explicit constructors,
+  `kind(err)`, and `code(err)`.
+- The hosted runtime still keeps `Error` scalar at the ABI boundary, and that
+  representation remains intentionally opaque to callers.
+- Real programs and tests no longer need raw `fail_code(...)` for the obvious
+  cases, but there is still follow-up pressure around consistency of named
+  module-local codes and a small readability vocabulary.
+- The next honest question is not whether to reopen hidden propagation or richer
+  error objects, but whether this narrow polish wave is the strongest next owner
+  compared with the remaining compiler-facing gaps.
+
+Problem being solved
+--------------------
+- Even after the phase-1 redesign, user-facing code can still drift into ad hoc
+  unnamed local codes or inconsistent constructor spelling if the repository
+  never standardizes the pattern.
+- Without one bounded follow-up, the repo risks either stagnating at a partly
+  cleaned-up surface or jumping too early to messages, causes, or heap-backed
+  errors.
+- The repository therefore needs one possible intermediate phase that finishes
+  the named-code and vocabulary story without changing the explicit `(value,
+  Error)` model.
+
+Core rule
+---------
+- Keep `Error` opaque at the source and ABI boundaries.
+- Do not add hidden propagation, exception behavior, or message-owning error
+  objects in this phase.
+- Prefer subsystem constructors plus named module-local codes over raw numeric
+  literals.
+- Standardize vocabulary only where it improves readability and consistency.
+- Stop before any representation rewrite, wrapped-cause design, or allocation
+  policy expansion.
+
+Chosen slice for this phase
+---------------------------
+Primary candidate slice:
+- finish the small surface-level vocabulary in `errors.mc`
+- standardize named per-module code constants where the semantics are already
+  stable
+- convert remaining admitted examples and tests that still carry older ad hoc
+  error spellings
+
+The planned admission should:
+- preserve the existing `kind(err)` and `code(err)` contract
+- keep runtime and stdlib error transport explicit and cheap
+- improve readability in real programs without widening the semantic model
+- make later richer error work optional rather than necessary
+
+What this phase should try to prove
+-----------------------------------
+- real admitted programs read better with `is_err(...)`, named constructors, and
+  named module-local codes than they did with raw or partly ad hoc spellings
+- the repository can standardize a small vocabulary without committing to richer
+  error objects
+- named codes are enough to stabilize the current explicit model for another
+  stretch of admitted projects
+- messages, wrapped causes, and source-context enrichment still remain separate,
+  explicit later follow-up work
+
+Preferred pressure points
+-------------------------
+1. Real admitted examples and tests still carrying older ad hoc error spelling.
+2. Stable parser or validation helpers that benefit from named user-facing codes.
+3. Runtime-adjacent code paths where subsystem constructors already match the
+   semantics cleanly.
+4. Documentation that explains the intended code-naming pattern for future work.
+
+Deliverables
+------------
+- one bounded `errors.mc` vocabulary polish pass if still needed by the chosen
+  slice
+- named module-local error-code constants for the remaining admitted examples,
+  stdlib helpers, and test proofs whose semantics are already stable
+- focused regression updates proving the admitted error vocabulary still works
+  across project and direct-source executable builds
+- documentation updates in
+  `/Users/ro/dev/c_modern/docs/arch/open_decisions.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/backlog.txt`, and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` if the admitted pattern
+  changes materially
+
+Suggested execution order
+-------------------------
+1. Inventory the remaining admitted call sites that still use ad hoc error-code
+   spelling.
+2. Convert only the sites whose semantics are already stable and easy to name.
+3. Add or finish the smallest vocabulary helpers needed for readability.
+4. Refresh direct-source and project regressions touched by the naming pass.
+5. Record which richer error ideas remain explicitly deferred.
+
+Exit criteria
+-------------
+- admitted examples, tests, and narrow stdlib helpers no longer rely on raw or
+  inconsistent error-code spelling where the meaning is already clear
+- the source-level `errors` vocabulary is small, consistent, and explicit
+- the repository still treats richer messages, causes, and object semantics as a
+  separate later choice
+- the explicit `(value, Error)` model remains unchanged
+
+Non-goals
+---------
+- message strings or formatted diagnostic payloads
+- wrapped causes or stack-like source context
+- hidden propagation syntax or any exception mechanism
+- changing the hosted runtime to a non-scalar `Error` representation
+
+Acceptance criteria for this document
+-------------------------------------
+- This note stands as one bounded alternate next step that can be selected by a
+  later frontier audit.
+- The note is explicit that named per-module codes and small vocabulary polish,
+  not richer error objects, are the whole scope of the phase.

@@ -1,7 +1,8 @@
-export { IpAddr, IpEndpoint, tcp_listen, accept, connect_tcp }
+export { IpAddr, IpEndpoint, parse_port, tcp_listen, accept, connect_tcp }
 
 import errors
 import io
+import strings
 
 struct IpAddr {
     a: u8
@@ -15,9 +16,37 @@ struct IpEndpoint {
     port: u16
 }
 
+const NET_ERR_INVALID_PORT: usize = 1
+
 extern(c) func __mc_net_tcp_listen(a: u8, b: u8, c: u8, d: u8, port: u16, err: *errors.Error) i32
 extern(c) func __mc_net_accept(listener: io.File, err: *errors.Error) i32
 extern(c) func __mc_net_connect_tcp(a: u8, b: u8, c: u8, d: u8, port: u16, err: *errors.Error) i32
+
+func parse_port(text: str) (u16, errors.Error) {
+    if text.len == 0 {
+        return 0, errors.fail_user(NET_ERR_INVALID_PORT)
+    }
+
+    bytes: Slice<u8> = strings.bytes(text)
+    value: u32 = 0
+    index: usize = 0
+    while index < bytes.len {
+        ch: u8 = bytes[index]
+        if ch < 48 {
+            return 0, errors.fail_user(NET_ERR_INVALID_PORT)
+        }
+        if ch > 57 {
+            return 0, errors.fail_user(NET_ERR_INVALID_PORT)
+        }
+        value = value * (u32)(10) + (u32)(ch - 48)
+        if value > (u32)(65535) {
+            return 0, errors.fail_user(NET_ERR_INVALID_PORT)
+        }
+        index = index + 1
+    }
+
+    return (u16)(value), errors.ok()
+}
 
 func tcp_listen(bind: IpEndpoint) (io.File, errors.Error) {
     err: errors.Error = errors.ok()

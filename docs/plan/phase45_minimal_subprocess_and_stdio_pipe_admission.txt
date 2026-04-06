@@ -3,7 +3,7 @@ Phase 45 -- Minimal Subprocess And Stdio Pipe Admission
 
 Status
 ------
-PLANNED (conditional on Phase 44 authorization)
+IMPLEMENTED (repository-bounded admitted slice)
 
 Purpose
 -------
@@ -23,7 +23,28 @@ Repository status note
 - The repository still has no honest basis for broad `os` scope; the smallest
   plausible first step is a subprocess surface that composes with existing
   `io.File` handles and remains hosted-only.
-- If Phase 44 does not authorize it, this phase remains preserved but inactive.
+- Phase 44 authorized one bounded child-process consumer and this phase now
+  lands the owned subprocess boundary required by that proof.
+
+What landed
+-----------
+- `stdlib/os.mc` now exports a narrow hosted subprocess slice: `Child`,
+  `spawn(...)`, and `wait(...)`.
+- `runtime/hosted/mc_hosted_runtime.c` now implements explicit argv-based
+  `fork` plus `execv` spawn and blocking `waitpid` completion over the admitted
+  Darwin arm64 hosted slice.
+- the hosted runtime now marks `io.pipe()` endpoints close-on-exec by default
+  so the existing pipe surface composes honestly with child-process stdio
+  redirection without leaking unrelated inherited pipe ends into spawned tools.
+- `tests/stdlib/subprocess_tr_capture.mc` now provides a direct-source proof of
+  explicit spawn plus wait plus pipe-backed stdout capture without shell
+  semantics.
+
+Validation run
+--------------
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build/debug -R mc_codegen_executable_unit --output-on-failure`
+- `ctest --test-dir build/debug -R mc_phase7_tool_unit --output-on-failure`
 
 Problem being solved
 --------------------

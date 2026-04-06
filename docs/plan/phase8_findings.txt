@@ -386,3 +386,7 @@ Real utility candidates
 - pipe-ready finding: after Phase 43 landed the first blocking pipe proof, the repository still lacked a second real project demonstrating that `io.poller_*` composes honestly with pipe endpoints rather than only with sockets
 - Classification: admitted capability pressure closed without widening the portable surface
 - Resolution: landed `examples/real/pipe_ready/` with a thin runtime helper module, deterministic ordinary tests, and tool-level run-test-rerun plus test-run-retest coverage, proving one bounded readiness-based pipe workflow without widening into non-blocking policy, half-close rules, or scheduler claims
+- Status: line-filter relay implemented as the next explicit admitted child-process stdio consumer
+- line-filter relay finding: after the blocking and readiness-based pipe proofs landed, the remaining missing owner for one concrete utility shape was child-process lifetime plus stdio redirection rather than additional in-process handle transport
+- Classification: narrow hosted `os` subprocess gap closed
+- Resolution: landed `stdlib/os.mc` `spawn(...)` plus `wait(...)`, hosted runtime support in `runtime/hosted/mc_hosted_runtime.c`, the direct-source `tests/stdlib/subprocess_tr_capture.mc` smoke, the real `examples/real/line_filter_relay/` project, deterministic ordinary tests, and tool-level run-test-rerun plus test-run-retest coverage without widening into shell strings, environment APIs, cwd control, stderr policy, or broader process management

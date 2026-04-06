@@ -51,3 +51,20 @@ Consequence:
 - MIR validation and LLVM lowering must consult semantic builtin aggregate metadata instead of carrying private tables
 - new builtin aggregate behavior should be added in sema type helpers first, then consumed downstream
 - executable support for aggregate field/index effects depends on this normalized sema-owned metadata rather than source spelling
+
+3. Phase-1 Error Representation
+
+Decision:
+- keep the language-level explicit `(value, Error)` model unchanged
+- keep the hosted ABI for `Error` scalar at the stdlib/runtime boundary for now
+- treat `Error` as an opaque encoded value classified through `errors.kind(err)` and `errors.code(err)` rather than as a raw integer sentinel
+
+Why:
+- real programs now need more meaning than anonymous `fail_code(1)` style sentinels provide
+- moving directly to heap-backed error objects would widen runtime ABI, allocation policy, and ownership questions all at once
+- a scalar kind/code encoding gives immediate classification wins without reintroducing hidden control flow or premature object-lifetime policy
+
+Consequence:
+- callers should construct errors through helpers such as `errors.fail(...)` and `errors.from_errno(...)` instead of inventing raw numeric layouts
+- hosted runtime failures should preserve errno-classification through the encoded scalar channel
+- richer message, source-context, cause-chaining, or heap-backed error objects remain a later follow-up rather than part of the current admitted slice

@@ -43,6 +43,10 @@ Rules:
 - the standard library should not invent ambient errno-like hidden channels as the primary language error model
 - failure must remain visible in signatures and call sites
 
+Representation note:
+- the concrete in-memory representation of `Error` is library-defined and should be treated as opaque by user code
+- when code needs to classify failures, it should do so through the admitted `errors` inspectors and constructors rather than by comparing raw integer layouts
+
 5. Non-Goals
 
 This document does not define:

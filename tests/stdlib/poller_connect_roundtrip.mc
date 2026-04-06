@@ -8,32 +8,6 @@ func close_ignored(file: io.File) {
     _ = io.close(file)
 }
 
-func parse_port(text: str) (u16, errors.Error) {
-    if text.len == 0 {
-        return 0, errors.fail_code(1)
-    }
-
-    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
-    value: u32 = 0
-    index: usize = 0
-    while index < bytes.len {
-        ch: u8 = bytes[index]
-        if ch < 48 {
-            return 0, errors.fail_code(1)
-        }
-        if ch > 57 {
-            return 0, errors.fail_code(1)
-        }
-        value = value * (u32)(10) + (u32)(ch - 48)
-        if value > (u32)(65535) {
-            return 0, errors.fail_code(1)
-        }
-        index = index + 1
-    }
-
-    return (u16)(value), errors.ok()
-}
-
 func loopback(port: u16) net.IpEndpoint {
     return net.IpEndpoint{ addr: net.IpAddr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
 }
@@ -45,7 +19,7 @@ func main(args: Slice<cstr>) i32 {
 
     port: u16
     err: errors.Error
-    port, err = parse_port(args[1])
+    port, err = net.parse_port(args[1])
     if !errors.is_ok(err) {
         return 31
     }

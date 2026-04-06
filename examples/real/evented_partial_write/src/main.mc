@@ -1,6 +1,5 @@
 export { main }
 
-import echo_core
 import errors
 import io
 import net
@@ -37,9 +36,9 @@ func main(args: Slice<cstr>) i32 {
     }
 
     port: u16
-    parse_err: uintptr
-    port, parse_err = echo_core.parse_port(args[1])
-    if parse_err != 0 {
+    parse_err: errors.Error
+    port, parse_err = net.parse_port(args[1])
+    if errors.is_err(parse_err) {
         return 81
     }
 

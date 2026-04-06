@@ -3,7 +3,7 @@ Phase 46 -- Pipeline And Stdio Follow-Through
 
 Status
 ------
-PLANNED (conditional on Phase 45 landing)
+IMPLEMENTED (repository-bounded admitted follow-through)
 
 Purpose
 -------
@@ -23,6 +23,24 @@ Repository status note
   follow-through.
 - This phase is therefore about proving the landed subprocess slice through one
   real utility or project, not about broadening `os` for its own sake.
+
+What landed
+-----------
+- `examples/real/line_filter_relay/` now proves one bounded child-process line
+  relay over `/usr/bin/tr`, feeding explicit stdin through one pipe and
+  capturing stdout through another with shell semantics kept entirely out of
+  the admitted surface.
+- the project ordinary tests prove both a non-empty transformed line and the
+  empty-line relay case under checked mode.
+- `tests/tool/phase7_tool_tests.cpp` now proves deterministic `mc run` and
+  `mc test` workflow for the new project through run-test-rerun and
+  test-run-retest sequences in the same admitted style as the other real
+  projects.
+
+Validation run
+--------------
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build/debug -R mc_phase7_tool_unit --output-on-failure`
 
 Problem being solved
 --------------------

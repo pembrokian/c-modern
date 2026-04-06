@@ -3,6 +3,12 @@ export { main, parse_config }
 import errors
 import strings
 
+const CONFIG_ERR_MISSING_EQUALS_BASE: usize = 0
+const CONFIG_ERR_INVALID_PORT_BASE: usize = 100
+const CONFIG_ERR_UNKNOWN_KEY_BASE: usize = 200
+const CONFIG_ERR_MISSING_PORT: usize = 300
+const CONFIG_ERR_INVALID_MODE: usize = 301
+
 func parse_config(input: str) errors.Error {
     rest: str = input
     line_no: usize = 1
@@ -32,20 +38,20 @@ func parse_config(input: str) errors.Error {
 
         equals: usize = strings.find_byte(line, 61)
         if equals == line.len {
-            return errors.fail_code(line_no)
+            return errors.fail_user(CONFIG_ERR_MISSING_EQUALS_BASE + line_no)
         }
 
         key: str = strings.trim_space(line[0:equals])
         value: str = strings.trim_space(line[equals + 1:line.len])
         if strings.eq(key, "port") {
             if !strings.eq(value, "8080") {
-                return errors.fail_code(line_no + 100)
+                return errors.fail_user(CONFIG_ERR_INVALID_PORT_BASE + line_no)
             }
             port = 8080
         } else if strings.eq(key, "mode") {
             mode = value
         } else {
-            return errors.fail_code(line_no + 200)
+            return errors.fail_user(CONFIG_ERR_UNKNOWN_KEY_BASE + line_no)
         }
 
         line_no = line_no + 1
@@ -55,10 +61,10 @@ func parse_config(input: str) errors.Error {
     }
 
     if port != 8080 {
-        return errors.fail_code(300)
+        return errors.fail_user(CONFIG_ERR_MISSING_PORT)
     }
     if !strings.eq(mode, "fast") {
-        return errors.fail_code(301)
+        return errors.fail_user(CONFIG_ERR_INVALID_MODE)
     }
 
     return errors.ok()

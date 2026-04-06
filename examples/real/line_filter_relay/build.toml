@@ -1,0 +1,21 @@
+schema = 1
+project = "line-filter-relay"
+default = "line-filter-relay"
+
+[targets.line-filter-relay]
+kind = "exe"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.line-filter-relay.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.line-filter-relay.runtime]
+startup = "default"
+
+[targets.line-filter-relay.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

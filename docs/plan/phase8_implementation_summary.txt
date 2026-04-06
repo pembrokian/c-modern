@@ -35,6 +35,7 @@ What landed
 - A bounded threaded worker-queue utility under `examples/real/worker_queue/` proving one real project-mode low-level shared-memory consumer of the admitted hosted `sync` slice through deterministic `mc run` and `mc test` workflow plus build-directory reuse sequences.
 - A bounded pipe-handoff utility under `examples/real/pipe_handoff/` proving one real project-mode handle-first communication consumer of the admitted `io.pipe()` surface through deterministic `mc run` and `mc test` workflow plus build-directory reuse sequences.
 - A bounded pipe-readiness utility under `examples/real/pipe_ready/` proving one real project-mode poller-coupled communication consumer of `io.pipe()` plus `io.poller_*` through deterministic `mc run` and `mc test` workflow plus build-directory reuse sequences.
+- A bounded line-filter relay utility under `examples/real/line_filter_relay/` proving one real project-mode child-process consumer of the admitted hosted `os.spawn(...)` plus `os.wait(...)` slice through explicit argv plus stdin/stdout pipes and deterministic `mc run` plus `mc test` workflow.
 - Tool-level Phase 8 workflow proof in `tests/tool/phase7_tool_tests.cpp` covering `mc run` and `mc test` for grep-lite, file walker, hash tool, and the arena-backed parser utility.
 - Documentation updates in the top-level README and `examples/README.md` so the admitted Phase 8 slice and its example workflows are discoverable without reading the implementation history.
 
@@ -51,7 +52,7 @@ What did not land in this slice
 Repository proof added
 ----------------------
 - `tests/codegen/codegen_executable_tests.cpp` covers the admitted canonical executable proofs, including the arena-backed AST example and recursive evaluator.
-- `tests/tool/phase7_tool_tests.cpp` now exercises the real utility project workflows for grep-lite, file walker, the bounded hash tool, the arena-backed parser utility, the worker-queue low-level shared-memory sync project, the pipe-handoff handle-first communication project, and the pipe-ready poller-coupled communication project.
+- `tests/tool/phase7_tool_tests.cpp` now exercises the real utility project workflows for grep-lite, file walker, the bounded hash tool, the arena-backed parser utility, the worker-queue low-level shared-memory sync project, the pipe-handoff handle-first communication project, the pipe-ready poller-coupled communication project, and the line-filter relay subprocess project.
 - The Phase 14 follow-up did not admit new executable or project proofs by
 	itself; instead it tightened the repository rule that no additional
 	canonical or real program should be treated as admitted without matching

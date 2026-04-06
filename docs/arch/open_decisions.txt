@@ -30,12 +30,16 @@ Use docs/plan/decision_log.txt for intentional limited solutions and deferred fu
 
 The semantic decision is settled: explicit returns, no hidden propagation. The remaining question is whether a very small convenience pattern is justified later.
 
+Current repository status:
+- the repository now admits a phase-1 opaque `Error` surface with kind or code inspection and named subsystem constructors at the stdlib boundary
+- that closes the earlier anonymous `fail_code(...)` pressure, but it still leaves one narrow follow-up around standard named module-local codes and a slightly cleaner source-level vocabulary such as `is_err(...)` and `fail_errno(...)`
+
 Open questions:
 - After more real programs are written, is explicit `(value, Error)` handling still acceptable without a standard propagation helper?
 - If a helper is ever added, can it remain purely explicit and avoid becoming a second hidden control-flow system?
 
 Why this is still open:
-- This should be decided from pressure in real code, not speculation. It is not a reason to reopen the basic error model now.
+- The next narrow follow-up is now clearer: standardize named per-module error codes and the small source-level vocabulary before revisiting any richer message, wrapped-cause, hidden-propagation, exception, or heap-backed object work.
 
 Non-open items
 

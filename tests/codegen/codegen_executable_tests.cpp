@@ -1483,6 +1483,13 @@ int main(int argc, char** argv) {
                                       BuildPartialWriteResponse(1536));
 
     RunBuiltOutputFixture(mc_path,
+                          source_root / "tests/stdlib/subprocess_tr_capture.mc",
+                          work_root / "phase45_subprocess_tr_capture_build",
+                          {},
+                          0,
+                          "SUBPROCESS SMOKE\n");
+
+    RunBuiltOutputFixture(mc_path,
                           source_root / "examples/canonical/hello_stdout.mc",
                           work_root / "phase8_hello_stdout_build",
                           {},

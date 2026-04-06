@@ -12,8 +12,10 @@
 #include <unistd.h>
 
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <stdbool.h>
+#include <sys/wait.h>
 
 struct mc_string {
     const char* ptr;
@@ -70,6 +72,10 @@ struct mc_sync_thread {
     uintptr_t raw;
 };
 
+struct mc_os_child {
+    uintptr_t raw;
+};
+
 struct mc_sync_mutex {
     uintptr_t raw;
 };
@@ -104,6 +110,22 @@ struct mc_dir_entry {
     size_t len;
     int is_dir;
 };
+
+enum mc_error_kind {
+    MC_ERROR_KIND_NONE = 0,
+    MC_ERROR_KIND_GENERIC = 1,
+    MC_ERROR_KIND_ERRNO = 2,
+    MC_ERROR_KIND_IO = 3,
+    MC_ERROR_KIND_UTF8 = 4,
+    MC_ERROR_KIND_MEM = 5,
+    MC_ERROR_KIND_OS = 6,
+    MC_ERROR_KIND_NET = 7,
+    MC_ERROR_KIND_SYNC = 8,
+    MC_ERROR_KIND_USER = 9,
+};
+
+static const uintptr_t k_mc_error_kind_scale = (uintptr_t) 65536u;
+static const uintptr_t k_mc_unknown_errno_code = (uintptr_t) 65535u;
 
 static void mc_zero_buffer_u8(struct mc_buffer_u8* out, struct mc_allocator* alloc) {
     if (out == NULL) {
@@ -145,8 +167,26 @@ static void mc_free_dir_entries(struct mc_dir_entry* entries, size_t count) {
     free(entries);
 }
 
+static uintptr_t mc_error_make(enum mc_error_kind kind, uintptr_t code) {
+    if (kind == MC_ERROR_KIND_NONE || code == 0) {
+        return 0;
+    }
+    return (uintptr_t) kind * k_mc_error_kind_scale + code;
+}
+
+static uintptr_t mc_error_from_errno_value(int err) {
+    if (err <= 0) {
+        return mc_error_make(MC_ERROR_KIND_ERRNO, k_mc_unknown_errno_code);
+    }
+    return mc_error_make(MC_ERROR_KIND_ERRNO, (uintptr_t) err);
+}
+
 static uintptr_t mc_error_code_from_errno(void) {
-    return (uintptr_t) (errno == 0 ? 1 : errno);
+    return mc_error_from_errno_value(errno);
+}
+
+static int mc_errno_was_interrupted(void) {
+    return errno == EINTR;
 }
 
 static void mc_store_error(uintptr_t* out_err, uintptr_t err) {
@@ -263,6 +303,53 @@ static void* mc_thread_entry_shim(void* opaque) {
     return NULL;
 }
 
+static void mc_free_c_argv(char** argv, size_t count) {
+    if (argv == NULL) {
+        return;
+    }
+
+    for (size_t index = 0; index < count; ++index) {
+        free(argv[index]);
+    }
+    free(argv);
+}
+
+static char** mc_allocate_argv(size_t count) {
+    char** argv = (char**) calloc(count + 1u, sizeof(char*));
+    if (argv == NULL) {
+        return NULL;
+    }
+
+    argv[count] = NULL;
+    return argv;
+}
+
+static char** mc_copy_three_strings_to_argv(struct mc_string program,
+                                            struct mc_string arg0,
+                                            struct mc_string arg1) {
+    char** argv = mc_allocate_argv(3u);
+    if (argv == NULL) {
+        return NULL;
+    }
+
+    argv[0] = mc_copy_string_to_cstr(program);
+    if (argv[0] == NULL) {
+        mc_free_c_argv(argv, 0u);
+        return NULL;
+    }
+    argv[1] = mc_copy_string_to_cstr(arg0);
+    if (argv[1] == NULL) {
+        mc_free_c_argv(argv, 1u);
+        return NULL;
+    }
+    argv[2] = mc_copy_string_to_cstr(arg1);
+    if (argv[2] == NULL) {
+        mc_free_c_argv(argv, 2u);
+        return NULL;
+    }
+    return argv;
+}
+
 struct mc_allocator* __mc_mem_default_allocator(void) {
     return &k_default_allocator;
 }
@@ -368,47 +455,62 @@ int32_t __mc_io_write_line(struct mc_string text) {
 int64_t __mc_io_read(int32_t file, struct mc_slice_u8 bytes, uintptr_t* out_err) {
     mc_store_error(out_err, 0);
     if (bytes.len < 0) {
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
         return 0;
     }
     if (bytes.len == 0) {
         return 0;
     }
 
-    errno = 0;
-    const ssize_t read_size = read(file, bytes.ptr, (size_t) bytes.len);
-    if (read_size < 0) {
-        mc_store_error(out_err, mc_error_code_from_errno());
-        return 0;
+    for (;;) {
+        errno = 0;
+        const ssize_t read_size = read(file, bytes.ptr, (size_t) bytes.len);
+        if (read_size < 0) {
+            if (mc_errno_was_interrupted()) {
+                continue;
+            }
+            mc_store_error(out_err, mc_error_code_from_errno());
+            return 0;
+        }
+        return (int64_t) read_size;
     }
-    return (int64_t) read_size;
 }
 
 int64_t __mc_io_write_file(int32_t file, struct mc_slice_u8 bytes, uintptr_t* out_err) {
     mc_store_error(out_err, 0);
     if (bytes.len < 0) {
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
         return 0;
     }
     if (bytes.len == 0) {
         return 0;
     }
 
-    errno = 0;
-    const ssize_t write_size = write(file, bytes.ptr, (size_t) bytes.len);
-    if (write_size < 0) {
-        mc_store_error(out_err, mc_error_code_from_errno());
-        return 0;
+    for (;;) {
+        errno = 0;
+        const ssize_t write_size = write(file, bytes.ptr, (size_t) bytes.len);
+        if (write_size < 0) {
+            if (mc_errno_was_interrupted()) {
+                continue;
+            }
+            mc_store_error(out_err, mc_error_code_from_errno());
+            return 0;
+        }
+        return (int64_t) write_size;
     }
-    return (int64_t) write_size;
 }
 
 uintptr_t __mc_io_close(int32_t file) {
-    errno = 0;
-    if (close(file) != 0) {
+    for (;;) {
+        errno = 0;
+        if (close(file) == 0) {
+            return 0;
+        }
+        if (mc_errno_was_interrupted()) {
+            continue;
+        }
         return mc_error_code_from_errno();
     }
-    return 0;
 }
 
 struct mc_io_pipe __mc_io_pipe(uintptr_t* out_err) {
@@ -427,11 +529,110 @@ struct mc_io_pipe __mc_io_pipe(uintptr_t* out_err) {
     return out;
 }
 
+struct mc_os_child __mc_os_spawn3(struct mc_string program,
+                                  struct mc_string arg0,
+                                  struct mc_string arg1,
+                                 int32_t stdin_file,
+                                 int32_t stdout_file,
+                                  int32_t close_file0,
+                                  int32_t close_file1,
+                                 uintptr_t* out_err) {
+    struct mc_os_child out = {0};
+    mc_store_error(out_err, 0);
+
+    char** c_argv = mc_copy_three_strings_to_argv(program, arg0, arg1);
+    if (c_argv == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return out;
+    }
+
+    errno = 0;
+    const pid_t pid = fork();
+    if (pid < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        mc_free_c_argv(c_argv, 3u);
+        return out;
+    }
+
+    if (pid == 0) {
+        if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
+            if (dup2(stdin_file, STDIN_FILENO) < 0) {
+                _exit(127);
+            }
+        }
+        if (stdout_file >= 0 && stdout_file != STDOUT_FILENO) {
+            if (dup2(stdout_file, STDOUT_FILENO) < 0) {
+                _exit(127);
+            }
+        }
+
+        if (close_file0 >= 0 && close_file0 != STDIN_FILENO && close_file0 != STDOUT_FILENO) {
+            close(close_file0);
+        }
+        if (close_file1 >= 0 && close_file1 != STDIN_FILENO && close_file1 != STDOUT_FILENO &&
+            close_file1 != close_file0) {
+            close(close_file1);
+        }
+
+        if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
+            close(stdin_file);
+        }
+        if (stdout_file >= 0 && stdout_file != STDOUT_FILENO && stdout_file != stdin_file) {
+            close(stdout_file);
+        }
+
+        execv(c_argv[0], c_argv);
+        _exit(127);
+    }
+
+    mc_free_c_argv(c_argv, 3u);
+    out.raw = (uintptr_t) pid;
+    return out;
+}
+
+int32_t __mc_os_wait(struct mc_os_child* child, uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    if (child == NULL || child->raw == 0) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_OS, 1));
+        return -1;
+    }
+
+    const pid_t pid = (pid_t) child->raw;
+    int status = 0;
+
+    pid_t wait_result;
+    for (;;) {
+        errno = 0;
+        wait_result = waitpid(pid, &status, 0);
+        if (wait_result < 0 && mc_errno_was_interrupted()) {
+            continue;
+        }
+        break;
+    }
+    if (wait_result != pid) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return -1;
+    }
+
+    child->raw = 0;
+#ifdef WIFEXITED
+    if (WIFEXITED(status)) {
+        return WEXITSTATUS(status);
+    }
+#endif
+#ifdef WIFSIGNALED
+    if (WIFSIGNALED(status)) {
+        return 128 + WTERMSIG(status);
+    }
+#endif
+    return status;
+}
+
 struct mc_io_poller* __mc_io_poller_new(uintptr_t* out_err) {
     mc_store_error(out_err, 0);
     struct mc_io_poller* poller = (struct mc_io_poller*) calloc(1, sizeof(struct mc_io_poller));
     if (poller == NULL) {
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
         return NULL;
     }
     return poller;
@@ -439,13 +640,13 @@ struct mc_io_poller* __mc_io_poller_new(uintptr_t* out_err) {
 
 uintptr_t __mc_io_poller_add(struct mc_io_poller* poller, int32_t file, uint32_t interests) {
     if (poller == NULL) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_IO, 1);
     }
     if (mc_find_pollfd(poller, file) != NULL) {
-        return (uintptr_t) EEXIST;
+        return mc_error_from_errno_value(EEXIST);
     }
     if (poller->len == poller->cap && !mc_grow_poller(poller)) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_MEM, 1);
     }
 
     poller->entries[poller->len].fd = file;
@@ -458,7 +659,7 @@ uintptr_t __mc_io_poller_add(struct mc_io_poller* poller, int32_t file, uint32_t
 uintptr_t __mc_io_poller_set(struct mc_io_poller* poller, int32_t file, uint32_t interests) {
     struct pollfd* entry = mc_find_pollfd(poller, file);
     if (entry == NULL) {
-        return (uintptr_t) ENOENT;
+        return mc_error_from_errno_value(ENOENT);
     }
 
     entry->events = mc_poll_events_from_mask(interests);
@@ -468,7 +669,7 @@ uintptr_t __mc_io_poller_set(struct mc_io_poller* poller, int32_t file, uint32_t
 
 uintptr_t __mc_io_poller_remove(struct mc_io_poller* poller, int32_t file) {
     if (poller == NULL) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_IO, 1);
     }
 
     for (size_t index = 0; index < poller->len; ++index) {
@@ -481,7 +682,7 @@ uintptr_t __mc_io_poller_remove(struct mc_io_poller* poller, int32_t file) {
             return 0;
         }
     }
-    return (uintptr_t) ENOENT;
+    return mc_error_from_errno_value(ENOENT);
 }
 
 int64_t __mc_io_poller_wait(struct mc_io_poller* poller,
@@ -491,13 +692,20 @@ int64_t __mc_io_poller_wait(struct mc_io_poller* poller,
                             uintptr_t* out_err) {
     mc_store_error(out_err, 0);
     if (poller == NULL || capacity < 0) {
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
         return 0;
     }
 
     const int timeout = timeout_ms < 0 ? -1 : timeout_ms;
-    errno = 0;
-    const int ready = poll(poller->entries, poller->len, timeout);
+    int ready;
+    for (;;) {
+        errno = 0;
+        ready = poll(poller->entries, poller->len, timeout);
+        if (ready < 0 && mc_errno_was_interrupted()) {
+            continue;
+        }
+        break;
+    }
     if (ready < 0) {
         mc_store_error(out_err, mc_error_code_from_errno());
         return 0;
@@ -820,8 +1028,15 @@ int32_t __mc_net_tcp_listen(uint8_t a,
 
 int32_t __mc_net_accept(int32_t listener, uintptr_t* out_err) {
     mc_store_error(out_err, 0);
-    errno = 0;
-    const int fd = accept(listener, NULL, NULL);
+    int fd;
+    for (;;) {
+        errno = 0;
+        fd = accept(listener, NULL, NULL);
+        if (fd < 0 && mc_errno_was_interrupted()) {
+            continue;
+        }
+        break;
+    }
     if (fd < 0) {
         mc_store_error(out_err, mc_error_code_from_errno());
         return -1;
@@ -863,20 +1078,20 @@ struct mc_sync_thread __mc_sync_thread_spawn(uintptr_t entry,
     struct mc_sync_thread out = {0};
     mc_store_error(out_err, 0);
     if (entry == 0) {
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_SYNC, 1));
         return out;
     }
 
     struct mc_hosted_thread* thread = (struct mc_hosted_thread*) calloc(1, sizeof(struct mc_hosted_thread));
     if (thread == NULL) {
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
         return out;
     }
 
     struct mc_hosted_thread_start* start = (struct mc_hosted_thread_start*) malloc(sizeof(struct mc_hosted_thread_start));
     if (start == NULL) {
         free(thread);
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
         return out;
     }
     start->entry = entry;
@@ -886,7 +1101,7 @@ struct mc_sync_thread __mc_sync_thread_spawn(uintptr_t entry,
     if (rc != 0) {
         free(start);
         free(thread);
-        mc_store_error(out_err, (uintptr_t) rc);
+        mc_store_error(out_err, mc_error_from_errno_value(rc));
         return out;
     }
 
@@ -896,13 +1111,13 @@ struct mc_sync_thread __mc_sync_thread_spawn(uintptr_t entry,
 
 uintptr_t __mc_sync_thread_join(struct mc_sync_thread thread) {
     if (thread.raw == 0) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_SYNC, 1);
     }
 
     struct mc_hosted_thread* handle = (struct mc_hosted_thread*) thread.raw;
     const int rc = pthread_join(handle->thread, NULL);
     if (rc != 0) {
-        return (uintptr_t) rc;
+        return mc_error_from_errno_value(rc);
     }
 
     free(handle);
@@ -915,14 +1130,14 @@ struct mc_sync_mutex __mc_sync_mutex_init(uintptr_t* out_err) {
 
     struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) calloc(1, sizeof(struct mc_hosted_mutex));
     if (handle == NULL) {
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
         return out;
     }
 
     const int rc = pthread_mutex_init(&handle->mutex, NULL);
     if (rc != 0) {
         free(handle);
-        mc_store_error(out_err, (uintptr_t) rc);
+        mc_store_error(out_err, mc_error_from_errno_value(rc));
         return out;
     }
 
@@ -932,13 +1147,13 @@ struct mc_sync_mutex __mc_sync_mutex_init(uintptr_t* out_err) {
 
 uintptr_t __mc_sync_mutex_destroy(struct mc_sync_mutex* mu) {
     if (mu == NULL || mu->raw == 0) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_SYNC, 1);
     }
 
     struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) mu->raw;
     const int rc = pthread_mutex_destroy(&handle->mutex);
     if (rc != 0) {
-        return (uintptr_t) rc;
+        return mc_error_from_errno_value(rc);
     }
 
     free(handle);
@@ -948,22 +1163,22 @@ uintptr_t __mc_sync_mutex_destroy(struct mc_sync_mutex* mu) {
 
 uintptr_t __mc_sync_mutex_lock(struct mc_sync_mutex* mu) {
     if (mu == NULL || mu->raw == 0) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_SYNC, 1);
     }
 
     struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) mu->raw;
     const int rc = pthread_mutex_lock(&handle->mutex);
-    return rc == 0 ? 0 : (uintptr_t) rc;
+    return rc == 0 ? 0 : mc_error_from_errno_value(rc);
 }
 
 uintptr_t __mc_sync_mutex_unlock(struct mc_sync_mutex* mu) {
     if (mu == NULL || mu->raw == 0) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_SYNC, 1);
     }
 
     struct mc_hosted_mutex* handle = (struct mc_hosted_mutex*) mu->raw;
     const int rc = pthread_mutex_unlock(&handle->mutex);
-    return rc == 0 ? 0 : (uintptr_t) rc;
+    return rc == 0 ? 0 : mc_error_from_errno_value(rc);
 }
 
 struct mc_sync_condvar __mc_sync_condvar_init(uintptr_t* out_err) {
@@ -972,14 +1187,14 @@ struct mc_sync_condvar __mc_sync_condvar_init(uintptr_t* out_err) {
 
     struct mc_hosted_condvar* handle = (struct mc_hosted_condvar*) calloc(1, sizeof(struct mc_hosted_condvar));
     if (handle == NULL) {
-        mc_store_error(out_err, 1);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
         return out;
     }
 
     const int rc = pthread_cond_init(&handle->cond, NULL);
     if (rc != 0) {
         free(handle);
-        mc_store_error(out_err, (uintptr_t) rc);
+        mc_store_error(out_err, mc_error_from_errno_value(rc));
         return out;
     }
 
@@ -989,13 +1204,13 @@ struct mc_sync_condvar __mc_sync_condvar_init(uintptr_t* out_err) {
 
 uintptr_t __mc_sync_condvar_destroy(struct mc_sync_condvar* cv) {
     if (cv == NULL || cv->raw == 0) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_SYNC, 1);
     }
 
     struct mc_hosted_condvar* cond = (struct mc_hosted_condvar*) cv->raw;
     const int rc = pthread_cond_destroy(&cond->cond);
     if (rc != 0) {
-        return (uintptr_t) rc;
+        return mc_error_from_errno_value(rc);
     }
 
     free(cond);
@@ -1006,23 +1221,23 @@ uintptr_t __mc_sync_condvar_destroy(struct mc_sync_condvar* cv) {
 uintptr_t __mc_sync_condvar_wait(struct mc_sync_condvar* cv,
                                  struct mc_sync_mutex* mu) {
     if (cv == NULL || cv->raw == 0 || mu == NULL || mu->raw == 0) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_SYNC, 1);
     }
 
     struct mc_hosted_condvar* cond = (struct mc_hosted_condvar*) cv->raw;
     struct mc_hosted_mutex* mutex = (struct mc_hosted_mutex*) mu->raw;
     const int rc = pthread_cond_wait(&cond->cond, &mutex->mutex);
-    return rc == 0 ? 0 : (uintptr_t) rc;
+    return rc == 0 ? 0 : mc_error_from_errno_value(rc);
 }
 
 uintptr_t __mc_sync_condvar_signal(struct mc_sync_condvar* cv) {
     if (cv == NULL || cv->raw == 0) {
-        return 1;
+        return mc_error_make(MC_ERROR_KIND_SYNC, 1);
     }
 
     struct mc_hosted_condvar* cond = (struct mc_hosted_condvar*) cv->raw;
     const int rc = pthread_cond_signal(&cond->cond);
-    return rc == 0 ? 0 : (uintptr_t) rc;
+    return rc == 0 ? 0 : mc_error_from_errno_value(rc);
 }
 
 int main(int argc, char** argv) {

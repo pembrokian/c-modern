@@ -1,21 +1,22 @@
 export { test_parse_invalid_port }
 
-import echo_core
+import errors
+import net
 import testing
 
 func test_parse_invalid_port() *i32 {
     value: u16
-    err: uintptr
-    value, err = echo_core.parse_port("70000")
-    if err == 0 {
+    err: errors.Error
+    value, err = net.parse_port("70000")
+    if errors.is_ok(err) {
         return testing.fail()
     }
     if value != 0 {
         return testing.fail()
     }
 
-    value, err = echo_core.parse_port("40x0")
-    if err == 0 {
+    value, err = net.parse_port("40x0")
+    if errors.is_ok(err) {
         return testing.fail()
     }
     if value != 0 {
