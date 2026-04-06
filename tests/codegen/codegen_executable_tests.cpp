@@ -674,6 +674,35 @@ void RunBuiltFixtureWithIrSnippets(const std::filesystem::path& mc_path,
                          "run built executable " + artifacts.executable.generic_string());
 }
 
+void RunBuiltIrFixtureWithSnippets(const std::filesystem::path& mc_path,
+                                   const std::filesystem::path& source_path,
+                                   const std::filesystem::path& build_dir,
+                                   const std::vector<std::string>& required_ir_snippets) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          source_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build " + source_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
+    if (!std::filesystem::exists(artifacts.llvm_ir) ||
+        !std::filesystem::exists(artifacts.object) ||
+        !std::filesystem::exists(artifacts.executable)) {
+        Fail("expected build artifacts for fixture: " + source_path.generic_string());
+    }
+
+    const std::string llvm_ir = ReadFile(artifacts.llvm_ir);
+    for (const auto& snippet : required_ir_snippets) {
+        if (llvm_ir.find(snippet) == std::string::npos) {
+            Fail("expected LLVM IR snippet '" + snippet + "' in " + artifacts.llvm_ir.generic_string());
+        }
+    }
+}
+
 void RunBuildFailureFixture(const std::filesystem::path& mc_path,
                            const std::filesystem::path& source_path,
                            const std::filesystem::path& build_dir,
@@ -1686,6 +1715,33 @@ int main(int argc, char** argv) {
                                   work_root / "phase15_shared_counter_mutex_build",
                                   0,
                                   {},
+                                  {"define {{i64}, i64} @sync.thread_spawn(",
+                                   "call {{i64}, i64} @sync.thread_spawn("});
+
+    const std::filesystem::path deferred_thread_spawn_source = work_root / "phase51_deferred_imported_thread_spawn.mc";
+    WriteFile(deferred_thread_spawn_source,
+              "import sync\n"
+              "\n"
+              "var worker_status: i32 = 0\n"
+              "\n"
+              "func worker(ctx: *i32) {\n"
+              "    ignored: uintptr = (uintptr)(ctx)\n"
+              "    if ignored == 0 {\n"
+              "        worker_status = 1\n"
+              "    }\n"
+              "}\n"
+              "\n"
+              "func launch() {\n"
+              "    defer sync.thread_spawn<i32>(worker, &worker_status)\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    launch()\n"
+              "    return 0\n"
+              "}\n");
+    RunBuiltIrFixtureWithSnippets(mc_path,
+                                  deferred_thread_spawn_source,
+                                  work_root / "phase51_deferred_imported_thread_spawn_build",
                                   {"define {{i64}, i64} @sync.thread_spawn(",
                                    "call {{i64}, i64} @sync.thread_spawn("});
 

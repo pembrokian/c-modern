@@ -1,0 +1,136 @@
+Phase 51 -- Imported Generic Call Closure Follow-Through
+========================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Close the remaining proof asymmetry after Phase 49 by adding executable-path
+coverage for deferred imported generic calls, without reopening the already
+closed compiler-owned `sync.thread_spawn<T>` rewrite frontier.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative roadmap first named imported generic call closure earlier in
+  the Phase 48 through Phase 57 band, and the repository completed that core
+  closure in Phase 49.
+- This Phase 51 document does not duplicate that work. It records the narrower
+  follow-through that remained after the compiler and library closure landed:
+  executable proof still covered only the ordinary direct call path while MIR
+  already covered both the ordinary and deferred imported generic call shapes.
+
+Repository status note
+----------------------
+- Phase 49 removed the `sync.thread_spawn_raw` escape hatch, restored ordinary
+  imported generic direct-call lowering, and proved the executable path on the
+  canonical shared-counter sync example.
+- MIR regression coverage already proves both ordinary and deferred imported
+  `sync.thread_spawn<T>` lowering and validation.
+- The remaining gap was not implementation correctness in sema, MIR, or LLVM
+  emission. It was proof coverage: no executable-path regression exercised a
+  deferred imported generic call.
+- The repository still does not claim broad generic-function completion,
+  monomorphization, or executable support for imported generic functions whose
+  ABI depends on unresolved type parameters.
+
+Problem being solved
+--------------------
+- The admitted imported generic closure was stronger than its executable proof
+  surface. Direct imported generic calls were checked through emitted LLVM IR,
+  but deferred imported generic calls were only checked at the MIR layer.
+- That left one supported control-flow shape unproven at the executable
+  boundary even though the backend was intended to support it.
+- The repository needed one narrow proof refresh to show that deferred imported
+  generic calls also survive the normal executable emission path.
+
+Core rule
+---------
+- Do not reopen the already-closed compiler rewrite frontier.
+- Fix proof gaps with the narrowest owner-local regression possible.
+- Keep the follow-through on the erased-ABI imported generic function family
+  already admitted through `sync.thread_spawn<T>`.
+- Prefer build-plus-IR proof when runtime behavior would widen the consumer
+  surface or introduce unrelated thread-lifecycle policy.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one synthetic executable-build regression that contains a
+deferred imported `sync.thread_spawn<T>` call, builds through the normal hosted
+pipeline, and checks the emitted LLVM IR for the real `sync.thread_spawn`
+definition and direct call site.
+
+What this phase should try to prove
+-----------------------------------
+- Deferred imported generic calls survive the executable backend, not just MIR
+  lowering and validation.
+- The proof still travels through the real generic `sync.thread_spawn<T>` body
+  rather than any raw helper or consumer-local rewrite.
+- The emitted LLVM IR remains within the already-admitted erased-ABI generic
+  family.
+- No broader generic-function breadth is implied by this follow-through.
+
+Preferred pressure points
+-------------------------
+1. Deferred imported `sync.thread_spawn<T>` lowering.
+2. Normal `mc build` executable emission.
+3. LLVM IR inspection for the real `sync.thread_spawn` symbol and call shape.
+4. A build-only regression that avoids widening runtime lifecycle policy.
+
+Deliverables
+------------
+- one canonical phase note documenting why this is a proof follow-through and
+  not a second attempt at Phase 49
+- one focused executable regression that builds a deferred imported generic
+  call fixture and inspects emitted LLVM IR for the real generic function path
+- no changes to sema, MIR, stdlib, or backend behavior unless the proof
+  exposes a real latent bug
+
+Suggested execution order
+-------------------------
+1. Reconfirm that Phase 49 already closed the compiler and stdlib owner work.
+2. Isolate the remaining proof asymmetry between MIR and executable coverage.
+3. Add the smallest build-and-IR regression for deferred imported generic
+   calls.
+4. Rebuild the test target and run the codegen executable suite.
+5. Record the follow-through as complete without broadening the generic
+   frontier.
+
+Exit criteria
+-------------
+- the executable regression suite covers both ordinary and deferred imported
+  `sync.thread_spawn<T>` call shapes
+- emitted LLVM IR for the deferred case references the real
+  `sync.thread_spawn` definition and call site
+- no `thread_spawn_raw` escape hatch or other consumer-specific workaround is
+  reintroduced
+- broader generic-function completion remains explicitly deferred
+
+Non-goals
+---------
+- reopening MIR or backend generic-call lowering design
+- adding runtime policy around detached threads, joins, or scheduler semantics
+- general generic-function monomorphization
+- changing the speculative roadmap numbering history
+
+What landed
+-----------
+- added a dedicated executable-build regression for a deferred imported
+  `sync.thread_spawn<T>` call that inspects emitted LLVM IR without widening
+  runtime behavior expectations
+- kept the proof on the existing erased-ABI generic family by checking the real
+  `sync.thread_spawn` symbol instead of inventing a broader generic consumer
+- left sema, MIR, stdlib, and backend behavior unchanged because the remaining
+  work was proof closure rather than a missing implementation
+
+Closeout statement
+------------------
+Phase 51 is complete as a narrow follow-through. The repository does not reopen
+imported generic call closure as unfinished compiler work; instead it closes the
+last executable-proof asymmetry left after Phase 49 by showing that deferred
+imported `sync.thread_spawn<T>` calls also survive the normal hosted build path
+through the real generic function boundary.

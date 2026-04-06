@@ -1860,15 +1860,22 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
     }
 
     if (instruction.result.empty()) {
-        if (!callee->return_types.empty()) {
+        if (callee->return_types.empty()) {
+            output_lines.push_back("call void " + function_it->second + "(" + args.str() + ")");
+            return true;
+        }
+
+        const auto lowered_return_type = LowerFunctionReturnType(*state.module, callee->return_types);
+        if (!lowered_return_type.has_value()) {
             ReportBackendError(source_path,
-                               "LLVM bootstrap executable emission requires a result for non-void call to '" +
+                               "LLVM bootstrap executable emission could not lower discarded call result type for '" +
                                    instruction.target_name + "' in function '" + state.function->name + "' block '" +
                                    block.label + "'",
                                diagnostics);
             return false;
         }
-        output_lines.push_back("call void " + function_it->second + "(" + args.str() + ")");
+
+        output_lines.push_back("call " + LLVMTypeName(*lowered_return_type) + " " + function_it->second + "(" + args.str() + ")");
         return true;
     }
 
