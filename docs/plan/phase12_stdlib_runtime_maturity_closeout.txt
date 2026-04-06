@@ -35,8 +35,8 @@ What landed
 - Phase 12E: focused stdlib executable regressions now cover `fs.is_dir` and
   deterministic `fs.list_dir` output directly.
 - Phase 12D: canonical non-allocating text helpers `eq`, `find_byte`,
-  `trim_space`, and `is_blank` now live on `strings`, while `text` remains as a
-  compatibility shim.
+  `trim_space`, and `is_blank` now live on `strings` as the canonical
+  non-allocating text surface.
 - Phase 12D: canonical examples now use the `strings` surface directly where
   appropriate.
 - Phase 12D: `utf8` now exposes narrow borrowed helpers beyond `valid`, namely

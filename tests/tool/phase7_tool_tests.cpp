@@ -1114,9 +1114,8 @@ void TestProjectTestCommandSucceeds(const std::filesystem::path& binary_root,
               "import io\n"
               "\n"
               "func main() i32 {\n"
-              "    status: i32 = io.write_line(\"phase7 run output\")\n"
-              "    if status != 0 {\n"
-              "        return status\n"
+              "    if io.write_line(\"phase7 run output\") != 0 {\n"
+              "        return 1\n"
               "    }\n"
               "    return 5\n"
               "}\n");

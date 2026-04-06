@@ -9,7 +9,7 @@ func main() i32 {
     view = mem.slice_from_buffer<u8>(buf)
     view[0] = 192
     view[1] = 175
-    text = string{ ptr: view.ptr, len: view.len }
+    text = str{ ptr: view.ptr, len: view.len }
     if utf8.valid(text) {
         mem.buffer_free<u8>(buf)
         return 1

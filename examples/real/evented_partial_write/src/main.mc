@@ -23,14 +23,13 @@ func poller_remove_ignored(poller: *io.Poller, file: io.File) {
 }
 
 func loopback(port: u16) net.IpEndpoint {
-    return net.IpEndpoint{ addr: net.IpAddr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
+    return net.IpEndpoint{ addr: net.Ipv4Addr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
 }
 
 func main(args: Slice<cstr>) i32 {
     if args.len != 2 {
-        status: i32 = io.write_line("usage: evented-partial-write <port>")
-        if status != 0 {
-            return status
+        if io.write_line("usage: evented-partial-write <port>") != 0 {
+            return 1
         }
         return 80
     }

@@ -18,5 +18,8 @@ func main(args: Slice<cstr>) i32 {
 
     bytes: Slice<u8> = mem.slice_from_buffer<u8>(entries)
     text: str = str{ ptr: bytes.ptr, len: bytes.len }
-    return io.write(text)
+    if io.write(text) != 0 {
+        return 1
+    }
+    return 0
 }

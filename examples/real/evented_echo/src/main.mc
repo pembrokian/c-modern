@@ -6,9 +6,8 @@ import net
 
 func main(args: Slice<cstr>) i32 {
     if args.len != 2 {
-        status: i32 = io.write_line("usage: evented-echo <port>")
-        if status != 0 {
-            return status
+        if io.write_line("usage: evented-echo <port>") != 0 {
+            return 1
         }
         return 64
     }
@@ -38,7 +37,7 @@ func run(port_text: str) i32 {
         return 10
     }
 
-    bind: net.IpEndpoint = net.IpEndpoint{ addr: net.IpAddr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
+    bind: net.IpEndpoint = net.IpEndpoint{ addr: net.Ipv4Addr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
     listener: io.File
     err: errors.Error
     listener, err = net.tcp_listen(bind)

@@ -3,9 +3,8 @@ import walk
 
 func main(args: Slice<cstr>) i32 {
     if args.len != 2 {
-        status: i32 = io.write_line("usage: file-walker <path>")
-        if status != 0 {
-            return status
+        if io.write_line("usage: file-walker <path>") != 0 {
+            return 1
         }
         return 64
     }

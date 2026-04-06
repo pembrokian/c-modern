@@ -1,0 +1,891 @@
+stdlib Architectural and Quality Review — Phase 51
+=====================================================
+Reviewer: Senior Compiler Systems Engineer
+Scope: stdlib/errors.mc, fs.mc, io.mc, mem.mc, net.mc, os.mc,
+       strings.mc, sync.mc, testing.mc, utf8.mc
+Date: 2026-04-06
+
+This review treats the stdlib as a production-quality bootstrap layer for a
+real compiler project.  It holds each file to the standard of a long-lived
+systems project: not just functional correctness, but soundness, clarity, and
+maintainability over years.
+
+The README is honest about bootstrap scope, so observations about missing
+features are noted but not treated as bugs.  The focus is on what IS present:
+whether it is correct, whether the abstractions are sound, and whether the
+design will scale cleanly when the missing parts land.
+
+
+════════════════════════════════════════════════════════════════════════════════
+1. errors.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+Error values are encoded as a single uintptr word using a fixed-width scheme:
+  raw = kind * ERROR_KIND_SCALE + code   (ERROR_KIND_SCALE = 65536)
+Success is zero.  kind and code are recovered by division and modulo.
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] Kind constants are zero-argument functions, not const declarations.
+     kind_none(), kind_generic(), kind_errno() etc. each return a small
+     integer literal.  There is no computation, no state, no reason for these
+     to be functions.  The language already has `const`.  Functions carry call
+     overhead (however small), inhibit compile-time constant folding, and
+     obscure intent to every reader.
+
+     Preferred:
+       const KIND_NONE:    ErrorKind = 0
+       const KIND_GENERIC: ErrorKind = 1
+       const KIND_ERRNO:   ErrorKind = 2
+       ...
+
+     The 10 separate kind() helpers on the export list clutter the module
+     surface and make it harder to see what the module actually does.
+
+[D2] from_errno and fail_errno are identical aliases.  One of them must be
+     removed.  Aliases at module API level create confusion about which name
+     is canonical.  Pick one (fail_errno is more consistent with the fail_*
+     naming pattern) and delete the other.
+
+[D3] The encoding scheme has an implicit maximum code value of 65535.  Nothing
+     in the type system enforces this.  Any usize value can be passed to
+     fail() as err_code.  The overflow case is a silent correctness hazard
+     (see C1 below).
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] CRITICAL: code value overflow silently corrupts kind.
+     The encoding is:  raw = kind * 65536 + code
+     The decoding is:  kind(err) = raw / 65536
+                       code(err) = raw % 65536
+
+     If a caller passes err_code = 65537, then:
+       raw = 1 * 65536 + 65537 = 131073
+       kind(err) = 131073 / 65536 = 2    ← wrong, returns kind_errno not kind_generic
+       code(err) = 131073 % 65536 = 1    ← wrong code
+
+     The kind is silently misread.  Since err_code is usize and has no upper
+     bound enforced at the API level, this is a real correctness hazard
+     whenever a subsystem uses errno values, HTTP status codes, or any code
+     that could exceed 65535.  POSIX errno values are typically small (<256),
+     so the immediate risk is low — but it is a time bomb as the error space
+     grows.
+
+     Fix option A: assert/clamp err_code in fail() and document the limit.
+     Fix option B: change the encoding to bit-fields using a wider scheme,
+       e.g., kind in the upper 16 bits, code in the lower 48 bits on a 64-bit
+       target.
+
+[C2] fail() silently returns ok() when err_code == 0.
+     A caller constructing fail(kind_generic(), 0) intends to create an error,
+     but gets success.  The zero-code guard looks defensive but is actually
+     surprising: "I created an error with code zero and got back success."
+     If code zero is reserved for success, that invariant should be documented
+     and enforced at the kind+code construction boundary, not buried inside
+     fail().  As written, it is a silent failure path.
+
+─── Safety & Robustness ─────────────────────────────────────────────────────
+
+[S1] Error = uintptr and ErrorKind = usize have an implicit architecture
+     assumption: uintptr >= usize.  This holds on all LP64/LLP64 targets in
+     scope but is not stated anywhere.  A static assertion at the C runtime
+     boundary would catch a future mismatch.
+
+─── Simplicity & Elegance ───────────────────────────────────────────────────
+
+[E1] The module export list is 25 names.  Converting the 10 kind_*() functions
+     to constants reduces it to 15 names and makes the module's actual content
+     much clearer at a glance.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  CRITICAL : [C1] Overflow of err_code silently corrupts kind — fix encoding
+  HIGH     : [C2] fail(kind, 0) silently returns ok() — document or eliminate
+  HIGH     : [D1] Replace kind_*() functions with const declarations
+  MEDIUM   : [D2] Remove from_errno duplicate alias
+  LOW      : [S1] Add static assertion uintptr >= usize at C boundary
+
+
+════════════════════════════════════════════════════════════════════════════════
+2. fs.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+Four thin wrappers over C extern functions: file_size, is_dir, list_dir,
+read_all.  Allocation is explicit (callers pass a *mem.Allocator).
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] CRITICAL: file_size returns isize with no error channel.
+     On POSIX, a stat(2) failure (e.g., ENOENT, EACCES) returns -1 and sets
+     errno.  The mc wrapper returns an isize with the same convention but
+     exposes no errno and no errors.Error path.  Callers who test (result < 0)
+     get a binary answer — but lose the specific failure cause.  Worse, if the
+     implementation returns a raw (isize)-1 without going through the errors
+     module, the error reporting contract is entirely outside the language
+     boundary.  Since errors.mc exists precisely for this, the omission is an
+     internal inconsistency.
+
+     Preferred signature:
+       func file_size(path: str) (isize, errors.Error)
+
+[C2] is_dir conflates three distinct outcomes as false:
+       (a) path does not exist
+       (b) path exists but is a regular file, symlink, or device
+       (c) path exists but access is denied
+     All three return false.  Any code that makes decisions based on is_dir
+     is semantically weaker than it appears.  An exists_and_is_dir name would
+     be more honest, or the function should return a tri-state / error.
+
+[C3] list_dir and read_all return *Buffer<u8> or nil with no error channel.
+     The README acknowledges this as intentional bootstrap behavior.  It is
+     noted here because it creates a maintainability trap: callers cannot log
+     or propagate filesystem failure diagnostics.  When an errors.Error
+     channel is added, every callsite will need to change.  Consider at
+     minimum adding a TODO comment at the extern boundary so this is not
+     forgotten.
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] The module depends on mem for the Allocator type but fs.mc imports mem —
+     the caller passes an explicit *mem.Allocator.  This is good design: I/O
+     and allocation policies are kept separate, and callers choose their
+     allocator strategy.  Worth preserving when the API expands.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  CRITICAL : [C1] file_size has no error channel — add errors.Error return
+  HIGH     : [C2] is_dir conflates not-found, not-a-dir, and permission-denied
+  MEDIUM   : [C3] nil-only failure for list_dir / read_all — add TODO marker
+
+
+════════════════════════════════════════════════════════════════════════════════
+3. io.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+Core I/O boundary: File (= i32 fd), Pipe, readiness polling (Poller, Event),
+and two text-specific write helpers (write, write_line).
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] HIGH: write() and write_line() are inconsistent with the rest of the API.
+     Every other function in io.mc returns (data, errors.Error) or at minimum
+     errors.Error.  write() and write_line() return a raw i32.  This breaks
+     the uniform error-handling contract: callers of write must know that a
+     negative return means failure (the POSIX write(2) convention) while every
+     other io operation goes through errors.Error.
+
+     These two functions also take str (text) while read/write_file take
+     Slice<u8> (bytes).  They appear to be stdout convenience shims rather
+     than proper I/O primitives.  If they are only for early-stage debug
+     printing, they should be in a separate module (e.g., diag or debug), not
+     in the primary I/O boundary.
+
+     Preferred (if kept in io):
+       func write(text: str) errors.Error
+       func write_line(text: str) errors.Error
+
+[D2] Poller is heap-allocated on the C side but the struct wraps only an
+     opaque pointer:
+       struct Poller { raw: uintptr }
+       func poller_new() (*Poller, errors.Error)
+
+     This is a double indirection: the language-side *Poller pointer points to
+     a single-field struct that itself holds a raw uintptr pointing to the
+     actual poll object (epoll/kqueue fd).  If the purpose of the struct is
+     to carry the opaque handle, and the handle is a single word, then either:
+       (a) the struct should contain the fd directly:  struct Poller { fd: i32 }
+           and be returned by value, or
+       (b) the C side returns a pointer directly and Poller wraps it:
+           type Poller = uintptr
+     As written, every poll operation traverses two pointer dereferences to
+     reach the actual fd.  The indirection exists to give the type a name, but
+     the actual resource is hidden two levels deep.
+
+[D3] poller_wait decomposes the Slice<Event> into a raw pointer and length
+     before passing to the extern C function:
+       __mc_io_poller_wait(p, events.ptr, events.len, timeout_ms, &err)
+     This breaks the Slice abstraction at the ABI boundary and requires the
+     C function to receive an unbounded pointer.  Consistent with how other
+     Slice parameters work in this codebase (read/write_file also take
+     Slice), but worth flagging: the C side must never write more than
+     events.len entries, and there is no enforcement mechanism.
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] Event.failed is a boolean alongside Event.readable and Event.writable.
+     The name failed is vague: does it mean the underlying fd has an error
+     condition (EPOLLERR, EPOLLHUP), or that the wait itself failed?  On
+     Linux, a hung-up fd triggers EPOLLHUP even on the reading side after the
+     write end closes.  Callers need to know whether to close the fd or retry.
+     A richer err field (errors.Error) on Event would distinguish these cases.
+     At minimum, the semantics of failed must be documented.
+
+─── Safety & Robustness ─────────────────────────────────────────────────────
+
+[S1] poller_new can return nil if allocation fails (indicated by the error
+     out-parameter).  There is no language-enforced check.  This is consistent
+     with the rest of the codebase but means callers must discipline themselves
+     to check err before using the pointer — a convention that is not
+     documented in the module.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  HIGH     : [D1] write/write_line bypass errors.Error — unify error contract
+  HIGH     : [D1] write/write_line take str; other ops take Slice<u8> — unify
+  MEDIUM   : [D2] Double indirection for Poller is unnecessary overhead
+  MEDIUM   : [C1] Event.failed is semantically underspecified
+  LOW      : [S1] Document nil-check convention for pointer-returning functions
+
+
+════════════════════════════════════════════════════════════════════════════════
+4. mem.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+Allocator and Arena abstractions plus generic Buffer<T> operations.  Generics
+are admitted as extern(c) functions (buffer_new<T>, buffer_free<T>, etc.).
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] Arena = *u8 is a meaningless type alias at the language level.
+     At first glance, Arena could be any *u8 — a string slice, an element
+     pointer, any byte pointer.  The name carries semantic weight (bump
+     allocator with linear lifetime) that the type declaration does not
+     capture.  Compare Allocator { raw: uintptr } which at least creates a
+     distinct nominal type that cannot be accidentally aliased with any other
+     uintptr.
+
+     Arena should be a struct:
+       struct Arena { raw: uintptr }
+     or at minimum:
+       type Arena = uintptr
+
+     As a *u8, it can be silently passed to any function expecting a byte
+     pointer, and a byte pointer can be accidentally used as an Arena.
+
+[D2] Buffer<T> operations are inconsistently wrapped.
+     buffer_new<T>, buffer_free<T>, slice_from_buffer<T>, arena_new<T> are
+     exported directly as extern(c) generics.  By contrast, arena_init and
+     arena_deinit are non-generic C externs wrapped by MC-level functions
+     (arena_init / arena_deinit act as thin pass-throughs).
+
+     The inconsistency means the module surface has two distinct patterns for
+     no apparent reason.  Either all generics should be directly exported
+     extern(c), or they should all be wrapped.  The wrapped pattern is
+     preferable because it gives a stable MC-level symbol that can be updated
+     without changing all callsites if the C ABI changes.
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] CRITICAL: arena_new<T> has no error channel.
+     If arena capacity is exhausted, the C implementation presumably returns
+     nil.  The MC declaration:
+       extern(c) func arena_new<T>(arena: Arena) *T
+     returns *T with no out-parameter for errors.Error.  A nil return is the
+     only signal.  Unlike Buffer allocations that are often sized up front,
+     arena overflow is commonly a programming error, so a debug panic or
+     documented abort may be intentional — but neither is stated.  If the
+     semantics are "abort on exhaustion", document it.  If the semantics are
+     "return nil", callers need to check it but currently have no way to get
+     a diagnostic.
+
+[C2] buffer_len only works for Buffer<u8>.
+     The module exports buffer_new<T> (generic), buffer_free<T> (generic),
+     slice_from_buffer<T> (generic), but buffer_len is:
+       func buffer_len(buf: *Buffer<u8>) usize
+     There is no generic buffer_len<T>.  Callers with Buffer<i32> or
+     Buffer<Event> (from io) cannot query the length without going to the C
+     side directly.  This is a clear API gap: the only purpose of a buffer
+     is to hold elements, yet the element count is unavailable generically.
+     The underlying C function __mc_mem_buffer_len_u8 is specifically typed as
+     taking *Buffer<u8>.  Either the C function should be generic, or there
+     should be a size_bytes function and a derived element_count at the MC
+     level.
+
+─── Safety & Robustness ─────────────────────────────────────────────────────
+
+[S1] buffer_free<T> has no error return and no spec on double-free or nil
+     free behavior.  Double-free of a heap-allocated buffer is undefined
+     behavior at the C layer.  Since the language has no ownership model, this
+     is caller responsibility — but the expectation should be documented.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  CRITICAL : [C1] arena_new has no error channel — document semantics on exhaustion
+  HIGH     : [C2] buffer_len is non-generic — is a gap in the buffer API
+  HIGH     : [D1] Arena = *u8 should be a distinct nominal type (struct or opaque)
+  MEDIUM   : [D2] Inconsistent wrapping pattern for generic vs scalar externs
+
+
+════════════════════════════════════════════════════════════════════════════════
+5. net.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+IPv4-only TCP: parse_port, tcp_listen, accept, connect_tcp.  Network
+operations return io.File so callers can use ordinary io.read/write/close.
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] IpAddr is IPv4-specific but named generically.
+     A future IPv6 or dual-stack addition would either need a completely
+     different type or a breaking change to IpAddr.  The name IpAddr implies
+     generality; Ipv4Addr is honest about scope.
+
+[D2] The IpEndpoint abstraction is decomposed at the C ABI boundary.
+     tcp_listen and connect_tcp constructors take an IpEndpoint struct but
+     immediately flatten it into (a, b, c, d, port) as individual C arguments:
+       __mc_net_tcp_listen(bind.addr.a, bind.addr.b, bind.addr.c, bind.addr.d,
+                           bind.port, &err)
+     This is fragile: adding a new field (e.g., scope_id for IPv6, or a
+     timeout) requires updating both the struct definition and every C extern
+     declaration.  If the C side can accept a packed struct (which it can on
+     most real ABIs), passing the struct directly is cleaner and less
+     error-prone.
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] parse_port uses magic numeric literals 48 and 57 for ASCII '0' and '9'.
+     The module already defines NET_ERR_INVALID_PORT as a named constant.
+     The digit bounds should also be named:
+       const ASCII_ZERO: u8 = 48
+       const ASCII_NINE: u8 = 57
+     This improves readability and makes it immediately clear that the check
+     is ASCII digit range validation.  As written, someone unfamiliar with
+     ASCII must verify that 48..57 is correct.
+
+[C2] parse_port rejects non-digit bytes correctly, but has no handling for
+     leading whitespace or a leading '+' sign.  The behavior (reject) is
+     correct for a strict port parser, but is undocumented.  A caller
+     who passes "  8080" with leading spaces gets NET_ERR_INVALID_PORT with
+     no explanation.
+
+[C3] tcp_listen on failure: the C function returns an i32 (raw fd or -1 on
+     error).  If err is set, the returned io.File is presumably -1 or 0, but
+     this is not stated.  Callers who check err correctly are fine; callers who
+     accidentally use the file before checking err may get a valid-looking
+     descriptor value.
+
+─── Safety & Robustness ─────────────────────────────────────────────────────
+
+[S1] accept() in a tight loop without a backoff or error-termination
+     condition is easy to write incorrectly.  This is a usage concern, not
+     a library bug, but there is no documentation warning about accept-loop
+     patterns (EINTR retry logic, EAGAIN from non-blocking sockets, etc.).
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  HIGH     : [D1] IpAddr is misleadingly generic — rename to Ipv4Addr
+  MEDIUM   : [C1] Magic numbers 48/57 in parse_port — add named ASCII constants
+  MEDIUM   : [D2] IpEndpoint decomposition at C boundary — prefer struct passthrough
+  LOW      : [C2] Document parse_port's whitespace/sign rejection behavior
+  LOW      : [S1] Document accept-loop error handling expectations
+
+
+════════════════════════════════════════════════════════════════════════════════
+6. os.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+Process spawning (spawn) and waiting (wait).  The spawn signature is a fixed
+2-argument form with 2 close-file slots.
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] CRITICAL: spawn is hardcoded to exactly two arguments.
+     The signature is:
+       func spawn(program, arg0, arg1, stdin_file, stdout_file,
+                  close_file0, close_file1) (Child, errors.Error)
+     Real programs require zero, one, three, four, or arbitrary arguments.
+     This cannot run a bare `ls`, cannot run `grep -r pattern dir1 dir2`, and
+     cannot represent argv[0] (the program name) distinctly from the argument
+     list.  The two-arg restriction is so narrow it breaks the API for nearly
+     any realistic use.
+
+     The name __mc_os_spawn3 in the extern declaration confirms this is the
+     "(program + 3 tokens)" form.  Either:
+       (a) Provide a varargs or Slice<str>-based form for the argument list, or
+       (b) Document clearly that spawn is a fixed-2-arg bootstrap stub and
+           provide a timeline for a real argv[] call.
+
+[D2] close_file0 / close_file1 are post-fork, pre-exec pipe-end closings
+     embedded into the API.  This is the POSIX idiom: after fork(), the parent
+     closes the child-side pipe ends that are now duplicated in the child.
+     However:
+       (a) The number of slots is fixed at 2, limiting users to 1 pipe pair.
+       (b) Passing an invalid/sentinel fd to indicate "don't close this slot"
+           is undocumented — is the convention to pass -1? 0? the same fd
+           as stdin/stdout?
+       (c) The concept does not generalize: if a caller creates two pipes (4
+           fds), they cannot safely close all 4 on the parent side via this API.
+     A cleaner design is: spawn does not close anything in the parent; that is
+     the caller's responsibility after spawn returns.
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] After wait(child), the Child handle is consumed but the language has no
+     move semantics.  A caller can call wait(&child) a second time on the same
+     Child.  The C implementation presumably calls waitpid on the stored pid;
+     on the second call, the pid is either re-used (potential wait on wrong
+     process) or ECHILD is returned.  The post-wait state of Child is
+     undefined in the API.
+
+[C2] wait takes *Child but spawn returns Child by value.  The asymmetry means
+     callers must take the address of a local:
+       child_val, err = spawn(...)
+       status, err2  = wait(&child_val)
+     This is minor but unusual.  Consistency with spawn returning Child and
+     wait taking Child by value (copying the opaque raw handle) or an
+     explicit "handle ref" type would be cleaner.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  CRITICAL : [D1] spawn is hardcoded to 2 args — cannot represent real argv
+  HIGH     : [D2] close_file0/close_file1 slots are underdocumented and fixed
+  HIGH     : [C1] Double-wait on same Child is undefined — document or guard
+  LOW      : [C2] Asymmetry: spawn returns Child by value, wait takes *Child
+
+
+════════════════════════════════════════════════════════════════════════════════
+7. strings.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+Non-allocating string helpers: byte_len, bytes, empty, eq, find_byte,
+trim_space, is_blank.
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] byte_len(text: str) -> usize is a trivial wrapper for text.len.
+     If str has a .len field accessible everywhere, byte_len adds no
+     capability and no safety — it is just a function call wrapping a field
+     access.  It should be removed from the export surface to keep the API
+     clean.  If it exists only for parity with utf8.byte_len, rename it
+     utf8.byte_count or document the distinction explicitly.
+
+[D2] trim_space delegates to two C functions for start and end offsets.
+     This is workable, but the behavior of "space" is entirely defined in C,
+     invisible from the MC side.  Is it ASCII whitespace only (0x09, 0x0A,
+     0x0D, 0x20)?  Unicode whitespace?  This is not documented.  In a
+     compiler-adjacent context where strings often contain source text or
+     structured data, the definition of whitespace matters.
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] trim_space: the end variable returned by __mc_strings_trim_space_end is
+     an exclusive-end byte offset (the position just past the last non-space
+     byte), not a count from the right.  This is correct for a slice
+     operation, but the name end conflicts with "end of whitespace region"
+     vs "end of content region."  A brief comment or a rename to
+     content_end would prevent future maintainers from misreading the intent.
+
+[C2] find_byte returns usize.  A usize return has no sentinel for "not found"
+     unless the convention is to return text.len or MAX_USIZE.  The C
+     function __mc_strings_find_byte must define and document this sentinel.
+     If text.len is used (a common convention), callers can check
+     (result == text.len) — but this is not stated in the mc source.
+
+─── Safety & Robustness ─────────────────────────────────────────────────────
+
+[S1] The strings module enforces no invariants about null termination.  The
+     C implementations (eq, find_byte, trim_space) must handle the str
+     internally as (ptr, len) pairs without relying on a null terminator.
+     This is consistent with the str type, but each extern C implementation
+     must be audited to ensure no strlen or null-terminated string function
+     is used internally.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  MEDIUM   : [D1] byte_len is redundant — equals text.len, consider removing
+  MEDIUM   : [C2] find_byte "not found" sentinel is undocumented
+  MEDIUM   : [D2] "space" definition for trim_space is not documented
+  LOW      : [C1] Rename end variable in trim_space for clarity
+  LOW      : [S1] Each C impl must avoid null-terminated string functions
+
+
+════════════════════════════════════════════════════════════════════════════════
+8. sync.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+Thread spawn/join, Mutex, Condvar, MemoryOrder enum, and a generic Atomic<T>
+type with load/store.
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] Mutex { raw: uintptr }, Thread { raw: uintptr }, Condvar { raw: uintptr }
+     all use heap-allocated opaque handles.  On POSIX, pthread_mutex_t and
+     pthread_cond_t can be stack-allocated.  Requiring a heap allocation for
+     every mutex initialization adds: one malloc call, one pointer
+     dereference on every lock/unlock/wait, and one free call.  For a module
+     that sits inside a compiler — where locks protect shared state that
+     persists for the entire compilation — a fixed-size embedded struct
+     approach (with sufficient storage for the platform's native type) would
+     avoid this overhead.  The current approach is fine for bootstrap;
+     document it as a known allocation overhead and note whether this is
+     intentional.
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] CRITICAL: Atomic<T> is an empty struct.
+     The declaration is:
+       struct Atomic<T> {}
+
+     atomic_load<T>(ptr: *Atomic<T>, ...) and atomic_store<T>(ptr, value, ...)
+     are extern(c) functions that accept a *Atomic<T> pointer.  Since
+     Atomic<T> has zero size in the language type system, *Atomic<T> is a
+     pointer to a zero-byte object.  Any layout assumption (the actual atomic
+     value lives at the same address) is not captured by the type and cannot
+     be verified by the compiler.
+
+     The C implementation must interpret *Atomic<T> as a pointer to a
+     T-sized memory region.  This works only if the C caller allocates
+     appropriately-aligned storage and passes its address as *Atomic<T>.  The
+     language offers no way to create such storage: you cannot have a field of
+     type Atomic<u32> and have it occupy 4 bytes in a struct, because the
+     language sees Atomic<u32> as size 0.
+
+     This is not just a documentation gap — it is a type system soundness
+     problem.  The language cannot correctly model atomic variables without a
+     way to give Atomic<T> the size and alignment of T.
+
+     Fix: embed storage as a byte array of the appropriate size:
+       struct Atomic<T> { storage: [sizeof(T)]u8 }
+     or add a compiler-magic intrinsic type that carries the real size.
+
+[C2] thread_spawn erases the function pointer type.
+     thread_spawn<T>(entry: func(*T), ctx: *T) casts both to uintptr:
+       __mc_sync_thread_spawn((uintptr)(entry), (uintptr)(ctx), &err)
+     The C runtime receives two uintptr values and must cast entry back to
+     a C function pointer before calling it.  A C function pointer and a
+     data pointer are the same size on all targets in scope (POSIX is
+     explicit about this for dlsym), but the cast through uintptr is a
+     compile-target assumption noted nowhere.  More importantly, the generic
+     instantiation must ensure the C side calls entry(ctx) with the correct
+     calling convention.  Monomorphization is the only safe path; the extern
+     C side must be a single dispatcher that re-casts, which is inherently
+     unsafe.
+
+[C3] condvar_wait can spuriously wake.  The API exposes a raw wait-once
+     primitive with no retry structure.  Every correct condvar usage requires
+     wrapping in a while loop with a predicate.  This is standard POSIX
+     semantics, but it is easy to use incorrectly.  Document the spurious
+     wakeup requirement prominently, or provide a higher-level wait_while
+     helper that takes a predicate.
+
+[C4] thread_join takes Thread by value.  After join, the Thread value is
+     logically consumed.  Since the language has no move semantics, calling
+     thread_join(thread) on the same thread twice is undefined.  The second
+     call will pass the same raw uintptr to pthread_join, which returns EINVAL
+     (or races with thread id reuse).  This is an important usage hazard.
+
+─── Safety & Robustness ─────────────────────────────────────────────────────
+
+[S1] condvar_broadcast is absent.  Many important patterns — a thread pool
+     draining work, a barrier, a broadcaster sending to multiple waiting
+     readers — require broadcast semantics.  The absence forces callers to
+     either use a polling loop (CPU waste) or multiple sequential signal calls
+     with careful thread counting (error-prone).
+
+[S2] No atomic_compare_exchange or atomic_fetch_add.  The admitted Atomic<T>
+     surface is load + store only.  Any non-trivial lock-free or wait-free
+     algorithm requires CAS.  Even the reference counting pattern that most
+     allocators use requires fetch_add.  The deferred status is noted in the
+     README but the practical consequence is that the admitted sync surface
+     is only sufficient for the single-writer, single-reader case.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  CRITICAL : [C1] Atomic<T> is zero-size — type system cannot model atomic storage
+  HIGH     : [C4] Double-join on same Thread is undefined — document clearly
+  HIGH     : [C2] thread_spawn function pointer erasure — document ABI assumption
+  MEDIUM   : [S1] condvar_broadcast is absent — needed for several common patterns
+  MEDIUM   : [C3] condvar_wait spurious wakeup — document and consider wait_while
+  LOW      : [D1] Mutex heap allocation overhead — document as known limitation
+
+
+════════════════════════════════════════════════════════════════════════════════
+9. testing.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+--------
+Narrow assertion helpers: expect, expect_false, expect_i32_eq,
+expect_str_eq, expect_usize_eq, fail.  Returns *i32 (nil = pass, non-nil =
+fail).
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] CRITICAL: fail() returns a crafted invalid pointer.
+     The implementation is:
+       func fail() *i32 {
+           raw: uintptr = 1
+           return (*i32)(raw)
+       }
+     Address 1 is not a valid pointer on any real system.  The return value is
+     used as a boolean sentinel (nil vs non-nil), never dereferenced.  This
+     convention works in practice but violates the type contract: the caller
+     receives a *i32 that cannot be read or written.  If any future code
+     follows the *i32 return through a generic or meta-programming path that
+     dereferences it (e.g., to print the failure code), it is undefined
+     behavior.
+
+     A safer alternative is a non-pointer result type — for example:
+       type TestResult = bool    (or a small enum: Pass | Fail)
+     or if a pointer is required by the test driver convention, a pointer to a
+     static failure object:
+       const FAIL_SENTINEL: i32 = 1
+       func fail() *i32 { return &FAIL_SENTINEL }
+     The latter is still non-informative but is at least a valid pointer.
+
+[C2] Assertion helpers carry no diagnostic information.
+     expect_i32_eq(actual: i32, expected: i32) on failure returns the fail
+     sentinel with no record of what actual was or what expected was.  Any
+     non-trivial test suite will produce failures with zero diagnostic output,
+     forcing bisect-by-elimination.  Even the most minimal testing frameworks
+     (Plan 9 C tests, Go's t.Fatal) report "got X, want Y".
+
+     The constraint here is that io.write_line is available for output.  A
+     minimal improvement:
+       if actual != expected {
+           io.write_line("expect_i32_eq failed")
+           return fail()
+       }
+     At minimum, a boolean flag indicating failure has occurred (so the test
+     driver can print line information) would help.
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] expect_false is expect(!condition).  Whether this warrants its own
+     function depends on how much it is used.  For readability when the
+     condition is a boolean expression, expect_false(is_valid(...)) reads more
+     clearly than expect(!is_valid(...)).  The duplication is minor; keep it
+     only if usage justifies it.
+
+[D2] The return type *i32 as a pass/fail signal mixes pointer semantics with
+     boolean semantics.  This creates cognitive load for every reader who
+     encounters `result: *i32 = expect(...)` and has to remember that nil is
+     pass, not "null error pointer."  A dedicated TestResult type would be
+     more explicit.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  CRITICAL : [C1] fail() returns an invalid pointer — replace with safe sentinel
+  HIGH     : [C2] Zero diagnostic output on failure — add minimal message or value
+  MEDIUM   : [D2] *i32 as boolean result type — consider TestResult type alias
+  LOW      : [D1] expect_false is trivially derived from expect — document why kept
+
+
+════════════════════════════════════════════════════════════════════════════════
+10. utf8.mc
+════════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW
+────────
+Full UTF-8 decode/encode with correct rejection of overlong encodings and
+surrogate codepoints.  Based on a manual leading-byte classifier.  Exports
+Decoded (codepoint + width), Encoded ([4]u8 + len), and validation/iteration
+helpers.
+
+─── Correctness & Soundness ─────────────────────────────────────────────────
+
+[C1] codepoint_len(text: str) -> usize is misnamed.
+     The implementation calls leading_codepoint_len_bytes which returns the
+     byte width of the FIRST codepoint in the string (1..4, or 0 for invalid),
+     not the total number of codepoints in the string.  A name like
+     "codepoint_len" strongly implies "how many codepoints are in this string?"
+     — the scalar-length analogue of byte_len().
+
+     A caller who writes:
+       chars: usize = utf8.codepoint_len(some_str)
+     believes they have the character count.  They actually have the byte width
+     of the first character.  This will produce subtly wrong behavior (off by
+     a factor of 1..4) any time the caller iterates or sizes a buffer based on
+     this result.
+
+     Renaming options:
+       leading_codepoint_bytes(text: str) -> usize    (honest, explicit)
+       first_codepoint_width(text: str) -> usize      (clear intent)
+
+[C2] Constants UTF8_LEAD_E0 and UTF8_LEAD_3_MIN are duplicates.
+     UTF8_LEAD_E0 = 224 and UTF8_LEAD_3_MIN = 224.  The code uses LEAD_3_MIN
+     as the branch boundary and LEAD_E0 when checking the specific E0 boundary
+     case.  Both names refer to the same byte value, creating the possibility
+     that future edits update one but not the other.  Eliminate the duplicate:
+
+       Use UTF8_LEAD_3_MIN for the range boundary check.
+       Inline the value 0xE0 = 224 as UTF8_LEAD_3_MIN in the specific check.
+     Or keep only LEAD_E0 = LEAD_3_MIN (clearly equal).
+
+[C3] Variable naming: second_2, second_3, second_4 / third_3, third_4 /
+     fourth_4.
+     These suffixes exist because the language (or the author) avoids
+     reusing variable names across if-branches.  The result is eight name
+     variations for what is conceptually the same logical slot ("the second
+     byte").  In decode_bytes, each step's variables are only live within
+     their branch, so the suffixes carry no useful disambiguation.  Any
+     maintainer adding a step-specific fix must first understand the naming
+     convention.  Consider hoisting common byte reads into local variables
+     at the top of each branch block where the language allows rebinding.
+
+─── Design & Architecture ───────────────────────────────────────────────────
+
+[D1] leading_codepoint_len_bytes is a private function (not exported) that
+     is called by both decode_bytes and valid_bytes.  This is correct factoring
+     — validation and decoding share the same leading-byte classifier.  The
+     design is sound.
+
+[D2] zero_utf8_bytes() reinitializes all four bytes manually.  If the language
+     supports zero-initialization syntax for fixed arrays, this function is
+     unnecessary.  If it does not, the function is fine but should be named
+     clearly as a zero-init helper rather than sounding like a transformation.
+
+[D3] The constants block at the top of the file is large (14 constants) and
+     some relationships are not obvious without reading the Unicode spec.  A
+     brief comment grouping them by purpose (ASCII boundary, overlong-rejection
+     thresholds, surrogate limits, continuation range) would significantly aid
+     future maintainers.
+
+─── Performance & Scalability ───────────────────────────────────────────────
+
+[P1] valid_bytes calls leading_codepoint_len_bytes per codepoint, which
+     inspects up to 4 bytes for each step.  For ASCII-heavy strings (typical
+     for source code, identifiers, comments), every byte triggers the full
+     classifier path.  A fast path that advances over contiguous ASCII bytes
+     (all bytes < 128) in a loop before hitting the branch-heavy classifier
+     would reduce the validation cost of ASCII runs to a tight compare-and-
+     advance.  This matters for the compiler's own internal validation of
+     source files.
+
+─── Recommendations ─────────────────────────────────────────────────────────
+  CRITICAL : [C1] codepoint_len is misnamed — returns first-codepoint byte width
+  HIGH     : [C2] UTF8_LEAD_E0 duplicates UTF8_LEAD_3_MIN — remove one
+  MEDIUM   : [P1] valid_bytes has no ASCII fast path — add bulk ASCII advance
+  MEDIUM   : [D3] Constants block lacks grouping comments
+  LOW      : [C3] second_N / third_N variable naming is confusing — simplify
+
+
+════════════════════════════════════════════════════════════════════════════════
+CROSS-CUTTING CONCERNS
+════════════════════════════════════════════════════════════════════════════════
+
+[X1] OUT-PARAMETER vs TUPLE RETURN FOR ERRORS — Inconsistent across modules.
+     Some functions return (value, errors.Error) tuples.  Others (fs.*,
+     io.write, io.write_line, some externs) use out-parameters or raw return
+     codes.  The tuple pattern is cleaner and compositional.  The modules
+     should converge on a single contract:
+       Success: return (result, errors.ok())
+       Failure: return (zero_value, errors.fail_*(code))
+     Every function that can fail should return errors.Error — no raw i32
+     error codes, no nil-as-the-only-signal.
+
+[X2] OPAQUE HANDLE CONVENTION: Thread, Mutex, Condvar, Allocator, Poller all
+     use struct { raw: uintptr }.  This is consistent and correct for bootstrap.
+     One concern: raw uintptr is a numeric type; it can be accidentally passed
+     where a plain integer is expected, or stored in a field of the wrong type,
+     without a type error.  Consider whether the language wants a distinct
+     "opaque handle" primitive to prevent this class of accidental aliasing.
+
+[X3] NIL POINTERS AS ERROR SIGNALS: Several allocating functions (arena_new,
+     list_dir, read_all, poller_new) can return nil on failure.  For functions
+     with an errors.Error out-parameter, callers must check both the error and
+     the pointer.  For functions without an error channel (fs.*), nil is the
+     only signal.  Convergence rule: any function that returns a pointer must
+     either (a) always return a non-nil pointer on success and document the
+     nil contract, or (b) also return an errors.Error so the failure reason is
+     accessible.
+
+[X4] MEMORY OWNERSHIP — There is no ownership model in the type system.
+     Buffer<T> and arena-allocated *T have no compiler-enforced lifetime.
+     This is a fundamental bootstrapping constraint, not a stdlib defect.
+     However, every public function that returns an owned pointer should carry
+     a doc comment stating lifetime expectations: who is responsible for
+     freeing it, and with what function.
+
+[X5] GENERIC EXTERN(C) FUNCTIONS: buffer_new<T>, buffer_free<T>, etc. are
+     declared as extern(c) with type parameters.  C has no generics; the
+     compiler must monomorphize these at each instantiation site.  This is a
+     non-standard design choice that should be documented in the compiler
+     architecture.  The risk: if two instantiations of buffer_new<T> for
+     different T compile to the same mangled C symbol, the linker will resolve
+     them to one implementation, causing silent type confusion.  Verify that
+     the compiler generates distinct mangled names per T.
+
+[X6] MISSING stdlib MODULES: net.mc, os.mc, and errors.mc are present but
+     slim.  No time module, no path manipulation, no formatted output.  These
+     are noted as deferred in the README.  The risk is that callers start
+     inlining logic that belongs in these modules (e.g., manual time calls,
+     path string concatenation) and create technical debt before the proper
+     modules arrive.  Consider adding placeholder module files with a comment
+     block listing the intended API surface, to serve as a reservation and
+     prevent callsite accumulation.
+
+
+════════════════════════════════════════════════════════════════════════════════
+PRIORITIZED MASTER RECOMMENDATION TABLE
+════════════════════════════════════════════════════════════════════════════════
+
+Priority   File          ID    Issue
+---------  ------------  ----  -------------------------------------------------
+CRITICAL   errors.mc     C1    err_code > 65535 silently corrupts kind field
+CRITICAL   errors.mc     C2    fail(kind, 0) silently returns ok() — surprising
+CRITICAL   sync.mc       C1    Atomic<T> is zero-size; type system cannot model
+                                atomic storage
+CRITICAL   testing.mc    C1    fail() returns crafted invalid pointer (addr 1)
+CRITICAL   utf8.mc       C1    codepoint_len misnamed: returns first-codepoint
+                                width, not total codepoint count
+CRITICAL   os.mc         D1    spawn is hardcoded to 2 args; cannot model real
+                                argv
+CRITICAL   mem.mc        C1    arena_new has no error channel; nil on exhaustion
+                                is undocumented
+CRITICAL   fs.mc         C1    file_size has no error channel; leaks C errno
+                                convention
+
+HIGH       errors.mc     D1    kind_*() should be const, not zero-arg functions
+HIGH       errors.mc     D2    from_errno duplicates fail_errno — remove one
+HIGH       io.mc         D1    write/write_line bypass errors.Error; inconsistent
+                                API contract
+HIGH       mem.mc        C2    buffer_len is non-generic — gap in Buffer<T> API
+HIGH       mem.mc        D1    Arena = *u8 should be a distinct nominal type
+HIGH       net.mc        D1    IpAddr should be Ipv4Addr — misleadingly generic
+High       os.mc         C1    Double-wait on same Child is undefined
+HIGH       sync.mc       C4    Double-join on same Thread is undefined
+HIGH       sync.mc       C2    thread_spawn function pointer erasure is an
+                                undocumented ABI assumption
+HIGH       testing.mc    C2    No diagnostic output on assertion failure
+HIGH       fs.mc         C2    is_dir conflates not-found/not-dir/denied as false
+
+MEDIUM     errors.mc     S1    Add static assert: uintptr >= usize at C boundary
+MEDIUM     sync.mc       S1    condvar_broadcast absent; needed for common patterns
+MEDIUM     sync.mc       C3    condvar_wait spurious wakeup — document requirement
+MEDIUM     utf8.mc       C2    UTF8_LEAD_E0 duplicates UTF8_LEAD_3_MIN — remove
+MEDIUM     utf8.mc       P1    valid_bytes has no ASCII fast path
+MEDIUM     utf8.mc       D3    Constants block needs grouping comments
+MEDIUM     strings.mc    C2    find_byte "not found" sentinel is undocumented
+MEDIUM     strings.mc    D2    "space" definition for trim_space is undocumented
+MEDIUM     net.mc        C1    Magic numbers 48/57 in parse_port — add constants
+MEDIUM     io.mc         D2    Poller double indirection is unnecessary
+MEDIUM     io.mc         C1    Event.failed is semantically underspecified
+MEDIUM     mem.mc        D2    Inconsistent wrapping pattern for generic externs
+MEDIUM     os.mc         D2    close_file0/1 slots are underdocumented and fixed
+MEDIUM     testing.mc    D2    *i32 as boolean result type — consider TestResult
+MEDIUM     [cross]       X1    Converge on single error-return contract
+MEDIUM     [cross]       X3    Nil-ptr-as-error vs errors.Error contract — unify
+MEDIUM     [cross]       X5    Generic extern(c) must generate distinct C symbols
+
+LOW        fs.mc         C3    Add TODO for future errors.Error in list_dir/read_all
+LOW        strings.mc    D1    byte_len duplicates text.len — consider removing
+LOW        strings.mc    S1    C impls must not use strlen internally
+LOW        sync.mc       D1    Mutex/Condvar heap allocation overhead — document
+LOW        net.mc        C2    Document parse_port whitespace/sign rejection
+LOW        net.mc        D2    IpEndpoint decomposition at C boundary is fragile
+LOW        utf8.mc       C3    second_N/third_N naming pattern is confusing
+LOW        os.mc         C2    Asymmetry: spawn returns Child, wait takes *Child
+LOW        testing.mc    D1    expect_false is trivially derived — document why kept
+LOW        [cross]       X2    Consider opaque handle type to prevent accidental aliasing
+LOW        [cross]       X4    Document memory ownership expectations per allocating fn
+LOW        [cross]       X6    Add placeholder modules for deferred time/path/fmt
+
+End of review.

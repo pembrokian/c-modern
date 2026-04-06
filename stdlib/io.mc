@@ -25,8 +25,8 @@ struct Poller {
     raw: uintptr
 }
 
-extern(c) func __mc_io_write(text: str) i32
-extern(c) func __mc_io_write_line(text: str) i32
+extern(c) func __mc_io_write(text: str) errors.Error
+extern(c) func __mc_io_write_line(text: str) errors.Error
 extern(c) func __mc_io_read(file: File, bytes: Slice<u8>, err: *errors.Error) usize
 extern(c) func __mc_io_write_file(file: File, bytes: Slice<u8>, err: *errors.Error) usize
 extern(c) func __mc_io_close(file: File) errors.Error
@@ -38,11 +38,11 @@ extern(c) func __mc_io_poller_remove(p: *Poller, file: File) errors.Error
 extern(c) func __mc_io_poller_wait(p: *Poller, events: *Event, cap: usize, timeout_ms: i32, err: *errors.Error) usize
 extern(c) func __mc_io_poller_close(p: *Poller)
 
-func write(text: str) i32 {
+func write(text: str) errors.Error {
     return __mc_io_write(text)
 }
 
-func write_line(text: str) i32 {
+func write_line(text: str) errors.Error {
     return __mc_io_write_line(text)
 }
 

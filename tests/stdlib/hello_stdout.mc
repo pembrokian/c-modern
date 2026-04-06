@@ -3,5 +3,8 @@ export { main }
 import io
 
 func main(args: Slice<cstr>) i32 {
-    return io.write_line("hello, stdlib")
+    if io.write_line("hello, stdlib") != 0 {
+        return 1
+    }
+    return 0
 }

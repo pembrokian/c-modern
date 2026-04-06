@@ -1,10 +1,10 @@
-export { IpAddr, IpEndpoint, parse_port, tcp_listen, accept, connect_tcp }
+export { Ipv4Addr, IpEndpoint, parse_port, tcp_listen, accept, connect_tcp }
 
 import errors
 import io
 import strings
 
-struct IpAddr {
+struct Ipv4Addr {
     a: u8
     b: u8
     c: u8
@@ -12,11 +12,13 @@ struct IpAddr {
 }
 
 struct IpEndpoint {
-    addr: IpAddr
+    addr: Ipv4Addr
     port: u16
 }
 
 const NET_ERR_INVALID_PORT: usize = 1
+const ASCII_ZERO: u8 = 48
+const ASCII_NINE: u8 = 57
 
 extern(c) func __mc_net_tcp_listen(a: u8, b: u8, c: u8, d: u8, port: u16, err: *errors.Error) i32
 extern(c) func __mc_net_accept(listener: io.File, err: *errors.Error) i32
@@ -32,13 +34,13 @@ func parse_port(text: str) (u16, errors.Error) {
     index: usize = 0
     while index < bytes.len {
         ch: u8 = bytes[index]
-        if ch < 48 {
+        if ch < ASCII_ZERO {
             return 0, errors.fail_net(NET_ERR_INVALID_PORT)
         }
-        if ch > 57 {
+        if ch > ASCII_NINE {
             return 0, errors.fail_net(NET_ERR_INVALID_PORT)
         }
-        value = value * (u32)(10) + (u32)(ch - 48)
+        value = value * (u32)(10) + (u32)(ch - ASCII_ZERO)
         if value > (u32)(65535) {
             return 0, errors.fail_net(NET_ERR_INVALID_PORT)
         }

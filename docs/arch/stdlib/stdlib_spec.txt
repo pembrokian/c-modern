@@ -50,6 +50,9 @@ Toolchain companion module:
 - current repository shape: fallible decode and encode use explicit value-plus-
 	error returns, namely `decode(text) (Decoded, Error)` and
 	`encode(codepoint) (Encoded, Error)`
+- current repository shape: `leading_codepoint_width(text)` reports the leading
+	code-point byte width and returns `0` for invalid or incomplete leading byte
+	sequences
 - current repository shape: `Decoded` carries `{ codepoint, width }`, and
 	`Encoded` carries `{ bytes, len }` for borrowed UTF-8 code-unit output
 

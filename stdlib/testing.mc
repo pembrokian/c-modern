@@ -2,9 +2,10 @@ export { expect, expect_false, expect_i32_eq, expect_str_eq, expect_usize_eq, fa
 
 import strings
 
+extern(c) func __mc_testing_fail_sentinel() *i32
+
 func fail() *i32 {
-    raw: uintptr = 1
-    return (*i32)(raw)
+    return __mc_testing_fail_sentinel()
 }
 
 func expect(ok: bool) *i32 {

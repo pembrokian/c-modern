@@ -242,7 +242,10 @@ void TestParserBuildsDeterministicAstDump() {
         "    if args.len == 0 {\n"
         "        return 1\n"
         "    }\n"
-        "    return io.write(cfg.path)\n"
+        "    if io.write(cfg.path) != 0 {\n"
+        "        return 1\n"
+        "    }\n"
+        "    return 0\n"
         "}\n",
         diagnostics);
 

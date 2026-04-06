@@ -24,13 +24,25 @@ func rollup_kind(summary: rollup_model.Summary) i32 {
 func write_rollup(summary: rollup_model.Summary) i32 {
     kind: i32 = rollup_kind(summary)
     if kind == ROLLUP_EMPTY {
-        return io.write_line("issue-rollup-empty")
+        if io.write_line("issue-rollup-empty") != 0 {
+            return 1
+        }
+        return 0
     }
     if kind == ROLLUP_ATTENTION {
-        return io.write_line("issue-rollup-attention")
+        if io.write_line("issue-rollup-attention") != 0 {
+            return 1
+        }
+        return 0
     }
     if kind == ROLLUP_BUSY {
-        return io.write_line("issue-rollup-busy")
+        if io.write_line("issue-rollup-busy") != 0 {
+            return 1
+        }
+        return 0
     }
-    return io.write_line("issue-rollup-steady")
+    if io.write_line("issue-rollup-steady") != 0 {
+        return 1
+    }
+    return 0
 }

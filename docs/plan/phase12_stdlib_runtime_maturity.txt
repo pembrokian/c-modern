@@ -300,7 +300,7 @@ Portable `io` poller
 
 Narrow `net`
 ~~~~~~~~~~~~
-- `struct IpAddr`
+- `struct Ipv4Addr`
 - `struct IpEndpoint`
 - `func tcp_listen(bind: IpEndpoint) (i32, Error)`
 - `func accept(listener: i32) (i32, Error)`

@@ -9,7 +9,7 @@ func close_ignored(file: io.File) {
 }
 
 func loopback(port: u16) net.IpEndpoint {
-    return net.IpEndpoint{ addr: net.IpAddr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
+    return net.IpEndpoint{ addr: net.Ipv4Addr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
 }
 
 func main(args: Slice<cstr>) i32 {

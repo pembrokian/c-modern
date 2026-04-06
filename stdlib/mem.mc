@@ -4,7 +4,7 @@ struct Allocator {
     raw: uintptr
 }
 
-type Arena = *u8
+distinct Arena = *u8
 
 extern(c) func __mc_mem_default_allocator() *Allocator
 extern(c) func __mc_mem_buffer_len_u8(buf: *Buffer<u8>) usize

@@ -63,7 +63,10 @@ func walk_path(path: str) i32 {
         if fs.file_size(path) < 0 {
             return 94
         }
-        return io.write_line(path)
+        if io.write_line(path) != 0 {
+            return 1
+        }
+        return 0
     }
 
     listing_buf: *Buffer<u8> = fs.list_dir(path, mem.default_allocator())
@@ -97,7 +100,10 @@ func walk_path(path: str) i32 {
             if entry_is_dir(entry) {
                 status = walk_path(child_path)
             } else {
-                status = io.write_line(child_path)
+                if io.write_line(child_path) != 0 {
+                    mem.buffer_free<u8>(child_buf)
+                    return 1
+                }
             }
             mem.buffer_free<u8>(child_buf)
             if status != 0 {

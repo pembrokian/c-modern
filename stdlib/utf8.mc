@@ -1,4 +1,4 @@
-export { Decoded, Encoded, byte_len, empty, valid, valid_bytes, codepoint_len, decode, encode }
+export { Decoded, Encoded, byte_len, empty, valid, valid_bytes, leading_codepoint_width, decode, encode }
 
 import errors
 import strings
@@ -15,6 +15,20 @@ struct Encoded {
 
 const UTF8_ERR_INVALID_BYTES: usize = 1
 const UTF8_ERR_INVALID_CODEPOINT: usize = 2
+const UTF8_ASCII_HI: u8 = 128
+const UTF8_CONT_LO: u8 = 128
+const UTF8_CONT_HI: u8 = 192
+const UTF8_LEAD_2_MIN: u8 = 194
+const UTF8_LEAD_2_BASE: u8 = 192
+const UTF8_LEAD_3_MIN: u8 = 224
+const UTF8_LEAD_4_MIN: u8 = 240
+const UTF8_LEAD_4_LIMIT: u8 = 245
+const UTF8_LEAD_E0: u8 = 224
+const UTF8_LEAD_ED: u8 = 237
+const UTF8_LEAD_F0: u8 = 240
+const UTF8_LEAD_F4: u8 = 244
+const UTF8_SECOND_E0_MIN: u8 = 160
+const UTF8_SECOND_F0_MIN: u8 = 144
 
 func invalid_utf8() errors.Error {
     return errors.fail_utf8(UTF8_ERR_INVALID_BYTES)
@@ -37,110 +51,97 @@ func empty_encoded() Encoded {
     return Encoded{ bytes: zero_utf8_bytes(), len: 0 }
 }
 
-func codepoint_len_bytes(bytes: Slice<u8>) usize {
-    ascii_hi: u8 = 128
-    cont_lo: u8 = 128
-    cont_hi: u8 = 192
-    lead_2_min: u8 = 194
-    lead_3_min: u8 = 224
-    lead_4_min: u8 = 240
-    lead_4_limit: u8 = 245
-    lead_e0: u8 = 224
-    lead_ed: u8 = 237
-    lead_f0: u8 = 240
-    lead_f4: u8 = 244
-    second_e0_min: u8 = 160
-    second_f0_min: u8 = 144
+func leading_codepoint_len_bytes(bytes: Slice<u8>) usize {
     if bytes.len == 0 {
         return 0
     }
 
     first: u8 = bytes[0]
-    if first < ascii_hi {
+    if first < UTF8_ASCII_HI {
         return 1
     }
 
-    if first < lead_2_min {
+    if first < UTF8_LEAD_2_MIN {
         return 0
     }
 
-    if first < lead_3_min {
+    if first < UTF8_LEAD_3_MIN {
         if bytes.len < 2 {
             return 0
         }
         second_2: u8 = bytes[1]
-        if second_2 < cont_lo {
+        if second_2 < UTF8_CONT_LO {
             return 0
         }
-        if second_2 >= cont_hi {
+        if second_2 >= UTF8_CONT_HI {
             return 0
         }
         return 2
     }
 
-    if first < lead_4_min {
+    if first < UTF8_LEAD_4_MIN {
         if bytes.len < 3 {
             return 0
         }
         second_3: u8 = bytes[1]
         third_3: u8 = bytes[2]
-        if second_3 < cont_lo {
+        if second_3 < UTF8_CONT_LO {
             return 0
         }
-        if second_3 >= cont_hi {
+        if second_3 >= UTF8_CONT_HI {
             return 0
         }
-        if third_3 < cont_lo {
+        if third_3 < UTF8_CONT_LO {
             return 0
         }
-        if third_3 >= cont_hi {
+        if third_3 >= UTF8_CONT_HI {
             return 0
         }
-        if first == lead_e0 {
-            if second_3 < second_e0_min {
+        if first == UTF8_LEAD_E0 {
+            if second_3 < UTF8_SECOND_E0_MIN {
                 return 0
             }
         }
-        if first == lead_ed {
-            if second_3 >= second_e0_min {
+        if first == UTF8_LEAD_ED {
+            if second_3 >= UTF8_SECOND_E0_MIN {
                 return 0
             }
         }
         return 3
     }
 
-    if first < lead_4_limit {
+    if first < UTF8_LEAD_4_LIMIT {
         if bytes.len < 4 {
             return 0
         }
         second_4: u8 = bytes[1]
         third_4: u8 = bytes[2]
         fourth_4: u8 = bytes[3]
-        if second_4 < cont_lo {
+        if second_4 < UTF8_CONT_LO {
             return 0
         }
-        if second_4 >= cont_hi {
+        if second_4 >= UTF8_CONT_HI {
             return 0
         }
-        if third_4 < cont_lo {
+        if third_4 < UTF8_CONT_LO {
             return 0
         }
-        if third_4 >= cont_hi {
+        if third_4 >= UTF8_CONT_HI {
             return 0
         }
-        if fourth_4 < cont_lo {
+        if fourth_4 < UTF8_CONT_LO {
             return 0
         }
-        if fourth_4 >= cont_hi {
+        if fourth_4 >= UTF8_CONT_HI {
             return 0
         }
-        if first == lead_f0 {
-            if second_4 < second_f0_min {
+        if first == UTF8_LEAD_F0 {
+            if second_4 < UTF8_SECOND_F0_MIN {
                 return 0
             }
         }
-        if first == lead_f4 {
-            if second_4 >= second_f0_min {
+        if first == UTF8_LEAD_F4 {
+            if second_4 >= UTF8_SECOND_F0_MIN {
                 return 0
             }
         }
@@ -151,45 +152,41 @@ func codepoint_len_bytes(bytes: Slice<u8>) usize {
 }
 
 func decode_bytes(bytes: Slice<u8>) (Decoded, errors.Error) {
-    ascii_hi: u8 = 128
-    cont_lo: u8 = 128
-    lead_3_min: u8 = 224
-    lead_4_min: u8 = 240
     empty: Decoded = Decoded{ codepoint: 0, width: 0 }
 
-    step: usize = codepoint_len_bytes(bytes)
+    step: usize = leading_codepoint_len_bytes(bytes)
     if step == 0 {
         return empty, invalid_utf8()
     }
 
     first: u8 = bytes[0]
-    if first < ascii_hi {
+    if first < UTF8_ASCII_HI {
         return Decoded{ codepoint: (u32)(first), width: 1 }, errors.ok()
     }
 
     if step == 2 {
         second_2: u8 = bytes[1]
-        codepoint_2: u32 = ((u32)(first) - (u32)(192)) * (u32)(64) + ((u32)(second_2) - (u32)(cont_lo))
+        codepoint_2: u32 = ((u32)(first) - (u32)(UTF8_LEAD_2_BASE)) * (u32)(64) + ((u32)(second_2) - (u32)(UTF8_CONT_LO))
         return Decoded{ codepoint: codepoint_2, width: 2 }, errors.ok()
     }
 
     if step == 3 {
         second_3: u8 = bytes[1]
         third_3: u8 = bytes[2]
-        codepoint_3: u32 = ((u32)(first) - (u32)(lead_3_min)) * (u32)(4096) + ((u32)(second_3) - (u32)(cont_lo)) * (u32)(64) + ((u32)(third_3) - (u32)(cont_lo))
+        codepoint_3: u32 = ((u32)(first) - (u32)(UTF8_LEAD_3_MIN)) * (u32)(4096) + ((u32)(second_3) - (u32)(UTF8_CONT_LO)) * (u32)(64) + ((u32)(third_3) - (u32)(UTF8_CONT_LO))
         return Decoded{ codepoint: codepoint_3, width: 3 }, errors.ok()
     }
 
     second_4: u8 = bytes[1]
     third_4: u8 = bytes[2]
     fourth_4: u8 = bytes[3]
-    codepoint_4: u32 = ((u32)(first) - (u32)(lead_4_min)) * (u32)(262144) + ((u32)(second_4) - (u32)(cont_lo)) * (u32)(4096) + ((u32)(third_4) - (u32)(cont_lo)) * (u32)(64) + ((u32)(fourth_4) - (u32)(cont_lo))
+    codepoint_4: u32 = ((u32)(first) - (u32)(UTF8_LEAD_4_MIN)) * (u32)(262144) + ((u32)(second_4) - (u32)(UTF8_CONT_LO)) * (u32)(4096) + ((u32)(third_4) - (u32)(UTF8_CONT_LO)) * (u32)(64) + ((u32)(fourth_4) - (u32)(UTF8_CONT_LO))
     return Decoded{ codepoint: codepoint_4, width: 4 }, errors.ok()
 }
 
 func encode_into(codepoint: u32) (Encoded, errors.Error) {
     empty: Encoded = empty_encoded()
-    bytes = zero_utf8_bytes()
+    bytes: [4]u8 = zero_utf8_bytes()
     if codepoint <= 127 {
         bytes[0] = (u8)(codepoint)
         return Encoded{ bytes: bytes, len: 1 }, errors.ok()
@@ -223,7 +220,7 @@ func encode_into(codepoint: u32) (Encoded, errors.Error) {
 func valid_bytes(bytes: Slice<u8>) bool {
     index: usize = 0
     while index < bytes.len {
-        step: usize = codepoint_len_bytes(bytes[index:bytes.len])
+        step: usize = leading_codepoint_len_bytes(bytes[index:bytes.len])
         if step == 0 {
             return false
         }
@@ -241,19 +238,16 @@ func empty(text: str) bool {
     return strings.empty(text)
 }
 
-func valid(text: string) bool {
-    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
-    return valid_bytes(bytes)
+func valid(text: str) bool {
+    return valid_bytes(strings.bytes(text))
 }
 
-func codepoint_len(text: str) usize {
-    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
-    return codepoint_len_bytes(bytes)
+func leading_codepoint_width(text: str) usize {
+    return leading_codepoint_len_bytes(strings.bytes(text))
 }
 
 func decode(text: str) (Decoded, errors.Error) {
-    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
-    return decode_bytes(bytes)
+    return decode_bytes(strings.bytes(text))
 }
 
 func encode(codepoint: u32) (Encoded, errors.Error) {

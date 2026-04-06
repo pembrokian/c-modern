@@ -205,26 +205,30 @@ func parse_text(arena: mem.Arena, text: str) *Expr {
 func write_expr(expr: *Expr) i32 {
     node: Expr = *expr
     if node.kind == EXPR_NUMBER {
-        return io.write(node.text)
+        if io.write(node.text) != 0 {
+            return 1
+        }
+        return 0
     }
 
-    status: i32 = io.write("(")
+    if io.write("(") != 0 {
+        return 1
+    }
+    status: i32 = write_expr(node.left)
     if status != 0 {
         return status
     }
-    status = write_expr(node.left)
-    if status != 0 {
-        return status
-    }
-    status = io.write("+")
-    if status != 0 {
-        return status
+    if io.write("+") != 0 {
+        return 1
     }
     status = write_expr(node.right)
     if status != 0 {
         return status
     }
-    return io.write(")")
+    if io.write(")") != 0 {
+        return 1
+    }
+    return 0
 }
 
 func normalize_text(text: str) i32 {
@@ -242,5 +246,8 @@ func normalize_text(text: str) i32 {
     if status != 0 {
         return status
     }
-    return io.write_line("")
+    if io.write_line("") != 0 {
+        return 1
+    }
+    return 0
 }

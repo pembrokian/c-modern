@@ -32,7 +32,7 @@ Current repository-specific notes:
   `strings`; fuller canonical validation helpers remain deferred, but
   executable byte-view support is now present
 - the admitted `utf8` surface also includes `utf8.valid_bytes(...)` for direct
-  byte-slice validation and `utf8.codepoint_len(...)` for non-allocating
+  byte-slice validation and `utf8.leading_codepoint_width(...)` for non-allocating
   leading-code-point sizing
 - the admitted file-loading path is `fs.read_all(path,
   mem.default_allocator())`, keeping allocation policy explicit at the callsite
@@ -55,6 +55,8 @@ Current repository-specific notes:
   the admitted slice now also includes `net.parse_port(...)` as one borrowed-
   text helper for ordinary CLI-style port parsing used across the admitted
   networking proofs, while richer endpoint text parsing remains deferred
+- the admitted networking address record is currently explicit IPv4-only
+  `net.Ipv4Addr`; broader multi-family address modeling remains deferred
 - `testing` is admitted only as a narrow toolchain companion module for the
   ordinary project-test path; it now includes modest expectation helpers for
   boolean, integer, and string checks, but it is still not a broader fixture,

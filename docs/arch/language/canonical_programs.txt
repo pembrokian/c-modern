@@ -254,7 +254,7 @@ func file_size(path: cstr) (ui64, Error) {
     st = CStat{}
     rc = c_stat(path, &st)
     if rc != 0 {
-        return 0, Error.from_errno()
+        return 0, Error.fail_errno()
     }
     return st.size, nil
 }

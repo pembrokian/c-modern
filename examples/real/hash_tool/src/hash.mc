@@ -92,5 +92,8 @@ func run(path: str) i32 {
 
     line_bytes: Slice<u8> = mem.slice_from_buffer<u8>(line)
     line_text: str = str{ ptr: line_bytes.ptr, len: line_bytes.len }
-    return io.write_line(line_text)
+    if io.write_line(line_text) != 0 {
+        return 1
+    }
+    return 0
 }

@@ -22,6 +22,7 @@ func eq(left: str, right: str) bool {
 }
 
 func find_byte(text: str, needle: u8) usize {
+    // Returns text.len when needle is absent.
     return __mc_strings_find_byte(text, needle)
 }
 

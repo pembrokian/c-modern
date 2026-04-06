@@ -104,6 +104,7 @@ struct mc_hosted_thread_start {
 extern int32_t __mc_hosted_entry(struct mc_slice_cstr args);
 
 static struct mc_allocator k_default_allocator = {0};
+static int32_t k_mc_testing_fail_sentinel = 1;
 
 struct mc_dir_entry {
     char* name;
@@ -170,6 +171,9 @@ static void mc_free_dir_entries(struct mc_dir_entry* entries, size_t count) {
 static uintptr_t mc_error_make(enum mc_error_kind kind, uintptr_t code) {
     if (kind == MC_ERROR_KIND_NONE || code == 0) {
         return 0;
+    }
+    if (code >= k_mc_error_kind_scale) {
+        code = k_mc_error_kind_scale - 1u;
     }
     return (uintptr_t) kind * k_mc_error_kind_scale + code;
 }
@@ -433,23 +437,36 @@ void __mc_mem_arena_deinit(struct mc_arena* arena) {
     free(arena);
 }
 
-int32_t __mc_io_write(struct mc_string text) {
+uintptr_t __mc_io_write(struct mc_string text) {
+    errno = 0;
     const size_t size = text.len < 0 ? 0 : (size_t) text.len;
     const size_t written = fwrite(text.ptr, 1, size, stdout);
     if (written != size || fflush(stdout) != 0) {
-        return 1;
+        if (errno != 0) {
+            return mc_error_code_from_errno();
+        }
+        return mc_error_make(MC_ERROR_KIND_IO, 1);
     }
     return 0;
 }
 
-int32_t __mc_io_write_line(struct mc_string text) {
-    if (__mc_io_write(text) != 0) {
-        return 1;
+uintptr_t __mc_io_write_line(struct mc_string text) {
+    const uintptr_t write_err = __mc_io_write(text);
+    if (write_err != 0) {
+        return write_err;
     }
+    errno = 0;
     if (fputc('\n', stdout) == EOF || fflush(stdout) != 0) {
-        return 1;
+        if (errno != 0) {
+            return mc_error_code_from_errno();
+        }
+        return mc_error_make(MC_ERROR_KIND_IO, 1);
     }
     return 0;
+}
+
+int32_t* __mc_testing_fail_sentinel(void) {
+    return &k_mc_testing_fail_sentinel;
 }
 
 int64_t __mc_io_read(int32_t file, struct mc_slice_u8 bytes, uintptr_t* out_err) {

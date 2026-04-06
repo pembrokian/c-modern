@@ -65,6 +65,6 @@ Why:
 - a scalar kind/code encoding gives immediate classification wins without reintroducing hidden control flow or premature object-lifetime policy
 
 Consequence:
-- callers should construct errors through helpers such as `errors.fail(...)` and `errors.from_errno(...)` instead of inventing raw numeric layouts
+- callers should construct errors through helpers such as `errors.fail(...)` and `errors.fail_errno(...)` instead of inventing raw numeric layouts
 - hosted runtime failures should preserve errno-classification through the encoded scalar channel
 - richer message, source-context, cause-chaining, or heap-backed error objects remain a later follow-up rather than part of the current admitted slice

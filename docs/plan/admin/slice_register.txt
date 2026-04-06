@@ -683,7 +683,7 @@ Register By Concern
   repo wave: networking slice plus later typed-surface widening
   docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/language/canonical_programs.txt, README.md
   end state: portable networking above raw platform sockets with concrete
-  IpAddr and IpEndpoint values and ordinary File-handle composition with io.
+  Ipv4Addr and IpEndpoint values and ordinary File-handle composition with io.
 
 - Slice: sync module narrow baseline
   design: settled
