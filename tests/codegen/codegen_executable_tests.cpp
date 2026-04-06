@@ -1681,11 +1681,13 @@ int main(int argc, char** argv) {
                     0,
                     {});
 
-    RunBuiltFixture(mc_path,
-                    source_root / "examples/canonical/shared_counter_mutex.mc",
-                    work_root / "phase15_shared_counter_mutex_build",
-                    0,
-                    {});
+    RunBuiltFixtureWithIrSnippets(mc_path,
+                                  source_root / "examples/canonical/shared_counter_mutex.mc",
+                                  work_root / "phase15_shared_counter_mutex_build",
+                                  0,
+                                  {},
+                                  {"define {{i64}, i64} @sync.thread_spawn(",
+                                   "call {{i64}, i64} @sync.thread_spawn("});
 
     RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/producer_consumer_condvar.mc",

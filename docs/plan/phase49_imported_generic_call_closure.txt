@@ -23,23 +23,28 @@ Repository status note
 - Bootstrap sema already instantiates imported generic function signatures at
   the call site, and MIR already has enough direct-call metadata to represent
   ordinary imported calls.
-- The real remaining gap is the build and executable boundary: imported generic
-  functions that remain generic in MIR were still skipped or treated as
-  unsupported by validation and LLVM emission, so the admitted sync surface was
-  papered over in MIR instead.
+- The compiler-core closure landed first: MIR validation and LLVM emission now
+  accept the narrow erased-ABI imported generic function family needed by the
+  admitted sync surface.
+- The remaining supported-slice distortion was the library boundary itself:
+  `stdlib/sync.mc` still exported `thread_spawn_raw` and implemented the public
+  `thread_spawn<T>` API through that raw helper, so ordinary executable and
+  project proofs did not yet travel through the real imported generic function
+  body.
 - The repository still does not claim broad generic-function completion, full
   monomorphization, or arbitrary imported generic executable support.
 
 Problem being solved
 --------------------
-- The admitted `sync.thread_spawn<T>(entry: func(*T), ctx: *T)` API still
-  lowered through a compiler-owned MIR rewrite to `sync.thread_spawn_raw`, even
-  though the public supported slice already exposed the typed generic surface.
-- That rewrite hid the actual owner-local limitation: the compiler did not yet
-  validate or emit the narrow erased-ABI imported generic function family that
-  `sync.thread_spawn<T>` belongs to.
-- As long as the rewrite remained live, the admitted slice still depended on a
-  special consumer-shaped exception rather than one honest direct-call path.
+- The compiler-owned MIR rewrite is gone, but the admitted `sync.thread_spawn<T>`
+  API still reached the runtime through a public raw helper inside
+  `stdlib/sync.mc` rather than through the generic function body itself.
+- That meant the supported executable and project proofs still did not confirm
+  that the erased-ABI imported generic function family survived the real
+  library boundary end-to-end.
+- As long as `thread_spawn_raw` remained part of the supported sync slice, the
+  repository still carried a sharper consumer-shaped escape hatch than the
+  compiler and backend now required.
 
 Core rule
 ---------
@@ -86,28 +91,28 @@ Preferred pressure points
 
 Deliverables
 ------------
-- removal of the MIR-only `sync.thread_spawn<T>` rewrite path
-- narrow MIR validation support for direct calls targeting imported generic
-  functions with instantiated call signatures
-- narrow LLVM emission support for erased-ABI generic function declarations and
-  definitions that are representable without monomorphization
-- focused MIR expectation updates plus planning-log refresh that records the
-  rewrite as closed and the remaining broader generic frontier as still
-  deferred
+- removal of the public `sync.thread_spawn_raw` helper from the admitted sync
+  slice so `thread_spawn<T>` becomes the real library implementation boundary
+- focused MIR expectation updates that keep the supported imported surface on
+  the direct generic call path only
+- focused executable-build proof that checks the emitted LLVM IR for the real
+  `sync.thread_spawn` definition and call shape while preserving the admitted
+  worker-queue project proof
+- planning text that records the closure as an honest library-and-executable
+  follow-through rather than a still-pending compiler rewrite
 
 Suggested execution order
 -------------------------
-1. Remove the admitted `sync.thread_spawn<T>` MIR rewrite and let the sync call
-   lower as an ordinary direct call again.
-2. Teach MIR validation to accept direct-call metadata for instantiated generic
-   callees when the call shape still matches the generic function boundary.
-3. Teach LLVM emission to keep erased-ABI generic declarations and definitions
-   only when their signatures and bodies remain representable without broader
-   generic support.
-4. Refresh focused MIR expectations and prove the admitted sync project still
-   builds and runs.
-5. Record the closed rewrite and keep broader generic-function support deferred
-   with a sharper boundary.
+1. Remove the public `thread_spawn_raw` export and helper body from
+  `stdlib/sync.mc` so `thread_spawn<T>` performs the runtime call directly.
+2. Refresh focused MIR expectations so the supported imported-module fixtures
+  only model the direct generic surface.
+3. Add one executable-build proof that checks the emitted LLVM IR for the real
+  `sync.thread_spawn` definition and direct-call sites.
+4. Re-run the admitted worker-queue project proof to keep the project workflow
+  honest after the library-surface cleanup.
+5. Record the closed raw-helper escape hatch and keep broader generic-function
+  support deferred with a sharper boundary.
 
 Exit criteria
 -------------
@@ -138,26 +143,28 @@ Acceptance criteria for this document
 
 What landed
 -----------
-- removed the MIR-only `sync.thread_spawn<T>` rewrite path so imported and
-  deferred sync spawn calls lower as ordinary direct function calls again
-- widened MIR validation just enough to accept instantiated direct-call and
-  symbol-reference metadata for generic callees when the call shape matches the
-  callee's generic signature
-- widened LLVM emission just enough to keep erased-ABI generic declarations and
-  definitions whose signatures and lowered bodies remain representable without
-  monomorphization
+- removed the public `sync.thread_spawn_raw` export and helper body from the
+  admitted sync slice so `thread_spawn<T>` now performs the runtime call inside
+  the generic function body itself
+- preserved the existing MIR direct-call closure and tightened the imported-
+  module MIR tests so the supported surface no longer models the obsolete raw
+  helper as part of the sync boundary
+- added executable-build proof on the canonical shared-counter sync example,
+  checking the emitted LLVM IR for both the `sync.thread_spawn` definition and
+  the direct call sites that target it
 - preserved the existing admitted project proof path so the `worker_queue`
-  project continues to build and run through normal tool coverage without the
-  older raw-helper rewrite
+  project continues to build and run through normal tool coverage with the raw
+  helper removed from the public slice
 - kept broader generic-function executable support deferred for functions whose
   ABI or lowered body still depends on unresolved type parameters
 
 Closeout statement
 ------------------
 Phase 49 is complete. The admitted `sync.thread_spawn<T>` surface now travels
-through sema-instantiated direct-call truth, ordinary MIR call lowering, and
-erased-ABI LLVM emission without the old compiler-owned rewrite to
-`sync.thread_spawn_raw`. The repository closes the admitted distortion at its
-owner boundary while keeping the broader generic frontier explicit: this phase
-does not claim general generic-function completion, only the narrower erased-
-ABI imported generic call family the supported sync slice required.
+through sema-instantiated direct-call truth, ordinary MIR call lowering, the
+real generic stdlib function body, and erased-ABI LLVM emission without the old
+`sync.thread_spawn_raw` escape hatch. The repository closes the admitted
+distortion at its owner boundary while keeping the broader generic frontier
+explicit: this phase does not claim general generic-function completion, only
+the narrower erased-ABI imported generic call family the supported sync slice
+required.

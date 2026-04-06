@@ -1,4 +1,4 @@
-export { Thread, Mutex, Condvar, MemoryOrder, Atomic, thread_spawn_raw, thread_spawn, thread_join, mutex_init, mutex_destroy, mutex_lock, mutex_unlock, condvar_init, condvar_destroy, condvar_wait, condvar_signal, atomic_load, atomic_store }
+export { Thread, Mutex, Condvar, MemoryOrder, Atomic, thread_spawn, thread_join, mutex_init, mutex_destroy, mutex_lock, mutex_unlock, condvar_init, condvar_destroy, condvar_wait, condvar_signal, atomic_load, atomic_store }
 
 import errors
 
@@ -38,14 +38,10 @@ extern(c) func __mc_sync_condvar_signal(cv: *Condvar) errors.Error
 extern(c) func atomic_load<T>(ptr: *Atomic<T>, order: MemoryOrder) T
 extern(c) func atomic_store<T>(ptr: *Atomic<T>, value: T, order: MemoryOrder)
 
-func thread_spawn_raw(entry: uintptr, ctx: uintptr) (Thread, errors.Error) {
-    err: errors.Error = errors.ok()
-    thread: Thread = __mc_sync_thread_spawn(entry, ctx, &err)
-    return thread, err
-}
-
 func thread_spawn<T>(entry: func(*T), ctx: *T) (Thread, errors.Error) {
-    return thread_spawn_raw((uintptr)(entry), (uintptr)(ctx))
+    err: errors.Error = errors.ok()
+    thread: Thread = __mc_sync_thread_spawn((uintptr)(entry), (uintptr)(ctx), &err)
+    return thread, err
 }
 
 func thread_join(thread: Thread) errors.Error {

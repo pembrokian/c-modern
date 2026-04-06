@@ -508,11 +508,6 @@ void TestImportedTypedThreadSpawnLowersDirectly() {
                         mc::sema::PointerType(mc::sema::NamedType("T"))},
         .return_types = {mc::sema::NamedType("Thread")},
     });
-    imported_sync.functions.push_back({
-        .name = "thread_spawn_raw",
-        .param_types = {mc::sema::NamedType("uintptr"), mc::sema::NamedType("uintptr")},
-        .return_types = {mc::sema::NamedType("Thread")},
-    });
     mc::sema::BuildModuleLookupMaps(imported_sync);
 
     std::unordered_map<std::string, mc::sema::Module> imported_modules;
@@ -573,11 +568,6 @@ void TestDeferredImportedTypedThreadSpawnLowersDirectly() {
         .type_params = {"T"},
         .param_types = {mc::sema::ProcedureType({mc::sema::PointerType(mc::sema::NamedType("T"))}, {}),
                         mc::sema::PointerType(mc::sema::NamedType("T"))},
-        .return_types = {mc::sema::NamedType("Thread")},
-    });
-    imported_sync.functions.push_back({
-        .name = "thread_spawn_raw",
-        .param_types = {mc::sema::NamedType("uintptr"), mc::sema::NamedType("uintptr")},
         .return_types = {mc::sema::NamedType("Thread")},
     });
     mc::sema::BuildModuleLookupMaps(imported_sync);
