@@ -24,7 +24,7 @@ extern(c) func __mc_net_connect_tcp(a: u8, b: u8, c: u8, d: u8, port: u16, err: 
 
 func parse_port(text: str) (u16, errors.Error) {
     if text.len == 0 {
-        return 0, errors.fail_user(NET_ERR_INVALID_PORT)
+        return 0, errors.fail_net(NET_ERR_INVALID_PORT)
     }
 
     bytes: Slice<u8> = strings.bytes(text)
@@ -33,14 +33,14 @@ func parse_port(text: str) (u16, errors.Error) {
     while index < bytes.len {
         ch: u8 = bytes[index]
         if ch < 48 {
-            return 0, errors.fail_user(NET_ERR_INVALID_PORT)
+            return 0, errors.fail_net(NET_ERR_INVALID_PORT)
         }
         if ch > 57 {
-            return 0, errors.fail_user(NET_ERR_INVALID_PORT)
+            return 0, errors.fail_net(NET_ERR_INVALID_PORT)
         }
         value = value * (u32)(10) + (u32)(ch - 48)
         if value > (u32)(65535) {
-            return 0, errors.fail_user(NET_ERR_INVALID_PORT)
+            return 0, errors.fail_net(NET_ERR_INVALID_PORT)
         }
         index = index + 1
     }

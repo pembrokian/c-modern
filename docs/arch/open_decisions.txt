@@ -32,14 +32,14 @@ The semantic decision is settled: explicit returns, no hidden propagation. The r
 
 Current repository status:
 - the repository now admits a phase-1 opaque `Error` surface with kind or code inspection and named subsystem constructors at the stdlib boundary
-- that closes the earlier anonymous `fail_code(...)` pressure, but it still leaves one narrow follow-up around standard named module-local codes and a slightly cleaner source-level vocabulary such as `is_err(...)` and `fail_errno(...)`
+- the Phase 47 full error-treatment wave now also standardizes the small source-level vocabulary and the named module-local code pattern across the admitted examples, tests, and narrow stdlib helpers
 
 Open questions:
 - After more real programs are written, is explicit `(value, Error)` handling still acceptable without a standard propagation helper?
 - If a helper is ever added, can it remain purely explicit and avoid becoming a second hidden control-flow system?
 
 Why this is still open:
-- The next narrow follow-up is now clearer: standardize named per-module error codes and the small source-level vocabulary before revisiting any richer message, wrapped-cause, hidden-propagation, exception, or heap-backed object work.
+- The next possible follow-up is no longer code naming or small vocabulary polish; it is whether real programs eventually need richer detail than kind or code alone, such as messages or wrapped causes, and whether any explicit propagation helper is justified without reintroducing hidden control flow.
 
 Non-open items
 

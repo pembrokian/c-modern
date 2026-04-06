@@ -1,6 +1,12 @@
 import errors
 import io
+import net
 import utf8
+
+const TEST_ERR_USER: usize = 11
+const TEST_ERR_ERRNO: usize = 22
+const TEST_ERR_NET: usize = 33
+const TEST_INVALID_PORT_CODE: usize = 1
 
 func main() i32 {
     err: errors.Error = errors.fail_io(7)
@@ -41,20 +47,43 @@ func main() i32 {
         return 9
     }
 
-    err = errors.fail_user(11)
+    err = errors.fail_user(TEST_ERR_USER)
     if errors.kind(err) != errors.kind_user() {
         return 11
     }
-    if errors.code(err) != 11 {
+    if errors.code(err) != TEST_ERR_USER {
         return 12
     }
 
-    err = errors.fail_errno(22)
+    err = errors.fail_errno(TEST_ERR_ERRNO)
     if errors.kind(err) != errors.kind_errno() {
         return 13
     }
-    if errors.code(err) != 22 {
+    if errors.code(err) != TEST_ERR_ERRNO {
         return 14
+    }
+
+    err = errors.fail_net(TEST_ERR_NET)
+    if errors.kind(err) != errors.kind_net() {
+        return 15
+    }
+    if errors.code(err) != TEST_ERR_NET {
+        return 16
+    }
+
+    invalid_port: u16
+    invalid_port, err = net.parse_port("70000")
+    if errors.is_ok(err) {
+        return 17
+    }
+    if invalid_port != 0 {
+        return 18
+    }
+    if errors.kind(err) != errors.kind_net() {
+        return 19
+    }
+    if errors.code(err) != TEST_INVALID_PORT_CODE {
+        return 20
     }
 
     return 0
