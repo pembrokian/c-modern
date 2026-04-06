@@ -28,7 +28,6 @@ enum class SpecialCallKind {
     kBufferFree,
     kArenaNew,
     kSliceFromBuffer,
-    kTypedThreadSpawn,
     kVolatileLoad,
     kVolatileStore,
     kAtomicLoad,
@@ -122,6 +121,9 @@ std::optional<sema::Type> FindMirFieldType(const Module& module,
                                            std::string_view field_name);
 const Function* FindMirFunction(const Module& module, std::string_view name);
 sema::Type FunctionProcedureType(const Function& function);
+bool MatchesGenericFunctionType(const Module& module,
+                                const Function& function,
+                                const sema::Type& actual_type);
 const VariantDecl* FindMirVariantDecl(const TypeDecl& type_decl, std::string_view variant_name);
 std::string_view PrimaryTargetName(const Instruction& instruction);
 std::string CanonicalVariantDisplayName(const sema::Type& selector_type, std::string_view variant_name);

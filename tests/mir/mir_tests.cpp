@@ -491,7 +491,7 @@ void TestImportedAtomicBoundaryValidationAcceptsDynamicOrderOperand() {
     }
 }
 
-void TestImportedTypedThreadSpawnLowersToRawHelper() {
+void TestImportedTypedThreadSpawnLowersDirectly() {
     mc::support::DiagnosticSink diagnostics;
 
     mc::sema::Module imported_sync;
@@ -550,13 +550,15 @@ void TestImportedTypedThreadSpawnLowersToRawHelper() {
     }
 
     const auto dump = mc::mir::DumpModule(*lowered.module);
-    if (dump.find("target=sync.thread_spawn_raw") == std::string::npos ||
-        dump.find("pointer_to_int") == std::string::npos) {
-        Fail("typed thread_spawn should lower through the raw helper with explicit uintptr conversions");
+    if (dump.find("target=sync.thread_spawn") == std::string::npos) {
+        Fail("typed thread_spawn should lower as an ordinary imported direct call");
+    }
+    if (dump.find("target=sync.thread_spawn_raw") != std::string::npos) {
+        Fail("typed thread_spawn must not lower through the raw helper rewrite anymore");
     }
 }
 
-void TestDeferredImportedTypedThreadSpawnLowersToRawHelper() {
+void TestDeferredImportedTypedThreadSpawnLowersDirectly() {
     mc::support::DiagnosticSink diagnostics;
 
     mc::sema::Module imported_sync;
@@ -615,12 +617,11 @@ void TestDeferredImportedTypedThreadSpawnLowersToRawHelper() {
     }
 
     const auto dump = mc::mir::DumpModule(*lowered.module);
-    if (dump.find("call target=sync.thread_spawn target_kind=function target_name=sync.thread_spawn") != std::string::npos) {
-        Fail("deferred typed thread_spawn must not fall back to a generic imported call");
+    if (dump.find("target=sync.thread_spawn") == std::string::npos) {
+        Fail("deferred typed thread_spawn should lower as an ordinary imported direct call");
     }
-    if (dump.find("target=sync.thread_spawn_raw") == std::string::npos ||
-        dump.find("pointer_to_int") == std::string::npos) {
-        Fail("deferred typed thread_spawn should lower through the raw helper with explicit uintptr conversions");
+    if (dump.find("target=sync.thread_spawn_raw") != std::string::npos) {
+        Fail("deferred typed thread_spawn must not lower through the raw helper rewrite anymore");
     }
 }
 
@@ -3055,8 +3056,8 @@ int main() {
     TestImportedModuleVariantMatchLowersQualifiedVariants();
     TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes();
     TestImportedAtomicBoundaryValidationAcceptsDynamicOrderOperand();
-    TestImportedTypedThreadSpawnLowersToRawHelper();
-    TestDeferredImportedTypedThreadSpawnLowersToRawHelper();
+    TestImportedTypedThreadSpawnLowersDirectly();
+    TestDeferredImportedTypedThreadSpawnLowersDirectly();
     TestGlobalAddressLoweringUsesExplicitLocalAddr();
     TestAddressOfFieldLowersForDirectAggregateBase();
     TestMixedBindingOrAssignmentUsesSemanticClassification();

@@ -175,6 +175,44 @@ std::vector<const mir::Local*> ParameterLocals(const mir::Function& function) {
     return params;
 }
 
+bool TypeSupportsErasedGenericEmission(const mir::Module& module,
+                                       const sema::Type& type) {
+    return sema::IsUnknown(type) || type.kind == sema::Type::Kind::kVoid || LowerTypeInfo(module, type).has_value();
+}
+
+bool FunctionSupportsErasedGenericEmission(const mir::Module& module,
+                                           const mir::Function& function) {
+    for (const auto& local : function.locals) {
+        if (!TypeSupportsErasedGenericEmission(module, local.type)) {
+            return false;
+        }
+    }
+    for (const auto& return_type : function.return_types) {
+        if (!TypeSupportsErasedGenericEmission(module, return_type)) {
+            return false;
+        }
+    }
+    for (const auto& block : function.blocks) {
+        for (const auto& instruction : block.instructions) {
+            if (!TypeSupportsErasedGenericEmission(module, instruction.type) ||
+                !TypeSupportsErasedGenericEmission(module, instruction.target_base_type)) {
+                return false;
+            }
+            for (const auto& aux_type : instruction.target_aux_types) {
+                if (!TypeSupportsErasedGenericEmission(module, aux_type)) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool ShouldEmitFunctionForExecutable(const mir::Module& module,
+                                     const mir::Function& function) {
+    return function.type_params.empty() || FunctionSupportsErasedGenericEmission(module, function);
+}
+
 sema::Type InstantiateAliasedType(const mir::TypeDecl& type_decl, const sema::Type& instantiated_type) {
     sema::Type aliased_type = type_decl.aliased_type;
     if (!type_decl.type_params.empty()) {
@@ -3856,7 +3894,7 @@ bool RenderExternFunctionDeclaration(const mir::Module& module,
     if (!function.is_extern) {
         return true;
     }
-    if (!function.type_params.empty()) {
+    if (!ShouldEmitFunctionForExecutable(module, function)) {
         return true;
     }
     if (!function.extern_abi.empty() && function.extern_abi != "c") {
@@ -3996,7 +4034,7 @@ bool RenderLlvmModule(const mir::Module& module,
     std::unordered_map<std::string, std::string> function_symbols;
     function_symbols.reserve(module.functions.size());
     for (const auto& function : module.functions) {
-        if (!function.type_params.empty()) {
+        if (!ShouldEmitFunctionForExecutable(module, function)) {
             continue;
         }
         function_symbols.emplace(function.name, LLVMFunctionSymbol(function.name, wrap_hosted_main));
@@ -4064,7 +4102,7 @@ bool RenderLlvmModule(const mir::Module& module,
 
     bool emitted_extern_declaration = false;
     for (const auto& function : module.functions) {
-        if (!function.is_extern || !function.type_params.empty()) {
+        if (!function.is_extern || !ShouldEmitFunctionForExecutable(module, function)) {
             continue;
         }
         if (!RenderExternFunctionDeclaration(module, function, wrap_hosted_main, source_path, diagnostics, stream)) {
@@ -4105,7 +4143,7 @@ bool RenderLlvmModule(const mir::Module& module,
     }
 
     for (std::size_t function_index = 0; function_index < module.functions.size(); ++function_index) {
-        if (module.functions[function_index].is_extern || !module.functions[function_index].type_params.empty()) {
+        if (module.functions[function_index].is_extern || !ShouldEmitFunctionForExecutable(module, module.functions[function_index])) {
             continue;
         }
         if (!RenderExecutableFunction(module,

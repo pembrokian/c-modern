@@ -4,6 +4,7 @@
 
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 
 namespace mc::mir {
 
@@ -67,6 +68,63 @@ std::string AtomicMetadataText(const Instruction& instruction) {
         return "order=" + instruction.atomic_order;
     }
     return {};
+}
+
+bool MatchGenericTypePattern(const Module& module,
+                             const sema::Type& pattern,
+                             const sema::Type& actual,
+                             const std::unordered_map<std::string, bool>& type_param_set,
+                             std::unordered_map<std::string, sema::Type>& bindings) {
+    const sema::Type canonical_pattern = CanonicalMirType(module, pattern);
+    const sema::Type canonical_actual = CanonicalMirType(module, actual);
+
+    if (canonical_pattern.kind == sema::Type::Kind::kNamed && type_param_set.contains(canonical_pattern.name)) {
+        const auto found = bindings.find(canonical_pattern.name);
+        if (found == bindings.end()) {
+            bindings.emplace(canonical_pattern.name, canonical_actual);
+            return true;
+        }
+        return AreEquivalentTypes(module, found->second, canonical_actual);
+    }
+
+    if (canonical_pattern.kind != canonical_actual.kind) {
+        return false;
+    }
+
+    switch (canonical_pattern.kind) {
+        case sema::Type::Kind::kUnknown:
+            return true;
+        case sema::Type::Kind::kNamed:
+            if (canonical_pattern.name != canonical_actual.name || canonical_pattern.subtypes.size() != canonical_actual.subtypes.size()) {
+                return false;
+            }
+            break;
+        case sema::Type::Kind::kArray:
+            if (canonical_pattern.metadata != canonical_actual.metadata || canonical_pattern.subtypes.size() != canonical_actual.subtypes.size()) {
+                return false;
+            }
+            break;
+        default:
+            if (canonical_pattern.metadata != canonical_actual.metadata || canonical_pattern.subtypes.size() != canonical_actual.subtypes.size()) {
+                return canonical_pattern == canonical_actual;
+            }
+            break;
+    }
+
+    if (canonical_pattern.subtypes.size() != canonical_actual.subtypes.size()) {
+        return false;
+    }
+    for (std::size_t index = 0; index < canonical_pattern.subtypes.size(); ++index) {
+        if (!MatchGenericTypePattern(module,
+                                     canonical_pattern.subtypes[index],
+                                     canonical_actual.subtypes[index],
+                                     type_param_set,
+                                     bindings)) {
+            return false;
+        }
+    }
+    return canonical_pattern.kind == sema::Type::Kind::kNamed || canonical_pattern.subtypes.empty() || canonical_pattern == canonical_actual ||
+           canonical_pattern.metadata == canonical_actual.metadata;
 }
 
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name) {
@@ -137,6 +195,28 @@ sema::Type FunctionProcedureType(const Function& function) {
         }
     }
     return sema::ProcedureType(param_types, function.return_types);
+}
+
+bool MatchesGenericFunctionType(const Module& module,
+                                const Function& function,
+                                const sema::Type& actual_type) {
+    if (function.type_params.empty()) {
+        return AreEquivalentTypes(module, FunctionProcedureType(function), actual_type);
+    }
+
+    const sema::Type canonical_actual = CanonicalMirType(module, actual_type);
+    if (canonical_actual.kind != sema::Type::Kind::kProcedure) {
+        return false;
+    }
+
+    std::unordered_map<std::string, bool> type_param_set;
+    for (const auto& type_param : function.type_params) {
+        type_param_set.emplace(type_param, true);
+    }
+
+    std::unordered_map<std::string, sema::Type> bindings;
+    const sema::Type expected_type = FunctionProcedureType(function);
+    return MatchGenericTypePattern(module, expected_type, canonical_actual, type_param_set, bindings);
 }
 
 const VariantDecl* FindMirVariantDecl(const TypeDecl& type_decl, std::string_view variant_name) {

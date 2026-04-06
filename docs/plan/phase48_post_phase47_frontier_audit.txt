@@ -1,0 +1,199 @@
+Phase 48 -- Post-Phase-47 Frontier Audit
+========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Audit the remaining deferred fronts after the completed Phase 47 error-
+treatment wave and name the next honest active owner from current repository
+evidence, not from roadmap inertia or abstract completeness pressure.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 47 completed the current explicit `Error` vocabulary wave without
+  widening into message-owned errors, wrapped causes, or hidden propagation.
+- Phase 42 already closed imported structural aggregate constants at the
+  sema-plus-`.mci` boundary, but executable top-level aggregate const global
+  emission remains a separate backend follow-up that is still not part of the
+  admitted supported slice.
+- The project workflow and linker surface still stop intentionally at hosted
+  `staticlib`, selected-target reuse, and in-project archive consumption.
+- Phase 34 already kept `time` deferred, and the later admitted projects have
+  still not produced stronger cross-subsystem timing pressure than that audit
+  required.
+- The repository therefore needs one explicit route-to-owner decision before
+  starting another capability or cleanup wave.
+
+Problem being solved
+--------------------
+- After Phase 47, the repository has several still-explicit deferred fronts,
+  but they no longer have equal weight.
+- Without one frontier audit now, planning could drift into whichever family
+  happens to sound broad or roadmap-adjacent rather than whichever one still
+  distorts the admitted repository slice most directly.
+- The repository needs to distinguish between:
+  - live distortions inside the current admitted slice
+  - optional follow-throughs that remain real but are not yet required by the
+    admitted proof surface
+  - broader capability families that still lack enough consumer pressure to
+    reopen honestly
+
+Core rule
+---------
+- Prefer the remaining owner-local distortion that already affects an admitted
+  public surface over deferred breadth that still lacks pressure.
+- Do not reopen `time`, broader linker policy, or richer error objects without
+  new admitted consumer evidence.
+- Do not force a new real project or synthetic probe merely to justify a front
+  that still is not the narrowest current blocker.
+- Keep non-winning fronts explicit and deferred rather than quietly dropping
+  them.
+- Use this phase to choose the next owner, not to implement that next owner's
+  full closure in parallel.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one documentation-backed frontier audit across the
+current admitted slice, the preserved limited-solution register, and the
+remaining deferred capability notes.
+
+The audit should answer four questions directly:
+- does the next honest frontier already distort an admitted public surface
+  today, or would reopening it require manufacturing new pressure first?
+- which remaining front still belongs clearly to one owner boundary?
+- which previously deferred fronts remain real but optional because the
+  admitted proof set still does not require them?
+- what should the repository do next without implying that several fronts are
+  now open in parallel?
+
+Fronts audited in this phase
+----------------------------
+1. Imported generic procedure-call closure beyond the current
+   `sync.thread_spawn<T>` rewrite.
+2. Backend executable emission of top-level aggregate const globals after the
+   completed Phase 42 sema-plus-`.mci` closure.
+3. Broader linker or artifact behavior beyond the admitted hosted `staticlib`
+   plateau.
+4. Narrow `time` admission after the completed Phase 34 consumer-matrix gate.
+5. Richer error-object follow-through beyond the completed Phase 47 vocabulary
+   and named-code wave.
+
+What this phase should try to prove
+-----------------------------------
+- whether one remaining front now stands out because it still distorts a live
+  admitted surface rather than merely a possible future proof surface
+- whether the admitted repository slice is better served by one compiler-owner
+  closure wave than by another optional stdlib, tooling, or backend branch
+- whether the older second-consumer trigger for imported generic procedure-
+  typed calls should remain absolute, or whether the live admitted rewrite is
+  now itself the stronger routing fact
+- whether the non-winning fronts should remain deferred unchanged, or with a
+  sharper reason after the audit
+
+Preferred pressure points
+-------------------------
+1. The live compiler-owned `sync.thread_spawn<T>` to `sync.thread_spawn_raw`
+   rewrite still present in MIR lowering.
+2. The absence of a current admitted executable-build proof that needs
+   top-level aggregate const global emission.
+3. The absence of a current admitted project that needs `sharedlib`, external
+   system-library links, install-tree policy, or broader artifact coordination.
+4. The completed Phase 34 finding that host-side test timeouts and
+   `io.poller_wait(..., timeout_ms)` do not yet justify a general `time`
+   family.
+5. The completed Phase 47 finding that the current explicit `Error` model is
+   readable enough for the admitted examples after named-code and vocabulary
+   cleanup.
+
+Deliverables
+------------
+- one explicit frontier-audit phase note naming the next active owner after
+  Phase 47
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` recording the chosen
+  route and the still-deferred non-winning fronts
+- no README or hosted-slice support-statement changes unless the admitted
+  supported slice itself changes, which this phase should avoid
+
+Suggested execution order
+-------------------------
+1. Re-audit the still-explicit fronts against the current admitted examples,
+   tool workflow, and limited-solution register.
+2. Separate live admitted-slice distortions from optional future-proof follow-
+   throughs.
+3. Name the next active owner from that ranking.
+4. Refresh backlog and decision-log wording so the route is explicit.
+5. Stop after the route-to-owner decision instead of partially implementing the
+   next phase under this audit.
+
+Exit criteria
+-------------
+- the next active frontier after Phase 47 is named explicitly from current
+  admitted-slice evidence
+- non-winning fronts remain visible with clear reasons for continued deferral
+- the planning surface no longer implies that broader `time`, broader linker
+  policy, richer error objects, and compiler generic-call closure are all
+  equally live next steps
+- the repository can move into the next owner doc without another discovery
+  plateau first
+
+Non-goals
+---------
+- implementing the full imported generic procedure-call closure in this phase
+- reopening `time`, `sharedlib`, external-library linking, or richer error
+  objects without stronger admitted pressure
+- promoting executable aggregate const global emission to an admitted support
+  claim before a real build proof needs it
+- broad support-matrix, portability, or package-distribution changes
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 48 stands alone as the post-Phase-47 route-to-owner audit.
+- The phase is explicit that choosing the next frontier is the whole job of
+  this wave.
+
+What landed
+-----------
+- re-audited the remaining deferred fronts against the current admitted slice
+  and found that the strongest remaining distortion is no longer an unopened
+  capability family but the live compiler-owned imported generic procedure-call
+  rewrite still used by the admitted `sync.thread_spawn<T>` surface
+- kept backend aggregate const global emission deferred unchanged because the
+  repository still does not have an admitted executable-build proof that
+  requires top-level aggregate const globals beyond the completed Phase 42
+  project-`check` and interface-transport proof
+- kept broader linker or artifact behavior deferred unchanged because the
+  admitted richer project set still does not need `sharedlib`, external
+  system-library links, install policy, or broader artifact coordination than
+  the current hosted `staticlib` plateau already proves
+- kept `time` deferred unchanged because the Phase 34 consumer-matrix outcome
+  still holds: host-side `tests.timeout_ms` and the bounded
+  `io.poller_wait(..., timeout_ms)` use in admitted projects are not yet honest
+  evidence for a general `time` family
+- kept richer error-object follow-through deferred unchanged because the
+  completed Phase 47 wave resolved naming and readability drift without showing
+  a new admitted need for messages, wrapped causes, or explicit propagation
+  helpers
+- next-step statement: route the repository to a Phase 49 compiler-owner follow-
+  through on imported generic procedure-call closure, centered on removing the
+  admitted `sync.thread_spawn<T>` rewrite cleanly before reopening broader
+  optional fronts
+
+Closeout statement
+------------------
+Phase 48 is complete. The next honest frontier after the Phase 47 error-
+treatment wave is the remaining compiler-owned imported generic procedure-call
+distortion on the admitted `sync.thread_spawn<T>` surface. The competing fronts
+remain real, but they are still optional from current admitted proof: backend
+aggregate const global emission lacks a current executable-build consumer,
+broader linker policy lacks a current richer project trigger, `time` still
+lacks a cross-subsystem consumer matrix, and richer error objects remain beyond
+ the now-completed explicit vocabulary wave. The repository should therefore
+ proceed next to imported generic call closure rather than reopen a broader
+ capability family first.

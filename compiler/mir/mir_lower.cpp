@@ -285,7 +285,6 @@ class FunctionLowerer {
             case SpecialCallKind::kAtomicExchange:
             case SpecialCallKind::kAtomicFetchAdd:
                 return RenderOrderName(expr, 2);
-            case SpecialCallKind::kTypedThreadSpawn:
             case SpecialCallKind::kBufferNew:
             case SpecialCallKind::kBufferFree:
             case SpecialCallKind::kArenaNew:
@@ -313,101 +312,6 @@ class FunctionLowerer {
             return {};
         }
         return RenderCompareExchangeFailureOrder(expr);
-    }
-
-    bool IsTypedThreadSpawnCall(const Expr& expr) const {
-        if (expr.left == nullptr || expr.left->kind != Expr::Kind::kQualifiedName) {
-            return false;
-        }
-        return expr.left->text == "sync" && expr.left->secondary_text == "thread_spawn" && !expr.left->type_args.empty();
-    }
-
-    bool MatchesTypedThreadSpawnSignature(const sema::Type& callee_type) const {
-        const sema::Type stripped_callee = StripMirAliasOrDistinct(module_, callee_type);
-        if (stripped_callee.kind != sema::Type::Kind::kProcedure) {
-            return false;
-        }
-
-        const auto param_types = ProcedureParamTypes(stripped_callee);
-        if (param_types.size() != 2) {
-            return false;
-        }
-
-        const sema::Type entry_type = StripMirAliasOrDistinct(module_, param_types[0]);
-        const sema::Type ctx_type = StripMirAliasOrDistinct(module_, param_types[1]);
-        if (entry_type.kind != sema::Type::Kind::kProcedure || ctx_type.kind != sema::Type::Kind::kPointer ||
-            ctx_type.subtypes.empty()) {
-            return false;
-        }
-
-        const auto entry_param_types = ProcedureParamTypes(entry_type);
-        if (entry_param_types.size() != 1) {
-            return false;
-        }
-
-        return StripMirAliasOrDistinct(module_, entry_param_types.front()) == ctx_type;
-    }
-
-    bool EmitTypedThreadSpawnRawCall(const std::vector<ValueInfo>& args,
-                                     const sema::Type& result_type,
-                                     bool wants_result,
-                                     ValueInfo* result) {
-        if (args.size() != 2) {
-            return false;
-        }
-
-        const sema::Type uintptr_type = sema::NamedType("uintptr");
-        const ValueInfo entry = EmitConvertValue(args[0], uintptr_type);
-        const ValueInfo ctx = EmitConvertValue(args[1], uintptr_type);
-        const sema::Type raw_callee_type = sema::ProcedureType({uintptr_type, uintptr_type}, CallReturnTypes(result_type));
-        const std::string raw_target_name = "sync.thread_spawn_raw";
-        const std::string callee_value = NewValue();
-        Emit({
-            .kind = Instruction::Kind::kSymbolRef,
-            .result = callee_value,
-            .type = raw_callee_type,
-            .target = raw_target_name,
-            .target_kind = Instruction::TargetKind::kFunction,
-            .target_name = raw_target_name,
-            .target_display = raw_target_name,
-        });
-
-        Instruction call {
-            .kind = Instruction::Kind::kCall,
-            .type = result_type,
-            .target = raw_target_name,
-            .target_kind = Instruction::TargetKind::kFunction,
-            .target_name = raw_target_name,
-            .target_display = raw_target_name,
-            .operands = {callee_value, entry.value, ctx.value},
-        };
-        if (wants_result) {
-            call.result = NewValue();
-        }
-        Emit(std::move(call));
-        if (wants_result && result != nullptr) {
-            *result = {function_.blocks[*current_block_].instructions.back().result, result_type};
-        }
-        return true;
-    }
-
-    bool EmitTypedThreadSpawnCall(const Expr& expr,
-                                  const std::vector<ValueInfo>& args,
-                                  const sema::Type& result_type,
-                                  bool wants_result,
-                                  ValueInfo* result) {
-        if (!IsTypedThreadSpawnCall(expr)) {
-            return false;
-        }
-        if (args.size() != 2) {
-            Report(expr.span, "sync.thread_spawn expects exactly two arguments");
-            return true;
-        }
-        if (!MatchesTypedThreadSpawnSignature(ExprTypeOrUnknown(*expr.left))) {
-            Report(expr.span, "sync.thread_spawn rewrite requires imported signature func(*T), *T");
-            return true;
-        }
-        return EmitTypedThreadSpawnRawCall(args, result_type, wants_result, result);
     }
 
     bool EmitSpecialCallInstruction(const TargetMetadata& target_metadata,
@@ -538,9 +442,8 @@ class FunctionLowerer {
                 instruction.kind = Instruction::Kind::kAtomicFetchAdd;
                 break;
             default:
-                // kArenaNew, kMmioPtr, kSliceFromBuffer, kTypedThreadSpawn,
-                // and kNone are handled before the switch above and cannot
-                // reach this point.
+                // kArenaNew, kMmioPtr, kSliceFromBuffer, and kNone are handled
+                // before the switch above and cannot reach this point.
                 MC_UNREACHABLE("unhandled SpecialCallKind in EmitSpecialCallInstruction");
         }
 
@@ -597,9 +500,6 @@ class FunctionLowerer {
 
         const sema::Type call_type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "statement call result type");
         if (TryEmitVariantInit(expr, args, call_type, false, nullptr)) {
-            return;
-        }
-        if (EmitTypedThreadSpawnCall(expr, args, call_type, false, nullptr)) {
             return;
         }
         if (TryEmitSpecialCall(expr, args, call_type, false, nullptr)) {
@@ -667,8 +567,7 @@ class FunctionLowerer {
         for (const auto& arg : expr.args) {
             args.push_back(LowerExpr(*arg));
         }
-        const SpecialCallKind special_kind = IsTypedThreadSpawnCall(expr) ? SpecialCallKind::kTypedThreadSpawn
-                                                                          : ClassifySpecialCall(CalleeName(*expr.left));
+        const SpecialCallKind special_kind = ClassifySpecialCall(CalleeName(*expr.left));
         const auto callee = special_kind == SpecialCallKind::kNone ? LowerCalleeExpr(*expr.left) : ValueInfo {};
         const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
         DeferredCall call {
@@ -692,15 +591,6 @@ class FunctionLowerer {
     }
 
     void EmitDeferredCall(const DeferredCall& call) {
-        if (call.special_kind == SpecialCallKind::kTypedThreadSpawn) {
-            std::vector<ValueInfo> args;
-            args.reserve(call.arg_locals.size());
-            for (const auto& arg_local : call.arg_locals) {
-                args.push_back(LoadLocalValue(arg_local));
-            }
-            static_cast<void>(EmitTypedThreadSpawnRawCall(args, call.type, false, nullptr));
-            return;
-        }
         if (call.special_kind != SpecialCallKind::kNone) {
             std::vector<ValueInfo> args;
             args.reserve(call.arg_locals.size());
@@ -1333,10 +1223,6 @@ class FunctionLowerer {
                 ValueInfo variant_init_result;
                 if (TryEmitVariantInit(expr, args, type, true, &variant_init_result)) {
                     return variant_init_result;
-                }
-                ValueInfo typed_thread_spawn_result;
-                if (EmitTypedThreadSpawnCall(expr, args, type, true, &typed_thread_spawn_result)) {
-                    return typed_thread_spawn_result;
                 }
                 ValueInfo special_result;
                 if (TryEmitSpecialCall(expr, args, type, true, &special_result)) {
