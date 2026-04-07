@@ -1,0 +1,146 @@
+Phase 61 -- Imported Identity Finalization
+==========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Close the remaining imported-identity drift that still survived after Phase
+60: project-mode separate compilation already preserved imported type
+declarations, generic nominal arguments, and qualified semantic names across
+sema and `.mci`, but merged project MIR still reconstructed some instruction
+metadata from stale unqualified text after imported build-unit namespacing.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative admin roadmap named Phase 61 as imported identity
+  finalization.
+- The strongest still-live concrete owner now fits that label honestly:
+  imported qualified nominal forms survived direct-source sema and `.mci`,
+  but project MIR merge still left some type- and variant-target metadata in
+  pre-qualified spellings.
+
+Repository status note
+----------------------
+- Earlier phases already established module-qualified imported type names,
+  dotted imported type expressions, generic nominal type-argument
+  preservation, and deterministic `.mci` summaries.
+- Direct-source MIR lowering already preserved those imported identities
+  honestly.
+- The remaining gap was narrower than a broad type-system redesign: when the
+  project builder namespaced an imported build unit, it rewrote semantic type
+  objects but left some MIR instruction metadata fields as stale unqualified
+  text.
+
+Problem being solved
+--------------------
+- Imported build units are merged into one project MIR module after `.mci`
+  loading and type qualification.
+- That merge already rewrote type declarations, locals, return types, and
+  several typed metadata fields, but it still left textual instruction target
+  metadata unchanged for operations such as aggregate initialization and other
+  type-targeted instructions.
+- As a result, a helper module could lower successfully in direct-source mode
+  yet fail after project merge because result types were qualified as
+  `helper.Box<i32>` while the same instruction still named its target as
+  `Box<i32>`.
+- This was a reconstruction drift at the imported workflow boundary: the type
+  identity was already known, but project MIR still validated against stale
+  textual metadata.
+
+Core rule
+---------
+- Keep imported type identity authoritative in one place and regenerate
+  textual MIR metadata from the rewritten typed facts after namespacing.
+- Do not reopen sema qualification, `.mci` schema, or generic nominal design
+  when the remaining drift is inside project MIR merge.
+- Prefer one deterministic project-mode proof over speculative wider identity
+  cleanup.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: force one imported generic nominal aggregate through
+project `build --dump-mir`, prove that `.mci` still carries the module-local
+type spelling, and prove that merged MIR rewrites the resulting textual type
+metadata to the qualified imported form.
+
+Compiler change boundary:
+1. regenerate type-target instruction metadata from rewritten MIR types during
+   imported build-unit namespacing
+2. regenerate variant target display metadata from rewritten base-type facts
+   during the same pass
+3. keep sema, `.mci`, and direct-source MIR lowering unchanged
+
+What this phase should try to prove
+-----------------------------------
+- Imported qualified nominal forms survive the supported project workflow
+  without reconstruction drift.
+- Generic nominal identities already preserved by sema and `.mci` remain
+  valid after merged MIR namespacing.
+- Project-mode MIR validation no longer depends on stale unqualified type
+  spellings inside imported instruction metadata.
+
+Preferred pressure points
+-------------------------
+1. one helper module exporting a generic nominal and an aggregate that embeds
+   it
+2. one `.mci` artifact proving the helper still records the local spellings
+3. one merged MIR dump proving the imported build unit rewrites those same
+   identities to qualified spellings such as `helper.Box<i32>`
+
+Deliverables
+------------
+- one canonical Phase 61 note documenting the imported-identity closeout
+- one focused project-builder namespacing fix for type and variant MIR target
+  metadata
+- one project regression proving imported generic nominal identity survives
+  `.mci` reconstruction and merged MIR validation
+
+Suggested execution order
+-------------------------
+1. reproduce the project-mode failure with one imported generic nominal case
+2. patch imported build-unit namespacing to regenerate textual instruction
+   metadata from rewritten typed facts
+3. add one tool regression that inspects both the helper `.mci` and merged
+   MIR dump
+4. rebuild and run the focused owning test suites
+
+Exit criteria
+-------------
+- imported project builds no longer fail because merged MIR still carries
+  unqualified type-target metadata after namespacing
+- merged MIR dumps show qualified imported nominal spellings consistently for
+  the repaired instruction families
+- the fix stays local to project MIR merge rather than widening sema or `.mci`
+
+Non-goals
+---------
+- new generic-function, monomorphization, or package-model behavior
+- redesigning `.mci` text encoding or sema imported-type qualification
+- broad MIR metadata normalization unrelated to imported identity
+- claiming that every future semantic frontier after Phase 61 is already
+  closed
+
+What landed
+-----------
+- Imported build-unit namespacing now regenerates textual type-target MIR
+  metadata from rewritten result types for the instruction families whose
+  validation depends on those spellings.
+- Variant target display metadata now regenerates from the rewritten base-type
+  identity instead of preserving stale pre-qualified text.
+- A focused project regression now proves that helper `.mci` keeps the local
+  `Box<i32>` spelling while merged MIR rewrites the imported instruction
+  metadata to `helper.Box<i32>` deterministically.
+
+Closeout statement
+------------------
+Phase 61 is complete as a narrow imported identity finalization. The
+repository does not widen the type system here; it removes the smaller but
+real project-workflow drift where imported qualified nominal truth survived
+sema and `.mci`, but merged MIR still validated against stale unqualified
+instruction metadata.

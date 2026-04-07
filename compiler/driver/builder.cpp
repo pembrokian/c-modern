@@ -403,6 +403,88 @@ void RewriteImportedSymbolReference(const std::unordered_map<std::string, std::s
     }
 }
 
+bool InstructionUsesTypeTargetMetadata(mc::mir::Instruction::Kind kind) {
+    using Kind = mc::mir::Instruction::Kind;
+    switch (kind) {
+        case Kind::kArenaNew:
+        case Kind::kConvert:
+        case Kind::kConvertNumeric:
+        case Kind::kConvertDistinct:
+        case Kind::kPointerToInt:
+        case Kind::kIntToPointer:
+        case Kind::kArrayToSlice:
+        case Kind::kBufferToSlice:
+        case Kind::kAggregateInit:
+            return true;
+        case Kind::kConst:
+        case Kind::kLocalAddr:
+        case Kind::kLoadLocal:
+        case Kind::kStoreLocal:
+        case Kind::kStoreTarget:
+        case Kind::kSymbolRef:
+        case Kind::kBoundsCheck:
+        case Kind::kDivCheck:
+        case Kind::kShiftCheck:
+        case Kind::kUnary:
+        case Kind::kBinary:
+        case Kind::kBufferNew:
+        case Kind::kBufferFree:
+        case Kind::kSliceFromBuffer:
+        case Kind::kCall:
+        case Kind::kVolatileLoad:
+        case Kind::kVolatileStore:
+        case Kind::kAtomicLoad:
+        case Kind::kAtomicStore:
+        case Kind::kAtomicExchange:
+        case Kind::kAtomicCompareExchange:
+        case Kind::kAtomicFetchAdd:
+        case Kind::kField:
+        case Kind::kIndex:
+        case Kind::kSlice:
+        case Kind::kVariantInit:
+        case Kind::kVariantMatch:
+        case Kind::kVariantExtract:
+            return false;
+    }
+    return false;
+}
+
+bool InstructionUsesVariantTargetMetadata(mc::mir::Instruction::Kind kind) {
+    using Kind = mc::mir::Instruction::Kind;
+    return kind == Kind::kVariantInit || kind == Kind::kVariantMatch || kind == Kind::kVariantExtract;
+}
+
+std::string CanonicalVariantTarget(const mc::sema::Type& base_type,
+                                   std::string_view variant_name) {
+    if (variant_name.empty()) {
+        return {};
+    }
+    if (base_type.kind == mc::sema::Type::Kind::kNamed && !base_type.name.empty()) {
+        return base_type.name + "." + std::string(variant_name);
+    }
+    return std::string(variant_name);
+}
+
+void RewriteImportedInstructionMetadata(mc::mir::Instruction& instruction,
+                                        const std::unordered_map<std::string, std::string>& renamed_functions,
+                                        const std::unordered_map<std::string, std::string>& renamed_globals) {
+    if (InstructionUsesTypeTargetMetadata(instruction.kind)) {
+        const std::string formatted_type = mc::sema::FormatType(instruction.type);
+        instruction.target = formatted_type;
+        instruction.target_display = formatted_type;
+    }
+
+    if (InstructionUsesVariantTargetMetadata(instruction.kind)) {
+        const std::string canonical_target = CanonicalVariantTarget(instruction.target_base_type, instruction.target_name);
+        instruction.target = canonical_target;
+        instruction.target_display = canonical_target;
+    }
+
+    RewriteImportedSymbolReference(renamed_functions, renamed_globals, instruction.target_kind, instruction.target);
+    RewriteImportedSymbolReference(renamed_functions, renamed_globals, instruction.target_kind, instruction.target_name);
+    RewriteImportedSymbolReference(renamed_functions, renamed_globals, instruction.target_kind, instruction.target_display);
+}
+
 void NamespaceImportedBuildUnit(mc::mir::Module& module,
                                 std::string_view module_name) {
     std::unordered_map<std::string, std::string> renamed_types;
@@ -454,9 +536,7 @@ void NamespaceImportedBuildUnit(mc::mir::Module& module,
                 for (auto& target_aux_type : instruction.target_aux_types) {
                     target_aux_type = RewriteImportedTypeNames(std::move(target_aux_type), renamed_types);
                 }
-                RewriteImportedSymbolReference(renamed_functions, renamed_globals, instruction.target_kind, instruction.target);
-                RewriteImportedSymbolReference(renamed_functions, renamed_globals, instruction.target_kind, instruction.target_name);
-                RewriteImportedSymbolReference(renamed_functions, renamed_globals, instruction.target_kind, instruction.target_display);
+                RewriteImportedInstructionMetadata(instruction, renamed_functions, renamed_globals);
             }
         }
     }

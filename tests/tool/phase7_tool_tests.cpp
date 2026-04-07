@@ -1603,6 +1603,63 @@ void TestProjectImportedAbiTypeMirDeclarations(const std::filesystem::path& bina
                          "merged project MIR should retain imported abi(c) attributes");
 }
 
+void TestProjectImportedGenericNominalIdentity(const std::filesystem::path& binary_root,
+                                               const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase61_imported_identity_project";
+    const std::filesystem::path project_path = WriteBasicProject(
+        project_root,
+        "struct Box<T> {\n"
+        "    value: T\n"
+        "}\n"
+        "\n"
+        "struct Wrapper {\n"
+        "    item: Box<i32>\n"
+        "}\n"
+        "\n"
+        "func make() Wrapper {\n"
+        "    return Wrapper{ item: Box<i32>{ value: 7 } }\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    wrapped: helper.Wrapper = helper.make()\n"
+        "    return wrapped.item.value\n"
+        "}\n");
+    const std::filesystem::path build_dir = binary_root / "phase61_imported_identity_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string(),
+                                                      "--dump-mir"},
+                                                     build_dir / "build_output.txt",
+                                                     "phase61 imported identity dump-mir build");
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail("phase61 imported identity dump-mir build should succeed:\n" + output);
+    }
+
+    const auto helper_mci = mc::support::ComputeDumpTargets(project_root / "src/helper.mc", build_dir).mci;
+    const auto main_mir = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir).mir;
+    const std::string helper_mci_text = ReadFile(helper_mci);
+    const std::string main_mir_text = ReadFile(main_mir);
+    ExpectOutputContains(helper_mci_text,
+                         "type_field\tWrapper\titem\tBox<i32>",
+                         "helper .mci should preserve the module-local generic nominal spelling");
+    ExpectOutputContains(main_mir_text,
+                         "TypeDecl kind=struct name=helper.Box",
+                         "merged project MIR should retain imported generic nominal declarations");
+    ExpectOutputContains(main_mir_text,
+                         "aggregate_init",
+                         "merged project MIR should keep imported helper aggregate initialization after namespacing");
+    ExpectOutputContains(main_mir_text,
+                         "target=helper.Box<i32>",
+                         "merged project MIR should rewrite imported aggregate target metadata to the qualified nominal identity");
+}
+
 void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binary_root,
                                               const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "phase13_corrupt_mci_project";
@@ -4254,6 +4311,7 @@ int main(int argc, char** argv) {
     TestProjectTestTargetBuildsAndRuns(binary_root, mc_path);
     TestProjectImportedGlobalMirDeclarations(binary_root, mc_path);
     TestProjectImportedAbiTypeMirDeclarations(binary_root, mc_path);
+    TestProjectImportedGenericNominalIdentity(binary_root, mc_path);
     TestCorruptedInterfaceArtifactFailsBuild(binary_root, mc_path);
     TestStaleInterfaceArtifactFormatFailsBuild(binary_root, mc_path);
     TestModuleBuildStateIsVersionedAndDeterministic(binary_root, mc_path);
