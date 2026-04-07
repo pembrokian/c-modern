@@ -1,0 +1,143 @@
+Phase 60 -- Compile-Time Truth Closure
+======================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Close the remaining sema-owned compile-time drift that still survived after
+Phase 59: source-local top-level constant evaluation still assumed singleton
+bindings, even though the language, semantic module surface, and imported
+module summaries all already preserve per-bound-name constant facts.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative admin roadmap described Phase 60 as compile-time truth
+  closure for the remaining constant-expression and static-storage cases.
+- The strongest still-live concrete owner now fits that label honestly:
+  local sema constant lookup still discarded multi-name top-level const
+  bindings, leaving the direct source path weaker than the imported-module
+  path for the same admitted compile-time subset.
+
+Repository status note
+----------------------
+- Phase 25 closed the main compile-time and static-storage semantic slice for
+  the admitted v0.2 subset, including scalar constant evaluation,
+  deterministic zero-initialized top-level vars, and exported constant facts.
+- Later phases widened structural aggregate constant transport and imported
+  metadata retention, so imported module summaries now already preserve
+  per-name constant facts for globals.
+- The remaining gap was narrower and more local than a broad const-eval
+  redesign: direct source-file top-level constant lookup only recognized
+  declarations with exactly one bound name and one initializer.
+
+Problem being solved
+--------------------
+- The language constant boundary admits named constants whose values are
+  already compile-time constants; it does not limit that rule to one-name
+  top-level declarations.
+- The semantic module already records per-name constant facts for globals, and
+  imported constant lookup already indexes those facts by bound name.
+- Direct source-file constant evaluation still took a weaker path: when a
+  top-level const declaration bound multiple names, later constant-only uses
+  such as array lengths, dependent constants, and top-level var initializers
+  could not resolve those names through local const evaluation.
+- That made source-local compile-time truth less capable than the imported
+  workflow for the same admitted subset, which is a sema-owned contract drift.
+
+Core rule
+---------
+- Keep compile-time truth keyed by bound name, not by a historical
+  single-declaration shortcut.
+- Do not widen the admitted constant subset in this phase.
+- Fix the owner-local lookup asymmetry in sema rather than compensating in
+  MIR, backend, or fixtures.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: teach local top-level const evaluation to resolve any
+bound name from a multi-name top-level const declaration, evaluate the
+matching initializer by index, and prove the result through one sema fixture
+that exercises all three admitted compile-time use sites:
+1. dependent top-level const evaluation
+2. dependent top-level var static-storage initialization
+3. array-length evaluation
+
+Compiler change boundary:
+1. replace the singleton-only local const lookup with bound-name lookup
+2. evaluate and cache the initializer that corresponds to the matched bound
+   name rather than always reading the first initializer
+3. keep cycle detection and existing constant-subset rules unchanged
+
+What this phase should try to prove
+-----------------------------------
+- Source-local compile-time lookup now matches the per-name truth already used
+  by imported module summaries.
+- Multi-name top-level const declarations participate honestly in the
+  admitted compile-time subset without adding new constant forms.
+- Top-level var static-storage and array-length checks consume the repaired
+  sema truth directly instead of requiring source reshaping into singleton
+  const declarations.
+
+Preferred pressure points
+-------------------------
+1. one multi-name top-level const declaration whose second bound name depends
+   on the first
+2. one later top-level const and one top-level var that reuse those names
+3. one array length that depends on the repaired bound-name lookup
+
+Deliverables
+------------
+- one canonical Phase 60 note documenting the compile-time truth closure
+- one focused sema change for per-bound-name top-level const lookup
+- one sema fixture proving dependent const, var, and array-length closure for
+  local multi-name top-level const declarations
+
+Suggested execution order
+-------------------------
+1. replace singleton-only top-level const lookup with bound-name lookup
+2. evaluate the matched initializer by bound index and preserve existing cycle
+   detection
+3. add one sema fixture covering dependent consts, vars, and array lengths
+4. rebuild and run the focused owning test suites
+
+Exit criteria
+-------------
+- source-local top-level const evaluation resolves bound names from admitted
+  multi-name const declarations
+- dependent top-level consts, top-level vars, and array lengths can consume
+  those bound names deterministically
+- the fix remains sema-local and does not widen the admitted compile-time
+  subset beyond existing language truth
+
+Non-goals
+---------
+- adding new compile-time operators or function-execution rules
+- widening runtime, MIR, backend, or stdlib surfaces
+- reopening imported constant serialization design
+- claiming that all future compile-time pressure beyond this owner-local drift
+  is already closed
+
+What landed
+-----------
+- local top-level const evaluation now resolves any bound name from a
+  multi-name top-level const declaration and evaluates the matching
+  initializer by index.
+- Existing name-based cycle detection remains intact because the evaluation
+  cache and recursion guard still key on the individual constant name.
+- A focused sema regression now proves that one multi-name const declaration
+  can drive later top-level const evaluation, top-level var static-storage
+  initialization, and array-length computation.
+
+Closeout statement
+------------------
+Phase 60 is complete as a narrow compile-time truth closure. The repository
+does not widen the constant-expression model here; it removes the smaller but
+real sema drift where local source evaluation still behaved as though
+top-level constants had to be declared one name at a time, even though the
+language and imported-module surfaces already preserved per-name truth.

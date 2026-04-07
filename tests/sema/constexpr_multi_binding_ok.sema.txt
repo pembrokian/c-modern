@@ -1,0 +1,8 @@
+SemanticModule
+  TypeDecl name=Buffer kind=struct
+    Field name=bytes type=[5]u8
+    Layout size=5 align=1 offsets=[0]
+  Const names=[WIDTH, HEIGHT] type=usize values=[3, 5]
+  Const names=[AREA] type=usize values=[15]
+  Var names=[TOTAL, LIMIT] type=usize values=[15, 6]
+  Function name=main params=[] returns=[i32]

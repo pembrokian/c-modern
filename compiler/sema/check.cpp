@@ -315,19 +315,38 @@ class Checker {
         });
     }
 
-    const Decl* FindTopLevelGlobalDecl(std::string_view name, Decl::Kind kind) const {
+    struct TopLevelBindingDeclRef {
+        const Decl* decl = nullptr;
+        std::size_t index = 0;
+    };
+
+    std::optional<TopLevelBindingDeclRef> FindTopLevelBindingDecl(std::string_view name, Decl::Kind kind) const {
         for (const auto& decl : source_file_.decls) {
             if (decl.kind != kind) {
                 continue;
             }
-            if (decl.pattern.names.size() != 1 || decl.values.size() != 1) {
-                continue;
-            }
-            if (decl.pattern.names.front() == name) {
-                return &decl;
+            for (std::size_t index = 0; index < decl.pattern.names.size(); ++index) {
+                if (decl.pattern.names[index] != name) {
+                    continue;
+                }
+                if (index >= decl.values.size()) {
+                    return std::nullopt;
+                }
+                return TopLevelBindingDeclRef {
+                    .decl = &decl,
+                    .index = index,
+                };
             }
         }
-        return nullptr;
+        return std::nullopt;
+    }
+
+    const Decl* FindTopLevelGlobalDecl(std::string_view name, Decl::Kind kind) const {
+        const auto binding = FindTopLevelBindingDecl(name, kind);
+        if (!binding.has_value() || binding->decl == nullptr) {
+            return nullptr;
+        }
+        return binding->decl;
     }
 
     Type SemanticTypeFromAst(const ast::TypeExpr* type_expr, const std::vector<std::string>& type_params) {
@@ -382,30 +401,31 @@ class Checker {
 
     std::optional<ConstValue> EvaluateTopLevelConst(std::string_view name, bool report_errors,
                                                     std::unordered_set<std::string>& active_names) {
-        if (!active_names.insert(std::string(name)).second) {
+        const std::string key(name);
+        if (!active_names.insert(key).second) {
             if (report_errors) {
-                Report(source_file_.span, "compile-time constant cycle detected for " + std::string(name));
+                Report(source_file_.span, "compile-time constant cycle detected for " + key);
             }
             return std::nullopt;
         }
 
-        const auto cached = const_eval_cache_.find(std::string(name));
+        const auto cached = const_eval_cache_.find(key);
         if (cached != const_eval_cache_.end()) {
-            active_names.erase(std::string(name));
+            active_names.erase(key);
             return cached->second;
         }
 
-        const Decl* decl = FindTopLevelGlobalDecl(name, Decl::Kind::kConst);
-        if (decl == nullptr) {
-            active_names.erase(std::string(name));
+        const auto binding = FindTopLevelBindingDecl(name, Decl::Kind::kConst);
+        if (!binding.has_value() || binding->decl == nullptr) {
+            active_names.erase(key);
             return std::nullopt;
         }
 
-        const auto value = EvaluateConstExpr(*decl->values.front(), report_errors, active_names);
+        const auto value = EvaluateConstExpr(*binding->decl->values[binding->index], report_errors, active_names);
         if (value.has_value()) {
-            const_eval_cache_[std::string(name)] = *value;
+            const_eval_cache_[key] = *value;
         }
-        active_names.erase(std::string(name));
+        active_names.erase(key);
         return value;
     }
 
