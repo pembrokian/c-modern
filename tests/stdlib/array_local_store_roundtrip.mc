@@ -1,5 +1,3 @@
-export { main }
-
 func zero_bytes() [4]u8 {
     bytes: [4]u8
     bytes[0] = 0

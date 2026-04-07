@@ -1,5 +1,3 @@
-export { main }
-
 import fs
 import io
 import mem

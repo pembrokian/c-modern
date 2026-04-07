@@ -11,9 +11,11 @@
 namespace mc::mci {
 
 struct InterfaceArtifact {
-    int format_version = 5;
+    int format_version = 6;
     std::string target_identity;
+    std::string package_identity;
     std::string module_name;
+    ast::SourceFile::ModuleKind module_kind = ast::SourceFile::ModuleKind::kOrdinary;
     std::filesystem::path source_path;
     sema::Module module;
     std::string interface_hash;
@@ -31,7 +33,9 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
 bool ValidateInterfaceArtifactMetadata(const InterfaceArtifact& artifact,
                                        const std::filesystem::path& artifact_path,
                                        std::string_view expected_target_identity,
+                                       std::string_view expected_package_identity,
                                        std::string_view expected_module_name,
+                                       ast::SourceFile::ModuleKind expected_module_kind,
                                        const std::filesystem::path& expected_source_path,
                                        support::DiagnosticSink& diagnostics);
 

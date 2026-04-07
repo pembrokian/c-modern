@@ -1,14 +1,16 @@
-export { Allocator, Arena, default_allocator, buffer_new, buffer_free, buffer_len, slice_from_buffer, arena_init, arena_deinit, arena_new }
-
 struct Allocator {
     raw: uintptr
 }
 
 distinct Arena = *u8
 
+@private
 extern(c) func __mc_mem_default_allocator() *Allocator
+@private
 extern(c) func __mc_mem_buffer_len_u8(buf: *Buffer<u8>) usize
+@private
 extern(c) func __mc_mem_arena_init(alloc: *Allocator, cap: usize) Arena
+@private
 extern(c) func __mc_mem_arena_deinit(arena: Arena)
 
 extern(c) func buffer_new<T>(alloc: *Allocator, cap: usize) *Buffer<T>

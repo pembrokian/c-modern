@@ -1,5 +1,3 @@
-export { test_entry_is_dir }
-
 import testing
 import walk
 

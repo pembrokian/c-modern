@@ -138,6 +138,7 @@ std::filesystem::path WriteBasicProject(const std::filesystem::path& root,
               "\n"
               "[targets.app]\n"
               "kind = \"exe\"\n"
+              "package = \"app\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -162,6 +163,7 @@ std::filesystem::path WriteTestProject(const std::filesystem::path& root,
               "\n"
               "[targets.app]\n"
               "kind = \"exe\"\n"
+              "package = \"app\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -1082,14 +1084,10 @@ void TestProjectTestCommandSucceeds(const std::filesystem::path& binary_root,
         "    return 0\n"
         "}\n");
     WriteFile(project_root / "tests/alpha_test.mc",
-              "export { test_alpha_pass }\n"
-              "\n"
               "func test_alpha_pass() *i32 {\n"
               "    return nil\n"
               "}\n");
     WriteFile(project_root / "tests/beta_test.mc",
-              "export { test_beta_pass }\n"
-              "\n"
               "func test_beta_pass() *i32 {\n"
               "    return nil\n"
               "}\n");
@@ -1194,7 +1192,6 @@ void TestProjectTestCommandFailsOnOrdinaryFailure(const std::filesystem::path& b
         "    return 0\n"
         "}\n");
     WriteFile(project_root / "tests/failing_test.mc",
-              "export { test_failure }\n"
               "import testing\n"
               "\n"
               "func test_failure() *i32 {\n"
@@ -1364,8 +1361,6 @@ void TestDisabledTestTargetListsEnabledTargets(const std::filesystem::path& bina
     WriteFile(project_root / "src/main.mc", "func main() i32 { return 0 }\n");
     WriteFile(project_root / "src/unit.mc", "func main() i32 { return 0 }\n");
     WriteFile(project_root / "tests/sample_test.mc",
-              "export { test_ok }\n"
-              "\n"
               "func test_ok() *i32 {\n"
               "    return nil\n"
               "}\n");
@@ -1391,8 +1386,6 @@ void TestProjectBuildAndMciEmission(const std::filesystem::path& binary_root,
     const std::filesystem::path project_root = binary_root / "phase7_generated_project";
     const std::filesystem::path project_path = WriteBasicProject(
         project_root,
-        "export { answer }\n"
-        "\n"
         "func answer() i32 {\n"
         "    return 7\n"
         "}\n",
@@ -1429,7 +1422,9 @@ void TestProjectBuildAndMciEmission(const std::filesystem::path& binary_root,
     }
 
     const std::string helper_mci_text = ReadFile(helper_mci);
+    ExpectOutputContains(helper_mci_text, "package\tapp", "helper .mci should record the package identity");
     ExpectOutputContains(helper_mci_text, "module\thelper", "helper .mci should record the module identity");
+    ExpectOutputContains(helper_mci_text, "module_kind\tordinary", "helper .mci should record the module kind");
     ExpectOutputContains(helper_mci_text, "function\tanswer", "helper .mci should record exported functions");
     ExpectOutputContains(helper_mci_text, "interface_hash\t", "helper .mci should record an interface hash");
 
@@ -1506,8 +1501,6 @@ void TestProjectImportedGlobalMirDeclarations(const std::filesystem::path& binar
     const std::filesystem::path project_root = binary_root / "phase7_imported_globals_project";
     const std::filesystem::path project_path = WriteBasicProject(
         project_root,
-        "export { LIMIT, counter }\n"
-        "\n"
         "const LIMIT: i32 = 9\n"
         "var counter: i32 = 4\n",
         "import helper\n"
@@ -1563,8 +1556,6 @@ void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binar
     const std::filesystem::path project_root = binary_root / "phase13_corrupt_mci_project";
     const std::filesystem::path project_path = WriteBasicProject(
         project_root,
-        "export { answer }\n"
-        "\n"
         "func answer() i32 {\n"
         "    return 7\n"
         "}\n",
@@ -1592,9 +1583,11 @@ void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binar
 
     const auto helper_mci = mc::support::ComputeDumpTargets(project_root / "src/helper.mc", build_dir).mci;
     WriteFile(helper_mci,
-              "format\t2\n"
+              "format\t6\n"
               "target\tarm64-apple-darwin25.4.0\n"
+              "package\tapp\n"
               "module\thelper\n"
+              "module_kind\tordinary\n"
               "source\t" + (project_root / "src/helper.mc").generic_string() + "\n"
               "interface_hash\tdeadbeef\n");
 
@@ -1612,6 +1605,59 @@ void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binar
     ExpectOutputContains(corrupt_output,
                          "interface artifact hash mismatch",
                          "corrupted .mci should fail with a trust-boundary diagnostic");
+}
+
+void TestStaleInterfaceArtifactFormatFailsBuild(const std::filesystem::path& binary_root,
+                                                const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase54_stale_mci_project";
+    const std::filesystem::path project_path = WriteBasicProject(
+        project_root,
+        "func answer() i32 {\n"
+        "    return 7\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return helper.answer()\n"
+        "}\n");
+    const std::filesystem::path build_dir = binary_root / "phase54_stale_mci_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [initial_outcome, initial_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                      "build",
+                                                                      "--project",
+                                                                      project_path.generic_string(),
+                                                                      "--build-dir",
+                                                                      build_dir.generic_string()},
+                                                                     build_dir / "initial_build_output.txt",
+                                                                     "phase54 initial build");
+    if (!initial_outcome.exited || initial_outcome.exit_code != 0) {
+        Fail("phase54 initial build should succeed:\n" + initial_output);
+    }
+
+    const auto helper_mci = mc::support::ComputeDumpTargets(project_root / "src/helper.mc", build_dir).mci;
+    WriteFile(helper_mci,
+              "format\t5\n"
+              "target\tarm64-apple-darwin25.4.0\n"
+              "module\thelper\n"
+              "source\t" + (project_root / "src/helper.mc").generic_string() + "\n"
+              "interface_hash\tdeadbeef\n");
+
+    const auto [stale_outcome, stale_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string()},
+                                                                 build_dir / "stale_build_output.txt",
+                                                                 "phase54 stale mci build");
+    if (!stale_outcome.exited || stale_outcome.exit_code == 0) {
+        Fail("build with stale pre-phase54 .mci should fail");
+    }
+    ExpectOutputContains(stale_output,
+                         "unsupported interface artifact format version",
+                         "stale pre-phase54 .mci should fail with a format-cutover diagnostic");
 }
 
 void TestModuleBuildStateIsVersionedAndDeterministic(const std::filesystem::path& binary_root,
@@ -1635,14 +1681,10 @@ void TestModuleBuildStateIsVersionedAndDeterministic(const std::filesystem::path
               "[targets.app.runtime]\n"
               "startup = \"default\"\n");
     WriteFile(project_root / "src/alpha.mc",
-              "export { answer_alpha }\n"
-              "\n"
               "func answer_alpha() i32 {\n"
               "    return 2\n"
               "}\n");
     WriteFile(project_root / "src/zeta.mc",
-              "export { answer_zeta }\n"
-              "\n"
               "func answer_zeta() i32 {\n"
               "    return 5\n"
               "}\n");
@@ -1674,7 +1716,8 @@ void TestModuleBuildStateIsVersionedAndDeterministic(const std::filesystem::path
     const auto state_path = build_dir / "state" /
                             (mc::support::SanitizeArtifactStem(project_root / "src/main.mc") + ".state.txt");
     const std::string state_text = ReadFile(state_path);
-    ExpectOutputContains(state_text, "format\t1\n", "module build state should record its format version");
+    ExpectOutputContains(state_text, "format\t2\n", "module build state should record its format version");
+    ExpectOutputContains(state_text, "package\tapp\n", "module build state should record package identity");
 
     const std::size_t alpha_hash = state_text.find("import_hash\talpha=");
     const std::size_t zeta_hash = state_text.find("import_hash\tzeta=");
@@ -1691,8 +1734,6 @@ void TestForeignInterfaceArtifactFailsBuild(const std::filesystem::path& binary_
     const std::filesystem::path source_project_root = binary_root / "phase13_foreign_artifact_source_project";
     const std::filesystem::path source_project_path = WriteBasicProject(
         source_project_root,
-        "export { answer }\n"
-        "\n"
         "func answer() i32 {\n"
         "    return 7\n"
         "}\n",
@@ -1720,8 +1761,6 @@ void TestForeignInterfaceArtifactFailsBuild(const std::filesystem::path& binary_
     const std::filesystem::path contaminated_project_root = binary_root / "phase13_foreign_artifact_target_project";
     const std::filesystem::path contaminated_project_path = WriteBasicProject(
         contaminated_project_root,
-        "export { answer }\n"
-        "\n"
         "func answer() i32 {\n"
         "    return 11\n"
         "}\n",
@@ -1759,8 +1798,6 @@ void TestInvalidStateFileForcesRebuild(const std::filesystem::path& binary_root,
     const std::filesystem::path project_root = binary_root / "phase13_invalid_state_project";
     const std::filesystem::path project_path = WriteBasicProject(
         project_root,
-        "export { answer }\n"
-        "\n"
         "func answer() i32 {\n"
         "    return 7\n"
         "}\n",
@@ -1810,8 +1847,6 @@ void TestIncrementalRebuildBehavior(const std::filesystem::path& binary_root,
     const std::filesystem::path project_root = binary_root / "phase7_incremental_project";
     const std::filesystem::path project_path = WriteBasicProject(
         project_root,
-        "export { answer }\n"
-        "\n"
         "func answer() i32 {\n"
         "    return 7\n"
         "}\n",
@@ -1859,8 +1894,6 @@ void TestIncrementalRebuildBehavior(const std::filesystem::path& binary_root,
 
     SleepForTimestampTick();
     WriteFile(project_root / "src/helper.mc",
-              "export { answer }\n"
-              "\n"
               "func answer() i32 {\n"
               "    return 9\n"
               "}\n");
@@ -1892,8 +1925,6 @@ void TestIncrementalRebuildBehavior(const std::filesystem::path& binary_root,
 
     SleepForTimestampTick();
     WriteFile(project_root / "src/helper.mc",
-              "export { answer, extra }\n"
-              "\n"
               "func answer() i32 {\n"
               "    return 9\n"
               "}\n"
@@ -1914,13 +1945,153 @@ void TestIncrementalRebuildBehavior(const std::filesystem::path& binary_root,
     }
 }
 
+void TestPrivateAndInternalIncrementalBehavior(const std::filesystem::path& binary_root,
+                                               const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase54_private_internal_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase54-private-internal\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "package = \"pkg_app\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\", \"pkg_common\"]\n"
+              "\n"
+              "[targets.app.packages.pkg_common]\n"
+              "roots = [\"pkg_common\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(project_root / "pkg_common/internal.mc",
+              "@private\n"
+              "func hidden_seed() i32 {\n"
+              "    return 3\n"
+              "}\n"
+              "\n"
+              "func visible_value() i32 {\n"
+              "    return hidden_seed() + 4\n"
+              "}\n");
+    WriteFile(project_root / "pkg_common/helper.mc",
+              "import internal\n"
+              "\n"
+              "func answer() i32 {\n"
+              "    return internal.visible_value()\n"
+              "}\n");
+    WriteFile(project_root / "src/main.mc",
+              "import helper\n"
+              "\n"
+              "func main() i32 {\n"
+              "    return helper.answer()\n"
+              "}\n");
+
+    const std::filesystem::path build_dir = binary_root / "phase54_private_internal_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto run_build = [&](const std::string& context) {
+        const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                          "build",
+                                                          "--project",
+                                                          (project_root / "build.toml").generic_string(),
+                                                          "--build-dir",
+                                                          build_dir.generic_string()},
+                                                         build_dir / (context + ".txt"),
+                                                         context);
+        if (!outcome.exited || outcome.exit_code != 0) {
+            Fail(context + " should succeed:\n" + output);
+        }
+    };
+
+    run_build("phase54_private_internal_initial");
+
+    const auto internal_mci = mc::support::ComputeDumpTargets(project_root / "pkg_common/internal.mc", build_dir).mci;
+    const auto helper_object = mc::support::ComputeBuildArtifactTargets(project_root / "pkg_common/helper.mc", build_dir).object;
+    const auto main_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir).object;
+    const auto executable = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir).executable;
+
+    const std::string internal_mci_text = ReadFile(internal_mci);
+    ExpectOutputContains(internal_mci_text,
+                         "package\tpkg_common",
+                         "internal module .mci should record the owning package identity");
+    ExpectOutputContains(internal_mci_text,
+                         "module_kind\tinternal",
+                         "internal module .mci should record internal module kind");
+
+    const auto helper_object_time_1 = RequireWriteTime(helper_object);
+    const auto main_object_time_1 = RequireWriteTime(main_object);
+    const auto internal_mci_time_1 = RequireWriteTime(internal_mci);
+    const auto executable_time_1 = RequireWriteTime(executable);
+
+    SleepForTimestampTick();
+    WriteFile(project_root / "pkg_common/internal.mc",
+              "@private\n"
+              "func hidden_seed() i32 {\n"
+              "    return 9\n"
+              "}\n"
+              "\n"
+              "func visible_value() i32 {\n"
+              "    return hidden_seed() + 4\n"
+              "}\n");
+    run_build("phase54_private_internal_private_change");
+
+    if (RequireWriteTime(helper_object) != helper_object_time_1) {
+        Fail("@private internal edit should not rebuild the dependent helper object");
+    }
+    if (RequireWriteTime(main_object) != main_object_time_1) {
+        Fail("@private internal edit should not rebuild the downstream main object");
+    }
+    if (RequireWriteTime(internal_mci) != internal_mci_time_1) {
+        Fail("@private internal edit should preserve the internal module interface artifact");
+    }
+    if (!(RequireWriteTime(executable) > executable_time_1)) {
+        Fail("@private internal edit should still relink the final executable");
+    }
+
+    const auto [private_run_outcome, private_run_output] = RunCommandCapture({executable.generic_string()},
+                                                                             build_dir / "phase54_private_run.txt",
+                                                                             "phase54 private-change executable run");
+    if (!private_run_outcome.exited || private_run_outcome.exit_code != 13) {
+        Fail("@private internal edit should change runtime behavior to 13, got:\n" + private_run_output);
+    }
+
+    SleepForTimestampTick();
+    WriteFile(project_root / "pkg_common/internal.mc",
+              "@private\n"
+              "func hidden_seed() i32 {\n"
+              "    return 9\n"
+              "}\n"
+              "\n"
+              "func visible_value() i32 {\n"
+              "    return hidden_seed() + 4\n"
+              "}\n"
+              "\n"
+              "func extra_visible() i32 {\n"
+              "    return 10\n"
+              "}\n");
+    run_build("phase54_private_internal_interface_change");
+
+    if (!(RequireWriteTime(helper_object) > helper_object_time_1)) {
+        Fail("public internal edit should rebuild the direct dependent helper object");
+    }
+    if (RequireWriteTime(main_object) != main_object_time_1) {
+        Fail("public internal edit should not rebuild the downstream main object when helper's interface stays stable");
+    }
+    if (!(RequireWriteTime(internal_mci) > internal_mci_time_1)) {
+        Fail("public internal edit should rewrite the internal module interface artifact");
+    }
+}
+
 void TestRunExitCodeAndArgs(const std::filesystem::path& binary_root,
                             const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "phase7_run_project";
     const std::filesystem::path project_path = WriteBasicProject(
         project_root,
-        "export { answer }\n"
-        "\n"
         "func answer() i32 {\n"
         "    return 1\n"
         "}\n",
@@ -2111,8 +2282,6 @@ void TestProjectTestTimeoutFailsDeterministically(const std::filesystem::path& b
               "timeout_ms = 100\n");
     WriteFile(project_root / "src/main.mc", "func main() i32 { return 0 }\n");
     WriteFile(project_root / "tests/hang_test.mc",
-              "export { test_hang }\n"
-              "\n"
               "func test_hang() *i32 {\n"
               "    while true {\n"
               "    }\n"
@@ -2230,8 +2399,6 @@ void TestExecutableTargetRejectsNonStaticLibraryLink(const std::filesystem::path
               "[targets.app.runtime]\n"
               "startup = \"default\"\n");
     WriteFile(project_root / "src/lib_main.mc",
-              "export { helper }\n"
-              "\n"
               "func helper() i32 {\n"
               "    return 7\n"
               "}\n"
@@ -2867,6 +3034,7 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
               "\n"
               "[targets.audit]\n"
               "kind = \"exe\"\n"
+              "package = \"review-board\"\n"
               "root = \"src/audit_main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2885,6 +3053,7 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
               "\n"
               "[targets.focus]\n"
               "kind = \"exe\"\n"
+              "package = \"review-board\"\n"
               "root = \"src/focus_main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2979,8 +3148,6 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
 
     SleepForTimestampTick();
     WriteFile(cloned_project_root / "src/review_scan.mc",
-              "export { count_closed_items, count_open_items, count_urgent_open_items }\n"
-              "\n"
               "import strings\n"
               "\n"
               "func line_is_open(bytes: Slice<u8>, start: usize, newline: usize) bool {\n"
@@ -3159,8 +3326,6 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
 
     SleepForTimestampTick();
     WriteFile(cloned_project_root / "src/review_status.mc",
-              "export { audit_should_pause_text, focus_needs_escalation_text, helper_version, run_audit, run_focus }\n"
-              "\n"
               "import fs\n"
               "import io\n"
               "import mem\n"
@@ -3388,6 +3553,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
               "\n"
               "[targets.issue-rollup-core]\n"
               "kind = \"staticlib\"\n"
+              "package = \"issue-rollup\"\n"
               "root = \"src/core/rollup_core.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -3401,6 +3567,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
               "\n"
               "[targets.issue-rollup]\n"
               "kind = \"exe\"\n"
+              "package = \"issue-rollup\"\n"
               "root = \"src/app/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -3415,6 +3582,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
               "\n"
               "[targets.issue-rollup-report]\n"
               "kind = \"exe\"\n"
+              "package = \"issue-rollup\"\n"
               "root = \"src/app/report_main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -3433,8 +3601,6 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
               "mode = \"checked\"\n"
               "timeout_ms = 5000\n");
     WriteFile(cloned_project_root / "src/app/report_main.mc",
-              "export { main }\n"
-              "\n"
               "import fs\n"
               "import mem\n"
               "import rollup_core\n"
@@ -3564,8 +3730,6 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
 
     SleepForTimestampTick();
     WriteFile(cloned_project_root / "src/parse/rollup_parse.mc",
-              "export { summarize_text }\n"
-              "\n"
               "import rollup_model\n"
               "import strings\n"
               "\n"
@@ -3738,8 +3902,6 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
 
     SleepForTimestampTick();
     WriteFile(cloned_project_root / "src/core/rollup_core.mc",
-              "export { helper_version, summarize_text, write_text_rollup }\n"
-              "\n"
               "import rollup_model\n"
               "import rollup_parse\n"
               "import rollup_render\n"
@@ -3882,6 +4044,7 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
               "\n"
               "[targets.issue-rollup-core]\n"
               "kind = \"staticlib\"\n"
+              "package = \"issue-rollup\"\n"
               "root = \"src/core/rollup_core.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -3895,6 +4058,7 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
               "\n"
               "[targets.issue-rollup]\n"
               "kind = \"exe\"\n"
+              "package = \"issue-rollup\"\n"
               "root = \"src/app/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -3913,8 +4077,6 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
               "mode = \"checked\"\n"
               "timeout_ms = 5000\n");
     WriteFile(cloned_project_root / "src/model/rollup_model.mc",
-              "export { DEFAULT_SUMMARY, Summary, has_priority, total_items }\n"
-              "\n"
               "struct Summary {\n"
               "    open_items: usize\n"
               "    closed_items: usize\n"
@@ -3932,8 +4094,6 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
               "    return summary.priority_items > 0\n"
               "}\n");
     WriteFile(cloned_project_root / "src/app/main.mc",
-              "export { main }\n"
-              "\n"
               "import fs\n"
               "import mem\n"
               "import rollup_core\n"
@@ -3988,10 +4148,12 @@ int main(int argc, char** argv) {
     TestProjectTestTargetBuildsAndRuns(binary_root, mc_path);
     TestProjectImportedGlobalMirDeclarations(binary_root, mc_path);
     TestCorruptedInterfaceArtifactFailsBuild(binary_root, mc_path);
+    TestStaleInterfaceArtifactFormatFailsBuild(binary_root, mc_path);
     TestModuleBuildStateIsVersionedAndDeterministic(binary_root, mc_path);
     TestForeignInterfaceArtifactFailsBuild(binary_root, mc_path);
     TestInvalidStateFileForcesRebuild(binary_root, mc_path);
     TestIncrementalRebuildBehavior(binary_root, mc_path);
+    TestPrivateAndInternalIncrementalBehavior(binary_root, mc_path);
     TestRunExitCodeAndArgs(binary_root, mc_path);
     TestProjectTestCommandSucceeds(binary_root, mc_path);
     TestProjectTestCommandFailsOnOrdinaryFailure(binary_root, mc_path);

@@ -1,5 +1,3 @@
-export { main }
-
 import errors
 import sync
 

@@ -1,5 +1,3 @@
-export { test_message_matches }
-
 import pipe_handoff
 import strings
 import testing

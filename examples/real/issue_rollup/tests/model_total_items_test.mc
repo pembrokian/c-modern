@@ -1,5 +1,3 @@
-export { test_model_total_items }
-
 import rollup_model
 import testing
 

@@ -1,5 +1,3 @@
-export { test_contains_miss }
-
 import grep
 import testing
 

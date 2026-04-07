@@ -1,5 +1,3 @@
-export { file_size, is_dir, list_dir, read_all }
-
 import mem
 
 extern(c) func __mc_fs_file_size(path: str) isize

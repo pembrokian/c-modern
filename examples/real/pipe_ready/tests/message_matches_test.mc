@@ -1,5 +1,3 @@
-export { test_message_matches }
-
 import pipe_ready
 import strings
 import testing

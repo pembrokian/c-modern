@@ -1,5 +1,3 @@
-export { test_entry_name }
-
 import testing
 import walk
 

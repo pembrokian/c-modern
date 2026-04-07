@@ -1,5 +1,3 @@
-export { MemoryOrder, Atomic, atomic_load }
-
 enum MemoryOrder {
     Relaxed,
     Acquire,

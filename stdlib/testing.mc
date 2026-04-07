@@ -1,5 +1,3 @@
-export { expect, expect_false, expect_i32_eq, expect_str_eq, expect_usize_eq, fail }
-
 import strings
 
 extern(c) func __mc_testing_fail_sentinel() *i32

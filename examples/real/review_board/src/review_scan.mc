@@ -1,5 +1,3 @@
-export { count_closed_items, count_open_items, count_urgent_open_items }
-
 import strings
 
 func line_is_open(bytes: Slice<u8>, start: usize, newline: usize) bool {

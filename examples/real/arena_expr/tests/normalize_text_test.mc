@@ -1,5 +1,3 @@
-export { test_normalize_text }
-
 import expr
 import mem
 import testing

@@ -1,5 +1,3 @@
-export { test_expected_sum }
-
 import testing
 import worker_queue
 

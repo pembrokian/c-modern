@@ -1,5 +1,3 @@
-export { Error, ErrorKind, ok, fail, fail_code, fail_errno, fail_io, fail_utf8, fail_mem, fail_os, fail_net, fail_sync, fail_user, is_ok, is_err, kind, code, kind_none, kind_generic, kind_errno, kind_io, kind_utf8, kind_mem, kind_os, kind_net, kind_sync, kind_user }
-
 type Error = uintptr
 type ErrorKind = usize
 

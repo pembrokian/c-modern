@@ -1,5 +1,3 @@
-export { main }
-
 import fs
 
 func main(args: Slice<cstr>) i32 {

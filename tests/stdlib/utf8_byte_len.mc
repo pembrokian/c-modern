@@ -1,5 +1,3 @@
-export { main }
-
 import utf8
 
 func main() i32 {

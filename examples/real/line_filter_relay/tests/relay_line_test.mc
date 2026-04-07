@@ -1,5 +1,3 @@
-export { test_relay_line }
-
 import errors
 import line_filter_relay
 import mem

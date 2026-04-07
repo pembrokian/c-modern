@@ -7,6 +7,7 @@ Implemented bootstrap modules:
 
 - `mem.mc`
 - `io.mc`
+- `fmt.mc`
 - `fs.mc`
 - `sync.mc`
 - `strings.mc`
@@ -49,6 +50,10 @@ Current repository-specific notes:
   `File`, `read`, `write`, `close`, readiness polling, and the admitted
   `Pipe` plus `pipe()` primitive used to connect independent execution
   contexts without introducing scheduler policy
+- `fmt` is the narrow formatting companion above `io`: it currently provides
+  explicit sink helpers like `print` and `fprint`, plus owned-buffer text
+  helpers like `sprint` and small numeric conversion helpers for bootstrap
+  use
 - `net` remains a narrow portable constructor layer above `io`; TCP listen,
   accept, and connect operations return `io.File` so ordinary networking
   composes directly with `io.read`, `io.write`, `io.close`, and `io.poller_*`;

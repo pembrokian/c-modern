@@ -4,6 +4,7 @@ default = "audit"
 
 [targets.audit]
 kind = "exe"
+package = "review-board"
 root = "src/audit_main.mc"
 mode = "debug"
 env = "hosted"
@@ -22,6 +23,7 @@ timeout_ms = 5000
 
 [targets.focus]
 kind = "exe"
+package = "review-board"
 root = "src/focus_main.mc"
 mode = "debug"
 env = "hosted"

@@ -1,5 +1,3 @@
-export { main }
-
 import io
 
 func main() i32 {

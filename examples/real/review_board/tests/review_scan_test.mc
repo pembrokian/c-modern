@@ -1,5 +1,3 @@
-export { test_review_scan }
-
 import review_scan
 import testing
 

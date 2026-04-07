@@ -1,5 +1,3 @@
-export { main }
-
 import strings
 
 func main() i32 {

@@ -1,5 +1,3 @@
-export { File, Event, first_file }
-
 type File = i32
 
 struct Event {

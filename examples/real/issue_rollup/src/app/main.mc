@@ -1,5 +1,3 @@
-export { main }
-
 import fs
 import mem
 import rollup_core

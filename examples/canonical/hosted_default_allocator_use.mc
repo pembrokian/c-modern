@@ -1,5 +1,3 @@
-export { main }
-
 import mem
 
 func allocate_len(alloc: *mem.Allocator, cap: usize) usize {

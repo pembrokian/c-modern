@@ -1,5 +1,3 @@
-export { main }
-
 import mem
 
 func sum_fixed(values: [4]i32) i32 {

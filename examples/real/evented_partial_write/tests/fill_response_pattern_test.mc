@@ -1,5 +1,3 @@
-export { test_fill_response_pattern }
-
 import partial_write_core
 import testing
 

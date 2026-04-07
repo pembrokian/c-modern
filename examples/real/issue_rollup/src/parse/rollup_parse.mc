@@ -1,5 +1,3 @@
-export { summarize_text }
-
 import rollup_model
 import strings
 

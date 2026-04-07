@@ -1,5 +1,3 @@
-export { test_next_slot }
-
 import testing
 import worker_queue
 

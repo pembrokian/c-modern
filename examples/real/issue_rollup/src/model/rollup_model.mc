@@ -1,5 +1,3 @@
-export { Summary, has_priority, total_items }
-
 struct Summary {
     open_items: usize
     closed_items: usize

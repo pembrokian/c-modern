@@ -1,5 +1,3 @@
-export { Box, read_i32 }
-
 struct Box<T> {
     value: T
 }

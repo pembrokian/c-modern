@@ -1,5 +1,3 @@
-export { main, parse_config }
-
 import errors
 import strings
 

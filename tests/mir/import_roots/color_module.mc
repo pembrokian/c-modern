@@ -1,5 +1,3 @@
-export { Color }
-
 enum Color {
     Red,
     Green,

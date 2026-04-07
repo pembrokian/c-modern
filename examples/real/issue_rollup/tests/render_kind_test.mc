@@ -1,5 +1,3 @@
-export { test_render_kind }
-
 import rollup_model
 import rollup_render
 import testing

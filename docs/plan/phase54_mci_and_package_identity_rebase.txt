@@ -3,7 +3,7 @@ Phase 54 -- .mci And Package-Identity Rebase
 
 Status
 ------
-PLANNED
+IMPLEMENTED
 
 Purpose
 -------
@@ -17,15 +17,30 @@ after Phase 8.
 
 Repository status note
 ----------------------
-- The current `.mci` story is intentionally exported-surface-centered.
-- Separate-compilation reuse and dependent invalidation currently assume that
-  a module's rebuild-relevant contract is exactly the filtered exported
-  semantic surface.
-- The proposed module rewrite intentionally changes that assumption: ordinary
-  modules now expose all non-private declarations, and package-internal modules
-  are restricted by importer package identity rather than by separate export
-  curation.
-- That makes `.mci` and interface hashing the next major owner after Phase 53.
+- This repository now serializes the non-private import-visible semantic
+  surface rather than exported-name projections.
+- `.mci` format version 6 records explicit package identity and module kind,
+  and older interface artifact versions are rejected rather than reused.
+- Module build state version 2 records package identity explicitly so same
+  build-directory reuse stays honest across package-boundary changes.
+- Ordinary modules expose all non-private declarations, and `internal.mc`
+  imports are validated by package identity rather than by curated export
+  lists.
+- Direct-source builds now assign deterministic package identities as well, so
+  imported stdlib and helper `.mci` artifacts satisfy the same metadata
+  contract as project-mode builds.
+
+Implementation summary
+----------------------
+- Landed `.mci` schema and loader validation updates in
+  `/Users/ro/dev/c_modern/compiler/mci/`
+- Landed package-aware compile-graph, import-validation, and build-state reuse
+  updates in `/Users/ro/dev/c_modern/compiler/driver/`
+- Added focused Phase 54 workflow coverage in
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp`
+- Rebased repository stdlib, fixture, and example sources off removed export
+  blocks so the Phase 54 workflow runs against the current public-by-default
+  source model
 
 Problem being solved
 --------------------

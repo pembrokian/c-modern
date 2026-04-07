@@ -151,7 +151,9 @@ void TestMciRoundTrip() {
     const auto temp_path = std::filesystem::temp_directory_path() / "c_modern_phase7_roundtrip.mci";
     const mc::mci::InterfaceArtifact artifact {
         .target_identity = "arm64-apple-darwin25.4.0",
+        .package_identity = "phase7-tests",
         .module_name = "helper",
+        .module_kind = mc::ast::SourceFile::ModuleKind::kOrdinary,
         .source_path = "tests/tool/phase7_project/src/helper.mc",
         .module = module,
     };
@@ -163,7 +165,10 @@ void TestMciRoundTrip() {
     const auto loaded = mc::mci::LoadInterfaceArtifact(temp_path, diagnostics);
     Expect(loaded.has_value(), "mci loader should read interface artifacts back");
     Expect(!diagnostics.HasErrors(), "mci loader should accept its own canonical encoding");
+        Expect(loaded->package_identity == "phase7-tests", "mci loader should preserve the package identity");
     Expect(loaded->module_name == "helper", "mci loader should preserve the module name");
+        Expect(loaded->module_kind == mc::ast::SourceFile::ModuleKind::kOrdinary,
+            "mci loader should preserve the module kind");
     Expect(loaded->module.imports.size() == 1 && loaded->module.imports[0] == "helper_dep",
            "mci loader should preserve import lists");
         Expect(loaded->module.functions.size() == 2 && loaded->module.functions[0].name == "answer",
@@ -223,18 +228,17 @@ void TestSemaLookupFallsBackToModuleContents() {
 
 void TestLexerTracksKeywordsAndSeparators() {
     mc::support::DiagnosticSink diagnostics;
-    const auto lexed = mc::lex::Lex("export { main }\nimport io\nfunc main() {}\n", "<test>", diagnostics);
+    const auto lexed = mc::lex::Lex("import io\nfunc main() {}\n", "<test>", diagnostics);
     Expect(lexed.ok, "lexer should accept a basic module");
     Expect(!diagnostics.HasErrors(), "lexer should not emit diagnostics for valid input");
-    Expect(lexed.tokens.size() >= 10, "lexer should emit a real token stream");
-    Expect(lexed.tokens[0].kind == mc::lex::TokenKind::kExport, "lexer should recognize export keyword");
-    Expect(lexed.tokens[4].kind == mc::lex::TokenKind::kNewline, "lexer should preserve newline separators");
+    Expect(lexed.tokens.size() >= 7, "lexer should emit a real token stream");
+    Expect(lexed.tokens[0].kind == mc::lex::TokenKind::kImport, "lexer should recognize import keyword");
+    Expect(lexed.tokens[2].kind == mc::lex::TokenKind::kNewline, "lexer should preserve newline separators");
 }
 
 void TestParserBuildsDeterministicAstDump() {
     mc::support::DiagnosticSink diagnostics;
     const auto parsed = ParseText(
-        "export { main }\n"
         "import io\n"
         "@trace\n"
         "func main(args: Slice<cstr>) i32 {\n"
@@ -254,7 +258,6 @@ void TestParserBuildsDeterministicAstDump() {
 
     const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
     Expect(dump.find("SourceFile") != std::string::npos, "dump should start with SourceFile");
-    Expect(dump.find("ExportBlock names=[main]") != std::string::npos, "dump should include export block");
     Expect(dump.find("ImportDecl moduleName=io") != std::string::npos, "dump should include imports");
     Expect(dump.find("FuncDecl name=main") != std::string::npos, "dump should include function declaration");
     Expect(dump.find("AggregateInitExpr") != std::string::npos, "dump should include aggregate initializer expression");

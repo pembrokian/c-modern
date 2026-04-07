@@ -1,5 +1,3 @@
-export { fill_response, write_chunk_len }
-
 import strings
 
 const WRITE_LIMIT: usize = 128

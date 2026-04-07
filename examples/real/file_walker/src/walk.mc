@@ -1,5 +1,3 @@
-export { entry_is_dir, entry_name, path_join, run }
-
 import fs
 import io
 import mem

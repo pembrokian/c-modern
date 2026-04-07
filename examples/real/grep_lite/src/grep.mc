@@ -1,5 +1,3 @@
-export { contains, count_matches, run }
-
 import fs
 import io
 import mem

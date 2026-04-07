@@ -1,5 +1,3 @@
-export { test_format_line }
-
 import hash
 import mem
 import testing

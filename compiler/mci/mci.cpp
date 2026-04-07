@@ -17,7 +17,7 @@ namespace {
 
 using mc::support::DiagnosticSeverity;
 
-constexpr int kFormatVersion = 5;
+constexpr int kFormatVersion = 6;
 
 bool ParseBoolField(std::string_view text, bool& value);
 
@@ -552,6 +552,26 @@ std::optional<mc::ast::Decl::Kind> ParseTypeKind(std::string_view text) {
     return std::nullopt;
 }
 
+std::string ModuleKindName(mc::ast::SourceFile::ModuleKind kind) {
+    switch (kind) {
+        case mc::ast::SourceFile::ModuleKind::kOrdinary:
+            return "ordinary";
+        case mc::ast::SourceFile::ModuleKind::kInternal:
+            return "internal";
+    }
+    return "ordinary";
+}
+
+std::optional<mc::ast::SourceFile::ModuleKind> ParseModuleKind(std::string_view text) {
+    if (text == "ordinary") {
+        return mc::ast::SourceFile::ModuleKind::kOrdinary;
+    }
+    if (text == "internal") {
+        return mc::ast::SourceFile::ModuleKind::kInternal;
+    }
+    return std::nullopt;
+}
+
 class TypeParser {
   public:
     explicit TypeParser(std::string_view text) : text_(text) {}
@@ -842,14 +862,12 @@ std::string SerializeArtifactWithoutHashV1(const InterfaceArtifact& artifact) {
 }
 
 std::string SerializeArtifactWithoutHash(const InterfaceArtifact& artifact) {
-    if (artifact.format_version == 1) {
-        return SerializeArtifactWithoutHashV1(artifact);
-    }
-
     std::ostringstream output;
     output << "format\t" << artifact.format_version << '\n';
     output << "target\t" << EscapeText(artifact.target_identity) << '\n';
+    output << "package\t" << EscapeText(artifact.package_identity) << '\n';
     output << "module\t" << EscapeText(artifact.module_name) << '\n';
+    output << "module_kind\t" << ModuleKindName(artifact.module_kind) << '\n';
     output << "source\t" << EscapeText(artifact.source_path.generic_string()) << '\n';
     output << "imports\t" << JoinEscaped(artifact.module.imports) << '\n';
 
@@ -996,6 +1014,8 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
 
     InterfaceArtifact artifact;
     artifact.format_version = kFormatVersion;
+    bool saw_package_identity = false;
+    bool saw_module_kind = false;
     std::string line;
     std::size_t line_number = 0;
     while (std::getline(input, line)) {
@@ -1030,6 +1050,20 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
             artifact.target_identity = *value;
             continue;
         }
+        if (fields[0] == "package") {
+            if (fields.size() != 2) {
+                ReportMciError(path, line_number, "invalid package field in interface artifact", diagnostics);
+                return std::nullopt;
+            }
+            const auto value = UnescapeText(fields[1]);
+            if (!value.has_value()) {
+                ReportMciError(path, line_number, "invalid escaped package field in interface artifact", diagnostics);
+                return std::nullopt;
+            }
+            artifact.package_identity = *value;
+            saw_package_identity = true;
+            continue;
+        }
         if (fields[0] == "module") {
             if (fields.size() != 2) {
                 ReportMciError(path, line_number, "invalid module field in interface artifact", diagnostics);
@@ -1041,6 +1075,20 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
                 return std::nullopt;
             }
             artifact.module_name = *value;
+            continue;
+        }
+        if (fields[0] == "module_kind") {
+            if (fields.size() != 2) {
+                ReportMciError(path, line_number, "invalid module_kind field in interface artifact", diagnostics);
+                return std::nullopt;
+            }
+            const auto parsed = ParseModuleKind(fields[1]);
+            if (!parsed.has_value()) {
+                ReportMciError(path, line_number, "invalid module_kind value in interface artifact", diagnostics);
+                return std::nullopt;
+            }
+            artifact.module_kind = *parsed;
+            saw_module_kind = true;
             continue;
         }
         if (fields[0] == "source") {
@@ -1282,13 +1330,32 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
         return std::nullopt;
     }
 
-    if (artifact.format_version != 1 && artifact.format_version != 2 && artifact.format_version != 3 && artifact.format_version != 4 &&
-        artifact.format_version != kFormatVersion) {
+    if (artifact.format_version != kFormatVersion) {
         diagnostics.Report({
             .file_path = path,
             .span = mc::support::kDefaultSourceSpan,
             .severity = DiagnosticSeverity::kError,
             .message = "unsupported interface artifact format version",
+        });
+        return std::nullopt;
+    }
+
+    if (!saw_package_identity || artifact.package_identity.empty()) {
+        diagnostics.Report({
+            .file_path = path,
+            .span = mc::support::kDefaultSourceSpan,
+            .severity = DiagnosticSeverity::kError,
+            .message = "interface artifact is missing package identity",
+        });
+        return std::nullopt;
+    }
+
+    if (!saw_module_kind) {
+        diagnostics.Report({
+            .file_path = path,
+            .span = mc::support::kDefaultSourceSpan,
+            .severity = DiagnosticSeverity::kError,
+            .message = "interface artifact is missing module kind",
         });
         return std::nullopt;
     }
@@ -1320,7 +1387,9 @@ std::optional<InterfaceArtifact> LoadInterfaceArtifact(const std::filesystem::pa
 bool ValidateInterfaceArtifactMetadata(const InterfaceArtifact& artifact,
                                        const std::filesystem::path& artifact_path,
                                        std::string_view expected_target_identity,
+                                       std::string_view expected_package_identity,
                                        std::string_view expected_module_name,
+                                       ast::SourceFile::ModuleKind expected_module_kind,
                                        const std::filesystem::path& expected_source_path,
                                        support::DiagnosticSink& diagnostics) {
     auto report_error = [&](const std::string& message) {
@@ -1339,14 +1408,23 @@ bool ValidateInterfaceArtifactMetadata(const InterfaceArtifact& artifact,
     if (artifact.module_name.empty()) {
         return report_error("interface artifact is missing module name");
     }
+    if (artifact.package_identity.empty()) {
+        return report_error("interface artifact is missing package identity");
+    }
     if (artifact.source_path.empty()) {
         return report_error("interface artifact is missing source path");
     }
     if (!expected_target_identity.empty() && artifact.target_identity != expected_target_identity) {
         return report_error("interface artifact target mismatch");
     }
+    if (!expected_package_identity.empty() && artifact.package_identity != expected_package_identity) {
+        return report_error("interface artifact package identity mismatch");
+    }
     if (!expected_module_name.empty() && artifact.module_name != expected_module_name) {
         return report_error("interface artifact module mismatch");
+    }
+    if (artifact.module_kind != expected_module_kind) {
+        return report_error("interface artifact module kind mismatch");
     }
     if (!expected_source_path.empty()) {
         const auto actual_source = artifact.source_path.lexically_normal();

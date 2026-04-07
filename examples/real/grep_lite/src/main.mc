@@ -1,5 +1,3 @@
-export { main }
-
 import grep
 
 func main(args: Slice<cstr>) i32 {

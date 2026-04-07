@@ -1,5 +1,3 @@
-export { test_message_len }
-
 import pipe_handoff
 import testing
 

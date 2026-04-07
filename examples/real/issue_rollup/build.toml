@@ -4,6 +4,7 @@ default = "issue-rollup"
 
 [targets.issue-rollup-core]
 kind = "staticlib"
+package = "issue-rollup"
 root = "src/core/rollup_core.mc"
 mode = "debug"
 env = "hosted"
@@ -16,6 +17,7 @@ startup = "default"
 
 [targets.issue-rollup]
 kind = "exe"
+package = "issue-rollup"
 root = "src/app/main.mc"
 mode = "debug"
 env = "hosted"

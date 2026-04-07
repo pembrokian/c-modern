@@ -1,5 +1,3 @@
-export { test_parse_zero_port }
-
 import errors
 import net
 import testing

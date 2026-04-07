@@ -1375,6 +1375,13 @@ int main(int argc, char** argv) {
                           "phase6 write");
 
     RunBuiltOutputFixture(mc_path,
+                          source_root / "tests/stdlib/fmt_smoke.mc",
+                          work_root / "phase6_fmt_smoke_build",
+                          {},
+                          0,
+                          "fmt");
+
+    RunBuiltOutputFixture(mc_path,
                           source_root / "tests/stdlib/echo_arg.mc",
                           work_root / "phase6_echo_arg_build",
                           {"borrowed-arg"},
@@ -1570,8 +1577,6 @@ int main(int argc, char** argv) {
               "[targets.app.runtime]\n"
               "startup = \"default\"\n");
     WriteFile(imported_project_root / "src/helper.mc",
-              "export { Pair, make_pair, LIMIT, counter }\n"
-              "\n"
               "struct Pair {\n"
               "    left: i32,\n"
               "    right: i32,\n"
@@ -1616,8 +1621,6 @@ int main(int argc, char** argv) {
               "[targets.app.runtime]\n"
               "startup = \"default\"\n");
     WriteFile(imported_layout_project_root / "src/helper.mc",
-              "export { PackedHeader, make_packed, PaddedHeader, make_padded }\n"
-              "\n"
               "@packed\n"
               "struct PackedHeader {\n"
               "    tag: u8,\n"

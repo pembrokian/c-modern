@@ -61,6 +61,7 @@ struct ImportedInterfaceData {
 
 struct ModuleBuildState {
     std::string target_identity;
+    std::string package_identity;
     std::string mode;
     std::string env;
     std::string source_hash;
@@ -69,12 +70,19 @@ struct ModuleBuildState {
     std::vector<std::pair<std::string, std::string>> imported_interface_hashes;
 };
 
+struct CompileImport {
+    std::string module_name;
+    std::string package_identity;
+    std::filesystem::path source_path;
+    ast::SourceFile::ModuleKind module_kind = ast::SourceFile::ModuleKind::kOrdinary;
+};
+
 struct CompileNode {
     std::string module_name;
     std::string package_identity;
     std::filesystem::path source_path;
     mc::parse::ParseResult parse_result;
-    std::vector<std::pair<std::string, std::filesystem::path>> imports;
+    std::vector<CompileImport> imports;
 };
 
 struct CompileGraph {
@@ -117,7 +125,7 @@ enum class WaitForChildResult {
     kTimedOut,
 };
 
-constexpr int kModuleBuildStateFormatVersion = 1;
+constexpr int kModuleBuildStateFormatVersion = 2;
 
 std::optional<std::filesystem::path> DiscoverHostedRuntimeSupportSource(const std::filesystem::path& source_path);
 std::vector<std::filesystem::path> ComputeEffectiveImportRoots(const std::filesystem::path& source_path,

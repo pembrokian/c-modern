@@ -1,5 +1,3 @@
-export { Child, spawn, wait }
-
 import errors
 import io
 

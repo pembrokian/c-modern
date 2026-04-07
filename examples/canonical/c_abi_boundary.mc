@@ -1,5 +1,3 @@
-export { main }
-
 @abi(c)
 struct TextBox {
     text: cstr

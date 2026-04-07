@@ -1,5 +1,3 @@
-export { main }
-
 const CAPACITY: usize = 4
 
 func total(values: [4]i32, head: usize, len: usize) i32 {

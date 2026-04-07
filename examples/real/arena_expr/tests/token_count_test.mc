@@ -1,5 +1,3 @@
-export { test_token_count }
-
 import expr
 import testing
 

@@ -1,5 +1,3 @@
-export { test_hex_u64 }
-
 import hash
 import mem
 import testing

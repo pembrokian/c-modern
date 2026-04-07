@@ -1,5 +1,3 @@
-export { test_path_join }
-
 import mem
 import testing
 import walk

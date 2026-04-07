@@ -1,5 +1,3 @@
-export { main }
-
 import mem
 import utf8
 

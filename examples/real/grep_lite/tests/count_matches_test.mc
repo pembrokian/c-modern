@@ -1,5 +1,3 @@
-export { test_count_matches }
-
 import grep
 import testing
 

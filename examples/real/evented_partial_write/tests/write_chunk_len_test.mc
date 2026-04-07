@@ -1,5 +1,3 @@
-export { test_write_chunk_len }
-
 import partial_write_core
 import testing
 

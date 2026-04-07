@@ -1,5 +1,3 @@
-export { relay_line }
-
 import errors
 import io
 import mem

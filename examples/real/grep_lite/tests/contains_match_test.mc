@@ -1,5 +1,3 @@
-export { test_contains_match }
-
 import grep
 import testing
 

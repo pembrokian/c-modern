@@ -1,5 +1,3 @@
-export { Expr, normalize_text, parse_text, token_count }
-
 import io
 import mem
 

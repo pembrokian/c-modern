@@ -1,5 +1,3 @@
-export { main }
-
 import review_status
 
 func main(args: Slice<cstr>) i32 {

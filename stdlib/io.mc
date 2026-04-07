@@ -1,5 +1,3 @@
-export { write, write_line, read, write_file, close, File, Pipe, pipe, EventMask, EVENT_READABLE, EVENT_WRITABLE, Event, Poller, poller_new, poller_add, poller_set, poller_remove, poller_wait, poller_close }
-
 import errors
 
 type File = i32
@@ -25,17 +23,29 @@ struct Poller {
     raw: uintptr
 }
 
+@private
 extern(c) func __mc_io_write(text: str) errors.Error
+@private
 extern(c) func __mc_io_write_line(text: str) errors.Error
+@private
 extern(c) func __mc_io_read(file: File, bytes: Slice<u8>, err: *errors.Error) usize
+@private
 extern(c) func __mc_io_write_file(file: File, bytes: Slice<u8>, err: *errors.Error) usize
+@private
 extern(c) func __mc_io_close(file: File) errors.Error
+@private
 extern(c) func __mc_io_pipe(err: *errors.Error) Pipe
+@private
 extern(c) func __mc_io_poller_new(err: *errors.Error) *Poller
+@private
 extern(c) func __mc_io_poller_add(p: *Poller, file: File, interests: EventMask) errors.Error
+@private
 extern(c) func __mc_io_poller_set(p: *Poller, file: File, interests: EventMask) errors.Error
+@private
 extern(c) func __mc_io_poller_remove(p: *Poller, file: File) errors.Error
+@private
 extern(c) func __mc_io_poller_wait(p: *Poller, events: *Event, cap: usize, timeout_ms: i32, err: *errors.Error) usize
+@private
 extern(c) func __mc_io_poller_close(p: *Poller)
 
 func write(text: str) errors.Error {

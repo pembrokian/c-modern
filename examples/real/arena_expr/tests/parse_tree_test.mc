@@ -1,5 +1,3 @@
-export { test_parse_tree }
-
 import expr
 import mem
 import testing

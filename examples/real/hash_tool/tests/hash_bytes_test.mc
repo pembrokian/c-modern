@@ -1,5 +1,3 @@
-export { test_hash_bytes }
-
 import hash
 import strings
 import testing
