@@ -2317,6 +2317,82 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 RecordExecutableValue(state, instruction.result, field_ptr, type_info);
                 return true;
             }
+            if (instruction.target_kind == mir::Instruction::TargetKind::kIndex) {
+                ExecutableValue base;
+                ExecutableValue index;
+                if (!RequireOperandCount(instruction,
+                                         2,
+                                         "LLVM bootstrap executable emission",
+                                         "local_addr index",
+                                         state.function->name,
+                                         block,
+                                         source_path,
+                                         diagnostics) ||
+                    !ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, base) ||
+                    !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, index)) {
+                    return false;
+                }
+
+                std::string index_i64;
+                if (!ExtendIntegerToI64(index,
+                                        function_index,
+                                        block_index,
+                                        instruction_index,
+                                        "local_addr_index",
+                                        output_lines,
+                                        index_i64)) {
+                    return false;
+                }
+
+                const std::string ptr_temp = LLVMTempName(function_index, block_index, instruction_index) + ".index.addr";
+                if (!base.type.backend_name.empty() && base.type.backend_name.front() == '[') {
+                    std::string array_ptr;
+                    if (instruction.target_base_storage == mir::Instruction::StorageBaseKind::kLocal) {
+                        const auto local_it = state.local_slots.find(instruction.target_base_name);
+                        if (local_it != state.local_slots.end()) {
+                            array_ptr = local_it->second;
+                        }
+                    } else if (instruction.target_base_storage == mir::Instruction::StorageBaseKind::kGlobal) {
+                        const auto global_it = state.globals->find(instruction.target_base_name);
+                        if (global_it != state.globals->end()) {
+                            array_ptr = global_it->second.backend_name;
+                        }
+                    }
+                    if (array_ptr.empty()) {
+                        array_ptr = EmitAggregateStackSlot(base,
+                                                           function_index,
+                                                           block_index,
+                                                           instruction_index,
+                                                           "local_addr_index_array",
+                                                           output_lines);
+                    }
+                    output_lines.push_back(ptr_temp + " = getelementptr inbounds " + base.type.backend_name + ", ptr " + array_ptr + ", i64 0, i64 " +
+                                           index_i64);
+                } else if (base.type.backend_name == "{ptr, i64}") {
+                    BackendTypeInfo element_type;
+                    if (!LowerInstructionType(*state.module,
+                                              instruction.type.subtypes.front(),
+                                              source_path,
+                                              diagnostics,
+                                              ExecutableFunctionBlockContext("local_addr index element", state, block),
+                                              element_type)) {
+                        return false;
+                    }
+                    const std::string data_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".index.data";
+                    output_lines.push_back(data_ptr + " = extractvalue {ptr, i64} " + base.text + ", 0");
+                    output_lines.push_back(ptr_temp + " = getelementptr inbounds " + element_type.backend_name + ", ptr " + data_ptr + ", i64 " +
+                                           index_i64);
+                } else {
+                    ReportBackendError(source_path,
+                                       "LLVM bootstrap executable emission does not support local_addr index base type '" + base.type.source_name +
+                                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                                       diagnostics);
+                    return false;
+                }
+
+                RecordExecutableValue(state, instruction.result, ptr_temp, type_info);
+                return true;
+            }
             std::string local_slot;
             if (!ResolveExecutableLocal(state, instruction.target, block, source_path, diagnostics, local_slot)) {
                 return false;

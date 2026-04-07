@@ -1714,6 +1714,12 @@ int main(int argc, char** argv) {
                     {});
 
     RunBuiltFixture(mc_path,
+                    source_root / "tests/codegen/index_address_local.mc",
+                    work_root / "phase62_index_address_local_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
                     source_root / "tests/codegen/bool_struct_fields.mc",
                     work_root / "phase21_bool_struct_fields_build",
                     0,

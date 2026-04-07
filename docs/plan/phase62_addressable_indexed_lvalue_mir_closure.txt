@@ -1,0 +1,146 @@
+Phase 62 -- Addressable Indexed Lvalue MIR Closure
+==================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Close the remaining MIR-owned drift that still survived after Phase 61:
+sema already admits address-taking of addressable indexed expressions such as
+`&values[i]`, but MIR still rejected that same admitted lvalue surface with a
+generic "not yet supported" failure, especially once indexing or harmless
+parentheses were involved.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative admin roadmap described Phase 62 as MIR surface completion
+  for remaining owned semantics.
+- Phase 56 already closed the roadmap examples of short-circuit logical
+  lowering and indexed access evaluation itself.
+- The strongest still-live concrete owner now fits the same Phase 62 label
+  honestly: the language's admitted addressability rules already included
+  indexed lvalues, but MIR address lowering still stopped short of that
+  sema-owned truth.
+
+Repository status note
+----------------------
+- The language references specification already admits address-taking of array
+  elements, struct fields of addressable bases, and parenthesized forms of the
+  same addressable lvalues.
+- Sema already enforces that `&` requires an addressable operand and types
+  `a[i]` as the element type for arrays, slices, and buffers.
+- MIR already had explicit indexed read and indexed store forms, including
+  bounds checks and LLVM lowering for those value and effect paths.
+- The remaining gap was narrower than a general addressability redesign:
+  `&values[i]` and `&((values)[i])` still failed during MIR lowering even
+  though the same indexed lvalue could already be read from, written to, and
+  type-checked successfully.
+
+Problem being solved
+--------------------
+- The language and sema treat indexed elements as addressable lvalues.
+- MIR still handled address-of locals, globals, and some direct fields, but it
+  rejected indexed lvalues with a bootstrap-only lowering error.
+- That left a sema-admitted source form weaker than nearby MIR surfaces such
+  as indexed load, indexed store, and field address lowering.
+- Parenthesized lvalues amplified the drift because MIR treated harmless
+  grouping as a distinct unsupported address-of form instead of unwrapping it
+  back to the underlying addressable target.
+
+Core rule
+---------
+- If sema already admits an addressable lvalue category, MIR should lower it
+  through explicit target metadata rather than rejecting it generically.
+- Keep indexed address lowering owner-local to MIR, validation, and backend
+  pointer materialization.
+- Do not widen addressability beyond the existing language and sema contract in
+  this phase.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: add a dedicated `local_addr` lowering path for indexed
+lvalues, normalize parenthesized lvalues onto the same path, and prove the
+result through one MIR fixture plus one executable build-and-run regression.
+
+Compiler change boundary:
+1. unwrap parenthesized addressable operands before MIR address lowering
+2. lower `&base[index]` through explicit `local_addr` indexed-target metadata
+   plus the same bounds-check discipline already used by indexed value and
+   store operations
+3. extend MIR validation and LLVM lowering so indexed `local_addr` targets are
+   first-class rather than rejected as unsupported target metadata
+
+What this phase should try to prove
+-----------------------------------
+- MIR now honors the language's admitted indexed-lvalue addressability rules.
+- Parenthesized lvalues do not create artificial MIR surface gaps when the
+  underlying operand is already addressable.
+- Indexed address lowering remains explicit and inspectable through structured
+  MIR metadata instead of being reconstructed ad hoc in the backend.
+
+Preferred pressure points
+-------------------------
+1. one local fixed array whose element address is passed to a mutating helper
+2. one parenthesized indexed lvalue proving MIR unwraps grouping instead of
+   rejecting it
+3. one executable proof that the element pointer aliases the original array
+   storage rather than a copied temporary
+
+Deliverables
+------------
+- one canonical Phase 62 note documenting the indexed-lvalue MIR closeout
+- one focused MIR, validator, and backend change for indexed `local_addr`
+- one MIR fixture and one executable regression proving direct and
+  parenthesized indexed element address lowering
+
+Suggested execution order
+-------------------------
+1. reproduce the current `&values[i]` MIR failure on a minimal direct-source
+   program
+2. add indexed `local_addr` lowering and parenthesized-lvalue unwrapping in
+   MIR
+3. extend validation and backend pointer materialization for the new indexed
+   target metadata
+4. add one MIR fixture and one executable regression
+5. rebuild and run the focused owning test suites
+
+Exit criteria
+-------------
+- sema-admitted indexed lvalues no longer fail with a generic MIR address-of
+  rejection
+- parenthesized addressable lvalues lower through the same indexed address path
+- the fix stays owner-local to MIR, validation, and backend lowering rather
+  than widening sema or the language surface
+
+Non-goals
+---------
+- adding new addressable expression categories beyond the existing language
+  references specification
+- redesigning pointer semantics, borrow rules, or lifetime policy
+- broad MIR cleanup for unrelated unsupported address-of forms
+- widening project workflow, stdlib, or runtime surfaces
+
+What landed
+-----------
+- MIR now unwraps parenthesized lvalues before address lowering so ordinary
+  grouping does not create a false unsupported surface.
+- Indexed lvalues now lower through explicit `local_addr` index-target
+  metadata with the same bounds-check discipline already used by indexed load
+  and store operations.
+- MIR validation and LLVM lowering now accept and materialize indexed
+  `local_addr` pointers directly.
+- Focused MIR and executable regressions prove that `&values[i]` and
+  `&((values)[i])` alias the original array storage rather than a temporary.
+
+Closeout statement
+------------------
+Phase 62 is complete as a narrow MIR surface completion. The repository does
+not widen addressability here; it removes the smaller but real owner-local
+drift where the language and sema already admitted indexed element addresses,
+but MIR still treated that same lvalue surface as unsupported once an actual
+pointer value had to be formed.

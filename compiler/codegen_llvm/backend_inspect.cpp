@@ -79,6 +79,11 @@ bool LowerInstruction(const mir::Instruction& instruction,
                                                      base_name + "." + instruction.target_name);
                 return true;
             }
+            if (instruction.target_kind == mir::Instruction::TargetKind::kIndex) {
+                backend_block.instructions.push_back(backend_name + " = local_addr " + FormatTypeInfo(type_info) + " " +
+                                                     (instruction.target_display.empty() ? instruction.target : instruction.target_display));
+                return true;
+            }
             const BackendLocal* local = nullptr;
             if (!ResolveLocal(state, instruction.target, function, block, source_path, diagnostics, local)) {
                 return false;

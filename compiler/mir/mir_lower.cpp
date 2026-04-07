@@ -226,6 +226,10 @@ class FunctionLowerer {
     };
 
     StoreBaseMetadata StoreBaseMetadataForExpr(const Expr& expr) const {
+        if (expr.kind == Expr::Kind::kParen && expr.left != nullptr) {
+            return StoreBaseMetadataForExpr(*expr.left);
+        }
+
         if (!expr.text.empty() && local_types_.contains(expr.text)) {
             return {
                 .kind = Instruction::StorageBaseKind::kLocal,
@@ -242,6 +246,14 @@ class FunctionLowerer {
         }
 
         return {};
+    }
+
+    const Expr& UnwrapParenExpr(const Expr& expr) const {
+        const Expr* current = &expr;
+        while (current->kind == Expr::Kind::kParen && current->left != nullptr) {
+            current = current->left.get();
+        }
+        return *current;
     }
 
     std::string StableExprMetadataText(const Expr& expr) const {
@@ -1091,19 +1103,20 @@ class FunctionLowerer {
                 return EmitLiteralValue(expr.text, KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "literal expression type"));
             case Expr::Kind::kUnary: {
                 if (expr.text == "&" && expr.left != nullptr) {
+                    const Expr& address_target = UnwrapParenExpr(*expr.left);
                     const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "address-of expression type");
-                    if (expr.left->kind == Expr::Kind::kName && local_types_.contains(expr.left->text)) {
+                    if (address_target.kind == Expr::Kind::kName && local_types_.contains(address_target.text)) {
                         const std::string value = NewValue();
                         Emit({
                             .kind = Instruction::Kind::kLocalAddr,
                             .result = value,
                             .type = type,
-                            .target = expr.left->text,
+                            .target = address_target.text,
                         });
                         return {value, type};
                     }
 
-                    const TargetMetadata target_metadata = TargetMetadataForExpr(*expr.left);
+                    const TargetMetadata target_metadata = TargetMetadataForExpr(address_target);
                     if (target_metadata.kind == Instruction::TargetKind::kGlobal) {
                         const std::string value = NewValue();
                         Emit({
@@ -1118,27 +1131,27 @@ class FunctionLowerer {
                         return {value, type};
                     }
 
-                    if (expr.left->kind == Expr::Kind::kQualifiedName) {
+                    if (address_target.kind == Expr::Kind::kQualifiedName) {
                         StoreBaseMetadata base_storage;
                         sema::Type base_type = sema::UnknownType();
-                        if (local_types_.contains(expr.left->text)) {
+                        if (local_types_.contains(address_target.text)) {
                             base_storage = {
                                 .kind = Instruction::StorageBaseKind::kLocal,
-                                .name = expr.left->text,
+                                .name = address_target.text,
                             };
-                            base_type = local_types_.at(expr.left->text);
-                        } else if (const auto* global = sema::FindGlobalSummary(sema_module_, expr.left->text); global != nullptr) {
+                            base_type = local_types_.at(address_target.text);
+                        } else if (const auto* global = sema::FindGlobalSummary(sema_module_, address_target.text); global != nullptr) {
                             base_storage = {
                                 .kind = Instruction::StorageBaseKind::kGlobal,
-                                .name = expr.left->text,
+                                .name = address_target.text,
                             };
                             base_type = global->type;
-                        } else if (InferTargetKindForExpr(*expr.left) == Instruction::TargetKind::kGlobal) {
+                        } else if (InferTargetKindForExpr(address_target) == Instruction::TargetKind::kGlobal) {
                             base_storage = {
                                 .kind = Instruction::StorageBaseKind::kGlobal,
-                                .name = CombineQualifiedName(*expr.left),
+                                .name = CombineQualifiedName(address_target),
                             };
-                            base_type = ExprTypeOrUnknown(*expr.left);
+                            base_type = ExprTypeOrUnknown(address_target);
                         }
                         if (base_storage.kind != Instruction::StorageBaseKind::kNone) {
                             const std::string value = NewValue();
@@ -1146,50 +1159,71 @@ class FunctionLowerer {
                                 .kind = Instruction::Kind::kLocalAddr,
                                 .result = value,
                                 .type = type,
-                                .target = CombineQualifiedName(*expr.left),
+                                .target = CombineQualifiedName(address_target),
                                 .target_kind = Instruction::TargetKind::kField,
-                                .target_name = expr.left->secondary_text,
-                                .target_display = CombineQualifiedName(*expr.left),
+                                .target_name = address_target.secondary_text,
+                                .target_display = CombineQualifiedName(address_target),
                                 .target_base_storage = base_storage.kind,
                                 .target_base_name = base_storage.name,
                                 .target_base_type = KnownTypeOrError(base_type,
-                                                                     expr.left->span,
+                                                                     address_target.span,
                                                                      "address-of qualified field base type"),
                             });
                             return {value, type};
                         }
                     }
 
-                    if (expr.left->kind == Expr::Kind::kField && expr.left->left != nullptr) {
-                        const StoreBaseMetadata base_storage = StoreBaseMetadataForExpr(*expr.left->left);
+                    if (address_target.kind == Expr::Kind::kField && address_target.left != nullptr) {
+                        const StoreBaseMetadata base_storage = StoreBaseMetadataForExpr(*address_target.left);
                         if (base_storage.kind != Instruction::StorageBaseKind::kNone) {
                             const std::string value = NewValue();
                             Emit({
                                 .kind = Instruction::Kind::kLocalAddr,
                                 .result = value,
                                 .type = type,
-                                .target = RenderExprInline(*expr.left),
+                                .target = RenderExprInline(address_target),
                                 .target_kind = Instruction::TargetKind::kField,
-                                .target_name = expr.left->text,
-                                .target_display = RenderExprInline(*expr.left),
+                                .target_name = address_target.text,
+                                .target_display = RenderExprInline(address_target),
                                 .target_base_storage = base_storage.kind,
                                 .target_base_name = base_storage.name,
-                                .target_base_type = KnownTypeOrError(ExprTypeOrUnknown(*expr.left->left),
-                                                                     expr.left->left->span,
+                                .target_base_type = KnownTypeOrError(ExprTypeOrUnknown(*address_target.left),
+                                                                     address_target.left->span,
                                                                      "address-of field base type"),
                             });
                             return {value, type};
                         }
                     }
 
-                    if (expr.left->kind == Expr::Kind::kParen && expr.left->left != nullptr) {
-                        Report(expr.span,
-                               "not yet supported in MIR: address-of " + std::string(ToString(expr.left->left->kind)) + " expression");
-                        return EmitLiteralValue("0", sema::UnknownType());
+                    if (address_target.kind == Expr::Kind::kIndex && address_target.left != nullptr && address_target.right != nullptr) {
+                        const auto base = LowerExpr(*address_target.left);
+                        const auto index = LowerExpr(*address_target.right);
+                        EmitIndexBoundsCheck(base, index);
+                        const StoreBaseMetadata base_storage = StoreBaseMetadataForExpr(*address_target.left);
+                        const std::string value = NewValue();
+                        Emit({
+                            .kind = Instruction::Kind::kLocalAddr,
+                            .result = value,
+                            .type = type,
+                            .target = RenderExprInline(address_target),
+                            .target_kind = Instruction::TargetKind::kIndex,
+                            .target_display = RenderExprInline(address_target),
+                            .target_base_storage = base_storage.kind,
+                            .target_base_name = base_storage.name,
+                            .target_base_type = KnownTypeOrError(ExprTypeOrUnknown(*address_target.left),
+                                                                 address_target.left->span,
+                                                                 "address-of index base type"),
+                            .target_aux_types = {KnownTypeOrError(ExprTypeOrUnknown(*address_target.right),
+                                                                  address_target.right->span,
+                                                                  "address-of index type")},
+                            .operands = {base.value, index.value},
+                        });
+                        return {value, type};
                     }
-                    if (IsAddressOfLvalueKind(expr.left->kind)) {
+
+                    if (IsAddressOfLvalueKind(address_target.kind)) {
                         Report(expr.span,
-                               "not yet supported in MIR: address-of " + std::string(ToString(expr.left->kind)) + " expression");
+                               "not yet supported in MIR: address-of " + std::string(ToString(address_target.kind)) + " expression");
                         return EmitLiteralValue("0", sema::UnknownType());
                     }
                 }

@@ -1,0 +1,59 @@
+Module
+  Function name=bump returns=[i32]
+    Local name=ptr type=*i32 param readonly
+    Block label=entry0
+      load_local %v0:*i32 target=ptr
+      unary %v1:i32 op=* operands=[%v0]
+      const %v2:int_literal op=1
+      convert_numeric %v3:i32 target=i32 operands=[%v2]
+      binary %v4:i32 op=+ arithmetic=wrap operands=[%v1, %v3]
+      load_local %v5:*i32 target=ptr
+      store_target target=*ptr target_kind=other target_base=*i32 operands=[%v4, %v5]
+      load_local %v6:*i32 target=ptr
+      unary %v7:i32 op=* operands=[%v6]
+      terminator return values=[%v7]
+  Function name=main returns=[i32]
+    Local name=values type=[3]i32
+    Local name=middle type=*i32
+    Block label=entry0
+      const %v0:int_literal op=1
+      load_local %v1:[3]i32 target=values
+      const %v2:int_literal op=0
+      const %v3:usize op=3
+      bounds_check op=index operands=[%v2, %v3]
+      store_target target=values[0] target_kind=index target_base=[3]i32 operands=[%v0, %v1, %v2] target_types=[int_literal]
+      const %v4:int_literal op=4
+      load_local %v5:[3]i32 target=values
+      const %v6:int_literal op=1
+      const %v7:usize op=3
+      bounds_check op=index operands=[%v6, %v7]
+      store_target target=values[1] target_kind=index target_base=[3]i32 operands=[%v4, %v5, %v6] target_types=[int_literal]
+      const %v8:int_literal op=8
+      load_local %v9:[3]i32 target=values
+      const %v10:int_literal op=2
+      const %v11:usize op=3
+      bounds_check op=index operands=[%v10, %v11]
+      store_target target=values[2] target_kind=index target_base=[3]i32 operands=[%v8, %v9, %v10] target_types=[int_literal]
+      load_local %v12:[3]i32 target=values
+      const %v13:int_literal op=1
+      const %v14:usize op=3
+      bounds_check op=index operands=[%v13, %v14]
+      local_addr %v15:*i32 target=(values)[1] target_kind=index target_base=[3]i32 operands=[%v12, %v13] target_types=[int_literal]
+      store_local target=middle operands=[%v15]
+      load_local %v16:*i32 target=middle
+      symbol_ref %v17:proc(*i32)->i32 target=bump target_kind=function target_name=bump
+      call %v18:i32 target=bump target_kind=function target_name=bump operands=[%v17, %v16]
+      const %v19:int_literal op=5
+      convert_numeric %v20:i32 target=i32 operands=[%v19]
+      binary %v21:bool op=!= operands=[%v18, %v20]
+      terminator cond value=%v21 true=if_then1 false=if_merge2
+    Block label=if_then1
+      const %v22:int_literal op=10
+      terminator return values=[%v22]
+    Block label=if_merge2
+      load_local %v23:[3]i32 target=values
+      const %v24:int_literal op=1
+      const %v25:usize op=3
+      bounds_check op=index operands=[%v24, %v25]
+      index %v26:i32 target_kind=index target_display=values[1] target_base=[3]i32 operands=[%v23, %v24] target_types=[int_literal]
+      terminator return values=[%v26]

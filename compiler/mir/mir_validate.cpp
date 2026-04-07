@@ -492,9 +492,6 @@ bool ValidateModule(const Module& module,
                         if (instruction.result.empty()) {
                             report("local_addr must produce a result in function " + function.name);
                         }
-                        if (!instruction.operands.empty()) {
-                            report("local_addr must not take operands in function " + function.name);
-                        }
                         if (instruction.target.empty()) {
                             report("local_addr must name a target in function " + function.name);
                             break;
@@ -547,6 +544,52 @@ bool ValidateModule(const Module& module,
                                 report("local_addr field type mismatch in function " + function.name + " for " + instruction.target + ": expected *" +
                                        sema::FormatType(*field_type) + ", got " + sema::FormatType(instruction.type));
                             }
+                            break;
+                        }
+                        if (instruction.target_kind == Instruction::TargetKind::kIndex) {
+                            if (instruction.operands.size() != 2) {
+                                report("local_addr index target must use base and index operands in function " + function.name);
+                            }
+                            if (instruction.target_base_storage == Instruction::StorageBaseKind::kNone != instruction.target_base_name.empty()) {
+                                report("local_addr index target direct-base metadata must pair kind and name in function " + function.name);
+                            }
+                            if (!instruction.target_name.empty()) {
+                                report("local_addr index target must not record field-name metadata in function " + function.name);
+                            }
+                            if (instruction.target_aux_types.size() != 1) {
+                                report("local_addr index target must carry exactly one index type in function " + function.name);
+                            }
+                            if (operand_types.size() >= 1 && !sema::IsUnknown(instruction.target_base_type) && instruction.target_base_type != operand_types[0]) {
+                                report("local_addr index base metadata mismatch in function " + function.name);
+                            }
+                            sema::Type element_type = sema::UnknownType();
+                            if (instruction.target_base_type.kind == sema::Type::Kind::kArray && !instruction.target_base_type.subtypes.empty()) {
+                                element_type = instruction.target_base_type.subtypes.front();
+                            }
+                            if (instruction.target_base_type.kind == sema::Type::Kind::kNamed &&
+                                (IsNamedTypeFamily(instruction.target_base_type, "Slice") || IsNamedTypeFamily(instruction.target_base_type, "Buffer")) &&
+                                !instruction.target_base_type.subtypes.empty()) {
+                                element_type = instruction.target_base_type.subtypes.front();
+                            }
+                            if (sema::IsUnknown(element_type) && !sema::IsUnknown(instruction.target_base_type)) {
+                                report("local_addr index requires array, slice, or buffer base in function " + function.name);
+                                break;
+                            }
+                            if (!instruction.target_aux_types.empty() && instruction.target_aux_types.front() != sema::NamedType("usize") &&
+                                instruction.target_aux_types.front().kind != sema::Type::Kind::kIntLiteral) {
+                                report("local_addr index operand must be usize-compatible in function " + function.name);
+                            }
+                            if (operand_types.size() >= 2 && !instruction.target_aux_types.empty() && instruction.target_aux_types.front() != operand_types[1]) {
+                                report("local_addr index metadata type mismatch in function " + function.name);
+                            }
+                            if (!sema::IsUnknown(element_type) && instruction.type.subtypes.front() != element_type) {
+                                report("local_addr index type mismatch in function " + function.name + " for " + instruction.target + ": expected *" +
+                                       sema::FormatType(element_type) + ", got " + sema::FormatType(instruction.type));
+                            }
+                            break;
+                        }
+                        if (!instruction.operands.empty()) {
+                            report("local_addr must not take operands in function " + function.name);
                             break;
                         }
                         if (instruction.target_kind != Instruction::TargetKind::kNone) {
