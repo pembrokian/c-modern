@@ -6,11 +6,9 @@ func test_parse_zero_port() *i32 {
     value: u16
     err: errors.Error
     value, err = net.parse_port("0")
-    if errors.is_err(err) {
-        return testing.fail()
+    test_err: *i32 = testing.expect_ok(err)
+    if test_err != nil {
+        return test_err
     }
-    if value != 0 {
-        return testing.fail()
-    }
-    return nil
+    return testing.expect_usize_eq((usize)(value), 0)
 }

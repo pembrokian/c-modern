@@ -131,6 +131,47 @@ func expect_false(ok: bool) *i32 {
     return nil
 }
 
+func expect_non_nil<T>(value: *T) *i32 {
+    if value == nil {
+        return report_failure("expect_non_nil failed")
+    }
+    return nil
+}
+
+func expect_buffer_non_nil<T>(value: *Buffer<T>) *i32 {
+    if value == nil {
+        return report_failure("expect_buffer_non_nil failed")
+    }
+    return nil
+}
+
+func expect_nil<T>(value: *T) *i32 {
+    if value != nil {
+        return report_failure("expect_nil failed")
+    }
+    return nil
+}
+
+func expect_ok(err: errors.Error) *i32 {
+    if errors.is_err(err) {
+        return print_usize_mismatch("expect_ok failed: error kind", (usize)(errors.kind(err)), (usize)(errors.kind_none()))
+    }
+    return nil
+}
+
+func expect_err(err: errors.Error, kind: errors.ErrorKind, code: usize) *i32 {
+    if errors.is_ok(err) {
+        return report_failure("expect_err failed: got ok")
+    }
+    if errors.kind(err) != kind {
+        return print_usize_mismatch("expect_err failed: error kind", (usize)(errors.kind(err)), (usize)(kind))
+    }
+    if errors.code(err) != code {
+        return print_usize_mismatch("expect_err failed: error code", errors.code(err), code)
+    }
+    return nil
+}
+
 func expect_i32_eq(actual: i32, expected: i32) *i32 {
     if actual != expected {
         return print_i32_mismatch("expect_i32_eq failed", actual, expected)

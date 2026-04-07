@@ -84,8 +84,9 @@ Current repository-specific notes:
   than silently wrapping, while wall-clock and sleep semantics remain deferred
 - `testing` is admitted only as a narrow toolchain companion module for the
   ordinary project-test path; it now includes modest expectation helpers for
-  boolean, integer, and string checks with minimal mismatch output, but it is
-  still not a broader fixture, capture, or compiler-magic API
+  boolean, ordinary-pointer, buffer-pointer, classified-error, integer, and
+  string checks with minimal mismatch output, but it is still not a broader
+  fixture, capture, or compiler-magic API
 - `sync` is the hosted execution and low-level shared-memory boundary: thread
   spawn or join remain part of the primary execution model, while mutexes,
   condition variables, and narrow `Atomic<T>` load or store publication remain

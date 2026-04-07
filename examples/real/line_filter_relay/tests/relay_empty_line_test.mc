@@ -7,10 +7,11 @@ func test_relay_empty_line() *i32 {
     output: *Buffer<u8>
     err: errors.Error
     output, err = line_filter_relay.relay_line("", mem.default_allocator())
-    if !errors.is_ok(err) {
-        return testing.fail()
+    test_err: *i32 = testing.expect_ok(err)
+    if test_err != nil {
+        return test_err
     }
-    test_err: *i32 = testing.expect(output != nil)
+    test_err = testing.expect_buffer_non_nil<u8>(output)
     if test_err != nil {
         return test_err
     }

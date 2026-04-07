@@ -4,7 +4,7 @@ import testing
 
 func test_hex_u64() *i32 {
     text: *Buffer<u8> = hash.hex_u64(12289845435839482867)
-    err: *i32 = testing.expect(text != nil)
+    err: *i32 = testing.expect_buffer_non_nil<u8>(text)
     if err != nil {
         return err
     }

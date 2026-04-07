@@ -24,16 +24,19 @@ func test_parse_tree() *i32 {
     defer mem.arena_deinit(arena)
 
     root: *expr.Expr = expr.parse_text(arena, "1 + 2 + 3")
-    if root == nil {
-        return testing.fail()
+    test_err: *i32 = testing.expect_non_nil<expr.Expr>(root)
+    if test_err != nil {
+        return test_err
     }
 
     top: expr.Expr = *root
-    if top.left == nil {
-        return testing.fail()
+    test_err = testing.expect_non_nil<expr.Expr>(top.left)
+    if test_err != nil {
+        return test_err
     }
-    if top.right == nil {
-        return testing.fail()
+    test_err = testing.expect_non_nil<expr.Expr>(top.right)
+    if test_err != nil {
+        return test_err
     }
     right_ptr: *expr.Expr = top.right
     right_node: expr.Expr = *right_ptr
@@ -42,8 +45,9 @@ func test_parse_tree() *i32 {
     }
     left_ptr: *expr.Expr = top.left
     left_node: expr.Expr = *left_ptr
-    if left_node.left == nil {
-        return testing.fail()
+    test_err = testing.expect_non_nil<expr.Expr>(left_node.left)
+    if test_err != nil {
+        return test_err
     }
     return nil
 }

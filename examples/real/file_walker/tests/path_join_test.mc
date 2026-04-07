@@ -4,7 +4,7 @@ import walk
 
 func test_path_join() *i32 {
     joined: *Buffer<u8> = walk.path_join("root", "child.txt")
-    err: *i32 = testing.expect(joined != nil)
+    err: *i32 = testing.expect_buffer_non_nil<u8>(joined)
     if err != nil {
         return err
     }

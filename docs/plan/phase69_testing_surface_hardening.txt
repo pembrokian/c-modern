@@ -1,0 +1,171 @@
+Phase 69 -- Testing Surface Hardening
+====================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Land the next narrow `testing` companion follow-through after the completed
+filesystem and argv subprocess waves by absorbing the repeated ordinary-test
+ helper patterns that are now common across admitted real project tests.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 66 explicitly ranked testing helper hardening as the clearest later
+  adjacent candidate once the broader filesystem contract mismatch was closed.
+- Phase 67 then closed the stronger filesystem and cross-module error-contract
+  front.
+- Phase 68 closed the next honest subprocess follow-through with explicit argv
+  slices while broader `time` work remained deferred.
+- The current admitted `testing` surface is still intentionally small and
+  ordinary, but real project tests now repeat two specific patterns often
+  enough to justify one more additive helper wave:
+  - pointer presence checks such as `testing.expect(buf != nil)` followed by
+    immediate early return
+  - explicit `errors.Error` success or classified-failure checks written as
+    open-coded `errors.is_ok(...)`, `errors.kind(...)`, and `errors.code(...)`
+
+Problem being solved
+--------------------
+- Ordinary project tests now rely on `testing.expect(...)`,
+  `testing.expect_false(...)`, integer equality helpers, string equality
+  helpers, and `testing.fail()` pervasively, but several admitted tests still
+  duplicate nil-pointer and error-shape assertions in slightly different open-
+  coded forms.
+- That duplication is not a compiler problem and does not justify broader test
+  framework machinery, but it is now broad enough to count as a stable helper-
+  surface gap in the ordinary `testing` module.
+- The repository needs one narrow helper wave that reduces repeated test
+  boilerplate without introducing hidden context, compiler magic, output
+  capture policy, or fixture frameworks.
+
+Core rule
+---------
+- Keep `testing` as an ordinary helper library, not a special language or tool
+  feature.
+- Admit only the repeated patterns that are already stable across admitted real
+  project tests.
+- Prefer additive helper growth over source-breaking redesign of the existing
+  nil-or-pointer and `*i32` test-result convention.
+- Do not use helper growth as a back door to reopen richer fixture, capture,
+  timeout, or hidden-runner policy.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: add one narrow family of pointer and `errors.Error`
+expectation helpers, then migrate a small set of admitted real project tests
+to prove that the helpers close real repeated friction.
+
+Chosen helper widening:
+- add `testing.expect_non_nil<T>(value: *T)` for ordinary typed pointers
+- add `testing.expect_buffer_non_nil<T>(value: *Buffer<T>)` for owned buffer
+  pointers, keeping buffer-heavy ordinary tests honest without requiring raw
+  casts
+- add `testing.expect_nil<T>(value: *T)`
+- add `testing.expect_ok(err: errors.Error)`
+- add `testing.expect_err(err: errors.Error, kind: errors.ErrorKind,
+  code: usize)`
+
+Why this slice wins now
+-----------------------
+- The new helpers map directly to repeated patterns that already exist in the
+  admitted ordinary-test corpus.
+- They preserve explicit early-return control flow and the existing small
+  `*i32` pass-or-fail result convention.
+- They improve diagnostics for classified error mismatches without inventing a
+  larger assertion object model.
+- They stay clearly below the threshold of fixture frameworks, output capture,
+  ambient per-test state, or runner-specific policy.
+
+What this phase should try to prove
+-----------------------------------
+- the `testing` companion surface can absorb repeated nil-pointer and explicit
+  error-contract checks without becoming compiler magic
+- the new helpers are honest enough for both success-path and classified-
+  failure-path assertions in admitted real project tests
+- representative real project tests become smaller and more uniform after the
+  helper admission
+
+Preferred proof surfaces
+------------------------
+1. `line_filter_relay` ordinary tests for explicit `errors.Error` success plus
+   owned buffer presence.
+2. `evented_echo` ordinary tests for classified `errors.Error` failure and
+   success-path parsing.
+3. `hash_tool` and `file_walker` ordinary tests for owned buffer presence.
+4. `arena_expr` ordinary tests for user-defined pointer presence on parse-tree
+   nodes.
+
+Deliverables
+------------
+- one canonical Phase 69 note recording the chosen testing-surface slice
+- additive helper growth in `/Users/ro/dev/c_modern/stdlib/testing.mc`
+- a narrow migration of admitted real project tests that proves the new helper
+  surface on buffers, user-defined pointers, and classified `errors.Error`
+  checks
+- bounded documentation and planning updates recording Phase 69 completion and
+  moving later adjacent-runtime work forward explicitly
+
+Suggested execution order
+-------------------------
+1. Add the new `testing` helpers at the stdlib layer first.
+2. Migrate a narrow representative set of admitted real project tests to the
+   new helpers.
+3. Run focused build and project-workflow validation on the owning tool test
+   surface.
+4. Record the completed helper wave in the phase doc, backlog, decision log,
+   stdlib notes, slice register, and speculative roadmap.
+
+Exit criteria
+-------------
+- the repository has one additive helper slice for nil-pointer and explicit
+  error expectations in ordinary tests
+- admitted real project tests prove the helpers on both success and classified
+  failure paths
+- the planning surface records Phase 69 as completed testing-surface
+  hardening rather than leaving it speculative
+
+Non-goals
+---------
+- replacing the existing `*i32` ordinary-test result convention
+- adding fixture objects, output capture helpers, timeout APIs, or hidden test
+  context
+- turning `testing` into a compiler special case
+- reopening broader `sync`, `mem`, `os`, or `time` work in the same phase
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 69 stands alone as the next narrow `testing` helper follow-through
+  after the completed Phase 67 and Phase 68 adjacent-surface waves.
+- The phase is explicit that the admitted helper growth is additive, ordinary,
+  and small.
+
+Implemented slice
+-----------------
+- added `testing.expect_non_nil<T>(...)` for ordinary typed pointers and
+  `testing.expect_buffer_non_nil<T>(...)` for owned `Buffer<T>` pointers,
+  preserving explicit early-return test flow while matching the current
+  language's generic-call surface honestly
+- added `testing.expect_nil<T>(...)`, `testing.expect_ok(...)`, and
+  `testing.expect_err(...)` so ordinary tests can express pointer absence,
+  success-path `errors.Error` checks, and classified-failure assertions
+  without open-coded `errors.is_ok(...)`, `errors.kind(...)`, and
+  `errors.code(...)` sequences
+- migrated representative admitted real project tests in `line_filter_relay`,
+  `evented_echo`, `hash_tool`, `file_walker`, and `arena_expr` to the widened
+  helper path
+- aligned the planning and stdlib notes so the repository records Phase 69 as
+  completed testing-surface hardening rather than leaving it speculative
+
+Closeout statement
+------------------
+Phase 69 is complete as a small ordinary-library helper wave. The repository
+still does not claim a broader testing framework, fixture model, timeout API,
+or compiler-owned test magic, but the repeated nil-pointer and explicit error-
+contract checks that now recur across admitted real project tests have been
+absorbed into the `testing` companion surface with focused workflow proof.

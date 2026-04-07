@@ -135,6 +135,18 @@ Phase 68 is now concrete repository history rather than active speculation:
 The remaining speculative continuation in this band therefore starts at Phase
 69.
 
+Phase 69 is now concrete repository history rather than active speculation:
+- the next ordinary-test helper hardening wave landed as additive
+  `testing.expect_non_nil<T>(...)`, `testing.expect_buffer_non_nil<T>(...)`,
+  `testing.expect_nil<T>(...)`, `testing.expect_ok(...)`, and
+  `testing.expect_err(...)` helpers
+- representative admitted real project tests now use the widened helper path
+  for nil-pointer and classified-error checks without introducing hidden test
+  policy or compiler magic
+
+The remaining speculative continuation in this band therefore starts at Phase
+70.
+
 Likely themes:
 - filesystem and `io` contract convergence where nil-only or raw-status
   boundaries still remain materially harmful
@@ -154,10 +166,6 @@ Why this band is separate:
   still need to be implemented for the current admitted slice to feel real?”
 
 Phases in this band:
-
-Phase 69 -- Testing Surface Hardening
-- Exit criterion: repeated ordinary-test helper patterns are absorbed into a
-  stable `testing` surface without hidden compiler policy.
 
 Phase 70 -- Sync And Mem Follow-On Gate
 - Exit criterion: the repository decides whether any atomic, coordination,

@@ -725,7 +725,7 @@ Register By Concern
   design: settled
   plan phase: 6 and 7 boundary
   repo status: partial
-  repo wave: minimal admission plus Phase 24 helper growth
+  repo wave: minimal admission plus Phase 24 helper growth and Phase 69 hardening
   docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/tools/test_spec.txt, README.md
   end state: ordinary toolchain companion library for tests, with helpers but
   no compiler magic.

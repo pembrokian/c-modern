@@ -4,7 +4,7 @@ import testing
 
 func test_format_line() *i32 {
     line: *Buffer<u8> = hash.format_line(12289845435839482867, "sample.txt")
-    err: *i32 = testing.expect(line != nil)
+    err: *i32 = testing.expect_buffer_non_nil<u8>(line)
     if err != nil {
         return err
     }
