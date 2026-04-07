@@ -227,6 +227,7 @@ int main(int argc, char** argv) {
         {"const_initializer_non_constant_bad.mc", "const_initializer_non_constant_bad.errors.txt", {}, false},
         {"const_shift_count_bad.mc", "const_shift_count_bad.errors.txt", {}, false},
         {"global_initializer_type_bad.mc", "global_initializer_type_bad.errors.txt", {}, false},
+        {"generic_variant_ctor_ok.mc", "generic_variant_ctor_ok.sema.txt", {}, true},
         {"internal_cross_package/pkg_a/main.mc", "internal_cross_package/pkg_a/main.errors.txt", {"tests/sema/internal_cross_package/pkg_b"}, false, "pkg_a", {{"internal_cross_package/pkg_a", "pkg_a"}, {"internal_cross_package/pkg_b", "pkg_b"}}},
         {"internal_root/internal.mc", "internal_root.errors.txt", {}, false},
         {"private_access_bad.mc", "private_access_bad.errors.txt", {}, false},

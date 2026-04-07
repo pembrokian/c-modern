@@ -1559,11 +1559,25 @@ class Checker {
             return InstantiateFunctionType(*function, expr, CombineQualifiedName(expr));
         }
         if (const auto* type_decl = FindTypeDecl(imported_module, QualifyImportedName(expr.text, expr.secondary_text)); type_decl != nullptr) {
-            if (!expr.type_args.empty()) {
-                Report(expr.span, "type arguments apply only to functions: " + CombineQualifiedName(expr));
+            const std::size_t expected = type_decl->type_params.size();
+            const std::size_t actual = expr.type_args.size();
+            if (expected == 0 && actual != 0) {
+                Report(expr.span, "type " + CombineQualifiedName(expr) + " does not accept type arguments");
                 return UnknownType();
             }
-            return NamedType(type_decl->name);
+            if (expected != 0 && actual != expected) {
+                Report(expr.span,
+                       "generic type " + CombineQualifiedName(expr) + " expects " + std::to_string(expected) +
+                           " type arguments but got " + std::to_string(actual));
+                return UnknownType();
+            }
+            Type instantiated = NamedType(type_decl->name);
+            instantiated.subtypes.reserve(actual);
+            for (const auto& type_arg : expr.type_args) {
+                ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
+                instantiated.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
+            }
+            return instantiated;
         }
         if (const auto* global = FindGlobalSummary(imported_module, expr.secondary_text); global != nullptr) {
             if (!expr.type_args.empty()) {
@@ -1584,16 +1598,36 @@ class Checker {
         if (const auto* function = FindFunctionSignature(*module_, expr.text + "." + expr.secondary_text); function != nullptr) {
             return InstantiateFunctionType(*function, expr, CombineQualifiedName(expr));
         }
+        if (const auto* type_decl = FindTypeDecl(*module_, expr.text); type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
+            const std::size_t expected = type_decl->type_params.size();
+            const std::size_t actual = expr.type_args.size();
+            if (expected == 0 && actual != 0) {
+                Report(expr.span, "type " + expr.text + " does not accept type arguments");
+                return UnknownType();
+            }
+            if (expected != 0 && actual != expected) {
+                Report(expr.span,
+                       "generic type " + expr.text + " expects " + std::to_string(expected) +
+                           " type arguments but got " + std::to_string(actual));
+                return UnknownType();
+            }
+
+            Type enum_type = NamedType(expr.text);
+            enum_type.subtypes.reserve(actual);
+            for (const auto& type_arg : expr.type_args) {
+                ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
+                enum_type.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
+            }
+
+            for (const auto& variant : type_decl->variants) {
+                if (variant.name == expr.secondary_text) {
+                    return enum_type;
+                }
+            }
+        }
         if (!expr.type_args.empty()) {
             Report(expr.span, "type arguments apply only to functions: " + CombineQualifiedName(expr));
             return UnknownType();
-        }
-        if (const auto* type_decl = FindTypeDecl(*module_, expr.text); type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
-            for (const auto& variant : type_decl->variants) {
-                if (variant.name == expr.secondary_text) {
-                    return NamedType(expr.text);
-                }
-            }
         }
         return UnknownType();
     }

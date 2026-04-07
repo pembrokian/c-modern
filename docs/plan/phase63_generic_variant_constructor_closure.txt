@@ -1,0 +1,147 @@
+Phase 63 -- Generic Variant Constructor Closure
+==============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Close the remaining sema-owned generic-variant drift that still survived after
+Phase 62: generic enums were already part of the admitted nominal type surface,
+variant constructors already existed for ordinary enums, and imported generic
+enum identity already survived module summaries, but the ordinary constructor
+spelling still fell apart once a generic enum variant had to preserve an
+instantiated parent type.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative admin roadmap described Phase 63 as a final narrow semantic
+  fixture sweep.
+- The strongest still-live concrete owner now fits that label honestly:
+  generic enum declarations and generic nominal identity were already admitted,
+  but variant-constructor use still lagged that admitted surface because the
+  parser and sema lost the instantiated enum type at the constructor boundary.
+
+Repository status note
+----------------------
+- Earlier phases already admitted generic nominal declarations, generic
+  aggregate initialization, imported generic nominal identity, qualified enum
+  variants in switch patterns, and project-mode imported type preservation.
+- MIR already had dedicated enum variant initialization, matching, and payload
+  extraction instructions.
+- The remaining gap was narrower than a generic-type-system redesign:
+  constructor calls such as `Option<i32>.Some(7)` still parsed or typed as
+  though the parent enum were the uninstantiated nominal `Option`, which made
+  the admitted generic enum surface weaker than nearby generic struct and
+  imported-nominal paths.
+
+Problem being solved
+--------------------
+- The language already admits generic nominal types and enum variants.
+- The parser already carried postfix type arguments for constructor-like call
+  forms, but it still stopped short of preserving those type arguments through
+  the qualified enum-variant constructor spelling.
+- Sema still treated qualified enum variants as though type arguments applied
+  only to functions, so generic constructor calls either failed immediately or
+  collapsed back to the uninstantiated parent enum type.
+- That left one real owner-local drift: generic enum declarations existed, but
+  the ordinary constructor path could not preserve the instantiated enum truth
+  that later sema, MIR, and project workflow already expected.
+
+Core rule
+---------
+- Preserve instantiated generic enum identity at the qualified variant
+  constructor boundary instead of reconstructing it later.
+- Keep the closure narrow: support the already-admitted constructor form rather
+  than inventing new pattern or inference syntax.
+- Prove the result through focused parser, sema, MIR, and project-workflow
+  fixtures rather than broad generic feature widening.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: preserve explicit enum type arguments through
+`Enum<T>.Variant(...)`, let sema treat the qualified enum name as an
+instantiated enum rather than a function-only form, and prove the result both
+in direct-source MIR and in one imported project build.
+
+Compiler change boundary:
+1. let postfix expression parsing preserve explicit type arguments before a
+   qualified enum-variant member selection
+2. let sema instantiate qualified enum names with explicit type arguments
+   instead of rejecting them as function-only syntax
+3. keep MIR variant construction and imported project merge unchanged except
+   for consuming the repaired sema truth
+
+What this phase should try to prove
+-----------------------------------
+- Generic enum variant construction now preserves the instantiated parent enum
+  type instead of collapsing to the bare nominal.
+- Direct-source MIR can lower explicit generic enum variant construction and
+  subsequent payload matching without ad hoc reconstruction.
+- The supported project workflow can compile one helper module that constructs a
+  generic enum variant and one importing module that matches it through the
+  normal merged MIR path.
+
+Preferred pressure points
+-------------------------
+1. one local generic enum constructor returning `Option<i32>`
+2. one local switch that extracts the payload from that constructed value
+3. one project build where a helper constructs the generic variant and an
+   importing main module matches it
+
+Deliverables
+------------
+- one canonical Phase 63 note documenting the generic variant-constructor
+  closure
+- one focused parser and sema change for explicit generic enum variant
+  construction
+- one parser fixture, one sema fixture, one MIR fixture, and one project
+  regression proving the admitted workflow end to end
+
+Suggested execution order
+-------------------------
+1. reproduce the current generic enum constructor failure on a minimal source
+   file and project build
+2. preserve explicit type arguments through the qualified variant constructor
+   spelling in the parser
+3. instantiate qualified enum names in sema and let the existing variant path
+   consume that instantiated type
+4. add focused parser, sema, MIR, and project regressions
+5. rebuild and run the owning test suites
+
+Exit criteria
+-------------
+- generic enum variant constructors no longer lose the instantiated parent type
+- direct-source MIR lowers the repaired constructor path deterministically
+- one imported project build proves that helper-side construction and
+  importer-side variant matching survive the normal workflow without special
+  cases
+
+Non-goals
+---------
+- generic function type-argument inference
+- new enum pattern syntax or `is`-style variant tests
+- broader generic constraint, trait, or overload machinery
+- widening project packaging or runtime surfaces
+
+What landed
+-----------
+- Postfix parsing now preserves explicit type arguments through qualified enum
+  variant constructor spellings such as `Option<i32>.Some(...)`.
+- Sema now instantiates qualified enum names with explicit type arguments
+  instead of rejecting them as function-only syntax, so variant constructors
+  keep the instantiated parent enum identity.
+- Focused parser, sema, MIR, and project regressions now prove local generic
+  enum construction plus imported project-mode variant matching.
+
+Closeout statement
+------------------
+Phase 63 is complete as a narrow semantic closure. The repository does not
+invent a new generic model here; it removes the smaller but real drift where
+generic enum declarations and imported generic identity were already admitted,
+but the ordinary variant-constructor path still dropped the instantiated parent
+type before sema and MIR could use it.

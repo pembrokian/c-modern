@@ -1,0 +1,25 @@
+SourceFile
+  EnumDecl name=Option
+    typeParams=[T]
+    variants:
+      EnumVariantDecl name=Some
+        FieldDecl name=value
+          NamedType name=T
+      EnumVariantDecl name=None
+  FuncDecl name=make
+    returns:
+      NamedType name=Option
+        typeArgs:
+          NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              CallExpr
+                left:
+                  QualifiedNameExpr text=Option member=Some
+                    typeArgs:
+                      NamedType name=i32
+                args:
+                  LiteralExpr text=7 kind=int_lit

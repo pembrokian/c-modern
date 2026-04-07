@@ -1,0 +1,7 @@
+SemanticModule
+  TypeDecl name=Option kind=enum
+    typeParams=[T]
+    Variant name=Some
+      PayloadField name=value type=T
+    Variant name=None
+  Function name=make params=[] returns=[Option<i32>]

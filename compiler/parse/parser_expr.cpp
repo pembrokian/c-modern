@@ -312,7 +312,8 @@ bool Parser::LooksLikePostfixTypeArgs() const {
 
     const auto after_type_args = SkipTypeArgListLookahead(0, 0);
     return after_type_args.has_value() &&
-           (Peek(*after_type_args).kind == TokenKind::kLParen || Peek(*after_type_args).kind == TokenKind::kLBrace);
+           (Peek(*after_type_args).kind == TokenKind::kLParen || Peek(*after_type_args).kind == TokenKind::kLBrace ||
+            Peek(*after_type_args).kind == TokenKind::kDot);
 }
 
 std::unique_ptr<Expr> Parser::ParseTypeCallExpr() {
@@ -374,6 +375,7 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
                 node->kind = Expr::Kind::kQualifiedName;
                 node->text = expr->text;
                 node->secondary_text = member.value_or("");
+                node->type_args = std::move(expr->type_args);
                 node->span.end = Previous().span.end;
                 expr = std::move(node);
                 continue;

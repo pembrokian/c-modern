@@ -252,6 +252,7 @@ int main(int argc, char** argv) {
         {"foreach_range_defer.mc", "foreach_range_defer.mir.txt", true, "", {}, {}},
         {"foreach_non_iterable_fail.mc", "foreach_non_iterable_fail.errors.txt", false, "", {}, {}},
         {"explicit_conversion.mc", "explicit_conversion.mir.txt", true, "", {}, {}},
+        {"generic_variant_ctor_ok.mc", "generic_variant_ctor_ok.mir.txt", true, "", {}, {}},
         {"imported_generic_box_ok.mc", "imported_generic_box_ok.mir.txt", true, "", {}, {{"helper_box", "import_roots/helper_box.mc"}}},
         {"import_root_ok_main.mc", "import_root_ok_main.mir.txt", true, "", {"tests/mir/import_roots"}, {}},
         {"imported_atomic_ok.mc", "imported_atomic_ok.mir.txt", true, "", {}, {{"sync", "import_roots/sync_module.mc"}}},

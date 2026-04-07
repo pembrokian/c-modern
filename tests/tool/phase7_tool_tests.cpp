@@ -1660,6 +1660,63 @@ void TestProjectImportedGenericNominalIdentity(const std::filesystem::path& bina
                          "merged project MIR should rewrite imported aggregate target metadata to the qualified nominal identity");
 }
 
+void TestProjectImportedGenericVariantConstructor(const std::filesystem::path& binary_root,
+                                                  const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase63_generic_variant_project";
+    const std::filesystem::path project_path = WriteBasicProject(
+        project_root,
+        "enum Option<T> {\n"
+        "    Some(value: T)\n"
+        "    None\n"
+        "}\n"
+        "\n"
+        "func make() Option<i32> {\n"
+        "    return Option<i32>.Some(7)\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    value: helper.Option<i32> = helper.make()\n"
+        "    switch value {\n"
+        "    case helper.Option.Some(v):\n"
+        "        return v\n"
+        "    default:\n"
+        "        return 0\n"
+        "    }\n"
+        "}\n");
+    const std::filesystem::path build_dir = binary_root / "phase63_generic_variant_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string(),
+                                                      "--dump-mir"},
+                                                     build_dir / "build_output.txt",
+                                                     "phase63 generic variant dump-mir build");
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail("phase63 generic variant dump-mir build should succeed:\n" + output);
+    }
+
+    const auto main_mir = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir).mir;
+    const std::string main_mir_text = ReadFile(main_mir);
+    ExpectOutputContains(main_mir_text,
+                         "variant_init",
+                         "merged project MIR should retain the helper-side generic enum variant constructor");
+    ExpectOutputContains(main_mir_text,
+                         "TypeDecl kind=enum name=helper.Option",
+                         "merged project MIR should retain the imported generic enum declaration");
+    ExpectOutputContains(main_mir_text,
+                         "variant_extract",
+                         "merged project MIR should extract payloads from imported generic enum variants");
+    ExpectOutputContains(main_mir_text,
+                         "target=helper.Option.Some",
+                         "merged project MIR should preserve the imported generic variant target identity");
+}
+
 void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binary_root,
                                               const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "phase13_corrupt_mci_project";
@@ -4312,6 +4369,7 @@ int main(int argc, char** argv) {
     TestProjectImportedGlobalMirDeclarations(binary_root, mc_path);
     TestProjectImportedAbiTypeMirDeclarations(binary_root, mc_path);
     TestProjectImportedGenericNominalIdentity(binary_root, mc_path);
+    TestProjectImportedGenericVariantConstructor(binary_root, mc_path);
     TestCorruptedInterfaceArtifactFailsBuild(binary_root, mc_path);
     TestStaleInterfaceArtifactFormatFailsBuild(binary_root, mc_path);
     TestModuleBuildStateIsVersionedAndDeterministic(binary_root, mc_path);
