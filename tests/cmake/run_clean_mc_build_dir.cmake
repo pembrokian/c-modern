@@ -8,8 +8,19 @@ if(NOT clean_result EQUAL 0)
   message(FATAL_ERROR "failed to remove build dir: ${BUILD_DIR}")
 endif()
 
+set(command_args
+  "${MC}"
+  "${MODE}"
+  "${SOURCE}"
+  --build-dir
+  "${BUILD_DIR}")
+
+if(DEFINED IMPORT_ROOT)
+  list(APPEND command_args --import-root "${IMPORT_ROOT}")
+endif()
+
 execute_process(
-  COMMAND "${MC}" "${MODE}" "${SOURCE}" --build-dir "${BUILD_DIR}"
+  COMMAND ${command_args}
   RESULT_VARIABLE mc_result
   OUTPUT_VARIABLE mc_stdout
   ERROR_VARIABLE mc_stderr)

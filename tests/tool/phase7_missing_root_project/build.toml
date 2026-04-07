@@ -4,6 +4,7 @@ default = "app"
 
 [targets.app]
 kind = "exe"
+package = "phase7-missing-root"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

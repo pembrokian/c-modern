@@ -4,6 +4,7 @@ default = "hash"
 
 [targets.hash]
 kind = "exe"
+package = "hash-tool"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

@@ -154,7 +154,13 @@ add_test(NAME mc_sema_fixture_unit COMMAND mc_sema_fixture_tests ${CMAKE_CURRENT
 add_test(NAME mc_mir_unit COMMAND mc_mir_tests)
 add_test(NAME mc_mir_fixture_unit COMMAND mc_mir_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_help_smoke COMMAND mc --help)
-add_test(NAME mc_check_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc)
+add_test(NAME mc_check_smoke
+     COMMAND ${CMAKE_COMMAND}
+         -DMC=$<TARGET_FILE:mc>
+         -DMODE=check
+         -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc
+         -DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/stage5_check_smoke
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_clean_mc_build_dir.cmake)
 add_test(NAME mc_check_stdlib_import_smoke
      COMMAND ${CMAKE_COMMAND}
          -DMC=$<TARGET_FILE:mc>
@@ -169,6 +175,13 @@ add_test(NAME mc_build_smoke
          -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/tests/codegen/smoke_return_zero.mc
          -DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/stage5_smoke
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_clean_mc_build_dir.cmake)
-add_test(NAME mc_check_import_root_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_root_ok_main.mc --import-root ${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_roots)
+add_test(NAME mc_check_import_root_smoke
+     COMMAND ${CMAKE_COMMAND}
+         -DMC=$<TARGET_FILE:mc>
+         -DMODE=check
+         -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_root_ok_main.mc
+         -DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/stage5_import_root_smoke
+         -DIMPORT_ROOT=${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_roots
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_clean_mc_build_dir.cmake)
 add_test(NAME mc_check_dump_mir_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --dump-mir --build-dir ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_dump_paths_smoke COMMAND mc dump-paths ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --build-dir ${CMAKE_CURRENT_BINARY_DIR})

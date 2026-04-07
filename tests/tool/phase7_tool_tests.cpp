@@ -1280,6 +1280,7 @@ void TestUnknownTargetListsAvailableTargets(const std::filesystem::path& binary_
               "\n"
               "[targets.app]\n"
               "kind = \"exe\"\n"
+              "package = \"phase19-unknown-target\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -1292,6 +1293,7 @@ void TestUnknownTargetListsAvailableTargets(const std::filesystem::path& binary_
               "\n"
               "[targets.tool]\n"
               "kind = \"exe\"\n"
+              "package = \"phase19-unknown-target\"\n"
               "root = \"src/tool.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -1331,6 +1333,7 @@ void TestDisabledTestTargetListsEnabledTargets(const std::filesystem::path& bina
               "\n"
               "[targets.app]\n"
               "kind = \"exe\"\n"
+              "package = \"phase19-disabled-test-target\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -1343,6 +1346,7 @@ void TestDisabledTestTargetListsEnabledTargets(const std::filesystem::path& bina
               "\n"
               "[targets.unit]\n"
               "kind = \"exe\"\n"
+              "package = \"phase19-disabled-test-target\"\n"
               "root = \"src/unit.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -1447,6 +1451,7 @@ void TestProjectTestTargetBuildsAndRuns(const std::filesystem::path& binary_root
               "\n"
               "[targets.unit]\n"
               "kind = \"test\"\n"
+              "package = \"phase13-test-kind\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -1671,6 +1676,7 @@ void TestModuleBuildStateIsVersionedAndDeterministic(const std::filesystem::path
               "\n"
               "[targets.app]\n"
               "kind = \"exe\"\n"
+              "package = \"phase13-state\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -1717,7 +1723,7 @@ void TestModuleBuildStateIsVersionedAndDeterministic(const std::filesystem::path
                             (mc::support::SanitizeArtifactStem(project_root / "src/main.mc") + ".state.txt");
     const std::string state_text = ReadFile(state_path);
     ExpectOutputContains(state_text, "format\t2\n", "module build state should record its format version");
-    ExpectOutputContains(state_text, "package\tapp\n", "module build state should record package identity");
+    ExpectOutputContains(state_text, "package\tphase13-state\n", "module build state should record package identity");
 
     const std::size_t alpha_hash = state_text.find("import_hash\talpha=");
     const std::size_t zeta_hash = state_text.find("import_hash\tzeta=");
@@ -2129,6 +2135,7 @@ void TestMissingDefaultTargetFails(const std::filesystem::path& binary_root,
               "\n"
               "[targets.first]\n"
               "kind = \"exe\"\n"
+              "package = \"phase7-no-default\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2141,6 +2148,7 @@ void TestMissingDefaultTargetFails(const std::filesystem::path& binary_root,
               "\n"
               "[targets.second]\n"
               "kind = \"exe\"\n"
+              "package = \"phase7-no-default\"\n"
               "root = \"src/alt.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2229,6 +2237,7 @@ void TestDuplicateModuleRootFailsEarly(const std::filesystem::path& binary_root,
               "\n"
               "[targets.app]\n"
               "kind = \"exe\"\n"
+              "package = \"phase13-duplicate-root\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2265,6 +2274,7 @@ void TestProjectTestTimeoutFailsDeterministically(const std::filesystem::path& b
               "\n"
               "[targets.app]\n"
               "kind = \"exe\"\n"
+              "package = \"phase13-test-timeout\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2328,6 +2338,7 @@ void TestDuplicateTargetRootsFailEarly(const std::filesystem::path& binary_root,
               "\n"
               "[targets.first]\n"
               "kind = \"exe\"\n"
+              "package = \"phase13-duplicate-target-root\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2340,6 +2351,7 @@ void TestDuplicateTargetRootsFailEarly(const std::filesystem::path& binary_root,
               "\n"
               "[targets.second]\n"
               "kind = \"exe\"\n"
+              "package = \"phase13-duplicate-target-root\"\n"
               "root = \"./src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2376,6 +2388,7 @@ void TestExecutableTargetRejectsNonStaticLibraryLink(const std::filesystem::path
               "\n"
               "[targets.lib]\n"
               "kind = \"exe\"\n"
+              "package = \"phase29-invalid-staticlib-link\"\n"
               "root = \"src/lib_main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -2388,6 +2401,7 @@ void TestExecutableTargetRejectsNonStaticLibraryLink(const std::filesystem::path
               "\n"
               "[targets.app]\n"
               "kind = \"exe\"\n"
+              "package = \"phase29-invalid-staticlib-link\"\n"
               "root = \"src/main.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"hosted\"\n"
@@ -3090,6 +3104,9 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     const auto review_scan_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/review_scan.mc",
                                                                              rebuild_build_dir)
                                         .object;
+    const auto internal_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/internal.mc",
+                                                                          rebuild_build_dir)
+                                    .object;
     const auto review_status_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/review_status.mc",
                                                                                rebuild_build_dir)
                                           .object;
@@ -3102,6 +3119,9 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     const auto review_scan_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/review_scan.mc",
                                                                  rebuild_build_dir)
                                       .mci;
+    const auto internal_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/internal.mc",
+                                                              rebuild_build_dir)
+                                  .mci;
     const auto review_status_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/review_status.mc",
                                                                    rebuild_build_dir)
                                         .mci;
@@ -3113,10 +3133,12 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
                                       .executable;
 
     const auto review_scan_object_time_1 = RequireWriteTime(review_scan_object);
+    const auto internal_object_time_1 = RequireWriteTime(internal_object);
     const auto review_status_object_time_1 = RequireWriteTime(review_status_object);
     const auto audit_main_object_time_1 = RequireWriteTime(audit_main_object);
     const auto focus_main_object_time_1 = RequireWriteTime(focus_main_object);
     const auto review_scan_mci_time_1 = RequireWriteTime(review_scan_mci);
+    const auto internal_mci_time_1 = RequireWriteTime(internal_mci);
     const auto review_status_mci_time_1 = RequireWriteTime(review_status_mci);
     const auto audit_executable_time_1 = RequireWriteTime(audit_executable);
     const auto focus_executable_time_1 = RequireWriteTime(focus_executable);
@@ -3136,10 +3158,12 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
                                        "phase22 review board no-op focus build");
 
     if (RequireWriteTime(review_scan_object) != review_scan_object_time_1 ||
+        RequireWriteTime(internal_object) != internal_object_time_1 ||
         RequireWriteTime(review_status_object) != review_status_object_time_1 ||
         RequireWriteTime(audit_main_object) != audit_main_object_time_1 ||
         RequireWriteTime(focus_main_object) != focus_main_object_time_1 ||
         RequireWriteTime(review_scan_mci) != review_scan_mci_time_1 ||
+        RequireWriteTime(internal_mci) != internal_mci_time_1 ||
         RequireWriteTime(review_status_mci) != review_status_mci_time_1 ||
         RequireWriteTime(audit_executable) != audit_executable_time_1 ||
         RequireWriteTime(focus_executable) != focus_executable_time_1) {
@@ -3147,9 +3171,10 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     }
 
     SleepForTimestampTick();
-    WriteFile(cloned_project_root / "src/review_scan.mc",
+    WriteFile(cloned_project_root / "src/internal.mc",
               "import strings\n"
               "\n"
+              "@private\n"
               "func line_is_open(bytes: Slice<u8>, start: usize, newline: usize) bool {\n"
               "    if newline <= start {\n"
               "        return false\n"
@@ -3157,6 +3182,7 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
               "    return bytes[start] == 79\n"
               "}\n"
               "\n"
+              "@private\n"
               "func line_is_closed(bytes: Slice<u8>, start: usize, newline: usize) bool {\n"
               "    if newline <= start {\n"
               "        return false\n"
@@ -3164,6 +3190,7 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
               "    return bytes[start] == 67\n"
               "}\n"
               "\n"
+              "@private\n"
               "func line_is_urgent_open(bytes: Slice<u8>, start: usize, newline: usize) bool {\n"
               "    if newline <= start {\n"
               "        return false\n"
@@ -3257,33 +3284,41 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
                                        "phase22 review board implementation-only audit rebuild");
 
     const auto review_scan_object_time_2 = RequireWriteTime(review_scan_object);
+    const auto internal_object_time_2 = RequireWriteTime(internal_object);
     const auto review_status_object_time_2 = RequireWriteTime(review_status_object);
     const auto audit_main_object_time_2 = RequireWriteTime(audit_main_object);
     const auto focus_main_object_time_2 = RequireWriteTime(focus_main_object);
     const auto review_scan_mci_time_2 = RequireWriteTime(review_scan_mci);
+    const auto internal_mci_time_2 = RequireWriteTime(internal_mci);
     const auto review_status_mci_time_2 = RequireWriteTime(review_status_mci);
     const auto audit_executable_time_2 = RequireWriteTime(audit_executable);
 
-    if (!(review_scan_object_time_2 > review_scan_object_time_1)) {
-        Fail("phase22 implementation-only shared scan edit should rebuild the deep shared object");
+    if (review_scan_object_time_2 != review_scan_object_time_1) {
+        Fail("phase22 implementation-only internal scan edit should preserve the wrapper shared object");
+    }
+    if (!(internal_object_time_2 > internal_object_time_1)) {
+        Fail("phase22 implementation-only internal scan edit should rebuild the deep internal object");
     }
     if (review_status_object_time_2 != review_status_object_time_1) {
-        Fail("phase22 implementation-only shared scan edit should not rebuild the dependent shared status object");
+        Fail("phase22 implementation-only internal scan edit should not rebuild the dependent shared status object");
     }
     if (audit_main_object_time_2 != audit_main_object_time_1) {
-        Fail("phase22 implementation-only shared scan edit should not rebuild the default-target main object");
+        Fail("phase22 implementation-only internal scan edit should not rebuild the default-target main object");
     }
     if (focus_main_object_time_2 != focus_main_object_time_1) {
-        Fail("phase22 implementation-only shared scan edit should not rebuild the explicit-target main object");
+        Fail("phase22 implementation-only internal scan edit should not rebuild the explicit-target main object");
     }
     if (review_scan_mci_time_2 != review_scan_mci_time_1) {
-        Fail("phase22 implementation-only shared scan edit should preserve the deep shared interface artifact");
+        Fail("phase22 implementation-only internal scan edit should preserve the wrapper shared interface artifact");
+    }
+    if (internal_mci_time_2 != internal_mci_time_1) {
+        Fail("phase22 implementation-only internal scan edit should preserve the deep internal interface artifact");
     }
     if (review_status_mci_time_2 != review_status_mci_time_1) {
-        Fail("phase22 implementation-only shared scan edit should preserve the dependent shared interface artifact");
+        Fail("phase22 implementation-only internal scan edit should preserve the dependent shared interface artifact");
     }
     if (!(audit_executable_time_2 > audit_executable_time_1)) {
-        Fail("phase22 implementation-only shared scan edit should relink the default-target executable");
+        Fail("phase22 implementation-only internal scan edit should relink the default-target executable");
     }
     if (RequireWriteTime(focus_executable) != focus_executable_time_1) {
         Fail("phase22 implementation-only audit rebuild should not touch the explicit-target executable before it is selected");
@@ -3298,7 +3333,10 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
                                        "phase22 review board implementation-only focus rebuild");
 
     if (RequireWriteTime(review_scan_object) != review_scan_object_time_2) {
-        Fail("phase22 implementation-only focus rebuild should reuse the already rebuilt deep shared object");
+        Fail("phase22 implementation-only focus rebuild should reuse the wrapper shared object");
+    }
+    if (RequireWriteTime(internal_object) != internal_object_time_2) {
+        Fail("phase22 implementation-only focus rebuild should reuse the already rebuilt deep internal object");
     }
     if (RequireWriteTime(review_status_object) != review_status_object_time_1) {
         Fail("phase22 implementation-only focus rebuild should still reuse the dependent shared status object");

@@ -4,6 +4,7 @@ default = "pipe-ready"
 
 [targets.pipe-ready]
 kind = "exe"
+package = "pipe-ready"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

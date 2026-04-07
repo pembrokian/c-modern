@@ -4,6 +4,7 @@ default = "line-filter-relay"
 
 [targets.line-filter-relay]
 kind = "exe"
+package = "line-filter-relay"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

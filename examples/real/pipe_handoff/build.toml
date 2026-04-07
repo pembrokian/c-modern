@@ -4,6 +4,7 @@ default = "pipe-handoff"
 
 [targets.pipe-handoff]
 kind = "exe"
+package = "pipe-handoff"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

@@ -4,6 +4,7 @@ default = "partial-write"
 
 [targets.partial-write]
 kind = "exe"
+package = "evented-partial-write"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

@@ -5,6 +5,7 @@ build_dir = "build/phase7_project"
 
 [targets.app]
 kind = "exe"
+package = "phase7-project"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

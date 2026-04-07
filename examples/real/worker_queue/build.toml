@@ -4,6 +4,7 @@ default = "worker-queue"
 
 [targets.worker-queue]
 kind = "exe"
+package = "worker-queue"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

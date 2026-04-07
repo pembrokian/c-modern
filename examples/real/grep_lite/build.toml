@@ -4,6 +4,7 @@ default = "grep"
 
 [targets.grep]
 kind = "exe"
+package = "grep-lite"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

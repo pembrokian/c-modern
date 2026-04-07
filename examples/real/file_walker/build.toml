@@ -4,6 +4,7 @@ default = "walker"
 
 [targets.walker]
 kind = "exe"
+package = "file-walker"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

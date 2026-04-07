@@ -4,6 +4,7 @@ default = "echo"
 
 [targets.echo]
 kind = "exe"
+package = "evented-echo"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"

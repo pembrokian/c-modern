@@ -71,6 +71,13 @@ Supported command patterns:
 - direct-source inspection or build: `build/debug/mc check <file.mc>` and `build/debug/mc build <file.mc> --build-dir <dir>`
 - project inspection, build, run, or test: `build/debug/mc check --project <build.toml>`, `build/debug/mc build --project <build.toml> --build-dir <dir>`, `build/debug/mc run --project <build.toml> --build-dir <dir> -- <args>`, and `build/debug/mc test --project <build.toml> --build-dir <dir>`
 
+Current module-model contract:
+
+- ordinary modules are public by default
+- `@private` is the only declaration-level hiding mechanism
+- a file named `internal.mc` is package-internal and may be imported only by modules in the same explicit target `package`
+- project manifests should set `package = "..."` on each target instead of relying on implicit package identity
+
 Artifact expectations:
 
 - `build/debug/mc` is the produced compiler entrypoint for the supported path
