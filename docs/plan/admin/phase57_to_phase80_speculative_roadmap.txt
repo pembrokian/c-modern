@@ -147,6 +147,19 @@ Phase 69 is now concrete repository history rather than active speculation:
 The remaining speculative continuation in this band therefore starts at Phase
 70.
 
+Phase 70 is now concrete repository history rather than active speculation:
+- a sync and mem consumer-gate audit found no current admitted real-project
+  pressure that honestly justifies public sync widening beyond thread spawn or
+  join, mutex, condvar wait or signal or broadcast, and atomic load or store,
+  or public mem widening beyond explicit `Buffer<u8>` ownership, slice
+  formation, and arena-backed local allocation
+- the support notes were aligned to reflect that `condvar_broadcast(...)` is
+  already implemented, while public atomic read-modify-write and broader mem
+  API widening remain deferred for lack of a stronger admitted consumer
+
+The remaining speculative continuation in this band therefore starts at Phase
+71.
+
 Likely themes:
 - filesystem and `io` contract convergence where nil-only or raw-status
   boundaries still remain materially harmful
@@ -166,11 +179,6 @@ Why this band is separate:
   still need to be implemented for the current admitted slice to feel real?”
 
 Phases in this band:
-
-Phase 70 -- Sync And Mem Follow-On Gate
-- Exit criterion: the repository decides whether any atomic, coordination,
-  buffer, or arena widening is truly needed beyond the current admitted `sync`
-  and `mem` slices.
 
 Phase 71 -- Minimal Sync, Mem, Or Process Follow-On Or Explicit Deferral
 - Exit criterion: either the smallest honest sync, mem, or process follow-on

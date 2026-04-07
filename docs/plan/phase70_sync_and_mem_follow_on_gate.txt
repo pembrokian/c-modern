@@ -1,0 +1,167 @@
+Phase 70 -- Sync And Mem Follow-On Gate
+=======================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Decide whether any sync or mem widening is honestly required beyond the current
+admitted hosted slice after the completed testing-surface hardening wave.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- Phase 66 kept sync and mem follow-on explicit but deferred because neither
+  had a stronger admitted consumer than the already landed narrow slice.
+- Phase 67 and Phase 68 then closed the stronger filesystem and subprocess
+  adjacent fronts.
+- Phase 69 closed the next ordinary-test helper hardening wave, so the next
+  adjacent gate is now whether sync or mem has become the strongest honest
+  owner.
+- The current repository already ships more of the old speculative sync surface
+  than the roadmap originally assumed: `condvar_broadcast(...)` is present in
+  the hosted runtime and stdlib, even though broader atomic read-modify-write
+  APIs remain deferred.
+
+Problem being solved
+--------------------
+- The speculative roadmap still names atomic read-modify-write, broader
+  coordination, and richer buffer or arena semantics as possible next owners,
+  but the repository needs one explicit gate based on admitted consumer
+  pressure rather than on abstract completeness.
+- Without a gate phase, it would be easy to widen `sync` opportunistically
+  because low-level intrinsics or architecture docs mention compare-exchange or
+  fetch-add, or to widen `mem` because the long-term spec discusses richer
+  allocator helpers.
+- The repository needs one explicit answer on whether any of those fronts are
+  actually required by the admitted real project set today.
+
+Core rule
+---------
+- Judge sync and mem follow-on by admitted real consumer pressure, not by the
+  existence of longer-term spec families or low-level backend support.
+- Keep the current hosted sync slice narrow unless an admitted real project
+  needs more than thread spawn or join, mutex, condvar wait or signal or
+  broadcast, and atomic publication via load or store.
+- Keep the current mem slice narrow unless an admitted real project needs more
+  than explicit `Buffer<u8>` ownership, slice formation, and arena-backed local
+  allocation.
+- If no stronger consumer exists, record that result explicitly and route the
+  next phase toward deferral rather than speculative widening.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one consumer-matrix audit across the admitted real sync
+ and mem users, plus bounded documentation alignment where current support notes
+ drift from the implemented truth.
+
+Audited pressure summary
+------------------------
+Sync pressure:
+- The admitted real sync project remains `examples/real/worker_queue/`, which
+  uses typed `thread_spawn<T>(...)`, `thread_join(...)`, mutex init or destroy
+  or lock or unlock, and condition-variable wait or signal.
+- The admitted real pipe proofs `examples/real/pipe_handoff/` and
+  `examples/real/pipe_ready/` use threads and join, but they do not require
+  richer atomics or broader coordination APIs.
+- The admitted atomic proof remains narrow publication, not a real project that
+  needs compare-exchange, exchange, or fetch-add on the public `sync` surface.
+- `condvar_broadcast(...)` is already implemented, but no admitted real project
+  currently requires it as the decisive next owner.
+
+Mem pressure:
+- The admitted real mem consumers continue to use explicit `Buffer<u8>`
+  ownership plus `slice_from_buffer<u8>(...)` for file, formatting, relay, and
+  path-building workflows.
+- The admitted arena proof remains `examples/real/arena_expr/`, which needs
+  `arena_init(...)`, `arena_new<T>(...)`, and `arena_deinit(...)`, but does not
+  require a broader allocator protocol or richer arena policy.
+- No admitted real project currently depends on generic `buffer_len<T>(...)`,
+  `alloc_array<T>(...)`, `alloc_value<T>(...)`, or `arena_allocator(...)` as a
+  missing public boundary.
+
+Rejected follow-on candidates in this gate
+------------------------------------------
+Atomic read-modify-write widening:
+- low-level MIR and backend tests already model `atomic_exchange`,
+  `atomic_compare_exchange`, and `atomic_fetch_add`, but the admitted public
+  hosted `sync` slice still has no real project requiring those operations
+  instead of mutex or condvar coordination or load or store publication.
+
+Broader coordination helpers:
+- `condvar_broadcast(...)` is already present, so it is not a missing next
+  owner.
+- No admitted real project currently needs a higher-level wait helper, barrier,
+  channel, or scheduler abstraction.
+
+Mem API widening:
+- The real project set still does not show a public pressure point for broader
+  arena semantics, allocator adaptation helpers, or generic buffer metadata
+  operations beyond the current explicit `u8`-buffer workflows.
+
+Delivered outcome
+-----------------
+- no sync widening is currently justified beyond the admitted hosted slice
+- no mem widening is currently justified beyond the admitted hosted slice
+- the repository should carry the remaining sync or mem follow-on as explicit
+  deferred work rather than as an ambient future assumption
+- the support notes should be corrected where they still describe
+  `condvar_broadcast(...)` as deferred even though the implemented slice already
+  includes it
+- next-step statement: Phase 71 should be framed as explicit deferral unless a
+  new admitted sync, mem, or process consumer appears strong enough to win
+
+What this phase proved
+----------------------
+- current admitted real project pressure still stops at the landed hosted sync
+  and mem slice
+- low-level backend or MIR support for atomic read-modify-write does not by
+  itself justify public stdlib widening
+- the remaining sync or mem follow-on fronts are still real but not yet honest
+  enough to land as public repository surface
+
+Deliverables
+------------
+- one canonical Phase 70 gate note recording the sync and mem audit result
+- bounded updates to planning and support docs so Phase 70 no longer remains
+  speculative
+- one documentation correction removing the stale claim that condvar broadcast
+  is still absent from the admitted hosted sync slice
+
+Exit criteria
+-------------
+- the repository has one explicit Phase 70 answer on whether sync or mem needs
+  widening now
+- non-winning sync and mem fronts remain explicit with consumer-based deferral
+  reasons
+- the support notes match the implemented hosted sync truth
+
+Non-goals
+---------
+- landing atomic compare-exchange, exchange, or fetch-add on the public
+  `stdlib/sync.mc` surface without a real admitted consumer
+- widening `mem` to allocator-adapter or richer arena policy APIs without a
+  real admitted consumer
+- inventing channels, schedulers, barriers, or hidden coordination frameworks
+- treating low-level intrinsic coverage as equivalent to admitted stdlib API
+  pressure
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 70 stands alone as the sync and mem consumer gate after the completed
+  Phase 69 testing-surface hardening wave.
+- The phase is explicit that the current honest outcome is no public sync or
+  mem widening yet.
+
+Closeout statement
+------------------
+Phase 70 is complete as a gate rather than as a widening wave. The repository
+still carries explicit future fronts for atomic read-modify-write and richer
+mem APIs, but the admitted real project set does not yet force either surface
+beyond the already landed hosted slice. The next adjacent step should therefore
+either park those fronts explicitly again in Phase 71 or reopen one only when a
+new admitted consumer makes it honest.

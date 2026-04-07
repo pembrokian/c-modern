@@ -730,6 +730,25 @@ Register By Concern
   end state: ordinary toolchain companion library for tests, with helpers but
   no compiler magic.
 
+- Slice: hosted sync follow-on breadth gate
+  design: settled by repository execution rule
+  plan phase: post-Phase-65 adjacent follow-through
+  repo status: implemented gate
+  repo wave: Phase 70
+  docs: docs/plan/phase70_sync_and_mem_follow_on_gate.txt, README.md, docs/plan/backlog.txt
+  end state: public sync widening beyond the admitted hosted slice happens only
+  when a real admitted consumer justifies it.
+
+- Slice: hosted mem follow-on breadth gate
+  design: settled by repository execution rule
+  plan phase: post-Phase-65 adjacent follow-through
+  repo status: implemented gate
+  repo wave: Phase 70
+  docs: docs/plan/phase70_sync_and_mem_follow_on_gate.txt, README.md, docs/plan/backlog.txt
+  end state: public mem widening beyond explicit `Buffer<u8>` ownership,
+  slice formation, and arena-backed local allocation happens only when a real
+  admitted consumer justifies it.
+
 7. Pressure Programs, Proof Surfaces, And Release Shape
 ------------------------------------------------------
 

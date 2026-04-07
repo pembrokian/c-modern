@@ -89,11 +89,12 @@ Current repository-specific notes:
   fixture, capture, or compiler-magic API
 - `sync` is the hosted execution and low-level shared-memory boundary: thread
   spawn or join remain part of the primary execution model, while mutexes,
-  condition variables, and narrow `Atomic<T>` load or store publication remain
-  explicit low-level hosted tools rather than the preferred portable
-  communication model; `condvar_wait(...)` follows the ordinary spurious-wakeup
-  rule and callers must re-check their predicate in a loop, while compare-
-  exchange, fetch-add, and broader scheduler claims remain deferred
+  condition variables, including `condvar_broadcast(...)`, and narrow
+  `Atomic<T>` load or store publication remain explicit low-level hosted tools
+  rather than the preferred portable communication model; `condvar_wait(...)`
+  follows the ordinary spurious-wakeup rule and callers must re-check their
+  predicate in a loop, while compare-exchange, exchange, fetch-add, and broader
+  scheduler claims remain deferred
 - the repository does not admit async syntax, futures, channels, actors, or
   hidden scheduler semantics; the preferred portable model remains explicit
   execution plus handle-based communication plus readiness waiting
