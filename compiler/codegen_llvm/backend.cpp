@@ -676,6 +676,134 @@ std::string FormatLLVMLiteral(const BackendTypeInfo& type_info,
     return std::string(value);
 }
 
+bool RenderLLVMGlobalConstValue(const mir::Module& module,
+                                sema::Type type,
+                                const sema::ConstValue& value,
+                                const std::filesystem::path& source_path,
+                                support::DiagnosticSink& diagnostics,
+                                std::string& rendered) {
+    type = sema::CanonicalizeBuiltinType(std::move(type));
+    if (type.kind == sema::Type::Kind::kConst && !type.subtypes.empty()) {
+        return RenderLLVMGlobalConstValue(module, type.subtypes.front(), value, source_path, diagnostics, rendered);
+    }
+
+    const sema::Type canonical_type = StripMirAliasOrDistinct(module, std::move(type));
+    const auto lowered_type = LowerTypeInfo(module, canonical_type);
+    if (!lowered_type.has_value()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend cannot lower global constant type " + sema::FormatType(canonical_type),
+                           diagnostics);
+        return false;
+    }
+
+    if (value.kind != sema::ConstValue::Kind::kAggregate) {
+        rendered = FormatLLVMLiteral(*lowered_type, value.text);
+        return true;
+    }
+
+    if (canonical_type.kind == sema::Type::Kind::kArray) {
+        if (canonical_type.subtypes.empty()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend requires array element type for global constant " +
+                                   sema::FormatType(canonical_type),
+                               diagnostics);
+            return false;
+        }
+
+        const auto length = mc::support::ParseArrayLength(canonical_type.metadata);
+        if (!length.has_value() || *length != value.elements.size()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend requires exact array constant element count for global type " +
+                                   sema::FormatType(canonical_type),
+                               diagnostics);
+            return false;
+        }
+
+        const auto element_type = LowerTypeInfo(module, canonical_type.subtypes.front());
+        if (!element_type.has_value()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend cannot lower array element type for global constant " +
+                                   sema::FormatType(canonical_type.subtypes.front()),
+                               diagnostics);
+            return false;
+        }
+
+        std::ostringstream stream;
+        stream << '[';
+        for (std::size_t index = 0; index < value.elements.size(); ++index) {
+            std::string element_text;
+            if (!RenderLLVMGlobalConstValue(module,
+                                            canonical_type.subtypes.front(),
+                                            value.elements[index],
+                                            source_path,
+                                            diagnostics,
+                                            element_text)) {
+                return false;
+            }
+            if (index > 0) {
+                stream << ", ";
+            }
+            stream << element_type->backend_name << ' ' << element_text;
+        }
+        stream << ']';
+        rendered = stream.str();
+        return true;
+    }
+
+    std::vector<std::pair<std::string, sema::Type>> fields = sema::BuiltinAggregateFields(canonical_type);
+    if (fields.empty() && canonical_type.kind == sema::Type::Kind::kTuple) {
+        fields.reserve(canonical_type.subtypes.size());
+        for (std::size_t index = 0; index < canonical_type.subtypes.size(); ++index) {
+            fields.push_back({std::to_string(index), canonical_type.subtypes[index]});
+        }
+    }
+    if (fields.empty() && canonical_type.kind == sema::Type::Kind::kNamed) {
+        if (const auto* type_decl = FindTypeDecl(module, canonical_type.name); type_decl != nullptr) {
+            fields = InstantiateFields(*type_decl, canonical_type);
+        }
+    }
+    if (fields.empty()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend cannot render structural global constant for type " +
+                               sema::FormatType(canonical_type),
+                           diagnostics);
+        return false;
+    }
+    if (fields.size() != value.elements.size()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend requires one constant element per field for global type " +
+                               sema::FormatType(canonical_type),
+                           diagnostics);
+        return false;
+    }
+
+    std::ostringstream stream;
+    stream << '{';
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        const auto field_type = LowerTypeInfo(module, fields[index].second);
+        if (!field_type.has_value()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend cannot lower field type " + sema::FormatType(fields[index].second) +
+                                   " for global constant " + sema::FormatType(canonical_type),
+                               diagnostics);
+            return false;
+        }
+
+        std::string field_text;
+        if (!RenderLLVMGlobalConstValue(module, fields[index].second, value.elements[index], source_path, diagnostics, field_text)) {
+            return false;
+        }
+
+        if (index > 0) {
+            stream << ", ";
+        }
+        stream << field_type->backend_name << ' ' << field_text;
+    }
+    stream << '}';
+    rendered = stream.str();
+    return true;
+}
+
 bool ResolveExecutableValue(const ExecutableFunctionState& state,
                             const std::string& value_name,
                             const mir::BasicBlock& block,
@@ -4131,7 +4259,8 @@ bool RenderLlvmModule(const mir::Module& module,
                                   global_type)) {
             return false;
         }
-        for (const auto& name : global.names) {
+        for (std::size_t index = 0; index < global.names.size(); ++index) {
+            const auto& name = global.names[index];
             stream << LLVMGlobalName(name) << " = ";
             if (global.is_extern) {
                 stream << "external " << (global.is_const ? "constant " : "global ")
@@ -4139,8 +4268,19 @@ bool RenderLlvmModule(const mir::Module& module,
                 continue;
             }
 
-            const std::string init_value = global.initializers.empty() ? LLVMZeroValue(global_type)
-                                                                       : FormatLLVMLiteral(global_type, global.initializers.front());
+            std::string init_value = LLVMStructInsertBase(global_type);
+            if (index < global.constant_values.size() && global.constant_values[index].has_value()) {
+                if (!RenderLLVMGlobalConstValue(module,
+                                                global.type,
+                                                *global.constant_values[index],
+                                                source_path,
+                                                diagnostics,
+                                                init_value)) {
+                    return false;
+                }
+            } else if (index < global.initializers.size()) {
+                init_value = FormatLLVMLiteral(global_type, global.initializers[index]);
+            }
             stream << (global.is_const ? "constant " : "global ")
                    << global_type.backend_name << " " << init_value << ", align " << global_type.alignment << "\n";
         }

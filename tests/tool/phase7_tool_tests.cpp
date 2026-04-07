@@ -4168,6 +4168,27 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
     ExpectOutputContains(output,
                          "checked target issue-rollup",
                          "phase42 issue rollup imported aggregate const pressure should succeed through project check");
+
+    const std::filesystem::path build_dir = binary_root / "phase58_issue_rollup_aggregate_const_build";
+    std::filesystem::remove_all(build_dir);
+
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       cloned_project_path,
+                                       build_dir,
+                                       "",
+                                       "phase58_issue_rollup_aggregate_const_build_output.txt",
+                                       "phase58 issue rollup aggregate const executable build");
+
+    const std::string run_output = RunProjectTargetAndExpectSuccess(mc_path,
+                                                                    cloned_project_path,
+                                                                    build_dir,
+                                                                    "",
+                                                                    cloned_project_root / "tests/sample.txt",
+                                                                    "phase58_issue_rollup_aggregate_const_run_output.txt",
+                                                                    "phase58 issue rollup aggregate const executable run");
+    ExpectIssueRollupRunOutput(run_output,
+                               "issue-rollup-steady\n",
+                               "phase58 issue rollup aggregate const executable run");
 }
 
 }  // namespace

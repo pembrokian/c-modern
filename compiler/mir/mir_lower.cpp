@@ -1716,6 +1716,11 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
             for (const auto& value : decl.values) {
                 global.initializers.push_back(RenderExprInline(*value));
             }
+            if (!decl.pattern.names.empty()) {
+                if (const sema::GlobalSummary* summary = sema::FindGlobalSummary(sema_module, decl.pattern.names.front()); summary != nullptr) {
+                    global.constant_values = summary->constant_values;
+                }
+            }
             module->globals.push_back(std::move(global));
         }
     }

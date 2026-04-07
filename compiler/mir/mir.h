@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -42,6 +43,7 @@ struct GlobalDecl {
     std::vector<std::string> names;
     sema::Type type;
     std::vector<std::string> initializers;
+    std::vector<std::optional<sema::ConstValue>> constant_values;
 };
 
 struct Local {

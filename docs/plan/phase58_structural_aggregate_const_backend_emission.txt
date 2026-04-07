@@ -1,0 +1,158 @@
+Phase 58 -- Structural Aggregate Const Backend Emission
+=======================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Close the remaining backend-owned follow-through after Phase 42 by making
+top-level structural aggregate constants emit honestly through the executable
+ LLVM path, without reopening broader linker, artifact, or generic-function
+ work.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- Phase 56 already closed the owner-local grammar and MIR gap for logical
+  `||`, logical `&&`, and indexed access `a[i]`.
+- The speculative admin roadmap kept both expression-form closure and imported
+  generic breadth as possible near-term candidates, but current repository
+  evidence no longer makes either one the strongest active owner:
+  - expression closure is already landed in Phase 56
+  - broader imported generic widening still lacks a second admitted consumer
+- The strongest still-live compiler-owned distortion on the admitted slice is
+  therefore the older backend follow-through kept explicit since Phase 42:
+  executable emission of top-level structural aggregate const globals.
+
+Repository status note
+----------------------
+- Phase 40 chose structural aggregate constant pressure as the honest next
+  owner from real `issue_rollup` consumer evidence.
+- Phase 42 closed that pressure at the sema-plus-`.mci` boundary by adding
+  recursive structural `ConstValue` transport and project `check` proof for an
+  imported `DEFAULT_SUMMARY` aggregate constant.
+- The remaining limitation was deliberately left separate: MIR and the LLVM
+  executable backend still represented top-level global initializers as
+  rendered source text, which is sufficient for scalar literals but not for
+  structural constants.
+- The repository therefore already knew the semantic truth for aggregate const
+  globals; what remained missing was honest backend transport and executable
+  proof.
+
+Problem being solved
+--------------------
+- Imported and local top-level structural constants can now survive semantic
+  analysis and `.mci` round-trips, but the executable path still lowers global
+  initializers through text rendering rather than through typed constant facts.
+- That loses field-level structure before LLVM emission and blocks real
+  executable builds for globals such as
+  `const DEFAULT_SUMMARY_COPY: rollup_model.Summary = rollup_model.DEFAULT_SUMMARY`.
+- The backend also implicitly treated one initializer string as if it applied
+  to every name in a multi-name global declaration, which is weaker than the
+  semantic contract already tracked per bound name.
+- The repository needs one narrow backend-owned closure that carries semantic
+  constant facts through MIR and emits typed LLVM initializers structurally.
+
+Core rule
+---------
+- Do not re-solve compile-time semantics in the backend.
+- Reuse the semantic `ConstValue` truth already computed by sema.
+- Keep the change narrowly focused on top-level global constant emission.
+- Do not widen linker behavior, artifact policy, or general constant-folding
+  claims beyond what the admitted executable consumer needs.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one real project executable-build and run regression that
+clones the admitted `issue_rollup` project, introduces a top-level imported
+aggregate const global in the executable target, and proves that the normal
+project `mc build` and `mc run` path succeeds without consumer-local
+workarounds.
+
+Compiler change boundary:
+1. preserve per-name semantic constant facts on MIR globals instead of only
+   rendered initializer text
+2. carry those facts into the LLVM backend global model
+3. render scalar, pointer-nil, array, and struct-shaped constant initializers
+   recursively from typed semantic values during executable emission
+
+What this phase should try to prove
+-----------------------------------
+- The executable backend can emit top-level structural aggregate const globals
+  honestly from sema-owned constant facts.
+- The proof uses the real admitted `issue_rollup` consumer shape rather than a
+  synthetic backend-only fixture.
+- The backend remains type-directed and deterministic instead of reparsing
+  initializer source text.
+- Broader linker policy and general generic-function widening remain deferred.
+
+Preferred pressure points
+-------------------------
+1. Imported structural aggregate const globals in an executable target.
+2. MIR transport of per-name constant facts for globals.
+3. LLVM textual emission of struct and array constants.
+4. Normal project `mc build` plus `mc run` workflow proof on the admitted
+   hosted slice.
+
+Deliverables
+------------
+- one canonical Phase 58 note documenting why this is backend follow-through
+  after Phase 42 rather than a new semantic phase
+- one focused compiler change that carries semantic constant facts from sema to
+  MIR to LLVM global emission
+- one tool regression that builds and runs a cloned `issue_rollup` project with
+  an imported aggregate const global in the executable target
+
+Suggested execution order
+-------------------------
+1. Reconfirm that Phase 42 already closed structural aggregate constant truth
+   at sema and `.mci` boundaries.
+2. Extend MIR global metadata so per-name semantic constant facts survive to
+   the backend.
+3. Teach executable LLVM global emission to render structural constants
+   recursively from typed semantic values.
+4. Add one real project build-and-run regression around the cloned
+   `issue_rollup` aggregate-const consumer.
+5. Rebuild the compiler and run the focused regression suites.
+
+Exit criteria
+-------------
+- top-level structural aggregate const globals emit through the executable LLVM
+  path without backend text-reconstruction hacks
+- the admitted `issue_rollup` aggregate-const executable consumer builds and
+  runs through the normal project workflow
+- per-name global constant facts remain preserved across MIR and backend
+  boundaries
+- broader linker behavior and generic-function breadth remain explicitly
+  deferred
+
+Non-goals
+---------
+- reopening `.mci` format design for a second time
+- broad linker or archive policy widening
+- general runtime initialization semantics beyond admitted constant globals
+- general-purpose executable support for every possible compile-time aggregate
+  family not exercised by the current admitted slice
+
+What landed
+-----------
+- MIR global declarations now preserve sema-owned per-name constant facts
+  instead of relying only on rendered initializer text.
+- The executable LLVM backend now emits typed structural constant initializers
+  recursively for the admitted top-level aggregate global cases, while still
+  falling back to zero initialization when no semantic constant is present.
+- The real `issue_rollup` project pressure is now proved through project build
+  and run coverage with an imported aggregate const global in the executable
+  target.
+
+Closeout statement
+------------------
+Phase 58 is complete as a narrow backend follow-through. The repository does
+not reopen structural aggregate constant semantics as unfinished sema work;
+instead it carries the already-landed semantic truth through MIR and into the
+executable LLVM path so admitted real-project builds can emit top-level
+aggregate const globals honestly.
