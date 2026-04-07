@@ -77,8 +77,13 @@ func main(args: Slice<cstr>) i32 {
     defer close_ignored(output_pipe.read_end)
     defer close_ignored(output_pipe.write_end)
 
+    argv: [3]cstr
+    argv[0] = "phase68-tr"
+    argv[1] = "a-z"
+    argv[2] = "A-Z"
+
     child: os.Child
-    child, err = os.spawn("/usr/bin/tr", "a-z", "A-Z", input_pipe.read_end, output_pipe.write_end, input_pipe.write_end, output_pipe.read_end)
+    child, err = os.spawn_argv("/usr/bin/tr", (Slice<cstr>)(argv), input_pipe.read_end, output_pipe.write_end, input_pipe.write_end, output_pipe.read_end)
     if !errors.is_ok(err) {
         return 12
     }

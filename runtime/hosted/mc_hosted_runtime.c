@@ -364,6 +364,28 @@ static char** mc_copy_three_strings_to_argv(struct mc_string program,
     return argv;
 }
 
+static char** mc_copy_string_slice_to_argv(struct mc_slice_cstr args) {
+    if (args.len < 0) {
+        return NULL;
+    }
+
+    const size_t count = (size_t) args.len;
+    char** argv = mc_allocate_argv(count);
+    if (argv == NULL) {
+        return NULL;
+    }
+
+    for (size_t index = 0; index < count; ++index) {
+        argv[index] = mc_copy_string_to_cstr(args.ptr[index]);
+        if (argv[index] == NULL) {
+            mc_free_c_argv(argv, index);
+            return NULL;
+        }
+    }
+
+    return argv;
+}
+
 struct mc_allocator* __mc_mem_default_allocator(void) {
     return &k_default_allocator;
 }
@@ -617,6 +639,81 @@ struct mc_os_child __mc_os_spawn3(struct mc_string program,
     return out;
 }
 
+struct mc_os_child __mc_os_spawnv(struct mc_string program,
+                                  struct mc_slice_cstr argv,
+                                  int32_t stdin_file,
+                                  int32_t stdout_file,
+                                  int32_t close_file0,
+                                  int32_t close_file1,
+                                  uintptr_t* out_err) {
+    struct mc_os_child out = {0};
+    mc_store_error(out_err, 0);
+
+    if (argv.len <= 0 || argv.ptr == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_OS, 2));
+        return out;
+    }
+
+    char* c_program = mc_copy_string_to_cstr(program);
+    if (c_program == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return out;
+    }
+
+    char** c_argv = mc_copy_string_slice_to_argv(argv);
+    if (c_argv == NULL) {
+        free(c_program);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return out;
+    }
+
+    const size_t argc = (size_t) argv.len;
+    errno = 0;
+    const pid_t pid = fork();
+    if (pid < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        mc_free_c_argv(c_argv, argc);
+        free(c_program);
+        return out;
+    }
+
+    if (pid == 0) {
+        if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
+            if (dup2(stdin_file, STDIN_FILENO) < 0) {
+                _exit(127);
+            }
+        }
+        if (stdout_file >= 0 && stdout_file != STDOUT_FILENO) {
+            if (dup2(stdout_file, STDOUT_FILENO) < 0) {
+                _exit(127);
+            }
+        }
+
+        if (close_file0 >= 0 && close_file0 != STDIN_FILENO && close_file0 != STDOUT_FILENO) {
+            close(close_file0);
+        }
+        if (close_file1 >= 0 && close_file1 != STDIN_FILENO && close_file1 != STDOUT_FILENO &&
+            close_file1 != close_file0) {
+            close(close_file1);
+        }
+
+        if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
+            close(stdin_file);
+        }
+        if (stdout_file >= 0 && stdout_file != STDOUT_FILENO && stdout_file != stdin_file) {
+            close(stdout_file);
+        }
+
+        execv(c_program, c_argv);
+        _exit(127);
+    }
+
+    mc_free_c_argv(c_argv, argc);
+    free(c_program);
+    out.raw = (uintptr_t) pid;
+    return out;
+}
+
 int32_t __mc_os_wait(struct mc_os_child* child, uintptr_t* out_err) {
     mc_store_error(out_err, 0);
     if (child == NULL || child->raw == 0) {
@@ -855,6 +952,140 @@ int32_t __mc_fs_is_dir(struct mc_string path, uintptr_t* out_err) {
     return is_dir;
 }
 
+struct mc_buffer_u8* __mc_fs_list_dir_err(struct mc_string path,
+                                          struct mc_allocator* alloc,
+                                          uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    struct mc_allocator* actual_alloc = alloc != NULL ? alloc : &k_default_allocator;
+
+    char* c_path = mc_copy_string_to_cstr(path);
+    if (c_path == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return NULL;
+    }
+
+    DIR* dir = opendir(c_path);
+    if (dir == NULL) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        free(c_path);
+        return NULL;
+    }
+
+    struct mc_dir_entry* entries = NULL;
+    size_t count = 0;
+    size_t capacity = 0;
+    int failed = 0;
+    const size_t base_len = strlen(c_path);
+
+    for (;;) {
+        errno = 0;
+        struct dirent* dir_entry = readdir(dir);
+        if (dir_entry == NULL) {
+            if (errno != 0) {
+                mc_store_error(out_err, mc_error_code_from_errno());
+                failed = 1;
+            }
+            break;
+        }
+
+        if (strcmp(dir_entry->d_name, ".") == 0 || strcmp(dir_entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        if (count == capacity) {
+            const size_t next_capacity = capacity == 0 ? 8u : capacity * 2u;
+            struct mc_dir_entry* next_entries =
+                (struct mc_dir_entry*) realloc(entries, next_capacity * sizeof(struct mc_dir_entry));
+            if (next_entries == NULL) {
+                mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+                failed = 1;
+                break;
+            }
+            entries = next_entries;
+            capacity = next_capacity;
+        }
+
+        const size_t name_len = strlen(dir_entry->d_name);
+        char* name_copy = (char*) malloc(name_len + 1);
+        if (name_copy == NULL) {
+            mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+            failed = 1;
+            break;
+        }
+        memcpy(name_copy, dir_entry->d_name, name_len + 1);
+
+        char* joined_path = mc_join_path(c_path, base_len, dir_entry->d_name, name_len);
+        if (joined_path == NULL) {
+            free(name_copy);
+            mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+            failed = 1;
+            break;
+        }
+
+        struct stat entry_stat;
+        const int stat_ok = lstat(joined_path, &entry_stat) == 0;
+        free(joined_path);
+        if (!stat_ok) {
+            free(name_copy);
+            mc_store_error(out_err, mc_error_code_from_errno());
+            failed = 1;
+            break;
+        }
+
+        entries[count].name = name_copy;
+        entries[count].len = name_len;
+        entries[count].is_dir = S_ISDIR(entry_stat.st_mode) ? 1 : 0;
+        ++count;
+    }
+
+    closedir(dir);
+    free(c_path);
+
+    if (failed) {
+        mc_free_dir_entries(entries, count);
+        return NULL;
+    }
+
+    if (count > 1) {
+        qsort(entries, count, sizeof(struct mc_dir_entry), mc_compare_dir_entries);
+    }
+
+    size_t total_len = 0;
+    for (size_t index = 0; index < count; ++index) {
+        total_len += entries[index].len + 1u;
+        if (entries[index].is_dir) {
+            total_len += 1u;
+        }
+    }
+
+    struct mc_buffer_u8* out = __mc_mem_buffer_new_u8(actual_alloc, (int64_t) total_len);
+    if (out == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        mc_free_dir_entries(entries, count);
+        return NULL;
+    }
+
+    size_t cursor = 0;
+    for (size_t index = 0; index < count; ++index) {
+        if (entries[index].len > 0) {
+            memcpy(out->ptr + cursor, entries[index].name, entries[index].len);
+            cursor += entries[index].len;
+        }
+        if (entries[index].is_dir) {
+            out->ptr[cursor] = '/';
+            ++cursor;
+        }
+        out->ptr[cursor] = '\n';
+        ++cursor;
+    }
+
+    out->len = (int64_t) cursor;
+    out->cap = (int64_t) cursor;
+    out->alloc = actual_alloc;
+    mc_free_dir_entries(entries, count);
+    return out;
+}
+
 struct mc_buffer_u8* __mc_fs_list_dir(struct mc_string path, struct mc_allocator* alloc) {
     struct mc_allocator* actual_alloc = alloc != NULL ? alloc : &k_default_allocator;
 
@@ -1019,6 +1250,74 @@ struct mc_buffer_u8* __mc_fs_read_all(struct mc_string path, struct mc_allocator
     fclose(file);
 
     if (read_size != target_size) {
+        __mc_mem_buffer_free_u8(out);
+        return NULL;
+    }
+
+    out->len = (int64_t) read_size;
+    out->cap = (int64_t) read_size;
+    out->alloc = actual_alloc;
+    return out;
+}
+
+struct mc_buffer_u8* __mc_fs_read_all_err(struct mc_string path,
+                                          struct mc_allocator* alloc,
+                                          uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    struct mc_allocator* actual_alloc = alloc != NULL ? alloc : &k_default_allocator;
+
+    char* c_path = mc_copy_string_to_cstr(path);
+    if (c_path == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return NULL;
+    }
+
+    errno = 0;
+    FILE* file = fopen(c_path, "rb");
+    free(c_path);
+    if (file == NULL) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return NULL;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        fclose(file);
+        return NULL;
+    }
+
+    const long raw_size = ftell(file);
+    if (raw_size < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        fclose(file);
+        return NULL;
+    }
+
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        fclose(file);
+        return NULL;
+    }
+
+    struct mc_buffer_u8* out = __mc_mem_buffer_new_u8(actual_alloc, (int64_t) raw_size);
+    if (out == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        fclose(file);
+        return NULL;
+    }
+
+    const size_t target_size = (size_t) raw_size;
+    errno = 0;
+    const size_t read_size = target_size == 0 ? 0 : fread(out->ptr, 1, target_size, file);
+    const int read_error = ferror(file);
+    fclose(file);
+
+    if (read_error != 0 || read_size != target_size) {
+        if (read_error != 0) {
+            mc_store_error(out_err, mc_error_code_from_errno());
+        } else {
+            mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
+        }
         __mc_mem_buffer_free_u8(out);
         return NULL;
     }

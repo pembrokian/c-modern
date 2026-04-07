@@ -53,13 +53,14 @@ Current repository-specific notes:
   their primary result so callers can distinguish filesystem failure from an
   ordinary negative or zero result; `fs.is_dir(...)` currently returns an
   `i32` status flag rather than `bool` so the MC ABI matches the hosted C
-  runtime honestly on the current compiler boundary; `fs.read_all(...)` and
-  `fs.list_dir(...)` still use nil-only failure for the admitted slice
-- `fs.read_all(...)` and `fs.list_dir(...)` intentionally remain coarse on the
-  admitted slice: they return either an owned buffer or `nil`, and they do not
-  currently surface per-call host error codes through an `errors.Error` channel;
-  widening that boundary stays deferred until a real admitted consumer needs
-  actionable filesystem failure detail rather than simple success-or-failure
+  runtime honestly on the current compiler boundary; `fs.read_all_err(...)`
+  and `fs.list_dir_err(...)` now extend the same error-reporting model to
+  whole-file reads and directory listing
+- `fs.read_all(...)` and `fs.list_dir(...)` remain available as coarse
+  compatibility wrappers on the admitted slice: they return either an owned
+  buffer or `nil`, while the companion `*_err(...)` variants should be used by
+  callers that need actionable filesystem failure detail rather than simple
+  success-or-failure
 - `io` is the primary portable I/O and communication boundary: it owns
   `File`, `read`, `write`, `close`, readiness polling, and the admitted
   `Pipe` plus `pipe()` primitive used to connect independent execution

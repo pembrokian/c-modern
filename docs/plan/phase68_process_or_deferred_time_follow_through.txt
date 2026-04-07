@@ -1,0 +1,158 @@
+Phase 68 -- Process Or Deferred Time Follow-Through
+===================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Choose between the two remaining honest adjacent follow-through options named
+for Phase 68, then land the smallest implementation that current admitted
+consumer pressure actually justifies.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative roadmap framed Phase 68 as a fork: either one admitted
+  project would justify the next subprocess or argv widening, or the
+  repository would record that the already admitted narrow `time` slice still
+  needed no follow-through.
+- Phase 67 already closed the stronger filesystem contract mismatch, so the
+  remaining honest question for this phase was whether subprocess pressure had
+  finally become specific enough to widen, not whether another adjacent family
+  should be reopened speculatively.
+
+Repository status note
+----------------------
+- The narrow hosted `time` slice already provides `Duration`,
+  `time.monotonic()`, and small saturation-safe conversion helpers.
+- No new admitted project after Phase 35 depends on wall-clock time, sleeping,
+  deadlines, or any broader `time` policy.
+- The admitted subprocess slice is real, but `stdlib/os.mc` still exposes only
+  a fixed two-argument `spawn(...)` wrapper even though its own documentation
+  and critique trail already call out argv shaping as the next honest pressure
+  point.
+- The admitted real `line_filter_relay` project is still the concrete child-
+  process proof, so any Phase 68 process widening should be driven through that
+  project rather than through a synthetic subprocess demo.
+
+Problem being solved
+--------------------
+- The current `os.spawn(...)` API is structurally narrower than the subprocess
+  slice it claims to model: it hardcodes exactly two argument strings and
+  cannot represent a full argv vector cleanly.
+- That shape keeps the current slice usable for one bounded proof, but it does
+  not preserve the explicit argv ownership model the repository already wants
+  to claim.
+- Reopening `time` instead would have no admitted consumer and would widen into
+  wall-clock or sleep policy without concrete pressure.
+
+Core rule
+---------
+- Prefer the concrete subprocess ownership gap over reopening `time` without a
+  new consumer.
+- Keep the subprocess widening additive and narrow: fix argv representation,
+  not environment policy, cwd mutation, stderr routing, signals, or broader
+  process management.
+- Preserve the existing fixed helper as a compatibility surface if that avoids
+  needless churn, but make the argv-shaped API the honest owner.
+- Prove the widened contract through the admitted real `line_filter_relay`
+  project and one focused stdlib subprocess fixture.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: land a slice-based argv subprocess boundary and route the
+bounded real relay proof through it.
+
+Chosen outcome: process follow-through, not deferred `time` work.
+
+Chosen widening:
+- add `os.spawn_argv(program, argv: Slice<cstr>, stdin_file, stdout_file,
+  close_file0, close_file1) (Child, errors.Error)`
+- keep `os.spawn(...)` as a compatibility wrapper that materializes the old
+  fixed three-entry argv shape and forwards to `os.spawn_argv(...)`
+
+Explicit non-choice:
+- do not widen `time` in this phase because no admitted consumer now justifies
+  sleep, wall-clock, or broader deadline helpers beyond the already landed
+  monotonic slice
+
+What this phase should try to prove
+-----------------------------------
+- the repository now has an honest argv-shaped subprocess API rather than a
+  fixed two-argument stub at the main `os` boundary
+- the admitted `line_filter_relay` proof still passes through ordinary
+  `mc run` and `mc test` workflow after moving to explicit argv slices
+- the stdlib subprocess smoke can prove that argv ownership is explicit enough
+  to decouple the executed program path from `argv[0]`
+
+Deliverables
+------------
+- one canonical Phase 68 note recording the process-over-time decision
+- hosted runtime support for slice-based argv spawning
+- additive `stdlib/os.mc` support for `spawn_argv(...)` plus a compatibility
+  wrapper for the legacy `spawn(...)` surface
+- the admitted `line_filter_relay` real project updated to use explicit argv
+  slices
+- one focused stdlib subprocess fixture updated to prove the widened argv path
+- bounded documentation and planning updates marking Phase 68 complete and
+  keeping broader process policy plus broader `time` work deferred
+
+Suggested execution order
+-------------------------
+1. Confirm that current admitted `time` pressure is still insufficient for
+   widening.
+2. Add a hosted runtime entrypoint that accepts an argv slice and executes the
+   provided program path with that explicit vector.
+3. Expose `os.spawn_argv(...)` in the stdlib and route the old fixed helper
+   through it.
+4. Update the admitted real subprocess proof and one focused stdlib smoke to
+   use the widened argv path.
+5. Align README, release-hardening notes, backlog, decision log, and the
+   speculative roadmap with the implemented result.
+
+Exit criteria
+-------------
+- the repository has an honest argv-shaped subprocess API on the admitted
+  hosted slice
+- the admitted real subprocess project uses that widened API through the
+  normal project workflow
+- the planning surface records that Phase 68 chose process follow-through and
+  left broader `time` work deferred for lack of consumer pressure
+
+Non-goals
+---------
+- widening into shell command strings, environment APIs, cwd mutation,
+  stderr policy, signals, or broader process control
+- removing the legacy fixed helper in the same phase
+- adding wall-clock, sleep, or broader deadline semantics to `time`
+- solving broader child-handle lifetime questions beyond the existing bounded
+  `wait(...)` consumption model
+
+Implemented slice
+-----------------
+- added hosted runtime support for argv-slice subprocess spawning while keeping
+  the previous fixed helper intact as a compatibility path
+- added `os.spawn_argv(...)` in `stdlib/os.mc` and reimplemented the old
+  fixed-argument `spawn(...)` surface as a forwarding wrapper
+- moved the admitted `line_filter_relay` proof onto an explicit local argv
+  slice so the real subprocess project now drives the widened boundary
+- updated the stdlib subprocess smoke to use `spawn_argv(...)` with a custom
+  `argv[0]`, proving that the executed program path and argv vector are no
+  longer conflated
+- aligned README, hosted release-hardening notes, backlog, decision-log, and
+  the speculative roadmap so Phase 68 is recorded as completed process follow-
+  through while broader `time` work remains deferred
+
+Closeout statement
+------------------
+Phase 68 is complete as process follow-through rather than deferred `time`
+reconsideration. The repository still does not claim broad process management
+or any wider `time` family, but it no longer routes its admitted subprocess
+slice through a fixed two-argument stub that undercuts its own explicit argv
+ownership story. The next adjacent work can now move on to later candidates
+with both filesystem and argv-shaped subprocess follow-through explicitly
+closed.

@@ -117,8 +117,23 @@ Phase 66 is now concrete repository history rather than active speculation:
 - testing helper hardening remains a real second-wave candidate
 - broader `os`, `sync`, `mem`, and further `time` widening remain deferred
 
+Phase 67 is now concrete repository history rather than active speculation:
+- the smallest honest filesystem and cross-module error-contract widening
+  landed as additive `fs.read_all_err(...)` and `fs.list_dir_err(...)`
+  companions while preserving the coarse compatibility wrappers
+- one admitted real filesystem consumer now uses the widened error-reporting
+  path directly
+
+Phase 68 is now concrete repository history rather than active speculation:
+- the next honest subprocess follow-through landed as additive
+  `os.spawn_argv(...)` support while preserving the fixed helper as a
+  compatibility wrapper
+- the admitted real `line_filter_relay` proof now uses an explicit argv slice
+- broader `time` work remained deferred because no new admitted consumer
+  justified widening beyond the landed monotonic slice
+
 The remaining speculative continuation in this band therefore starts at Phase
-67.
+69.
 
 Likely themes:
 - filesystem and `io` contract convergence where nil-only or raw-status
@@ -139,17 +154,6 @@ Why this band is separate:
   still need to be implemented for the current admitted slice to feel real?”
 
 Phases in this band:
-
-Phase 67 -- Filesystem And Error-Contract Follow-Through
-- Exit criterion: the smallest honest next filesystem or cross-module
-  error-contract widening lands, or the remaining nil-only or status-only
-  boundaries are explicitly deferred again with a consumer-based reason.
-
-Phase 68 -- Process Or Deferred Time Follow-Through
-- Exit criterion: one real admitted project drives the next honest subprocess
-  or argv widening through the normal workflow and tests, or the repository
-  records that the already admitted narrow `time` slice still needs no further
-  widening.
 
 Phase 69 -- Testing Surface Hardening
 - Exit criterion: repeated ordinary-test helper patterns are absorbed into a

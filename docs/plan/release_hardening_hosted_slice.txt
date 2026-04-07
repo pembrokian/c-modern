@@ -140,7 +140,7 @@ This smoke set proves, at the narrowest honest level:
 - checked ordinary-test workflow on the admitted poller-coupled pipe-readiness
   proof over `io.pipe()` plus `io.poller_*`
 - checked ordinary-test workflow on the admitted narrow hosted subprocess plus
-  stdio proof over `os.spawn(...)` plus `os.wait(...)`
+  stdio proof over `os.spawn_argv(...)` plus `os.wait(...)`
 - checked ordinary-test workflow on the admitted hosted networking project
   proof
 
@@ -177,7 +177,8 @@ Known limitations
   and non-blocking pipe semantics beyond the current readiness proof remain
   out of scope
 - the repository now admits one narrow hosted `os` subprocess slice with
-  explicit argv-based `spawn(...)`, blocking `wait(...)`, and bounded
+  explicit argv-slice `spawn_argv(...)`, the legacy fixed `spawn(...)`
+  compatibility wrapper, blocking `wait(...)`, and bounded
   stdin/stdout pipe redirection proved by `examples/real/line_filter_relay/`;
   shell command strings, environment APIs, cwd mutation, stderr policy,
   signals, and broader process management remain out of scope

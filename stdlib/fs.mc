@@ -5,11 +5,11 @@ import mem
 extern(c) func __mc_fs_file_size(path: str, err: *errors.Error) isize
 @private
 extern(c) func __mc_fs_is_dir(path: str, err: *errors.Error) i32
-// TODO: widen list_dir to surface errors.Error once a real admitted consumer
-// needs actionable filesystem failure diagnostics rather than nil-only failure.
+@private
+extern(c) func __mc_fs_list_dir_err(path: str, alloc: *mem.Allocator, err: *errors.Error) *Buffer<u8>
 extern(c) func __mc_fs_list_dir(path: str, alloc: *mem.Allocator) *Buffer<u8>
-// TODO: widen read_all to surface errors.Error once a real admitted consumer
-// needs actionable filesystem failure diagnostics rather than nil-only failure.
+@private
+extern(c) func __mc_fs_read_all_err(path: str, alloc: *mem.Allocator, err: *errors.Error) *Buffer<u8>
 extern(c) func __mc_fs_read_all(path: str, alloc: *mem.Allocator) *Buffer<u8>
 
 func file_size(path: str) (isize, errors.Error) {
@@ -24,10 +24,34 @@ func is_dir(path: str) (i32, errors.Error) {
     return raw, err
 }
 
+func list_dir_err(path: str, alloc: *mem.Allocator) (*Buffer<u8>, errors.Error) {
+    err: errors.Error = errors.ok()
+    buf: *Buffer<u8> = __mc_fs_list_dir_err(path, alloc, &err)
+    return buf, err
+}
+
 func list_dir(path: str, alloc: *mem.Allocator) *Buffer<u8> {
-    return __mc_fs_list_dir(path, alloc)
+    buf: *Buffer<u8>
+    err: errors.Error
+    buf, err = list_dir_err(path, alloc)
+    if errors.is_err(err) {
+        return nil
+    }
+    return buf
+}
+
+func read_all_err(path: str, alloc: *mem.Allocator) (*Buffer<u8>, errors.Error) {
+    err: errors.Error = errors.ok()
+    buf: *Buffer<u8> = __mc_fs_read_all_err(path, alloc, &err)
+    return buf, err
 }
 
 func read_all(path: str, alloc: *mem.Allocator) *Buffer<u8> {
-    return __mc_fs_read_all(path, alloc)
+    buf: *Buffer<u8>
+    err: errors.Error
+    buf, err = read_all_err(path, alloc)
+    if errors.is_err(err) {
+        return nil
+    }
+    return buf
 }

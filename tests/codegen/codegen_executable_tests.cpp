@@ -1474,6 +1474,12 @@ int main(int argc, char** argv) {
                     0,
                     {phase6_dir_input.generic_string(), phase6_file_input.generic_string()});
 
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/fs_error_surface.mc",
+                    work_root / "phase67_fs_error_surface_build",
+                    0,
+                    {});
+
     RunBuiltOutputFixture(mc_path,
                           source_root / "tests/stdlib/list_dir_stdout.mc",
                           work_root / "phase6_list_dir_stdout_build",

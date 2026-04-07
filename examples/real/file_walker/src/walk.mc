@@ -44,8 +44,10 @@ func walk_path(root: str) i32 {
         return 0
     }
 
-    listing_buf: *Buffer<u8> = fs.list_dir(root, mem.default_allocator())
-    if listing_buf == nil {
+    listing_buf: *Buffer<u8>
+    listing_err: errors.Error
+    listing_buf, listing_err = fs.list_dir_err(root, mem.default_allocator())
+    if errors.is_err(listing_err) {
         return 92
     }
     defer mem.buffer_free<u8>(listing_buf)

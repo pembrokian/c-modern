@@ -1,0 +1,157 @@
+Phase 67 -- Filesystem And Error-Contract Follow-Through
+========================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Land the smallest honest filesystem and cross-module error-contract widening
+authorized by Phase 66 without forcing a broad source break across the already
+admitted coarse convenience surface.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative admin roadmap named Phase 67 as the smallest honest
+  filesystem and cross-module error-contract follow-through after the Phase 66
+  adjacent consumer matrix.
+- The Phase 66 matrix already narrowed the candidate surface to the coarse
+  nil-only `fs.read_all(...)` and `fs.list_dir(...)` boundaries.
+- The remaining honest question for this phase was therefore not whether the
+  repository should widen filesystem error handling at all, but how to do so
+  without destabilizing the broad admitted callsite base in one wave.
+
+Repository status note
+----------------------
+- `fs.file_size(...)` and `fs.is_dir(...)` already return `errors.Error`.
+- `fs.read_all(...)` and `fs.list_dir(...)` were still nil-only convenience
+  wrappers even though admitted real projects and fixtures use them broadly.
+- The hosted runtime already had errno-to-`errors.Error` conversion machinery
+  at the C boundary, so the missing piece was localized to the `fs` surface and
+  its runtime entrypoints rather than a broader compiler or ABI ownership gap.
+- The repository still needed to avoid a full callsite rewrite across the
+  current admitted examples, tests, and docs unless real pressure proved that a
+  source-breaking replacement was necessary.
+
+Problem being solved
+--------------------
+- The current `fs` surface was visibly uneven inside one admitted stdlib
+  family: some file queries surfaced `errors.Error`, while whole-file loading
+  and directory listing still collapsed failure to nil.
+- That mismatch made it impossible for admitted consumers to distinguish
+  missing input from permission or host I/O failure when they actually wanted
+  to report or branch on the reason.
+- Replacing the coarse APIs in one step would have forced unnecessary churn
+  across a broad admitted source base even though many callers still only need
+  success-or-failure semantics.
+
+Core rule
+---------
+- Prefer additive contract convergence before source-breaking replacement when
+  the broader admitted surface still honestly uses the coarse convenience API.
+- Keep the existing nil-only wrappers available for callers that still only
+  need success-or-failure semantics.
+- Add explicit error-reporting companions that use the same allocator and
+  ownership model as the existing `fs` API.
+- Prove the widened contract with at least one admitted real consumer and one
+  focused stdlib error-surface fixture.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: add narrow companion APIs rather than changing the
+existing coarse signatures in place.
+
+Chosen widening:
+- `fs.list_dir_err(path, alloc) (*Buffer<u8>, errors.Error)`
+- `fs.read_all_err(path, alloc) (*Buffer<u8>, errors.Error)`
+
+Compatibility policy:
+- keep `fs.list_dir(...)` and `fs.read_all(...)` as coarse wrappers for the
+  admitted convenience path
+- route those coarse wrappers through the new error-reporting entrypoints so
+  the runtime surface converges internally even when callers ignore the error
+  result
+- migrate one admitted real project to the widened API where actionable
+  failure detail is more honest than a coarse status code
+
+What this phase should try to prove
+-----------------------------------
+- the repository can close the most visible filesystem error-contract mismatch
+  without destabilizing the broader admitted convenience surface
+- the hosted runtime can surface filesystem errors for whole-file reads and
+  directory listing through the existing `errors.Error` encoding model
+- at least one admitted real consumer now uses the widened contract directly
+  instead of translating nil into an opaque exit code
+
+Deliverables
+------------
+- one canonical Phase 67 note documenting the additive filesystem error-API
+  convergence decision
+- hosted runtime support for error-reporting read-all and list-dir entrypoints
+- `stdlib/fs.mc` companion APIs that surface `errors.Error` while preserving
+  the coarse convenience wrappers
+- one focused stdlib executable fixture covering the new error surface and one
+  admitted real project updated to use it
+- bounded planning updates marking Phase 67 complete and routing later work to
+  remaining adjacent fronts rather than leaving this mismatch ambient
+
+Suggested execution order
+-------------------------
+1. Add runtime entrypoints for whole-file reads and directory listing that
+   report `errors.Error` through the existing hosted error encoding path.
+2. Expose narrow `fs.*_err(...)` companion APIs in the stdlib and keep the old
+   coarse wrappers as compatibility shims.
+3. Update one admitted real consumer to use the widened API where it can now
+   return a more honest filesystem-specific failure code.
+4. Add focused stdlib executable coverage for the new error-reporting surface.
+5. Align backlog, decision-log, stdlib notes, and the speculative roadmap with
+   the implemented outcome.
+
+Exit criteria
+-------------
+- the repository exposes an honest error-reporting path for the previously
+  nil-only `fs.read_all(...)` and `fs.list_dir(...)` operations
+- the coarse convenience wrappers remain available for callers that still only
+  need success-or-failure semantics
+- at least one admitted real consumer and one focused stdlib test prove the
+  widened contract
+- the planning surface no longer treats Phase 67 as future work
+
+Non-goals
+---------
+- removing the coarse `fs.read_all(...)` and `fs.list_dir(...)` APIs in this
+  phase
+- inventing a richer directory-entry object model or streaming file API
+- forcing every existing caller onto the widened contract in one wave
+- widening unrelated `os`, `sync`, `mem`, or testing surfaces
+
+Implemented slice
+-----------------
+- added hosted runtime entrypoints that surface `errors.Error` for whole-file
+  reads and directory listing while preserving the existing buffer ownership
+  model
+- added `fs.read_all_err(...)` and `fs.list_dir_err(...)` as additive stdlib
+  companions, and reimplemented the coarse wrappers through those companions so
+  runtime behavior converges internally on one error-reporting path
+- updated the admitted real `file_walker` proof to use `fs.list_dir_err(...)`
+  and return a dedicated failure code only when the filesystem listing itself
+  fails
+- added a focused stdlib executable fixture covering both new APIs on missing
+  paths and validating that the surfaced error kind is `errors.kind_errno()`
+- aligned stdlib notes, backlog, decision-log, and the speculative roadmap so
+  filesystem error-contract follow-through is now recorded as completed
+
+Closeout statement
+------------------
+Phase 67 is complete as the smallest honest filesystem and cross-module
+error-contract follow-through after the Phase 66 matrix. The repository still
+keeps coarse `fs.read_all(...)` and `fs.list_dir(...)` convenience wrappers for
+callers that only need success-or-failure semantics, but it no longer forces
+admitted consumers to collapse whole-file and directory-iteration failure to
+nil when they need actionable diagnostics. The remaining adjacent work now
+shifts back to later candidates such as testing helper hardening, process
+follow-through, or explicit continued deferral.
