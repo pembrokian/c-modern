@@ -1,0 +1,131 @@
+Phase 73 -- Process Split Stderr Follow-Through
+===============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Land the next smallest honest process follow-through after the completed
+merged-diagnostics wave by making stdout and stderr separately observable on
+the admitted pipe-relay subprocess family without widening broader process
+policy.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- Phase 71 admitted `os.spawn_pipe_argv(...)` as the owner for the repeated
+  one-input-pipe plus one-output-pipe relay shape.
+- Phase 72 then admitted `os.spawn_pipe_argv_merged_output(...)` so child
+  diagnostics became observable on that same bounded family.
+- The remaining honest subprocess friction is now separation rather than mere
+  observability: some consumers need to distinguish ordinary stdout from child
+  diagnostics without reopening broader stderr policy or multi-pipe process
+  frameworks.
+
+Problem being solved
+--------------------
+- The merged-output helper makes child diagnostics visible, but it also
+  deliberately conflates stdout and stderr.
+- For the admitted relay family, the next honest step is one bounded helper
+  that keeps stdout and stderr separate while preserving the same explicit
+  pipe-backed ownership model.
+- Anything broader would widen too quickly into general process management,
+  multi-stage pipelines, environment policy, or arbitrary close-list design.
+
+Core rule
+---------
+- Keep the follow-through additive and local to the admitted subprocess relay
+  family.
+- Reuse the already landed stderr-capable lower-level owner in `stdlib/os.mc`
+  rather than redesigning the runtime ABI.
+- Admit one split-output helper only for the bounded one-stdin-pipe plus one-
+  stdout-pipe plus one-stderr-pipe shape.
+- Keep broader stderr routing policy, environment APIs, cwd mutation,
+  signals, and general process control deferred.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one additive public helper for split stdout and stderr
+on the admitted pipe-relay family, plus one focused stdlib smoke and one real
+ordinary test in `line_filter_relay`.
+
+Chosen widening:
+- add `os.spawn_pipe_argv_split_output(program, argv: Slice<cstr>,
+  stdin_pipe: io.Pipe, stdout_pipe: io.Pipe, stderr_pipe: io.Pipe)
+  (Child, errors.Error)`
+
+Explicit non-choices:
+- no new runtime ABI family
+- no arbitrary close-list or file-descriptor vector support
+- no multi-stage pipeline helpers
+- no redesign of `wait(...)`, child handles, or process lifecycle
+
+What this phase should prove
+----------------------------
+- the admitted subprocess relay family now has a bounded separate-stderr path
+  in addition to the earlier stdout-only and merged-output helpers
+- a failing child can prove `stdout` remains empty while `stderr` carries
+  diagnostics through the ordinary explicit-pipe model
+- the admitted `line_filter_relay` project and a focused stdlib smoke both
+  cover that split-output boundary
+
+Deliverables
+------------
+- one canonical Phase 73 note recording the split-output follow-through
+- additive `stdlib/os.mc` support for split stdout/stderr pipe spawning
+- one focused stdlib subprocess smoke for separate stderr capture
+- one ordinary test added to the admitted `line_filter_relay` real project
+- bounded planning and support-doc updates recording the implemented result
+
+Suggested execution order
+-------------------------
+1. Add the public split-output helper in `stdlib/os.mc` over the existing
+   stderr-capable lower-level owner.
+2. Add one focused stdlib smoke proving empty stdout plus non-empty stderr on
+   a failing child.
+3. Add one ordinary relay-project test proving the same separation.
+4. Align README, stdlib notes, release-hardening notes, backlog, decision log,
+   slice register, and the speculative roadmap with the completed result.
+
+Exit criteria
+-------------
+- the repository has one bounded helper for separate stdout and stderr on the
+  admitted subprocess relay family
+- the stdlib smoke and admitted relay project both prove stdout-empty,
+  stderr-non-empty child diagnostics on a failing child
+- the planning surface records Phase 73 as split-output subprocess follow-
+  through while broader process policy remains deferred
+
+Non-goals
+---------
+- admitting a general stderr framework or arbitrary file-descriptor routing
+- introducing multiple pipeline stages, shells, environment mutation, cwd
+  control, or signals
+- replacing the existing stdout-only or merged-output helpers
+
+Implemented slice
+-----------------
+- added `os.spawn_pipe_argv_split_output(...)` in `stdlib/os.mc` over the
+  existing stderr-capable spawn owner
+- added a focused stdlib subprocess smoke that proves a failing child writes
+  no stdout, non-empty stderr, and non-zero status through the split-output
+  path
+- added an ordinary `line_filter_relay` project test that proves the same
+  separation on the admitted real subprocess proof surface
+- aligned README, stdlib support notes, release-hardening notes, backlog,
+  decision log, slice register, and the speculative roadmap so Phase 73 is
+  recorded as completed narrow split-stderr follow-through
+
+Closeout statement
+------------------
+Phase 73 is complete as a bounded separate-stderr subprocess wave. The
+repository still does not claim a broad stderr framework, arbitrary
+file-descriptor routing, or general process management, but the admitted
+subprocess relay family now supports three explicit proof-backed shapes:
+stdout-only relay, merged diagnostics capture, and split stdout/stderr relay.
+Further process widening remains explicit future work rather than ambient
+assumption.

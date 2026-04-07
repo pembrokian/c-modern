@@ -140,7 +140,11 @@ This smoke set proves, at the narrowest honest level:
 - checked ordinary-test workflow on the admitted poller-coupled pipe-readiness
   proof over `io.pipe()` plus `io.poller_*`
 - checked ordinary-test workflow on the admitted narrow hosted subprocess plus
-  stdio proof over `os.spawn_argv(...)` plus `os.wait(...)`
+  stdio proof over `os.spawn_pipe_argv(...)` plus `os.wait(...)`
+- checked ordinary-test workflow on bounded merged child-diagnostics capture
+  over `os.spawn_pipe_argv_merged_output(...)`
+- checked ordinary-test workflow on bounded separate stdout and stderr capture
+  over `os.spawn_pipe_argv_split_output(...)`
 - checked ordinary-test workflow on the admitted hosted networking project
   proof
 
@@ -177,11 +181,15 @@ Known limitations
   and non-blocking pipe semantics beyond the current readiness proof remain
   out of scope
 - the repository now admits one narrow hosted `os` subprocess slice with
-  explicit argv-slice `spawn_argv(...)`, the legacy fixed `spawn(...)`
-  compatibility wrapper, blocking `wait(...)`, and bounded
+  explicit argv-slice `spawn_argv(...)`, additive `spawn_pipe_argv(...)` for
+  the admitted one-input-pipe plus one-output-pipe relay shape, additive
+  `spawn_pipe_argv_merged_output(...)` for bounded merged child diagnostics on
+  that same pipe family, additive `spawn_pipe_argv_split_output(...)` for
+  bounded separate stdout and stderr capture on that same family, the legacy
+  fixed `spawn(...)` compatibility wrapper, blocking `wait(...)`, and bounded
   stdin/stdout pipe redirection proved by `examples/real/line_filter_relay/`;
-  shell command strings, environment APIs, cwd mutation, stderr policy,
-  signals, and broader process management remain out of scope
+  shell command strings, broader stderr routing policy, environment APIs, cwd
+  mutation, signals, and broader process management remain out of scope
 - the repository now admits a narrow hosted `sync` slice: typed thread spawn
   or join plus mutex init, destroy, lock, unlock, condvar init, destroy,
   wait, signal, and a narrow `MemoryOrder` plus `Atomic<T>` load or store

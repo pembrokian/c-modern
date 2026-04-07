@@ -1,0 +1,141 @@
+Phase 71 -- Process Pipe Helper Follow-Through
+==============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Land the smallest honest adjacent follow-through left after the completed
+Phase 70 gate by closing the repeated pipe-shaped subprocess boilerplate
+without widening broader process policy.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- Phase 68 already admitted the honest argv-shaped subprocess owner through
+  `os.spawn_argv(...)` while keeping the older fixed `spawn(...)` entry as a
+  compatibility wrapper.
+- Phase 70 then found no current admitted sync or mem pressure strong enough
+  to justify public widening beyond the landed hosted slice.
+- The remaining adjacent friction is now concentrated in the narrow hosted
+  subprocess proof: both the admitted real `examples/real/line_filter_relay/`
+  project and the focused stdlib subprocess smoke still spell the same one-
+  input-pipe plus one-output-pipe `spawn_argv(...)` call by hand, including
+  the underdocumented `close_file0` and `close_file1` pairing.
+
+Problem being solved
+--------------------
+- The public subprocess boundary now has an honest argv model, but the most
+  common admitted stdio relay shape still requires callers to remember the raw
+  `spawn_argv(program, argv, stdin_file, stdout_file, close_file0,
+  close_file1)` pipe-end pairing themselves.
+- That pairing is stable enough to have become repeated friction, but it is
+  not strong enough to justify broader process management work such as
+  environment APIs, cwd mutation, stderr policy, signals, or multi-stage
+  pipeline frameworks.
+- If the repository leaves this shape fully manual, the admitted subprocess
+  proof keeps exposing raw slots whose meaning is only obvious if the caller
+  already knows the hosted fork/exec closure pattern.
+
+Core rule
+---------
+- Keep sync and mem deferred exactly as Phase 70 left them unless a new real
+  admitted consumer appears.
+- Keep process follow-through additive and owner-local: encode the repeated
+  single-stdin-pipe plus single-stdout-pipe spawn shape at the `os` boundary
+  rather than redesigning the runtime ABI or inventing a subprocess framework.
+- Preserve `spawn_argv(...)` as the lower-level honest owner for callers that
+  truly need custom file wiring, and preserve the legacy fixed `spawn(...)`
+  compatibility wrapper.
+- Prove the helper through the admitted real subprocess project and the
+  focused stdlib subprocess smoke, not through a synthetic new process family.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: add one additive helper for the already admitted relay
+pattern and route the existing subprocess proofs through it.
+
+Chosen widening:
+- add `os.spawn_pipe_argv(program, argv: Slice<cstr>, stdin_pipe: io.Pipe,
+  stdout_pipe: io.Pipe) (Child, errors.Error)`
+- define that helper as the owner for the admitted one-input-pipe plus one-
+  output-pipe subprocess shape by forwarding to `spawn_argv(...)` with the
+  correct child-stdin, child-stdout, and pre-exec close-file pairing
+
+Explicit non-choices:
+- do not widen `sync` or `mem` in this phase
+- do not redesign `wait(...)`, child-handle lifetime, or add move semantics
+- do not add environment APIs, cwd mutation, stderr routing, signals, or
+  arbitrary multi-pipe process plumbing
+
+What this phase should prove
+----------------------------
+- the admitted subprocess slice now owns its common pipe-relay wiring pattern
+  at the stdlib boundary rather than repeating raw close-slot choreography in
+  every proof
+- the real `line_filter_relay` project still passes through ordinary
+  `mc run` and `mc test` workflow after moving to the helper
+- the focused stdlib subprocess smoke still proves explicit argv ownership and
+  pipe-backed stdin/stdout relay, but now through the narrow helper rather
+  than handwritten close-slot wiring
+
+Deliverables
+------------
+- one canonical Phase 71 note recording the chosen process follow-through
+- additive `stdlib/os.mc` support for `spawn_pipe_argv(...)`
+- the admitted real subprocess proof and the focused stdlib subprocess smoke
+  updated to use the helper
+- bounded planning and support-doc updates marking broader sync or mem work
+  deferred and recording the new process helper as the completed Phase 71
+  result
+
+Suggested execution order
+-------------------------
+1. Keep the Phase 70 sync and mem gate result intact.
+2. Add the narrow pipe-oriented helper in `stdlib/os.mc` by forwarding to the
+   already admitted argv owner.
+3. Move the admitted real relay proof and the focused stdlib subprocess smoke
+   onto the helper.
+4. Align README, release-hardening notes, backlog, decision log, slice
+   register, and the speculative roadmap with the implemented result.
+
+Exit criteria
+-------------
+- the repository has one additive stdlib helper that owns the admitted
+  single-input-pipe plus single-output-pipe subprocess wiring pattern
+- the existing subprocess proofs use that helper
+- the planning surface records Phase 71 as narrow process follow-through while
+  broader sync, mem, and process policy remain deferred
+
+Non-goals
+---------
+- runtime ABI changes or host-runtime subprocess rewrites
+- support for more than one pipe pair or arbitrary pre-exec close lists
+- broader process-lifecycle redesign beyond the existing `wait(...)`
+  consumption model
+- any claim that the repository now admits general process-management policy
+
+Implemented slice
+-----------------
+- added `os.spawn_pipe_argv(...)` in `stdlib/os.mc` as the pipe-oriented
+  helper over the existing `spawn_argv(...)` owner
+- moved `examples/real/line_filter_relay/` onto `spawn_pipe_argv(...)`
+- moved the focused stdlib subprocess smoke onto `spawn_pipe_argv(...)`
+- aligned README, stdlib support notes, release-hardening notes, backlog,
+  decision log, slice register, and the speculative roadmap so Phase 71 is
+  recorded as completed narrow process follow-through while broader sync, mem,
+  and process policy remain deferred
+
+Closeout statement
+------------------
+Phase 71 is complete as a small process-helper follow-through. The repository
+still does not claim broad process management, child-lifecycle redesign, or
+any sync or mem widening beyond the landed hosted slice, but it no longer asks
+the admitted subprocess proofs to repeat raw close-slot pipe choreography at
+every call site. The next adjacent step can now move on to explicit deferral
+audit or another consumer-driven follow-through only if a stronger owner
+appears.

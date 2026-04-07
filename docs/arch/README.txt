@@ -44,6 +44,7 @@ docs/arch/
 │   ├── runtime_spec.txt
 │   ├── ffi_spec.txt
 │   ├── concurrency_runtime.txt
+│   ├── canopus_lite_v0.txt
 │   └── call_stack_spec.txt
 ├── stdlib/
 │   ├── stdlib_spec.txt

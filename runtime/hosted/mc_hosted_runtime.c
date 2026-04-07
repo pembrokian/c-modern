@@ -578,6 +578,53 @@ struct mc_io_pipe __mc_io_pipe(uintptr_t* out_err) {
     return out;
 }
 
+static bool mc_prepare_child_stdio(int32_t stdin_file,
+                                   int32_t stdout_file,
+                                   int32_t stderr_file,
+                                   bool redirect_stderr,
+                                   int32_t close_file0,
+                                   int32_t close_file1) {
+    if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
+        if (dup2(stdin_file, STDIN_FILENO) < 0) {
+            return false;
+        }
+    }
+    if (stdout_file >= 0 && stdout_file != STDOUT_FILENO) {
+        if (dup2(stdout_file, STDOUT_FILENO) < 0) {
+            return false;
+        }
+    }
+    if (redirect_stderr && stderr_file >= 0 && stderr_file != STDERR_FILENO) {
+        if (dup2(stderr_file, STDERR_FILENO) < 0) {
+            return false;
+        }
+    }
+
+    if (close_file0 >= 0 && close_file0 != STDIN_FILENO && close_file0 != STDOUT_FILENO &&
+        close_file0 != STDERR_FILENO) {
+        close(close_file0);
+    }
+    if (close_file1 >= 0 && close_file1 != STDIN_FILENO && close_file1 != STDOUT_FILENO &&
+        close_file1 != STDERR_FILENO && close_file1 != close_file0) {
+        close(close_file1);
+    }
+
+    if (stdin_file >= 0 && stdin_file != STDIN_FILENO && stdin_file != STDOUT_FILENO &&
+        (!redirect_stderr || stdin_file != STDERR_FILENO)) {
+        close(stdin_file);
+    }
+    if (stdout_file >= 0 && stdout_file != STDOUT_FILENO && stdout_file != stdin_file &&
+        (!redirect_stderr || stdout_file != STDERR_FILENO)) {
+        close(stdout_file);
+    }
+    if (redirect_stderr && stderr_file >= 0 && stderr_file != STDERR_FILENO &&
+        stderr_file != stdin_file && stderr_file != stdout_file) {
+        close(stderr_file);
+    }
+
+    return true;
+}
+
 struct mc_os_child __mc_os_spawn3(struct mc_string program,
                                   struct mc_string arg0,
                                   struct mc_string arg1,
@@ -604,30 +651,8 @@ struct mc_os_child __mc_os_spawn3(struct mc_string program,
     }
 
     if (pid == 0) {
-        if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
-            if (dup2(stdin_file, STDIN_FILENO) < 0) {
-                _exit(127);
-            }
-        }
-        if (stdout_file >= 0 && stdout_file != STDOUT_FILENO) {
-            if (dup2(stdout_file, STDOUT_FILENO) < 0) {
-                _exit(127);
-            }
-        }
-
-        if (close_file0 >= 0 && close_file0 != STDIN_FILENO && close_file0 != STDOUT_FILENO) {
-            close(close_file0);
-        }
-        if (close_file1 >= 0 && close_file1 != STDIN_FILENO && close_file1 != STDOUT_FILENO &&
-            close_file1 != close_file0) {
-            close(close_file1);
-        }
-
-        if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
-            close(stdin_file);
-        }
-        if (stdout_file >= 0 && stdout_file != STDOUT_FILENO && stdout_file != stdin_file) {
-            close(stdout_file);
+        if (!mc_prepare_child_stdio(stdin_file, stdout_file, -1, false, close_file0, close_file1)) {
+            _exit(127);
         }
 
         execv(c_argv[0], c_argv);
@@ -678,30 +703,67 @@ struct mc_os_child __mc_os_spawnv(struct mc_string program,
     }
 
     if (pid == 0) {
-        if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
-            if (dup2(stdin_file, STDIN_FILENO) < 0) {
-                _exit(127);
-            }
-        }
-        if (stdout_file >= 0 && stdout_file != STDOUT_FILENO) {
-            if (dup2(stdout_file, STDOUT_FILENO) < 0) {
-                _exit(127);
-            }
+        if (!mc_prepare_child_stdio(stdin_file, stdout_file, -1, false, close_file0, close_file1)) {
+            _exit(127);
         }
 
-        if (close_file0 >= 0 && close_file0 != STDIN_FILENO && close_file0 != STDOUT_FILENO) {
-            close(close_file0);
-        }
-        if (close_file1 >= 0 && close_file1 != STDIN_FILENO && close_file1 != STDOUT_FILENO &&
-            close_file1 != close_file0) {
-            close(close_file1);
-        }
+        execv(c_program, c_argv);
+        _exit(127);
+    }
 
-        if (stdin_file >= 0 && stdin_file != STDIN_FILENO) {
-            close(stdin_file);
-        }
-        if (stdout_file >= 0 && stdout_file != STDOUT_FILENO && stdout_file != stdin_file) {
-            close(stdout_file);
+    mc_free_c_argv(c_argv, argc);
+    free(c_program);
+    out.raw = (uintptr_t) pid;
+    return out;
+}
+
+struct mc_os_child __mc_os_spawnve(struct mc_string program,
+                                   struct mc_slice_cstr argv,
+                                   int32_t stdin_file,
+                                   int32_t stdout_file,
+                                   int32_t stderr_file,
+                                   int32_t close_file0,
+                                   int32_t close_file1,
+                                   uintptr_t* out_err) {
+    struct mc_os_child out = {0};
+    mc_store_error(out_err, 0);
+
+    if (argv.len <= 0 || argv.ptr == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_OS, 2));
+        return out;
+    }
+
+    char* c_program = mc_copy_string_to_cstr(program);
+    if (c_program == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return out;
+    }
+
+    char** c_argv = mc_copy_string_slice_to_argv(argv);
+    if (c_argv == NULL) {
+        free(c_program);
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return out;
+    }
+
+    const size_t argc = (size_t) argv.len;
+    errno = 0;
+    const pid_t pid = fork();
+    if (pid < 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        mc_free_c_argv(c_argv, argc);
+        free(c_program);
+        return out;
+    }
+
+    if (pid == 0) {
+        if (!mc_prepare_child_stdio(stdin_file,
+                                    stdout_file,
+                                    stderr_file,
+                                    true,
+                                    close_file0,
+                                    close_file1)) {
+            _exit(127);
         }
 
         execv(c_program, c_argv);

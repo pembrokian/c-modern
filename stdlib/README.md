@@ -82,6 +82,16 @@ Current repository-specific notes:
   conversion or comparison helpers; `time.millis(...)`, `time.seconds(...)`,
   and `time.add(...)` now saturate at the maximum representable duration rather
   than silently wrapping, while wall-clock and sleep semantics remain deferred
+- `os` is a narrow hosted subprocess companion on the admitted slice: it now
+  includes explicit argv-slice `spawn_argv(...)`, additive
+  `spawn_pipe_argv(...)` for the admitted one-input-pipe plus one-output-pipe
+  relay shape, additive `spawn_pipe_argv_merged_output(...)` for bounded
+  merged child-diagnostics capture on that same relay family, additive
+  `spawn_pipe_argv_split_output(...)` for bounded separate stdout and stderr
+  capture on that same relay family, the legacy fixed `spawn(...)`
+  compatibility wrapper, and blocking `wait(...)`; environment APIs, broader
+  stderr-routing policy, cwd mutation, signals, multi-stage pipelines, and
+  broader process management remain deferred
 - `testing` is admitted only as a narrow toolchain companion module for the
   ordinary project-test path; it now includes modest expectation helpers for
   boolean, ordinary-pointer, buffer-pointer, classified-error, integer, and
@@ -101,5 +111,4 @@ Current repository-specific notes:
 
 Still deferred in this repository:
 
-- `os`
 - `hal`

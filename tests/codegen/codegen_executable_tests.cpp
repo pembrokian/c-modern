@@ -1538,6 +1538,20 @@ int main(int argc, char** argv) {
                           "SUBPROCESS SMOKE\n");
 
     RunBuiltOutputFixture(mc_path,
+                          source_root / "tests/stdlib/subprocess_tr_stderr_capture.mc",
+                          work_root / "phase72_subprocess_tr_stderr_capture_build",
+                          {},
+                          0,
+                          "SUBPROCESS STDERR SMOKE\n");
+
+    RunBuiltOutputFixture(mc_path,
+                          source_root / "tests/stdlib/subprocess_tr_stderr_split_capture.mc",
+                          work_root / "phase73_subprocess_tr_stderr_split_capture_build",
+                          {},
+                          0,
+                          "SUBPROCESS STDERR SPLIT SMOKE\n");
+
+    RunBuiltOutputFixture(mc_path,
                           source_root / "examples/canonical/hello_stdout.mc",
                           work_root / "phase8_hello_stdout_build",
                           {},

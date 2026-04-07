@@ -1,0 +1,134 @@
+Phase 72 -- Process Diagnostics Capture Follow-Through
+======================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Land the next smallest honest process follow-through after the completed pipe-
+relay helper wave by making child diagnostics observable on the admitted
+ subprocess relay shape without widening into broader stderr or process policy.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- Phase 68 admitted the argv-shaped subprocess owner through
+  `os.spawn_argv(...)`.
+- Phase 71 then closed the repeated one-input-pipe plus one-output-pipe relay
+  wiring by adding `os.spawn_pipe_argv(...)` and moving the admitted
+  `line_filter_relay` proof plus the focused stdlib subprocess smoke onto that
+  helper.
+- The remaining concrete subprocess friction is now child diagnostics: the
+  admitted relay shape can move input and stdout cleanly, but there is still
+  no narrow owner for making stderr observable on the same bounded pipe-based
+  workflow.
+
+Problem being solved
+--------------------
+- The admitted subprocess slice can currently report only spawn failure or
+  non-zero exit status at the public boundary unless callers build a broader,
+  currently unsupported stderr policy around it.
+- For the admitted relay-shaped workflow, the smallest honest next step is not
+  full independent stderr routing or multi-pipe process management; it is one
+  bounded merged-output capture path so child diagnostics become observable.
+- Leaving even this narrow diagnostic path absent would keep the subprocess
+  slice materially rougher than the real proof surfaces now justify.
+
+Core rule
+---------
+- Keep the follow-through additive and process-local.
+- Do not reopen sync, mem, environment APIs, cwd mutation, signals, or general
+  stderr framework work in the same phase.
+- Keep `spawn_argv(...)` and `spawn_pipe_argv(...)` intact for existing users.
+- Add only the bounded merged stdout-plus-stderr relay shape needed by the
+  current admitted consumer pressure.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one lower-level stderr-capable spawn entry inside
+`stdlib/os.mc`, plus one public helper for the admitted pipe-relay shape that
+merges child stdout and stderr into a single output pipe.
+
+Chosen widening:
+- add hosted runtime and `stdlib/os.mc` support for explicit stderr-file
+  subprocess wiring
+- add `os.spawn_pipe_argv_merged_output(program, argv: Slice<cstr>,
+  stdin_pipe: io.Pipe, output_pipe: io.Pipe) (Child, errors.Error)` as the
+  owner for the admitted merged-output relay shape
+
+Explicit non-choices:
+- no separate stderr pipe helper in this phase
+- no arbitrary close-list support beyond the current bounded pipe shape
+- no redesign of `wait(...)`, child handles, or general process lifecycle
+- no broader claim that stderr policy is now fully solved on the hosted slice
+
+What this phase should prove
+----------------------------
+- child diagnostics are observable on the admitted pipe-relay subprocess shape
+  without requiring broader process-policy work
+- the real `line_filter_relay` project can prove that a failing child emits
+  non-empty merged output and a non-zero status through ordinary project tests
+- a focused stdlib subprocess smoke can prove the same merged-output boundary
+  while still reporting a deterministic fixed success line to the executable
+  regression suite
+
+Deliverables
+------------
+- one canonical Phase 72 note recording the chosen diagnostics follow-through
+- hosted runtime stderr-file spawn support for the narrow admitted slice
+- additive `stdlib/os.mc` support for merged-output pipe spawning
+- one focused stdlib subprocess smoke for merged child diagnostics
+- one ordinary test added to the admitted `line_filter_relay` real project
+- bounded planning and support-doc updates recording the implemented result and
+  keeping broader process policy explicit
+
+Suggested execution order
+-------------------------
+1. Add the hosted runtime entrypoint that can redirect child stderr.
+2. Expose one narrow merged-output pipe helper in `stdlib/os.mc`.
+3. Add the focused stdlib smoke and one admitted relay-project ordinary test.
+4. Align README, stdlib notes, release-hardening notes, backlog, decision log,
+   slice register, and the speculative roadmap with the completed result.
+
+Exit criteria
+-------------
+- the repository has one bounded merged-output helper for the admitted
+  subprocess relay shape
+- the stdlib smoke and admitted relay project both prove that child
+  diagnostics become observable through that helper
+- the planning surface records Phase 72 as subprocess diagnostics follow-
+  through while broader stderr and process policy remain deferred
+
+Non-goals
+---------
+- admitting full stderr-routing policy or multiple independent output pipes
+- adding shell command strings, environment APIs, cwd mutation, or signals
+- replacing the existing stdout-only relay helper
+- solving every future subprocess diagnostics need in one phase
+
+Implemented slice
+-----------------
+- added hosted runtime support for explicit child stderr redirection on the
+  existing subprocess ABI family
+- added `os.spawn_pipe_argv_merged_output(...)` as the public owner for the
+  admitted merged stdout-plus-stderr relay shape
+- added a focused stdlib subprocess smoke that verifies non-empty child
+  diagnostics and fixed success output
+- added an ordinary `line_filter_relay` project test that proves non-empty
+  merged child diagnostics and non-zero exit status on a failing child
+- aligned README, stdlib support notes, release-hardening notes, backlog,
+  decision log, slice register, and the speculative roadmap so Phase 72 is
+  recorded as completed narrow process diagnostics follow-through
+
+Closeout statement
+------------------
+Phase 72 is complete as a bounded subprocess diagnostics wave. The repository
+still does not claim broad stderr policy, separate multi-pipe process control,
+or any general process-management framework, but the admitted subprocess relay
+shape no longer hides child diagnostics behind a bare exit code. Broader
+stderr routing and adjacent runtime deferral questions remain explicit future
+work rather than implicit promises.

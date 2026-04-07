@@ -160,6 +160,48 @@ Phase 70 is now concrete repository history rather than active speculation:
 The remaining speculative continuation in this band therefore starts at Phase
 71.
 
+Phase 71 is now concrete repository history rather than active speculation:
+- the remaining honest adjacent follow-through stayed on the process surface,
+  not sync or mem, because the admitted subprocess proof still repeated the
+  same one-input-pipe plus one-output-pipe `spawn_argv(...)` close-slot
+  pairing while no stronger public sync or mem consumer had appeared
+- additive `os.spawn_pipe_argv(...)` landed as the owner for that admitted
+  pipe-relay subprocess shape while preserving `spawn_argv(...)` as the lower-
+  level argv owner and keeping broader process policy deferred
+- the admitted `line_filter_relay` proof and the focused stdlib subprocess
+  smoke now use the helper directly
+
+The remaining speculative continuation in this band therefore starts at Phase
+72.
+
+Phase 72 is now concrete repository history rather than active speculation:
+- the next honest adjacent follow-through remained on the subprocess surface
+  because the admitted relay shape still hid child diagnostics behind a bare
+  exit status unless callers reopened broader stderr policy
+- additive `os.spawn_pipe_argv_merged_output(...)` landed as the owner for one
+  bounded merged stdout-plus-stderr capture shape on the admitted pipe-relay
+  family while broader stderr routing and process policy remained deferred
+- the admitted `line_filter_relay` proof now includes an ordinary child-
+  diagnostics test and a focused stdlib subprocess smoke proves the same
+  merged-output boundary
+
+The remaining speculative continuation therefore starts at Phase 73.
+
+Phase 73 is now concrete repository history rather than active speculation:
+- the next honest adjacent follow-through remained on the subprocess surface
+  because the admitted merged-diagnostics helper still conflated stdout and
+  stderr even though the current consumer pressure justified one bounded
+  separate-stderr relay shape
+- additive `os.spawn_pipe_argv_split_output(...)` landed as the owner for the
+  admitted one-stdin-pipe plus one-stdout-pipe plus one-stderr-pipe relay
+  family while broader file-descriptor routing and process policy remained
+  deferred
+- the admitted `line_filter_relay` proof now includes an ordinary split-
+  diagnostics test and a focused stdlib subprocess smoke proves the same
+  stdout-empty and stderr-non-empty boundary
+
+The remaining speculative continuation therefore starts at Phase 74.
+
 Likely themes:
 - filesystem and `io` contract convergence where nil-only or raw-status
   boundaries still remain materially harmful
@@ -179,16 +221,6 @@ Why this band is separate:
   still need to be implemented for the current admitted slice to feel real?”
 
 Phases in this band:
-
-Phase 71 -- Minimal Sync, Mem, Or Process Follow-On Or Explicit Deferral
-- Exit criterion: either the smallest honest sync, mem, or process follow-on
-  lands or the remaining follow-on is explicitly parked again with a
-  consumer-based reason.
-
-Phase 72 -- Adjacent Runtime Deferral Audit
-- Exit criterion: `os`, `hal`, and any other runtime-adjacent family still not
-  justified by pressure remain named as deferred rather than ambient future
-  work.
 
 Phase 51 Critique Coverage Note
 -------------------------------

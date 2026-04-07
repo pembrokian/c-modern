@@ -706,11 +706,14 @@ Register By Concern
 - Slice: os module
   design: settled
   plan phase: 6
-  repo status: deferred
-  repo wave: none
-  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/runtime/runtime_spec.txt
-  end state: explicit platform-facing APIs, raw event backends, environment,
-  subprocess, process IDs, and handle escape hatches.
+  repo status: partial
+  repo wave: Phase 45, Phase 46, Phase 68, Phase 71, Phase 72, Phase 73
+  docs: docs/arch/stdlib/stdlib_spec.txt, docs/arch/runtime/runtime_spec.txt, docs/plan/phase68_process_or_deferred_time_follow_through.txt, docs/plan/phase71_process_pipe_helper_follow_through.txt, docs/plan/phase72_process_diagnostics_capture_follow_through.txt, docs/plan/phase73_process_split_stderr_follow_through.txt, README.md, stdlib/README.md
+  end state: a narrow hosted subprocess slice with explicit argv ownership,
+  one admitted pipe-relay helper shape, one admitted merged child-diagnostics
+  capture shape, one admitted split stdout/stderr relay shape, and bounded
+  wait semantics, while environment policy, broader process management, and
+  raw platform escape hatches remain deferred.
 
 - Slice: hal module
   design: settled
