@@ -241,6 +241,7 @@ int main(int argc, char** argv) {
         {"layout_cycle_bad.mc", "layout_cycle_bad.errors.txt", {}, false},
         {"unknown_param_type_bad.mc", "unknown_param_type_bad.errors.txt", {}, false},
         {"qualified_variant_ok.mc", "qualified_variant_ok.sema.txt", {}, true},
+        {"variant_is_type_mismatch_bad.mc", "variant_is_type_mismatch_bad.errors.txt", {}, false},
     };
 
     for (const auto& fixture : fixtures) {

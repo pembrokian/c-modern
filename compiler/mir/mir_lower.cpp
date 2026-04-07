@@ -173,6 +173,70 @@ class FunctionLowerer {
         return {};
     }
 
+    std::string VariantDesignatorLeafName(const Expr& expr) const {
+        if (expr.kind == Expr::Kind::kQualifiedName) {
+            return expr.secondary_text;
+        }
+        if (expr.kind == Expr::Kind::kField) {
+            return expr.text;
+        }
+        return {};
+    }
+
+    bool TryVariantPayloadProjection(const Expr& expr, ValueInfo* result) {
+        if (expr.kind != Expr::Kind::kField || expr.left == nullptr) {
+            return false;
+        }
+
+        ValueInfo selector;
+        sema::Type selector_type = sema::UnknownType();
+        std::string variant_name;
+
+        if (expr.left->kind == Expr::Kind::kQualifiedName && local_types_.contains(expr.left->text)) {
+            selector = LoadLocalValue(expr.left->text);
+            selector_type = StripMirAliasOrDistinct(module_, local_types_.at(expr.left->text));
+            variant_name = expr.left->secondary_text;
+        } else if (expr.left->kind == Expr::Kind::kField && expr.left->left != nullptr) {
+            selector = LowerExpr(*expr.left->left);
+            selector_type = StripMirAliasOrDistinct(module_, ExprTypeOrUnknown(*expr.left->left));
+            variant_name = expr.left->text;
+        } else {
+            return false;
+        }
+
+        if (selector_type.kind != sema::Type::Kind::kNamed) {
+            return false;
+        }
+
+        const TypeDecl* type_decl = FindMirTypeDecl(module_, selector_type.name);
+        if (type_decl == nullptr || type_decl->variants.empty()) {
+            return false;
+        }
+
+        const VariantDecl* variant = FindMirVariantDecl(*type_decl, variant_name);
+        if (variant == nullptr) {
+            return false;
+        }
+
+        std::optional<std::size_t> payload_index;
+        for (std::size_t index = 0; index < variant->payload_fields.size(); ++index) {
+            if (std::to_string(index) == expr.text) {
+                payload_index = index;
+                break;
+            }
+        }
+        if (!payload_index.has_value()) {
+            return false;
+        }
+
+        *result = EmitVariantExtractValue(selector,
+                                          selector_type,
+                                          expr.span,
+                                          variant_name,
+                                          *payload_index);
+        return true;
+    }
+
     bool IsImportedModuleName(std::string_view name) const {
         return std::find(sema_module_.imports.begin(), sema_module_.imports.end(), name) != sema_module_.imports.end();
     }
@@ -1240,6 +1304,10 @@ class FunctionLowerer {
                 return {value, type};
             }
             case Expr::Kind::kBinary: {
+                if (expr.text == "is") {
+                    const auto selector = LowerExpr(*expr.left);
+                    return EmitVariantMatchValue(selector, VariantDesignatorLeafName(*expr.right));
+                }
                 if (expr.text == "&&" || expr.text == "||") {
                     return LowerShortCircuitLogicalExpr(expr);
                 }
@@ -1325,6 +1393,10 @@ class FunctionLowerer {
             }
             case Expr::Kind::kField:
             case Expr::Kind::kDerefField: {
+                ValueInfo variant_projection;
+                if (expr.kind == Expr::Kind::kField && TryVariantPayloadProjection(expr, &variant_projection)) {
+                    return variant_projection;
+                }
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "field expression type");
                 if (expr.kind == Expr::Kind::kField && expr.left != nullptr) {
                     const sema::Type selector_type = StripMirAliasOrDistinct(module_, ExprTypeOrUnknown(*expr.left));

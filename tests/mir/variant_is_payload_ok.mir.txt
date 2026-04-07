@@ -1,0 +1,22 @@
+Module
+  TypeDecl kind=enum name=Option
+    typeParams=[T]
+    Variant name=Some
+      PayloadField name=value type=T
+    Variant name=None
+  Function name=main returns=[i32]
+    Local name=value type=Option<i32>
+    Block label=entry0
+      const %v0:int_literal op=7
+      variant_init %v1:Option<i32> target=Option.Some target_name=Some target_base=Option<i32> target_index=0 operands=[%v0]
+      store_local target=value operands=[%v1]
+      load_local %v2:Option<i32> target=value
+      variant_match %v3:bool target=Option.Some target_name=Some target_base=Option<i32> operands=[%v2]
+      terminator cond value=%v3 true=if_then1 false=if_merge2
+    Block label=if_then1
+      load_local %v4:Option<i32> target=value
+      variant_extract %v5:i32 op=0 target=Option.Some target_name=Some target_base=Option<i32> target_index=0 operands=[%v4]
+      terminator return values=[%v5]
+    Block label=if_merge2
+      const %v6:int_literal op=0
+      terminator return values=[%v6]

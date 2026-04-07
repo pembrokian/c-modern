@@ -1717,6 +1717,58 @@ void TestProjectImportedGenericVariantConstructor(const std::filesystem::path& b
                          "merged project MIR should preserve the imported generic variant target identity");
 }
 
+void TestProjectImportedGenericVariantInspection(const std::filesystem::path& binary_root,
+                                                const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase64_variant_inspection_project";
+    const std::filesystem::path project_path = WriteBasicProject(
+        project_root,
+        "enum Option<T> {\n"
+        "    Some(value: T)\n"
+        "    None\n"
+        "}\n"
+        "\n"
+        "func make() Option<i32> {\n"
+        "    return Option<i32>.Some(7)\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    value: helper.Option<i32> = helper.make()\n"
+        "    if value is helper.Option.Some {\n"
+        "        return value.Some.0\n"
+        "    }\n"
+        "    return 0\n"
+        "}\n");
+    const std::filesystem::path build_dir = binary_root / "phase64_variant_inspection_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string(),
+                                                      "--dump-mir"},
+                                                     build_dir / "build_output.txt",
+                                                     "phase64 generic variant inspection dump-mir build");
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail("phase64 generic variant inspection dump-mir build should succeed:\n" + output);
+    }
+
+    const auto main_mir = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir).mir;
+    const std::string main_mir_text = ReadFile(main_mir);
+    ExpectOutputContains(main_mir_text,
+                         "variant_match",
+                         "merged project MIR should lower expression-form variant tests through variant_match");
+    ExpectOutputContains(main_mir_text,
+                         "variant_extract",
+                         "merged project MIR should lower payload projection through variant_extract");
+    ExpectOutputContains(main_mir_text,
+                         "target=helper.Option.Some",
+                         "merged project MIR should preserve imported variant identity for expression-form inspection");
+}
+
 void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binary_root,
                                               const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "phase13_corrupt_mci_project";
@@ -4370,6 +4422,7 @@ int main(int argc, char** argv) {
     TestProjectImportedAbiTypeMirDeclarations(binary_root, mc_path);
     TestProjectImportedGenericNominalIdentity(binary_root, mc_path);
     TestProjectImportedGenericVariantConstructor(binary_root, mc_path);
+    TestProjectImportedGenericVariantInspection(binary_root, mc_path);
     TestCorruptedInterfaceArtifactFailsBuild(binary_root, mc_path);
     TestStaleInterfaceArtifactFormatFailsBuild(binary_root, mc_path);
     TestModuleBuildStateIsVersionedAndDeterministic(binary_root, mc_path);

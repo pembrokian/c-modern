@@ -45,8 +45,24 @@ std::unique_ptr<Expr> Parser::ParseLogicalOrExpr() {
 }
 
 std::unique_ptr<Expr> Parser::ParseLogicalAndExpr() {
-    auto expr = ParseEqualityExpr();
+    auto expr = ParseIsExpr();
     while (Match(TokenKind::kAmpAmp)) {
+        const auto op = Previous();
+        auto node = std::make_unique<Expr>();
+        node->kind = Expr::Kind::kBinary;
+        node->span.begin = expr->span.begin;
+        node->text = std::string(mc::lex::ToString(op.kind));
+        node->left = std::move(expr);
+        node->right = ParseIsExpr();
+        node->span.end = node->right->span.end;
+        expr = std::move(node);
+    }
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::ParseIsExpr() {
+    auto expr = ParseEqualityExpr();
+    if (Match(TokenKind::kIs)) {
         const auto op = Previous();
         auto node = std::make_unique<Expr>();
         node->kind = Expr::Kind::kBinary;
@@ -368,7 +384,13 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
     auto expr = ParsePrimaryExpr();
     while (true) {
         if (Match(TokenKind::kDot)) {
-            const auto member = ParseIdentifier("expected field name after '.'");
+            std::optional<std::string> member;
+            if (Check(TokenKind::kIdentifier) || Check(TokenKind::kIntLiteral)) {
+                member = Current().lexeme;
+                Advance();
+            } else {
+                ReportError(Current(), "expected field name after '.'");
+            }
             auto node = std::make_unique<Expr>();
             node->span.begin = expr->span.begin;
             if (expr->kind == Expr::Kind::kName) {

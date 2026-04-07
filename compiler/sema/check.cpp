@@ -1509,13 +1509,28 @@ class Checker {
         }
 
         const Type stripped_base = StripType(raw_base, *module_, TypeStripMode::kAliasesOnly);
+        const auto builtin_fields = BuiltinAggregateFields(stripped_base);
+        if (!builtin_fields.empty()) {
+            for (const auto& field : builtin_fields) {
+                if (field.first == member_name) {
+                    return field.second;
+                }
+            }
+            Report(span, "type " + FormatType(stripped_base) + " has no field named " + std::string(member_name));
+            return UnknownType();
+        }
+
         if (stripped_base.kind == Type::Kind::kNamed) {
             if (const auto* type_decl = FindTypeDecl(*module_, stripped_base.name);
                 type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
-                for (const auto& variant : type_decl->variants) {
-                    if (variant.name == member_name) {
-                        return stripped_base;
+                const auto variant = LookupVariant(stripped_base, member_name);
+                if (variant.has_value()) {
+                    std::vector<Type> payload_types;
+                    payload_types.reserve(variant->payload_fields.size());
+                    for (const auto& payload_field : variant->payload_fields) {
+                        payload_types.push_back(payload_field.second);
                     }
+                    return TupleType(std::move(payload_types));
                 }
                 Report(span, "type " + type_decl->name + " has no field named " + std::string(member_name));
                 return UnknownType();
@@ -1660,6 +1675,41 @@ class Checker {
             }
         }
 
+        return std::nullopt;
+    }
+
+    struct VariantDesignatorInfo {
+        std::optional<Type> explicit_enum_type;
+        std::string enum_name;
+        std::string variant_name;
+    };
+
+    std::optional<VariantDesignatorInfo> AnalyzeVariantDesignator(const Expr& expr) {
+        if (expr.kind == Expr::Kind::kQualifiedName) {
+            std::optional<Type> explicit_enum_type;
+            if (!expr.type_args.empty()) {
+                explicit_enum_type = AnalyzeQualifiedFunctionOrEnum(expr);
+            }
+            return VariantDesignatorInfo {
+                .explicit_enum_type = std::move(explicit_enum_type),
+                .enum_name = expr.text,
+                .variant_name = expr.secondary_text,
+            };
+        } else if (expr.kind == Expr::Kind::kField && expr.left != nullptr) {
+            if (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName) {
+                std::optional<Type> explicit_enum_type;
+                if (!expr.left->type_args.empty()) {
+                    explicit_enum_type = AnalyzeExpr(*expr.left);
+                }
+                return VariantDesignatorInfo {
+                    .explicit_enum_type = std::move(explicit_enum_type),
+                    .enum_name = CombineQualifiedName(*expr.left),
+                    .variant_name = expr.text,
+                };
+            }
+        }
+
+        Report(expr.span, "expected enum variant designator");
         return std::nullopt;
     }
 
@@ -1864,6 +1914,35 @@ class Checker {
             }
             case Expr::Kind::kBinary:
             case Expr::Kind::kRange: {
+                if (expr.text == "is") {
+                    const Type left = AnalyzeExpr(*expr.left);
+                    const auto variant = AnalyzeVariantDesignator(*expr.right);
+                    if (variant.has_value() && !IsUnknown(left)) {
+                        const Type selector_type = StripType(left, *module_, TypeStripMode::kAliasesOnly);
+                        if (selector_type.kind != Type::Kind::kNamed) {
+                            Report(expr.span,
+                                   "variant test requires enum selector type but got " + FormatType(left));
+                        } else {
+                            if (variant->explicit_enum_type.has_value() &&
+                                !IsAssignable(*variant->explicit_enum_type, selector_type, *module_) &&
+                                !IsAssignable(selector_type, *variant->explicit_enum_type, *module_)) {
+                                Report(expr.span,
+                                       "variant test requires selector type " + FormatType(*variant->explicit_enum_type) +
+                                           " but got " + FormatType(selector_type));
+                            } else if (!variant->enum_name.empty() && variant->enum_name != selector_type.name) {
+                                Report(expr.span,
+                                       "variant test requires selector type " + variant->enum_name +
+                                           " but got " + FormatType(selector_type));
+                            }
+                            if (!LookupVariant(selector_type, variant->variant_name).has_value()) {
+                                Report(expr.right->span,
+                                       "type " + FormatType(selector_type) + " has no variant named " + variant->variant_name);
+                            }
+                        }
+                    }
+                    return record(BoolType());
+                }
+
                 const Type left = AnalyzeExpr(*expr.left);
                 const Type right = AnalyzeExpr(*expr.right);
                 if (expr.kind == Expr::Kind::kRange) {

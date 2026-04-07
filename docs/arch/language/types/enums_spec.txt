@@ -80,6 +80,11 @@ Switch rules:
 - case selection is driven by variant identity, not by a user-visible integer discriminant
 - case destructuring binds payload components according to the matched variant's declared payload order
 
+Expression-form inspection rules:
+- the admitted expression-form boolean variant test is `value is Enum.Variant`
+- the admitted expression-form payload projection is ordered payload selection after a variant view, such as `value.Variant.0`
+- expression-form inspection does not create a second enum model; it reuses the same variant identity and payload ordering already owned by sema
+
 Destructuring rules:
 - case destructuring uses the switch case syntax defined by `language_spec.txt` and `grammar_spec.txt`
 - a destructuring case may bind only the payload corresponding to the matched variant
@@ -114,7 +119,7 @@ Value rules:
 - payload ownership or borrowing behavior comes from the payload field types and APIs, not from the enum mechanism itself
 
 Safety boundary:
-- reading or destructuring an enum value as though it held a different active variant is invalid behavior unless guarded by the language's defined matching and switching rules
+- reading or destructuring an enum value as though it held a different active variant is invalid behavior unless guarded by the language's defined matching, switching, or explicit variant-test rules
 - the active tag is therefore a semantic safety boundary, not optional metadata
 
 7. Non-Goals

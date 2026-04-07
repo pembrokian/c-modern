@@ -1,0 +1,46 @@
+SourceFile
+  EnumDecl name=Option
+    typeParams=[T]
+    variants:
+      EnumVariantDecl name=Some
+        FieldDecl name=value
+          NamedType name=T
+      EnumVariantDecl name=None
+  FuncDecl name=main
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          BindingStmt hasInitializer=true
+            NamePattern names=[value]
+            type:
+              NamedType name=Option
+                typeArgs:
+                  NamedType name=i32
+            exprs:
+              CallExpr
+                left:
+                  QualifiedNameExpr text=Option member=Some
+                    typeArgs:
+                      NamedType name=i32
+                args:
+                  LiteralExpr text=7 kind=int_lit
+          IfStmt
+            exprs:
+              BinaryExpr text=is
+                left:
+                  NameExpr text=value
+                right:
+                  QualifiedNameExpr text=Option member=Some
+            then:
+              BlockStmt
+                statements:
+                  ReturnStmt
+                    exprs:
+                      FieldExpr text=0
+                        left:
+                          QualifiedNameExpr text=value member=Some
+          ReturnStmt
+            exprs:
+              LiteralExpr text=0 kind=int_lit

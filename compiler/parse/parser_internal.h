@@ -109,6 +109,7 @@ class Parser {
     std::unique_ptr<Expr> ParseRangeExpr();
     std::unique_ptr<Expr> ParseLogicalOrExpr();
     std::unique_ptr<Expr> ParseLogicalAndExpr();
+    std::unique_ptr<Expr> ParseIsExpr();
     std::unique_ptr<Expr> ParseEqualityExpr();
     std::unique_ptr<Expr> ParseRelationalExpr();
     std::unique_ptr<Expr> ParseShiftExpr();

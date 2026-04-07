@@ -1,0 +1,157 @@
+Phase 64 -- Expression-Form Variant Inspection Closure
+=====================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Close the remaining sema-owned enum-inspection drift that still survives after
+Phase 63: variant constructors, switch-pattern matching, imported qualified
+variant identity, and generic enum instantiation already exist, but ordinary
+expression-form inspection still falls back to older unsupported spellings.
+The strongest live example is the pre-switch probe shape `value is
+helper.Option.Some` followed by payload projection such as `value.Some.0`.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative admin roadmap described Phase 64 as a semantic owner
+  re-audit.
+- The strongest still-live concrete owner now fits that label honestly:
+  existing enum semantics were already strong enough for constructors and
+  switch destructuring, but one ordinary expression-form inspection surface
+  still remained absent at the parser and sema boundary.
+
+Repository status note
+----------------------
+- Earlier phases already admitted enum declarations, qualified variant switch
+  cases, generic enum constructors, imported qualified enum identity, and MIR
+  instructions for variant construction, matching, and payload extraction.
+- MIR and backend support already exist for boolean variant tests and typed
+  payload extraction once sema has established the selector type, variant
+  identity, and payload index.
+- The remaining gap is narrower than a new enum model: the source language
+  still rejects or cannot type-check one ordinary inspection path that asks
+  whether a value holds a specific variant and then projects that variant's
+  payload through ordinary expression syntax.
+
+Problem being solved
+--------------------
+- The repository already supports enum inspection in `switch` statement form.
+- Older expression-form inspection probes such as `value is Enum.Variant`
+  still fail before sema can reuse the existing variant metadata path.
+- Payload projection syntax such as `value.Variant.0` likewise has no owned
+  semantic rule today even though the underlying variant payload typing and MIR
+  extraction machinery already exist.
+- That leaves one real semantic owner gap: enum variant inspection works only
+  through statement-pattern syntax, not through the narrower expression forms
+  that can be checked and lowered from the same semantic truth.
+
+Core rule
+---------
+- Keep enum-inspection truth owned by parser and sema.
+- Reuse the existing MIR `variant_match` and `variant_extract` instructions
+  only after sema has established the inspected selector type, matched variant,
+  and payload component type.
+- Do not invent a new pattern system, borrow checker rule, or backend-only
+  recovery path in this phase.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: admit one explicit boolean inspection operator
+`expr is Enum.Variant` plus one explicit ordered payload projection form
+through ordinary field syntax, where `expr.Variant` denotes the payload view
+for the named variant and a following `.0` selects the first payload field.
+
+Compiler change boundary:
+1. add parser support for the `is` operator and numeric tuple-style field names
+   after `.` so expression-form variant inspection is representable in the AST
+2. add sema rules that validate variant tests against enum selector types and
+   type-check payload projection only when the intermediate variant view is
+   well-formed
+3. lower the admitted expression forms through existing MIR variant-match and
+   variant-extract instructions rather than inventing new backend semantics
+
+What this phase should try to prove
+-----------------------------------
+- Expression-form enum inspection no longer relies on switch-only syntax for
+  ordinary boolean tests.
+- Imported and generic enum identities survive the same inspection surface
+  without reconstruction drift.
+- MIR remains a consumer of sema-owned enum truth rather than a place that
+  guesses variant meaning from unresolved field syntax.
+
+Preferred pressure points
+-------------------------
+1. one local enum using `value is Result.Ok`
+2. one local payload projection using `value.Ok.0` or `value.Ok.field`
+3. one imported generic enum project build where a helper constructs the value
+   and an importer inspects it through the new expression-form surface
+
+Deliverables
+------------
+- one canonical Phase 64 note documenting the expression-form variant
+  inspection closure
+- one focused parser, sema, and MIR change for `is`-based variant tests and
+  payload projection
+- one parser fixture, one sema fixture, one MIR fixture, and one project
+  regression proving imported generic enum inspection end to end
+
+Suggested execution order
+-------------------------
+1. reproduce the current parser failure on one imported generic enum inspection
+   probe
+2. add parser support for `is` and digit field names after `.`
+3. let sema validate variant-test selectors and type-check payload projection
+   from the matched variant summary
+4. lower the repaired expressions through existing MIR variant-match and
+   variant-extract instructions
+5. add focused parser, sema, MIR, and project regressions
+6. rebuild and run the owning test suites
+
+Exit criteria
+-------------
+- `expr is Enum.Variant` parses, type-checks, and lowers deterministically for
+  admitted enum selector types
+- ordered payload projection through the repaired expression-form variant path
+  reuses the matched variant payload typing rather than ad hoc backend guesses
+- imported generic enum inspection works through the supported project workflow
+  without special cases outside parser, sema, and MIR
+
+Non-goals
+---------
+- general guard propagation or flow-sensitive narrowing beyond the explicit
+  inspected expression
+- new switch syntax, pattern guards, or exhaustive-expression forms
+- redesigning enum layout, payload representation, or imported `.mci` schema
+- widening payload access beyond the explicit repaired ordered-projection path
+
+What landed
+-----------
+- The lexer and parser now admit expression-form enum inspection through the
+  `is` operator plus ordered payload projection through numeric field syntax
+  such as `value.Some.0`.
+- Sema now validates enum variant designators against the inspected selector
+  type, including imported generic enums whose variant designators omit
+  repeated type arguments on the right-hand side.
+- Variant payload views now type-check through tuple-style ordered fields so
+  `value.Variant.0` reuses sema-owned payload ordering instead of inventing a
+  second enum model.
+- MIR lowering now maps `expr is Enum.Variant` onto `variant_match` and the
+  repaired ordered payload projection path onto `variant_extract` without new
+  backend-only semantics.
+- Focused parser, sema, MIR, and project regressions now prove the admitted
+  expression-form inspection surface in both direct-source and imported
+  project workflow.
+
+Closeout statement
+------------------
+Phase 64 is complete as a narrow semantic owner re-audit. The repository does
+not invent a new enum system here; it removes the smaller but real drift where
+constructors and switch destructuring already carried the admitted enum truth,
+but ordinary expression-form inspection still failed before parser and sema
+could hand that same truth to MIR.

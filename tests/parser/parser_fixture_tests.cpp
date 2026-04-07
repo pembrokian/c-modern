@@ -97,6 +97,7 @@ int main(int argc, char** argv) {
         {"private_decl_kinds.mc", "private_decl_kinds.ast.txt", true},
         {"qualified_variant_case.mc", "qualified_variant_case.ast.txt", true},
         {"switch_empty_default.mc", "switch_empty_default.ast.txt", true},
+        {"variant_is_payload_ok.mc", "variant_is_payload_ok.ast.txt", true},
         {"export_block_cutover_bad.mc", "export_block_cutover_bad.errors.txt", false},
         {"missing_param_paren.mc", "missing_param_paren.errors.txt", false},
         {"missing_block_brace.mc", "missing_block_brace.errors.txt", false},

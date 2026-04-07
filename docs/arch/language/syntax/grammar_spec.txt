@@ -67,6 +67,7 @@ Keywords:
 - `for`
 - `while`
 - `in`
+- `is`
 - `return`
 - `break`
 - `continue`
@@ -338,7 +339,8 @@ expr            = range_expr
 range_expr      = logical_or_expr [ ".." logical_or_expr ]
 
 logical_or_expr = logical_and_expr { "||" logical_and_expr }
-logical_and_expr = equality_expr { "&&" equality_expr }
+logical_and_expr = is_expr { "&&" is_expr }
+is_expr         = equality_expr [ "is" equality_expr ]
 equality_expr   = relational_expr { ("==" | "!=") relational_expr }
 relational_expr = additive_expr { ("<" | "<=" | ">" | ">=") additive_expr }
 additive_expr   = multiplicative_expr { ("+" | "-") multiplicative_expr }
@@ -355,7 +357,7 @@ postfix_op      = field_access
                 | call_suffix
                 | aggregate_init_suffix
 
-field_access    = "." <identifier>
+field_access    = "." ( <identifier> | <int_lit> )
 deref_access    = ".*"
 index_access    = "[" expr "]"
 slice_access    = "[" [ expr ] ":" [ expr ] "]"
@@ -369,9 +371,11 @@ Rules:
 - postfix operations associate left to right
 - unary operators associate right to left
 - `..` binds more weakly than logical and arithmetic operators and is intended primarily for range iteration syntax
+- `is` is a non-chained enum-variant inspection operator in the current admitted slice
 - aggregate initialization is a postfix form on a type-like primary expression, which permits examples such as `Config{}` and `Buffer<ui8>{ ptr: nil, len: 0, cap: 0, alloc: alloc }`
 - `expr.*` is the standardized explicit dereference syntax used in current examples
 - indexing and slicing are distinct postfix forms
+- `.0`, `.1`, and similar numeric field selections are admitted for tuple-style payload projection and tuple values
 
 10. Primary Expressions
 

@@ -21,7 +21,8 @@ const std::unordered_map<std::string_view, TokenKind> kKeywords = {
     {"type", TokenKind::kType},         {"extern", TokenKind::kExtern},   {"if", TokenKind::kIf},
     {"else", TokenKind::kElse},         {"switch", TokenKind::kSwitch},   {"case", TokenKind::kCase},
     {"default", TokenKind::kDefault},   {"for", TokenKind::kFor},         {"while", TokenKind::kWhile},
-    {"in", TokenKind::kIn},             {"return", TokenKind::kReturn},   {"break", TokenKind::kBreak},
+    {"in", TokenKind::kIn},             {"is", TokenKind::kIs},           {"return", TokenKind::kReturn},
+    {"break", TokenKind::kBreak},
     {"continue", TokenKind::kContinue}, {"defer", TokenKind::kDefer},     {"var", TokenKind::kVar},
     {"const", TokenKind::kConst},       {"nil", TokenKind::kNil},         {"true", TokenKind::kTrue},
     {"false", TokenKind::kFalse},
@@ -565,6 +566,8 @@ std::string_view ToString(TokenKind kind) {
             return "while";
         case TokenKind::kIn:
             return "in";
+        case TokenKind::kIs:
+            return "is";
         case TokenKind::kReturn:
             return "return";
         case TokenKind::kBreak:

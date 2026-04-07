@@ -29,6 +29,7 @@ enum class TokenKind {
     kFor,
     kWhile,
     kIn,
+    kIs,
     kReturn,
     kBreak,
     kContinue,
