@@ -1,0 +1,324 @@
+Phase 57 Through Phase 80 -- Speculative Roadmap
+================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the concrete Phase 56 frontier-audit
+decision without turning that sketch into a committed plan.
+
+This document is intentionally forward-looking and tentative.
+It does not introduce a new architecture phase after Phase 8.
+It does not replace `docs/plan/plan.txt`.
+It gives a rough shape for the next 24 phases if the repository continues
+advancing in the same evidence-first style used so far:
+
+- one owner-local gap at a time
+- one real consumer or proof surface at a time
+- one explicit exit criterion per phase
+- no speculative widening without admitted pressure
+
+Repository numbering note
+-------------------------
+- Phase 48 and Phase 49 already exist as the earlier post-Phase-47 frontier
+  audit and imported generic call closure wave.
+- Phase 51 is already occupied by imported generic call follow-through.
+- Phase 52 through Phase 55 are now reserved by the module-model reset series.
+- Phase 56 is now the concrete post-Phase-55 frontier-audit and route-to-owner
+  document.
+- This speculative continuation therefore starts at Phase 57.
+
+Repository status note
+----------------------
+- The current repository has already moved through the bootstrap bring-up
+  phases, the first broad hosted proof waves, the planned full error-treatment
+  follow-up captured in Phase 47, the imported generic call closure work, and
+  the newly inserted Phase 52 through Phase 55 module-model reset series.
+- The admitted surface now includes sema, MIR, hosted runtime support, a
+  hosted project workflow, bounded `sync`, bounded `io.pipe()`, a minimal
+  hosted `os` subprocess slice, several real project proofs, a clearer
+  source-level error vocabulary, and one explicit module-model reset plan.
+- The remaining work is no longer about proving the compiler exists.
+  It is about closing the last honest language-owner gaps, deciding which
+  adjacent families are truly needed, and hardening the public-supported slice.
+
+What this roadmap is trying to answer
+-------------------------------------
+- Which remaining semantic or MIR owner gaps are still real after the current
+  admitted consumer set?
+- Which critique-driven stdlib and runtime follow-through items are now honest
+  to land, and which ones are still blocked by current compiler or ABI
+  boundaries?
+- Which adjacent runtime or stdlib surfaces are actually justified by pressure?
+- Which workflow and release-hardening items need to land before a first public
+  `v0.2` cut can be taken seriously?
+
+Core rule
+---------
+- Prefer owner-local closure over convenience.
+- Keep the next admitted surface narrow enough that one phase can still be
+  audited by hand.
+- Use real projects and canonical fixtures to justify widening.
+- If a frontier has no real consumer, keep it deferred explicitly.
+- If the syntax docs already name a form such as `||`, `&&`, or `a[i]`, treat
+  any missing parser, sema, MIR, or backend support as owner-local closure,
+  not as justification for ad hoc library workarounds.
+
+Roadmap Bands
+-------------
+
+Band A - Finish The Remaining Language Truth
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 57 through 66 likely close the last sema and MIR gaps that still matter
+for the admitted v0.2 core.
+
+Likely themes:
+- imported generic procedure-call widening beyond the current narrow rewrite
+- structural aggregate constant transport across sema, `.mci`, MIR, and backend
+- any remaining layout, ABI, or conversion edge cases exposed by real consumers
+- closure for already-documented expression forms whose implementation may
+  still lag the written grammar, especially short-circuit boolean operators and
+  array indexing
+- a final pass on compile-time truth, imported type identity, and owner-local
+  lowering rules
+
+Why this band comes first:
+- the repository still gets the most leverage from making language meaning
+  authoritative before widening more tools or more runtime surfaces
+- the current plans already show repeated evidence that later layers should not
+  compensate for missing semantic truth
+
+Phases in this band:
+
+Phase 57 -- Post-Plateau Frontier Follow-Through
+- Exit criterion: the next honest frontier after the concrete Phase 56 audit is
+  started from current evidence rather than from abstract completeness
+  pressure, including an explicit answer on whether the already-documented
+  `||`, `&&`, and `a[i]` forms still need near-term parser, sema, or MIR
+  closure.
+
+Phase 58 -- Imported Generic Call Or Expression Closure
+- Exit criterion: the strongest still-live language-owner distortion, whether
+  imported generic call breadth or expression-form closure, works end-to-end
+  without a consumer-local workaround.
+
+Phase 59 -- Structural Aggregate Constant Backend Emission
+- Exit criterion: top-level aggregate constant globals emit honestly through
+  the backend, matching the sema-plus-`.mci` truth already landed.
+
+Phase 60 -- Imported Layout And ABI Re-Audit
+- Exit criterion: any remaining layout or ABI edge cases found by real
+  consumers are either closed or explicitly deferred with a named reason.
+
+Phase 61 -- Compile-Time Truth Closure
+- Exit criterion: the admitted compile-time subset is deterministic across the
+  remaining static-storage and constant-expression cases.
+
+Phase 62 -- Imported Identity Finalization
+- Exit criterion: imported type identity and qualified nominal forms survive
+  the supported workflow without reconstruction drift.
+
+Phase 63 -- MIR Surface Completion For Remaining Owned Semantics
+- Exit criterion: any sema construct still missing a dedicated MIR form has a
+  clear owner-local lowering path or a named deferral, including short-circuit
+  boolean evaluation and indexed access if those forms are still lagging the
+  written grammar.
+
+Phase 64 -- Final Narrow Semantic Fixture Sweep
+- Exit criterion: the remaining sema and MIR fixtures cover the final admitted
+  edge cases without broadening the language surface.
+
+Phase 65 -- Semantic Owner Re-Audit
+- Exit criterion: no known sema rule is still being papered over in MIR,
+  backend, or tooling.
+
+Phase 66 -- Language Surface Plateau Decision
+- Exit criterion: the repository has a stable answer on whether the admitted
+  v0.2 core is now semantically complete enough for release hardening.
+
+Band B - Runtime And Library Adjacent Closure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 67 through 73 likely decide which adjacent runtime families are still
+needed after the core language truth is stable.
+
+Likely themes:
+- `time` if and only if a real consumer needs deadlines, retries, or sleep
+- filesystem and `io` contract convergence where nil-only or raw-status
+  boundaries still remain materially harmful
+- narrow `os` process-surface widening only if real argv or handle-lifecycle
+  consumers make it honest
+- `testing` only if repeated project helper pressure exposes a stable pattern
+- `sync` and `mem` follow-on only if atomic read-modify-write, broader
+  coordination, or honest generic buffer or arena semantics are clearly
+  demanded
+- a final answer on whether any additional `os` or `hal` surface is actually
+  justified
+
+Why this band is separate:
+- the current repository already shows that adjacent families should be admitted
+  only when a consumer matrix makes them honest
+- the next question is not “what modules exist in the spec,” but “which of them
+  still need to be implemented for the current admitted slice to feel real?”
+
+Phases in this band:
+
+Phase 67 -- Adjacent Stdlib And Runtime Consumer Matrix
+- Exit criterion: one explicit matrix names which remaining adjacent-library
+  follow-through items are honest next steps: `time`, fs or io error-channel
+  widening, testing helper hardening, sync follow-on, or argv process widening.
+
+Phase 68 -- Filesystem And Error-Contract Follow-Through
+- Exit criterion: the smallest honest next filesystem or cross-module
+  error-contract widening lands, or the remaining nil-only or status-only
+  boundaries are explicitly deferred again with a consumer-based reason.
+
+Phase 69 -- Time Or Process Follow-Through
+- Exit criterion: one real admitted project drives either the next narrow
+  `time` slice or the next honest subprocess or argv widening through the
+  normal workflow and tests.
+
+Phase 70 -- Testing Surface Hardening
+- Exit criterion: repeated ordinary-test helper patterns are absorbed into a
+  stable `testing` surface without hidden compiler policy.
+
+Phase 71 -- Sync And Mem Follow-On Gate
+- Exit criterion: the repository decides whether any atomic, coordination,
+  buffer, or arena widening is truly needed beyond the current admitted `sync`
+  and `mem` slices.
+
+Phase 72 -- Minimal Sync, Mem, Or Process Follow-On Or Explicit Deferral
+- Exit criterion: either the smallest honest sync, mem, or process follow-on
+  lands or the remaining follow-on is explicitly parked again with a
+  consumer-based reason.
+
+Phase 73 -- Adjacent Runtime Deferral Audit
+- Exit criterion: `os`, `hal`, and any other runtime-adjacent family still not
+  justified by pressure remain named as deferred rather than ambient future
+  work.
+
+Phase 51 Critique Coverage Note
+-------------------------------
+This roadmap should be read alongside the Phase 51 stdlib critique.
+Some Phase 51 items are already closed after the critique wave and therefore do
+not require future roadmap ownership here: the `io.write` and `io.write_line`
+error-contract inconsistency, the invalid `testing.fail()` sentinel,
+misleading `net.IpAddr` naming, the `parse_port` digit magic numbers, the old
+`utf8.codepoint_len` name, the absence of `path` and `time`, and several of the
+lower-risk string and UTF-8 clarity items.
+
+The remaining critique items should be routed as follows:
+
+- `errors` encoding limits, zero-code semantics, and any future wider error
+  encoding belong in Phase 56, Phase 61, and Phase 66.
+- exported constant-versus-helper issues in `errors` belong in Band A and stay
+  subordinate to imported constant and backend truth rather than becoming a
+  stdlib-only cleanup.
+- `fs` tri-state meaning, `read_all` or `list_dir` error channels, and the
+  broader nil-versus-error convergence rule belong in Phase 67 and Phase 68.
+- `io` poller representation, `Event.failed` semantics, and pointer-returning
+  contract clarity belong in Phase 67, Phase 68, and Phase 73.
+- `mem` arena semantics, generic buffer length, and wrapping consistency split:
+  compiler-bound nominal or layout truth belongs in Band A, while honest public
+  API widening belongs in Phase 71 and Phase 72.
+- `net` struct-passthrough cleanup and listener or accept-loop contract
+  sharpening belong in Phase 67, Phase 69, and Phase 73.
+- `os` argv widening, close-policy cleanup, and consumed-child semantics belong
+  in Phase 67, Phase 69, and Phase 72.
+- remaining `strings` and `utf8` clarity, performance, and C-boundary audit
+  items belong in Phase 64, Phase 67, and Phase 77.
+- `sync` atomic storage truth belongs in Band A, while broadcast, condition-
+  variable helper shaping, and any read-modify-write follow-on belong in Phase
+  71 and Phase 72.
+- `testing` result-shape cleanup and richer helper hardening belong in Phase
+  70 and Phase 77.
+- cross-cutting error-contract convergence, nil-pointer conventions, ownership
+  docs, opaque-handle questions, and generic-extern verification belong across
+  Phase 56, Phase 63, Phase 68, Phase 71, and Phase 77.
+
+Short-Term Syntax Closure Note
+------------------------------
+The written grammar already names logical `||`, logical `&&`, and indexed
+postfix access `a[i]`.
+The short-term roadmap intent is therefore not to invent these forms late, but
+to make sure parser, semantic, MIR, backend, fixture, and real-project support
+for them are either admitted promptly in Band A or explicitly named as a still-
+owned deferral.
+
+Band C - Workflow, Support, And Release Hardening
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 74 through 80 likely focus on making the supported slice feel like a
+real toolchain that can be trusted by other humans.
+
+Likely themes:
+- package and target-model maturity without drifting into full package
+  management
+- stronger deterministic rebuild and selected-target reuse proof
+- install and usage path hardening for the supported hosted slice
+- support-matrix freeze, public-cut smoke audits, and README alignment
+- a final decision on whether `v0.2` is ready to tag or still needs one more
+  plateau
+
+Why this band comes last:
+- the repository already has enough breadth to expose workflow weaknesses
+- the next risk is less “can it compile?” and more “can people trust the
+  supported slice and the documentation around it?”
+
+Phases in this band:
+
+Phase 74 -- Package And Target Maturity
+- Exit criterion: the admitted project graph stays honest across the real
+  multi-target shapes the repository supports today.
+
+Phase 75 -- Deterministic Rebuild And Cross-Target Reuse
+- Exit criterion: selected-target rebuild reuse remains deterministic and does
+  not churn unrelated targets across ordinary workflows.
+
+Phase 76 -- Install And Usage Path Hardening
+- Exit criterion: the supported path from source checkout to working `mc`
+  usage is documented and repeatable.
+
+Phase 77 -- Supported Slice Audit
+- Exit criterion: the README and support notes accurately state what the
+  repository does and does not support.
+
+Phase 78 -- Public-Cut Smoke Refresh
+- Exit criterion: the public-cut smoke commands and fixture set reflect the
+  current admitted slice without stale examples or hidden assumptions.
+
+Phase 79 -- Release-Readiness Re-Audit
+- Exit criterion: the remaining gaps are either narrow enough to tolerate in a
+  `v0.2` release or clearly large enough to keep the release deferred.
+
+Phase 80 -- v0.2 Gate
+- Exit criterion: the repository either tags `v0.2` or writes down the one
+  remaining plateau that still blocks that tag.
+
+Likely ordering bias
+--------------------
+If the repository keeps following the same pattern, the safest order is:
+
+1. Finish the remaining semantic and MIR truth first.
+2. Admit only the runtime or library families that real consumers force.
+3. Harden workflow, support, and documentation last.
+
+That ordering keeps the project from confusing “more features” with “more
+confidence.”
+
+Non-goals
+---------
+- claiming these phases are already approved
+- widening multiple new families in parallel
+- converting this note into a replacement for the phase-specific plans
+- promising portability, package management, or self-hosting as part of this
+  speculative arc
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- If real pressure changes the shape of the remaining work, the right answer is
+  to rewrite the next narrow phase docs, not to preserve this speculation.
+- If the repository reaches a plateau earlier than Phase 80, that is a good
+  outcome, not a failure of the roadmap.

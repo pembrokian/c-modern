@@ -13,6 +13,8 @@ struct Encoded {
 
 const UTF8_ERR_INVALID_BYTES: usize = 1
 const UTF8_ERR_INVALID_CODEPOINT: usize = 2
+
+// Classifier boundaries for leading and continuation bytes.
 const UTF8_ASCII_HI: u8 = 128
 const UTF8_CONT_LO: u8 = 128
 const UTF8_CONT_HI: u8 = 192
@@ -21,10 +23,11 @@ const UTF8_LEAD_2_BASE: u8 = 192
 const UTF8_LEAD_3_MIN: u8 = 224
 const UTF8_LEAD_4_MIN: u8 = 240
 const UTF8_LEAD_4_LIMIT: u8 = 245
-const UTF8_LEAD_E0: u8 = 224
 const UTF8_LEAD_ED: u8 = 237
 const UTF8_LEAD_F0: u8 = 240
 const UTF8_LEAD_F4: u8 = 244
+
+// Second-byte bounds that reject overlong encodings and surrogates.
 const UTF8_SECOND_E0_MIN: u8 = 160
 const UTF8_SECOND_F0_MIN: u8 = 144
 
@@ -67,11 +70,11 @@ func leading_codepoint_len_bytes(bytes: Slice<u8>) usize {
         if bytes.len < 2 {
             return 0
         }
-        second_2: u8 = bytes[1]
-        if second_2 < UTF8_CONT_LO {
+        second_two: u8 = bytes[1]
+        if second_two < UTF8_CONT_LO {
             return 0
         }
-        if second_2 >= UTF8_CONT_HI {
+        if second_two >= UTF8_CONT_HI {
             return 0
         }
         return 2
@@ -81,27 +84,27 @@ func leading_codepoint_len_bytes(bytes: Slice<u8>) usize {
         if bytes.len < 3 {
             return 0
         }
-        second_3: u8 = bytes[1]
-        third_3: u8 = bytes[2]
-        if second_3 < UTF8_CONT_LO {
+        second_three: u8 = bytes[1]
+        third_three: u8 = bytes[2]
+        if second_three < UTF8_CONT_LO {
             return 0
         }
-        if second_3 >= UTF8_CONT_HI {
+        if second_three >= UTF8_CONT_HI {
             return 0
         }
-        if third_3 < UTF8_CONT_LO {
+        if third_three < UTF8_CONT_LO {
             return 0
         }
-        if third_3 >= UTF8_CONT_HI {
+        if third_three >= UTF8_CONT_HI {
             return 0
         }
-        if first == UTF8_LEAD_E0 {
-            if second_3 < UTF8_SECOND_E0_MIN {
+        if first == UTF8_LEAD_3_MIN {
+            if second_three < UTF8_SECOND_E0_MIN {
                 return 0
             }
         }
         if first == UTF8_LEAD_ED {
-            if second_3 >= UTF8_SECOND_E0_MIN {
+            if second_three >= UTF8_SECOND_E0_MIN {
                 return 0
             }
         }
@@ -112,34 +115,34 @@ func leading_codepoint_len_bytes(bytes: Slice<u8>) usize {
         if bytes.len < 4 {
             return 0
         }
-        second_4: u8 = bytes[1]
-        third_4: u8 = bytes[2]
-        fourth_4: u8 = bytes[3]
-        if second_4 < UTF8_CONT_LO {
+        second_four: u8 = bytes[1]
+        third_four: u8 = bytes[2]
+        fourth_four: u8 = bytes[3]
+        if second_four < UTF8_CONT_LO {
             return 0
         }
-        if second_4 >= UTF8_CONT_HI {
+        if second_four >= UTF8_CONT_HI {
             return 0
         }
-        if third_4 < UTF8_CONT_LO {
+        if third_four < UTF8_CONT_LO {
             return 0
         }
-        if third_4 >= UTF8_CONT_HI {
+        if third_four >= UTF8_CONT_HI {
             return 0
         }
-        if fourth_4 < UTF8_CONT_LO {
+        if fourth_four < UTF8_CONT_LO {
             return 0
         }
-        if fourth_4 >= UTF8_CONT_HI {
+        if fourth_four >= UTF8_CONT_HI {
             return 0
         }
         if first == UTF8_LEAD_F0 {
-            if second_4 < UTF8_SECOND_F0_MIN {
+            if second_four < UTF8_SECOND_F0_MIN {
                 return 0
             }
         }
         if first == UTF8_LEAD_F4 {
-            if second_4 >= UTF8_SECOND_F0_MIN {
+            if second_four >= UTF8_SECOND_F0_MIN {
                 return 0
             }
         }
@@ -163,22 +166,22 @@ func decode_bytes(bytes: Slice<u8>) (Decoded, errors.Error) {
     }
 
     if step == 2 {
-        second_2: u8 = bytes[1]
-        codepoint_2: u32 = ((u32)(first) - (u32)(UTF8_LEAD_2_BASE)) * (u32)(64) + ((u32)(second_2) - (u32)(UTF8_CONT_LO))
+        second_two: u8 = bytes[1]
+        codepoint_2: u32 = ((u32)(first) - (u32)(UTF8_LEAD_2_BASE)) * (u32)(64) + ((u32)(second_two) - (u32)(UTF8_CONT_LO))
         return Decoded{ codepoint: codepoint_2, width: 2 }, errors.ok()
     }
 
     if step == 3 {
-        second_3: u8 = bytes[1]
-        third_3: u8 = bytes[2]
-        codepoint_3: u32 = ((u32)(first) - (u32)(UTF8_LEAD_3_MIN)) * (u32)(4096) + ((u32)(second_3) - (u32)(UTF8_CONT_LO)) * (u32)(64) + ((u32)(third_3) - (u32)(UTF8_CONT_LO))
+        second_three: u8 = bytes[1]
+        third_three: u8 = bytes[2]
+        codepoint_3: u32 = ((u32)(first) - (u32)(UTF8_LEAD_3_MIN)) * (u32)(4096) + ((u32)(second_three) - (u32)(UTF8_CONT_LO)) * (u32)(64) + ((u32)(third_three) - (u32)(UTF8_CONT_LO))
         return Decoded{ codepoint: codepoint_3, width: 3 }, errors.ok()
     }
 
-    second_4: u8 = bytes[1]
-    third_4: u8 = bytes[2]
-    fourth_4: u8 = bytes[3]
-    codepoint_4: u32 = ((u32)(first) - (u32)(UTF8_LEAD_4_MIN)) * (u32)(262144) + ((u32)(second_4) - (u32)(UTF8_CONT_LO)) * (u32)(4096) + ((u32)(third_4) - (u32)(UTF8_CONT_LO)) * (u32)(64) + ((u32)(fourth_4) - (u32)(UTF8_CONT_LO))
+    second_four: u8 = bytes[1]
+    third_four: u8 = bytes[2]
+    fourth_four: u8 = bytes[3]
+    codepoint_4: u32 = ((u32)(first) - (u32)(UTF8_LEAD_4_MIN)) * (u32)(262144) + ((u32)(second_four) - (u32)(UTF8_CONT_LO)) * (u32)(4096) + ((u32)(third_four) - (u32)(UTF8_CONT_LO)) * (u32)(64) + ((u32)(fourth_four) - (u32)(UTF8_CONT_LO))
     return Decoded{ codepoint: codepoint_4, width: 4 }, errors.ok()
 }
 
@@ -218,6 +221,16 @@ func encode_into(codepoint: u32) (Encoded, errors.Error) {
 func valid_bytes(bytes: Slice<u8>) bool {
     index: usize = 0
     while index < bytes.len {
+        while index < bytes.len {
+            if bytes[index] >= UTF8_ASCII_HI {
+                break
+            }
+            index = index + 1
+        }
+        if index == bytes.len {
+            break
+        }
+
         step: usize = leading_codepoint_len_bytes(bytes[index:bytes.len])
         if step == 0 {
             return false
@@ -226,10 +239,6 @@ func valid_bytes(bytes: Slice<u8>) bool {
     }
 
     return true
-}
-
-func byte_len(text: str) usize {
-    return strings.byte_len(text)
 }
 
 func empty(text: str) bool {

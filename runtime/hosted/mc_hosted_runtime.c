@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -197,6 +198,15 @@ static void mc_store_error(uintptr_t* out_err, uintptr_t err) {
     if (out_err != NULL) {
         *out_err = err;
     }
+}
+
+uint64_t __mc_time_monotonic_nanos(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        return 0;
+    }
+
+    return (uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec;
 }
 
 static short mc_poll_events_from_mask(uint32_t interests) {
@@ -803,32 +813,42 @@ int64_t __mc_strings_trim_space_end(struct mc_string text) {
     return index;
 }
 
-int64_t __mc_fs_file_size(struct mc_string path) {
+int64_t __mc_fs_file_size(struct mc_string path, uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
     int64_t size = -1;
     char* c_path = mc_copy_string_to_cstr(path);
     if (c_path == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
         return -1;
     }
 
     struct stat file_stat;
     if (stat(c_path, &file_stat) == 0) {
         size = (int64_t) file_stat.st_size;
+    } else {
+        mc_store_error(out_err, mc_error_code_from_errno());
     }
 
     free(c_path);
     return size;
 }
 
-int32_t __mc_fs_is_dir(struct mc_string path) {
+int32_t __mc_fs_is_dir(struct mc_string path, uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
     int32_t is_dir = 0;
     char* c_path = mc_copy_string_to_cstr(path);
     if (c_path == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
         return 0;
     }
 
     struct stat file_stat;
-    if (stat(c_path, &file_stat) == 0 && S_ISDIR(file_stat.st_mode)) {
-        is_dir = 1;
+    if (stat(c_path, &file_stat) == 0) {
+        if (S_ISDIR(file_stat.st_mode)) {
+            is_dir = 1;
+        }
+    } else {
+        mc_store_error(out_err, mc_error_code_from_errno());
     }
 
     free(c_path);
@@ -1254,6 +1274,16 @@ uintptr_t __mc_sync_condvar_signal(struct mc_sync_condvar* cv) {
 
     struct mc_hosted_condvar* cond = (struct mc_hosted_condvar*) cv->raw;
     const int rc = pthread_cond_signal(&cond->cond);
+    return rc == 0 ? 0 : mc_error_from_errno_value(rc);
+}
+
+uintptr_t __mc_sync_condvar_broadcast(struct mc_sync_condvar* cv) {
+    if (cv == NULL || cv->raw == 0) {
+        return mc_error_make(MC_ERROR_KIND_SYNC, 1);
+    }
+
+    struct mc_hosted_condvar* cond = (struct mc_hosted_condvar*) cv->raw;
+    const int rc = pthread_cond_broadcast(&cond->cond);
     return rc == 0 ? 0 : mc_error_from_errno_value(rc);
 }
 

@@ -1,7 +1,7 @@
 import strings
 
 func main() i32 {
-    if strings.byte_len("phase6") != 6 {
+    if "phase6".len != 6 {
         return 1
     }
     if !strings.empty("") {

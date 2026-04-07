@@ -32,6 +32,7 @@ extern(c) func __mc_sync_condvar_init(err: *errors.Error) Condvar
 extern(c) func __mc_sync_condvar_destroy(cv: *Condvar) errors.Error
 extern(c) func __mc_sync_condvar_wait(cv: *Condvar, mu: *Mutex) errors.Error
 extern(c) func __mc_sync_condvar_signal(cv: *Condvar) errors.Error
+extern(c) func __mc_sync_condvar_broadcast(cv: *Condvar) errors.Error
 
 extern(c) func atomic_load<T>(ptr: *Atomic<T>, order: MemoryOrder) T
 extern(c) func atomic_store<T>(ptr: *Atomic<T>, value: T, order: MemoryOrder)
@@ -43,6 +44,7 @@ func thread_spawn<T>(entry: func(*T), ctx: *T) (Thread, errors.Error) {
 }
 
 func thread_join(thread: Thread) errors.Error {
+    // Thread handles are single-use; joining the same handle twice is an error.
     return __mc_sync_thread_join(thread)
 }
 
@@ -75,9 +77,14 @@ func condvar_destroy(cv: *Condvar) errors.Error {
 }
 
 func condvar_wait(cv: *Condvar, mu: *Mutex) errors.Error {
+    // Condvars may wake spuriously; callers must re-check their predicate in a loop.
     return __mc_sync_condvar_wait(cv, mu)
 }
 
 func condvar_signal(cv: *Condvar) errors.Error {
     return __mc_sync_condvar_signal(cv)
+}
+
+func condvar_broadcast(cv: *Condvar) errors.Error {
+    return __mc_sync_condvar_broadcast(cv)
 }

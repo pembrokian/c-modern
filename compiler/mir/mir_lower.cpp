@@ -723,6 +723,45 @@ class FunctionLowerer {
         return {value, type};
     }
 
+    ValueInfo LowerShortCircuitLogicalExpr(const Expr& expr) {
+        EnsureCurrentBlock();
+
+        const sema::Type result_type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "logical expression type");
+        const std::string result_local = NewHiddenLocal(expr.text == "&&" ? "logical_and" : "logical_or");
+        EnsureLocal(result_local, result_type, true);
+
+        const ValueInfo left = LowerExpr(*expr.left);
+        const std::size_t rhs_block = CreateBlock(expr.text == "&&" ? "logical_and_rhs" : "logical_or_rhs");
+        const std::size_t short_block = CreateBlock(expr.text == "&&" ? "logical_and_short" : "logical_or_short");
+        const std::size_t merge_block = CreateBlock(expr.text == "&&" ? "logical_and_merge" : "logical_or_merge");
+
+        auto& entry = function_.blocks[*current_block_];
+        entry.terminator.kind = Terminator::Kind::kCondBranch;
+        entry.terminator.values = {left.value};
+        if (expr.text == "&&") {
+            entry.terminator.true_target = function_.blocks[rhs_block].label;
+            entry.terminator.false_target = function_.blocks[short_block].label;
+        } else {
+            entry.terminator.true_target = function_.blocks[short_block].label;
+            entry.terminator.false_target = function_.blocks[rhs_block].label;
+        }
+
+        current_block_ = short_block;
+        const ValueInfo short_value = EmitLiteralValue(expr.text == "&&" ? "false" : "true", result_type);
+        StoreLocal(result_local, short_value.value, result_type, true);
+        function_.blocks[*current_block_].terminator.kind = Terminator::Kind::kBranch;
+        function_.blocks[*current_block_].terminator.true_target = function_.blocks[merge_block].label;
+
+        current_block_ = rhs_block;
+        const ValueInfo right = LowerExpr(*expr.right);
+        StoreLocal(result_local, right.value, result_type, true);
+        function_.blocks[*current_block_].terminator.kind = Terminator::Kind::kBranch;
+        function_.blocks[*current_block_].terminator.true_target = function_.blocks[merge_block].label;
+
+        current_block_ = merge_block;
+        return LoadLocalValue(result_local);
+    }
+
     std::optional<ValueInfo> EmitBoundsLengthValue(const ValueInfo& base) {
         const sema::Type stripped_base = StripMirAliasOrDistinct(module_, base.type);
         if (stripped_base.kind == sema::Type::Kind::kArray) {
@@ -1167,6 +1206,9 @@ class FunctionLowerer {
                 return {value, type};
             }
             case Expr::Kind::kBinary: {
+                if (expr.text == "&&" || expr.text == "||") {
+                    return LowerShortCircuitLogicalExpr(expr);
+                }
                 ValueInfo left = LowerExpr(*expr.left);
                 ValueInfo right = LowerExpr(*expr.right);
                 const sema::Type result_type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "binary expression type");

@@ -1,0 +1,189 @@
+Phase 56 -- Post-Phase-55 Frontier Audit And Critique-Driven Follow-Through Selection
+======================================================================================
+
+Status
+------
+COMPLETED
+
+Implementation result
+---------------------
+- Phase 56 closed the owner-local language-implementation gap for logical
+  `||`, logical `&&`, and the already-admitted indexed-access surface by
+  landing explicit short-circuit MIR lowering and executable proof instead of
+  leaving those forms as roadmap-only debt.
+- Parser and basic semantic support for these forms already existed; the real
+  missing contract was runtime-faithful lowering for `||` and `&&`.
+- MIR now lowers short-circuit boolean operators through explicit conditional
+  control flow and a hidden bool result local so the right-hand side is only
+  evaluated when required by the language spec.
+- Indexed access `a[i]` remains within the admitted surface with explicit MIR
+  bounds checks and existing fixture coverage, so this phase did not widen the
+  language further than the named owner-local closure.
+
+Purpose
+-------
+Audit the remaining fronts after the Phase 52 through Phase 55 module-model
+reset series and the recent stdlib critique follow-through, then name the next
+honest active owner and the next honest adjacent widening wave from current
+repository evidence rather than from stale roadmap inertia.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- Phase 48 and Phase 49 are already recorded in the repository as the
+  post-Phase-47 frontier audit and imported generic call closure wave.
+- Phase 51 is already occupied by imported generic call follow-through.
+- Phase 52 through Phase 55 are now reserved by the module-model reset series.
+- The next new concrete repository owner document therefore begins at Phase 56.
+
+Repository status note
+----------------------
+- The repository already closed several Phase 51 stdlib critique items through
+  the recent stdlib wave: the `io.write` and `io.write_line` error contract,
+  the invalid `testing.fail()` sentinel, the `utf8.codepoint_len` naming bug,
+  the `net.IpAddr` naming drift, the `parse_port` digit magic numbers, and the
+  absence of `path` and `time`.
+- The repository also now has sharper `path` and `time` semantics plus focused
+  executable proof on those modules.
+- Several remaining critique items are implementable now, but they are no
+  longer all the same kind of work:
+  - some are owner-local language or compiler closure for forms the written
+    grammar already names, such as `||`, `&&`, and indexed access `a[i]`
+  - some are adjacent stdlib or runtime widenings that are now feasible but
+    still broader than a small cleanup, such as richer filesystem error
+    channels or argv-shaped subprocess APIs
+  - some remain blocked by live compiler or ABI boundaries, such as exported
+    imported scalar constants, nominal `Arena` wrapping, and honest atomic
+    storage layout
+- The repository needs one explicit route-to-owner decision now so those three
+  classes of work are not mixed together under one vague "cleanup" label.
+
+Problem being solved
+--------------------
+- After the module-model reset series was inserted and the recent stdlib wave
+  landed, the old speculative roadmap numbering and frontier ranking no longer
+  reflect the real repository state.
+- Without one fresh audit, planning could blur together:
+  - syntax and expression forms already promised by the written grammar
+  - adjacent library widenings that are now honest but still optional
+  - genuinely blocked fronts that still require compiler or ABI closure first
+- The repository needs to separate those classes clearly and choose one active
+  owner boundary rather than reopening all remaining critique items in
+  parallel.
+
+Core rule
+---------
+- If the written grammar already names a form, close it at the language-owner
+  boundary before normalizing the gap in stdlib or example code.
+- Distinguish implementable-now adjacent widenings from still-blocked fronts.
+- Prefer one active owner at a time, with one explicit second-wave candidate
+  named behind it.
+- Keep the blocked fronts visible with their real owner boundary instead of
+  mislabeling them as ordinary library cleanup.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one documentation-backed frontier audit across the
+current admitted language, stdlib, runtime, tool workflow, the recent Phase 51
+stdlib critique, and the new module-model phase series.
+
+The audit should answer four questions directly:
+- which remaining critique items are already closed and therefore should not
+  still appear as ambient roadmap debt?
+- which remaining fronts are owner-local language or compiler closure because
+  the written grammar already promises them?
+- which remaining stdlib or runtime items are honest next widenings now, even
+  if they require callsite churn or hosted runtime support?
+- which fronts are still blocked by the current compiler, MIR, or backend
+  boundaries and therefore should not be scheduled as near-term library work?
+
+Fronts audited in this phase
+----------------------------
+1. Short-term language-owner closure for logical `||`, logical `&&`, and
+   indexed access `a[i]`, which are already named by the concrete grammar.
+2. Remaining filesystem and cross-module error-contract convergence after the
+   recent `fs.file_size(...)` and `fs.is_dir(...)` widening.
+3. Narrow process-surface widening beyond the current fixed-argv subprocess
+   stub.
+4. `testing` result-shape and helper hardening beyond the now-landed minimal
+   diagnostic output.
+5. `sync` and `mem` follow-on work, split between real adjacent widening and
+   still-blocked compiler-owned representation problems.
+6. Remaining low-risk strings and UTF-8 clarity or performance follow-through.
+
+What this phase should try to prove
+-----------------------------------
+- the next active frontier after Phase 55 is not a generic "stdlib cleanup"
+  bucket but a specific owner-local language closure: make the implementation
+  match the already-written grammar for `||`, `&&`, and `a[i]`
+- the strongest next adjacent widening after that language-owner closure is a
+  narrower and more reviewable stdlib or runtime wave, not a broad reopening
+  of all deferred families
+- the still-blocked fronts can be named precisely enough that future plans do
+  not accidentally treat them as ordinary library tasks
+- the speculative roadmap can now be renumbered cleanly so it starts after the
+  concrete Phase 56 owner-selection document and the inserted Phase 52 through
+  Phase 55 module-model series
+
+Preferred pressure points
+-------------------------
+1. The current gap between the written grammar and any missing parser, sema,
+   MIR, backend, or fixture support for `||`, `&&`, and `a[i]`.
+2. The remaining nil-only or status-only I/O and filesystem boundaries that
+   still materially weaken admitted consumers.
+3. The narrow but obviously limited argv and close-policy shape of the current
+   hosted subprocess API.
+4. The difference between `testing` hardening that is now ordinary surface
+   polish and result-shape changes that would need tool workflow coordination.
+5. The known blocker list around imported scalar constants, nominal arena
+   representation, and atomic storage truth.
+
+Deliverables
+------------
+- one explicit frontier-audit phase note naming the next active owner after
+  the Phase 52 through Phase 55 module-model reset series
+- one renumbered speculative admin roadmap that begins after Phase 56 and no
+  longer collides with the inserted module-model phases
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` only if the chosen route
+  or the sharper blocker wording needs to be recorded immediately
+
+Suggested execution order
+-------------------------
+1. Re-audit the remaining Phase 51 critique items against the current landed
+   stdlib state and the inserted Phase 52 through Phase 55 series.
+2. Separate owner-local grammar or compiler closure from adjacent stdlib or
+   runtime widening.
+3. Separate both of those from still-blocked fronts.
+4. Name the next active owner as already-promised grammar closure for `||`,
+   `&&`, and `a[i]` if that implementation gap still exists.
+5. Name the second-wave candidate as the next adjacent stdlib or runtime
+   widening after that language-owner closure.
+6. Renumber the speculative roadmap to start after Phase 56.
+
+Exit criteria
+-------------
+- the next active owner after Phase 55 is named explicitly from current
+  repository evidence
+- implementable-now adjacent widenings are distinguished clearly from blocked
+  fronts
+- the roadmap numbering no longer collides with the inserted module-model
+  phases or the new concrete Phase 56 document
+- the short-term plan explicitly treats `||`, `&&`, and `a[i]` as near-term
+  language-owner closure if the implementation still lags the written grammar
+
+Non-goals
+---------
+- implementing `||`, `&&`, or indexed access in this phase document
+- reopening the module-model reset series itself
+- landing every remaining critique item in one wave
+- broadening runtime families in parallel just because they appear in the spec
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 56 stands alone as the post-Phase-55 route-to-owner audit.
+- The phase is explicit that the next concrete step should distinguish
+  language-owner closure, adjacent-library widening, and blocked fronts rather
+  than treating them as one cleanup bucket.

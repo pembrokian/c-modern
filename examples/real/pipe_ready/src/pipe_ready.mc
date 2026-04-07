@@ -15,7 +15,7 @@ func expected_message() str {
 }
 
 func message_len() usize {
-    return strings.byte_len(expected_message())
+    return expected_message().len
 }
 
 func message_matches(bytes: Slice<u8>) bool {

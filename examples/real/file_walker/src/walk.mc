@@ -1,6 +1,8 @@
 import fs
+import errors
 import io
 import mem
+import path
 import strings
 
 func entry_is_dir(entry: str) bool {
@@ -13,61 +15,36 @@ func entry_is_dir(entry: str) bool {
 }
 
 func entry_name(entry: str) str {
-    if entry_is_dir(entry) {
-        return entry[0:entry.len - 1]
-    }
-    return entry
+    return path.basename(entry)
 }
 
-func path_join(base: str, name: str) *Buffer<u8> {
-    base_bytes: Slice<u8> = strings.bytes(base)
-    name_bytes: Slice<u8> = strings.bytes(name)
-    need_separator: bool = false
-    if base.len > 0 {
-        need_separator = base_bytes[base.len - 1] != 47
-    }
-
-    extra: usize = 0
-    if need_separator {
-        extra = 1
-    }
-
-    joined: *Buffer<u8> = mem.buffer_new<u8>(mem.default_allocator(), base.len + extra + name.len)
-    if joined == nil {
-        return nil
-    }
-
-    bytes: Slice<u8> = mem.slice_from_buffer<u8>(joined)
-    cursor: usize = 0
-    while cursor < base.len {
-        bytes[cursor] = base_bytes[cursor]
-        cursor = cursor + 1
-    }
-    if need_separator {
-        bytes[cursor] = 47
-        cursor = cursor + 1
-    }
-
-    index: usize = 0
-    while index < name.len {
-        bytes[cursor + index] = name_bytes[index]
-        index = index + 1
-    }
-    return joined
+func path_join(root: str, child: str) *Buffer<u8> {
+    return path.join(mem.default_allocator(), root, child)
 }
 
-func walk_path(path: str) i32 {
-    if !fs.is_dir(path) {
-        if fs.file_size(path) < 0 {
+func walk_path(root: str) i32 {
+    is_dir: i32
+    err: errors.Error
+    is_dir, err = fs.is_dir(root)
+    if errors.is_err(err) {
+        return 94
+    }
+    if is_dir == 0 {
+        size: isize
+        size, err = fs.file_size(root)
+        if errors.is_err(err) {
             return 94
         }
-        if io.write_line(path) != 0 {
+        if size < 0 {
+            return 94
+        }
+        if errors.is_err(io.write_line(root)) {
             return 1
         }
         return 0
     }
 
-    listing_buf: *Buffer<u8> = fs.list_dir(path, mem.default_allocator())
+    listing_buf: *Buffer<u8> = fs.list_dir(root, mem.default_allocator())
     if listing_buf == nil {
         return 92
     }
@@ -87,7 +64,7 @@ func walk_path(path: str) i32 {
 
         entry: str = listing[start:newline]
         if entry.len != 0 {
-            child_buf: *Buffer<u8> = path_join(path, entry_name(entry))
+            child_buf: *Buffer<u8> = path.join(mem.default_allocator(), root, path.basename(entry))
             if child_buf == nil {
                 return 93
             }
@@ -98,7 +75,7 @@ func walk_path(path: str) i32 {
             if entry_is_dir(entry) {
                 status = walk_path(child_path)
             } else {
-                if io.write_line(child_path) != 0 {
+                if errors.is_err(io.write_line(child_path)) {
                     mem.buffer_free<u8>(child_buf)
                     return 1
                 }

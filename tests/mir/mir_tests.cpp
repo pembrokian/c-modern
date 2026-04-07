@@ -110,6 +110,49 @@ void TestIfElseLoweringBranchesToMerge() {
     }
 }
 
+void TestLogicalShortCircuitLoweringUsesControlFlow() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "var hits: i32 = 0\n"
+        "\n"
+        "func hit() bool {\n"
+        "    hits = hits + 1\n"
+        "    return true\n"
+        "}\n"
+        "\n"
+        "func both(left: bool) bool {\n"
+        "    return left && hit()\n"
+        "}\n"
+        "\n"
+        "func either(left: bool) bool {\n"
+        "    return left || hit()\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("logical short-circuit lowering should succeed:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(*lowered.module);
+    if (dump.find("Block label=logical_and_rhs") == std::string::npos ||
+        dump.find("Block label=logical_and_short") == std::string::npos ||
+        dump.find("Block label=logical_or_rhs") == std::string::npos ||
+        dump.find("Block label=logical_or_short") == std::string::npos) {
+        Fail("logical short-circuit lowering should create dedicated rhs and short-circuit blocks");
+    }
+    if (dump.find("binary %v") != std::string::npos &&
+        (dump.find(" op=&&") != std::string::npos || dump.find(" op=||") != std::string::npos)) {
+        Fail("logical short-circuit lowering must not emit plain binary && or || instructions");
+    }
+    if (dump.find("Local name=%hidden.logical_and") == std::string::npos ||
+        dump.find("Local name=%hidden.logical_or") == std::string::npos) {
+        Fail("logical short-circuit lowering should materialize hidden bool result locals");
+    }
+    if (dump.find("call %v") == std::string::npos || dump.find("target=hit target_kind=function target_name=hit") == std::string::npos) {
+        Fail("logical short-circuit lowering should still lower the rhs call in its dedicated block");
+    }
+}
+
 void TestVariantSwitchLoweringSucceeds() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
@@ -3037,6 +3080,7 @@ void TestValidatorAcceptsDominatingBlockValue() {
 int main() {
     TestLoweringProducesDeterministicDump();
     TestIfElseLoweringBranchesToMerge();
+    TestLogicalShortCircuitLoweringUsesControlFlow();
     TestVariantSwitchLoweringSucceeds();
     TestVariantConstructorLoweringSucceeds();
     TestForEachAndDeferLoweringSucceed();

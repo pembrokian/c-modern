@@ -7,10 +7,6 @@ extern(c) func __mc_strings_trim_space_start(text: str) usize
 @private
 extern(c) func __mc_strings_trim_space_end(text: str) usize
 
-func byte_len(text: str) usize {
-    return text.len
-}
-
 func bytes(text: str) Slice<u8> {
     return Slice<u8>{ ptr: text.ptr, len: text.len }
 }
@@ -29,12 +25,13 @@ func find_byte(text: str, needle: u8) usize {
 }
 
 func trim_space(text: str) str {
+    // Space is the ASCII subset: space, tab, newline, and carriage return.
     start: usize = __mc_strings_trim_space_start(text)
-    end: usize = __mc_strings_trim_space_end(text)
-    if end < start {
+    content_end: usize = __mc_strings_trim_space_end(text)
+    if content_end < start {
         return text[0:0]
     }
-    return text[start:end]
+    return text[start:content_end]
 }
 
 func is_blank(text: str) bool {

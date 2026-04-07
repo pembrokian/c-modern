@@ -1374,6 +1374,12 @@ int main(int argc, char** argv) {
                           0,
                           "phase6 write");
 
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/stdlib/path_time_smoke.mc",
+                    work_root / "phase6_path_time_smoke_build",
+                    0,
+                    {});
+
     RunBuiltOutputFixture(mc_path,
                           source_root / "tests/stdlib/fmt_smoke.mc",
                           work_root / "phase6_fmt_smoke_build",
@@ -1841,6 +1847,30 @@ int main(int argc, char** argv) {
                                   7,
                                   {},
                                   {"define i32 @load(ptr noalias %arg.ptr)", "call i32 @load(ptr %local.value)"});
+
+    const std::filesystem::path short_circuit_source = work_root / "phase56_short_circuit.mc";
+    WriteFile(short_circuit_source,
+              "var hits: i32 = 0\n"
+              "\n"
+              "func hit() bool {\n"
+              "    hits = hits + 1\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    if false && hit() {\n"
+              "        hits = hits + 100\n"
+              "    }\n"
+              "    if true || hit() {\n"
+              "        return hits\n"
+              "    }\n"
+              "    return 77\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    short_circuit_source,
+                    work_root / "phase56_short_circuit_build",
+                    0,
+                    {});
 
     return 0;
 }
