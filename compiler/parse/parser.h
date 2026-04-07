@@ -1,6 +1,7 @@
 #ifndef C_MODERN_COMPILER_PARSE_PARSER_H_
 #define C_MODERN_COMPILER_PARSE_PARSER_H_
 
+#include <filesystem>
 #include <memory>
 
 #include "compiler/ast/ast.h"
@@ -16,7 +17,7 @@ struct ParseResult {
 
 ParseResult Parse(const mc::lex::LexResult& lexed_module,
                   const std::filesystem::path& file_path,
-                  support::DiagnosticSink& diagnostics);
+                  mc::support::DiagnosticSink& diagnostics);
 
 }  // namespace mc::parse
 

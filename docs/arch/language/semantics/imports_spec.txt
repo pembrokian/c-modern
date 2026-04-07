@@ -3,11 +3,14 @@ Modern C - Imports
 Purpose
 
 This document freezes the v0.2 import surface for Modern C.
-It exists to keep module acquisition, visibility, and ambiguity handling explicit and deterministic.
+It exists to keep module acquisition, visibility, and ambiguity handling
+explicit and deterministic.
 
 Authority and scope:
-- modules_spec.txt remains the broader module and interface-artifact authority
-- grammar_spec.txt remains the concrete syntax authority for import declarations
+- modules_spec.txt remains the broader module, visibility, and interface-
+	artifact authority
+- grammar_spec.txt remains the concrete syntax authority for import
+	declarations
 - this document freezes the source-level import rules that ordinary code relies on directly
 
 1. Core Rules
@@ -15,15 +18,24 @@ Authority and scope:
 Import rules:
 - imports are explicit
 - imports are acyclic
-- import resolution must produce exactly one module for each import
+- import resolution must produce exactly one visible module for each import
 - imports do not implicitly reexport imported names
 
 2. Visibility
 
 Rules:
-- importing a module makes only that module's exported surface available
-- private declarations in the imported module remain inaccessible
+- importing an ordinary module makes that module's non-private declarations
+	available
+- importing an `internal.mc` module is legal only when the importer shares the
+	same explicit package identity
+- `@private` declarations in the imported module remain inaccessible
 - imported names remain qualified according to the language's ordinary member qualification rules
+
+Direct-source rule:
+- direct-source workflows do not define package identity
+- because `internal.mc` legality depends on explicit package identity,
+	direct-source workflows must reject imports that would resolve to
+	`internal.mc`
 
 3. Disallowed Features In v0.2
 
@@ -32,14 +44,19 @@ Rules:
 - no hidden transitive imports
 - no source-level import aliases that rewrite canonical module identity
 - no first-match-wins ambiguity rule
+- no declaration-scoped package-private import tier
 
 4. Errors
 
 Rules:
 - missing imports are errors
-- duplicate matches are errors
+- duplicate visible matches are errors
 - import cycles are errors
+- cross-package imports of `internal.mc` are errors
 
 Bottom line:
 - imports are explicit, deterministic, and narrow
+- ordinary modules are public by default to legal importers
+- package-internal sharing exists only through `internal.mc` plus explicit
+	package identity
 - the source language does not hide package-manager behavior or namespace rewriting behind import syntax

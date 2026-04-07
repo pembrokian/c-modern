@@ -21,12 +21,14 @@ struct ProjectTargetTests {
 struct ProjectTarget {
     std::string name;
     std::string kind = "exe";
+    std::string package_name;
     std::filesystem::path root;
     std::string mode = "debug";
     std::string env = "hosted";
     std::string target;
     std::vector<std::string> links;
     std::vector<std::filesystem::path> module_search_paths;
+    std::unordered_map<std::string, std::vector<std::filesystem::path>> package_roots;
     std::string runtime_startup = "default";
     ProjectTargetTests tests;
 };
@@ -50,6 +52,9 @@ const ProjectTarget* SelectProjectTarget(const ProjectFile& project,
 std::vector<std::filesystem::path> ComputeProjectImportRoots(const ProjectFile& project,
                                                              const ProjectTarget& target,
                                                              const std::vector<std::filesystem::path>& cli_import_roots);
+
+std::optional<std::string> ResolveTargetPackageIdentity(const ProjectTarget& target,
+                                                        const std::filesystem::path& source_path);
 
 }  // namespace mc::driver
 

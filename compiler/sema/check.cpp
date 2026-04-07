@@ -44,6 +44,130 @@ enum class VisitState {
 
 using ImportedModules = std::unordered_map<std::string, Module>;
 
+struct ResolvedImportPath {
+    std::filesystem::path path;
+    std::optional<std::string> package_identity;
+};
+
+std::string JoinPaths(const std::vector<std::filesystem::path>& paths) {
+    std::ostringstream stream;
+    for (std::size_t index = 0; index < paths.size(); ++index) {
+        if (index > 0) {
+            stream << ", ";
+        }
+        stream << paths[index].generic_string();
+    }
+    return stream.str();
+}
+
+bool IsInternalModulePath(const std::filesystem::path& path) {
+    return path.filename() == "internal.mc";
+}
+
+bool HasPrivateAttribute(const std::vector<ast::Attribute>& attributes) {
+    return std::any_of(attributes.begin(), attributes.end(), [](const ast::Attribute& attribute) {
+        return attribute.name == "private";
+    });
+}
+
+std::string DeclDisplayName(const Decl& decl) {
+    switch (decl.kind) {
+        case Decl::Kind::kFunc:
+        case Decl::Kind::kExternFunc:
+        case Decl::Kind::kStruct:
+        case Decl::Kind::kEnum:
+        case Decl::Kind::kDistinct:
+        case Decl::Kind::kTypeAlias:
+            return decl.name;
+        case Decl::Kind::kConst:
+        case Decl::Kind::kVar:
+            return !decl.pattern.names.empty() ? decl.pattern.names.front() : std::string("<binding>");
+    }
+    return "<decl>";
+}
+
+std::optional<ResolvedImportPath> ResolveImportPathForCheck(const std::filesystem::path& importer_path,
+                                                            std::string_view module_name,
+                                                            const std::vector<std::filesystem::path>& import_roots,
+                                                            const std::optional<std::string>& importer_package_identity,
+                                                            const std::function<std::optional<std::string>(const std::filesystem::path&)>&
+                                                                package_identity_for_source,
+                                                            support::DiagnosticSink& diagnostics,
+                                                            const mc::support::SourceSpan& span) {
+    std::vector<std::filesystem::path> search_roots;
+    search_roots.reserve(import_roots.size() + 1);
+    search_roots.push_back(importer_path.parent_path());
+    for (const auto& root : import_roots) {
+        search_roots.push_back(root);
+    }
+
+    std::vector<std::filesystem::path> matches;
+    std::unordered_set<std::string> seen_matches;
+    std::optional<std::string> rejected_internal_reason;
+    std::optional<std::string> matched_package_identity;
+
+    for (const auto& root : search_roots) {
+        const std::filesystem::path candidate = std::filesystem::absolute(root / (std::string(module_name) + ".mc")).lexically_normal();
+        if (!std::filesystem::exists(candidate)) {
+            continue;
+        }
+        if (!seen_matches.insert(candidate.generic_string()).second) {
+            continue;
+        }
+
+        if (IsInternalModulePath(candidate)) {
+            if (!importer_package_identity.has_value()) {
+                rejected_internal_reason =
+                    "direct source mode does not support importing internal module: " + std::string(module_name);
+                continue;
+            }
+
+            const auto candidate_package_identity = package_identity_for_source
+                ? package_identity_for_source(candidate)
+                : std::nullopt;
+            if (!candidate_package_identity.has_value()) {
+                rejected_internal_reason = "unable to determine package identity for internal module: " + candidate.generic_string();
+                continue;
+            }
+            if (*candidate_package_identity != *importer_package_identity) {
+                rejected_internal_reason = "module " + std::string(module_name) + " is internal to package '" +
+                    *candidate_package_identity + "' and cannot be imported from package '" + *importer_package_identity + "'";
+                continue;
+            }
+            matched_package_identity = candidate_package_identity;
+        }
+
+        matches.push_back(candidate);
+    }
+
+    if (matches.size() == 1) {
+        return ResolvedImportPath {
+            .path = matches.front(),
+            .package_identity = matched_package_identity,
+        };
+    }
+
+    if (matches.empty()) {
+        diagnostics.Report({
+            .file_path = importer_path,
+            .span = span,
+            .severity = DiagnosticSeverity::kError,
+            .message = rejected_internal_reason.has_value()
+                ? *rejected_internal_reason
+                : "unable to resolve import module: " + std::string(module_name),
+        });
+        return std::nullopt;
+    }
+
+    diagnostics.Report({
+        .file_path = importer_path,
+        .span = span,
+        .severity = DiagnosticSeverity::kError,
+        .message = "ambiguous import module '" + std::string(module_name) + "' matched multiple roots: " + JoinPaths(matches),
+    });
+    return std::nullopt;
+}
+
 std::size_t ProcedureParamCount(const Type& type) {
     if (type.kind != Type::Kind::kProcedure || type.metadata.empty()) {
         return 0;
@@ -132,13 +256,22 @@ class Checker {
   public:
     Checker(const ast::SourceFile& source_file,
             const std::filesystem::path& file_path,
+                        std::optional<std::string> current_package_identity,
             const ImportedModules* imported_modules,
             support::DiagnosticSink& diagnostics)
-        : source_file_(source_file), file_path_(file_path), imported_modules_(imported_modules), diagnostics_(diagnostics) {}
+                : source_file_(source_file),
+                    file_path_(file_path),
+                    current_package_identity_(std::move(current_package_identity)),
+                    imported_modules_(imported_modules),
+                    diagnostics_(diagnostics) {}
 
     CheckResult Run() {
         auto module = std::make_unique<Module>();
         module_ = module.get();
+                module_->module_kind = source_file_.module_kind;
+                if (current_package_identity_.has_value()) {
+                        module_->package_identity = *current_package_identity_;
+                }
 
         for (const auto& import_decl : source_file_.imports) {
             module_->imports.push_back(import_decl.module_name);
@@ -152,13 +285,15 @@ class Checker {
         //      Type and function lookup before this point is incomplete.
         //   3. ValidateTypeDecls   — validates struct/enum/distinct/alias fields
         //      and triggers ComputeTypeLayouts.
-        //   4. ValidateGlobals     — checks global const/var declarations.
-        //   5. ValidateFunctions   — type-checks function bodies using the fully
+        //   4. ValidateVisibleDecls — validates @private and public surface use.
+        //   5. ValidateGlobals     — checks global const/var declarations.
+        //   6. ValidateFunctions   — type-checks function bodies using the fully
         //      populated module summary.
         SeedImportedSymbols();
         CollectTopLevelDecls();
-        ValidateExportBlock();
+        ValidateDeclVisibility();
         ValidateTypeDecls();
+        ValidateVisibleDeclTypes();
         ValidateGlobals();
         ValidateFunctionSignatures();
         ValidateFunctions();
@@ -578,19 +713,141 @@ class Checker {
         }
     }
 
-    void ValidateExportBlock() {
-        if (!source_file_.has_export_block) {
-            return;
-        }
+    void ValidateDeclVisibility() {
+        for (const auto& decl : source_file_.decls) {
+            bool saw_private = false;
+            for (const auto& attribute : decl.attributes) {
+                if (attribute.name != "private") {
+                    continue;
+                }
+                if (!attribute.args.empty()) {
+                    Report(attribute.span, "@private does not take arguments");
+                }
+                if (saw_private) {
+                    Report(attribute.span, "duplicate @private attribute on declaration " + DeclDisplayName(decl));
+                    continue;
+                }
+                saw_private = true;
+            }
 
-        std::unordered_set<std::string> seen;
-        for (const auto& name : source_file_.export_block.names) {
-            if (!seen.insert(name).second) {
-                Report(source_file_.export_block.span, "duplicate export name: " + name);
+            if (!saw_private) {
                 continue;
             }
-            if (!value_symbols_.contains(name) && !type_symbols_.contains(name)) {
-                Report(source_file_.export_block.span, "export name is not declared in module: " + name);
+
+            switch (decl.kind) {
+                case Decl::Kind::kFunc:
+                case Decl::Kind::kExternFunc:
+                    if (!decl.name.empty()) {
+                        private_value_names_.insert(decl.name);
+                    }
+                    break;
+                case Decl::Kind::kConst:
+                case Decl::Kind::kVar:
+                    for (const auto& name : decl.pattern.names) {
+                        private_value_names_.insert(name);
+                    }
+                    break;
+                case Decl::Kind::kStruct:
+                case Decl::Kind::kEnum:
+                case Decl::Kind::kDistinct:
+                case Decl::Kind::kTypeAlias:
+                    if (!decl.name.empty()) {
+                        private_type_names_.insert(decl.name);
+                    }
+                    break;
+            }
+        }
+    }
+
+    void CollectVisiblePrivateTypeReferences(const Type& type,
+                                             const std::vector<std::string>& local_type_params,
+                                             std::unordered_set<std::string>& leaked_private_types) const {
+        for (const auto& subtype : type.subtypes) {
+            CollectVisiblePrivateTypeReferences(subtype, local_type_params, leaked_private_types);
+        }
+
+        if (type.kind != Type::Kind::kNamed || type.name.empty() || type.name.find('.') != std::string::npos) {
+            return;
+        }
+        if (IsBuiltinNamedType(type.name) ||
+            std::find(local_type_params.begin(), local_type_params.end(), type.name) != local_type_params.end()) {
+            return;
+        }
+        if (private_type_names_.contains(type.name)) {
+            leaked_private_types.insert(type.name);
+        }
+    }
+
+    void ReportVisiblePrivateTypeLeaks(const Decl& decl,
+                                       std::string_view declaration_kind,
+                                       const std::unordered_set<std::string>& leaked_private_types) {
+        for (const auto& type_name : leaked_private_types) {
+            Report(decl.span,
+                   "public " + std::string(declaration_kind) + " " + DeclDisplayName(decl) +
+                       " references private type " + type_name);
+        }
+    }
+
+    void ValidateVisibleDeclTypes() {
+        for (const auto& decl : source_file_.decls) {
+            if (HasPrivateAttribute(decl.attributes)) {
+                continue;
+            }
+
+            std::unordered_set<std::string> leaked_private_types;
+            switch (decl.kind) {
+                case Decl::Kind::kFunc:
+                case Decl::Kind::kExternFunc:
+                    for (const auto& param : decl.params) {
+                        if (param.type != nullptr) {
+                            CollectVisiblePrivateTypeReferences(SemanticTypeFromAst(param.type.get(), decl.type_params),
+                                                               decl.type_params,
+                                                               leaked_private_types);
+                        }
+                    }
+                    for (const auto& return_type : decl.return_types) {
+                        if (return_type != nullptr) {
+                            CollectVisiblePrivateTypeReferences(SemanticTypeFromAst(return_type.get(), decl.type_params),
+                                                               decl.type_params,
+                                                               leaked_private_types);
+                        }
+                    }
+                    ReportVisiblePrivateTypeLeaks(decl, "function", leaked_private_types);
+                    break;
+                case Decl::Kind::kConst:
+                case Decl::Kind::kVar:
+                    if (decl.type_ann != nullptr) {
+                        CollectVisiblePrivateTypeReferences(SemanticTypeFromAst(decl.type_ann.get(), {}), {}, leaked_private_types);
+                    }
+                    ReportVisiblePrivateTypeLeaks(decl, decl.kind == Decl::Kind::kConst ? "global" : "global", leaked_private_types);
+                    break;
+                case Decl::Kind::kStruct:
+                case Decl::Kind::kEnum:
+                case Decl::Kind::kDistinct:
+                case Decl::Kind::kTypeAlias:
+                    for (const auto& field : decl.fields) {
+                        if (field.type != nullptr) {
+                            CollectVisiblePrivateTypeReferences(SemanticTypeFromAst(field.type.get(), decl.type_params),
+                                                               decl.type_params,
+                                                               leaked_private_types);
+                        }
+                    }
+                    for (const auto& variant : decl.variants) {
+                        for (const auto& field : variant.payload_fields) {
+                            if (field.type != nullptr) {
+                                CollectVisiblePrivateTypeReferences(SemanticTypeFromAst(field.type.get(), decl.type_params),
+                                                                   decl.type_params,
+                                                                   leaked_private_types);
+                            }
+                        }
+                    }
+                    if (decl.aliased_type != nullptr) {
+                        CollectVisiblePrivateTypeReferences(SemanticTypeFromAst(decl.aliased_type.get(), decl.type_params),
+                                                           decl.type_params,
+                                                           leaked_private_types);
+                    }
+                    ReportVisiblePrivateTypeLeaks(decl, "type", leaked_private_types);
+                    break;
             }
         }
     }
@@ -1075,6 +1332,10 @@ class Checker {
         for (std::size_t index = 0; index < decl.params.size() && index < signature.param_types.size(); ++index) {
             bool saw_noalias = false;
             for (const auto& attribute : decl.params[index].attributes) {
+                if (attribute.name == "private") {
+                    Report(attribute.span, "@private is only supported on top-level declarations");
+                    continue;
+                }
                 if (attribute.name != "noalias") {
                     continue;
                 }
@@ -1291,7 +1552,11 @@ class Checker {
             }
             return global->type;
         }
-        Report(expr.span, "module " + expr.text + " has no exported member named " + expr.secondary_text);
+        if (imported_module.hidden_value_names.contains(expr.secondary_text) || imported_module.hidden_type_names.contains(expr.secondary_text)) {
+            Report(expr.span, "module " + expr.text + " member " + expr.secondary_text + " is private");
+        } else {
+            Report(expr.span, "module " + expr.text + " has no visible member named " + expr.secondary_text);
+        }
         return UnknownType();
     }
 
@@ -2081,6 +2346,7 @@ class Checker {
 
     const ast::SourceFile& source_file_;
     std::filesystem::path file_path_;
+    std::optional<std::string> current_package_identity_;
     const ImportedModules* imported_modules_;
     support::DiagnosticSink& diagnostics_;
     Module* module_ = nullptr;
@@ -2088,6 +2354,8 @@ class Checker {
     std::unordered_map<std::string, Decl::Kind> type_symbols_;
     std::unordered_map<std::string, ValueBinding> global_symbols_;
     std::unordered_map<std::string, ConstValue> const_eval_cache_;
+    std::unordered_set<std::string> private_value_names_;
+    std::unordered_set<std::string> private_type_names_;
     std::vector<std::unordered_map<std::string, ValueBinding>> scopes_;
     const FunctionSignature* current_function_ = nullptr;
     int loop_depth_ = 0;
@@ -2119,14 +2387,27 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
                                  const std::filesystem::path& file_path,
                                  const CheckOptions& options,
                                  support::DiagnosticSink& diagnostics,
-                                 std::unordered_map<std::filesystem::path, Module>& exported_cache,
+                                 std::unordered_map<std::filesystem::path, Module>& visible_cache,
                                  std::unordered_map<std::filesystem::path, VisitState>& visit_state) {
     const std::filesystem::path normalized_path = std::filesystem::absolute(file_path).lexically_normal();
-    const auto cached = exported_cache.find(normalized_path);
-    if (cached != exported_cache.end()) {
+    const auto cached = visible_cache.find(normalized_path);
+    if (cached != visible_cache.end()) {
         return {
             .module = std::make_unique<Module>(cached->second),
             .ok = !diagnostics.HasErrors(),
+        };
+    }
+
+    if (source_file.module_kind == ast::SourceFile::ModuleKind::kInternal && !options.current_package_identity.has_value()) {
+        diagnostics.Report({
+            .file_path = normalized_path,
+            .span = source_file.span,
+            .severity = DiagnosticSeverity::kError,
+            .message = "direct source mode does not support internal module roots",
+        });
+        return {
+            .module = std::make_unique<Module>(),
+            .ok = false,
         };
     }
 
@@ -2157,16 +2438,18 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
         }
     } else {
         for (const auto& import_decl : source_file.imports) {
-            const auto import_path = mc::support::ResolveImportPath(normalized_path,
-                                        import_decl.module_name,
-                                        options.import_roots,
-                                        diagnostics,
-                                        import_decl.span);
-            if (!import_path.has_value()) {
+            const auto resolved_import = ResolveImportPathForCheck(normalized_path,
+                                                                   import_decl.module_name,
+                                                                   options.import_roots,
+                                                                   options.current_package_identity,
+                                                                   options.package_identity_for_source,
+                                                                   diagnostics,
+                                                                   import_decl.span);
+            if (!resolved_import.has_value()) {
                 continue;
             }
 
-            const auto import_state = visit_state.find(*import_path);
+            const auto import_state = visit_state.find(resolved_import->path);
             if (import_state != visit_state.end() && import_state->second == VisitState::kVisiting) {
                 diagnostics.Report({
                     .file_path = normalized_path,
@@ -2177,29 +2460,36 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
                 continue;
             }
 
-            Module exported_module;
-            const auto found_exported = exported_cache.find(*import_path);
-            if (found_exported != exported_cache.end()) {
-                exported_module = found_exported->second;
+            Module visible_module;
+            const auto found_visible = visible_cache.find(resolved_import->path);
+            if (found_visible != visible_cache.end()) {
+                visible_module = found_visible->second;
             } else {
-                auto parsed_import = ParseFile(*import_path, diagnostics);
+                auto parsed_import = ParseFile(resolved_import->path, diagnostics);
                 if (parsed_import == nullptr) {
                     continue;
                 }
-                const auto checked_import = CheckProgramInternal(*parsed_import, *import_path, options, diagnostics, exported_cache, visit_state);
+                CheckOptions child_options = options;
+                child_options.current_package_identity = resolved_import->package_identity;
+                const auto checked_import = CheckProgramInternal(*parsed_import,
+                                                                 resolved_import->path,
+                                                                 child_options,
+                                                                 diagnostics,
+                                                                 visible_cache,
+                                                                 visit_state);
                 if (checked_import.module != nullptr) {
-                    exported_module = BuildExportedModuleSurface(*checked_import.module, *parsed_import);
+                    visible_module = BuildImportVisibleModuleSurface(*checked_import.module, *parsed_import);
                 }
             }
 
-            imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(exported_module, import_decl.module_name);
+            imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(visible_module, import_decl.module_name);
         }
     }
 
     const ImportedModules* imported_modules_ptr = imported_modules.empty() ? nullptr : &imported_modules;
-    auto checked = Checker(source_file, normalized_path, imported_modules_ptr, diagnostics).Run();
-    Module exported_module = checked.module != nullptr ? BuildExportedModuleSurface(*checked.module, source_file) : Module {};
-    exported_cache[normalized_path] = exported_module;
+    auto checked = Checker(source_file, normalized_path, options.current_package_identity, imported_modules_ptr, diagnostics).Run();
+    Module visible_module = checked.module != nullptr ? BuildImportVisibleModuleSurface(*checked.module, source_file) : Module {};
+    visible_cache[normalized_path] = visible_module;
     visit_state[normalized_path] = VisitState::kDone;
     return checked;
 }
@@ -2210,9 +2500,9 @@ CheckResult CheckProgram(const ast::SourceFile& source_file,
                          const std::filesystem::path& file_path,
                          const CheckOptions& options,
                          support::DiagnosticSink& diagnostics) {
-    std::unordered_map<std::filesystem::path, Module> exported_cache;
+    std::unordered_map<std::filesystem::path, Module> visible_cache;
     std::unordered_map<std::filesystem::path, VisitState> visit_state;
-    return CheckProgramInternal(source_file, file_path, options, diagnostics, exported_cache, visit_state);
+    return CheckProgramInternal(source_file, file_path, options, diagnostics, visible_cache, visit_state);
 }
 
 CheckResult CheckProgram(const ast::SourceFile& source_file,
@@ -2224,7 +2514,7 @@ CheckResult CheckProgram(const ast::SourceFile& source_file,
 CheckResult CheckSourceFile(const ast::SourceFile& source_file,
                             const std::filesystem::path& file_path,
                             support::DiagnosticSink& diagnostics) {
-    return Checker(source_file, file_path, nullptr, diagnostics).Run();
+    return Checker(source_file, file_path, std::nullopt, nullptr, diagnostics).Run();
 }
 
 const FunctionSignature* FindFunctionSignature(const Module& module, std::string_view name) {

@@ -1,0 +1,3 @@
+SemanticModule
+  Import name=internal
+  Function name=main params=[] returns=[i32]

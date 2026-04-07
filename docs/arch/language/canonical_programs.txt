@@ -12,6 +12,10 @@ Selection criteria:
 - Pressure on tagged unions and error handling
 - Pressure on interop and low-level memory semantics
 
+Visibility note:
+- top-level declarations shown below are public to legal importers by default
+    unless marked `@private`
+
 1. Hello, stdout
 
 Purpose:
@@ -19,8 +23,6 @@ Purpose:
 - Exercise import syntax, string literals, and explicit I/O
 
 Sketch:
-
-export { main }
 
 import io
 
@@ -45,8 +47,6 @@ Purpose:
 - Exercise allocator APIs, slices, defer, and failure handling
 
 Sketch:
-
-export { read_file }
 
 import fs
 import mem

@@ -1,5 +1,3 @@
-export { main }
-
 import helper_types
 
 func main() i32 {

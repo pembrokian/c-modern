@@ -14,8 +14,8 @@ TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,
                                         std::string_view module_name,
                                         const std::unordered_set<std::string>& local_type_names);
 bool EquivalentTypeDeclSummary(const TypeDeclSummary& left, const TypeDeclSummary& right);
-Module BuildExportedModuleSurface(const Module& module,
-                                  const ast::SourceFile& source_file);
+Module BuildImportVisibleModuleSurface(const Module& module,
+                                       const ast::SourceFile& source_file);
 Module RewriteImportedModuleSurfaceTypes(const Module& module,
                                          std::string_view module_name);
 

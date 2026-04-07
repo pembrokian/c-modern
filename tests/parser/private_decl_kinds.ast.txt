@@ -1,0 +1,23 @@
+SourceFile
+  DistinctDecl name=Counter
+    Attribute name=private
+    aliasedType:
+      NamedType name=i32
+  TypeAliasDecl name=Alias
+    Attribute name=private
+    aliasedType:
+      NamedType name=Counter
+  ConstDecl hasInitializer=true
+    Attribute name=private
+    NamePattern names=[SECRET]
+    type:
+      NamedType name=Alias
+    values:
+      LiteralExpr text=1 kind=int_lit
+  VarDecl hasInitializer=true
+    Attribute name=private
+    NamePattern names=[scratch]
+    type:
+      NamedType name=Alias
+    values:
+      LiteralExpr text=2 kind=int_lit

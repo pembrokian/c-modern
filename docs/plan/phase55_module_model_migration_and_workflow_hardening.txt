@@ -1,0 +1,139 @@
+Phase 55 -- Module Model Migration And Workflow Hardening
+=========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Migrate the repository to the new module model, prove the package-aware import
+workflow on real project shapes, and close the reset series with deterministic
+stdlib, example, fixture, and tooling coverage.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- After Phase 52 through Phase 54, the compiler and build graph should already
+  understand the new contract.
+- The repository will still contain one large remaining risk: most checked-in
+  sources, tests, and examples will still encode the old export-block model or
+  lack real pressure on `internal.mc` and package identity.
+- The reset therefore needs one migration and hardening wave so the repository
+  baseline itself stops teaching the old model.
+
+Problem being solved
+--------------------
+- A contract reset is not complete if the repository's own stdlib, examples,
+  canonical programs, and workflow tests continue to exercise the superseded
+  source model.
+- The new model also needs real project pressure, not only parser or tool-only
+  proofs, especially around package identity and `internal.mc` import legality.
+- The repository needs one final phase that converts the checked-in source
+  corpus and proves ordinary build and test workflows under the migrated model.
+
+Core rule
+---------
+- Migrate once, after the compiler and `.mci` truth are stable.
+- Prefer real project and stdlib shapes over synthetic migration-only fixtures.
+- Use `internal.mc` only where package sharing is real; do not create internal
+  modules merely to demonstrate the feature.
+- Keep the workflow deterministic and reviewable while the repository-wide
+  syntax churn lands.
+
+Chosen slice for this phase
+---------------------------
+Repository-wide source migration plus focused workflow hardening and proof.
+
+Expected implementation areas
+-----------------------------
+- remove `export {}` blocks from stdlib modules, examples, canonical programs,
+  and tests
+- add `@private` annotations where the new default-public model would otherwise
+  leak implementation-only declarations
+- introduce `internal.mc` only for real package-sharing boundaries discovered
+  during migration, especially in richer project fixtures if they benefit from
+  one package-internal companion module
+- update project manifests or target metadata with the explicit package-
+  identity fields chosen in Phase 52
+- refresh tool tests to prove same-package internal imports, rejected cross-
+  package imports, and deterministic rebuild behavior after repository-wide
+  migration
+- refresh documentation that teaches module authoring, project layout, or
+  separate compilation
+
+What this phase should try to prove
+-----------------------------------
+- The stdlib and canonical examples remain readable under public-by-default and
+  use `@private` only when there is real implementation hiding to preserve.
+- The repository has at least one honest real project or richer tool fixture
+  that uses `internal.mc` for actual package-internal sharing.
+- Ordinary `mc build`, `mc run`, `mc test`, and direct-source checks remain
+  deterministic after the source migration.
+- Documentation, examples, and fixtures now all teach one module model instead
+  of half-preserving the old export-block story.
+
+Preferred pressure points
+-------------------------
+1. Stdlib migration where helper declarations should become `@private` instead
+   of silently public.
+2. Canonical-program migration so the published language examples match the new
+   syntax.
+3. One richer project proof that uses explicit package identity and
+   package-internal sharing honestly.
+4. Tool regressions for same-package and cross-package `internal.mc` imports.
+5. Rebuild and rerun reuse after broad repository migration on one build
+   directory.
+
+Deliverables
+------------
+- source migration across `/Users/ro/dev/c_modern/stdlib/`,
+  `/Users/ro/dev/c_modern/examples/`, and relevant fixture directories under
+  `/Users/ro/dev/c_modern/tests/`
+- workflow regressions under
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` and any narrower
+  owning test layers needed to prove the migrated module model
+- documentation refresh in `/Users/ro/dev/c_modern/README.md`,
+  `/Users/ro/dev/c_modern/compiler/README.md`, and architecture docs whose user
+  guidance still references export blocks or package-free visibility rules
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt` and
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt` if the migration closes
+  or sharpens any remaining follow-up items
+
+Suggested execution order
+-------------------------
+1. Migrate the stdlib and canonical examples first so the repository's primary
+   teaching surface matches the new contract.
+2. Migrate parser, sema, and tool fixtures next so regression coverage reflects
+   the new syntax and import rules.
+3. Land one richer project or tool proof that exercises explicit package
+   identity and `internal.mc` honestly.
+4. Re-run deterministic build, run, test, and rerun coverage on the migrated
+   repository.
+5. Close or restate any follow-up work in backlog or decision-log form rather
+   than leaving module-reset ambiguity scattered across comments and tests.
+
+Exit criteria
+-------------
+- the checked-in repository source corpus no longer depends on `export {}`
+- stdlib, examples, and fixtures teach the new visibility model consistently
+- at least one real project or richer workflow proof exercises explicit
+  package identity and `internal.mc` import legality
+- ordinary repository workflow remains deterministic after the migration
+
+Non-goals
+---------
+- new language features beyond the agreed module-model reset
+- speculative package refactors whose only purpose is to use `internal.mc`
+- unrelated stdlib or runtime API expansion
+- reopening the core contract already settled in Phase 52
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 55 stands alone as the migration and hardening capstone for the module
+  reset series.
+- The phase is explicit that the repository must teach and prove one module
+  model at the end of the series, not keep the old one alive in examples or
+  fixtures.

@@ -1,0 +1,141 @@
+Phase 53 -- Default-Public And Internal-Module Frontend Rewrite
+===============================================================
+
+Status
+------
+COMPLETED
+
+Completion note
+---------------
+- Export-block AST/parser/sema support was removed.
+- `@private` now drives declaration-level hiding in parser and sema.
+- `internal.mc` is classified in the frontend and enforced through package-aware semantic import checks.
+- Parser and sema fixture coverage now exercises cutover diagnostics, private visibility, and internal-module legality.
+
+Purpose
+-------
+Replace export-block parsing and exported-surface sema filtering with the new
+source model: ordinary top-level declarations are public by default,
+`@private` hides declarations, and `internal.mc` is a package-internal module
+kind with import legality enforced from explicit package identity.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The current parser has first-class syntax support for `export {}` blocks.
+- The current AST carries export-block state as part of the module structure.
+- The current sema pass validates export blocks and constructs exported-only
+  module surfaces for imports and `.mci` generation.
+- Those codepaths are not small optional helpers; they are the current
+  visibility contract.
+- Once Phase 52 resets the docs, the compiler needs one dedicated rewrite wave
+  that removes those assumptions cleanly rather than letting them linger as
+  dead compatibility infrastructure.
+
+Problem being solved
+--------------------
+- The compiler currently cannot represent the proposed source truth because it
+  assumes visibility comes from one module-level export list.
+- The new model needs visibility decisions to attach to declarations and module
+  kind instead: public-by-default for ordinary declarations, explicit
+  `@private`, and package-internal access only for `internal.mc`.
+- Without a focused frontend and sema rewrite, later `.mci` or workflow work
+  would still be built on obsolete AST and semantic assumptions.
+
+Core rule
+---------
+- Remove export-block semantics completely; do not preserve them as hidden
+  deprecated state in the AST.
+- Keep the declaration-level visibility split binary: public by default or
+  `@private`.
+- Keep package-sharing module-scoped: the only special module kind is
+  `internal.mc`.
+- Keep semantic and diagnostic behavior deterministic while the internal model
+  changes.
+
+Chosen slice for this phase
+---------------------------
+Parser, AST, sema, and direct semantic regression updates needed to make the
+new visibility model compile and diagnose correctly.
+
+Expected implementation areas
+-----------------------------
+- parser removal of top-level `export {}` handling
+- parser admission of `@private` on supported top-level declarations
+- AST replacement of export-block state with declaration visibility metadata
+  plus module-kind metadata for ordinary versus `internal` modules
+- sema validation for illegal `@private` placements and duplicate visibility
+  attributes
+- sema classification of visible versus hidden declarations without an export
+  list
+- import-legality checks for `internal.mc` based on package identity supplied
+  by the driver or direct-source mode rules chosen in Phase 52
+- deterministic diagnostic updates for private access, illegal internal import,
+  and any stale export-block syntax
+
+What this phase should try to prove
+-----------------------------------
+- The compiler can parse and semantically check the new source model without
+  carrying old export-block metadata.
+- `@private` behaves as a narrow declaration-level hiding tool instead of the
+  first step toward a larger visibility lattice.
+- `internal.mc` access is enforced at the correct boundary: importer package
+  identity, not textually nearby paths.
+- Parser and sema diagnostics make the cutover obvious when old `export {}`
+  syntax is encountered.
+
+Preferred pressure points
+-------------------------
+1. One parser-fixture wave that removes export blocks from representative
+   modules and adds `@private` coverage.
+2. One sema-fixture wave for public-by-default access across ordinary imports.
+3. One sema-fixture wave for `internal.mc` allowed and rejected imports.
+4. Deterministic diagnostics for stale syntax and illegal `@private` use.
+5. Narrow direct-source proofs for whatever `internal.mc` rule Phase 52 admits.
+
+Deliverables
+------------
+- parser and AST updates under `/Users/ro/dev/c_modern/compiler/parse/` and
+  `/Users/ro/dev/c_modern/compiler/ast/`
+- sema updates under `/Users/ro/dev/c_modern/compiler/sema/` that remove
+  export-block validation and classify visibility under the new rules
+- updated parser and sema fixtures under `/Users/ro/dev/c_modern/tests/parser/`
+  and `/Users/ro/dev/c_modern/tests/sema/`
+- bounded documentation refresh in `/Users/ro/dev/c_modern/compiler/README.md`
+  or nearby developer notes only if the compiler-owner workflow changes
+
+Suggested execution order
+-------------------------
+1. Remove export-block parsing and AST fields first so later code cannot keep
+   leaning on stale state.
+2. Add `@private` parsing and AST representation.
+3. Introduce module-kind classification for ordinary versus `internal` source
+   files.
+4. Rework sema visibility and import-legality checks to use declaration flags
+   plus package identity.
+5. Refresh parser and sema fixtures, including stale-syntax diagnostics.
+
+Exit criteria
+-------------
+- no parser or AST path still treats `export {}` as a live visibility feature
+- sema computes declaration visibility without an export list
+- legal and illegal `internal.mc` imports are enforced deterministically from
+  package identity or the explicit direct-source rule
+- the parser and sema fixture suites prove the new syntax and visibility model
+  at the owning layers
+
+Non-goals
+---------
+- `.mci` schema redesign
+- rebuild invalidation redesign
+- broad stdlib or example migration beyond the narrow fixture coverage needed
+  for parser and sema truth
+- compatibility parsing for old export blocks after the cutover point
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 53 stands alone as the compiler-front-end and sema rewrite wave.
+- The phase is explicit that exported-surface filtering is being removed, not
+  merely hidden behind new syntax.

@@ -4,23 +4,6 @@
 
 namespace mc::parse {
 
-ExportBlock Parser::ParseExportBlock(mc::support::SourcePosition start) {
-    ExportBlock block;
-    block.span.begin = start;
-    Consume(TokenKind::kLBrace, "expected '{' after export");
-    if (!Check(TokenKind::kRBrace)) {
-        do {
-            const auto name = ParseIdentifier("expected export name");
-            if (name.has_value()) {
-                block.names.push_back(*name);
-            }
-        } while (Match(TokenKind::kComma));
-    }
-    const auto* close = Consume(TokenKind::kRBrace, "expected '}' after export block");
-    block.span.end = close != nullptr ? close->span.end : Current().span.end;
-    return block;
-}
-
 ImportDecl Parser::ParseImportDecl(mc::support::SourcePosition start) {
     ImportDecl decl;
     decl.span.begin = start;
@@ -107,6 +90,24 @@ std::optional<Decl> Parser::ParseTopLevelDecl() {
     if (!attributes.empty()) {
         SkipNewlines();
     }
+    if (Match(TokenKind::kExport)) {
+        ReportError(Previous(), "export blocks are no longer supported; top-level declarations are public by default and @private hides them");
+        if (Match(TokenKind::kLBrace)) {
+            int depth = 1;
+            while (!AtEnd() && depth > 0) {
+                if (Match(TokenKind::kLBrace)) {
+                    ++depth;
+                    continue;
+                }
+                if (Match(TokenKind::kRBrace)) {
+                    --depth;
+                    continue;
+                }
+                Advance();
+            }
+        }
+        return std::nullopt;
+    }
     if (Match(TokenKind::kExtern)) {
         return ParseExternFuncDecl(std::move(attributes), Previous().span.begin);
     }
@@ -120,16 +121,16 @@ std::optional<Decl> Parser::ParseTopLevelDecl() {
         return ParseEnumDecl(std::move(attributes), Previous().span.begin);
     }
     if (Match(TokenKind::kDistinct)) {
-        return ParseDistinctDecl(Previous().span.begin);
+        return ParseDistinctDecl(std::move(attributes), Previous().span.begin);
     }
     if (Match(TokenKind::kType)) {
-        return ParseTypeAliasDecl(Previous().span.begin);
+        return ParseTypeAliasDecl(std::move(attributes), Previous().span.begin);
     }
     if (Match(TokenKind::kVar)) {
-        return ParseBindingDecl(Decl::Kind::kVar, Previous().span.begin, true);
+        return ParseBindingDecl(std::move(attributes), Decl::Kind::kVar, Previous().span.begin, true);
     }
     if (Match(TokenKind::kConst)) {
-        return ParseBindingDecl(Decl::Kind::kConst, Previous().span.begin, false);
+        return ParseBindingDecl(std::move(attributes), Decl::Kind::kConst, Previous().span.begin, false);
     }
 
     ReportError(Current(), "expected top-level declaration");
@@ -314,9 +315,11 @@ std::optional<Decl> Parser::ParseEnumDecl(std::vector<Attribute> attributes, mc:
     return decl;
 }
 
-std::optional<Decl> Parser::ParseDistinctDecl(mc::support::SourcePosition start) {
+std::optional<Decl> Parser::ParseDistinctDecl(std::vector<Attribute> attributes,
+                                              mc::support::SourcePosition start) {
     Decl decl;
     decl.kind = Decl::Kind::kDistinct;
+    decl.attributes = std::move(attributes);
     decl.span.begin = start;
     const auto name = ParseIdentifier("expected distinct type name");
     if (name.has_value()) {
@@ -328,9 +331,11 @@ std::optional<Decl> Parser::ParseDistinctDecl(mc::support::SourcePosition start)
     return decl;
 }
 
-std::optional<Decl> Parser::ParseTypeAliasDecl(mc::support::SourcePosition start) {
+std::optional<Decl> Parser::ParseTypeAliasDecl(std::vector<Attribute> attributes,
+                                               mc::support::SourcePosition start) {
     Decl decl;
     decl.kind = Decl::Kind::kTypeAlias;
+    decl.attributes = std::move(attributes);
     decl.span.begin = start;
     const auto name = ParseIdentifier("expected type alias name");
     if (name.has_value()) {
@@ -345,11 +350,13 @@ std::optional<Decl> Parser::ParseTypeAliasDecl(mc::support::SourcePosition start
     return decl;
 }
 
-std::optional<Decl> Parser::ParseBindingDecl(Decl::Kind kind,
+std::optional<Decl> Parser::ParseBindingDecl(std::vector<Attribute> attributes,
+                                             Decl::Kind kind,
                                              mc::support::SourcePosition start,
                                              bool allow_storage_without_initializer) {
     Decl decl;
     decl.kind = kind;
+    decl.attributes = std::move(attributes);
     decl.span.begin = start;
     auto binding = ParseBindingTail(allow_storage_without_initializer,
                                     kind == Decl::Kind::kConst ? "const declaration requires initializer"

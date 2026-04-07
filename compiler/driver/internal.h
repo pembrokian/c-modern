@@ -71,6 +71,7 @@ struct ModuleBuildState {
 
 struct CompileNode {
     std::string module_name;
+    std::string package_identity;
     std::filesystem::path source_path;
     mc::parse::ParseResult parse_result;
     std::vector<std::pair<std::string, std::filesystem::path>> imports;

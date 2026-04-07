@@ -531,16 +531,8 @@ std::string DumpSourceFile(const SourceFile& source_file) {
     std::ostringstream stream;
     WriteLine(stream, 0, "SourceFile");
 
-    if (source_file.has_export_block) {
-        WriteIndent(stream, 1);
-        stream << "ExportBlock names=[";
-        for (std::size_t index = 0; index < source_file.export_block.names.size(); ++index) {
-            if (index > 0) {
-                stream << ", ";
-            }
-            stream << source_file.export_block.names[index];
-        }
-        stream << "]\n";
+    if (source_file.module_kind == SourceFile::ModuleKind::kInternal) {
+        WriteLine(stream, 1, "ModuleKind=internal");
     }
 
     for (const auto& import_decl : source_file.imports) {

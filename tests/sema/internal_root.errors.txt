@@ -1,0 +1,1 @@
+direct source mode does not support internal module roots

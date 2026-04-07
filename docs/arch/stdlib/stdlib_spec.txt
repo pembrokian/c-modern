@@ -156,7 +156,8 @@ Toolchain companion layer:
 
 Recommended rule:
 - no hidden prelude beyond language built-ins
-- importing a module brings its exported names into scope according to the language's import rules
+- importing a module brings its non-private legal surface into scope according
+	to the language's import rules
 - docs and examples should import the modules they use explicitly
 
 This keeps the library shape visible in real programs.

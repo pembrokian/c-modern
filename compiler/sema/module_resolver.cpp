@@ -8,6 +8,42 @@
 namespace mc::sema {
 namespace {
 
+bool DeclHasPrivateAttribute(const ast::Decl& decl) {
+    return std::any_of(decl.attributes.begin(), decl.attributes.end(), [](const ast::Attribute& attribute) {
+        return attribute.name == "private";
+    });
+}
+
+void RecordHiddenDeclNames(const ast::Decl& decl,
+                          Module& module) {
+    if (!DeclHasPrivateAttribute(decl)) {
+        return;
+    }
+
+    switch (decl.kind) {
+        case ast::Decl::Kind::kFunc:
+        case ast::Decl::Kind::kExternFunc:
+            if (!decl.name.empty()) {
+                module.hidden_value_names.insert(decl.name);
+            }
+            break;
+        case ast::Decl::Kind::kConst:
+        case ast::Decl::Kind::kVar:
+            for (const auto& name : decl.pattern.names) {
+                module.hidden_value_names.insert(name);
+            }
+            break;
+        case ast::Decl::Kind::kStruct:
+        case ast::Decl::Kind::kEnum:
+        case ast::Decl::Kind::kDistinct:
+        case ast::Decl::Kind::kTypeAlias:
+            if (!decl.name.empty()) {
+                module.hidden_type_names.insert(decl.name);
+            }
+            break;
+    }
+}
+
 Type RewriteImportedTypeNames(Type type,
                               std::string_view module_name,
                               const std::unordered_set<std::string>& local_type_names,
@@ -92,91 +128,61 @@ bool EquivalentTypeDeclSummary(const TypeDeclSummary& left, const TypeDeclSummar
     return true;
 }
 
-Module BuildExportedModuleSurface(const Module& module,
-                                  const ast::SourceFile& source_file) {
-    const auto collect_referenced_named_types = [&](const auto& self,
-                                                    const Type& type,
-                                                    std::unordered_set<std::string>& needed_type_names) -> void {
-        for (const auto& subtype : type.subtypes) {
-            self(self, subtype, needed_type_names);
-        }
-        if (type.kind == Type::Kind::kNamed) {
-            needed_type_names.insert(type.name);
-        }
-    };
+Module BuildImportVisibleModuleSurface(const Module& module,
+                                       const ast::SourceFile& source_file) {
+    Module visible;
+    visible.module_kind = module.module_kind;
+    visible.package_identity = module.package_identity;
+    visible.imports = module.imports;
 
-    Module exported;
-    exported.imports = module.imports;
-    if (!source_file.has_export_block) {
-        return exported;
+    std::unordered_set<std::string> private_type_names;
+    for (const auto& decl : source_file.decls) {
+        RecordHiddenDeclNames(decl, visible);
+        if (decl.kind == ast::Decl::Kind::kStruct || decl.kind == ast::Decl::Kind::kEnum ||
+            decl.kind == ast::Decl::Kind::kDistinct || decl.kind == ast::Decl::Kind::kTypeAlias) {
+            if (DeclHasPrivateAttribute(decl) && !decl.name.empty()) {
+                private_type_names.insert(decl.name);
+            }
+        }
     }
 
-    std::unordered_set<std::string> exported_names(source_file.export_block.names.begin(), source_file.export_block.names.end());
-    std::unordered_set<std::string> needed_type_names;
     for (const auto& function : module.functions) {
-        if (exported_names.contains(function.name)) {
-            exported.functions.push_back(function);
-            for (const auto& param_type : function.param_types) {
-                collect_referenced_named_types(collect_referenced_named_types, param_type, needed_type_names);
-            }
-            for (const auto& return_type : function.return_types) {
-                collect_referenced_named_types(collect_referenced_named_types, return_type, needed_type_names);
-            }
+        if (!visible.hidden_value_names.contains(function.name)) {
+            visible.functions.push_back(function);
         }
     }
+
     for (const auto& global : module.globals) {
         GlobalSummary filtered = global;
         filtered.names.clear();
         filtered.constant_values.clear();
         filtered.zero_initialized_values.clear();
         for (std::size_t index = 0; index < global.names.size(); ++index) {
-            if (exported_names.contains(global.names[index])) {
-                filtered.names.push_back(global.names[index]);
-                if (index < global.constant_values.size()) {
-                    filtered.constant_values.push_back(global.constant_values[index]);
-                }
-                if (index < global.zero_initialized_values.size()) {
-                    filtered.zero_initialized_values.push_back(global.zero_initialized_values[index]);
-                }
+            if (visible.hidden_value_names.contains(global.names[index])) {
+                continue;
+            }
+            filtered.names.push_back(global.names[index]);
+            if (index < global.constant_values.size()) {
+                filtered.constant_values.push_back(global.constant_values[index]);
+            }
+            if (index < global.zero_initialized_values.size()) {
+                filtered.zero_initialized_values.push_back(global.zero_initialized_values[index]);
             }
         }
         if (!filtered.names.empty()) {
-            exported.globals.push_back(std::move(filtered));
-            collect_referenced_named_types(collect_referenced_named_types, global.type, needed_type_names);
+            visible.globals.push_back(std::move(filtered));
         }
     }
 
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        for (const auto& type_decl : module.type_decls) {
-            if (!exported_names.contains(type_decl.name) && !needed_type_names.contains(type_decl.name)) {
-                continue;
-            }
-            const auto already_exported = std::find_if(exported.type_decls.begin(),
-                                                       exported.type_decls.end(),
-                                                       [&](const TypeDeclSummary& existing) {
-                                                           return existing.name == type_decl.name;
-                                                       });
-            if (already_exported != exported.type_decls.end()) {
-                continue;
-            }
-
-            exported.type_decls.push_back(type_decl);
-            changed = true;
-            collect_referenced_named_types(collect_referenced_named_types, type_decl.aliased_type, needed_type_names);
-            for (const auto& field : type_decl.fields) {
-                collect_referenced_named_types(collect_referenced_named_types, field.second, needed_type_names);
-            }
-            for (const auto& variant : type_decl.variants) {
-                for (const auto& payload_field : variant.payload_fields) {
-                    collect_referenced_named_types(collect_referenced_named_types, payload_field.second, needed_type_names);
-                }
-            }
+    for (const auto& type_decl : module.type_decls) {
+        if (private_type_names.contains(type_decl.name)) {
+            continue;
         }
+        visible.type_decls.push_back(type_decl);
     }
-    BuildModuleLookupMaps(exported);
-    return exported;
+
+    BuildModuleLookupMaps(visible);
+    return visible;
 }
 
 Module RewriteImportedModuleSurfaceTypes(const Module& module,

@@ -169,7 +169,7 @@ void RunFixture(const std::filesystem::path& source_root,
         if (!imported_checked.ok) {
             Fail("imported module fixture should pass semantic checking: " + imported_path.generic_string() + "\n" + diagnostics.Render());
         }
-        imported_modules[imported_fixture.first] = mc::sema::BuildExportedModuleSurface(*imported_checked.module, *imported_parsed.source_file);
+        imported_modules[imported_fixture.first] = mc::sema::BuildImportVisibleModuleSurface(*imported_checked.module, *imported_parsed.source_file);
     }
     if (!imported_modules.empty()) {
         options.imported_modules = &imported_modules;

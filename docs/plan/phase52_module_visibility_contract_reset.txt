@@ -1,0 +1,184 @@
+Phase 52 -- Module Visibility Contract Reset
+============================================
+
+Status
+------
+COMPLETED (contract reset landed in architecture docs)
+
+Purpose
+-------
+Replace the written v0.2 module, import, and build contract so the repository
+can pursue the simpler source model honestly: public by default, `@private`
+for declaration hiding, `internal.mc` for package-only sharing, and explicit
+build-owned package identity.
+
+This document records the completed contract reset. It is not a new
+architecture phase after Phase 8, and it does not claim that parser, sema,
+`.mci`, or workflow implementation has already been rebased; those follow-on
+owners remain Phase 53 through Phase 55.
+
+Repository status note
+----------------------
+- Before this phase, the architecture docs still froze the old export-block
+  model: explicit `export {}` lists, exported-versus-module-private as the only
+  visibility split, and build-time packages that did not participate in source
+  visibility.
+- `build_spec.txt` likewise framed `.mci` and rebuild invalidation around a
+  curated exported surface.
+- That written contract would have left every later implementation phase
+  chasing stale invariants.
+
+Implemented decisions
+---------------------
+1. Ordinary modules now expose all top-level declarations except those marked
+   `@private`.
+2. `@private` is the only declaration-level hiding mechanism in the source
+   contract.
+3. A source file named `internal.mc` is the only package-internal module kind.
+4. `internal.mc` imports are legal only when importer and imported module share
+   the same explicit build-owned package identity.
+5. Package identity is now spelled explicitly in `build.toml` schema version 1
+   through a required per-target `package` field plus optional
+   `packages.<name>.roots` mappings for additional package identities.
+6. Direct-source workflows do not admit `internal.mc` because they do not carry
+   explicit package identity.
+7. `.mci` is now documented as a compiler-consumed summary of the non-private
+   semantic surface plus package and module-kind metadata, not a curated export
+   list.
+
+Files updated by this phase
+---------------------------
+- `/Users/ro/dev/c_modern/docs/arch/language/semantics/modules_spec.txt`
+- `/Users/ro/dev/c_modern/docs/arch/language/semantics/imports_spec.txt`
+- `/Users/ro/dev/c_modern/docs/arch/language/syntax/grammar_spec.txt`
+- `/Users/ro/dev/c_modern/docs/arch/language/language_spec.txt`
+- `/Users/ro/dev/c_modern/docs/arch/compiler/build_spec.txt`
+- `/Users/ro/dev/c_modern/docs/arch/language/canonical_programs.txt`
+- `/Users/ro/dev/c_modern/docs/arch/key_decisions.txt`
+
+Why these choices were frozen here
+----------------------------------
+- The replacement model is simpler to state and review than an export-block
+  contract plus later visibility exceptions.
+- Package identity had to be made explicit before `internal.mc` could have a
+  deterministic legality rule.
+- Direct-source behavior had to be stated honestly rather than left to
+  accidental implementation behavior.
+- `.mci` and rebuild invalidation needed one new written truth before later
+  compiler work can rebase artifacts and dependency checks safely.
+
+Problem being solved
+--------------------
+- The proposed module rewrite is not a local syntax tweak; it changes the
+  language contract that governs visibility, interface generation, import
+  legality, and rebuild invalidation.
+- Without this reset, later implementation phases would keep inheriting stale
+  exported-surface assumptions or reopening questions that should already be
+  closed.
+- The repository now has one spec-owned answer that parser, sema, driver, and
+  tests can implement against.
+
+Core rule
+---------
+- Keep package identity explicit and build-owned.
+- Keep declaration-level visibility binary: default-public or `@private`.
+- Keep package sharing module-scoped through `internal.mc`; do not introduce a
+  declaration-scoped package-private tier.
+- Keep `.mci` a compiler-consumed artifact, not a curated hand-authored API
+  contract.
+
+Completed slice
+---------------
+Authoritative documentation and contract reset only. This phase intentionally
+stops at written contract truth and routes implementation work forward:
+- `language_spec.txt` now describes default-public declarations,
+  `@private`, and `internal.mc`
+- `grammar_spec.txt` removes `export {}` and admits `@private` through the
+  attribute surface
+- `modules_spec.txt` now defines default-public declarations, `internal.mc`
+  module kind, package-aware import legality, and direct-source rejection of
+  package-internal modules
+- `imports_spec.txt` now describes import legality in terms of non-private
+  surfaces and explicit package identity
+- `build_spec.txt` now defines explicit package identity, package-to-root
+  mapping, and `.mci` expectations under the new model
+- `canonical_programs.txt` and related architecture notes no longer present
+  export blocks as the v0.2 baseline
+- `key_decisions.txt` now records the reset as settled architecture rationale
+
+Replacement contract that should be frozen here
+-----------------------------------------------
+1. Ordinary modules expose all top-level declarations except those explicitly
+   marked `@private`.
+2. `@private` is the only declaration-level hiding mechanism.
+3. A source file named `internal.mc` is a package-internal module that may be
+   imported only by modules in the same explicit package identity.
+4. Package identity is provided by the build model, not inferred by raw
+   directory adjacency alone.
+5. `.mci` serializes the non-private semantic surface relevant to legal
+   importers instead of a hand-curated export list.
+6. Direct-source workflows reject `internal.mc` because package identity is not
+  defined outside project context.
+
+What this phase should try to prove
+-----------------------------------
+- The replacement model is simple enough to explain without fallback references
+  to export blocks.
+- Package identity and `internal.mc` legality are specified tightly enough that
+  compiler owners do not have to invent ad hoc rules later.
+- The repository has one unambiguous answer for what counts as a rebuild-
+  relevant interface change under the new source model.
+- Direct-source and project-driven workflows are both described honestly rather
+  than left to implementation accident.
+
+Preferred pressure points
+-------------------------
+1. Exact package-identity spelling in `build.toml` schema version 1.
+2. Exact `internal.mc` naming and import-legality rule.
+3. Exact direct-source behavior for package-internal modules.
+4. Exact `.mci` contract once exported-name filtering is gone.
+5. Exact migration posture: hard cutover rather than dual syntax.
+
+Implementation boundary
+-----------------------
+- This phase changes docs only.
+- Parser, AST, sema, direct diagnostics, `.mci`, rebuild invalidation, and
+  repository migration remain owned by Phase 53 through Phase 55.
+- Until those phases land, the written contract is ahead of the implementation
+  on purpose.
+
+Follow-on routing
+-----------------
+1. Phase 53 removes export-block parsing and sema filtering and lands
+  `@private` plus `internal.mc` frontend truth.
+2. Phase 54 rebases `.mci`, package metadata, and rebuild invalidation on the
+  non-private semantic surface.
+3. Phase 55 migrates repository sources, tests, and workflow coverage to the
+  new contract.
+
+Exit criteria
+-------------
+- the architecture docs no longer freeze `export {}` as the source-level
+  visibility mechanism for v0.2
+- the replacement visibility lattice is explicit: default-public,
+  declaration-level `@private`, and module-scoped package sharing only through
+  `internal.mc`
+- package identity and package-internal import legality are written precisely
+  enough that Phase 53 and Phase 54 can implement them without reopening core
+  design questions
+- the repository has an explicit cutover posture rather than a vague
+  compatibility story
+
+Non-goals
+---------
+- parser, sema, driver, or `.mci` implementation changes
+- stdlib or test migration
+- compatibility shims that keep both export blocks and `@private` alive
+- package-management or registry design
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 52 stands alone as the contract-reset gate for the entire series.
+- The phase is explicit that the new module model was written first, before
+  parser, sema, `.mci`, and migration work are allowed to claim the new
+  contract.

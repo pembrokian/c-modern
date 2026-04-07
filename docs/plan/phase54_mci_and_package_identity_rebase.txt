@@ -1,0 +1,143 @@
+Phase 54 -- .mci And Package-Identity Rebase
+============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Rebase interface artifacts, interface hashing, import consumption, and
+incremental rebuild logic on the new module contract: non-private semantic
+surfaces plus explicit package identity rather than curated exported-name
+lists.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- The current `.mci` story is intentionally exported-surface-centered.
+- Separate-compilation reuse and dependent invalidation currently assume that
+  a module's rebuild-relevant contract is exactly the filtered exported
+  semantic surface.
+- The proposed module rewrite intentionally changes that assumption: ordinary
+  modules now expose all non-private declarations, and package-internal modules
+  are restricted by importer package identity rather than by separate export
+  curation.
+- That makes `.mci` and interface hashing the next major owner after Phase 53.
+
+Problem being solved
+--------------------
+- If `.mci` stays export-block-shaped after the source model changes, the
+  repository will silently keep old rebuild semantics under a new syntax.
+- The build graph needs one honest answer for what downstream modules consume,
+  what interface hash changes mean, and how package-internal modules are
+  represented without contextual export filtering.
+- The repository therefore needs a dedicated rebase phase for interface
+  artifacts and separate-compilation truth.
+
+Core rule
+---------
+- Make `.mci` reflect the real import-visible semantic surface under the new
+  rules.
+- Keep package identity explicit in artifact metadata and import validation.
+- Keep interface hashes semantic and deterministic: public or package-visible
+  declaration changes should rebuild dependents; implementation-only and
+  `@private` changes should not.
+- Do not add contextual per-importer `.mci` projections; the artifact should be
+  a stable module summary plus enough metadata to validate importer access.
+
+Chosen slice for this phase
+---------------------------
+Compiler and toolchain work needed to rebuild the separate-compilation contract
+around the new visibility model.
+
+Expected implementation areas
+-----------------------------
+- `.mci` schema update from exported-surface contract to non-private semantic
+  module summary
+- format-version bump and stale-artifact invalidation rules for old interface
+  files
+- explicit package-identity metadata in compiled module state and interface
+  artifacts
+- import-consumption changes so ordinary modules consume non-private surfaces
+  and `internal.mc` consumption is gated by package identity
+- interface-hash redefinition so declaration-surface changes, not source-file
+  timestamps, drive dependent rebuilds
+- tool and driver updates for dependency scanning, same-build-dir reuse, and
+  stale-state diagnostics under the new contract
+
+What this phase should try to prove
+-----------------------------------
+- `.mci` remains deterministic and reviewable after the contract reset.
+- changing a public-by-default declaration in an ordinary module rebuilds legal
+  dependents exactly when expected.
+- changing a `@private` declaration or internal implementation body does not
+  force avoidable downstream rebuilds.
+- package-internal modules can be serialized once and validated against
+  importer package identity without generating importer-specific interfaces.
+- stale pre-reset interface artifacts are rejected cleanly rather than reused
+  incorrectly.
+
+Preferred pressure points
+-------------------------
+1. Implementation-only change versus non-private declaration change in one
+   ordinary module.
+2. `@private` declaration change versus public declaration change in the same
+   module.
+3. Allowed same-package import of `internal.mc` versus rejected cross-package
+   import.
+4. Repeated `mc build`, `mc run`, and `mc test` reuse in one build directory
+   after the interface-format bump.
+5. Sharp stale-artifact diagnostics after a repository checkout or compiler
+   rebuild that crosses the old and new `.mci` formats.
+
+Deliverables
+------------
+- `.mci` and import-consumption updates under
+  `/Users/ro/dev/c_modern/compiler/sema/`,
+  `/Users/ro/dev/c_modern/compiler/support/`, and any owning serialization or
+  driver paths
+- focused workflow regressions under
+  `/Users/ro/dev/c_modern/tests/tool/phase7_tool_tests.cpp` proving rebuild and
+  invalidation truth under the new interface contract
+- bounded documentation refresh in
+  `/Users/ro/dev/c_modern/docs/arch/compiler/build_spec.txt`,
+  `/Users/ro/dev/c_modern/README.md`, and
+  `/Users/ro/dev/c_modern/docs/plan/release_hardening_hosted_slice.txt` if the
+  supported project-workflow guarantees change materially
+
+Suggested execution order
+-------------------------
+1. Define and implement the new `.mci` schema plus format-version bump.
+2. Rework semantic surface serialization and import consumption around
+   non-private declarations and package identity.
+3. Recompute interface hashing and dependent invalidation rules.
+4. Add deterministic tool tests for implementation-only, `@private`, public,
+   and package-internal edit cases.
+5. Tighten stale-artifact diagnostics and same-build-dir reuse behavior.
+
+Exit criteria
+-------------
+- `.mci` no longer depends on exported-name filtering
+- interface hashes track the new semantic import surface precisely enough to
+  preserve honest incremental rebuild behavior
+- package-internal module consumption is validated without importer-specific
+  interface artifact generation
+- ordinary project workflow remains deterministic after the interface-format
+  cutover
+
+Non-goals
+---------
+- source-syntax migration across the whole repository
+- broader package-management or workspace features
+- opportunistic build-cache redesign unrelated to the module-model reset
+- reopening parser or sema syntax decisions already settled in Phase 52 and
+  Phase 53
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 54 stands alone as the separate-compilation and `.mci` rebase phase.
+- The phase is explicit that rebuild correctness is part of the language
+  contract reset, not optional tooling polish.

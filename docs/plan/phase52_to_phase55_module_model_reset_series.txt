@@ -1,0 +1,126 @@
+Phase 52 Through Phase 55 -- Module Model Reset Overview
+========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Turn the proposed module-system rewrite into one explicit execution series that
+replaces the current export-block-centered contract with a simpler source model
+without smearing half-old and half-new invariants across parser, sema, `.mci`,
+and project workflow.
+
+This document is intentionally cross-phase.
+It does not introduce a new architecture phase after Phase 8.
+It packages one repository-owned contract-reset series across the language,
+compiler, and tool owners and routes readers to the separate phase-specific
+docs:
+
+- Phase 52 ownership for the contract reset in language and build docs
+- Phase 53 ownership for parser, AST, and sema visibility-model rewrite
+- Phase 54 ownership for `.mci`, separate-compilation, and package-identity
+  rebase
+- Phase 55 ownership for repository migration and workflow hardening
+
+Phase-specific documents
+------------------------
+- Phase 52:
+  `/Users/ro/dev/c_modern/docs/plan/phase52_module_visibility_contract_reset.txt`
+- Phase 53:
+  `/Users/ro/dev/c_modern/docs/plan/phase53_default_public_and_internal_module_frontend_rewrite.txt`
+- Phase 54:
+  `/Users/ro/dev/c_modern/docs/plan/phase54_mci_and_package_identity_rebase.txt`
+- Phase 55:
+  `/Users/ro/dev/c_modern/docs/plan/phase55_module_model_migration_and_workflow_hardening.txt`
+
+Repository status note
+----------------------
+- The current repository freezes one source file equals one module, explicit
+  `export {}` blocks, and build-time packages that do not participate in source
+  visibility.
+- The current parser, AST, sema, `.mci`, and project-workflow rules all assume
+  that exported-name filtering is the semantic contract used for imports and
+  rebuild invalidation.
+- The proposed rewrite intentionally changes that contract rather than merely
+  widening one admitted capability family.
+- The replacement direction is now clear enough to plan around: public by
+  default, `@private` as the only declaration-level hiding tool,
+  `internal.mc` as the only package-sharing mechanism, explicit build-owned
+  package identity, and `.mci` as a deterministic summary of the non-private
+  semantic surface rather than a curated export list.
+- Because this rewrites an already-frozen contract, the first phase must reset
+  the written rules before later phases touch parser, sema, or rebuild logic.
+
+Series summary
+--------------
+- Phase 52 rewrites the source and build contract so the repository is no
+  longer pretending the old export-block model still governs the language.
+- Phase 53 removes export-block parsing and sema filtering, replaces them with
+  default-public plus `@private`, and introduces `internal.mc` as a module-kind
+  decision rather than a declaration-scoped visibility tier.
+- Phase 54 rebases `.mci`, interface hashing, and separate-compilation rules on
+  non-private semantic surfaces plus explicit package identity.
+- Phase 55 migrates the repository to the new model, hardens project workflow,
+  and proves that the simpler source story still preserves deterministic
+  rebuild and import behavior.
+
+Core rule
+---------
+- Replace the module contract all the way through the owning layers; do not
+  preserve export-block assumptions behind compatibility shims that would leave
+  the repository with two truths.
+- Keep package identity explicit and build-owned; do not redefine package
+  membership by raw directory heuristics.
+- Keep package sharing module-scoped through `internal.mc`; do not add a second
+  declaration-level package-private visibility tier.
+- Treat `.mci` and rebuild invalidation as semantic trust boundaries that must
+  follow the new visibility contract exactly.
+
+Recommended execution choice
+----------------------------
+Prefer one contract-reset series with a hard boundary between spec reset,
+frontend and sema rewrite, `.mci` plus rebuild rebase, and repository
+migration. That sequencing keeps each phase reviewable and reduces the chance
+of chasing stale export-block invariants while the new model is only partially
+landed.
+
+Why this sequence is recommended
+--------------------------------
+- The current docs explicitly forbid the very visibility model this rewrite
+  wants to introduce, so implementation-first work would create review churn
+  immediately.
+- Parser and sema changes are straightforward only after the package-identity
+  and `internal.mc` rules are written precisely enough that there is one clear
+  answer for import legality.
+- `.mci` and incremental rebuild logic sit on the old exported-surface
+  assumption, so they need a separate dedicated phase rather than being folded
+  invisibly into parser cleanup.
+- Repository migration should happen after the contract and compiler truth are
+  stable so examples, stdlib modules, and fixtures are migrated once.
+
+Suggested sequencing checkpoints
+--------------------------------
+1. Freeze the replacement module and package contract in the architecture docs.
+2. Remove source-level export-block semantics from parser, AST, and sema.
+3. Rebase `.mci` contents and interface hashing on the new non-private surface.
+4. Migrate stdlib, tests, examples, and canonical docs to the new syntax and
+   visibility model.
+5. Use the migrated repository to decide whether a short closeout is needed or
+   whether the module reset can simply become the new baseline.
+
+Non-goals for this series
+-------------------------
+- adding hierarchical package names or dotted module identities
+- adding wildcard imports, hidden preludes, or reexport chains
+- preserving export blocks as a deprecated compatibility surface
+- inventing declaration-level package-private, friend, or namespace features
+- expanding package management, vendoring policy, or registry behavior
+
+Acceptance criteria for this document
+-------------------------------------
+- The repository has one short overview plus separate Phase 52 through Phase 55
+  planning docs.
+- The overview stays routing-focused and contract-focused rather than
+  duplicating every implementation detail from the phase-specific documents.

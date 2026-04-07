@@ -123,6 +123,8 @@ Per target:
 - target kind: `exe`, `staticlib`, `sharedlib`, `test`
 - root module or source file list
 - import roots if more than one source root is allowed
+- explicit package identity for the target-owned source roots
+- optional additional package identities and the roots assigned to them
 - build mode: `debug`, `release`, `checked`
 - target triple or platform profile
 - hosted or freestanding mode
@@ -143,6 +145,7 @@ build_dir = "build"
 
 [targets.grep]
 kind = "exe"
+package = "grep"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"
@@ -151,6 +154,9 @@ links = ["c"]
 
 [targets.grep.search_paths]
 modules = ["src", "vendor"]
+
+[targets.grep.packages.vendor_argparse]
+roots = ["vendor/argparse"]
 
 [targets.grep.runtime]
 startup = "default"
@@ -168,12 +174,16 @@ Suggested meanings:
 - `default`: target selected when the user runs `mc build` with no explicit target
 - `build_dir`: visible output directory
 - `kind`: one of `exe`, `staticlib`, `sharedlib`, `test`
+- `package`: explicit package identity for the root module and for any
+	configured source root not claimed by another package entry
 - `root`: root module for the target
 - `mode`: default build mode for that target
 - `env`: `hosted` or `freestanding`
 - `target`: target triple or canonical target name
 - `links`: explicit external libraries
 - `search_paths.modules`: explicit source or vendored module roots
+- `packages.<name>.roots`: explicit source roots that belong to package
+	identity `<name>` instead of the target's default `package`
 - `runtime.startup`: `default` or a named replacement shim
 - `tests.enabled`: whether the build tool should discover and build test targets associated with this target
 - `tests.roots`: directories searched for test files
@@ -185,6 +195,16 @@ Syntax rule:
 
 Schema version 1 rule:
 - these field names and nesting rules are the canonical v0.2 starting point, not just illustrative pseudocode
+
+Package identity rules for schema version 1:
+- every target must declare one explicit default `package` identity
+- each configured source root belongs to exactly one package identity after
+	applying the target default plus any `packages.<name>.roots` overrides
+- one package identity may own more than one root
+- package identities are compared by exact spelling and are owned by the build
+	description rather than by raw directory adjacency
+- `internal.mc` import legality is defined from this package mapping, not from
+	textual path proximity alone
 
 6. What The Build File Should Not Describe Yet
 
@@ -206,10 +226,12 @@ Because the module system is explicit and acyclic, the build tool can stay simpl
 
 Canonical behavior:
 - each module compiles independently to an object file plus a small interface artifact
-- the interface artifact records exported names and enough type information for downstream checking
+- the interface artifact records the non-private import-visible surface and
+	enough type information for downstream checking
 - importing a module should not require reparsing the entire upstream source tree every time
 - if an interface changes, dependent modules rebuild
-- if only implementation details change, unaffected dependents do not
+- if only implementation details or `@private` declarations change,
+	unaffected dependents do not
 
 This gives a simple and fast separate-compilation story without requiring a giant build graph language.
 
@@ -226,13 +248,16 @@ Canonical artifact model:
 Suggested contents:
 - compiler format version
 - target triple or target ABI profile
+- package identity
 - source module name
+- module kind: ordinary or `internal`
 - source file path or stable module identity
-- exported declarations
-- fully resolved type signatures for exported declarations
-- distinct-type identities needed by importers
-- layout-relevant facts for exported structs, enums, and ABI-visible types
-- calling convention or ABI information for exported procedures
+- import-visible non-private declarations
+- fully resolved type signatures for import-visible non-private declarations
+- distinct-type identities needed by legal importers
+- layout-relevant facts for import-visible structs, enums, and ABI-visible
+	types
+- calling convention or ABI information for import-visible procedures
 - imported module list
 - content hash or interface hash
 - optional diagnostic map or source span references if needed for better downstream errors
@@ -246,7 +271,7 @@ These artifacts should be:
 Encoding decision:
 - v0.2 `.mci` files should use a canonical text encoding rather than a binary format
 - field order should be deterministic
-- exported declarations should be serialized in a stable normalized form
+- import-visible declarations should be serialized in a stable normalized form
 - future toolchains may add a cached binary sidecar internally, but the canonical interchange artifact remains text unless the spec changes
 
 Important rebuild rule:
@@ -260,16 +285,18 @@ This is one area where a Plan 9 style influence still makes sense: keep compilat
 Illustrative `.mci` shape:
 
 ```text
-format = 1
+format = 2
 target = x86_64-macos
+package = std_strings
 module = strings
+module_kind = ordinary
 source = std/strings/main.mc
 imports = [utf8]
 interface_hash = 8f1c...
 
-export func split_once(input: str, sep: str) (str, str, bool)
-export func trim_space(input: str) str
-export type Builder = opaque
+decl func split_once(input: str, sep: str) (str, str, bool)
+decl func trim_space(input: str) str
+decl type Builder = opaque
 ```
 
 The actual binary or text encoding can be decided later.
@@ -456,6 +483,7 @@ build_dir = "build"
 
 [targets.grep]
 kind = "exe"
+package = "grep"
 root = "src/main.mc"
 mode = "debug"
 env = "hosted"
@@ -464,6 +492,9 @@ links = ["c"]
 
 [targets.grep.search_paths]
 modules = ["src", "vendor"]
+
+[targets.grep.packages.vendor_argparse]
+roots = ["vendor/argparse"]
 
 [targets.grep.runtime]
 startup = "default"

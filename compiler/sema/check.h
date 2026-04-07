@@ -3,11 +3,13 @@
 
 #include <filesystem>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "compiler/ast/ast.h"
@@ -125,10 +127,14 @@ struct SourceSpanEqual {
 };
 
 struct Module {
+    ast::SourceFile::ModuleKind module_kind = ast::SourceFile::ModuleKind::kOrdinary;
+    std::string package_identity;
     std::vector<std::string> imports;
     std::vector<TypeDeclSummary> type_decls;
     std::vector<GlobalSummary> globals;
     std::vector<FunctionSignature> functions;
+    std::unordered_set<std::string> hidden_value_names;
+    std::unordered_set<std::string> hidden_type_names;
     std::unordered_map<support::SourceSpan, Type, SourceSpanHash, SourceSpanEqual> expr_types;
     std::unordered_map<support::SourceSpan, BindingOrAssignFact, SourceSpanHash, SourceSpanEqual> binding_or_assign_facts;
     std::unordered_map<support::SourceSpan, ForInFact, SourceSpanHash, SourceSpanEqual> for_in_facts;
@@ -148,6 +154,8 @@ struct CheckResult {
 struct CheckOptions {
     std::vector<std::filesystem::path> import_roots;
     const std::unordered_map<std::string, Module>* imported_modules = nullptr;
+    std::optional<std::string> current_package_identity;
+    std::function<std::optional<std::string>(const std::filesystem::path&)> package_identity_for_source;
 };
 
 CheckResult CheckProgram(const ast::SourceFile& source_file,
@@ -163,8 +171,8 @@ CheckResult CheckSourceFile(const ast::SourceFile& source_file,
                             const std::filesystem::path& file_path,
                             support::DiagnosticSink& diagnostics);
 
-Module BuildExportedModuleSurface(const Module& module,
-                                  const ast::SourceFile& source_file);
+Module BuildImportVisibleModuleSurface(const Module& module,
+                                       const ast::SourceFile& source_file);
 
 Module RewriteImportedModuleSurfaceTypes(const Module& module,
                                          std::string_view module_name);

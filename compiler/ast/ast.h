@@ -30,10 +30,6 @@ struct Attribute : Node {
     std::vector<AttributeArg> args;
 };
 
-struct ExportBlock : Node {
-    std::vector<std::string> names;
-};
-
 struct ImportDecl : Node {
     std::string module_name;
 };
@@ -243,8 +239,12 @@ struct Decl : Node {
 };
 
 struct SourceFile : Node {
-    bool has_export_block = false;
-    ExportBlock export_block;
+    enum class ModuleKind {
+        kOrdinary,
+        kInternal,
+    };
+
+    ModuleKind module_kind = ModuleKind::kOrdinary;
     std::vector<ImportDecl> imports;
     std::vector<Decl> decls;
 };

@@ -20,7 +20,6 @@ using mc::ast::CasePattern;
 using mc::ast::Decl;
 using mc::ast::DefaultCase;
 using mc::ast::EnumVariantDecl;
-using mc::ast::ExportBlock;
 using mc::ast::Expr;
 using mc::ast::FieldDecl;
 using mc::ast::FieldInit;
@@ -39,7 +38,7 @@ class Parser {
   public:
     Parser(const mc::lex::LexResult& lexed_module,
            const std::filesystem::path& file_path,
-           support::DiagnosticSink& diagnostics);
+           mc::support::DiagnosticSink& diagnostics);
 
     ParseResult Run();
 
@@ -59,7 +58,6 @@ class Parser {
     void SynchronizeTopLevel();
     std::optional<std::string> ParseIdentifier(const char* message);
 
-    ExportBlock ParseExportBlock(mc::support::SourcePosition start);
     ImportDecl ParseImportDecl(mc::support::SourcePosition start);
     std::vector<Attribute> ParseAttributes();
     std::optional<std::vector<std::string>> ParseTypeParams();
@@ -75,9 +73,12 @@ class Parser {
     std::vector<std::unique_ptr<TypeExpr>> ParseProcedureReturnTypes(std::size_t depth);
     std::optional<Decl> ParseStructDecl(std::vector<Attribute> attributes, mc::support::SourcePosition start);
     std::optional<Decl> ParseEnumDecl(std::vector<Attribute> attributes, mc::support::SourcePosition start);
-    std::optional<Decl> ParseDistinctDecl(mc::support::SourcePosition start);
-    std::optional<Decl> ParseTypeAliasDecl(mc::support::SourcePosition start);
-    std::optional<Decl> ParseBindingDecl(Decl::Kind kind, mc::support::SourcePosition start, bool allow_storage_without_initializer);
+    std::optional<Decl> ParseDistinctDecl(std::vector<Attribute> attributes, mc::support::SourcePosition start);
+    std::optional<Decl> ParseTypeAliasDecl(std::vector<Attribute> attributes, mc::support::SourcePosition start);
+    std::optional<Decl> ParseBindingDecl(std::vector<Attribute> attributes,
+                       Decl::Kind kind,
+                       mc::support::SourcePosition start,
+                       bool allow_storage_without_initializer);
     FieldDecl ParseFieldDecl();
     EnumVariantDecl ParseEnumVariantDecl();
     FieldDecl ParseVariantField();
@@ -156,7 +157,7 @@ class Parser {
 
     const std::vector<Token>& tokens_;
     std::filesystem::path file_path_;
-    support::DiagnosticSink& diagnostics_;
+    mc::support::DiagnosticSink& diagnostics_;
     std::size_t index_ = 0;
     bool ok_ = true;
     bool allow_aggregate_init_ = true;

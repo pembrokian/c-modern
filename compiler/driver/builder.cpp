@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -24,6 +25,100 @@ namespace mc::driver {
 namespace {
 
 constexpr std::string_view kHostedRuntimeSupportRelativePath = "runtime/hosted/mc_hosted_runtime.c";
+
+bool IsInternalModulePath(const std::filesystem::path& path) {
+    return path.filename() == "internal.mc";
+}
+
+std::string JoinPaths(const std::vector<std::filesystem::path>& paths) {
+    std::ostringstream stream;
+    for (std::size_t index = 0; index < paths.size(); ++index) {
+        if (index > 0) {
+            stream << ", ";
+        }
+        stream << paths[index].generic_string();
+    }
+    return stream.str();
+}
+
+struct ResolvedImportPath {
+    std::filesystem::path path;
+    std::optional<std::string> package_identity;
+};
+
+std::optional<ResolvedImportPath> ResolveImportPathWithPackageRules(
+    const std::filesystem::path& importer_path,
+    std::string_view module_name,
+    const std::vector<std::filesystem::path>& search_roots,
+    const std::optional<std::string>& importer_package_identity,
+    const std::function<std::optional<std::string>(const std::filesystem::path&)>& package_identity_for_source,
+    support::DiagnosticSink& diagnostics,
+    const support::SourceSpan& span) {
+    std::vector<std::filesystem::path> matches;
+    std::unordered_set<std::string> seen_matches;
+    std::optional<std::string> rejected_internal_reason;
+    std::optional<std::string> matched_package_identity;
+
+    for (const auto& root : search_roots) {
+        const std::filesystem::path candidate = std::filesystem::absolute(root / (std::string(module_name) + ".mc")).lexically_normal();
+        if (!std::filesystem::exists(candidate)) {
+            continue;
+        }
+        if (!seen_matches.insert(candidate.generic_string()).second) {
+            continue;
+        }
+
+        if (IsInternalModulePath(candidate)) {
+            if (!importer_package_identity.has_value()) {
+                rejected_internal_reason =
+                    "direct source mode does not support importing internal module: " + std::string(module_name);
+                continue;
+            }
+
+            const auto candidate_package_identity = package_identity_for_source
+                ? package_identity_for_source(candidate)
+                : std::nullopt;
+            if (!candidate_package_identity.has_value()) {
+                rejected_internal_reason = "unable to determine package identity for internal module: " + candidate.generic_string();
+                continue;
+            }
+            if (*candidate_package_identity != *importer_package_identity) {
+                rejected_internal_reason = "module " + std::string(module_name) + " is internal to package '" +
+                    *candidate_package_identity + "' and cannot be imported from package '" + *importer_package_identity + "'";
+                continue;
+            }
+            matched_package_identity = candidate_package_identity;
+        }
+
+        matches.push_back(candidate);
+    }
+
+    if (matches.size() == 1) {
+        return ResolvedImportPath {
+            .path = matches.front(),
+            .package_identity = matched_package_identity,
+        };
+    }
+    if (matches.empty()) {
+        diagnostics.Report({
+            .file_path = importer_path,
+            .span = span,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = rejected_internal_reason.has_value()
+                ? *rejected_internal_reason
+                : "unable to resolve import module: " + std::string(module_name),
+        });
+        return std::nullopt;
+    }
+
+    diagnostics.Report({
+        .file_path = importer_path,
+        .span = span,
+        .severity = support::DiagnosticSeverity::kError,
+        .message = "ambiguous import module '" + std::string(module_name) + "' matched multiple roots: " + JoinPaths(matches),
+    });
+    return std::nullopt;
+}
 
 std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesystem::path& start_path) {
     std::filesystem::path current = std::filesystem::absolute(start_path).lexically_normal();
@@ -105,7 +200,7 @@ mc::mci::InterfaceArtifact MakeModuleInterfaceArtifact(const std::filesystem::pa
         .target_identity = std::move(target_identity),
         .module_name = source_path.stem().string(),
         .source_path = source_path,
-        .module = sema::BuildExportedModuleSurface(checked_module, source_file),
+        .module = sema::BuildImportVisibleModuleSurface(checked_module, source_file),
     };
 }
 
@@ -850,6 +945,7 @@ bool SupportsBootstrapTarget(const ProjectTarget& target,
 bool DiscoverModuleGraphRecursive(const std::string& module_name,
                                   const std::filesystem::path& source_path,
                                   const std::vector<std::filesystem::path>& import_roots,
+                                  const std::function<std::optional<std::string>(const std::filesystem::path&)>& package_identity_for_source,
                                   const std::unordered_set<std::string>& external_module_paths,
                                   support::DiagnosticSink& diagnostics,
                                   std::unordered_set<std::string>& visiting,
@@ -876,30 +972,46 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
         return false;
     }
 
+    const auto current_package_identity = package_identity_for_source ? package_identity_for_source(normalized_path) : std::nullopt;
+    if (IsInternalModulePath(normalized_path) && !current_package_identity.has_value()) {
+        diagnostics.Report({
+            .file_path = normalized_path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "direct source mode does not support internal module roots",
+        });
+        visiting.erase(path_key);
+        return false;
+    }
+
     CompileNode node {
         .module_name = module_name,
+        .package_identity = current_package_identity.value_or(std::string {}),
         .source_path = normalized_path,
         .parse_result = std::move(*parse_result),
     };
 
     for (const auto& import_decl : node.parse_result.source_file->imports) {
-        const auto import_path = mc::support::ResolveImportPathFromRoots(normalized_path,
-                                                                         import_decl.module_name,
-                                                                         import_roots,
-                                                                         diagnostics,
-                                                                         import_decl.span);
+        const auto import_path = ResolveImportPathWithPackageRules(normalized_path,
+                                                                   import_decl.module_name,
+                                                                   import_roots,
+                                                                   current_package_identity,
+                                                                   package_identity_for_source,
+                                                                   diagnostics,
+                                                                   import_decl.span);
         if (!import_path.has_value()) {
             visiting.erase(path_key);
             return false;
         }
-        node.imports.push_back({import_decl.module_name, *import_path});
-        const std::string import_key = std::filesystem::absolute(*import_path).lexically_normal().generic_string();
+        node.imports.push_back({import_decl.module_name, import_path->path});
+        const std::string import_key = std::filesystem::absolute(import_path->path).lexically_normal().generic_string();
         if (external_module_paths.contains(import_key)) {
             continue;
         }
         if (!DiscoverModuleGraphRecursive(import_decl.module_name,
-                                          *import_path,
+                                          import_path->path,
                                           import_roots,
+                                          package_identity_for_source,
                                           external_module_paths,
                                           diagnostics,
                                           visiting,
@@ -918,6 +1030,7 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
 
 std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& entry_source_path,
                                                 const std::vector<std::filesystem::path>& import_roots,
+                                                const std::function<std::optional<std::string>(const std::filesystem::path&)>& package_identity_for_source,
                                                 const std::unordered_set<std::string>& external_module_paths,
                                                 const std::filesystem::path& build_dir,
                                                 const mc::codegen_llvm::TargetConfig& target_config,
@@ -941,6 +1054,7 @@ std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& ent
     if (!DiscoverModuleGraphRecursive(normalized_entry.stem().string(),
                                       normalized_entry,
                                       import_roots,
+                                      package_identity_for_source,
                                       external_module_paths,
                                       diagnostics,
                                       visiting,
@@ -1053,6 +1167,9 @@ std::optional<TargetBuildGraph> BuildResolvedTargetGraph(const ProjectFile& proj
     const auto import_roots = ComputeProjectImportRoots(project, target, cli_import_roots);
     auto compile_graph = DiscoverModuleGraph(target.root,
                                              import_roots,
+                                             [&](const std::filesystem::path& path) {
+                                                 return ResolveTargetPackageIdentity(target, path);
+                                             },
                                              external_module_paths,
                                              project.build_dir,
                                              ResolveProjectTargetConfig(project, target, diagnostics),
@@ -1138,6 +1255,9 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         }
         if (!imported_data->modules.empty()) {
             sema_options.imported_modules = &imported_data->modules;
+        }
+        if (!node.package_identity.empty()) {
+            sema_options.current_package_identity = node.package_identity;
         }
 
         const auto source_text = ReadSourceText(node.source_path, diagnostics);
@@ -1288,6 +1408,7 @@ std::optional<BuildUnit> CompileToMir(const CommandOptions& options,
     auto graph = DiscoverModuleGraph(
         entry_path,
         import_roots,
+        {},
         {},
         options.build_dir,
         bootstrap_config,

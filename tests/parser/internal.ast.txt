@@ -1,0 +1,23 @@
+SourceFile
+  ModuleKind=internal
+  FuncDecl name=hidden
+    Attribute name=private
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              LiteralExpr text=1 kind=int_lit
+  FuncDecl name=reveal
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              CallExpr
+                left:
+                  NameExpr text=hidden

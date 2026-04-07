@@ -1,5 +1,3 @@
-export { main }
-
 import helper_aliases
 
 func main() i32 {

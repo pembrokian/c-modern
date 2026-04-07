@@ -1,0 +1,1 @@
+module internal is internal to package 'pkg_b' and cannot be imported from package 'pkg_a'

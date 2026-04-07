@@ -1,5 +1,3 @@
-export { DEFAULT_SUMMARY, Summary }
-
 struct Summary {
     open_items: usize
     closed_items: usize

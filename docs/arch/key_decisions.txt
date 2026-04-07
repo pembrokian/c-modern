@@ -68,3 +68,33 @@ Consequence:
 - callers should construct errors through helpers such as `errors.fail(...)` and `errors.fail_errno(...)` instead of inventing raw numeric layouts
 - hosted runtime failures should preserve errno-classification through the encoded scalar channel
 - richer message, source-context, cause-chaining, or heap-backed error objects remain a later follow-up rather than part of the current admitted slice
+
+4. Module Visibility And Package-Internal Sharing
+
+Decision:
+- ordinary top-level declarations are public to legal importers by default
+- `@private` is the only declaration-level hiding mechanism
+- a source file named `internal.mc` is the only package-internal module kind
+- package identity is explicit and build-owned rather than inferred from raw
+	directory adjacency
+- direct-source workflows do not admit `internal.mc` because they do not carry
+	explicit package identity
+
+Why:
+- removes the curated export-list contract and replaces it with one simpler
+	semantic rule the parser, sema, `.mci`, and project workflow can all share
+- keeps package sharing module-scoped rather than inventing a second
+	declaration-level package-private lattice
+- avoids path-based heuristics that would make import legality depend on local
+	filesystem accidents instead of declared build state
+- keeps direct-source mode honest about what it can and cannot prove without
+	project metadata
+
+Consequence:
+- grammar and examples remove `export {}` from the v0.2 source contract
+- build descriptions must name package identity explicitly for project-driven
+	workflows
+- `.mci` must summarize the non-private semantic surface plus enough metadata
+	to validate `internal.mc` imports
+- later implementation phases should reject stale export-block assumptions
+	rather than carrying compatibility shims

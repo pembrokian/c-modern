@@ -1,8 +1,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "compiler/lex/lexer.h"
@@ -17,7 +19,22 @@ struct FixtureCase {
     std::string expected_output_name;
     std::vector<std::string> import_roots;
     bool should_check = true;
+    std::optional<std::string> current_package_identity;
+    std::vector<std::pair<std::string, std::string>> package_roots;
 };
+
+bool PathWithinRoot(const std::filesystem::path& path, const std::filesystem::path& root) {
+    auto path_it = path.begin();
+    auto root_it = root.begin();
+    while (root_it != root.end()) {
+        if (path_it == path.end() || *path_it != *root_it) {
+            return false;
+        }
+        ++path_it;
+        ++root_it;
+    }
+    return true;
+}
 
 void Fail(const std::string& message) {
     std::cerr << "test failure: " << message << '\n';
@@ -66,6 +83,27 @@ void RunFixture(const std::filesystem::path& source_root, const std::filesystem:
     mc::sema::CheckOptions options;
     for (const auto& import_root : fixture.import_roots) {
         options.import_roots.push_back(source_root / import_root);
+    }
+    options.current_package_identity = fixture.current_package_identity;
+    if (!fixture.package_roots.empty()) {
+        std::vector<std::pair<std::filesystem::path, std::string>> package_roots;
+        package_roots.reserve(fixture.package_roots.size());
+        for (const auto& [relative_root, package_identity] : fixture.package_roots) {
+            package_roots.push_back({
+                std::filesystem::absolute(fixture_dir / relative_root).lexically_normal(),
+                package_identity,
+            });
+        }
+        options.package_identity_for_source =
+            [package_roots = std::move(package_roots)](const std::filesystem::path& source_path) -> std::optional<std::string> {
+            const auto normalized_path = std::filesystem::absolute(source_path).lexically_normal();
+            for (const auto& [root, package_identity] : package_roots) {
+                if (PathWithinRoot(normalized_path, root)) {
+                    return package_identity;
+                }
+            }
+            return std::nullopt;
+        };
     }
 
     const auto checked = mc::sema::CheckProgram(*parsed.source_file, source_path, options, diagnostics);
@@ -166,6 +204,7 @@ int main(int argc, char** argv) {
         {"import_alias_ok_main.mc", "import_alias_ok_main.sema.txt", {}, true},
         {"import_const_array_ok_main.mc", "import_const_array_ok_main.sema.txt", {}, true},
         {"import_ok_main.mc", "import_ok_main.sema.txt", {}, true},
+        {"internal_same_package/main.mc", "internal_same_package/main.sema.txt", {}, true, "pkg", {{"internal_same_package", "pkg"}}},
         {"import_type_ok_main.mc", "import_type_ok_main.sema.txt", {}, true},
         {"import_root_ok_main.mc", "import_root_ok_main.sema.txt", {"tests/sema/import_roots"}, true},
         {"layout_ok.mc", "layout_ok.sema.txt", {}, true},
@@ -188,6 +227,10 @@ int main(int argc, char** argv) {
         {"const_initializer_non_constant_bad.mc", "const_initializer_non_constant_bad.errors.txt", {}, false},
         {"const_shift_count_bad.mc", "const_shift_count_bad.errors.txt", {}, false},
         {"global_initializer_type_bad.mc", "global_initializer_type_bad.errors.txt", {}, false},
+        {"internal_cross_package/pkg_a/main.mc", "internal_cross_package/pkg_a/main.errors.txt", {"tests/sema/internal_cross_package/pkg_b"}, false, "pkg_a", {{"internal_cross_package/pkg_a", "pkg_a"}, {"internal_cross_package/pkg_b", "pkg_b"}}},
+        {"internal_root/internal.mc", "internal_root.errors.txt", {}, false},
+        {"private_access_bad.mc", "private_access_bad.errors.txt", {}, false},
+        {"private_type_leak_bad.mc", "private_type_leak_bad.errors.txt", {}, false},
         {"var_initializer_non_constant_bad.mc", "var_initializer_non_constant_bad.errors.txt", {}, false},
         {"return_type_bad.mc", "return_type_bad.errors.txt", {}, false},
         {"break_outside_loop_bad.mc", "break_outside_loop_bad.errors.txt", {}, false},

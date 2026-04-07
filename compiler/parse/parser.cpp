@@ -7,19 +7,17 @@ namespace mc::parse {
 
 Parser::Parser(const mc::lex::LexResult& lexed_module,
                const std::filesystem::path& file_path,
-               support::DiagnosticSink& diagnostics)
+               mc::support::DiagnosticSink& diagnostics)
     : tokens_(lexed_module.tokens), file_path_(file_path), diagnostics_(diagnostics), ok_(lexed_module.ok) {}
 
 ParseResult Parser::Run() {
     auto source_file = std::make_unique<SourceFile>();
     source_file->span.begin = Current().span.begin;
+    if (file_path_.filename() == "internal.mc") {
+        source_file->module_kind = SourceFile::ModuleKind::kInternal;
+    }
 
     SkipNewlines();
-    if (Match(TokenKind::kExport)) {
-        source_file->has_export_block = true;
-        source_file->export_block = ParseExportBlock(Previous().span.begin);
-        RequireSourceSeparator("export block");
-    }
 
     while (Match(TokenKind::kImport)) {
         source_file->imports.push_back(ParseImportDecl(Previous().span.begin));
@@ -287,7 +285,7 @@ Parser::AggInitGuard::~AggInitGuard() {
 
 ParseResult Parse(const mc::lex::LexResult& lexed_module,
                   const std::filesystem::path& file_path,
-                  support::DiagnosticSink& diagnostics) {
+                  mc::support::DiagnosticSink& diagnostics) {
     return Parser(lexed_module, file_path, diagnostics).Run();
 }
 

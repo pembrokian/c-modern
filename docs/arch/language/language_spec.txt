@@ -38,6 +38,10 @@ Modules:
 - One source file equals one module in v0.2.
 - Modules compile independently.
 - Imports are explicit and acyclic.
+- Ordinary top-level declarations are visible to legal importers by default.
+- `@private` hides a top-level declaration from importers and interface artifacts.
+- A source file named `internal.mc` is package-internal and may be imported only by modules in the same explicit package identity.
+- Package identity is provided by the build configuration, not inferred from raw directory adjacency.
 - There are no hidden static constructors or module initialization hooks.
 - Top-level `const` initializers must be compile-time constants.
 - Top-level `var` declarations are allowed for static storage.
@@ -51,10 +55,13 @@ Execution note:
 
 Example:
 
-export { foo, bar }
-
 import io
 import math
+
+@private
+func local_helper() i32 {
+    return 0
+}
 
 Future direction:
 - Multi-file modules are a possible future extension, but are not part of v0.2.

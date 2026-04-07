@@ -88,6 +88,20 @@ bool ReportDuplicateConfiguredPaths(const std::filesystem::path& project_path,
     return false;
 }
 
+bool IsPathWithinRoot(const std::filesystem::path& path,
+                     const std::filesystem::path& root) {
+    const std::filesystem::path normalized_path = std::filesystem::absolute(path).lexically_normal();
+    const std::filesystem::path normalized_root = std::filesystem::absolute(root).lexically_normal();
+    auto path_it = normalized_path.begin();
+    auto root_it = normalized_root.begin();
+    for (; root_it != normalized_root.end(); ++root_it, ++path_it) {
+        if (path_it == normalized_path.end() || *path_it != *root_it) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::string StripComment(std::string_view line) {
     std::string output;
     output.reserve(line.size());
@@ -499,6 +513,13 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                 target->kind = parsed_value->string_value;
                 continue;
             }
+            if (key == "package") {
+                if (!ExpectValueKind(*parsed_value, ParsedValue::Kind::kString, project.path, line_number, key, diagnostics)) {
+                    continue;
+                }
+                target->package_name = parsed_value->string_value;
+                continue;
+            }
             if (key == "root") {
                 if (!ExpectValueKind(*parsed_value, ParsedValue::Kind::kString, project.path, line_number, key, diagnostics)) {
                     continue;
@@ -550,6 +571,22 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             target->module_search_paths.clear();
             for (const auto& entry : parsed_value->string_array_value) {
                 target->module_search_paths.push_back(entry);
+            }
+            continue;
+        }
+
+        if (section.size() == 4 && section[2] == "packages") {
+            if (key != "roots") {
+                ReportProjectError(project.path, line_number, "unknown packages key: " + key, diagnostics);
+                continue;
+            }
+            if (!ExpectValueKind(*parsed_value, ParsedValue::Kind::kStringArray, project.path, line_number, key, diagnostics)) {
+                continue;
+            }
+            auto& package_roots = target->package_roots[section[3]];
+            package_roots.clear();
+            for (const auto& entry : parsed_value->string_array_value) {
+                package_roots.push_back(entry);
             }
             continue;
         }
@@ -643,6 +680,9 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         } else {
             target.root = std::filesystem::absolute(project.root_dir / target.root).lexically_normal();
         }
+        if (target.package_name.empty()) {
+            target.package_name = name;
+        }
         if (!IsSupportedMode(target.mode)) {
             diagnostics.Report({
                 .file_path = project.path,
@@ -670,6 +710,24 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         for (auto& module_root : target.module_search_paths) {
             module_root = std::filesystem::absolute(project.root_dir / module_root).lexically_normal();
         }
+        for (auto& [package_name, package_roots] : target.package_roots) {
+            if (package_name.empty()) {
+                diagnostics.Report({
+                    .file_path = project.path,
+                    .span = mc::support::kDefaultSourceSpan,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "target '" + name + "' declares an empty package identity",
+                });
+            }
+            for (auto& package_root : package_roots) {
+                package_root = std::filesystem::absolute(project.root_dir / package_root).lexically_normal();
+            }
+            ReportDuplicateConfiguredPaths(project.path,
+                                           name,
+                                           "package root",
+                                           package_roots,
+                                           diagnostics);
+        }
         for (auto& test_root : target.tests.roots) {
             test_root = std::filesystem::absolute(project.root_dir / test_root).lexically_normal();
         }
@@ -683,6 +741,22 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                                        "test root",
                                        target.tests.roots,
                                        diagnostics);
+        std::unordered_map<std::string, std::string> owned_package_roots;
+        for (const auto& [package_name, package_roots] : target.package_roots) {
+            for (const auto& package_root : package_roots) {
+                const std::string normalized_root = package_root.lexically_normal().generic_string();
+                const auto [it, inserted] = owned_package_roots.emplace(normalized_root, package_name);
+                if (!inserted && it->second != package_name) {
+                    diagnostics.Report({
+                        .file_path = project.path,
+                        .span = mc::support::kDefaultSourceSpan,
+                        .severity = DiagnosticSeverity::kError,
+                        .message = "target '" + name + "' assigns source root '" + normalized_root +
+                                   "' to multiple package identities: '" + it->second + "' and '" + package_name + "'",
+                    });
+                }
+            }
+        }
         if (!IsSupportedMode(target.tests.mode)) {
             diagnostics.Report({
                 .file_path = project.path,
@@ -791,6 +865,31 @@ std::vector<std::filesystem::path> ComputeProjectImportRoots(const ProjectFile& 
 
     (void)project;
     return roots;
+}
+
+std::optional<std::string> ResolveTargetPackageIdentity(const ProjectTarget& target,
+                                                        const std::filesystem::path& source_path) {
+    std::optional<std::string> best_package;
+    std::size_t best_depth = 0;
+    for (const auto& [package_name, package_roots] : target.package_roots) {
+        for (const auto& package_root : package_roots) {
+            if (!IsPathWithinRoot(source_path, package_root)) {
+                continue;
+            }
+            const std::size_t depth = static_cast<std::size_t>(std::distance(package_root.begin(), package_root.end()));
+            if (!best_package.has_value() || depth > best_depth) {
+                best_package = package_name;
+                best_depth = depth;
+            }
+        }
+    }
+    if (best_package.has_value()) {
+        return best_package;
+    }
+    if (!target.package_name.empty()) {
+        return target.package_name;
+    }
+    return std::nullopt;
 }
 
 }  // namespace mc::driver

@@ -771,12 +771,14 @@ bool RunOrdinaryTestsForTarget(const ProjectFile& project,
     ProjectTarget runner_target;
     runner_target.name = target.name + "-tests";
     runner_target.kind = "exe";
+    runner_target.package_name = target.package_name;
     runner_target.root = runner_path;
     runner_target.mode = test_mode;
     runner_target.env = options.env_override.value_or(target.env);
     runner_target.target = target.target;
     runner_target.links = target.links;
     runner_target.module_search_paths = BuildTestImportRoots(project, target, options.import_roots, test_roots, generated_root);
+    runner_target.package_roots = target.package_roots;
     runner_target.runtime_startup = "default";
 
     std::unordered_set<std::string> visiting_targets;

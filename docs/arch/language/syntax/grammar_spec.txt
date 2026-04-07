@@ -53,7 +53,6 @@ digit        = "0".."9"
 
 Keywords:
 - `import`
-- `export`
 - `func`
 - `struct`
 - `enum`
@@ -131,14 +130,10 @@ Notes:
 2. Source File Structure
 
 ```text
-source_file     = [ export_block source_sep ]
-                  { import_decl source_sep }
+source_file     = { import_decl source_sep }
                   [ top_level_decl { source_sep top_level_decl } [ source_sep ] ]
 
 source_sep      = <newline>
-
-export_block    = "export" "{" [ export_name_list ] "}"
-export_name_list = <identifier> { "," <identifier> }
 
 import_decl     = "import" module_name
 module_name     = <identifier>
@@ -147,7 +142,12 @@ module_name     = <identifier>
 Rules:
 - one source file is one module in v0.2
 - imports are explicit and acyclic
-- exports are declared through the top-level export block, not by per-declaration `export` modifiers in source syntax
+- top-level declarations are visible to legal importers by default
+- `@private` is written as an ordinary attribute before supported top-level
+    declarations; legality is enforced semantically rather than by a dedicated
+    grammar production
+- a source file named `internal.mc` gains package-internal module kind through
+    build configuration and filename convention, not through extra source syntax
 - this grammar standardizes single-segment module names for v0.2
 
 3. Attributes and Modifiers
@@ -164,6 +164,8 @@ extern_modifier = "extern" "(" <identifier> ")"
 Rules:
 - attributes may appear before top-level declarations
 - parameter attributes are allowed before a parameter name to support cases such as `@noalias`
+- `@private` is the standardized visibility attribute spelling for top-level
+    declarations in v0.2
 - `extern(c)` is the standardized foreign-declaration modifier for v0.2
 
 4. Top-Level Declarations

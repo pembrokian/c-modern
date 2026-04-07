@@ -1,5 +1,3 @@
-export { main }
-
 import helper_consts
 
 struct Packet {
