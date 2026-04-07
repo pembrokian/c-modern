@@ -1,0 +1,189 @@
+Phase 66 -- Adjacent Stdlib And Runtime Consumer Matrix
+======================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Audit the remaining adjacent stdlib and runtime follow-through fronts after the
+Phase 65 language-surface plateau decision, then name which of those fronts is
+the next honest active owner and which ones still remain deferred.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository status note
+----------------------
+- Phase 65 recorded that the admitted v0.2 core is semantically complete
+  enough for repository-bounded release hardening.
+- The next open questions therefore no longer center on a known parser, sema,
+  or MIR ownership gap inside that admitted core slice.
+- The remaining adjacent fronts are materially different from one another:
+  - `time` is no longer a deferred candidate for first admission because the
+    repository already landed the narrow `Duration` plus monotonic-clock slice
+    in Phase 35
+  - filesystem and cross-module error-contract convergence remain visibly
+    uneven because `fs.file_size(...)` and `fs.is_dir(...)` already return
+    `errors.Error`, while the heavily used `fs.read_all(...)` and
+    `fs.list_dir(...)` paths still expose nil-only failure
+  - `testing` is now used broadly across admitted ordinary project tests, but
+    its remaining gaps look more like second-wave helper hardening than the
+    strongest current runtime-boundary mismatch
+  - `os` subprocess support is real but still bounded to one admitted
+    child-process relay proof and one matching stdlib regression path
+  - `sync` and `mem` follow-on work still lacks a stronger admitted consumer
+    than the currently landed narrow hosted slice
+
+Problem being solved
+--------------------
+- The speculative roadmap still listed several adjacent follow-through options,
+  but after Phase 65 the repository needed one explicit ranking based on the
+  current admitted consumer set rather than on earlier possibility space.
+- Without a matrix phase, planning could reopen `time`, broader `os`, or
+  testing helper work opportunistically even though the strongest remaining
+  adjacent pressure now comes from a narrower filesystem and error-contract
+  mismatch.
+- The repository needs one gatekeeper phase that names the next honest follow-
+  through and records why the other adjacent fronts are not first.
+
+Core rule
+---------
+- Choose the next adjacent wave from current admitted consumer pressure, not
+  from the existence of deferred spec families.
+- Prefer the strongest user-facing contract mismatch over helper polish when
+  both are real.
+- Keep already-landed admissions such as the narrow `time` slice out of the
+  candidate set unless a new consumer now justifies widening them.
+- Keep broader `os`, `sync`, `mem`, and `hal` explicit, but do not reopen them
+  without a stronger admitted consumer than the repository has today.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one consumer-matrix audit across the current admitted
+real projects, stdlib surfaces, tests, and recent critique routing.
+
+The matrix ranks five adjacent fronts:
+1. filesystem and cross-module error-contract follow-through
+2. testing helper hardening
+3. process-surface widening beyond the current bounded subprocess slice
+4. sync or mem follow-on work
+5. further `time` widening beyond the already admitted Phase 35 slice
+
+Audited pressure summary
+------------------------
+Filesystem and error-contract pressure:
+- `fs.read_all(...)` is used across several admitted utilities and real project
+  proofs including `grep_lite`, `hash_tool`, `arena_expr`, `issue_rollup`, and
+  `review_board`.
+- `fs.list_dir(...)` and `fs.is_dir(...)` remain part of the admitted real
+  `file_walker` proof.
+- The current `fs` surface is visibly uneven: `fs.file_size(...)` and
+  `fs.is_dir(...)` already return `errors.Error`, but `fs.read_all(...)` and
+  `fs.list_dir(...)` still collapse all failures to nil.
+- That mismatch now sits on the broadest real file-oriented consumer set in the
+  admitted repository.
+
+Testing pressure:
+- The admitted real project tests now use `testing.expect(...)`,
+  `testing.expect_false(...)`, integer equality helpers, string equality
+  helpers, and `testing.fail()` pervasively.
+- This is real pressure, but the remaining gap is narrower and more cosmetic
+  than the filesystem error-contract mismatch: the current helper surface is
+  already honest, merely limited.
+
+Process pressure:
+- The current hosted subprocess slice is still proved mainly by one bounded
+  real project, `line_filter_relay`, plus matching stdlib coverage.
+- The critique concerns around child-handle post-wait state and API asymmetry
+  are real, but the admitted consumer set still does not show a second project
+  that needs broader argv, stderr, environment, cwd, or multi-stage pipeline
+  policy.
+
+Sync and mem pressure:
+- The repository still lacks a stronger admitted consumer for read-modify-write
+  atomics, broader coordination helpers, or richer arena or generic-buffer
+  API shaping than the current landed proofs already cover.
+
+Time pressure:
+- The first-admission question is already settled by the landed Phase 35 time
+  slice.
+- Current repository evidence still does not justify widening from monotonic
+  elapsed time into wall-clock, sleep, or broader deadline helpers.
+
+Delivered outcome
+-----------------
+- the strongest next adjacent frontier is filesystem and cross-module
+  error-contract follow-through
+- testing helper hardening remains a real second-wave candidate, but it does
+  not outrank the broader file-oriented contract mismatch on admitted consumers
+- broader process follow-through remains deferred until a second admitted
+  subprocess consumer or a stronger post-wait ownership need appears
+- sync or mem follow-on remains deferred until a stronger admitted consumer
+  exists
+- further `time` widening remains deferred because the already admitted narrow
+  `time` slice still covers the current honest need
+- next-step statement: authorize Phase 67 for the smallest honest filesystem
+  and cross-module error-contract follow-through, with testing helper
+  hardening left as the clearest later candidate in this band
+
+What this phase should try to prove
+-----------------------------------
+- which adjacent stdlib or runtime follow-through now has the strongest current
+  consumer pressure after the Phase 65 plateau decision
+- whether the next wave should address a real contract mismatch or merely
+  helper-surface convenience
+- whether any formerly speculative candidate should now be recorded as still
+  deferred rather than left ambient in the roadmap
+
+Preferred pressure points
+-------------------------
+1. Broad admitted utility reliance on `fs.read_all(...)` and `fs.list_dir(...)`.
+2. Uneven file-oriented error contracts inside one admitted stdlib family.
+3. Repeated ordinary-test helper use as a secondary but honest surface signal.
+4. The current lack of a second admitted subprocess consumer.
+5. The current lack of a stronger admitted sync or mem consumer.
+
+Deliverables
+------------
+- one consumer-matrix note naming the adjacent fronts audited and the winning
+  next owner
+- bounded updates to `/Users/ro/dev/c_modern/docs/plan/backlog.txt`,
+  `/Users/ro/dev/c_modern/docs/plan/decision_log.txt`, and the speculative
+  roadmap so the next-step order stays explicit
+- one short next-step statement authorizing Phase 67 and keeping the other
+  adjacent fronts explicit but deferred
+
+Suggested execution order
+-------------------------
+1. Re-audit the admitted stdlib surfaces and real project proofs after the
+   Phase 65 plateau decision.
+2. Separate first-admission questions from widening questions that are already
+   settled, such as the narrow landed `time` slice.
+3. Rank the remaining adjacent fronts by admitted consumer pressure and by the
+   severity of the current contract mismatch.
+4. Authorize only the strongest next owner and record the others as explicit
+   later or deferred fronts.
+
+Exit criteria
+-------------
+- the repository has one explicit next adjacent follow-through owner after
+  Phase 65
+- the non-winning adjacent fronts remain explicit with honest deferral reasons
+- the speculative roadmap no longer treats Phase 66 as future work
+
+Non-goals
+---------
+- implementing filesystem or testing widening directly in this matrix phase
+- reopening broad `os`, `sync`, `mem`, or `hal` work without stronger consumer
+  evidence
+- treating helper convenience alone as stronger than a broader user-facing
+  contract mismatch
+- redefining the already admitted narrow `time` slice
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 66 stands alone as the adjacent stdlib and runtime gatekeeper after
+  the Phase 65 plateau decision.
+- The phase is explicit that Phase 67 is the authorized next follow-through.

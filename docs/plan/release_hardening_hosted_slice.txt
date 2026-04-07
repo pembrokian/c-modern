@@ -11,6 +11,12 @@ Record the current supported hosted slice, frozen support matrix, installation
 path, usage path, checked-versus-release posture, and known limitations for
 the repository's current capability plateau.
 
+Phase 65 now makes one additional planning point explicit: the admitted v0.2
+core is semantically complete enough for this repository-bounded release-
+hardening posture. The remaining open work is therefore support breadth,
+adjacent-family admission, portability, and workflow trust, not a known
+missing parser/sema/MIR ownership gap inside the admitted core slice.
+
 This note is the repository-bounded realization of the original bootstrap-plan
 Phase 9 release-hardening work. It is not a claim that the entire language,
 toolchain, or long-term architecture roadmap is finished.
@@ -200,3 +206,9 @@ selected-target same-build-dir reuse without non-selected-target churn on the
 admitted richer project proof, and the admitted real-project examples.
 Everything outside that slice should be treated as explicitly unsupported until
 a narrower owner document and proof layer admit it.
+
+Within that bounded support claim, the admitted v0.2 core should now be read
+as semantically complete enough for repository-bounded release hardening. New
+core-language closure work should therefore reopen only when a fresh admitted
+parser, sema, MIR, or backend distortion is found on the already admitted
+slice.

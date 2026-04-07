@@ -1,0 +1,157 @@
+Phase 65 -- Language Surface Plateau Decision
+============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Record one explicit answer after the Phase 60 through Phase 64 closure wave:
+the admitted v0.2 core no longer has a known parser, sema, or MIR ownership
+gap on the supported slice that should block repository-bounded release
+hardening.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative admin roadmap described Phase 65 as the language-surface
+  plateau decision.
+- That label now fits the strongest honest remaining need after the completed
+  Phase 60 through Phase 64 wave: the repository needs an explicit yes-or-no
+  answer on whether the admitted v0.2 core is semantically complete enough
+  for release hardening, rather than another vague promise of future core
+  closure.
+
+Repository status note
+----------------------
+- Phase 60 closed the remaining admitted compile-time truth drift on the
+  current supported slice.
+- Phase 61 finalized imported identity so admitted qualified and imported type
+  forms survive the supported workflow without reconstruction drift.
+- Phase 62 closed the MIR-owned indexed-lvalue addressability gap already
+  admitted by the language and sema.
+- Phase 63 closed generic variant constructor preservation for admitted generic
+  enum construction.
+- Phase 64 closed the remaining ordinary expression-form enum inspection gap
+  on the admitted slice.
+- The repository already has a published hosted-slice release-hardening note,
+  but before this phase it still lacked one explicit planning statement tying
+  that release-hardening posture to the completed core semantic closure wave.
+- The remaining open fronts are still real, but they now cluster around
+  support breadth, adjacent stdlib or runtime family admission, portability,
+  and workflow hardening rather than around a known missing core-language
+  ownership gap inside the admitted v0.2 slice.
+
+Problem being solved
+--------------------
+- Without an explicit plateau decision, planning prose could keep reopening
+  parser, sema, or MIR closure work opportunistically even after the admitted
+  core-language gaps from the current wave were already closed.
+- The repository already has support and release-hardening notes, but they
+  needed an explicit statement of what they are now grounded on.
+- The next planning wave should distinguish between core semantic completion on
+  the admitted slice and outward growth into broader libraries, platforms,
+  tooling policy, or a larger language surface.
+
+Core rule
+---------
+- Separate the admitted v0.2 core plateau from the broader long-term language
+  and tooling roadmap.
+- Treat release hardening as honest only when no known parser, sema, or MIR
+  owner gap still distorts the already admitted core surface.
+- Do not convert this plateau decision into a claim that the full language,
+  full architecture plan, or broader portability story is complete.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: use the completed Phase 60 through Phase 64 closeout set
+as the semantic evidence, then align the repository support statements and
+planning notes around one explicit outcome:
+
+Chosen outcome: yes.
+
+The admitted v0.2 core is now semantically complete enough for
+repository-bounded release hardening.
+
+That means the next repository work should be framed as one of the following:
+- support-matrix and public-cut hardening on the already admitted slice
+- adjacent stdlib or runtime family work justified by new pressure
+- portability, workflow, artifact, or packaging follow-through
+
+It does not mean:
+- the full language plan is complete
+- every future compiler feature is already implemented
+- deferred adjacent families such as broader `time`, `hal`, richer `os`, or
+  broader linker policy have been admitted automatically
+
+What this phase should try to prove
+-----------------------------------
+- the repository has an explicit answer on the admitted core-language plateau
+  instead of keeping core completion perpetually implicit
+- the support statement and release-hardening note are grounded in the
+  completed Phase 60 through Phase 64 semantic closure wave
+- future planning can treat new core-language closure claims as exceptions that
+  require fresh evidence, not as the default next step
+
+Deliverables
+------------
+- one canonical Phase 65 note documenting the language-surface plateau
+  decision
+- one README and one hosted-slice release-hardening update stating the new
+  plateau explicitly and narrowly
+- bounded backlog and decision-log updates recording that the next wave should
+  be release hardening or outward growth, not another unspecified core-
+  language closure pass
+
+Suggested execution order
+-------------------------
+1. Re-audit the completed Phase 60 through Phase 64 wave against the current
+   supported slice.
+2. Decide explicitly whether any known admitted core-language owner gap still
+   blocks repository-bounded release hardening.
+3. If no such gap remains, record the plateau and align README plus
+   release-hardening wording with that result.
+4. Keep non-core follow-on fronts explicit in backlog and decision-log form.
+
+Exit criteria
+-------------
+- the repository has a clear yes-or-no answer on the admitted v0.2 core
+  plateau
+- the answer is reflected in the support statement rather than only in
+  scattered phase closeouts
+- remaining open fronts stay explicit and bounded as deferred support,
+  portability, workflow, artifact, or adjacent-family work
+
+Non-goals
+---------
+- claiming the full long-term language or architecture plan is complete
+- broadening the supported target matrix, portability story, or runtime
+  surface in this phase
+- inventing a new language feature solely to avoid making the plateau decision
+- treating the existence of future work as proof that the admitted core is not
+  yet semantically closed
+
+Implemented slice
+-----------------
+- recorded the explicit plateau outcome: the admitted v0.2 core is now
+  semantically complete enough for repository-bounded release hardening
+- aligned the repository support statements so README and the hosted-slice
+  release-hardening note now describe Phase 65 as the point where the core
+  semantic closure wave became an explicit plateau rather than an implicit
+  assumption
+- updated the planning surface so backlog and decision-log entries route the
+  next wave toward hardening or outward growth while keeping a narrow reopen
+  trigger for any newly discovered admitted core-language owner gap
+
+Closeout statement
+------------------
+Phase 65 is complete as a language-surface plateau decision. The repository is
+not claiming the full language or platform story is finished; it is making a
+narrower and more useful statement: the admitted v0.2 core no longer has a
+known parser, sema, or MIR ownership gap on the supported slice that should
+block repository-bounded release hardening. Future core-language closure work
+therefore needs fresh concrete evidence, while the default next work shifts to
+hardening, support clarity, and explicitly justified outward growth.

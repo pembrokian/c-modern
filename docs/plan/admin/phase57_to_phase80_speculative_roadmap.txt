@@ -1,4 +1,4 @@
-Phase 60 Through Phase 79 -- Speculative Roadmap
+Phase 67 Through Phase 79 -- Speculative Roadmap
 ================================================
 
 Status
@@ -32,9 +32,9 @@ Repository numbering note
 - The old speculative Phase 57 frontier-follow-through was effectively
   subsumed by the concrete Phase 56 route-to-owner note rather than landing as
   a separate repository phase.
-- The old speculative Phase 59 and Phase 60 topics are now concrete repository
-  history as Phase 58 and Phase 59.
-- This speculative continuation therefore starts at Phase 60.
+- The old speculative Phase 59 through Phase 66 topics are now concrete
+  repository history as Phase 58 through Phase 66.
+- This speculative continuation therefore starts at Phase 67.
 
 Repository status note
 ----------------------
@@ -88,47 +88,39 @@ Likely themes:
 - a final pass on compile-time truth, imported type identity, and owner-local
   lowering rules
 
-Why this band comes first:
-- the repository still gets the most leverage from making language meaning
-  authoritative before widening more tools or more runtime surfaces
-- the current plans already show repeated evidence that later layers should not
-  compensate for missing semantic truth
+Band A - Core Language Closure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 60 through 65 are now concrete repository history rather than active
+speculation:
 
-Phases in this band:
+- Phase 60 closed the remaining admitted compile-time truth drift.
+- Phase 61 finalized imported identity on the supported workflow.
+- Phase 62 closed indexed-lvalue address lowering on the MIR-owned boundary.
+- Phase 63 closed generic variant constructor preservation.
+- Phase 64 closed expression-form variant inspection.
+- Phase 65 recorded the resulting language-surface plateau decision: the
+  admitted v0.2 core is semantically complete enough for repository-bounded
+  release hardening.
 
-Phase 60 -- Compile-Time Truth Closure
-- Exit criterion: the admitted compile-time subset is deterministic across the
-  remaining static-storage and constant-expression cases.
-
-Phase 61 -- Imported Identity Finalization
-- Exit criterion: imported type identity and qualified nominal forms survive
-  the supported workflow without reconstruction drift.
-
-Phase 62 -- MIR Surface Completion For Remaining Owned Semantics
-- Exit criterion: any sema construct still missing a dedicated MIR form has a
-  clear owner-local lowering path or a named deferral, including short-circuit
-  boolean evaluation and indexed access if those forms are still lagging the
-  written grammar.
-
-Phase 63 -- Final Narrow Semantic Fixture Sweep
-- Exit criterion: the remaining sema and MIR fixtures cover the final admitted
-  edge cases without broadening the language surface.
-
-Phase 64 -- Semantic Owner Re-Audit
-- Exit criterion: no known sema rule is still being papered over in MIR,
-  backend, or tooling.
-
-Phase 65 -- Language Surface Plateau Decision
-- Exit criterion: the repository has a stable answer on whether the admitted
-  v0.2 core is now semantically complete enough for release hardening.
+The remaining speculative continuation therefore starts with Band B at Phase
+66.
 
 Band B - Runtime And Library Adjacent Closure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 66 through 72 likely decide which adjacent runtime families are still
-needed after the core language truth is stable.
+Phases 66 through 72 now include one concrete matrix decision followed by the
+remaining speculative adjacent-runtime follow-through.
+
+Phase 66 is now concrete repository history rather than active speculation:
+- the adjacent stdlib and runtime consumer matrix chose filesystem and
+  cross-module error-contract follow-through as the strongest next adjacent
+  owner after the Phase 65 plateau decision
+- testing helper hardening remains a real second-wave candidate
+- broader `os`, `sync`, `mem`, and further `time` widening remain deferred
+
+The remaining speculative continuation in this band therefore starts at Phase
+67.
 
 Likely themes:
-- `time` if and only if a real consumer needs deadlines, retries, or sleep
 - filesystem and `io` contract convergence where nil-only or raw-status
   boundaries still remain materially harmful
 - narrow `os` process-surface widening only if real argv or handle-lifecycle
@@ -148,20 +140,16 @@ Why this band is separate:
 
 Phases in this band:
 
-Phase 66 -- Adjacent Stdlib And Runtime Consumer Matrix
-- Exit criterion: one explicit matrix names which remaining adjacent-library
-  follow-through items are honest next steps: `time`, fs or io error-channel
-  widening, testing helper hardening, sync follow-on, or argv process widening.
-
 Phase 67 -- Filesystem And Error-Contract Follow-Through
 - Exit criterion: the smallest honest next filesystem or cross-module
   error-contract widening lands, or the remaining nil-only or status-only
   boundaries are explicitly deferred again with a consumer-based reason.
 
-Phase 68 -- Time Or Process Follow-Through
-- Exit criterion: one real admitted project drives either the next narrow
-  `time` slice or the next honest subprocess or argv widening through the
-  normal workflow and tests.
+Phase 68 -- Process Or Deferred Time Follow-Through
+- Exit criterion: one real admitted project drives the next honest subprocess
+  or argv widening through the normal workflow and tests, or the repository
+  records that the already admitted narrow `time` slice still needs no further
+  widening.
 
 Phase 69 -- Testing Surface Hardening
 - Exit criterion: repeated ordinary-test helper patterns are absorbed into a

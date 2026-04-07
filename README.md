@@ -10,6 +10,7 @@ What is in place:
 - a handwritten lexer and parser that handle modules, declarations, types, statements, and expression precedence for the current v0.2 bootstrap subset
 - bootstrap semantic checking for imports, visibility, local control-flow rules, and first-cut layout reporting
 - typed MIR lowering, validation, and deterministic MIR fixture coverage for the currently supported semantic subset
+- the admitted v0.2 core language surface is now at a repository-bounded semantic plateau suitable for release hardening: current planned follow-on work is support clarity, workflow hardening, and adjacent-surface growth rather than a known missing parser/sema/MIR owner gap inside that admitted core
 - bootstrap LLVM backend scaffolding for the frozen hosted Darwin arm64 target, with narrow backend preflight diagnostics for out-of-scope MIR
 - a thin `mc` driver with direct-source `check` and `build`, project-driven `build.toml` target `check`, `build`, `run`, and `test`, `dump-paths`, and optional AST/MIR/backend dump emission for compiler inspection
 - a bootstrap Phase 6 hosted slice with automatic repository-local stdlib discovery, imported-module executable builds, and explicit runtime support under `runtime/hosted/`
@@ -168,6 +169,7 @@ Notes:
 - the current standard-library boundary is still a bootstrap slice, not the full long-term Phase 6 surface from `docs/plan/plan.txt`.
 - the current repository Phase 7 work now covers workstreams A through H for the admitted bootstrap slice, but the broader long-term architecture-specified Phase 7 surface remains open.
 - the current repository Phase 8 work now covers the admitted first-pass closure described in `docs/plan/phase8_implementation_summary.txt`, but the broader long-term architecture-specified Phase 8 surface remains open.
+- `docs/plan/phase65_language_surface_plateau_decision.txt` now records that the admitted v0.2 core is semantically complete enough for repository-bounded release hardening; remaining work should be read as support hardening, portability, or adjacent-surface follow-through unless a new admitted core-language owner gap is found.
 - the current hosted release-hardening statement is recorded in `docs/plan/release_hardening_hosted_slice.txt`; keep that note and this README aligned whenever the supported slice changes.
 - known limitations remain explicit: the supported host target is still Darwin arm64 only, the admitted networking surface remains narrow IPv4 TCP plus poller support rather than a broader async or portability claim, and the admitted hosted `sync` slice still excludes compare-exchange, fetch-add, condvar broadcast, schedulers, and broader portability claims.
 - `make` is a thin convenience wrapper around the canonical CMake workflow above.
