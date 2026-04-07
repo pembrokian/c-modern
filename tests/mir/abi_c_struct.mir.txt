@@ -1,0 +1,15 @@
+Module
+  TypeDecl kind=struct name=Header
+    attributes=[abi(c)]
+    Field name=tag type=u8
+    Field name=value type=i32
+  Function name=main returns=[i32]
+    Local name=header type=Header
+    Block label=entry0
+      const %v0:int_literal op=1
+      const %v1:int_literal op=9
+      aggregate_init %v2:Header target=Header operands=[%v0, %v1] fields=[tag, value]
+      store_local target=header operands=[%v2]
+      load_local %v3:Header target=header
+      field %v4:i32 target=value target_kind=field target_name=value target_display=header.value target_base=Header operands=[%v3]
+      terminator return values=[%v4]

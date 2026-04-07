@@ -1556,6 +1556,53 @@ void TestProjectImportedGlobalMirDeclarations(const std::filesystem::path& binar
                          "merged project MIR should lower imported mutable global stores as global targets");
 }
 
+void TestProjectImportedAbiTypeMirDeclarations(const std::filesystem::path& binary_root,
+                                               const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase59_imported_abi_project";
+    const std::filesystem::path project_path = WriteBasicProject(
+        project_root,
+        "@abi(c)\n"
+        "struct Header {\n"
+        "    tag: u8\n"
+        "    value: i32\n"
+        "}\n"
+        "\n"
+        "func make_header() Header {\n"
+        "    return Header{ tag: 1, value: 9 }\n"
+        "}\n",
+        "import helper\n"
+        "\n"
+        "func main() i32 {\n"
+        "    header: helper.Header = helper.make_header()\n"
+        "    return (i32)(header.tag) + header.value\n"
+        "}\n");
+    const std::filesystem::path build_dir = binary_root / "phase59_imported_abi_build";
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "build",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string(),
+                                                      "--dump-mir"},
+                                                     build_dir / "build_output.txt",
+                                                     "phase59 imported abi dump-mir build");
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail("phase59 imported abi dump-mir build should succeed:\n" + output);
+    }
+
+    const auto main_mir = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir).mir;
+    const std::string main_mir_text = ReadFile(main_mir);
+    ExpectOutputContains(main_mir_text,
+                         "TypeDecl kind=struct name=helper.Header",
+                         "merged project MIR should retain imported abi-marked type declarations");
+    ExpectOutputContains(main_mir_text,
+                         "attributes=[abi(c)]",
+                         "merged project MIR should retain imported abi(c) attributes");
+}
+
 void TestCorruptedInterfaceArtifactFailsBuild(const std::filesystem::path& binary_root,
                                               const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "phase13_corrupt_mci_project";
@@ -4206,6 +4253,7 @@ int main(int argc, char** argv) {
     TestProjectBuildAndMciEmission(binary_root, mc_path);
     TestProjectTestTargetBuildsAndRuns(binary_root, mc_path);
     TestProjectImportedGlobalMirDeclarations(binary_root, mc_path);
+    TestProjectImportedAbiTypeMirDeclarations(binary_root, mc_path);
     TestCorruptedInterfaceArtifactFailsBuild(binary_root, mc_path);
     TestStaleInterfaceArtifactFormatFailsBuild(binary_root, mc_path);
     TestModuleBuildStateIsVersionedAndDeterministic(binary_root, mc_path);

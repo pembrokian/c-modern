@@ -32,6 +32,7 @@ struct TypeDecl {
     std::string name;
     std::vector<std::string> type_params;
     bool is_packed = false;
+    bool is_abi_c = false;
     std::vector<std::pair<std::string, sema::Type>> fields;
     std::vector<VariantDecl> variants;
     sema::Type aliased_type;

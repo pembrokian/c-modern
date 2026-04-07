@@ -1,0 +1,134 @@
+Phase 59 -- Imported Layout And ABI Re-Audit
+===========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Re-audit the admitted imported layout and ABI surface after Phase 58 and
+close the narrow compiler-owned drift that still remained: `@abi(c)` type
+attributes survived sema and `.mci`, but the MIR boundary silently discarded
+them before project-level inspectability or later backend decisions could see
+ them.
+
+This document is a repository execution plan, not a new architecture phase
+after Phase 8.
+
+Repository numbering note
+-------------------------
+- The speculative admin roadmap is stale relative to the current repository.
+  Its old Phase 59 topic, structural aggregate const backend emission, is
+  already implemented concretely as Phase 58.
+- The next honest concrete owner therefore becomes Phase 59 here rather than
+  reusing the speculative numbering blindly.
+
+Repository status note
+----------------------
+- Phase 58 closed the executable backend follow-through for top-level
+  structural aggregate const globals.
+- The admitted imported layout surface already had direct executable proof for
+  packed and naturally padded structs, plus sema and `.mci` support for
+  `@abi(c)` type attributes.
+- The remaining gap was narrower than a broad ABI redesign: MIR type
+  declarations preserved `packed` but had no slot for `abi(c)`, so imported
+  and local ABI-marked types lost that owner-local fact during lowering and
+  project merge.
+
+Problem being solved
+--------------------
+- The repository claimed `@abi(c)` as semantic type-declaration metadata and
+  serialized it through `.mci`, but MIR dumps and project-merged MIR could not
+  show whether that fact survived the workflow.
+- That made Phase 59's imported layout and ABI re-audit weaker than it should
+  be: one of the admitted layout-owned attributes was present upstream and
+  silently absent downstream.
+- Even on a target where current default struct lowering may coincide with the
+  current admitted `abi(c)` cases, silently dropping the attribute is still a
+  contract drift at the compiler-owned boundary.
+
+Core rule
+---------
+- Preserve ABI-owned type facts across compiler boundaries even when the
+  current backend behavior does not yet branch on them.
+- Do not invent broader C ABI support just to fix metadata drift.
+- Prefer narrow inspectability and workflow proof over speculative backend
+  widening.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: keep `@abi(c)` on MIR type declarations for both direct
+lowering and imported project merge, expose it deterministically in MIR dumps,
+and prove the result through one local MIR fixture plus one project
+`mc build --dump-mir` regression.
+
+Compiler change boundary:
+1. add `is_abi_c` to MIR type declarations
+2. preserve that field when lowering checked source and when importing type
+   declarations into merged project MIR
+3. dump the attribute explicitly so direct and imported proofs can see it
+
+What this phase should try to prove
+-----------------------------------
+- `@abi(c)` no longer disappears between sema or `.mci` truth and MIR-owned
+  inspectability.
+- The admitted imported workflow can prove ABI-marked type retention without
+  broadening executable ABI claims beyond the currently supported slice.
+- Packed-layout proof remains separate and unchanged; this phase only closes
+  the missing ABI attribute transport.
+
+Preferred pressure points
+-------------------------
+1. a local MIR fixture with one `@abi(c)` struct
+2. a project build with `--dump-mir` that imports an `@abi(c)` helper type
+3. explicit MIR dump inspection rather than inferred behavior
+
+Deliverables
+------------
+- one canonical Phase 59 note documenting the imported layout and ABI re-audit
+  result
+- one focused MIR metadata preservation change for `@abi(c)`
+- one MIR fixture and one project regression proving direct and imported ABI
+  attribute retention
+
+Suggested execution order
+-------------------------
+1. extend MIR type declarations to carry `is_abi_c`
+2. preserve the field in source lowering and project import merge
+3. expose the attribute in MIR dumps
+4. add direct and imported regression proof
+5. rebuild and run the focused owning test suites
+
+Exit criteria
+-------------
+- MIR type declarations preserve `@abi(c)` metadata for direct and imported
+  type declarations
+- MIR dumps expose the attribute deterministically
+- the supported project workflow proves imported `@abi(c)` retention through
+  `mc build --dump-mir`
+- broader C ABI lowering questions remain explicitly out of scope
+
+Non-goals
+---------
+- broad C ABI completion or new extern calling-convention features
+- changing current struct layout rules beyond preserving existing metadata
+- introducing new runtime or stdlib pressure just to exercise ABI annotations
+- renumbering the entire speculative roadmap in the same change
+
+What landed
+-----------
+- `mc::mir::TypeDecl` now carries `is_abi_c` alongside `is_packed`.
+- Both direct MIR lowering and imported project MIR merge now preserve
+  sema-owned `@abi(c)` facts.
+- MIR dumps now print `attributes=[abi(c)]` deterministically, matching the
+  existing attribute style used for `packed`.
+- A local MIR fixture and a project `--dump-mir` regression now prove that
+  ABI-marked imported types survive the admitted workflow.
+
+Closeout statement
+------------------
+Phase 59 is complete as a narrow imported layout and ABI re-audit. The
+repository does not claim broader C ABI completion here; it closes the smaller
+but real contract drift where sema and `.mci` knew a type was `@abi(c)` and
+MIR silently forgot it.

@@ -1675,6 +1675,7 @@ TypeDecl LowerTypeDeclSummary(const sema::TypeDeclSummary& summary) {
     type_decl.name = summary.name;
     type_decl.type_params = summary.type_params;
     type_decl.is_packed = summary.is_packed;
+    type_decl.is_abi_c = summary.is_abi_c;
     type_decl.fields = summary.fields;
     type_decl.aliased_type = summary.aliased_type;
     for (const auto& variant : summary.variants) {

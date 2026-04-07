@@ -29,6 +29,9 @@ std::string DumpModule(const Module& module) {
         if (type_decl.is_packed) {
             WriteLine(stream, 2, "attributes=[packed]");
         }
+        if (type_decl.is_abi_c) {
+            WriteLine(stream, 2, "attributes=[abi(c)]");
+        }
         for (const auto& field : type_decl.fields) {
             WriteLine(stream, 2, "Field name=" + field.first + " type=" + sema::FormatType(field.second));
         }

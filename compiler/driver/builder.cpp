@@ -337,6 +337,7 @@ mc::mir::TypeDecl ConvertImportedTypeDecl(const mc::sema::TypeDeclSummary& type_
     mir_type_decl.name = type_decl.name;
     mir_type_decl.type_params = type_decl.type_params;
     mir_type_decl.is_packed = type_decl.is_packed;
+    mir_type_decl.is_abi_c = type_decl.is_abi_c;
     mir_type_decl.fields = type_decl.fields;
     mir_type_decl.aliased_type = type_decl.aliased_type;
     for (const auto& variant : type_decl.variants) {

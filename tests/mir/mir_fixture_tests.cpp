@@ -238,6 +238,7 @@ int main(int argc, char** argv) {
     const std::filesystem::path source_root = argv[1];
     const std::filesystem::path fixture_dir = source_root / "tests/mir";
     const std::vector<FixtureCase> fixtures = {
+        {"abi_c_struct.mc", "abi_c_struct.mir.txt", true, "", {}, {}},
         {"array_to_slice_conversion.mc", "array_to_slice_conversion.mir.txt", true, "", {}, {}},
         {"bounds_check.mc", "bounds_check.mir.txt", true, "", {}, {}},
         {"buffer_to_slice_conversion.mc", "buffer_to_slice_conversion.mir.txt", true, "", {}, {}},
