@@ -1,7 +1,7 @@
 BUILD_DIR ?= build/debug
 CONFIG ?= Debug
 
-.PHONY: build test first-use-smoke format dump-paths clean
+.PHONY: build test first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate format dump-paths clean
 
 build:
 	cmake -S . -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE="$(CONFIG)"
@@ -12,6 +12,15 @@ test: build
 
 first-use-smoke: build
 	ctest --test-dir "$(BUILD_DIR)" -R '^mc_first_use_smoke$$' --output-on-failure
+
+public-cut-smoke: build
+	ctest --test-dir "$(BUILD_DIR)" -R '^mc_public_cut_smoke$$' --output-on-failure
+
+release-readiness-audit: build
+	ctest --test-dir "$(BUILD_DIR)" -R '^mc_release_readiness_audit$$' --output-on-failure
+
+v0_2_gate: build
+	ctest --test-dir "$(BUILD_DIR)" -R '^mc_v0_2_gate$$' --output-on-failure
 
 format:
 	find compiler tests -type f \( -name '*.cpp' -o -name '*.h' \) -print0 | xargs -0 clang-format -i

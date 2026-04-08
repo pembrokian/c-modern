@@ -60,6 +60,24 @@ Repeat the narrow supported first-use path with:
 make first-use-smoke
 ```
 
+Repeat the broader current public-cut smoke audit with:
+
+```sh
+make public-cut-smoke
+```
+
+Repeat the current release-readiness audit with:
+
+```sh
+make release-readiness-audit
+```
+
+Repeat the current `v0.2` gate with:
+
+```sh
+make v0_2_gate
+```
+
 Compiler entrypoint on the supported path:
 
 ```sh
@@ -94,6 +112,9 @@ Artifact expectations:
 - command-local `--build-dir` trees are disposable generated state and should be treated as build outputs, not source inputs
 - `make build` and `make test` are convenience wrappers around the same CMake-based path, not a separate supported installation story
 - `make first-use-smoke` is the repo-owned convenience wrapper for the narrow documented first-use validation path, not a broader public-cut certification
+- `make public-cut-smoke` is the repo-owned convenience wrapper for the broader current public-cut smoke audit on the admitted hosted slice
+- `make release-readiness-audit` is the repo-owned convenience wrapper for the current aggregate release-readiness re-audit on the admitted hosted slice
+- `make v0_2_gate` is the repo-owned convenience wrapper for the final documented `v0.2` gate outcome on the admitted hosted slice
 
 Additional developer commands:
 
@@ -101,6 +122,9 @@ Additional developer commands:
 make build
 make test
 make first-use-smoke
+make public-cut-smoke
+make release-readiness-audit
+make v0_2_gate
 make dump-paths FILE=tests/cases/hello.mc
 make check FILE=tests/cases/hello.mc
 
@@ -144,10 +168,17 @@ Checked versus debug posture:
 
 Public-cut smoke audit:
 
+Repeat the repo-owned public-cut smoke path with:
+
+```sh
+make public-cut-smoke
+```
+
 ```sh
 build/debug/mc check tests/cases/hello.mc
 build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase33_smoke_return_zero
 build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
 build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup
 build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase33_worker_queue
 build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
@@ -160,6 +191,17 @@ First public-cut hosted statement:
 
 - the current repository can honestly claim a hosted Darwin arm64 bootstrap compiler and toolchain slice with direct-source semantic check and executable build, project-mode debug executable runs, checked ordinary tests, grouped internal package layouts, one admitted in-project `staticlib`, deterministic selected-target same-build-dir reuse without non-selected-target churn on the admitted real `issue_rollup` project proof, the narrow hosted `time` and pure slash-separated `path` helper slice, and the admitted `issue_rollup`, `worker_queue`, `pipe_handoff`, `pipe_ready`, `line_filter_relay`, and `evented_echo` examples, with `worker_queue` scoped as the low-level shared-memory sync proof, `pipe_handoff` as the direct handle-first communication proof, `pipe_ready` as the poller-coupled pipe-readiness proof, and `line_filter_relay` as the narrow hosted subprocess plus stdio proof
 - it does not honestly claim broad release-mode certification across the full canonical-program surface, portability beyond Darwin arm64, package distribution, non-hosted targets, shared libraries, or broader linker-policy coverage
+
+Release-readiness re-audit:
+
+- the remaining gaps after the current support freeze, first-use smoke, supported-slice doc audit, and public-cut smoke refresh are now explicitly outside the admitted source-only Darwin arm64 hosted claim rather than hidden breaks inside it
+- those remaining gaps are narrow enough to tolerate in a source-only `v0.2` release cut if the repository chooses to tag at that boundary, but Phase 79 still owns the final tag-or-defer decision
+
+`v0.2` gate outcome:
+
+- the repository does not create a `v0.2` tag in-tree at this point
+- the one remaining plateau that still blocks that tag is maintainer-owned release execution: cutting the final reviewed commit snapshot and applying the tag from that committed state rather than from a live working tree
+- within the repository itself, the technical gate is otherwise satisfied by the current first-use smoke, supported-slice doc audit, public-cut smoke, and aggregate release-readiness audit
 
 Notes:
 
@@ -185,5 +227,8 @@ Notes:
 - `docs/plan/phase65_language_surface_plateau_decision.txt` now records that the admitted v0.2 core is semantically complete enough for repository-bounded release hardening; remaining work should be read as support hardening, portability, or adjacent-surface follow-through unless a new admitted core-language owner gap is found.
 - the current hosted release-hardening statement is recorded in `docs/plan/release_hardening_hosted_slice.txt`; keep that note and this README aligned whenever the supported slice changes.
 - the documented supported first-use path is now also automated through `make first-use-smoke` and the `mc_first_use_smoke` CTest entry; keep those aligned with the written install-and-usage guidance.
+- the documented current public-cut smoke path is now also automated through `make public-cut-smoke` and the `mc_public_cut_smoke` CTest entry; keep those aligned with the written public-cut audit commands.
+- the documented current release-readiness re-audit is now also automated through `make release-readiness-audit` and the `mc_release_readiness_audit` CTest entry; keep those aligned with the written release-readiness statement.
+- the documented current `v0.2` gate is now also automated through `make v0_2_gate` and the `mc_v0_2_gate` CTest entry; keep those aligned with the written tag-or-defer outcome.
 - known limitations remain explicit: the supported host target is still Darwin arm64 only, the admitted networking surface remains narrow IPv4 TCP plus poller support rather than a broader async or portability claim, the admitted hosted `sync` slice still excludes public compare-exchange, exchange, fetch-add, schedulers, and broader portability claims even though `condvar_broadcast(...)` is implemented, and the admitted `time` plus `path` helper slice still stops short of sleep, wall-clock, timezone, normalization, or broader platform APIs.
 - `make` is a thin convenience wrapper around the canonical CMake workflow above.

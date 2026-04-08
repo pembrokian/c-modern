@@ -239,6 +239,44 @@ Phase 76 is now concrete repository history rather than active speculation:
 
 The remaining speculative continuation therefore starts at Phase 77.
 
+Phase 77 is now concrete repository history rather than active speculation:
+- the documented public-cut smoke commands were refreshed so they match the
+  current admitted hosted proof set rather than older Phase 33-era command
+  inventory plus newer implied guarantees
+- additive `mc_public_cut_smoke` now serves as one repo-owned public-cut smoke
+  path, and additive `make public-cut-smoke` exposes the same refresh through
+  the top-level convenience workflow
+- the refreshed smoke path now proves direct-source check plus build, default
+  and report-target `issue_rollup` runs on one shared build directory, and the
+  admitted checked ordinary-test workflows across the shipped real examples
+
+The remaining speculative continuation therefore starts at Phase 78.
+
+Phase 78 is now concrete repository history rather than active speculation:
+- the repository re-audited whether any remaining deferred front was still too
+  large to tolerate in a narrow source-only Darwin arm64 `v0.2` release claim
+- additive `mc_release_readiness_audit` now serves as one repo-owned aggregate
+  release-readiness path over the existing first-use smoke, supported-slice doc
+  audit, and broader public-cut smoke
+- the current outcome is that the remaining deferred fronts cluster around
+  broader portability, distribution, linker policy, and still-deferred
+  adjacent families rather than hidden breakage inside the admitted hosted
+  slice, so Phase 79 can act as the final tag-or-defer policy gate
+
+The remaining speculative continuation therefore starts at Phase 79.
+
+Phase 79 is now concrete repository history rather than active speculation:
+- the repository did not create a `v0.2` tag in-tree at this point even though
+  the narrow hosted technical gate passed
+- the one remaining plateau blocking that tag was written down explicitly as
+  maintainer-owned release execution: choosing the final reviewed commit
+  snapshot and applying the tag from committed state rather than from a live
+  working tree
+- additive `mc_v0_2_gate` now serves as one repo-owned final gate over the
+  release-readiness audit plus the written tag-or-defer outcome
+
+The speculative continuation ends here.
+
 Likely themes:
 - filesystem and `io` contract convergence where nil-only or raw-status
   boundaries still remain materially harmful
@@ -332,14 +370,9 @@ Phase 73 -- Package And Target Maturity
 - Exit criterion: the admitted project graph stays honest across the real
   multi-target shapes the repository supports today.
 
-Phase 77 -- Public-Cut Smoke Refresh
-- Exit criterion: the public-cut smoke commands and fixture set reflect the
-  current admitted slice without stale examples or hidden assumptions.
-
 Phase 78 -- Release-Readiness Re-Audit
 - Exit criterion: the remaining gaps are either narrow enough to tolerate in a
   `v0.2` release or clearly large enough to keep the release deferred.
-
 Phase 79 -- v0.2 Gate
 - Exit criterion: the repository either tags `v0.2` or writes down the one
   remaining plateau that still blocks that tag.

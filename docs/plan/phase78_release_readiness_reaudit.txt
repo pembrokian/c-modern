@@ -1,0 +1,155 @@
+Phase 78 -- Release-Readiness Re-Audit
+======================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Re-audit the remaining deferred fronts after the support freeze and smoke-path
+refreshes so the repository has one explicit answer on whether those fronts are
+small enough to tolerate in a narrow `v0.2` release or still large enough to
+keep the release deferred.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- Phase 75 turned the narrow first-use path into one repo-owned smoke entry.
+- Phase 76 re-audited the published supported-slice statement and added a doc
+  audit guarding that wording.
+- Phase 77 then refreshed the broader public-cut smoke path so the current
+  admitted hosted proof set is runnable through one repo-owned entrypoint.
+- The remaining question after those waves is no longer whether the current
+  supported slice is stated and exercised honestly. It is whether the still-
+  deferred fronts are now narrow enough to tolerate in a `v0.2` cut.
+
+Problem being solved
+--------------------
+- The repository already had a current supported-slice statement plus runnable
+  first-use and public-cut audit paths, but it still lacked one explicit yes-or-
+  no answer on release readiness.
+- Without that answer, Phase 79 would have to decide about tagging without an
+  explicit prior re-audit of what the remaining deferred fronts actually mean
+  for a narrow source-only release.
+- The repository needs one audit that separates tolerable explicit exclusions
+  from hidden blockers inside the admitted hosted slice.
+
+Core rule
+---------
+- Judge release readiness against the current explicit source-only Darwin arm64
+  hosted support claim, not against broader portability or package-distribution
+  ambitions that the repository does not claim today.
+- Treat only hidden breakage inside the admitted slice as a real release
+  blocker at this phase.
+- Keep the final tag-or-defer policy choice separate; this phase should decide
+  readiness posture, not perform the tag.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one aggregate repo-owned release-readiness audit entrypoint
+over the already landed first-use smoke, supported-slice doc audit, and public-
+cut smoke, plus one explicit planning conclusion about the remaining deferred
+fronts.
+
+Audited remaining fronts
+------------------------
+Explicitly tolerated deferred fronts for a narrow source-only `v0.2` claim:
+- non-hosted targets, cross-compilation, and broader portability beyond Darwin
+  arm64
+- shared libraries, external system-library links, install-tree policy, and
+  broader distribution packaging
+- broader adjacent-family work such as richer `os`, broader `time`, richer
+  `mem`, broader `sync`, and `hal`
+- broader release-mode certification across the full language surface
+
+Why those fronts do not block the narrow current release claim:
+- they are already explicit exclusions in the frozen support matrix
+- the current repo-owned smoke paths cover the admitted source-only hosted
+  slice directly
+- no new hidden parser, sema, MIR, backend, or workflow distortion was found on
+  the admitted slice during the Phase 75 through Phase 77 refresh wave
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The remaining gaps are now narrow enough to tolerate in a source-only Darwin
+arm64 hosted `v0.2` release claim.
+
+That does not mean:
+- the repository is claiming broader portability or package distribution
+- the repository is claiming shared libraries, broader linker policy, or a
+  richer adjacent-family surface
+- the repository is skipping the final policy gate in Phase 79
+
+What this phase should prove
+----------------------------
+- the repository now has one explicit release-readiness answer rather than
+  leaving that judgment implicit in separate smoke and support notes
+- the current admitted slice is exercised by one aggregate repo-owned audit
+  path rather than by separate trust in scattered earlier checks
+- Phase 79 can focus on the final tag-or-defer decision instead of reopening
+  the broader readiness audit from scratch
+
+Deliverables
+------------
+- one canonical Phase 78 note recording the release-readiness re-audit
+- one aggregate `mc_release_readiness_audit` CTest entry
+- one top-level `make release-readiness-audit` convenience entrypoint
+- refreshed README and hosted release-hardening note wording stating the
+  current readiness outcome narrowly
+- aligned backlog, decision-log, and speculative-roadmap updates
+
+Suggested execution order
+-------------------------
+1. Re-audit the current admitted slice against the remaining deferred fronts.
+2. Decide explicitly whether those fronts are tolerable for a narrow `v0.2`
+   claim or still large enough to block the release.
+3. Encode the resulting audit as one aggregate repo-owned entrypoint over the
+   already landed smoke and doc checks.
+4. Refresh README and the hosted release note so the written release-readiness
+   statement matches the runnable audit and the explicit support boundary.
+
+Exit criteria
+-------------
+- the repository has one explicit release-readiness answer for the current
+  narrow hosted claim
+- that answer is backed by one aggregate repo-owned audit path
+- the remaining deferred fronts are either explicitly tolerated at that
+  boundary or clearly identified as blockers for the next phase
+
+Non-goals
+---------
+- tagging `v0.2` directly in this phase
+- widening the supported host set, runtime boundary, target kinds, or adjacent
+  module families
+- turning the current source-only hosted claim into a portability or package
+  distribution statement
+
+Implemented slice
+-----------------
+- recorded the explicit release-readiness outcome: the remaining deferred fronts
+  are narrow enough to tolerate in a source-only Darwin arm64 hosted `v0.2`
+  claim
+- added `mc_release_readiness_audit` as an aggregate repo-owned audit over the
+  current first-use smoke, supported-slice doc audit, and broader public-cut
+  smoke paths
+- added `make release-readiness-audit` as the top-level convenience wrapper for
+  that aggregate audit
+- refreshed README and the hosted release-hardening note so the written
+  release-readiness statement now matches the runnable audit and the current
+  support boundary
+- aligned backlog, decision-log, and the speculative roadmap around the
+  completed re-audit
+
+Closeout statement
+------------------
+Phase 78 is complete as a release-readiness re-audit. The repository still does
+not claim broader portability, package distribution, shared libraries, or a
+wider adjacent-family surface than the admitted hosted slice supports, but it
+now has one explicit and repo-owned answer that those deferred fronts do not
+block a narrow source-only Darwin arm64 `v0.2` release claim. Phase 79 remains
+the final tag-or-defer policy gate.

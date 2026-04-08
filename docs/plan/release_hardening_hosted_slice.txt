@@ -3,7 +3,7 @@ Hosted Slice Release-Hardening Note
 
 Status
 ------
-PUBLISHED (repository-bounded support freeze, install-path hardening, supported-slice re-audit, and public-cut audit)
+PUBLISHED (repository-bounded support freeze, install-path hardening, supported-slice re-audit, public-cut audit, release-readiness re-audit, and `v0.2` gate)
 
 Purpose
 -------
@@ -88,6 +88,25 @@ Repo-owned convenience entrypoint for that same narrow supported path:
 make first-use-smoke
 ```
 
+Repo-owned convenience entrypoint for the broader current public-cut smoke
+audit:
+
+```sh
+make public-cut-smoke
+```
+
+Repo-owned convenience entrypoint for the current release-readiness re-audit:
+
+```sh
+make release-readiness-audit
+```
+
+Repo-owned convenience entrypoint for the current `v0.2` gate:
+
+```sh
+make v0_2_gate
+```
+
 Supported command patterns:
 
 - direct-source inspection or build: `build/debug/mc check <file.mc>` and
@@ -108,6 +127,12 @@ Artifact expectations:
   CMake-based path; they are not a separate supported installation story
 - `make first-use-smoke` is the repo-owned convenience wrapper for the narrow
   documented first-use validation path, not a broader public-cut certification
+- `make public-cut-smoke` is the repo-owned convenience wrapper for the current
+  broader public-cut smoke audit on the admitted hosted slice
+- `make release-readiness-audit` is the repo-owned convenience wrapper for the
+  current aggregate release-readiness re-audit on the admitted hosted slice
+- `make v0_2_gate` is the repo-owned convenience wrapper for the final
+  documented `v0.2` gate outcome on the admitted hosted slice
 
 Checked versus debug audit
 --------------------------
@@ -132,6 +157,7 @@ The narrowest honest public-cut smoke set for the current hosted plateau is:
 build/debug/mc check tests/cases/hello.mc
 build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase33_smoke_return_zero
 build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
 build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup
 build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase33_worker_queue
 build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
@@ -146,11 +172,9 @@ This smoke set proves, at the narrowest honest level:
 - direct-source executable build entrypoint
 - debug-mode project executable run through the admitted grouped-package and
   in-project `staticlib` boundary
-- checked ordinary-test workflow on the richer grouped project proof
 - explicit same-build-dir target switching across the shipped `issue_rollup`
   executable consumers without sibling-target churn
-- one repo-owned first-use smoke path that replays the documented supported
-  build-from-source to `mc` usage sequence
+- checked ordinary-test workflow on the richer grouped project proof
 - checked ordinary-test workflow on the admitted low-level shared-memory
   hosted `sync` project proof
 - checked ordinary-test workflow on the admitted direct handle-first
@@ -185,6 +209,37 @@ It does not honestly claim broad release-mode certification across the full
 canonical-program surface, portability beyond Darwin arm64, package
 distribution, non-hosted targets, or broader target-kind and linker-policy
 coverage.
+
+Release-readiness re-audit
+--------------------------
+The current release-readiness outcome is:
+
+- yes for a source-only Darwin arm64 hosted `v0.2` support claim
+- no for any broader portability, distribution, or target-kind claim than the
+  frozen support matrix above
+
+In practical terms, the remaining deferred fronts now cluster around broader
+portability, package distribution, wider linker policy, and still-deferred
+adjacent families rather than around hidden breakage inside the admitted
+source-only hosted slice itself.
+
+That means the remaining gaps are now narrow enough to tolerate in a source-
+only `v0.2` release cut if the repository chooses to tag at that boundary.
+Phase 79 still owns the final tag-or-defer decision and any one remaining
+plateau statement needed for that cut.
+
+`v0.2` gate
+-----------
+The current `v0.2` gate outcome is:
+
+- no in-repository tag is created at this point
+- the one remaining plateau blocking that tag is maintainer-owned release
+  execution: selecting the final reviewed commit snapshot and applying the tag
+  from committed repository state rather than from a live working tree
+
+Within the repository itself, the technical gate is otherwise satisfied by the
+current first-use smoke, supported-slice doc audit, public-cut smoke, and
+aggregate release-readiness audit.
 
 Known limitations
 -----------------

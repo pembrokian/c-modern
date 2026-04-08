@@ -195,3 +195,21 @@ add_test(NAME mc_supported_slice_doc_audit
      COMMAND ${CMAKE_COMMAND}
          -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_supported_slice_doc_audit.cmake)
+add_test(NAME mc_public_cut_smoke
+     COMMAND ${CMAKE_COMMAND}
+         -DMC=$<TARGET_FILE:mc>
+         -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
+         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_public_cut_smoke.cmake)
+add_test(NAME mc_release_readiness_audit
+     COMMAND ${CMAKE_COMMAND}
+         -DMC=$<TARGET_FILE:mc>
+         -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
+         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_release_readiness_audit.cmake)
+add_test(NAME mc_v0_2_gate
+     COMMAND ${CMAKE_COMMAND}
+         -DMC=$<TARGET_FILE:mc>
+         -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
+         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_v0_2_gate.cmake)

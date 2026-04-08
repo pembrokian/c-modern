@@ -1,0 +1,137 @@
+Phase 77 -- Public-Cut Smoke Refresh
+====================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Refresh the broader public-cut smoke path after the supported-slice re-audit so
+the documented smoke commands and the repo-owned executable proof match the
+current admitted hosted slice exactly.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- Phase 75 already turned the narrow first-use path into one repo-owned smoke
+  entrypoint.
+- Phase 76 then re-audited the README and hosted release note so the supported
+  slice statement matched the actual admitted surface.
+- The remaining gap after those waves was broader proof repeatability: the
+  public-cut smoke section still mixed older Phase 33 command inventory with
+  newer proof claims and newer admitted examples.
+
+Problem being solved
+--------------------
+- The repository already documented a public-cut smoke set, but that command
+  list no longer matched the full set of proof claims attached to it.
+- In particular, the docs claimed explicit same-build-dir target switching on
+  the shipped `issue_rollup` project while the command list still omitted the
+  additive report-target run that now carries that proof.
+- The docs also blurred the separate Phase 75 first-use smoke path into the
+  broader public-cut proof bullets instead of keeping those two validation
+  layers distinct.
+- Without one explicit refresh wave, the repository risked having a correct
+  supported-slice statement and a stale broader smoke path.
+
+Core rule
+---------
+- Keep the public-cut smoke broader than the first-use path, but still narrow
+  enough that one repo-owned command can be audited by hand.
+- Update the smoke list to reflect the current admitted proof set exactly;
+  do not widen the supported slice in order to justify stale commands.
+- Reuse the admitted real examples and the existing first-use smoke boundary
+  rather than inventing synthetic public-cut fixtures.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one repo-owned public-cut smoke automation path plus one
+documentation refresh aligning the listed public-cut commands with that same
+path.
+
+Chosen implementation:
+- add one focused `mc_public_cut_smoke` CTest that runs:
+  - direct-source `mc check` on `tests/cases/hello.mc`
+  - direct-source `mc build` on `tests/codegen/smoke_return_zero.mc`
+  - default-target `issue_rollup` run on one shared build directory
+  - explicit `issue-rollup-report` run on that same build directory
+  - ordinary `mc test` workflows for `issue_rollup`, `worker_queue`,
+    `pipe_handoff`, `pipe_ready`, `line_filter_relay`, and `evented_echo`
+- add `make public-cut-smoke` as the top-level convenience entrypoint for that
+  same public-cut path
+- refresh README and the hosted release-hardening note so the documented
+  public-cut commands match the repo-owned smoke exactly
+
+Explicit non-choices:
+- no release-mode certification expansion
+- no broad new fixture family beyond the current admitted real projects
+- no attempt to collapse the narrow first-use smoke and the broader public-cut
+  smoke into one indistinguishable workflow
+
+What this phase should prove
+----------------------------
+- the repository has one repeatable broader public-cut smoke path matching the
+  current admitted hosted claim
+- same-build-dir target switching on the shipped `issue_rollup` project is
+  represented explicitly in the smoke command list rather than only in prose
+- the admitted checked ordinary-test proof set is carried by the shipped real
+  examples named in the current support note
+
+Deliverables
+------------
+- one canonical Phase 77 note recording the public-cut smoke refresh
+- one focused `mc_public_cut_smoke` CTest entry
+- one top-level `make public-cut-smoke` convenience entrypoint
+- refreshed README and hosted release-hardening note public-cut sections
+- aligned backlog, decision-log, and speculative-roadmap updates
+
+Suggested execution order
+-------------------------
+1. Re-audit the current public-cut smoke commands against the current admitted
+   hosted claim.
+2. Encode the refreshed public-cut path as one focused automation script.
+3. Expose that script through one named CTest and one make convenience target.
+4. Refresh README and the hosted release-hardening note so the written command
+   list matches the repo-owned smoke exactly.
+
+Exit criteria
+-------------
+- the documented public-cut smoke commands reflect the current admitted hosted
+  proof set without stale omissions or hidden assumptions
+- the repository has one repeatable repo-owned public-cut smoke path
+- the refreshed smoke path includes explicit same-build-dir target switching on
+  the shipped `issue_rollup` project plus the admitted checked real-project
+  test proofs
+
+Non-goals
+---------
+- widening the supported host set, target kinds, runtime families, or linker
+  policy
+- replacing the narrower first-use path with the broader public-cut smoke path
+- claiming broad release-mode certification across the full language surface
+- inventing synthetic public-cut fixtures when shipped real examples already
+  carry the admitted proof
+
+Implemented slice
+-----------------
+- added `mc_public_cut_smoke` as a focused repo-owned smoke that covers the
+  current direct-source entrypoints, explicit same-build-dir `issue_rollup`
+  target switching, and the admitted checked real-project example set
+- added `make public-cut-smoke` as the top-level convenience wrapper for that
+  broader public-cut path
+- refreshed README and the hosted release-hardening note so the listed
+  public-cut commands now include the shipped report-target run explicitly and
+  no longer smuggle the separate first-use smoke path into the broader proof
+- aligned backlog, decision-log, and the speculative roadmap around the
+  completed refresh
+
+Closeout statement
+------------------
+Phase 77 is complete as a public-cut smoke refresh. The repository still does
+not claim broad release-mode certification, broader portability, or a wider
+hosted slice than it already admits, but its broader public-cut proof is now a
+repo-owned runnable path whose command list matches the current admitted claim
+without stale omissions or hidden assumptions.
