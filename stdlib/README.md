@@ -111,4 +111,13 @@ Current repository-specific notes:
 
 Still deferred in this repository:
 
-- `hal`
+- broader `hal` taxonomy beyond the first hardware-boundary slice
+
+Newly admitted narrow `hal` bootstrap surface:
+
+- `hal` is now present only as a hardware-facing boundary for the first
+  freestanding proofs; it intentionally exposes just `hal.mmio_ptr<T>(...)`,
+  `hal.volatile_load<T>(...)`, and `hal.volatile_store<T>(...)`
+- this surface is intentionally target-oriented and non-portable by design; it
+  exists so early freestanding or Canopus-oriented proofs can express MMIO and
+  volatile traffic without pushing that ownership into `mem` or `sync`

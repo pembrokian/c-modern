@@ -92,6 +92,7 @@ struct CompileGraph {
     std::string mode;
     std::string env;
     bool wrap_entry_main = true;
+    bool namespace_entry_module = false;
     mc::codegen_llvm::TargetConfig target_config;
     std::vector<CompileNode> nodes;
 };
@@ -128,6 +129,9 @@ enum class WaitForChildResult {
 constexpr int kModuleBuildStateFormatVersion = 2;
 
 std::optional<std::filesystem::path> DiscoverHostedRuntimeSupportSource(const std::filesystem::path& source_path);
+std::optional<std::filesystem::path> DiscoverRuntimeSupportSource(std::string_view env,
+                                                                  std::string_view startup,
+                                                                  const std::filesystem::path& source_path);
 std::vector<std::filesystem::path> ComputeEffectiveImportRoots(const std::filesystem::path& source_path,
                                                                const std::vector<std::filesystem::path>& import_roots);
 std::optional<std::string> ReadSourceText(const std::filesystem::path& path,
@@ -147,7 +151,9 @@ std::string HashText(std::string_view text);
 std::filesystem::path ComputeModuleStatePath(const std::filesystem::path& source_path,
                                              const std::filesystem::path& build_dir);
 std::filesystem::path ComputeRuntimeObjectPath(const std::filesystem::path& entry_source_path,
-                                               const std::filesystem::path& build_dir);
+                                               const std::filesystem::path& build_dir,
+                                               std::string_view env,
+                                               std::string_view startup);
 
 std::string FormatCommandForDisplay(const std::vector<std::string>& args);
 WaitForChildResult WaitForChildProcess(pid_t pid,
@@ -185,6 +191,7 @@ std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& ent
                                                 std::string mode,
                                                 std::string env,
                                                 bool wrap_entry_main,
+                                                bool namespace_entry_module,
                                                 support::DiagnosticSink& diagnostics);
 void AssertCompileGraphTopologicalOrder(const CompileGraph& graph);
 

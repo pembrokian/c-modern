@@ -25,6 +25,7 @@ namespace mc::driver {
 namespace {
 
 constexpr std::string_view kHostedRuntimeSupportRelativePath = "runtime/hosted/mc_hosted_runtime.c";
+constexpr std::string_view kFreestandingRuntimeDirectoryRelativePath = "runtime/freestanding";
 
 bool IsInternalModulePath(const std::filesystem::path& path) {
     return path.filename() == "internal.mc";
@@ -788,6 +789,33 @@ std::optional<std::filesystem::path> DiscoverHostedRuntimeSupportSource(const st
     return runtime_source;
 }
 
+std::optional<std::filesystem::path> DiscoverRuntimeSupportSource(std::string_view env,
+                                                                  std::string_view startup,
+                                                                  const std::filesystem::path& source_path) {
+    if (env == "hosted") {
+        if (startup != "default") {
+            return std::nullopt;
+        }
+        return DiscoverHostedRuntimeSupportSource(source_path);
+    }
+
+    if (env != "freestanding") {
+        return std::nullopt;
+    }
+
+    const auto repo_root = DiscoverRepositoryRoot(source_path);
+    if (!repo_root.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::filesystem::path runtime_source =
+        *repo_root / std::string(kFreestandingRuntimeDirectoryRelativePath) / ("mc_" + std::string(startup) + ".c");
+    if (!std::filesystem::exists(runtime_source)) {
+        return std::nullopt;
+    }
+    return runtime_source;
+}
+
 std::vector<std::filesystem::path> ComputeEffectiveImportRoots(const std::filesystem::path& source_path,
                                                                const std::vector<std::filesystem::path>& import_roots) {
     std::vector<std::filesystem::path> resolved_roots;
@@ -874,7 +902,7 @@ bool IsSupportedMode(std::string_view mode) {
 }
 
 bool IsSupportedEnv(std::string_view env) {
-    return env == "hosted";
+    return env == "hosted" || env == "freestanding";
 }
 
 bool IsExecutableTargetKind(std::string_view kind) {
@@ -910,9 +938,13 @@ std::filesystem::path ComputeModuleStatePath(const std::filesystem::path& source
 }
 
 std::filesystem::path ComputeRuntimeObjectPath(const std::filesystem::path& entry_source_path,
-                                               const std::filesystem::path& build_dir) {
+                                               const std::filesystem::path& build_dir,
+                                               std::string_view env,
+                                               std::string_view startup) {
     const auto build_targets = support::ComputeBuildArtifactTargets(entry_source_path, build_dir);
-    return build_targets.object.parent_path() / (build_targets.object.stem().generic_string() + ".runtime.o");
+    const std::string runtime_object_name =
+        build_targets.object.stem().generic_string() + "." + std::string(env) + "." + std::string(startup) + ".runtime.o";
+    return build_targets.object.parent_path() / runtime_object_name;
 }
 
 std::optional<ModuleBuildState> LoadModuleBuildState(const std::filesystem::path& path,
@@ -1197,6 +1229,7 @@ std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& ent
                                                 std::string mode,
                                                 std::string env,
                                                 bool wrap_entry_main,
+                                                bool namespace_entry_module,
                                                 support::DiagnosticSink& diagnostics) {
     const std::filesystem::path normalized_entry =
         std::filesystem::absolute(entry_source_path).lexically_normal();
@@ -1207,6 +1240,7 @@ std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& ent
         .mode = std::move(mode),
         .env = std::move(env),
         .wrap_entry_main = wrap_entry_main,
+        .namespace_entry_module = namespace_entry_module,
         .target_config = target_config,
     };
     std::unordered_set<std::string> visiting;
@@ -1338,7 +1372,8 @@ std::optional<TargetBuildGraph> BuildResolvedTargetGraph(const ProjectFile& proj
                                              ResolveProjectTargetConfig(project, target, diagnostics),
                                              target.mode,
                                              target.env,
-                                             IsExecutableTargetKind(target.kind),
+                                             IsExecutableTargetKind(target.kind) && target.env == "hosted",
+                                             !IsExecutableTargetKind(target.kind),
                                              diagnostics);
     if (!compile_graph.has_value()) {
         return std::nullopt;
@@ -1494,7 +1529,8 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         if (emit_objects && mir_result.ok && !imported_data->modules.empty()) {
             AddImportedExternDeclarations(*mir_result.module, imported_data->modules);
         }
-        if (mir_result.ok && (node.source_path != graph.entry_source_path || !graph.wrap_entry_main)) {
+        if (mir_result.ok &&
+            (node.source_path != graph.entry_source_path || graph.namespace_entry_module)) {
             NamespaceImportedBuildUnit(*mir_result.module, node.source_path.stem().string());
         }
         if (!mir_result.ok || !mc::mir::ValidateModule(*mir_result.module, node.source_path, diagnostics)) {
@@ -1583,6 +1619,7 @@ std::optional<BuildUnit> CompileToMir(const CommandOptions& options,
         "debug",
         "hosted",
         true,
+        false,
         diagnostics);
     if (!graph.has_value()) {
         return std::nullopt;
@@ -1679,8 +1716,13 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
         };
     }
 
-    const auto runtime_object_path = ComputeRuntimeObjectPath(entry_unit.source_path, graph.compile_graph.build_dir);
-    const auto runtime_source_path = DiscoverHostedRuntimeSupportSource(entry_unit.source_path);
+    const auto runtime_object_path = ComputeRuntimeObjectPath(entry_unit.source_path,
+                                                              graph.compile_graph.build_dir,
+                                                              graph.target.env,
+                                                              graph.target.runtime_startup);
+    const auto runtime_source_path = DiscoverRuntimeSupportSource(graph.target.env,
+                                                                  graph.target.runtime_startup,
+                                                                  entry_unit.source_path);
 
     if (ShouldRelinkProjectExecutable(build_targets.executable,
                                       runtime_object_path,

@@ -203,8 +203,22 @@ void TestLowerModuleRejectsUnsupportedTarget() {
     const auto result = mc::codegen_llvm::LowerModule(MakeMinimalSupportedModule(), "tests/cases/hello.mc", options, diagnostics);
     Expect(!result.ok, "unsupported targets should fail backend preflight");
     Expect(diagnostics.HasErrors(), "unsupported targets should emit a direct backend diagnostic");
-    Expect(diagnostics.Render().find("only supports hosted 'arm64-apple-darwin'") != std::string::npos,
+    Expect(diagnostics.Render().find("only supports bootstrap 'arm64-apple-darwin' targets") != std::string::npos,
            "target diagnostic should name the frozen bootstrap target family");
+}
+
+void TestLowerModuleAcceptsFreestandingBootstrapTarget() {
+    mc::support::DiagnosticSink diagnostics;
+    auto target = mc::codegen_llvm::BootstrapTargetConfig();
+    target.hosted = false;
+
+    mc::codegen_llvm::LowerOptions options {
+        .target = target,
+    };
+
+    const auto result = mc::codegen_llvm::LowerModule(MakeMinimalSupportedModule(), "tests/cases/hello.mc", options, diagnostics);
+    Expect(result.ok, "freestanding bootstrap targets should pass backend preflight");
+    Expect(!diagnostics.HasErrors(), "freestanding bootstrap targets should not emit backend diagnostics");
 }
 
 void TestLowerModuleRejectsUnsupportedInstruction() {
@@ -545,6 +559,7 @@ int main() {
     TestLowerModuleAcceptsStageOneSlice();
     TestLowerModuleLowersStoreBranchAndCompare();
     TestLowerModuleRejectsUnsupportedTarget();
+    TestLowerModuleAcceptsFreestandingBootstrapTarget();
     TestLowerModuleRejectsUnsupportedInstruction();
     TestLowerModuleLowersCheckedIntegerSemantics();
     TestLowerModuleLowersRepresentationPreservingConversions();

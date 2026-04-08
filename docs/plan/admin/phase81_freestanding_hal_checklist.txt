@@ -1,0 +1,108 @@
+Modern C -- Phase 81 Freestanding And Hal Checklist
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Convert the first two Canopus-driven proof programs into an implementation
+checklist spanning compiler, build, runtime, stdlib, and proof artifacts.
+
+Scope
+-----
+This checklist covers only:
+
+1. freestanding boot marker
+2. polled UART or equivalent narrow console write path
+
+Checklist
+---------
+Compiler and build-path tasks
+
+- define one repository-owned freestanding target shape that uses
+  `env = "freestanding"`
+- ensure freestanding targets do not link the hosted startup shim implicitly
+- ensure freestanding targets do not assume `main(args: Slice<cstr>) i32`
+- provide one explicit startup-selection or replacement-entry path in the
+  target runtime section
+- ensure the emitted artifact path is stable and inspectable for the first
+  proof programs
+- make any target-owned support objects or linker inputs explicit in the build
+  description rather than hidden in the driver
+
+Frontend and semantic tasks
+
+- verify that current explicit entrypoint declarations are sufficient for the
+  first freestanding proof
+- verify that pointer, integer, constant, and static-data forms used by MMIO
+  helpers are already admitted and preserved correctly
+- reopen sema work only if the first proofs expose a concrete ownership gap
+
+MIR and backend tasks
+
+- ensure freestanding targets lower without hosted-entry assumptions
+- ensure address constants and pointer-shaping needed by MMIO helpers survive
+  through MIR and backend lowering
+- ensure volatile operations are represented and preserved honestly through the
+  admitted path
+- ensure any required backend attributes or calling-convention differences are
+  attached at the target boundary rather than hidden in library code
+
+Stdlib and runtime tasks
+
+- add the smallest initial `stdlib/hal.mc` surface needed by the proofs
+- keep the initial public `hal` API limited to:
+  - `mmio_ptr<T>`
+  - `volatile_load<T>`
+  - `volatile_store<T>`
+- place any target-specific implementation support under the target-facing
+  runtime boundary rather than in portable `mem` or `sync`
+- ensure freestanding startup support stays replaceable and minimal
+
+Proof-program tasks
+
+- add one freestanding boot-marker proof program
+- add one MMIO-backed console-write proof program or the narrowest equivalent
+- keep both proof programs deterministic and minimal
+- make the first proof answer only "did custom entry run?"
+- make the second proof answer only "does the narrow `hal` path work?"
+
+Testing and validation tasks
+
+- add one focused validation path for freestanding build success
+- add one focused validation path for the `hal` proof artifact shape
+- if full execution is not yet automatable on the host, still validate emitted
+  dumps, symbols, or target-owned integration artifacts deterministically
+- avoid claiming broader non-hosted execution support than the proof actually
+  covers
+
+Documentation tasks
+
+- update build and support notes so `env = "freestanding"` is no longer purely
+  architectural prose if Phase 81 lands it
+- document the initial `hal` boundary as hardware-facing and intentionally
+  narrow
+- keep hosted and freestanding support statements separate and explicit
+
+Do not expand in this checklist
+-------------------------------
+- broad `os` module work
+- shared-memory IPC abstractions
+- interrupt-routing frameworks
+- scheduler or async abstractions
+- richer `hal` taxonomy before the first two proofs land
+- generalized cross-compilation or multi-target packaging beyond the first real
+  target path
+
+Completion check
+----------------
+Phase 81 should not be considered done until all of the following are true:
+
+- one freestanding artifact builds without hosted startup
+- one explicit non-hosted entry path is documented and exercised
+- one narrow `hal` API exists and is used by a real proof
+- one output-oriented MMIO or equivalent console proof exists
+- remaining blockers, if any, are named precisely as target, backend, or later
+  Canopus-library work

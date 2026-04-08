@@ -17,6 +17,23 @@ bool IsSupportedBootstrapTargetKind(std::string_view kind) {
     return kind == "exe" || kind == "test" || kind == "staticlib";
 }
 
+bool IsSupportedBootstrapEnv(std::string_view env) {
+    return env == "hosted" || env == "freestanding";
+}
+
+bool IsPlainStartupName(std::string_view name) {
+    if (name.empty()) {
+        return false;
+    }
+    for (const char ch : name) {
+        const unsigned char byte = static_cast<unsigned char>(ch);
+        if (std::isalnum(byte) == 0 && ch != '_') {
+            return false;
+        }
+    }
+    return true;
+}
+
 struct ParsedValue {
     enum class Kind {
         kString,
@@ -691,21 +708,39 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                 .message = "target '" + name + "' uses unsupported build mode: " + target.mode,
             });
         }
-        if (target.env != "hosted") {
+        if (!IsSupportedBootstrapEnv(target.env)) {
             diagnostics.Report({
                 .file_path = project.path,
                 .span = mc::support::kDefaultSourceSpan,
                 .severity = DiagnosticSeverity::kError,
-                .message = "target '" + name + "' uses unsupported Phase 7 environment: " + target.env,
+                .message = "target '" + name + "' uses unsupported bootstrap environment: " + target.env,
             });
         }
-        if (target.runtime_startup != "default") {
-            diagnostics.Report({
-                .file_path = project.path,
-                .span = mc::support::kDefaultSourceSpan,
-                .severity = DiagnosticSeverity::kError,
-                .message = "target '" + name + "' uses unsupported runtime startup: " + target.runtime_startup,
-            });
+        if (target.env == "hosted") {
+            if (target.runtime_startup != "default") {
+                diagnostics.Report({
+                    .file_path = project.path,
+                    .span = mc::support::kDefaultSourceSpan,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "target '" + name + "' uses unsupported hosted runtime startup: " + target.runtime_startup,
+                });
+            }
+        } else if (target.env == "freestanding") {
+            if (target.runtime_startup == "default") {
+                diagnostics.Report({
+                    .file_path = project.path,
+                    .span = mc::support::kDefaultSourceSpan,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "target '" + name + "' must declare an explicit freestanding runtime startup",
+                });
+            } else if (!IsPlainStartupName(target.runtime_startup)) {
+                diagnostics.Report({
+                    .file_path = project.path,
+                    .span = mc::support::kDefaultSourceSpan,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "target '" + name + "' uses invalid freestanding runtime startup name: " + target.runtime_startup,
+                });
+            }
         }
         for (auto& module_root : target.module_search_paths) {
             module_root = std::filesystem::absolute(project.root_dir / module_root).lexically_normal();

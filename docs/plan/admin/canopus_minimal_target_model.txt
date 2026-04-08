@@ -1,0 +1,152 @@
+Modern C -- Minimal Target Model For Canopus Lite Bring-Up
+==========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define the smallest target-model shape the repository should support for the
+first Canopus-driven `v0.3` wave so kernel, init, and early service artifacts
+can be described explicitly without importing the whole long-term
+cross-compilation or packaging story.
+
+Core rule
+---------
+- Keep the first target model explicit, small, and inspectable.
+- Make target, environment, startup, and artifact class visible in the build
+  description.
+- Do not hide sysroot, linker, or startup assumptions behind host defaults.
+
+Required artifact classes
+-------------------------
+1. kernel image input artifact
+2. init executable artifact
+3. early service executable artifact
+
+These are the only artifact classes the first target model should optimize
+for. Shared libraries, install trees, and general distribution formats remain
+out of scope.
+
+Artifact-class intent
+---------------------
+Kernel image input artifact:
+- freestanding
+- no hosted startup
+- target-owned entry symbol
+- intended to feed a kernel image link or pack step owned by the target build
+
+Init executable artifact:
+- freestanding user-space artifact for the first booted process
+- no hosted startup
+- explicit entry symbol or target-owned startup binding
+
+Early service executable artifact:
+- freestanding user-space artifact for log, echo, ping, registry, or similarly
+  small early services
+- same basic target family as init
+- explicit runtime and startup choice visible in the manifest
+
+Minimum build-description requirements
+--------------------------------------
+Per target, the build model should be able to say explicitly:
+
+- `kind`
+- `env = "freestanding"`
+- one explicit target name or triple
+- one explicit package identity
+- one explicit root module
+- one explicit startup choice
+- optional explicit link inputs owned by the target
+
+Suggested minimal shape
+-----------------------
+This note does not freeze schema, but the first Canopus-facing shape should be
+conceptually expressible as:
+
+```toml
+[targets.kernel]
+kind = "exe"
+package = "kernel"
+root = "kernel/main.mc"
+env = "freestanding"
+target = "aarch64-canopus"
+
+[targets.kernel.runtime]
+startup = "kernel_entry"
+
+[targets.kernel.link]
+inputs = ["target/kernel_entry.o", "target/linker.ld"]
+
+[targets.init]
+kind = "exe"
+package = "init"
+root = "user/init/main.mc"
+env = "freestanding"
+target = "aarch64-canopus"
+
+[targets.init.runtime]
+startup = "init_entry"
+
+[targets.log_service]
+kind = "exe"
+package = "log_service"
+root = "user/log_service/main.mc"
+env = "freestanding"
+target = "aarch64-canopus"
+
+[targets.log_service.runtime]
+startup = "service_entry"
+```
+
+Interpretation rules
+--------------------
+- `env = "freestanding"` means no hosted startup, no hosted stdlib
+  assumptions, and no implicit process-entry contract.
+- `target` must be explicit because Canopus bring-up should not depend on host
+  default guesses.
+- `runtime.startup` must stay explicit because different artifact classes may
+  use different entry objects or conventions.
+- target-owned link inputs must stay visible instead of being inferred from the
+  host environment.
+
+What the first target model does not need yet
+---------------------------------------------
+- full SDK discovery
+- generalized sysroot management
+- remote build execution
+- multi-target workspace packaging
+- runtime-loaded shared-library policy
+- automatic boot-image assembly inside `mc`
+- full kernel-versus-user privilege metadata in the build file
+
+Relationship to the first proof wave
+------------------------------------
+Phase 81 needs only enough target model to support:
+
+- one kernel-side freestanding boot marker artifact
+- one kernel-side or target-owned console-write proof
+- later continuity into init and one early service artifact without redesigning
+  the build description immediately afterward
+
+That means the first landing does not need the whole eventual Canopus build
+graph. It only needs a shape that can grow from kernel proof to init and early
+services without changing the conceptual model.
+
+Recommended repository stance
+-----------------------------
+- treat the initial Canopus target family as one explicit named target, not as
+  generic cross-compilation support already solved
+- treat kernel, init, and early services as separate explicit targets even if
+  they currently share most settings
+- keep final image packaging or boot-media assembly outside `mc` until the
+  ordinary freestanding artifact path is honest first
+
+Bottom line
+-----------
+The smallest honest target model for the Canopus wave is not complicated: one
+explicit freestanding target family, one explicit startup choice per artifact,
+and three explicit artifact classes for kernel, init, and early services. That
+is enough to unblock the first proofs without pretending the repository has
+already solved general cross-compilation or system packaging.

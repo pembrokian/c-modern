@@ -1,0 +1,242 @@
+Phase 82 Through Phase 95 -- Speculative v0.3 Roadmap
+======================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the hosted `v0.2` plateau and the now
+defined Canopus-driven `v0.3` direction without turning that sketch into a
+committed execution plan.
+
+This document is intentionally forward-looking and tentative.
+It does not replace `docs/plan/plan.txt`.
+It does not replace the concrete Phase 81 execution note.
+It gives a rough shape for the next `v0.3` wave if the repository continues
+moving in the same evidence-first style used so far:
+
+- one owner-local gap at a time
+- one real proof program or consumer at a time
+- one explicit exit criterion per phase
+- no speculative widening without bring-up pressure
+
+Repository numbering note
+-------------------------
+- Phase 81 is already occupied by the concrete freestanding-and-`hal`
+  bootstrap execution note plus its checklist and target-model support notes.
+- The earlier Phase 67 through Phase 80 speculative roadmap already ended with
+  the hosted `v0.2` release-snapshot preparation wave.
+- The `v0.3` direction note, consumer matrix, and proof-program ladder now
+  define the next plausible planning frame, but they do not yet provide one
+  multi-phase speculative continuation.
+- This speculative continuation therefore starts at Phase 82, with Phase 81 as
+  the current concrete anchor.
+
+Repository status note
+----------------------
+- The repository now has a repository-bounded hosted `v0.2` plateau, release
+  hardening, a final `v0.2` gate, and a release-snapshot preparation path.
+- The admitted implementation slice remains hosted Darwin arm64 only.
+- The core-language plateau remains closed unless a new proof exposes a real
+  parser, sema, MIR, backend, or ABI owner gap.
+- The first concrete next consumer is Canopus Lite bring-up, which changes the
+  pressure profile from hosted utility breadth toward freestanding execution,
+  narrow `hal`, and honest non-hosted artifact production.
+
+What this roadmap is trying to answer
+-------------------------------------
+- What likely comes after the first freestanding boot-marker and narrow `hal`
+  proofs if those land honestly?
+- Which follow-on fronts still belong to target, build, backend, runtime, or
+  stdlib owners rather than to a reopened core-language wave?
+- In what order should kernel mechanisms, user-space policy proofs, and
+  documentation hardening likely land if `v0.3` is driven by Canopus Lite?
+- Where should the repository stop before it drifts into a full OS-completion
+  claim, broad cross-compilation promise, or speculative language redesign?
+
+Core rule
+---------
+- Keep the hosted `v0.2` plateau closed unless the Canopus proof ladder
+  exposes a concrete language-owner failure.
+- Prefer freestanding truth, hardware-boundary truth, and target/toolchain
+  truth over new language machinery.
+- Admit only the smallest `hal`, target, and support surfaces required by the
+  next proof.
+- Keep scheduler policy, capability policy, and broad IPC frameworks in user
+  space and out of the language unless repeated proofs force a narrower owner.
+
+Roadmap bands
+-------------
+
+Band A - Cross The Hosted Boundary Honestly
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 81 through 84 should make the first non-hosted path real enough to
+trust before the roadmap widens into kernel or user-space policy work.
+
+Phase 81 is already a concrete repository planning note rather than active
+speculation:
+- it chooses the first execution pair as freestanding boot-marker truth plus
+  one narrow MMIO-backed console-write proof through `hal`
+- it keeps the initial public `hal` surface bounded to `mmio_ptr<T>`,
+  `volatile_load<T>`, and `volatile_store<T>`
+- it explicitly defers broader target policy, IPC, scheduler work, and broad
+  `os` growth until later proofs justify them
+
+The remaining speculative continuation in this band therefore starts at Phase
+82.
+
+Likely themes:
+- freestanding artifact and entry truth beyond the first execution note
+- link-path and target-owned support-object honesty
+- initial support-statement split between hosted and freestanding slices
+
+Possible phases in this band:
+
+Phase 82 -- Freestanding Artifact And Entry Hardening
+- Exit criterion: one repository-owned freestanding artifact path is stable,
+  inspectable, and free of hidden hosted-startup assumptions.
+
+Phase 83 -- Narrow Hal Admission And Console Proof
+- Exit criterion: the first admitted `hal` slice is real, narrowly bounded,
+  and proved by one deterministic MMIO-backed output path.
+
+Phase 84 -- Freestanding Support Statement And Tooling Audit
+- Exit criterion: the repository can state the first admitted freestanding
+  slice honestly and keep it separate from the hosted `v0.2` support claim.
+
+Band B - Validate Kernel Mechanism Representation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 85 through 88 likely test whether the current explicit language core is
+already sufficient for the first kernel-owned structures and lifecycle truth.
+
+Likely themes:
+- endpoint and message-buffer representation with ordinary structs and enums
+- explicit task or process lifecycle state
+- kernel-owned static data, layout, and artifact integration if needed
+- reopening compiler or ABI work only if the proofs expose a concrete failure
+
+Why this band comes next:
+- once freestanding entry and the first `hal` path are real, the strongest
+  remaining question is whether the existing core language can model kernel
+  mechanism data honestly without new syntax or runtime machinery
+
+Possible phases in this band:
+
+Phase 85 -- Kernel Endpoint Queue Smoke
+- Exit criterion: one bounded endpoint or message-queue proof is expressed and
+  validated through ordinary Modern C types without reopening speculative IPC
+  abstractions.
+
+Phase 86 -- Task Lifecycle Kernel Proof
+- Exit criterion: one minimal create, ready, exit, and wait lifecycle path is
+  represented honestly at the kernel boundary.
+
+Phase 87 -- Kernel Static-Data And Artifact Follow-Through
+- Exit criterion: any kernel-owned constant, layout, or static-data truths
+  required by the first mechanism proofs are carried honestly through the
+  chosen build and artifact path.
+
+Phase 88 -- Kernel Build Integration Audit
+- Exit criterion: the emitted freestanding objects or images compose honestly
+  with the minimal kernel build path without hidden driver behavior.
+
+Band C - Validate User-Space Policy Shape
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 89 through 92 likely move from kernel-only mechanism proofs to the
+first small user-space policy story Canopus Lite actually cares about.
+
+Likely themes:
+- init startup and one service handshake
+- capability-handle transfer as explicit data rather than ambient authority
+- small user-space helper libraries only if repeated protocol shapes appear
+- no hidden scheduler or capability-runtime machinery
+
+Why this band is separate:
+- Canopus Lite is not only about kernel boot; it is about keeping policy in
+  user space, so the roadmap needs an explicit band where that claim is proved
+  without yet demanding a full operating-system completion story
+
+Possible phases in this band:
+
+Phase 89 -- Init To Log-Service Handshake
+- Exit criterion: init starts, acquires one logging path or endpoint, and
+  completes one bounded request or acknowledgment flow.
+
+Phase 90 -- Capability-Handle Transfer Proof
+- Exit criterion: one user-space component receives and uses one explicit
+  transferred handle without ambient authority shortcuts.
+
+Phase 91 -- Early User-Space Helper Boundary Audit
+- Exit criterion: repeated protocol or handle-wrapper patterns are either kept
+  explicit or admitted as one narrow ordinary-library helper slice.
+
+Phase 92 -- User-Space Lifecycle Follow-Through
+- Exit criterion: one minimal launch, ready, exit, and observation path is
+  honest across the first user-space bring-up boundary.
+
+Band D - Add One Event Source And Integrate The First System
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 93 through 95 likely add the narrowest wakeup source beyond synchronous
+boot and then combine the earlier proofs into one first-system demo.
+
+Likely themes:
+- one timer or interrupt wake path
+- first end-to-end integration over kernel, init, and one small service set
+- support-note and proof-surface hardening for the first freestanding tranche
+
+Why this band comes last:
+- event delivery and end-to-end integration are only honest once the boot,
+  `hal`, kernel mechanism, and user-space policy bands are already bounded and
+  real
+
+Possible phases in this band:
+
+Phase 93 -- Timer Or Interrupt Wake Proof
+- Exit criterion: one narrow wakeup source beyond simple synchronous setup is
+  admitted without widening into a general interrupt or scheduler framework.
+
+Phase 94 -- First-System Demo Integration
+- Exit criterion: one small end-to-end Canopus Lite bring-up demo combines the
+  earlier kernel, init, logging, and request or reply proofs honestly.
+
+Phase 95 -- Freestanding v0.3 Slice Audit
+- Exit criterion: the repository can state the first admitted `v0.3`
+  freestanding slice honestly, name what remains deferred, and avoid implying
+  full OS completion, broad target support, or a general language redesign.
+
+Likely ordering bias
+--------------------
+If the repository keeps following the same pattern, the safest order is:
+
+1. Make one freestanding path and one narrow `hal` path real first.
+2. Prove kernel mechanisms with the existing explicit core language.
+3. Prove one small user-space policy story.
+4. Add one wakeup source and integrate the first-system demo.
+5. Freeze the first freestanding `v0.3` support statement last.
+
+That ordering keeps the repository from confusing Canopus pressure with
+permission to widen target policy, IPC abstractions, or language machinery all
+at once.
+
+Non-goals
+---------
+- treating this note as a committed implementation plan
+- claiming full Canopus Lite completion inside the roadmap horizon
+- turning `v0.3` into a broad syntax or runtime-feature release
+- implying broad cross-compilation, packaging, or multi-architecture support
+- admitting broad `os`, scheduler, channel, actor, or capability-runtime work
+  without proof pressure
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- The concrete Phase 81 note remains the active execution owner.
+- The direction note, consumer matrix, proof ladder, and this roadmap should
+  be kept aligned; if one of them changes materially, the right answer is to
+  rewrite the narrow phase docs rather than defend stale speculation.
+- If the first freestanding proofs expose a core-language gap, reopen the core
+  only at that owner boundary.
+- If the repository reaches a smaller honest plateau earlier than Phase 95,
+  that is a success, not a roadmap failure.

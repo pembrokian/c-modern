@@ -1,0 +1,147 @@
+Phase 81 -- Freestanding And Hal Bootstrap Execution
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Turn the Canopus-driven `v0.3` direction from a planning stance into one
+concrete execution phase: make the first freestanding and narrow `hal` proofs
+real enough that the repository crosses the hosted boundary honestly.
+
+This document is a repository execution plan.
+It does not claim that freestanding support or `hal` are already admitted.
+
+Repository status note
+----------------------
+- Phase 65 recorded that the admitted `v0.2` core is semantically complete
+  enough for repository-bounded release hardening.
+- Phase 66 through Phase 80 then chose adjacent stdlib follow-through,
+  workflow hardening, and narrow hosted release execution work rather than
+  reopening the core language.
+- The new Canopus planning notes now define the strongest next consumer as a
+  freestanding and hardware-boundary bring-up tranche rather than another
+  hosted utility wave.
+- The repository architecture already describes freestanding execution and a
+  `hal` boundary, but both remain unapplied to the admitted implementation
+  slice.
+
+Problem being solved
+--------------------
+- The repository now has a clear post-`v0.2` direction, but still lacks one
+  active execution owner that turns that direction into concrete compiler,
+  runtime, stdlib, and proof work.
+- Without a first phase, freestanding support, `hal` admission, and target
+  work could expand in parallel without a bounded proof shape.
+- The next honest step is not the whole Canopus system. It is crossing the
+  hosted boundary with the smallest proof pair that makes the new direction
+  real.
+
+Core rule
+---------
+- Make freestanding support honest before broadening target policy.
+- Admit only the narrow `hal` surface required by the first hardware-facing
+  proof.
+- Keep kernel policy, IPC frameworks, scheduler policy, and broader OS-surface
+  design deferred until later proofs require them.
+- Reopen core-language design only if the first proofs expose a concrete
+  parser, sema, MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. freestanding boot marker
+2. polled UART or equivalent narrow console write path through `hal`
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should make Phase 81 the first active Canopus-driven `v0.3`
+execution wave, centered on freestanding startup truth and the smallest honest
+`hal` admission.
+
+What this phase should try to prove
+-----------------------------------
+- the compiler can produce one freestanding artifact without hosted startup
+  assumptions
+- startup selection and replacement entry are explicit and inspectable on the
+  build path
+- the repository can admit one narrow `hal` surface without smearing hardware
+  behavior into `mem`, `sync`, or backend-only escapes
+- one hardware-facing output path is expressible through the admitted Modern C
+  surface
+
+Deliverables
+------------
+- one concrete freestanding target path that omits the hosted startup shim
+- one explicit startup-selection path for a replacement entry symbol
+- one initial admitted `hal` slice limited to:
+  - `hal.mmio_ptr<T>`
+  - `hal.volatile_load<T>`
+  - `hal.volatile_store<T>`
+- one proof program for freestanding boot-marker output
+- one proof program for polled MMIO-backed byte or string output
+- one focused target-model note defining the smallest artifact classes needed
+  for kernel, init, and early services
+- aligned planning-surface updates so the new wave is explicit in backlog and
+  decision history
+
+Suggested execution order
+-------------------------
+1. Freeze the minimal target model for freestanding kernel, init, and early
+   service artifacts.
+2. Make the build path honest for one freestanding artifact with replacement
+   entry and no hosted startup.
+3. Land the smallest `hal` surface required by the first MMIO or console proof.
+4. Add the freestanding boot-marker proof.
+5. Add the polled UART or equivalent console-write proof.
+6. Re-audit whether any missing work belongs to the language core, the target
+   boundary, or later Canopus-specific libraries.
+
+Preferred proof points
+----------------------
+1. An explicit `env = "freestanding"` target path that does not silently fall
+   back to hosted assumptions.
+2. A replacement startup or named entry path that stays visible in the build
+   description.
+3. One narrow hardware-facing library boundary rather than backend-private
+   intrinsics disguised as ordinary library calls.
+4. One deterministic output proof that can serve as the first non-hosted smoke.
+
+Exit criteria
+-------------
+- the repository has one honest freestanding build path for the first proof
+- the repository has one admitted narrow `hal` surface proved by a real
+  hardware-facing example
+- the first two Canopus-driven proof programs are explicit and executable in
+  repository terms
+- the phase can state clearly whether any remaining blockers are target-path
+  work, backend work, or genuine core-language gaps
+
+Non-goals
+---------
+- full Canopus Lite IPC, capability, or namespace bring-up
+- broad cross-compilation support beyond what the first proof path requires
+- broad `os` admission or hosted process-policy work
+- language-level channels, async runtime, schedulers, or capability systems
+- device-framework or interrupt-framework generalization beyond what the first
+  proof pair needs
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 81 stands alone as the first active execution phase after the hosted
+  `v0.2` plateau and release-hardening wave.
+- The phase names a bounded proof pair instead of a broad freestanding
+  ambition.
+- The phase keeps `hal` narrow and explicitly tied to the first proof.
+
+Closeout target
+---------------
+Phase 81 should end with one narrow but important new truth: Modern C can now
+cross the hosted boundary honestly enough to build and exercise the first
+freestanding and hardware-facing bring-up proofs without claiming the larger
+Canopus system is already complete.

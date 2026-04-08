@@ -4517,6 +4517,127 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
                                "phase58 issue rollup aggregate const executable run");
 }
 
+void TestPhase81FreestandingBootstrapAndHal(const std::filesystem::path& source_root,
+                                            const std::filesystem::path& binary_root,
+                                            const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase81_freestanding_project";
+    std::filesystem::remove_all(project_root);
+
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase81-freestanding\"\n"
+              "default = \"boot\"\n"
+              "\n"
+              "[targets.boot]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase81\"\n"
+              "root = \"src/boot.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "\n"
+              "[targets.boot.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.boot.runtime]\n"
+              "startup = \"bootstrap_main\"\n"
+              "\n"
+              "[targets.console]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase81\"\n"
+              "root = \"src/console.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "\n"
+              "[targets.console.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.console.runtime]\n"
+              "startup = \"bootstrap_main\"\n");
+    WriteFile(project_root / "src/boot.mc",
+              "func bootstrap_main() i32 {\n"
+              "    return 81\n"
+              "}\n");
+    WriteFile(project_root / "src/console.mc",
+              "import hal\n"
+              "\n"
+              "const UART0: uintptr = 4096\n"
+              "\n"
+              "func bootstrap_main() i32 {\n"
+              "    tx: *i32 = hal.mmio_ptr<i32>(UART0)\n"
+              "    hal.volatile_store<i32>(tx, 65)\n"
+              "    return hal.volatile_load<i32>(tx)\n"
+              "}\n");
+
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path boot_build_dir = binary_root / "phase81_freestanding_boot_build";
+    std::filesystem::remove_all(boot_build_dir);
+
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       boot_build_dir,
+                                       "boot",
+                                       "phase81_freestanding_boot_build_output.txt",
+                                       "phase81 freestanding boot build");
+
+    const auto boot_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/boot.mc", boot_build_dir);
+    const std::filesystem::path boot_runtime_object =
+        boot_targets.object.parent_path() / (boot_targets.object.stem().generic_string() + ".freestanding.bootstrap_main.runtime.o");
+    if (!std::filesystem::exists(boot_targets.executable)) {
+        Fail("phase81 freestanding boot build should produce an executable");
+    }
+    if (!std::filesystem::exists(boot_runtime_object)) {
+        Fail("phase81 freestanding boot build should produce a freestanding runtime object");
+    }
+
+    const auto [boot_outcome, boot_output] = RunCommandCapture({boot_targets.executable.generic_string()},
+                                                               boot_build_dir / "phase81_freestanding_boot_run_output.txt",
+                                                               "phase81 freestanding boot executable run");
+    if (!boot_outcome.exited || boot_outcome.exit_code != 81) {
+        Fail("phase81 freestanding boot executable should exit with the bootstrap marker:\n" + boot_output);
+    }
+
+    const std::filesystem::path console_build_dir = binary_root / "phase81_freestanding_console_build";
+    std::filesystem::remove_all(console_build_dir);
+
+    const auto [console_outcome, console_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                      "build",
+                                                                      "--project",
+                                                                      project_path.generic_string(),
+                                                                      "--target",
+                                                                      "console",
+                                                                      "--build-dir",
+                                                                      console_build_dir.generic_string(),
+                                                                      "--dump-mir"},
+                                                                     console_build_dir / "phase81_freestanding_console_build_output.txt",
+                                                                     "phase81 freestanding hal build");
+    if (!console_outcome.exited || console_outcome.exit_code != 0) {
+        Fail("phase81 freestanding hal build should succeed:\n" + console_output);
+    }
+
+    const auto console_dump_targets = mc::support::ComputeDumpTargets(project_root / "src/console.mc", console_build_dir);
+    const auto console_build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/console.mc", console_build_dir);
+    const std::string console_mir = ReadFile(console_dump_targets.mir);
+    const std::string console_llvm_ir = ReadFile(console_build_targets.llvm_ir);
+    ExpectOutputContains(console_mir,
+                         "int_to_pointer %v",
+                         "phase81 freestanding hal MIR should lower hal.mmio_ptr to int_to_pointer");
+    ExpectOutputContains(console_mir,
+                         "volatile_store target=hal.volatile_store",
+                         "phase81 freestanding hal MIR should lower hal.volatile_store to volatile_store");
+    ExpectOutputContains(console_mir,
+                         "volatile_load %v",
+                         "phase81 freestanding hal MIR should lower hal.volatile_load to volatile_load");
+    ExpectOutputContains(console_llvm_ir,
+                         "inttoptr i64",
+                         "phase81 freestanding hal LLVM IR should preserve the MMIO pointer conversion");
+    ExpectOutputContains(console_llvm_ir,
+                         "store volatile",
+                         "phase81 freestanding hal LLVM IR should preserve volatile stores");
+    ExpectOutputContains(console_llvm_ir,
+                         "load volatile i32",
+                         "phase81 freestanding hal LLVM IR should preserve volatile loads");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -4569,5 +4690,6 @@ int main(int argc, char** argv) {
     TestRealReviewBoardProject(source_root, binary_root, mc_path);
     TestRealIssueRollupProject(source_root, binary_root, mc_path);
     TestIssueRollupImportedAggregateConstPressure(source_root, binary_root, mc_path);
+    TestPhase81FreestandingBootstrapAndHal(source_root, binary_root, mc_path);
     return 0;
 }

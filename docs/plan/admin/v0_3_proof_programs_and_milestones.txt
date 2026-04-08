@@ -1,0 +1,213 @@
+Modern C -- v0.3 Proof Programs And Milestones
+==============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Name a small ordered proof set for a Canopus-driven `v0.3` wave so the next
+work can be executed as bounded milestones rather than as a vague freestanding
+or OS-bring-up ambition.
+
+Guiding rule
+------------
+- Each proof should unlock one new truth and stop.
+- Prefer narrow vertical slices over broad subsystem scaffolding.
+- Reuse the existing language core unless a proof exposes a concrete owner gap.
+
+Recommended proof programs
+--------------------------
+1. Freestanding boot marker
+
+Goal:
+- prove that Modern C can compile and link one freestanding artifact with
+  replacement entry and no hosted startup assumptions
+
+Minimal behavior:
+- custom entrypoint runs
+- writes one deterministic boot marker through the narrowest target-owned path
+- halts or loops cleanly
+
+Why it matters:
+- this is the first honest proof that the toolchain has crossed the hosted
+  boundary at all
+
+2. Polled UART or console write path
+
+Goal:
+- prove narrow `hal` admission through one MMIO-backed output path
+
+Minimal behavior:
+- use `hal.mmio_ptr`, `hal.volatile_load`, and `hal.volatile_store`
+- poll until transmit-ready
+- emit a short string or byte sequence
+
+Why it matters:
+- this anchors the hardware boundary in `hal` instead of in backend quirks or
+  ad hoc unsafe helpers
+
+3. Kernel endpoint queue smoke
+
+Goal:
+- prove that the kernel-side code can represent one endpoint, one bounded
+  message buffer, and one send or receive path using ordinary Modern C types
+
+Minimal behavior:
+- define message structs and endpoint state explicitly
+- enqueue or dequeue one message locally in kernel space
+- emit deterministic diagnostics or assertions in a host-side harness if the
+  full boot environment is not ready yet
+
+Why it matters:
+- this tests whether the current core-language surface is already sufficient
+  for explicit protocol and queue representation
+
+4. Init-to-log-service handshake
+
+Goal:
+- prove the first user-space service startup and one IPC request or reply path
+
+Minimal behavior:
+- kernel starts init
+- init obtains or is given one log-service endpoint capability
+- init sends one message and receives one reply or acknowledgment
+
+Why it matters:
+- this is the smallest honest user-space policy proof in the Canopus model
+
+5. Capability-handle transfer proof
+
+Goal:
+- prove that one user-space process can receive and use an explicitly
+  transferred handle rather than ambient authority
+
+Minimal behavior:
+- init or kernel transfers one endpoint or wait handle to another task
+- receiver uses that handle for one bounded action
+
+Why it matters:
+- this directly exercises one of Canopus Lite's central architectural claims
+
+6. Child-process or task lifecycle proof
+
+Goal:
+- prove the minimal create, exit, and wait lifecycle that Canopus Lite names
+
+Minimal behavior:
+- init launches one child task or process
+- child reports ready, exits, and parent observes completion
+
+Why it matters:
+- this closes the simplest honest process-tree behavior without opening richer
+  shutdown protocols too early
+
+7. Timer or interrupt wake proof
+
+Goal:
+- prove one narrow event source beyond pure synchronous boot code
+
+Minimal behavior:
+- timer or one needed interrupt wakes a blocked task or delivers one kernel
+  event into an endpoint path
+
+Why it matters:
+- Canopus Lite explicitly includes timer and interrupt delivery in the kernel
+  mechanism set, but this proof should stay minimal and single-purpose
+
+8. Canopus Lite first-system demo
+
+Goal:
+- combine the earlier proofs into the first end-to-end bring-up slice the
+  architecture note recommends
+
+Minimal behavior:
+- kernel boots
+- kernel starts init
+- init starts log service and one echo or ping service
+- client sends one request
+- service replies
+- logs show boot and service milestones
+
+Why it matters:
+- this is the first proof that the language, toolchain, and OS architecture
+  meet at the same honest boundary
+
+Recommended milestone order
+---------------------------
+Milestone 1 -- Cross the hosted boundary
+- proof 1: freestanding boot marker
+- proof 2: polled UART or console write path
+
+Primary output:
+- freestanding startup and narrow `hal` become real enough to trust
+
+Milestone 2 -- Validate kernel representation
+- proof 3: kernel endpoint queue smoke
+- proof 6: child-process or task lifecycle proof
+
+Primary output:
+- explicit kernel data structures and lifecycle mechanics are validated without
+  yet needing the full user-space service model
+
+Milestone 3 -- Validate user-space policy shape
+- proof 4: init-to-log-service handshake
+- proof 5: capability-handle transfer proof
+
+Primary output:
+- the Canopus Lite "kernel owns mechanism, user space owns policy" story is
+  now exercised directly
+
+Milestone 4 -- Add one event source
+- proof 7: timer or interrupt wake proof
+
+Primary output:
+- the kernel has one honest wakeup path beyond simple synchronous setup
+
+Milestone 5 -- First-system integration
+- proof 8: Canopus Lite first-system demo
+
+Primary output:
+- one small but complete end-to-end bring-up story
+
+Expected compiler and toolchain deliverables by milestone
+---------------------------------------------------------
+Milestone 1 should force:
+- freestanding build path
+- startup replacement truth
+- initial `hal` admission
+
+Milestone 2 should force, if needed:
+- any missing layout, constant, or static-data truth required by kernel-owned
+  endpoint tables and lifecycle state
+
+Milestone 3 should force, if needed:
+- any missing explicit protocol-shape or handle-wrapper ergonomics that cannot
+  be expressed honestly with the current core language
+
+Milestone 4 should force, if needed:
+- the narrowest interrupt or barrier extension actually required by the proof
+
+Milestone 5 should force:
+- target integration and documentation clarity rather than another speculative
+  language wave
+
+Reopen triggers for core-language work
+--------------------------------------
+Only reopen core-language design if one of the proofs demonstrates a concrete
+failure such as:
+
+- inability to express a required protocol or layout shape
+- inability to represent a required static-data or compile-time constant shape
+- inability to preserve a required ABI or volatile rule through MIR or backend
+- inability to model a necessary freestanding calling or entry convention
+
+Do not reopen core-language work merely because the OS domain is large.
+
+Bottom line
+-----------
+The fastest honest path to a Canopus-driven `v0.3` is not to design a large
+new language surface. It is to execute a small proof ladder that turns
+freestanding, `hal`, and first-system bring-up into concrete compiler and
+runtime requirements.

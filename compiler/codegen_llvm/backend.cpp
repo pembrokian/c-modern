@@ -51,7 +51,7 @@ bool AtomicOrderAllowedForInstruction(mir::Instruction::Kind kind,
                                       std::string_view order_name);
 
 bool IsBootstrapTarget(const TargetConfig& target) {
-    return target.hosted && target.triple == kBootstrapTriple && target.target_family == kBootstrapTargetFamily &&
+    return target.triple == kBootstrapTriple && target.target_family == kBootstrapTargetFamily &&
            target.object_format == kBootstrapObjectFormat;
 }
 
@@ -63,7 +63,7 @@ bool ValidateBootstrapTarget(const TargetConfig& target,
     }
 
     ReportBackendError(source_path,
-                       "LLVM bootstrap backend only supports hosted 'arm64-apple-darwin' in Stage 3; got triple='" +
+                       "LLVM bootstrap backend only supports bootstrap 'arm64-apple-darwin' targets in Stage 3; got triple='" +
                            target.triple + "' target_family='" + target.target_family + "'",
                        diagnostics);
     return false;
@@ -4520,7 +4520,7 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
 
     if (!options.runtime_source_path.has_value()) {
         ReportBackendError(source_path,
-                           "LLVM bootstrap backend requires an explicit hosted runtime support source path",
+                           "LLVM bootstrap backend requires an explicit runtime support source path",
                            diagnostics);
         return {};
     }
@@ -4528,7 +4528,7 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
     const auto& runtime_support_source = *options.runtime_source_path;
     if (!std::filesystem::exists(runtime_support_source)) {
         ReportBackendError(source_path,
-                           "LLVM bootstrap backend could not read hosted runtime support source '" +
+                           "LLVM bootstrap backend could not read runtime support source '" +
                                runtime_support_source.generic_string() + "'",
                            diagnostics);
         return {};
@@ -4549,7 +4549,7 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
                              options.runtime_object_path.generic_string()},
                             source_path,
                             diagnostics,
-                            "compile hosted runtime support")) {
+                            "compile runtime support")) {
             return {};
         }
     }
@@ -4573,7 +4573,7 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
     if (!RunHostCommand(link_command,
                         source_path,
                         diagnostics,
-                        "link a hosted executable")) {
+                        "link an executable")) {
         return {};
     }
 
