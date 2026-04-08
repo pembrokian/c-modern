@@ -1129,6 +1129,27 @@ int main(int argc, char** argv) {
                     0,
                     {});
 
+    const std::filesystem::path bitwise_ops_source = work_root / "bitwise_ops_ok.mc";
+    WriteFile(bitwise_ops_source,
+              "func combine(left: i32, right: i32, extra: i32) i32 {\n"
+              "    both: i32 = left & right\n"
+              "    either: i32 = both | extra\n"
+              "    return either ^ 3\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    if combine(14, 11, 16) == 25 {\n"
+              "        return 0\n"
+              "    }\n"
+              "    return 1\n"
+              "}\n");
+    RunBuiltFixtureWithIrSnippets(mc_path,
+                                  bitwise_ops_source,
+                                  work_root / "bitwise_ops_ok_build",
+                                  0,
+                                  {},
+                                  {" = and i32 ", " = or i32 ", " = xor i32 "});
+
     const std::filesystem::path div_zero_source = work_root / "checked_div_zero.mc";
     WriteFile(div_zero_source,
               "func main() i32 {\n"

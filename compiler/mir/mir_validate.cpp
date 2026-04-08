@@ -210,6 +210,19 @@ void ValidateBinaryInstruction(const Instruction& instruction, const ValidationC
             }
         }
     }
+    if (instruction.op == "&" || instruction.op == "|" || instruction.op == "^") {
+        for (const auto& operand_type : operand_types) {
+            if (!sema::IsUnknown(operand_type) && !IsIntegerLikeType(module, operand_type)) {
+                report("bitwise binary requires integer operands in function " + function.name);
+            }
+        }
+        if (operand_types.size() == 2 && !HasCompatibleNumericTypes(module, operand_types.front(), operand_types.back())) {
+            report("bitwise binary requires compatible operand types in function " + function.name);
+        }
+        if (!sema::IsUnknown(instruction.type) && !IsIntegerLikeType(module, instruction.type)) {
+            report("bitwise binary must produce integer type in function " + function.name);
+        }
+    }
     if (instruction.op == "+" || instruction.op == "-" || instruction.op == "*" || instruction.op == "/" || instruction.op == "%") {
         for (const auto& operand_type : operand_types) {
             if (!sema::IsUnknown(operand_type) && !IsNumericType(module, operand_type)) {

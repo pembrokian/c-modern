@@ -1,0 +1,30 @@
+SourceFile
+  FuncDecl name=test
+    ParamDecl name=a
+      NamedType name=i32
+    ParamDecl name=b
+      NamedType name=i32
+    ParamDecl name=c
+      NamedType name=i32
+    ParamDecl name=d
+      NamedType name=i32
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              BinaryExpr text=|
+                left:
+                  NameExpr text=a
+                right:
+                  BinaryExpr text=^
+                    left:
+                      NameExpr text=b
+                    right:
+                      BinaryExpr text=&
+                        left:
+                          NameExpr text=c
+                        right:
+                          NameExpr text=d

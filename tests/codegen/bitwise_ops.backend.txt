@@ -1,0 +1,21 @@
+BackendModule surface=backend_ir_text triple=arm64-apple-darwin25.4.0 target_family=arm64-apple-darwin object_format=macho hosted=true
+  Function source=mix backend=@mix returns=[i32 [repr=i32, size=4, align=4]]
+    Local source=left backend=%local.left type=i32 [repr=i32, size=4, align=4] param readonly
+    Local source=right backend=%local.right type=i32 [repr=i32, size=4, align=4] param readonly
+    Local source=extra backend=%local.extra type=i32 [repr=i32, size=4, align=4] param readonly
+    Local source=both backend=%local.both type=i32 [repr=i32, size=4, align=4]
+    Local source=either backend=%local.either type=i32 [repr=i32, size=4, align=4]
+    Block source=entry0 backend=bb0_0.entry0
+      %t0_0_0 = load i32 [repr=i32, size=4, align=4] %local.left
+      %t0_0_1 = load i32 [repr=i32, size=4, align=4] %local.right
+      %t0_0_2 = binary & i32 [repr=i32, size=4, align=4] %t0_0_0, %t0_0_1
+      store i32 %t0_0_2 -> %local.both as i32 [repr=i32, size=4, align=4]
+      %t0_0_4 = load i32 [repr=i32, size=4, align=4] %local.both
+      %t0_0_5 = load i32 [repr=i32, size=4, align=4] %local.extra
+      %t0_0_6 = binary | i32 [repr=i32, size=4, align=4] %t0_0_4, %t0_0_5
+      store i32 %t0_0_6 -> %local.either as i32 [repr=i32, size=4, align=4]
+      %t0_0_8 = load i32 [repr=i32, size=4, align=4] %local.either
+      %t0_0_9 = const int_literal [repr=i64, size=8, align=8] 1
+      %t0_0_10 = convert_numeric i32 [repr=i32, size=4, align=4] %t0_0_9
+      %t0_0_11 = binary ^ i32 [repr=i32, size=4, align=4] %t0_0_8, %t0_0_10
+      ret i32 [repr=i32, size=4, align=4] %t0_0_11

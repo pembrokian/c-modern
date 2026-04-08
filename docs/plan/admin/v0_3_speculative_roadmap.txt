@@ -29,13 +29,16 @@ Repository numbering note
 - Phase 82 is now occupied by the concrete freestanding artifact-and-entry
   hardening note that requires explicit freestanding target identity and makes
   extra target-owned link inputs manifest-visible.
+- Phase 83 is now occupied by the concrete narrow-`hal` console-proof note
+  that validates one deterministic polling console path through the admitted
+  MMIO surface.
 - The earlier Phase 67 through Phase 80 speculative roadmap already ended with
   the hosted `v0.2` release-snapshot preparation wave.
 - The `v0.3` direction note, consumer matrix, and proof-program ladder now
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation.
-- This speculative continuation therefore starts at Phase 83, with Phase 81 and
-  Phase 82 as the current concrete anchors.
+- This speculative continuation therefore starts at Phase 84, with Phase 81
+  through Phase 83 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -94,8 +97,15 @@ Phase 82 is now concrete as freestanding artifact and entry hardening:
 - it still deliberately stops short of linker scripts, arbitrary linker flags,
   broad cross-compilation, or packaging claims
 
+Phase 83 is now concrete as narrow `hal` console proof hardening:
+- it keeps the public `hal` surface unchanged
+- it validates one deterministic polling console path through explicit MMIO
+  status and data registers
+- it uses a manifest-owned target support object only as a repository-bounded
+  MMIO shim, not as a broader hardware abstraction layer
+
 The remaining speculative continuation in this band therefore starts at Phase
-83.
+84.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof
@@ -104,10 +114,6 @@ Likely themes:
   hardening
 
 Possible phases in this band:
-
-Phase 83 -- Narrow Hal Admission And Console Proof
-- Exit criterion: the first admitted `hal` slice is real, narrowly bounded,
-  and proved by one deterministic MMIO-backed output path.
 
 Phase 84 -- Freestanding Support Statement And Tooling Audit
 - Exit criterion: the repository can state the first admitted freestanding

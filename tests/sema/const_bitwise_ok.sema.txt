@@ -1,0 +1,5 @@
+SemanticModule
+  Const names=[MASK] type=i32 values=[2]
+  Const names=[FLAGS] type=i32 values=[10]
+  Const names=[MIXED] type=i32 values=[11]
+  Function name=main params=[] returns=[i32]

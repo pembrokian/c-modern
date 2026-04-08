@@ -1,0 +1,21 @@
+Module
+  Function name=mask returns=[i32]
+    Local name=left type=i32 param readonly
+    Local name=right type=i32 param readonly
+    Local name=extra type=i32 param readonly
+    Local name=both type=i32
+    Local name=either type=i32
+    Block label=entry0
+      load_local %v0:i32 target=left
+      load_local %v1:i32 target=right
+      binary %v2:i32 op=& operands=[%v0, %v1]
+      store_local target=both operands=[%v2]
+      load_local %v3:i32 target=both
+      load_local %v4:i32 target=extra
+      binary %v5:i32 op=| operands=[%v3, %v4]
+      store_local target=either operands=[%v5]
+      load_local %v6:i32 target=either
+      const %v7:int_literal op=1
+      convert_numeric %v8:i32 target=i32 operands=[%v7]
+      binary %v9:i32 op=^ operands=[%v6, %v8]
+      terminator return values=[%v9]

@@ -45,8 +45,56 @@ std::unique_ptr<Expr> Parser::ParseLogicalOrExpr() {
 }
 
 std::unique_ptr<Expr> Parser::ParseLogicalAndExpr() {
-    auto expr = ParseIsExpr();
+    auto expr = ParseBitwiseOrExpr();
     while (Match(TokenKind::kAmpAmp)) {
+        const auto op = Previous();
+        auto node = std::make_unique<Expr>();
+        node->kind = Expr::Kind::kBinary;
+        node->span.begin = expr->span.begin;
+        node->text = std::string(mc::lex::ToString(op.kind));
+        node->left = std::move(expr);
+        node->right = ParseBitwiseOrExpr();
+        node->span.end = node->right->span.end;
+        expr = std::move(node);
+    }
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::ParseBitwiseOrExpr() {
+    auto expr = ParseBitwiseXorExpr();
+    while (Match(TokenKind::kPipe)) {
+        const auto op = Previous();
+        auto node = std::make_unique<Expr>();
+        node->kind = Expr::Kind::kBinary;
+        node->span.begin = expr->span.begin;
+        node->text = std::string(mc::lex::ToString(op.kind));
+        node->left = std::move(expr);
+        node->right = ParseBitwiseXorExpr();
+        node->span.end = node->right->span.end;
+        expr = std::move(node);
+    }
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::ParseBitwiseXorExpr() {
+    auto expr = ParseBitwiseAndExpr();
+    while (Match(TokenKind::kCaret)) {
+        const auto op = Previous();
+        auto node = std::make_unique<Expr>();
+        node->kind = Expr::Kind::kBinary;
+        node->span.begin = expr->span.begin;
+        node->text = std::string(mc::lex::ToString(op.kind));
+        node->left = std::move(expr);
+        node->right = ParseBitwiseAndExpr();
+        node->span.end = node->right->span.end;
+        expr = std::move(node);
+    }
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::ParseBitwiseAndExpr() {
+    auto expr = ParseIsExpr();
+    while (Match(TokenKind::kAmp)) {
         const auto op = Previous();
         auto node = std::make_unique<Expr>();
         node->kind = Expr::Kind::kBinary;
@@ -393,9 +441,10 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
             }
             auto node = std::make_unique<Expr>();
             node->span.begin = expr->span.begin;
-            if (expr->kind == Expr::Kind::kName) {
+            if ((expr->kind == Expr::Kind::kName || expr->kind == Expr::Kind::kQualifiedName) &&
+                Previous().kind == TokenKind::kIdentifier) {
                 node->kind = Expr::Kind::kQualifiedName;
-                node->text = expr->text;
+                node->text = expr->kind == Expr::Kind::kQualifiedName ? expr->text + "." + expr->secondary_text : expr->text;
                 node->secondary_text = member.value_or("");
                 node->type_args = std::move(expr->type_args);
                 node->span.end = Previous().span.end;

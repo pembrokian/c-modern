@@ -4795,6 +4795,195 @@ void TestPhase82FreestandingArtifactAndEntryHardening(const std::filesystem::pat
                          "phase82 freestanding builds should reject missing explicit link inputs");
 }
 
+void TestPhase83NarrowHalAdmissionAndConsoleProof(const std::filesystem::path& source_root,
+                                                  const std::filesystem::path& binary_root,
+                                                  const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase83_hal_console_project";
+    std::filesystem::remove_all(project_root);
+
+    WriteFile(project_root / "src/main.mc",
+              "import hal\n"
+              "\n"
+              "extern(c) func phase83_uart_status_addr() uintptr\n"
+              "extern(c) func phase83_uart_data_addr() uintptr\n"
+              "extern(c) func phase83_uart_reset()\n"
+              "extern(c) func phase83_uart_commit()\n"
+              "extern(c) func phase83_uart_result() i32\n"
+              "\n"
+              "const UART_TX_READY: u32 = 1\n"
+              "\n"
+              "func uart_status_ptr() *u32 {\n"
+              "    return hal.mmio_ptr<u32>(phase83_uart_status_addr())\n"
+              "}\n"
+              "\n"
+              "func uart_data_ptr() *u32 {\n"
+              "    return hal.mmio_ptr<u32>(phase83_uart_data_addr())\n"
+              "}\n"
+              "\n"
+              "func uart_tx_ready() bool {\n"
+              "    status: u32 = hal.volatile_load<u32>(uart_status_ptr())\n"
+              "    return status == UART_TX_READY\n"
+              "}\n"
+              "\n"
+              "func uart_write_byte(b: u8) {\n"
+              "    while !uart_tx_ready() {\n"
+              "    }\n"
+              "    value: u32 = (u32)(b)\n"
+              "    hal.volatile_store<u32>(uart_data_ptr(), value)\n"
+              "    phase83_uart_commit()\n"
+              "}\n"
+              "\n"
+              "func bootstrap_main() i32 {\n"
+              "    phase83_uart_reset()\n"
+              "    bytes: [2]u8\n"
+              "    bytes[0] = 79\n"
+              "    bytes[1] = 75\n"
+              "    idx: usize = 0\n"
+              "    while idx < 2 {\n"
+              "        uart_write_byte(bytes[idx])\n"
+              "        idx = idx + 1\n"
+              "    }\n"
+              "    return phase83_uart_result()\n"
+              "}\n");
+    WriteFile(project_root / "target/phase83_uart_support.c",
+              "#include <stdint.h>\n"
+              "\n"
+              "static volatile uint32_t phase83_uart_status = 1;\n"
+              "static volatile uint32_t phase83_uart_data = 0;\n"
+              "static uint8_t phase83_uart_log[4] = {0, 0, 0, 0};\n"
+              "static uint32_t phase83_uart_count = 0;\n"
+              "\n"
+              "uintptr_t phase83_uart_status_addr(void) {\n"
+              "    return (uintptr_t)(&phase83_uart_status);\n"
+              "}\n"
+              "\n"
+              "uintptr_t phase83_uart_data_addr(void) {\n"
+              "    return (uintptr_t)(&phase83_uart_data);\n"
+              "}\n"
+              "\n"
+              "void phase83_uart_reset(void) {\n"
+              "    phase83_uart_status = 1;\n"
+              "    phase83_uart_data = 0;\n"
+              "    phase83_uart_count = 0;\n"
+              "    phase83_uart_log[0] = 0;\n"
+              "    phase83_uart_log[1] = 0;\n"
+              "    phase83_uart_log[2] = 0;\n"
+              "    phase83_uart_log[3] = 0;\n"
+              "}\n"
+              "\n"
+              "void phase83_uart_commit(void) {\n"
+              "    if (phase83_uart_count < 4) {\n"
+              "        phase83_uart_log[phase83_uart_count] = (uint8_t)(phase83_uart_data & 0xffu);\n"
+              "    }\n"
+              "    phase83_uart_count += 1;\n"
+              "    phase83_uart_status = 1;\n"
+              "}\n"
+              "\n"
+              "int phase83_uart_result(void) {\n"
+              "    if (phase83_uart_count != 2) {\n"
+              "        return (int)phase83_uart_count;\n"
+              "    }\n"
+              "    if (phase83_uart_log[0] != 'O') {\n"
+              "        return 10;\n"
+              "    }\n"
+              "    if (phase83_uart_log[1] != 'K') {\n"
+              "        return 11;\n"
+              "    }\n"
+              "    return 83;\n"
+              "}\n");
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase83-hal-console\"\n"
+              "default = \"console\"\n"
+              "\n"
+              "[targets.console]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase83\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
+              "\n"
+              "[targets.console.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.console.runtime]\n"
+              "startup = \"bootstrap_main\"\n"
+              "\n"
+              "[targets.console.link]\n"
+              "inputs = [\"target/phase83_uart_support.o\"]\n");
+
+    const std::filesystem::path support_object = project_root / "target/phase83_uart_support.o";
+    const auto [support_compile_outcome, support_compile_output] = RunCommandCapture({"xcrun",
+                                                                                      "clang",
+                                                                                      "-target",
+                                                                                      std::string(mc::kBootstrapTriple),
+                                                                                      "-c",
+                                                                                      (project_root / "target/phase83_uart_support.c").generic_string(),
+                                                                                      "-o",
+                                                                                      support_object.generic_string()},
+                                                                                     project_root / "target/phase83_uart_support_compile_output.txt",
+                                                                                     "phase83 uart support object compile");
+    if (!support_compile_outcome.exited || support_compile_outcome.exit_code != 0) {
+        Fail("phase83 uart support object compile should pass:\n" + support_compile_output);
+    }
+
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path build_dir = binary_root / "phase83_hal_console_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "console",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "phase83_hal_console_build_output.txt",
+                                                                 "phase83 freestanding hal console build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase83 freestanding hal console build should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir);
+    const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
+                                                             build_dir / "phase83_hal_console_run_output.txt",
+                                                             "phase83 freestanding hal console run");
+    if (!run_outcome.exited || run_outcome.exit_code != 83) {
+        Fail("phase83 freestanding hal console run should exit with the console proof marker:\n" + run_output);
+    }
+
+    const std::string console_mir = ReadFile(dump_targets.mir);
+    const std::string console_llvm_ir = ReadFile(build_targets.llvm_ir);
+    ExpectOutputContains(console_mir,
+                         "Function name=uart_write_byte",
+                         "phase83 freestanding hal MIR should include the polling helper");
+    ExpectOutputContains(console_mir,
+                         "Block label=loop_cond",
+                         "phase83 freestanding hal MIR should preserve the polling loop shape");
+    ExpectOutputContains(console_mir,
+                         "int_to_pointer %v",
+                         "phase83 freestanding hal MIR should lower hal.mmio_ptr to int_to_pointer");
+    ExpectOutputContains(console_mir,
+                         "volatile_load %v",
+                         "phase83 freestanding hal MIR should lower status reads to volatile_load");
+    ExpectOutputContains(console_mir,
+                         "volatile_store target=hal.volatile_store",
+                         "phase83 freestanding hal MIR should lower data writes to volatile_store");
+    ExpectOutputContains(console_llvm_ir,
+                         "inttoptr i64",
+                         "phase83 freestanding hal LLVM IR should preserve the MMIO pointer conversion");
+    ExpectOutputContains(console_llvm_ir,
+                         "load volatile i32",
+                         "phase83 freestanding hal LLVM IR should preserve volatile status loads");
+    ExpectOutputContains(console_llvm_ir,
+                         "store volatile i32",
+                         "phase83 freestanding hal LLVM IR should preserve volatile data stores");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -4849,5 +5038,6 @@ int main(int argc, char** argv) {
     TestIssueRollupImportedAggregateConstPressure(source_root, binary_root, mc_path);
     TestPhase81FreestandingBootstrapAndHal(source_root, binary_root, mc_path);
     TestPhase82FreestandingArtifactAndEntryHardening(source_root, binary_root, mc_path);
+    TestPhase83NarrowHalAdmissionAndConsoleProof(source_root, binary_root, mc_path);
     return 0;
 }

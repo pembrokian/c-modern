@@ -1978,6 +1978,22 @@ class Checker {
                     }
                     return record(left);
                 }
+                if (expr.text == "&" || expr.text == "|" || expr.text == "^") {
+                    if (!IsUnknown(left) && !IsIntegerLikeType(left, *module_)) {
+                        Report(expr.left->span, "bitwise operator requires integer operands");
+                    }
+                    if (!IsUnknown(right) && !IsIntegerLikeType(right, *module_)) {
+                        Report(expr.right->span, "bitwise operator requires integer operands");
+                    }
+                    const Type merged = MergeNumericTypes(left, right, *module_);
+                    if (IsUnknown(merged) || (!IsUnknown(merged) && !IsIntegerLikeType(merged, *module_))) {
+                        if (!IsUnknown(left) && !IsUnknown(right)) {
+                            Report(expr.span, "bitwise operator requires compatible integer operand types");
+                        }
+                        return record(UnknownType());
+                    }
+                    return record(merged);
+                }
                 if (!IsNumericType(left, *module_) || !IsNumericType(right, *module_)) {
                     if (!IsUnknown(left) && !IsUnknown(right)) {
                         Report(expr.span, "operator " + expr.text + " requires numeric operands");

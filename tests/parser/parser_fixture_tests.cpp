@@ -91,6 +91,7 @@ int main(int argc, char** argv) {
     const std::filesystem::path fixture_dir = source_root / "tests/parser";
     const std::vector<FixtureCase> fixtures = {
         {"aggregate_named_fields.mc", "aggregate_named_fields.ast.txt", true},
+        {"bitwise_precedence.mc", "bitwise_precedence.ast.txt", true},
         {"binding_or_assign_ambiguous.mc", "binding_or_assign_ambiguous.ast.txt", true},
         {"generic_variant_ctor_ok.mc", "generic_variant_ctor_ok.ast.txt", true},
         {"internal.mc", "internal.ast.txt", true},

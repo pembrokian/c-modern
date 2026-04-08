@@ -241,6 +241,7 @@ int main(int argc, char** argv) {
         {"abi_c_struct.mc", "abi_c_struct.mir.txt", true, "", {}, {}},
         {"address_of_index_ok.mc", "address_of_index_ok.mir.txt", true, "", {}, {}},
         {"array_to_slice_conversion.mc", "array_to_slice_conversion.mir.txt", true, "", {}, {}},
+        {"bitwise_ops.mc", "bitwise_ops.mir.txt", true, "", {}, {}},
         {"bounds_check.mc", "bounds_check.mir.txt", true, "", {}, {}},
         {"buffer_to_slice_conversion.mc", "buffer_to_slice_conversion.mir.txt", true, "", {}, {}},
         {"canonical_eval.mc", "canonical_eval.mir.txt", true, "eval.mc", {}, {}},

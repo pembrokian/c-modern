@@ -510,7 +510,9 @@ class Lexer {
                 if (PeekNext() == '|') {
                     return emit(TokenKind::kPipePipe, 2);
                 }
-                break;
+                return emit(TokenKind::kPipe, 1);
+            case '^':
+                return emit(TokenKind::kCaret, 1);
             default:
                 break;
         }
@@ -646,6 +648,10 @@ std::string_view ToString(TokenKind kind) {
             return "%";
         case TokenKind::kAmp:
             return "&";
+        case TokenKind::kPipe:
+            return "|";
+        case TokenKind::kCaret:
+            return "^";
         case TokenKind::kBang:
             return "!";
         case TokenKind::kAmpAmp:

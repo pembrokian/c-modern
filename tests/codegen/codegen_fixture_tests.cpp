@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
     const std::filesystem::path source_root = argv[1];
     const std::filesystem::path fixture_dir = source_root / "tests/codegen";
     const std::vector<FixtureCase> fixtures = {
+        {"bitwise_ops.mc", "bitwise_ops.backend.txt"},
         {"branch_direct_call.mc", "branch_direct_call.backend.txt"},
         {"checked_division.mc", "checked_division.backend.txt"},
         {"checked_shift.mc", "checked_shift.backend.txt"},

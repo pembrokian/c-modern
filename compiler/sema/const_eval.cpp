@@ -59,6 +59,18 @@ std::optional<std::int64_t> CheckedShiftRightInt64(std::int64_t lhs, std::int64_
     return lhs >> rhs;
 }
 
+std::optional<std::int64_t> BitwiseAndInt64(std::int64_t lhs, std::int64_t rhs) {
+    return lhs & rhs;
+}
+
+std::optional<std::int64_t> BitwiseOrInt64(std::int64_t lhs, std::int64_t rhs) {
+    return lhs | rhs;
+}
+
+std::optional<std::int64_t> BitwiseXorInt64(std::int64_t lhs, std::int64_t rhs) {
+    return lhs ^ rhs;
+}
+
 using CheckedIntBinaryOp = std::optional<std::int64_t> (*)(std::int64_t, std::int64_t);
 
 std::optional<std::int64_t> WrapAddInt64Checked(std::int64_t lhs, std::int64_t rhs) {
@@ -86,6 +98,9 @@ constexpr IntBinaryOpEntry kConstIntegerBinaryOps[] = {
     {"%", CheckedRemainderInt64},
     {"<<", CheckedShiftLeftInt64},
     {">>", CheckedShiftRightInt64},
+    {"&", BitwiseAndInt64},
+    {"|", BitwiseOrInt64},
+    {"^", BitwiseXorInt64},
 };
 
 CheckedIntBinaryOp FindConstIntegerBinaryOp(std::string_view op) {

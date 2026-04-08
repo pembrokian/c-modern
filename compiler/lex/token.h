@@ -69,6 +69,8 @@ enum class TokenKind {
     kSlash,
     kPercent,
     kAmp,
+    kPipe,
+    kCaret,
     kBang,
     kAmpAmp,
     kPipePipe,

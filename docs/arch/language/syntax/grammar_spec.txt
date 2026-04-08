@@ -120,7 +120,7 @@ String literal rules:
 Tokens and punctuation used by the grammar:
 
 ```text
-{ } ( ) [ ] , : . .* .. = == != < <= > >= + - * / % && || ! & @
+{ } ( ) [ ] , : . .* .. = == != < <= > >= + - * / % & | ^ && || ! @
 ->
 ```
 
@@ -339,7 +339,10 @@ expr            = range_expr
 range_expr      = logical_or_expr [ ".." logical_or_expr ]
 
 logical_or_expr = logical_and_expr { "||" logical_and_expr }
-logical_and_expr = is_expr { "&&" is_expr }
+logical_and_expr = bitwise_or_expr { "&&" bitwise_or_expr }
+bitwise_or_expr  = bitwise_xor_expr { "|" bitwise_xor_expr }
+bitwise_xor_expr = bitwise_and_expr { "^" bitwise_and_expr }
+bitwise_and_expr = is_expr { "&" is_expr }
 is_expr         = equality_expr [ "is" equality_expr ]
 equality_expr   = relational_expr { ("==" | "!=") relational_expr }
 relational_expr = additive_expr { ("<" | "<=" | ">" | ">=") additive_expr }

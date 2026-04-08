@@ -1,0 +1,139 @@
+Phase 83 -- Narrow Hal Admission And Console Proof
+==================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the first Phase 81 `hal` landing from a bootstrap-only admission into a
+more honest proof statement: the repository now has one deterministic,
+inspectable console-write path that uses only the admitted `hal` MMIO surface
+and runs through the freestanding executable path already hardened in Phase
+82.
+
+This document is both the Phase 83 execution note and its closeout.
+It does not claim broader `hal` taxonomy, interrupt support, barriers, or real
+hardware validation beyond the repository-bounded proof harness.
+
+Repository status note
+----------------------
+- Phase 81 introduced the first freestanding boot-marker path and the initial
+  public `hal` boundary limited to `mmio_ptr<T>`, `volatile_load<T>`, and
+  `volatile_store<T>`.
+- Phase 82 then made freestanding target identity and explicit target-owned
+  link inputs manifest-visible, which is the build-model support needed for a
+  more realistic non-hosted proof harness.
+- The remaining gap was no longer whether `hal` existed. It was whether the
+  repository could prove one deterministic console-write path through that
+  narrow surface without widening the API or hiding target behavior in the
+  compiler.
+
+Problem being solved
+--------------------
+- The original Phase 81 regression proved the dedicated MIR and LLVM lowering
+  for the `hal` intrinsics, but its console-side example was still only a
+  minimal single-register smoke.
+- The Canopus proof ladder calls for a bounded MMIO-backed console path rather
+  than a one-off intrinsic check.
+- The repository needed one regression that exercises polling, volatile loads,
+  volatile stores, and manifest-owned freestanding support objects together so
+  the admitted `hal` slice is real in repository terms.
+
+Core rule
+---------
+- Keep the public `hal` surface unchanged.
+- Keep the proof deterministic and repository-bounded.
+- Use target-owned support objects only to simulate the MMIO device boundary in
+  the test harness, not to add a second public hardware API.
+- Defer barriers, interrupts, richer register wrappers, and broader target
+  libraries until a later proof requires them.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target with explicit target identity and
+   manifest-owned support object inputs
+2. one bounded polling console path that reads a status register and writes a
+   data register through `hal`
+3. one deterministic harness-owned MMIO shim that validates the emitted byte
+   sequence at runtime
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the narrow `hal` admission loop now by proving one
+deterministic console path rather than leaving the first `hal` slice defined
+mainly by intrinsic lowering tests.
+
+What this phase proves
+----------------------
+- the admitted `hal` API is sufficient for one polling console-write path
+- the freestanding executable path can carry a target-owned MMIO shim through
+  explicit manifest link inputs
+- the repository can validate both the runtime result and the lowered IR for
+  that path without widening the language core or the public stdlib surface
+
+Deliverables
+------------
+- one canonical Phase 83 closeout note recording the implemented proof
+- one focused tool regression that builds and runs a freestanding polling
+  console target against a deterministic MMIO shim
+- verification that the resulting MIR and LLVM IR still lower through
+  `int_to_pointer`, `volatile_load`, and `volatile_store`
+- planning-surface updates so the speculative roadmap no longer treats Phase 83
+  as unassigned
+
+Suggested execution order
+-------------------------
+1. Define one deterministic MMIO shim as a target-owned support object.
+2. Build a freestanding executable that polls a ready status value and writes a bounded
+   byte sequence through `hal`.
+3. Run that executable in the repository harness and check the resulting proof
+   value.
+4. Inspect the dumped MIR and LLVM IR to ensure the dedicated `hal` lowering
+   path remains intact.
+5. Refresh the planning notes so the new concrete anchor is visible.
+
+Exit criteria
+-------------
+- one freestanding target proves a polling console path through the admitted
+  `hal` surface
+- the proof is deterministic in the repository test harness
+- MIR and LLVM IR both preserve the expected MMIO pointer conversion and
+  volatile operations
+- the repository planning surface records Phase 83 as concrete rather than
+  speculative
+
+Non-goals
+---------
+- new public `hal` APIs beyond `mmio_ptr`, `volatile_load`, and
+  `volatile_store`
+- barrier, interrupt, DMA, or device-framework support
+- claims about real hardware execution outside the repository harness
+- widening freestanding support into a general Canopus target or packaging
+  story
+
+Implemented slice
+-----------------
+- the tool regression suite now includes one Phase 83 freestanding target that
+  polls a status register, writes two bytes through a data register, and links
+  against a manifest-owned MMIO shim object
+- the runtime proof validates the emitted byte sequence through the support
+  shim and exits with a deterministic Phase 83 marker
+- the regression also checks the dumped MIR and LLVM IR to confirm the console
+  path still lowers through `int_to_pointer`, `volatile_load`, and
+  `volatile_store`
+- the speculative `v0.3` roadmap now records Phase 83 as a concrete anchor and
+  leaves later speculation starting at Phase 84
+
+Closeout statement
+------------------
+Phase 83 is complete as narrow `hal` admission and console proof. The
+repository still does not claim broad hardware support, interrupts, or richer
+device abstractions, but it now has one honest, deterministic, freestanding
+console-write proof that uses only the admitted `hal` surface and the explicit
+freestanding build-model contracts landed in Phase 82.

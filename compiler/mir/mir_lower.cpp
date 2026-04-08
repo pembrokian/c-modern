@@ -1327,6 +1327,11 @@ class FunctionLowerer {
                         left = CoerceBinaryOperand(left, result_type);
                         right = CoerceBinaryOperand(right, result_type);
                     }
+                } else if (expr.text == "&" || expr.text == "|" || expr.text == "^") {
+                    if (!sema::IsUnknown(result_type) && result_type.kind != sema::Type::Kind::kIntLiteral) {
+                        left = CoerceBinaryOperand(left, result_type);
+                        right = CoerceBinaryOperand(right, result_type);
+                    }
                 } else if ((expr.text == "==" || expr.text == "!=" || expr.text == "<" || expr.text == ">" ||
                             expr.text == "<=" || expr.text == ">=") &&
                            left.type != right.type) {
