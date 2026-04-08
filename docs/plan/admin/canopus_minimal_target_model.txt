@@ -58,7 +58,8 @@ Per target, the build model should be able to say explicitly:
 - one explicit package identity
 - one explicit root module
 - one explicit startup choice
-- optional explicit link inputs owned by the target
+- optional explicit extra prebuilt object or archive link inputs owned by the
+  target
 
 Suggested minimal shape
 -----------------------
@@ -77,7 +78,7 @@ target = "aarch64-canopus"
 startup = "kernel_entry"
 
 [targets.kernel.link]
-inputs = ["target/kernel_entry.o", "target/linker.ld"]
+inputs = ["target/kernel_entry.o", "target/boot_support.o"]
 
 [targets.init]
 kind = "exe"
@@ -108,8 +109,8 @@ Interpretation rules
   default guesses.
 - `runtime.startup` must stay explicit because different artifact classes may
   use different entry objects or conventions.
-- target-owned link inputs must stay visible instead of being inferred from the
-  host environment.
+- target-owned extra object or archive inputs must stay visible instead of
+  being inferred from the host environment.
 
 What the first target model does not need yet
 ---------------------------------------------
@@ -118,6 +119,7 @@ What the first target model does not need yet
 - remote build execution
 - multi-target workspace packaging
 - runtime-loaded shared-library policy
+- linker-script support or arbitrary linker-flag passthrough
 - automatic boot-image assembly inside `mc`
 - full kernel-versus-user privilege metadata in the build file
 

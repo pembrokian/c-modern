@@ -17,6 +17,10 @@ bool IsSupportedBootstrapTargetKind(std::string_view kind) {
     return kind == "exe" || kind == "test" || kind == "staticlib";
 }
 
+bool IsExecutableTargetKind(std::string_view kind) {
+    return kind == "exe" || kind == "test";
+}
+
 bool IsSupportedBootstrapEnv(std::string_view env) {
     return env == "hosted" || env == "freestanding";
 }
@@ -620,6 +624,21 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             continue;
         }
 
+        if (section.size() == 3 && section[2] == "link") {
+            if (key != "inputs") {
+                ReportProjectError(project.path, line_number, "unknown link key: " + key, diagnostics);
+                continue;
+            }
+            if (!ExpectValueKind(*parsed_value, ParsedValue::Kind::kStringArray, project.path, line_number, key, diagnostics)) {
+                continue;
+            }
+            target->link_inputs.clear();
+            for (const auto& entry : parsed_value->string_array_value) {
+                target->link_inputs.push_back(entry);
+            }
+            continue;
+        }
+
         if (section.size() == 3 && section[2] == "tests") {
             if (key == "enabled") {
                 if (!ExpectValueKind(*parsed_value, ParsedValue::Kind::kBoolean, project.path, line_number, key, diagnostics)) {
@@ -726,6 +745,14 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                 });
             }
         } else if (target.env == "freestanding") {
+            if (target.target.empty()) {
+                diagnostics.Report({
+                    .file_path = project.path,
+                    .span = mc::support::kDefaultSourceSpan,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "target '" + name + "' must declare an explicit freestanding target",
+                });
+            }
             if (target.runtime_startup == "default") {
                 diagnostics.Report({
                     .file_path = project.path,
@@ -741,6 +768,17 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                     .message = "target '" + name + "' uses invalid freestanding runtime startup name: " + target.runtime_startup,
                 });
             }
+        }
+        if (!target.link_inputs.empty() && !IsExecutableTargetKind(target.kind)) {
+            diagnostics.Report({
+                .file_path = project.path,
+                .span = mc::support::kDefaultSourceSpan,
+                .severity = DiagnosticSeverity::kError,
+                .message = "target '" + name + "' may only declare link.inputs on executable targets",
+            });
+        }
+        for (auto& link_input : target.link_inputs) {
+            link_input = std::filesystem::absolute(project.root_dir / link_input).lexically_normal();
         }
         for (auto& module_root : target.module_search_paths) {
             module_root = std::filesystem::absolute(project.root_dir / module_root).lexically_normal();
@@ -766,6 +804,11 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         for (auto& test_root : target.tests.roots) {
             test_root = std::filesystem::absolute(project.root_dir / test_root).lexically_normal();
         }
+        ReportDuplicateConfiguredPaths(project.path,
+                                       name,
+                                       "link input",
+                                       target.link_inputs,
+                                       diagnostics);
         ReportDuplicateConfiguredPaths(project.path,
                                        name,
                                        "module search path",

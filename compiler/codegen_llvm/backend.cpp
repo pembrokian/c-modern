@@ -4515,6 +4515,10 @@ ObjectBuildResult BuildObjectFile(const mir::Module& module,
 LinkResult LinkExecutable(const std::filesystem::path& source_path,
                           const LinkOptions& options,
                           support::DiagnosticSink& diagnostics) {
+    if (!ValidateBootstrapTarget(options.target, source_path, diagnostics)) {
+        return {};
+    }
+
     std::filesystem::create_directories(options.executable_path.parent_path());
     std::filesystem::create_directories(options.runtime_object_path.parent_path());
 
@@ -4532,6 +4536,15 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
                                runtime_support_source.generic_string() + "'",
                            diagnostics);
         return {};
+    }
+    for (const auto& input_path : options.extra_input_paths) {
+        if (!std::filesystem::exists(input_path)) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend could not read explicit link input '" +
+                                   input_path.generic_string() + "'",
+                               diagnostics);
+            return {};
+        }
     }
 
     const bool runtime_object_missing = !std::filesystem::exists(options.runtime_object_path);
@@ -4562,6 +4575,9 @@ LinkResult LinkExecutable(const std::filesystem::path& source_path,
     };
     for (const auto& object_path : options.object_paths) {
         link_command.push_back(object_path.generic_string());
+    }
+    for (const auto& input_path : options.extra_input_paths) {
+        link_command.push_back(input_path.generic_string());
     }
     for (const auto& library_path : options.library_paths) {
         link_command.push_back(library_path.generic_string());
@@ -4648,6 +4664,7 @@ BuildResult BuildExecutable(const mir::Module& module,
                                             {
                                                 .target = options.target,
                                                 .object_paths = {options.artifacts.object_path},
+                                                .extra_input_paths = {},
                                                 .library_paths = {},
                                                 .runtime_source_path = options.runtime_source_path,
                                                 .runtime_object_path = runtime_object_path,

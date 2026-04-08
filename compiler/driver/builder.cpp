@@ -723,6 +723,7 @@ bool IsOutputOlderThan(const std::filesystem::path& output_path,
 bool ShouldRelinkProjectExecutable(const std::filesystem::path& executable_path,
                                    const std::filesystem::path& runtime_object_path,
                                    const std::optional<std::filesystem::path>& runtime_source_path,
+                                   const std::vector<std::filesystem::path>& link_inputs,
                                    const std::vector<std::filesystem::path>& library_paths,
                                    const std::vector<BuildUnit>& units) {
     if (!std::filesystem::exists(executable_path) || !std::filesystem::exists(runtime_object_path)) {
@@ -736,6 +737,11 @@ bool ShouldRelinkProjectExecutable(const std::filesystem::path& executable_path,
     }
     for (const auto& unit : units) {
         if (!unit.reused_object || IsOutputOlderThan(executable_path, unit.object_path)) {
+            return true;
+        }
+    }
+    for (const auto& link_input : link_inputs) {
+        if (IsOutputOlderThan(executable_path, link_input)) {
             return true;
         }
     }
@@ -1111,6 +1117,15 @@ bool SupportsBootstrapTarget(const ProjectTarget& target,
                              const ProjectFile& project,
                              support::DiagnosticSink& diagnostics) {
     if (target.target.empty()) {
+        if (target.env == "freestanding") {
+            diagnostics.Report({
+                .file_path = project.path,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "target '" + target.name + "' must declare an explicit freestanding target",
+            });
+            return false;
+        }
         return true;
     }
 
@@ -1727,6 +1742,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
     if (ShouldRelinkProjectExecutable(build_targets.executable,
                                       runtime_object_path,
                                       runtime_source_path,
+                                      graph.target.link_inputs,
                                       linked_library_paths,
                                       *units)) {
         std::vector<std::filesystem::path> object_paths;
@@ -1739,6 +1755,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
                                                                   {
                                                                       .target = graph.compile_graph.target_config,
                                                                       .object_paths = object_paths,
+                                                                      .extra_input_paths = graph.target.link_inputs,
                                                                       .library_paths = linked_library_paths,
                                                                       .runtime_source_path = runtime_source_path,
                                                                       .runtime_object_path = runtime_object_path,

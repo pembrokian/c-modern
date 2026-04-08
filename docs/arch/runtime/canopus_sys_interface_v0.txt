@@ -1,0 +1,369 @@
+Canopus sys v0 — System Interface
+
+Status: v0 bring-up
+Scope: minimal user-visible system interface
+Audience: kernel + userland implementers
+
+⸻
+
+1. Purpose
+
+sys defines the only supported interface by which user programs interact with the Canopus kernel.
+
+It provides:
+	•	a small, stable API
+	•	explicit access to kernel mechanisms
+	•	a thin abstraction over endpoint-based IPC and capabilities
+
+sys is not:
+	•	a service framework
+	•	a messaging system
+	•	a runtime environment
+
+It is a minimal boundary layer.
+
+⸻
+
+2. Design Principles
+
+2.1 Minimal surface
+
+Only include operations required for system bring-up.
+
+2.2 Explicit authority
+
+All operations requiring authority must use capabilities.
+
+2.3 No policy
+
+sys exposes mechanisms only. Policy lives in user space.
+
+2.4 No hidden behavior
+
+No implicit resource access. No ambient authority.
+
+2.5 Stable core
+
+The API should remain small and stable over time.
+
+⸻
+
+3. Relationship to Canopus Lite
+
+sys sits above the kernel and below user libraries:
+
+[ applications ]
+        ↓
+[ std / user libraries ]
+        ↓
+[ sys ]
+        ↓
+[ kernel: tasks, endpoints, memory, caps ]
+
+sys maps directly to kernel primitives:
+
+Kernel concept	sys abstraction
+endpoint	Endpoint
+task/process	Process
+capability	Capability
+IPC	send/recv
+
+
+⸻
+
+4. Core Types
+
+4.1 Result
+
+type Result[T] = union {
+    Ok(T),
+    Err(Error),
+}
+
+
+⸻
+
+4.2 Error
+
+type Error {
+    code: ErrorCode
+}
+
+enum ErrorCode {
+    Invalid,
+    PermissionDenied,
+    NotFound,
+    Exhausted,
+    Unknown,
+}
+
+
+⸻
+
+4.3 Opaque Handles
+
+All kernel objects are opaque:
+
+type Endpoint { id: u64 }
+type Process  { id: u64 }
+type Capability { id: u64 }
+
+Handles are:
+	•	unforgeable
+	•	validated by the kernel
+	•	process-local
+
+⸻
+
+5. Capability Model
+
+5.1 Overview
+
+Capabilities represent explicit authority.
+
+Properties:
+	•	created by kernel
+	•	stored in process handle table
+	•	transferable via IPC
+	•	required for privileged operations
+
+⸻
+
+5.2 Rules
+	•	no ambient authority exists
+	•	capabilities must be passed explicitly
+	•	invalid capabilities result in PermissionDenied
+
+⸻
+
+6. IPC Interface
+
+IPC is the primary primitive exposed by sys.
+
+⸻
+
+6.1 Message Model
+
+v0 uses a simple byte buffer:
+
+type Message {
+    data: *u8
+    len: u64
+}
+
+No schema or encoding is enforced.
+
+⸻
+
+6.2 Operations
+
+func send(ep: Endpoint, msg: Message) -> Result[void]
+
+func recv(ep: Endpoint, buf: *u8, len: u64) -> Result[u64]
+
+
+⸻
+
+6.3 Semantics
+	•	blocking is acceptable in v0
+	•	messages are copied
+	•	message size is bounded
+	•	kernel mediates all delivery
+
+⸻
+
+7. Endpoint Management
+
+func endpoint_create() -> Result[Endpoint]
+
+Future extensions may include:
+	•	capability-restricted endpoints
+	•	transfer rules
+
+Not required for v0.
+
+⸻
+
+8. Process Interface
+
+8.1 Process Creation
+
+type ProcSpec {
+    path: str
+    args: []str
+    caps: []Capability
+}
+
+func spawn(spec: ProcSpec) -> Result[Process]
+
+
+⸻
+
+8.2 Process Control
+
+func wait(p: Process) -> Result[int]
+
+func kill(p: Process) -> Result[void]
+
+
+⸻
+
+8.3 Semantics
+	•	new process receives only provided capabilities
+	•	no implicit inheritance
+	•	process isolation enforced by kernel
+
+⸻
+
+9. Memory Interface (Minimal)
+
+func alloc(size: u64) -> Result[*u8]
+
+func free(ptr: *u8) -> Result[void]
+
+Notes:
+	•	may be implemented in userland later
+	•	included for bring-up convenience
+
+⸻
+
+10. Time Interface
+
+type Time = u64
+
+func now() -> Time
+
+func sleep(ms: u64) -> Result[void]
+
+
+⸻
+
+11. What sys Does NOT Include
+
+The following are explicitly excluded from v0:
+
+❌ No filesystem API
+
+❌ No networking API
+
+❌ No service registry
+
+❌ No namespace system
+
+❌ No structured messaging (ASDL)
+
+❌ No async runtime
+
+❌ No threads API
+
+These belong in user space or later revisions.
+
+⸻
+
+12. Example Usage
+
+12.1 Simple IPC
+
+let ep = sys.endpoint_create()?
+
+let msg = Message { data: buf, len: n }
+
+sys.send(ep, msg)?
+
+let out = alloc(128)?
+let n = sys.recv(ep, out, 128)?
+
+
+⸻
+
+12.2 Spawn Process
+
+let p = sys.spawn({
+    path: "/bin/echo",
+    args: ["hello"],
+    caps: []
+})?
+
+let code = sys.wait(p)?
+
+
+⸻
+
+13. Bring-Up Requirements
+
+A valid v0 system must support:
+	•	creating an endpoint
+	•	sending a message
+	•	receiving a message
+	•	spawning a process
+	•	waiting for process completion
+
+Minimal proof:
+	•	init creates endpoint
+	•	service listens
+	•	client sends message
+	•	service replies
+
+⸻
+
+14. Evolution Path
+
+After v0 stabilizes, sys may grow:
+	•	capability refinement APIs
+	•	shared memory primitives
+	•	structured IPC helpers
+
+Higher-level features should be added to:
+	•	user libraries (std)
+	•	service frameworks
+
+⸻
+
+15. Design Constraints
+
+Future changes must obey:
+
+15.1 No implicit authority
+
+15.2 No hidden global state
+
+15.3 No policy in sys
+
+15.4 Prefer addition in userland over kernel/API growth
+
+⸻
+
+16. Summary
+
+sys v0 provides a minimal, explicit interface:
+	•	endpoint-based IPC
+	•	process control
+	•	capability-aware operations
+
+It intentionally avoids:
+	•	high-level abstractions
+	•	service frameworks
+	•	messaging systems
+
+The goal is:
+
+to make the system usable without constraining its evolution
+
+⸻
+
+Final Note
+
+This design gives you something you were missing:
+
+a cheap, repeatable way to use your kernel
+
+without committing to:
+	•	full service architecture
+	•	ASDL
+	•	or distributed abstractions
+
+⸻
+
+If you want next step, we can:
+	•	map each sys call to exact kernel syscalls
+	•	or define the first std layer that wraps this cleanly

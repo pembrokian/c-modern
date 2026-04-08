@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "compiler/support/dump_paths.h"
+#include "compiler/support/target.h"
 
 namespace {
 
@@ -1000,8 +1001,14 @@ void ExpectLineFilterRelayTestOutput(std::string_view output,
                          "testing target line-filter-relay",
                          context_prefix + ": should announce the target under test");
     ExpectOutputContains(output,
-                         "ordinary tests target line-filter-relay: 2 cases, mode=checked, timeout=5000 ms",
+                         "ordinary tests target line-filter-relay: 4 cases, mode=checked, timeout=5000 ms",
                          context_prefix + ": should print ordinary test scope");
+    ExpectOutputContains(output,
+                         "PASS relay_child_diagnostics_test.test_relay_child_diagnostics",
+                         context_prefix + ": should include merged child-diagnostics coverage");
+    ExpectOutputContains(output,
+                         "PASS relay_child_split_diagnostics_test.test_relay_child_split_diagnostics",
+                         context_prefix + ": should include split child-diagnostics coverage");
     ExpectOutputContains(output,
                          "PASS relay_empty_line_test.test_relay_empty_line",
                          context_prefix + ": should include empty-line relay coverage");
@@ -1009,10 +1016,10 @@ void ExpectLineFilterRelayTestOutput(std::string_view output,
                          "PASS relay_line_test.test_relay_line",
                          context_prefix + ": should include transformed-line relay coverage");
     ExpectOutputContains(output,
-                         "2 tests, 2 passed, 0 failed",
+                         "4 tests, 4 passed, 0 failed",
                          context_prefix + ": should print the deterministic summary");
     ExpectOutputContains(output,
-                         "PASS ordinary tests for target line-filter-relay (2 cases)",
+                         "PASS ordinary tests for target line-filter-relay (4 cases)",
                          context_prefix + ": should print the ordinary-test verdict");
     ExpectOutputContains(output,
                          "PASS target line-filter-relay",
@@ -4534,6 +4541,7 @@ void TestPhase81FreestandingBootstrapAndHal(const std::filesystem::path& source_
               "root = \"src/boot.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
               "\n"
               "[targets.boot.search_paths]\n"
               "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
@@ -4547,6 +4555,7 @@ void TestPhase81FreestandingBootstrapAndHal(const std::filesystem::path& source_
               "root = \"src/console.mc\"\n"
               "mode = \"debug\"\n"
               "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
               "\n"
               "[targets.console.search_paths]\n"
               "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
@@ -4638,6 +4647,154 @@ void TestPhase81FreestandingBootstrapAndHal(const std::filesystem::path& source_
                          "phase81 freestanding hal LLVM IR should preserve volatile loads");
 }
 
+void TestPhase82FreestandingArtifactAndEntryHardening(const std::filesystem::path& source_root,
+                                                      const std::filesystem::path& binary_root,
+                                                      const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "phase82_freestanding_project";
+    std::filesystem::remove_all(project_root);
+
+    WriteFile(project_root / "src/main.mc",
+              "extern(c) func phase82_support_value() i32\n"
+              "\n"
+              "func bootstrap_main() i32 {\n"
+              "    return phase82_support_value()\n"
+              "}\n");
+    WriteFile(project_root / "target/phase82_support.c",
+              "int phase82_support_value(void) {\n"
+              "    return 82;\n"
+              "}\n");
+
+    const std::filesystem::path support_object = project_root / "target/phase82_support.o";
+    const auto [support_compile_outcome, support_compile_output] = RunCommandCapture({"xcrun",
+                                                                                      "clang",
+                                                                                      "-target",
+                                                                                      std::string(mc::kBootstrapTriple),
+                                                                                      "-c",
+                                                                                      (project_root / "target/phase82_support.c").generic_string(),
+                                                                                      "-o",
+                                                                                      support_object.generic_string()},
+                                                                                     project_root / "target/phase82_support_compile_output.txt",
+                                                                                     "phase82 support object compile");
+    if (!support_compile_outcome.exited || support_compile_outcome.exit_code != 0) {
+        Fail("phase82 support object compile should pass:\n" + support_compile_output);
+    }
+
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase82-freestanding\"\n"
+              "default = \"boot\"\n"
+              "\n"
+              "[targets.boot]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase82\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
+              "\n"
+              "[targets.boot.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.boot.runtime]\n"
+              "startup = \"bootstrap_main\"\n"
+              "\n"
+              "[targets.boot.link]\n"
+              "inputs = [\"target/phase82_support.o\"]\n");
+
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path build_dir = binary_root / "phase82_freestanding_build";
+    std::filesystem::remove_all(build_dir);
+
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "boot",
+                                       "phase82_freestanding_build_output.txt",
+                                       "phase82 freestanding explicit link input build");
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir);
+    const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
+                                                             build_dir / "phase82_freestanding_run_output.txt",
+                                                             "phase82 freestanding explicit link input run");
+    if (!run_outcome.exited || run_outcome.exit_code != 82) {
+        Fail("phase82 freestanding explicit link input run should exit with the support object result:\n" + run_output);
+    }
+
+    const std::filesystem::path missing_target_project_root = binary_root / "phase82_missing_target_project";
+    std::filesystem::remove_all(missing_target_project_root);
+    WriteFile(missing_target_project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase82-missing-target\"\n"
+              "default = \"boot\"\n"
+              "\n"
+              "[targets.boot]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase82\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "\n"
+              "[targets.boot.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.boot.runtime]\n"
+              "startup = \"bootstrap_main\"\n");
+    WriteFile(missing_target_project_root / "src/main.mc",
+              "func bootstrap_main() i32 {\n"
+              "    return 0\n"
+              "}\n");
+
+    const std::string missing_target_output = BuildProjectTargetAndExpectFailure(mc_path,
+                                                                                 missing_target_project_root / "build.toml",
+                                                                                 binary_root / "phase82_missing_target_build",
+                                                                                 "boot",
+                                                                                 "phase82_missing_target_output.txt",
+                                                                                 "phase82 freestanding missing explicit target");
+    ExpectOutputContains(missing_target_output,
+                         "must declare an explicit freestanding target",
+                         "phase82 freestanding builds should reject missing explicit target identity");
+
+    const std::filesystem::path missing_link_project_root = binary_root / "phase82_missing_link_input_project";
+    std::filesystem::remove_all(missing_link_project_root);
+    WriteFile(missing_link_project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase82-missing-link-input\"\n"
+              "default = \"boot\"\n"
+              "\n"
+              "[targets.boot]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase82\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
+              "\n"
+              "[targets.boot.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.boot.runtime]\n"
+              "startup = \"bootstrap_main\"\n"
+              "\n"
+              "[targets.boot.link]\n"
+              "inputs = [\"target/missing_support.o\"]\n");
+    WriteFile(missing_link_project_root / "src/main.mc",
+              "extern(c) func phase82_support_value() i32\n"
+              "\n"
+              "func bootstrap_main() i32 {\n"
+              "    return phase82_support_value()\n"
+              "}\n");
+
+    const std::string missing_link_output = BuildProjectTargetAndExpectFailure(mc_path,
+                                                                               missing_link_project_root / "build.toml",
+                                                                               binary_root / "phase82_missing_link_input_build",
+                                                                               "boot",
+                                                                               "phase82_missing_link_input_output.txt",
+                                                                               "phase82 freestanding missing explicit link input");
+    ExpectOutputContains(missing_link_output,
+                         "could not read explicit link input",
+                         "phase82 freestanding builds should reject missing explicit link inputs");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -4691,5 +4848,6 @@ int main(int argc, char** argv) {
     TestRealIssueRollupProject(source_root, binary_root, mc_path);
     TestIssueRollupImportedAggregateConstPressure(source_root, binary_root, mc_path);
     TestPhase81FreestandingBootstrapAndHal(source_root, binary_root, mc_path);
+    TestPhase82FreestandingArtifactAndEntryHardening(source_root, binary_root, mc_path);
     return 0;
 }

@@ -27,6 +27,7 @@ struct ProjectTarget {
     std::string env = "hosted";
     std::string target;
     std::vector<std::string> links;
+    std::vector<std::filesystem::path> link_inputs;
     std::vector<std::filesystem::path> module_search_paths;
     std::unordered_map<std::string, std::vector<std::filesystem::path>> package_roots;
     std::string runtime_startup = "default";

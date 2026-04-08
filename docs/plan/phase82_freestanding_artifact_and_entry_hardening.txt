@@ -1,0 +1,151 @@
+Phase 82 -- Freestanding Artifact And Entry Hardening
+====================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the first Phase 81 freestanding proof from a repository-local bootstrap
+success into a more honest build-model contract: freestanding targets must name
+their target identity explicitly, and any extra target-owned support objects
+used to complete the link must be visible in the manifest instead of hidden in
+driver policy.
+
+This document is a repository execution plan and closeout note.
+It does not claim general cross-compilation, linker-script support, or broad
+freestanding packaging.
+
+Repository status note
+----------------------
+- Phase 81 already made the first freestanding boot-marker and narrow `hal`
+  proof real on the bootstrap backend.
+- That landing added explicit freestanding startup selection, omitted the
+  hosted startup shim on the freestanding path, and proved one real MMIO-like
+  hardware-facing slice.
+- The remaining immediate build-model weakness was not another `hal` API gap.
+  It was that freestanding target identity could still be omitted and any
+  target-owned extra support objects still had to live outside the manifest
+  contract.
+
+Problem being solved
+--------------------
+- A freestanding target without an explicit target name leaves the artifact
+  identity implicit even though the Canopus direction requires target truth to
+  stay visible.
+- The build model already had explicit runtime startup selection, but it still
+  lacked one manifest-owned place to name extra prebuilt object or archive
+  inputs needed by the target link.
+- Without those two pieces, the repository could build the first proof but not
+  yet describe the next freestanding artifact slice as a stable, inspectable,
+  build-model truth.
+
+Core rule
+---------
+- Keep freestanding target identity explicit in the manifest.
+- Keep target-owned extra link inputs explicit in the manifest.
+- Limit this phase to prebuilt object or archive inputs carried through the
+  ordinary bootstrap linker path.
+- Defer linker scripts, generalized linker flags, and broader cross-target
+  policy until a later proof requires them.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. freestanding targets must declare an explicit `target`
+2. executable freestanding targets may declare explicit `[targets.<name>.link]`
+   `inputs = [...]`
+3. one freestanding executable links successfully against one target-owned
+   support object named in that manifest section
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should tighten the freestanding contract around explicit target
+identity and explicit extra link inputs before widening further into broader
+`hal`, kernel, or user-space policy work.
+
+Why this is the right next step
+-------------------------------
+- It strengthens the first freestanding artifact path without reopening the
+  language core.
+- It aligns the implemented manifest more closely with the Canopus target-model
+  note.
+- It exposes one real target-owned support boundary while staying much smaller
+  than general linker or cross-compilation design.
+
+What this phase should prove
+----------------------------
+- freestanding project targets no longer rely on implicit bootstrap target
+  identity
+- the manifest can carry explicit prebuilt target-owned link inputs through the
+  current executable link path
+- the repository can validate and exercise that slice with focused tool tests
+  without claiming arbitrary linker-script or general target-toolchain support
+
+Deliverables
+------------
+- one canonical Phase 82 note recording the implemented freestanding hardening
+  slice
+- manifest validation requiring explicit `target` on freestanding targets
+- additive `[targets.<name>.link] inputs = [...]` support for executable
+  targets
+- linker and rebuild-path plumbing for those explicit inputs
+- focused tool regression coverage for explicit-target failure, missing
+  explicit-link-input failure, and successful freestanding link-through against
+  a target-owned support object
+- refreshed build-spec and target-model notes aligned with the landed slice
+
+Suggested execution order
+-------------------------
+1. Require explicit freestanding target identity in the manifest and in the
+   resolved target graph path.
+2. Add one manifest-owned `link.inputs` section for explicit extra link inputs.
+3. Carry those inputs through rebuild detection and the bootstrap linker path.
+4. Add focused regression coverage for success and failure cases.
+5. Refresh the target-model and build-spec notes so the new slice is explicit.
+
+Exit criteria
+-------------
+- every freestanding target must declare an explicit `target`
+- executable targets may declare explicit `link.inputs` paths that are carried
+  through the bootstrap link step
+- one focused freestanding proof links through a manifest-owned support object
+- missing freestanding target identity and missing explicit link inputs both
+  fail with direct diagnostics
+
+Non-goals
+---------
+- arbitrary linker flag passthrough
+- linker-script support
+- general cross-compilation or non-bootstrap backend target admission
+- broader `hal` expansion or kernel image packaging
+- changing the hosted support statement into a freestanding support claim
+
+Implemented slice
+-----------------
+- freestanding targets now fail project validation unless they declare an
+  explicit `target`
+- project files now accept `[targets.<name>.link]` with `inputs = [...]` for
+  explicit extra prebuilt object or archive inputs on executable targets
+- the driver now resolves those paths deterministically, includes them in
+  relink decisions, and passes them to the bootstrap linker path
+- the LLVM bootstrap backend now validates the presence of each explicit link
+  input before invoking the host linker
+- the tool regression suite now proves one explicit-target diagnostic, one
+  missing-link-input diagnostic, and one successful freestanding executable
+  linked against a target-owned support object
+- the build-spec and Canopus target-model notes now describe the landed narrow
+  manifest shape and explicitly defer broader linker-script policy
+
+Closeout statement
+------------------
+Phase 82 is complete as freestanding artifact and entry hardening. The
+repository still does not claim general cross-compilation or broad freestanding
+packaging, but the first non-hosted artifact path is now more honest: target
+identity is explicit, extra target-owned link inputs are visible in the
+manifest, and the bootstrap freestanding proof no longer depends on hidden
+support objects outside the build-model contract.

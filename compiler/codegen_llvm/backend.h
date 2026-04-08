@@ -105,6 +105,7 @@ struct ObjectBuildResult {
 struct LinkOptions {
     TargetConfig target;
     std::vector<std::filesystem::path> object_paths;
+    std::vector<std::filesystem::path> extra_input_paths;
     std::vector<std::filesystem::path> library_paths;
     std::optional<std::filesystem::path> runtime_source_path;
     std::filesystem::path runtime_object_path;

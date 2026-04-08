@@ -26,13 +26,16 @@ Repository numbering note
 -------------------------
 - Phase 81 is already occupied by the concrete freestanding-and-`hal`
   bootstrap execution note plus its checklist and target-model support notes.
+- Phase 82 is now occupied by the concrete freestanding artifact-and-entry
+  hardening note that requires explicit freestanding target identity and makes
+  extra target-owned link inputs manifest-visible.
 - The earlier Phase 67 through Phase 80 speculative roadmap already ended with
   the hosted `v0.2` release-snapshot preparation wave.
 - The `v0.3` direction note, consumer matrix, and proof-program ladder now
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation.
-- This speculative continuation therefore starts at Phase 82, with Phase 81 as
-  the current concrete anchor.
+- This speculative continuation therefore starts at Phase 83, with Phase 81 and
+  Phase 82 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -84,19 +87,23 @@ speculation:
 - it explicitly defers broader target policy, IPC, scheduler work, and broad
   `os` growth until later proofs justify them
 
+Phase 82 is now concrete as freestanding artifact and entry hardening:
+- it requires explicit `target` identity on freestanding targets
+- it makes explicit extra target-owned prebuilt object or archive inputs
+  visible through `[targets.<name>.link] inputs = [...]`
+- it still deliberately stops short of linker scripts, arbitrary linker flags,
+  broad cross-compilation, or packaging claims
+
 The remaining speculative continuation in this band therefore starts at Phase
-82.
+83.
 
 Likely themes:
-- freestanding artifact and entry truth beyond the first execution note
-- link-path and target-owned support-object honesty
+- first admitted `hal` boundary beyond the bootstrap proof
 - initial support-statement split between hosted and freestanding slices
+- next target-build honesty questions after explicit target and link-input
+  hardening
 
 Possible phases in this band:
-
-Phase 82 -- Freestanding Artifact And Entry Hardening
-- Exit criterion: one repository-owned freestanding artifact path is stable,
-  inspectable, and free of hidden hosted-startup assumptions.
 
 Phase 83 -- Narrow Hal Admission And Console Proof
 - Exit criterion: the first admitted `hal` slice is real, narrowly bounded,

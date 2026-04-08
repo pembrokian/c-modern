@@ -180,7 +180,9 @@ Suggested meanings:
 - `mode`: default build mode for that target
 - `env`: `hosted` or `freestanding`
 - `target`: target triple or canonical target name
-- `links`: explicit external libraries
+- `links`: in-project static-library target dependencies
+- `link.inputs`: explicit extra prebuilt object or archive inputs for
+	executable targets
 - `search_paths.modules`: explicit source or vendored module roots
 - `packages.<name>.roots`: explicit source roots that belong to package
 	identity `<name>` instead of the target's default `package`
@@ -357,6 +359,7 @@ Hosted builds:
 Freestanding builds:
 - do not assume process startup, OS services, file I/O, or a default allocator
 - allow selecting or replacing entry code explicitly
+- should require explicit target identity in the manifest
 - allow omitting hosted runtime pieces entirely
 
 This split should be a first-class build setting, not a bag of undocumented flags.
@@ -368,7 +371,10 @@ The build tool should know how to assemble the standard layers without hiding th
 Recommendation:
 - standard-library selection should be mostly conventional
 - runtime startup selection should be explicit when deviating from the default
-- platform libraries should be linked through explicit target or platform settings
+- target-owned extra object or archive inputs should be linked through explicit
+	manifest settings
+- broader linker scripts or arbitrary linker flags should stay deferred until a
+	real target proof requires them
 
 The user should be able to say, in effect:
 - build a hosted executable with the standard runtime shim
