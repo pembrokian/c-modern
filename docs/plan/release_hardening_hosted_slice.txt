@@ -3,7 +3,7 @@ Hosted Slice Release-Hardening Note
 
 Status
 ------
-PUBLISHED (repository-bounded support freeze, install-path hardening, and public-cut audit)
+PUBLISHED (repository-bounded support freeze, install-path hardening, supported-slice re-audit, and public-cut audit)
 
 Purpose
 -------
@@ -30,6 +30,9 @@ Frozen support matrix
 - admitted project target boundary: hosted `exe` targets, hosted checked-test
   targets, and one admitted hosted `staticlib` target consumed inside one
   project by executable targets and ordinary tests
+- admitted adjacent helper boundary: narrow hosted `time` `Duration` plus
+  `monotonic()` and pure slash-separated `path` `join(...)`, `basename(...)`,
+  and `dirname(...)`
 - admitted richer real-project proof set: `examples/real/issue_rollup/`,
   `examples/real/worker_queue/`, `examples/real/pipe_handoff/`,
   `examples/real/pipe_ready/`, `examples/real/line_filter_relay/`, and
@@ -207,15 +210,20 @@ Known limitations
   mutation, signals, and broader process management remain out of scope
 - the repository now admits a narrow hosted `sync` slice: typed thread spawn
   or join plus mutex init, destroy, lock, unlock, condvar init, destroy,
-  wait, signal, and a narrow `MemoryOrder` plus `Atomic<T>` load or store
+  wait, signal, and broadcast, plus a narrow `MemoryOrder` and `Atomic<T>`
+  load or store
   surface proved by the shared-counter, producer-consumer, and atomic-
   publication canonical executables plus the real `examples/real/worker_queue/`
   project as an explicit low-level shared-memory proof; atomic read-modify-
-  write operations, condvar broadcast, and broader portability claims remain
-  out of scope
-- the repository does not yet claim `hal` or `time` as admitted module
-  families, and it does not claim `os` beyond the narrow subprocess slice
-  recorded in the phase documents
+  write operations and broader portability claims remain out of scope
+- the repository also admits one narrow hosted `time` plus `path` helper slice:
+  `time.Duration`, `time.monotonic()`, and pure slash-separated
+  `path.join(...)`, `path.basename(...)`, and `path.dirname(...)`; sleep,
+  wall-clock, calendar, timezone, normalization, and broader platform APIs
+  remain out of scope
+- the repository does not yet claim `hal` as an admitted module family, and it
+  does not claim `os` beyond the narrow subprocess slice recorded in the phase
+  documents
 - the repository does not yet claim self-hosting, package management, or a
   stable public distribution format beyond build-from-source on the supported
   host

@@ -191,3 +191,7 @@ add_test(NAME mc_first_use_smoke
          -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
          -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_first_use_smoke.cmake)
+add_test(NAME mc_supported_slice_doc_audit
+     COMMAND ${CMAKE_COMMAND}
+         -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_supported_slice_doc_audit.cmake)

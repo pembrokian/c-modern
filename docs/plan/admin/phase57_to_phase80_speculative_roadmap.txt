@@ -226,6 +226,19 @@ Phase 75 is now concrete repository history rather than active speculation:
 
 The remaining speculative continuation therefore starts at Phase 76.
 
+Phase 76 is now concrete repository history rather than active speculation:
+- the published README and hosted release-hardening note were re-audited
+  against the actual admitted hosted slice instead of only being carried
+  forward from earlier support freezes
+- stale support drift was removed, including the false exclusion of
+  `condvar_broadcast(...)`, the false negative around the admitted narrow
+  `time` plus `path` helper slice, and historical blur between the Phase 29
+  static-library admission and the later Phase 74 second-executable hardening
+- additive `mc_supported_slice_doc_audit` now serves as one repo-owned guard
+  that the README and hosted support note stay aligned on the supported slice
+
+The remaining speculative continuation therefore starts at Phase 77.
+
 Likely themes:
 - filesystem and `io` contract convergence where nil-only or raw-status
   boundaries still remain materially harmful
@@ -318,10 +331,6 @@ Phases in this band:
 Phase 73 -- Package And Target Maturity
 - Exit criterion: the admitted project graph stays honest across the real
   multi-target shapes the repository supports today.
-
-Phase 76 -- Supported Slice Audit
-- Exit criterion: the README and support notes accurately state what the
-  repository does and does not support.
 
 Phase 77 -- Public-Cut Smoke Refresh
 - Exit criterion: the public-cut smoke commands and fixture set reflect the

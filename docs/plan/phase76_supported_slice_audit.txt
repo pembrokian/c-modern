@@ -1,0 +1,150 @@
+Phase 76 -- Supported Slice Audit
+=================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Re-audit the published hosted support statement after the completed workflow-
+trust refreshes so the README and hosted release-hardening note describe the
+actual admitted slice, not an older approximation of it.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- Phase 74 moved deterministic selected-target reuse onto the shipped
+  `issue_rollup` project rather than leaving that guarantee anchored mainly to
+  a cloned regression harness.
+- Phase 75 then turned the documented first-use path into a repo-owned smoke
+  entrypoint.
+- The repository therefore already had stronger workflow truth than the older
+  published support wording in some places, but the docs had not yet been
+  re-audited as one explicit phase after those changes landed.
+
+Problem being solved
+--------------------
+- The repository already had a published hosted support note and a long-form
+  README summary, but those documents had drifted from the actual admitted
+  slice in both directions.
+- Some statements were false negatives: the support note still treated
+  `condvar_broadcast(...)` as unsupported and still failed to state the landed
+  narrow `time` plus `path` helper boundary.
+- Some statements blurred historical ownership: the README folded the later
+  second-executable `issue_rollup` shape back into the older Phase 29
+  static-library admission instead of distinguishing it from the later Phase 74
+  workflow hardening.
+- Without one explicit audit wave, the repository risked preserving accurate
+  implementation plus inaccurate public support language.
+
+Core rule
+---------
+- Audit the support statement against the current admitted slice, not against
+  stale earlier release notes.
+- Correct both false positives and false negatives.
+- Keep the phase documentation-owned unless a repo-owned validation hook is
+  needed to keep the support wording honest.
+- Do not widen the supported slice in this phase; describe it accurately.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one bounded documentation re-audit of the README and the
+hosted release-hardening note, plus one focused repo-owned check that the most
+important supported-slice statements do not silently drift again.
+
+Audited support drift
+---------------------
+Workflow statement drift:
+- The shipped `issue_rollup` project now exposes the selected-target reuse
+  guarantee directly, but the support wording was not consistently explicit
+  about that real-project anchor.
+- The documented first-use path now has a repo-owned smoke entrypoint, and the
+  support notes should treat that as part of the supported path rather than as
+  incidental developer knowledge.
+
+Helper-slice drift:
+- The admitted narrow hosted `time` boundary already exists through
+  `time.Duration` plus `time.monotonic()`.
+- The admitted pure slash-separated `path` helper boundary already exists
+  through `path.join(...)`, `path.basename(...)`, and `path.dirname(...)`.
+- The support note should describe those as admitted narrow helpers while still
+  keeping sleep, wall-clock, normalization, and broader platform APIs deferred.
+
+Known-limitations drift:
+- `condvar_broadcast(...)` is already implemented in the admitted hosted sync
+  slice, so it should not remain listed as unsupported.
+- Atomic read-modify-write, broader scheduler claims, and broader portability
+  claims remain deferred and should stay explicit.
+
+What this phase should prove
+----------------------------
+- the README and hosted release-hardening note now describe the same admitted
+  hosted slice the repository actually ships
+- the supported slice stays narrow, but its documented boundary no longer hides
+  already admitted helper surfaces or falsely excludes implemented sync API
+  points
+- future support-drift on the audited statements is caught by one focused
+  repo-owned validation instead of waiting for a broader release-hardening wave
+
+Deliverables
+------------
+- one canonical Phase 76 note recording the support-statement re-audit
+- one README refresh that corrects supported-slice wording without widening the
+  actual admitted surface
+- one hosted release-hardening note refresh correcting stale exclusions and
+  helper-slice omissions
+- one focused `mc_supported_slice_doc_audit` CTest entry
+- aligned backlog, decision-log, and speculative-roadmap updates
+
+Suggested execution order
+-------------------------
+1. Re-audit README and the hosted release-hardening note against the actual
+   admitted hosted slice.
+2. Correct stale workflow, helper-slice, and known-limitations wording.
+3. Add one focused doc audit that checks the key supported-slice statements.
+4. Record the result in the planning surface without widening into the later
+   public-cut smoke refresh.
+
+Exit criteria
+-------------
+- the README and hosted support note accurately describe what the repository
+  does and does not support on the admitted hosted slice
+- stale false exclusions such as `condvar_broadcast(...)` are removed
+- admitted narrow helper surfaces such as `time` and `path` are stated
+  explicitly where the support matrix describes current support
+- the repository has one focused validation hook guarding those statements
+
+Non-goals
+---------
+- widening the supported host set, runtime boundary, target kinds, or linker
+  policy
+- refreshing the broader public-cut smoke set across every admitted project
+- rewriting older archive documents whose historical status does not control the
+  current public support statement
+- admitting new `os`, `hal`, `sync`, `time`, or `path` functionality beyond the
+  already landed narrow slice
+
+Implemented slice
+-----------------
+- corrected README wording so the current supported slice states the admitted
+  narrow `time` plus `path` helper boundary, the repo-owned first-use smoke
+  path, and the real-project anchor for selected-target reuse more explicitly
+- corrected the hosted release-hardening note so it no longer lists
+  `condvar_broadcast(...)` as unsupported and no longer omits the admitted
+  narrow `time` plus `path` helper slice
+- added `mc_supported_slice_doc_audit` as a focused repo-owned CTest that
+  checks the key supported-slice wording for future drift
+- aligned backlog, decision-log, and the speculative roadmap around the
+  completed audit
+
+Closeout statement
+------------------
+Phase 76 is complete as a support-truth audit. The repository still does not
+claim broader portability, package management, wider linker policy, or richer
+runtime families than the admitted hosted slice already supports, but its
+published README and hosted release-hardening note now describe that slice more
+faithfully and carry one focused repo-owned guard against the same drift
+reappearing.
