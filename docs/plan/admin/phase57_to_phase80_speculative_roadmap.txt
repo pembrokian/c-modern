@@ -275,6 +275,20 @@ Phase 79 is now concrete repository history rather than active speculation:
 - additive `mc_v0_2_gate` now serves as one repo-owned final gate over the
   release-readiness audit plus the written tag-or-defer outcome
 
+The remaining speculative continuation therefore starts at Phase 80.
+
+Phase 80 is now concrete repository history rather than active speculation:
+- the remaining plateau from Phase 79 moved from maintainer folklore to one
+  concrete repo-owned preparation path rather than staying as an implied manual
+  follow-through
+- additive `tools/release/prepare_v0_2_snapshot.sh` now reruns the final gate,
+  requires clean committed state on the real maintainer path, writes the exact
+  reviewed commit snapshot report, and prints the exact `git tag -a v0.2 ...`
+  command without creating the tag automatically
+- additive `mc_release_snapshot_prep` now serves as one focused audit over the
+  new helper, and additive `make release-snapshot-prep` exposes the same
+  preparation path through the top-level convenience workflow
+
 The speculative continuation ends here.
 
 Likely themes:
@@ -376,6 +390,12 @@ Phase 78 -- Release-Readiness Re-Audit
 Phase 79 -- v0.2 Gate
 - Exit criterion: the repository either tags `v0.2` or writes down the one
   remaining plateau that still blocks that tag.
+
+Phase 80 -- Release Snapshot Preparation
+- Exit criterion: the repository has one explicit maintainer release-snapshot
+  preparation path that reruns the final gate from committed state, captures
+  the exact reviewed commit hash, and prints the tag command without creating
+  the tag automatically.
 
 Likely ordering bias
 --------------------

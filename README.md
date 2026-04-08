@@ -78,6 +78,12 @@ Repeat the current `v0.2` gate with:
 make v0_2_gate
 ```
 
+Prepare a reviewed `v0.2` release snapshot from clean committed state with:
+
+```sh
+make release-snapshot-prep
+```
+
 Compiler entrypoint on the supported path:
 
 ```sh
@@ -115,6 +121,8 @@ Artifact expectations:
 - `make public-cut-smoke` is the repo-owned convenience wrapper for the broader current public-cut smoke audit on the admitted hosted slice
 - `make release-readiness-audit` is the repo-owned convenience wrapper for the current aggregate release-readiness re-audit on the admitted hosted slice
 - `make v0_2_gate` is the repo-owned convenience wrapper for the final documented `v0.2` gate outcome on the admitted hosted slice
+- `make release-snapshot-prep` is the repo-owned convenience wrapper for the real maintainer release-snapshot preparation path after the final gate passes
+- `build/debug/release/v0.2-snapshot.txt` is disposable generated state capturing the exact reviewed commit hash plus the suggested `git tag -a v0.2 ...` command for the current release snapshot candidate
 
 Additional developer commands:
 
@@ -125,6 +133,7 @@ make first-use-smoke
 make public-cut-smoke
 make release-readiness-audit
 make v0_2_gate
+make release-snapshot-prep
 make dump-paths FILE=tests/cases/hello.mc
 make check FILE=tests/cases/hello.mc
 
@@ -230,5 +239,6 @@ Notes:
 - the documented current public-cut smoke path is now also automated through `make public-cut-smoke` and the `mc_public_cut_smoke` CTest entry; keep those aligned with the written public-cut audit commands.
 - the documented current release-readiness re-audit is now also automated through `make release-readiness-audit` and the `mc_release_readiness_audit` CTest entry; keep those aligned with the written release-readiness statement.
 - the documented current `v0.2` gate is now also automated through `make v0_2_gate` and the `mc_v0_2_gate` CTest entry; keep those aligned with the written tag-or-defer outcome.
+- the documented release-snapshot preparation path is now also automated through `make release-snapshot-prep`, validated through the `mc_release_snapshot_prep` audit entry, and writes `build/debug/release/v0.2-snapshot.txt`; keep those aligned with the written maintainer release-execution path.
 - known limitations remain explicit: the supported host target is still Darwin arm64 only, the admitted networking surface remains narrow IPv4 TCP plus poller support rather than a broader async or portability claim, the admitted hosted `sync` slice still excludes public compare-exchange, exchange, fetch-add, schedulers, and broader portability claims even though `condvar_broadcast(...)` is implemented, and the admitted `time` plus `path` helper slice still stops short of sleep, wall-clock, timezone, normalization, or broader platform APIs.
 - `make` is a thin convenience wrapper around the canonical CMake workflow above.

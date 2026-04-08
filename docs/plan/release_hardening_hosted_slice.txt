@@ -107,6 +107,13 @@ Repo-owned convenience entrypoint for the current `v0.2` gate:
 make v0_2_gate
 ```
 
+Repo-owned convenience entrypoint for release-snapshot preparation after that
+gate passes from clean committed state:
+
+```sh
+make release-snapshot-prep
+```
+
 Supported command patterns:
 
 - direct-source inspection or build: `build/debug/mc check <file.mc>` and
@@ -133,6 +140,11 @@ Artifact expectations:
   current aggregate release-readiness re-audit on the admitted hosted slice
 - `make v0_2_gate` is the repo-owned convenience wrapper for the final
   documented `v0.2` gate outcome on the admitted hosted slice
+- `make release-snapshot-prep` is the repo-owned convenience wrapper for the
+  real maintainer release-snapshot preparation path after the final gate passes
+- `build/debug/release/v0.2-snapshot.txt` is disposable generated state
+  capturing the exact reviewed commit hash and suggested tag commands for the
+  current release snapshot candidate
 
 Checked versus debug audit
 --------------------------
@@ -240,6 +252,13 @@ The current `v0.2` gate outcome is:
 Within the repository itself, the technical gate is otherwise satisfied by the
 current first-use smoke, supported-slice doc audit, public-cut smoke, and
 aggregate release-readiness audit.
+
+Phase 80 follow-through now turns that final operational step into one explicit
+repo-owned preparation path: `make release-snapshot-prep` reruns the final gate
+from the selected build directory, requires a clean committed worktree on the
+real path, and writes `build/debug/release/v0.2-snapshot.txt` with the exact
+reviewed commit hash plus the suggested `git tag -a v0.2 ...` command without
+creating the tag automatically.
 
 Known limitations
 -----------------
