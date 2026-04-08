@@ -1,0 +1,131 @@
+Phase 75 -- Install And Usage Path Hardening
+===========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Refresh the repository-bounded install and usage path on the current hosted
+slice by turning the documented first-use sequence into one repo-owned,
+repeatable automation path instead of leaving it as prose plus scattered
+commands.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- The repository already carried a published hosted support note, a supported
+  build-from-source path, and a first-use smoke sequence inherited from the
+  earlier Phase 32 release-hardening wave.
+- Since then, the admitted hosted slice widened materially: richer real
+  projects, a bounded static-library workflow, subprocess follow-through, and
+  the Phase 74 public multi-target `issue_rollup` proof all landed.
+- The current gap was no longer documentation absence. It was repeatability:
+  the supported first-use path was still described, but not available as one
+  explicit repo-owned validation entrypoint.
+
+Problem being solved
+--------------------
+- The supported path from source checkout to working `mc` usage was documented
+  in `README.md` and the hosted release-hardening note, but it still depended
+  on a user manually replaying several commands.
+- The repository already had many lower-level smoke tests, yet none of them
+  directly represented the narrow first-user story that the docs were asking a
+  human to trust.
+- That left a support-gap risk: the written installation story could drift away
+  from the actual runnable path even when deeper unit or workflow coverage was
+  still green.
+
+Core rule
+---------
+- Keep this wave narrow and installation-path-focused.
+- Automate the documented first-use path, not the broader public-cut smoke
+  matrix.
+- Reuse the existing admitted hosted example and command surface instead of
+  inventing a special tutorial-only project.
+- Leave binary distribution, package management, install trees, portability,
+  and broader release certification deferred.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one repo-owned first-use smoke automation path that runs
+the documented supported commands in order from an already built `mc` binary,
+plus one convenient top-level entrypoint that a user can invoke without
+reconstructing the sequence from prose.
+
+Chosen implementation:
+- add one focused CTest smoke that runs:
+  - `mc --help`
+  - `mc check tests/cases/hello.mc`
+  - `mc run --project examples/real/issue_rollup/build.toml ...`
+  - `mc test --project examples/real/issue_rollup/build.toml ...`
+- add `make first-use-smoke` as the narrow top-level entrypoint for that same
+  supported path
+- align README and hosted support notes around that explicit automation path
+
+Explicit non-choices:
+- no install-tree rules or packaging commands
+- no broad public-cut smoke refresh across every admitted project
+- no claim that `make` becomes the supported installation story instead of a
+  convenience wrapper around CMake
+
+What this phase should prove
+----------------------------
+- the documented first-user path is mechanically runnable on the supported
+  hosted slice
+- the repo now has one narrow automation path that matches the written support
+  story exactly enough to catch documentation drift early
+- the current install-and-usage guidance remains honest after the richer hosted
+  workflow expansions that landed after the earlier Phase 32 note
+
+Deliverables
+------------
+- one canonical Phase 75 note recording the install-and-usage refresh
+- one focused CTest smoke for the supported first-use path
+- one top-level `make first-use-smoke` convenience entrypoint
+- aligned README, hosted release-hardening notes, backlog, decision log, and
+  speculative roadmap text
+
+Suggested execution order
+-------------------------
+1. Encode the documented first-use path as one focused automation script.
+2. Expose that script through one named CTest and one make convenience target.
+3. Refresh README and hosted support notes so the written path points at the
+   repo-owned entrypoint.
+4. Record the result in the roadmap and planning notes without widening into
+   the later public-cut smoke audit.
+
+Exit criteria
+-------------
+- the supported path from source checkout to working `mc` usage has one
+  repeatable repo-owned automation path
+- the written install-and-usage guidance points at that same runnable path
+- the repository still keeps broader public-cut smoke refresh as a separate
+  later release-hardening phase
+
+Non-goals
+---------
+- package registries, installers, binary distribution, or install trees
+- shared-library, external-library, or broader linker-policy work
+- replacing the full public-cut smoke audit with this narrower first-use path
+
+Implemented slice
+-----------------
+- added a focused `mc_first_use_smoke` CTest that validates the documented
+  supported path from built compiler entrypoint to direct-source check to real
+  `issue_rollup` project run and ordinary test workflow
+- added `make first-use-smoke` as the narrow top-level entrypoint for that same
+  supported path
+- aligned README, hosted support notes, backlog, decision log, and the
+  speculative roadmap so the current install story is now both documented and
+  mechanically repeatable
+
+Closeout statement
+------------------
+Phase 75 is complete as a support-path hardening refresh. The repository still
+does not claim installers, package management, install-tree policy, or a broad
+public-cut certification sweep, but the supported first-user path is now a
+repo-owned runnable workflow instead of documentation alone.

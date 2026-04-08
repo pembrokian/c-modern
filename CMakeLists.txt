@@ -185,3 +185,9 @@ add_test(NAME mc_check_import_root_smoke
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_clean_mc_build_dir.cmake)
 add_test(NAME mc_check_dump_mir_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --dump-mir --build-dir ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_dump_paths_smoke COMMAND mc dump-paths ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --build-dir ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_first_use_smoke
+     COMMAND ${CMAKE_COMMAND}
+         -DMC=$<TARGET_FILE:mc>
+         -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
+         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_first_use_smoke.cmake)

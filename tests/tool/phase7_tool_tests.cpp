@@ -3795,6 +3795,119 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     ExpectIssueRollupTestOutput(test_output,
                                 "phase29 issue rollup retest after run");
 
+    {
+        const std::filesystem::path selected_target_reuse_build_dir = binary_root / "phase74_issue_rollup_selected_target_reuse_build";
+        std::filesystem::remove_all(selected_target_reuse_build_dir);
+
+        BuildProjectTargetAndExpectSuccess(mc_path,
+                                           project_path,
+                                           selected_target_reuse_build_dir,
+                                           "",
+                                           "phase74_issue_rollup_initial_build.txt",
+                                           "phase74 issue rollup initial default-target build");
+
+        const auto rollup_model_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/model/rollup_model.mc",
+                                                                                  selected_target_reuse_build_dir)
+                                             .object;
+        const auto rollup_parse_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/parse/rollup_parse.mc",
+                                                                                  selected_target_reuse_build_dir)
+                                             .object;
+        const auto rollup_render_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/render/rollup_render.mc",
+                                                                                   selected_target_reuse_build_dir)
+                                              .object;
+        const auto rollup_core_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/core/rollup_core.mc",
+                                                                                 selected_target_reuse_build_dir)
+                                             .object;
+        const auto app_main_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/app/main.mc",
+                                                                              selected_target_reuse_build_dir)
+                                         .object;
+        const auto report_main_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/app/report_main.mc",
+                                                                                 selected_target_reuse_build_dir)
+                                            .object;
+        const auto issue_rollup_core_archive = mc::support::ComputeBuildArtifactTargets(project_root / "src/core/rollup_core.mc",
+                                                                                         selected_target_reuse_build_dir)
+                                             .static_library;
+        const auto issue_rollup_executable = mc::support::ComputeBuildArtifactTargets(project_root / "src/app/main.mc",
+                                                                                      selected_target_reuse_build_dir)
+                                                 .executable;
+        const auto issue_rollup_report_executable = mc::support::ComputeBuildArtifactTargets(project_root / "src/app/report_main.mc",
+                                                                                             selected_target_reuse_build_dir)
+                                                     .executable;
+
+        const auto rollup_model_object_time_1 = RequireWriteTime(rollup_model_object);
+        const auto rollup_parse_object_time_1 = RequireWriteTime(rollup_parse_object);
+        const auto rollup_render_object_time_1 = RequireWriteTime(rollup_render_object);
+        const auto rollup_core_object_time_1 = RequireWriteTime(rollup_core_object);
+        const auto app_main_object_time_1 = RequireWriteTime(app_main_object);
+        const auto issue_rollup_core_archive_time_1 = RequireWriteTime(issue_rollup_core_archive);
+        const auto issue_rollup_executable_time_1 = RequireWriteTime(issue_rollup_executable);
+        if (std::filesystem::exists(report_main_object) || std::filesystem::exists(issue_rollup_report_executable)) {
+            Fail("phase74 initial default-target build should not emit report-target artifacts");
+        }
+
+        SleepForTimestampTick();
+        BuildProjectTargetAndExpectSuccess(mc_path,
+                                           project_path,
+                                           selected_target_reuse_build_dir,
+                                           "issue-rollup-report",
+                                           "phase74_issue_rollup_report_build.txt",
+                                           "phase74 issue rollup explicit report-target build");
+
+        const auto report_main_object_time_1 = RequireWriteTime(report_main_object);
+        const auto issue_rollup_report_executable_time_1 = RequireWriteTime(issue_rollup_report_executable);
+        if (RequireWriteTime(rollup_model_object) != rollup_model_object_time_1 ||
+            RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_1 ||
+            RequireWriteTime(rollup_render_object) != rollup_render_object_time_1 ||
+            RequireWriteTime(rollup_core_object) != rollup_core_object_time_1 ||
+            RequireWriteTime(app_main_object) != app_main_object_time_1 ||
+            RequireWriteTime(issue_rollup_core_archive) != issue_rollup_core_archive_time_1 ||
+            RequireWriteTime(issue_rollup_executable) != issue_rollup_executable_time_1) {
+            Fail("phase74 explicit report-target build should reuse shared objects, archive output, and the default executable artifacts");
+        }
+
+        std::string report_run_output = RunProjectTargetAndExpectSuccess(mc_path,
+                                                                         project_path,
+                                                                         selected_target_reuse_build_dir,
+                                                                         "issue-rollup-report",
+                                                                         sample_path,
+                                                                         "phase74_issue_rollup_report_run.txt",
+                                                                         "phase74 issue rollup explicit report-target run");
+        ExpectIssueRollupRunOutput(report_run_output,
+                                   "issue-rollup-steady\n",
+                                   "phase74 issue rollup explicit report-target run");
+        if (RequireWriteTime(rollup_model_object) != rollup_model_object_time_1 ||
+            RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_1 ||
+            RequireWriteTime(rollup_render_object) != rollup_render_object_time_1 ||
+            RequireWriteTime(rollup_core_object) != rollup_core_object_time_1 ||
+            RequireWriteTime(app_main_object) != app_main_object_time_1 ||
+            RequireWriteTime(report_main_object) != report_main_object_time_1 ||
+            RequireWriteTime(issue_rollup_core_archive) != issue_rollup_core_archive_time_1 ||
+            RequireWriteTime(issue_rollup_executable) != issue_rollup_executable_time_1 ||
+            RequireWriteTime(issue_rollup_report_executable) != issue_rollup_report_executable_time_1) {
+            Fail("phase74 explicit report-target run should reuse all already built artifacts without touching the sibling executable");
+        }
+
+        SleepForTimestampTick();
+        BuildProjectTargetAndExpectSuccess(mc_path,
+                                           project_path,
+                                           selected_target_reuse_build_dir,
+                                           "",
+                                           "phase74_issue_rollup_default_rebuild.txt",
+                                           "phase74 issue rollup default-target no-op rebuild");
+
+        if (RequireWriteTime(rollup_model_object) != rollup_model_object_time_1 ||
+            RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_1 ||
+            RequireWriteTime(rollup_render_object) != rollup_render_object_time_1 ||
+            RequireWriteTime(rollup_core_object) != rollup_core_object_time_1 ||
+            RequireWriteTime(app_main_object) != app_main_object_time_1 ||
+            RequireWriteTime(report_main_object) != report_main_object_time_1 ||
+            RequireWriteTime(issue_rollup_core_archive) != issue_rollup_core_archive_time_1 ||
+            RequireWriteTime(issue_rollup_executable) != issue_rollup_executable_time_1 ||
+            RequireWriteTime(issue_rollup_report_executable) != issue_rollup_report_executable_time_1) {
+            Fail("phase74 default-target no-op rebuild should preserve shared artifacts and the non-selected report executable");
+        }
+    }
+
     const std::filesystem::path cloned_project_root = binary_root / "phase29_issue_rollup_clone";
     CopyDirectoryTree(project_root, cloned_project_root);
     WriteFile(cloned_project_root / "build.toml",

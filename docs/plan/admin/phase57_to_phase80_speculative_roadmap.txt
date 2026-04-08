@@ -202,6 +202,30 @@ Phase 73 is now concrete repository history rather than active speculation:
 
 The remaining speculative continuation therefore starts at Phase 74.
 
+Phase 74 is now concrete repository history rather than active speculation:
+- the deterministic selected-target rebuild and reuse guarantee moved from a
+  cloned regression-only `issue_rollup` variant onto the shipped real
+  `examples/real/issue_rollup/` project itself
+- additive `issue-rollup-report` now serves as the bounded second executable
+  consumer over the admitted `issue-rollup-core` static-library boundary
+- focused tool coverage now proves same-build-dir explicit target switching,
+  no-op selected-target reuse, and sibling-target non-churn on that public
+  project surface
+
+The remaining speculative continuation therefore starts at Phase 75.
+
+Phase 75 is now concrete repository history rather than active speculation:
+- the supported install-and-usage path moved from documentation-only guidance
+  to one repo-owned repeatable smoke entrypoint
+- additive `mc_first_use_smoke` now validates the documented first-user path
+  from built `mc` entrypoint to direct-source check to real `issue_rollup`
+  run and test workflow
+- additive `make first-use-smoke` now serves as the narrow convenience wrapper
+  for that same supported path without replacing the later broader public-cut
+  smoke audit
+
+The remaining speculative continuation therefore starts at Phase 76.
+
 Likely themes:
 - filesystem and `io` contract convergence where nil-only or raw-status
   boundaries still remain materially harmful
@@ -294,14 +318,6 @@ Phases in this band:
 Phase 73 -- Package And Target Maturity
 - Exit criterion: the admitted project graph stays honest across the real
   multi-target shapes the repository supports today.
-
-Phase 74 -- Deterministic Rebuild And Cross-Target Reuse
-- Exit criterion: selected-target rebuild reuse remains deterministic and does
-  not churn unrelated targets across ordinary workflows.
-
-Phase 75 -- Install And Usage Path Hardening
-- Exit criterion: the supported path from source checkout to working `mc`
-  usage is documented and repeatable.
 
 Phase 76 -- Supported Slice Audit
 - Exit criterion: the README and support notes accurately state what the

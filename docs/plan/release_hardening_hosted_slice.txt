@@ -40,7 +40,10 @@ Frozen support matrix
   `line_filter_relay` as the narrow subprocess-plus-stdio proof, and
   `evented_echo` as the stronger networking proof over the same handle model
 - supported workflow guarantee on the admitted richer proof: deterministic
-  selected-target same-build-dir reuse without non-selected-target churn
+  selected-target same-build-dir reuse without non-selected-target churn,
+  now exposed directly on the shipped `issue_rollup` project through its
+  default and report executable consumers over the admitted static-library
+  boundary
 - unsupported today: non-hosted targets, cross-compilation, shared library
   targets, external system-library links in project manifests, package
   management, and any portability claim beyond Darwin arm64
@@ -76,6 +79,12 @@ build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir b
 build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase32_issue_rollup
 ```
 
+Repo-owned convenience entrypoint for that same narrow supported path:
+
+```sh
+make first-use-smoke
+```
+
 Supported command patterns:
 
 - direct-source inspection or build: `build/debug/mc check <file.mc>` and
@@ -94,6 +103,8 @@ Artifact expectations:
   be treated as build outputs, not source inputs
 - `make build` and `make test` remain convenience wrappers around the same
   CMake-based path; they are not a separate supported installation story
+- `make first-use-smoke` is the repo-owned convenience wrapper for the narrow
+  documented first-use validation path, not a broader public-cut certification
 
 Checked versus debug audit
 --------------------------
@@ -133,6 +144,10 @@ This smoke set proves, at the narrowest honest level:
 - debug-mode project executable run through the admitted grouped-package and
   in-project `staticlib` boundary
 - checked ordinary-test workflow on the richer grouped project proof
+- explicit same-build-dir target switching across the shipped `issue_rollup`
+  executable consumers without sibling-target churn
+- one repo-owned first-use smoke path that replays the documented supported
+  build-from-source to `mc` usage sequence
 - checked ordinary-test workflow on the admitted low-level shared-memory
   hosted `sync` project proof
 - checked ordinary-test workflow on the admitted direct handle-first
@@ -155,7 +170,7 @@ compiler and toolchain slice with direct-source semantic check and executable
 build, project-mode debug executable runs, checked ordinary tests, grouped
 internal package layouts, one admitted in-project static-library archive
 boundary, deterministic selected-target same-build-dir reuse without non-
-selected-target churn on the admitted richer project proof, and the admitted
+selected-target churn on the admitted real `issue_rollup` project proof, and the admitted
 real `issue_rollup`, `worker_queue`, `pipe_handoff`, `pipe_ready`,
 `line_filter_relay`, and `evented_echo` examples, with `worker_queue` scoped
 as the low-level shared-memory sync proof, `pipe_handoff` as the direct

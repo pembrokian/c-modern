@@ -1,0 +1,146 @@
+Phase 74 -- Deterministic Rebuild And Cross-Target Reuse
+========================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Refresh the earlier selected-target hardening proof on the admitted public
+project surface by moving deterministic same-build-dir target switching and
+non-selected-target non-churn onto the real `issue_rollup` workflow instead of
+leaving that guarantee primarily anchored to a cloned synthetic graph inside
+the tool regression suite.
+
+This document is a repository execution plan and closeout note, not a new
+architecture phase after Phase 8.
+
+Repository status note
+----------------------
+- Phase 29 admitted one bounded hosted `staticlib` target kind and proved that
+  ordinary `mc build`, `mc run`, and `mc test` can consume that archive
+  honestly through the real `examples/real/issue_rollup/` project.
+- Phase 30 then hardened selected-target reuse and sibling-target non-churn,
+  but the strongest proof still lived in a cloned test-only variant of that
+  project with a second executable consumer added inside the regression suite.
+- The release-hardening notes and README already treat deterministic selected-
+  target reuse as part of the supported hosted workflow, so the public admitted
+  project should expose and prove that contract directly.
+
+Problem being solved
+--------------------
+- The repository already claims deterministic same-build-dir selected-target
+  reuse without non-selected-target churn on the admitted richer project proof.
+- In practice, the real `issue_rollup` manifest still exposed only one public
+  executable target, so the ordinary supported workflow could not exercise that
+  guarantee directly.
+- The result was a trust gap in presentation rather than a known compiler-owner
+  rebuild bug: the implementation and synthetic proof existed, but the public
+  admitted example did not carry the multi-target shape that the support notes
+  described.
+
+Core rule
+---------
+- Move the proof onto the admitted real project rather than redesigning the
+  build graph.
+- Keep the widening additive and local to the existing `issue_rollup` static-
+  library boundary.
+- Prove no-op selected-target build and run reuse on one shared build
+  directory, and prove that the sibling executable does not churn when it was
+  not selected.
+- Leave broader artifact coordination, install policy, `sharedlib`, and
+  external linker policy deferred.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one additive second executable consumer on the real
+`examples/real/issue_rollup/` project plus one focused tool regression that
+checks timestamp stability across ordinary same-build-dir target switching.
+
+Chosen widening:
+- add `targets.issue-rollup-report` to the public `issue_rollup` manifest,
+  linked to the existing `issue-rollup-core` archive owner
+- add `src/app/report_main.mc` as the bounded second executable root on the
+  admitted project
+- add a tool regression that proves:
+  - initial default-target build does not emit report-target artifacts
+  - explicit report-target build reuses shared objects and leaves the default
+    executable untouched
+  - explicit report-target run reuses all already built artifacts
+  - later default-target no-op build still leaves the report executable
+    untouched
+
+Explicit non-choices:
+- no build-graph cache redesign
+- no new target kinds
+- no shared-library, install-tree, or package-management work
+- no attempt to broaden selected-target guarantees beyond one manifest and one
+  admitted multi-target static-library proof
+
+What this phase should prove
+----------------------------
+- the public admitted `issue_rollup` project now actually carries the same
+  multi-target shape that the repository claims to support
+- deterministic selected-target same-build-dir reuse is proved through
+  ordinary real-project `mc build` and `mc run` workflows, not just through a
+  cloned mutation harness
+- building or running one selected executable consumer does not churn the
+  sibling executable when shared inputs are unchanged
+
+Deliverables
+------------
+- one canonical Phase 74 note recording the rebuild and cross-target reuse
+  refresh
+- one additive second executable target on the real `issue_rollup` project
+- one focused tool regression proving ordinary same-build-dir target switching
+  reuse and non-selected-target non-churn on that public project
+- aligned support notes, roadmap text, backlog, and decision log entries
+
+Suggested execution order
+-------------------------
+1. Add the bounded report-target consumer to the real `issue_rollup` manifest.
+2. Add one focused tool regression around explicit target switching and no-op
+   same-build-dir reuse.
+3. Refresh the support notes so the public workflow statement matches the now-
+   exposed real project shape.
+4. Record the result in the roadmap, backlog, and decision log without
+   widening broader linker or install policy.
+
+Exit criteria
+-------------
+- the real `issue_rollup` example exposes two executable consumers over the
+  admitted `staticlib` boundary
+- the tool regression suite proves deterministic same-build-dir selected-target
+  build or run reuse without sibling-target churn on that public example
+- the support notes describe the same real project shape the repository now
+  actually ships
+
+Non-goals
+---------
+- proving shared-library or external-library workflows
+- changing the target graph algorithm or incremental rebuild metadata format
+- widening installation, packaging, or distribution policy
+- claiming broader multi-manifest or cross-project artifact reuse
+
+Implemented slice
+-----------------
+- added `issue-rollup-report` as a permanent second executable consumer in the
+  real `examples/real/issue_rollup/` project and rooted it at the additive
+  `src/app/report_main.mc` entrypoint
+- added a focused tool regression that proves explicit same-build-dir target
+  switching reuses shared objects and archive outputs, keeps the sibling
+  executable stable, and avoids rebuild churn during no-op selected-target run
+  and build workflows
+- aligned README, release-hardening notes, backlog, decision log, and the
+  speculative roadmap so the workflow guarantee is now tied to the shipped real
+  project proof rather than only to a synthetic cloned harness
+
+Closeout statement
+------------------
+Phase 74 is complete as a workflow-trust refresh, not a new capability-family
+admission. The repository still does not claim broader linker policy,
+shared-library support, install-tree coordination, or package management, but
+its admitted selected-target reuse guarantee is now carried by the public real
+`issue_rollup` example itself and proved through ordinary same-build-dir target
+switching on that shipped project.
