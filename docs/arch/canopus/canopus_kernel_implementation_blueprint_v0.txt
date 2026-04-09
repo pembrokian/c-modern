@@ -1,0 +1,712 @@
+Canopus Lite v0 - Kernel Implementation Blueprint
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define a more implementation-oriented kernel blueprint for the first Canopus
+Lite bring-up slice.
+
+This note is a companion to the higher-level architectural blueprint.
+It is meant to answer practical early questions such as:
+
+- which kernel subsystems exist first
+- which kernel-owned tables and queues exist first
+- what core structs and enums should look like conceptually
+- what state transitions must be implemented
+- what order of implementation is least likely to create churn
+
+This document does not attempt to freeze final ABI details, multicore design,
+or the long-term full Canopus authority model.
+
+Relationship to companion notes
+-------------------------------
+This note builds on:
+
+- `docs/arch/canopus/canopus_lite_v0.txt`
+- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_sys_interface_v0.txt`
+- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+
+If those notes define the architectural contract, this document defines a
+reasonable first internal kernel layout.
+
+Implementation stance
+---------------------
+The first kernel should prefer:
+
+- fixed-size tables over allocator complexity where practical
+- explicit state enums over implicit flag soup
+- bounded queues over unbounded dynamic growth
+- simple linear scans over premature indexing structures
+- single-core assumptions over early multicore machinery
+- direct inspectability in debugger and dumps over elegance-first abstractions
+
+The early code should be boring enough to debug.
+
+1. First Kernel Subsystems
+--------------------------
+
+The first kernel should be split into a small set of subsystems with narrow
+responsibilities.
+
+Recommended first subsystem set:
+
+- `arch`
+    - reset entry, trap entry, register save or restore glue, early MMU or
+      paging enable, timer hookup, interrupt controller hookup
+- `boot`
+    - bootstrap sequence, kernel object table initialization, initial process
+      construction, handoff to first task
+- `vm`
+    - address-space object, mapping records, image mapping, stack mapping,
+      teardown
+- `task`
+    - task table, process table, task states, context-switch entry points,
+      wait bookkeeping
+- `ipc`
+    - endpoint table, message queue operations, message copy path,
+      capability-transfer mediation
+- `caps`
+    - per-process handle table, handle validation, handle install/remove/move
+- `time`
+    - monotonic tick source, sleep bookkeeping, timeout wakeups
+- `device`
+    - minimal console and timer-facing support, later one narrow transport or
+      storage hook if needed
+- `syscall`
+    - syscall decoding, argument validation, dispatch into the subsystems
+- `diag`
+    - boot markers, panic output, minimal counters or debug dumps
+
+Recommended rule:
+
+- do not add a generic service framework, VFS layer, network stack, or driver
+  model to the kernel subsystem set in v0
+
+2. Core Global State
+--------------------
+
+The first kernel should keep one explicit top-level kernel state structure or
+one small set of global subsystem state records.
+
+Conceptual shape:
+
+```txt
+KernelState {
+    process_table
+    task_table
+    endpoint_table
+    address_space_table
+    message_pool
+    timer_state
+    scheduler_state
+    boot_caps
+}
+```
+
+Recommended implementation bias:
+
+- fixed-capacity arrays with explicit occupancy state
+- deterministic slot indices used internally as object ids
+- no hidden ownership between subsystems
+
+Every kernel object should have:
+
+- a slot state
+- an owner or authority record where applicable
+- explicit lifetime transitions
+
+3. Process Representation
+-------------------------
+
+The first process object should remain small.
+
+Conceptual shape:
+
+```txt
+enum ProcessState {
+    Free,
+    Created,
+    Ready,
+    Running,
+    Exited,
+    Reaped,
+}
+
+Process {
+    state: ProcessState
+    pid: u32
+    parent_pid: u32
+    address_space_id: u32
+    main_task_id: u32
+    handle_table
+    exit_code: i32
+    waiter_task_id: u32 or none
+}
+```
+
+Recommended initial rules:
+
+- one parent at spawn time
+- one waiter is enough for first bring-up
+- one main task per process is enough for first bring-up
+- process exit records exit code before wakeup
+
+The process object should not yet try to model:
+
+- multiple waiters
+- reparenting
+- process groups
+- session or terminal state
+- inherited descriptor sets
+
+4. Task Representation
+----------------------
+
+The first kernel task object should be explicit about scheduling and blocking.
+
+Conceptual shape:
+
+```txt
+enum TaskState {
+    Free,
+    Ready,
+    Running,
+    BlockedRecv,
+    BlockedWait,
+    BlockedSleep,
+    Exited,
+}
+
+Task {
+    state: TaskState
+    tid: u32
+    process_id: u32
+    saved_context
+    kernel_stack_ptr
+    user_stack_top
+    wait_target_process: u32 or none
+    wait_target_endpoint: u32 or none
+    wake_deadline_tick: u64
+}
+```
+
+Recommended first simplifications:
+
+- exactly one runnable task per process
+- one saved register frame shape per architecture
+- one ready queue for all runnable tasks
+- block reason encoded directly in `TaskState`
+
+This makes scheduler debugging much easier than a generic wait-object scheme.
+
+5. Handle Table Representation
+------------------------------
+
+The capability model should start as a simple per-process handle table.
+
+Conceptual shape:
+
+```txt
+enum HandleKind {
+    None,
+    Endpoint,
+    Process,
+    Program,
+    Memory,
+    Device,
+}
+
+enum HandleRights {
+    bits...
+}
+
+HandleEntry {
+    kind: HandleKind
+    rights: HandleRights
+    object_id: u32
+    generation: u32
+    occupied: bool
+}
+
+HandleTable {
+    entries: [N]HandleEntry
+}
+```
+
+Recommended first rules:
+
+- handles are process-local integer indices plus generation checks
+- `kind` and `rights` are validated on each syscall path
+- capability move is implemented as:
+  - validate sender handle
+  - reserve receiver slot
+  - copy object reference and rights
+  - invalidate sender slot only after queue admission succeeds
+
+Recommended early rights split:
+
+- endpoint send
+- endpoint receive
+- process wait
+- process kill
+- program spawn
+- memory map
+
+This can stay coarse in v0.
+
+6. Endpoint Representation
+--------------------------
+
+The endpoint object should be a bounded queue plus minimal waiter state.
+
+Conceptual shape:
+
+```txt
+enum EndpointState {
+    Free,
+    Live,
+    Closed,
+}
+
+Endpoint {
+    state: EndpointState
+    eid: u32
+    queue_head: u32
+    queue_tail: u32
+    queue_count: u32
+    waiting_receiver_task: u32 or none
+    messages: [Q]MessageSlot
+}
+```
+
+Recommended first rule:
+
+- only one blocked receiver per endpoint is needed initially
+
+That is enough if the first system has one service task receiving on one
+endpoint at a time.
+
+7. Message Representation
+-------------------------
+
+Messages should be kernel-owned fixed-size records for the first slice.
+
+Conceptual shape:
+
+```txt
+const MAX_MSG_BYTES = ...
+const MAX_MSG_CAPS = ...
+
+MessageSlot {
+    used: bool
+    sender_pid: u32
+    byte_len: u16
+    cap_count: u16
+    bytes: [MAX_MSG_BYTES]u8
+    caps: [MAX_MSG_CAPS]TransferredCap
+}
+
+TransferredCap {
+    kind: HandleKind
+    rights: HandleRights
+    object_id: u32
+    generation: u32
+}
+```
+
+Recommended first transport rules:
+
+- copy payload bytes into the message slot on send
+- snapshot transferred capability metadata into the message slot on send
+- install fresh receiver-local handles on receive
+- do not expose kernel object ids directly to user space
+
+This is intentionally not optimized.
+
+8. Address Space Representation
+-------------------------------
+
+The first address-space object should track only what spawn and teardown need.
+
+Conceptual shape:
+
+```txt
+enum AddressSpaceState {
+    Free,
+    Live,
+}
+
+Mapping {
+    base: u64
+    size: u64
+    flags
+    backing_kind
+    backing_id
+}
+
+AddressSpace {
+    state: AddressSpaceState
+    asid: u32
+    root_page_table
+    mappings: [M]Mapping
+}
+```
+
+Recommended first mapping classes:
+
+- executable image text or rodata
+- writable data or bss
+- user stack
+- optional IPC scratch or bootstrap data page if needed
+
+Recommended simplification:
+
+- keep mapping metadata kernel-owned and explicit
+- do not start with a general pager or page-fault-driven user policy
+
+9. Scheduler Representation
+---------------------------
+
+The first scheduler should stay extremely small.
+
+Conceptual shape:
+
+```txt
+SchedulerState {
+    current_task_id: u32 or none
+    ready_queue: ring buffer of task ids
+    tick_count: u64
+}
+```
+
+Recommended scheduling loop:
+
+1. pop next ready task
+2. switch to it
+3. on trap, syscall, timer interrupt, or block, return to kernel
+4. update task state
+5. wake any newly ready tasks
+6. choose next ready task
+
+Recommended first policy:
+
+- round-robin over one ready queue
+- timer tick only for sleep or fairness, not for sophisticated accounting
+
+10. Sleep And Timer Representation
+----------------------------------
+
+The first timer subsystem only needs enough machinery for `now()` and
+`sleep(...)`.
+
+Conceptual shape:
+
+```txt
+SleepWait {
+    task_id: u32
+    deadline_tick: u64
+    used: bool
+}
+
+TimerState {
+    monotonic_tick: u64
+    sleepers: [T]SleepWait
+}
+```
+
+Recommended simplification:
+
+- linear scan of sleepers on each tick is acceptable in first bring-up
+- upgrade to a heap or timing wheel only when the running system justifies it
+
+11. Syscall Implementation Shape
+--------------------------------
+
+Each syscall should follow the same internal structure:
+
+1. copy and validate raw arguments
+2. resolve process-local handles
+3. validate rights and pointer ranges
+4. perform one kernel mechanism action
+5. update object state
+6. write outputs
+7. return one status code
+
+Recommended internal layering:
+
+- syscall entry should decode only
+- subsystem helpers should perform object logic
+- copyin or copyout helpers should stay small and reusable
+
+Recommended first syscall table:
+
+- endpoint create
+- ipc send
+- ipc recv
+- proc spawn
+- proc wait
+- proc kill
+- time now
+- time sleep
+
+12. `send` Path
+---------------
+
+The first `send` implementation should look roughly like this:
+
+1. resolve sender endpoint handle with send rights
+2. validate message byte length and capability count
+3. validate every transferred sender handle and collect transfer records
+4. check endpoint queue capacity
+5. reserve message slot
+6. copy payload bytes into kernel slot
+7. record transferred capability metadata in slot
+8. enqueue slot into endpoint FIFO
+9. invalidate moved sender handles
+10. wake blocked receiver if present
+11. return `Ok`
+
+Failure rules:
+
+- if validation or reservation fails, no sender handles are removed
+- if the queue is full, return `WouldBlock` or `Exhausted`
+- partial transfer must not occur
+
+13. `recv` Path
+---------------
+
+The first `recv` implementation should look roughly like this:
+
+1. resolve receiver endpoint handle with receive rights
+2. if queue empty:
+   - mark current task `BlockedRecv`
+   - record endpoint wait target
+   - reschedule
+3. inspect first queued message without removing it
+4. if caller buffers are too small, return `TooLarge` and leave message queued
+5. reserve receiver handle-table slots for all transferred caps
+6. copy bytes to user buffer
+7. install receiver-local handles for attached capabilities
+8. pop message from queue
+9. write received lengths to user outputs
+10. return `Ok`
+
+Recommended invariant:
+
+- message removal happens only after receiver resource reservation succeeds
+
+14. `spawn` Path
+----------------
+
+The first `spawn` implementation should remain explicit and narrow.
+
+Recommended steps:
+
+1. resolve program capability with spawn rights
+2. validate argv spans
+3. validate each initial transferred capability
+4. allocate process slot
+5. allocate task slot
+6. allocate address-space slot
+7. construct child handle table from transferred caps
+8. map executable image and initial stack
+9. initialize saved register frame for user entry
+10. create parent-visible process or wait handle
+11. mark child ready and enqueue its task
+12. invalidate moved parent handles
+13. return child process handle
+
+Recommended first simplification:
+
+- child image format and relocation work may come from a trusted boot bundle or
+  narrow loader contract rather than a fully general executable loader
+
+15. `wait` And Exit Path
+------------------------
+
+The first wait model should be parent-child and explicit.
+
+Recommended `wait` steps:
+
+1. resolve process handle with wait rights
+2. if target not exited:
+   - mark caller `BlockedWait`
+   - record target pid
+   - reschedule
+3. copy exit code out
+4. mark target reaped
+5. release target resources if this is the chosen reap point
+6. return `Ok`
+
+Recommended process exit steps:
+
+1. record exit code in process object
+2. mark main task exited
+3. mark process exited
+4. wake parent waiter if present
+5. release runtime-owned mappings or transient resources not deferred to reap
+6. reschedule
+
+16. Boot And Init Handoff
+-------------------------
+
+The first boot-to-user transition should be explicit in kernel data.
+
+Recommended boot-owned records:
+
+```txt
+BootProgram {
+    name
+    image_metadata
+    program_cap
+}
+
+BootCaps {
+    init_program_cap
+    log_service_program_cap
+    echo_service_program_cap or registry_service_program_cap
+    bootstrap_endpoint_cap if needed
+}
+```
+
+Recommended boot sequence:
+
+1. early arch entry
+2. initialize kernel tables
+3. initialize console and timer
+4. materialize boot program capabilities for bundled images
+5. create `init` process
+6. install only the initial bootstrap capabilities into `init`
+7. switch to `init`
+
+Recommended discipline:
+
+- make boot-provided authority visible in one place
+- do not let `init` discover ambient authority through globals
+
+17. First Invariants To Assert
+------------------------------
+
+The first kernel should aggressively assert simple invariants in debug builds.
+
+Recommended invariants:
+
+- every occupied handle entry points to a live kernel object of matching kind
+- every ready task belongs to a live process
+- every blocked task records exactly one block reason
+- endpoint queue count matches head or tail state
+- moved sender handles are unusable immediately after successful send
+- process exit wakes at most the recorded waiter in the first model
+- reaped processes are not left runnable
+
+These checks matter more early than performance does.
+
+18. First Debug Output
+----------------------
+
+Recommended first diagnostic events:
+
+- boot phase markers
+- process created
+- process exited
+- endpoint created
+- message queued
+- message received
+- task blocked on recv
+- task blocked on wait
+- sleep entered
+- sleep wake
+
+Recommended output policy:
+
+- keep messages short and deterministic
+- do not print raw secrets or broad memory dumps by default
+
+19. Staged Bring-Up Plan
+------------------------
+
+Recommended implementation order:
+
+Stage 1:
+- arch entry
+- console output
+- kernel state initialization
+- panic path
+
+Stage 2:
+- task table
+- one ready queue
+- cooperative switch or minimal preemptive tick path
+
+Stage 3:
+- process table
+- address-space creation
+- one hardcoded user entry path
+
+Stage 4:
+- handle table
+- endpoint object
+- bounded message queue with kernel-local tests
+
+Stage 5:
+- syscall entry
+- endpoint create
+- send and recv with byte payload only
+
+Stage 6:
+- capability attachment to messages
+- destructive transfer semantics
+
+Stage 7:
+- program capability representation
+- spawn path
+- wait and kill path
+
+Stage 8:
+- boot `init`
+- init-to-log-service handshake
+- one additional service request or reply proof
+
+Stage 9:
+- user-to-user capability transfer proof
+- loader cleanup and documentation refresh
+
+20. Early Non-Goals
+-------------------
+
+The first implementation blueprint explicitly does not require:
+
+- dynamic kernel object allocators everywhere
+- SMP bring-up
+- per-CPU run queues
+- zero-copy IPC
+- shared-memory IPC
+- capability revocation algebra
+- VFS or pathname lookup
+- sockets or network syscalls
+- broad interrupt routing frameworks
+- full device-driver model
+- user-visible threads inside one process
+- async runtime adapters
+
+Bottom line
+-----------
+
+The first implementation should look like a small, table-driven microkernel
+with explicit state transitions, bounded queues, and process-local handle
+tables.
+
+If the early code can be understood by inspecting:
+
+- the process table
+- the task table
+- the endpoint queues
+- the handle tables
+- the scheduler ready queue
+
+then the implementation is probably staying on the right path for Canopus
+Lite v0.

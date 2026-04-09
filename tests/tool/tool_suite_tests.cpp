@@ -6249,6 +6249,385 @@ void TestPhase90CapabilityHandleTransferProof(const std::filesystem::path& sourc
                          "phase90 transfer MIR should preserve fixed payload storage through ordinary indexed array operations");
 }
 
+void TestPhase91EarlyUserSpaceHelperBoundaryAudit(const std::filesystem::path& source_root,
+                                                  const std::filesystem::path& binary_root,
+                                                  const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "user_space_helper_boundary_project";
+    std::filesystem::remove_all(project_root);
+
+    WriteFile(project_root / "src/user_helpers.mc",
+              "const CAP_RIGHT_SEND: u32 = 1\n"
+              "const DEFAULT_SLOT: u32 = 5\n"
+              "const GRANT_BYTE: u8 = 71\n"
+              "const LOG_BYTE: u8 = 90\n"
+              "const ACK_BYTE: u8 = 33\n"
+              "\n"
+              "enum MessageTag {\n"
+              "    Empty,\n"
+              "    GrantHandle,\n"
+              "    LogWrite,\n"
+              "    Ack,\n"
+              "}\n"
+              "\n"
+              "struct EndpointCapability {\n"
+              "    endpoint_id: u32\n"
+              "    service_pid: u32\n"
+              "    rights: u32\n"
+              "}\n"
+              "\n"
+              "struct Message {\n"
+              "    tag: MessageTag\n"
+              "    sender: u32\n"
+              "    recipient: u32\n"
+              "    handle_slot: u32\n"
+              "    len: usize\n"
+              "    payload: [4]u8\n"
+              "}\n"
+              "\n"
+              "struct TransferMessage {\n"
+              "    tag: MessageTag\n"
+              "    sender: u32\n"
+              "    recipient: u32\n"
+              "    handle_slot: u32\n"
+              "    handle_count: usize\n"
+              "    transferred_cap: EndpointCapability\n"
+              "    payload_len: usize\n"
+              "    payload: [4]u8\n"
+              "}\n"
+              "\n"
+              "struct ClientBinding {\n"
+              "    owner_pid: u32\n"
+              "    has_log_cap: u32\n"
+              "    received_slot: u32\n"
+              "    log_cap: EndpointCapability\n"
+              "}\n"
+              "\n"
+              "func zero_payload() [4]u8 {\n"
+              "    payload: [4]u8\n"
+              "    payload[0] = 0\n"
+              "    payload[1] = 0\n"
+              "    payload[2] = 0\n"
+              "    payload[3] = 0\n"
+              "    return payload\n"
+              "}\n"
+              "\n"
+              "func empty_cap() EndpointCapability {\n"
+              "    return EndpointCapability{ endpoint_id: 0, service_pid: 0, rights: 0 }\n"
+              "}\n"
+              "\n"
+              "func empty_message() Message {\n"
+              "    return Message{ tag: MessageTag.Empty, sender: 0, recipient: 0, handle_slot: 0, len: 0, payload: zero_payload() }\n"
+              "}\n"
+              "\n"
+              "func empty_transfer_message() TransferMessage {\n"
+              "    return TransferMessage{ tag: MessageTag.Empty, sender: 0, recipient: 0, handle_slot: 0, handle_count: 0, transferred_cap: empty_cap(), payload_len: 0, payload: zero_payload() }\n"
+              "}\n"
+              "\n"
+              "func empty_binding(owner_pid: u32) ClientBinding {\n"
+              "    return ClientBinding{ owner_pid: owner_pid, has_log_cap: 0, received_slot: 0, log_cap: empty_cap() }\n"
+              "}\n"
+              "\n"
+              "func bind_log_cap(owner_pid: u32, slot: u32, cap: EndpointCapability) ClientBinding {\n"
+              "    return ClientBinding{ owner_pid: owner_pid, has_log_cap: 1, received_slot: slot, log_cap: cap }\n"
+              "}\n"
+              "\n"
+              "func tag_score(tag: MessageTag) i32 {\n"
+              "    switch tag {\n"
+              "    case MessageTag.Empty:\n"
+              "        return 1\n"
+              "    case MessageTag.GrantHandle:\n"
+              "        return 2\n"
+              "    case MessageTag.LogWrite:\n"
+              "        return 4\n"
+              "    case MessageTag.Ack:\n"
+              "        return 8\n"
+              "    default:\n"
+              "        return 0\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n"
+              "\n"
+              "func cap_matches_service(cap: EndpointCapability, service_pid: u32, endpoint_id: u32) bool {\n"
+              "    if cap.endpoint_id != endpoint_id {\n"
+              "        return false\n"
+              "    }\n"
+              "    if cap.service_pid != service_pid {\n"
+              "        return false\n"
+              "    }\n"
+              "    if cap.rights != CAP_RIGHT_SEND {\n"
+              "        return false\n"
+              "    }\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func make_transfer_message(sender: u32, recipient: u32, slot: u32, cap: EndpointCapability) TransferMessage {\n"
+              "    payload: [4]u8 = zero_payload()\n"
+              "    payload[0] = GRANT_BYTE\n"
+              "    payload[1] = 82\n"
+              "    payload[2] = 78\n"
+              "    return TransferMessage{ tag: MessageTag.GrantHandle, sender: sender, recipient: recipient, handle_slot: slot, handle_count: 1, transferred_cap: cap, payload_len: 3, payload: payload }\n"
+              "}\n"
+              "\n"
+              "func install_received_handle(recipient_pid: u32, message: TransferMessage, service_pid: u32, endpoint_id: u32) ClientBinding {\n"
+              "    if tag_score(message.tag) != 2 {\n"
+              "        return empty_binding(recipient_pid)\n"
+              "    }\n"
+              "    if message.recipient != recipient_pid {\n"
+              "        return empty_binding(recipient_pid)\n"
+              "    }\n"
+              "    if message.handle_count != 1 {\n"
+              "        return empty_binding(recipient_pid)\n"
+              "    }\n"
+              "    if message.payload_len != 3 {\n"
+              "        return empty_binding(recipient_pid)\n"
+              "    }\n"
+              "    if message.payload[0] != GRANT_BYTE {\n"
+              "        return empty_binding(recipient_pid)\n"
+              "    }\n"
+              "    if !cap_matches_service(message.transferred_cap, service_pid, endpoint_id) {\n"
+              "        return empty_binding(recipient_pid)\n"
+              "    }\n"
+              "    return bind_log_cap(recipient_pid, message.handle_slot, message.transferred_cap)\n"
+              "}\n"
+              "\n"
+              "func make_log_request(sender: u32, binding: ClientBinding) Message {\n"
+              "    if binding.has_log_cap == 0 {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    payload: [4]u8 = zero_payload()\n"
+              "    payload[0] = LOG_BYTE\n"
+              "    return Message{ tag: MessageTag.LogWrite, sender: sender, recipient: binding.log_cap.service_pid, handle_slot: binding.received_slot, len: 1, payload: payload }\n"
+              "}\n"
+              "\n"
+              "func make_ack(sender: u32, recipient: u32, slot: u32) Message {\n"
+              "    payload: [4]u8 = zero_payload()\n"
+              "    payload[0] = ACK_BYTE\n"
+              "    return Message{ tag: MessageTag.Ack, sender: sender, recipient: recipient, handle_slot: slot, len: 1, payload: payload }\n"
+              "}\n"
+              "\n"
+              "func ack_is_valid(reply: Message, sender: u32, recipient: u32, slot: u32) bool {\n"
+              "    if tag_score(reply.tag) != 8 {\n"
+              "        return false\n"
+              "    }\n"
+              "    if reply.sender != sender {\n"
+              "        return false\n"
+              "    }\n"
+              "    if reply.recipient != recipient {\n"
+              "        return false\n"
+              "    }\n"
+              "    if reply.handle_slot != slot {\n"
+              "        return false\n"
+              "    }\n"
+              "    if reply.len != 1 {\n"
+              "        return false\n"
+              "    }\n"
+              "    if reply.payload[0] != ACK_BYTE {\n"
+              "        return false\n"
+              "    }\n"
+              "    return true\n"
+              "}\n");
+    WriteFile(project_root / "src/main.mc",
+              "import user_helpers\n"
+              "\n"
+              "const INIT_PID: u32 = 1\n"
+              "const LOG_PID: u32 = 2\n"
+              "const WORKER_PID: u32 = 3\n"
+              "const LOG_ENDPOINT_ID: u32 = 7\n"
+              "\n"
+              "struct LogService {\n"
+              "    pid: u32\n"
+              "    endpoint_id: u32\n"
+              "    requests: u32\n"
+              "    last_sender: u32\n"
+              "    last_slot: u32\n"
+              "    last_byte: u8\n"
+              "}\n"
+              "\n"
+              "var INIT_BINDING: user_helpers.ClientBinding\n"
+              "var WORKER_BINDING: user_helpers.ClientBinding\n"
+              "var LOG_SERVICE_STATE: LogService\n"
+              "\n"
+              "func kernel_boot() {\n"
+              "    grant_cap: user_helpers.EndpointCapability = user_helpers.EndpointCapability{ endpoint_id: LOG_ENDPOINT_ID, service_pid: LOG_PID, rights: user_helpers.CAP_RIGHT_SEND }\n"
+              "    INIT_BINDING = user_helpers.bind_log_cap(INIT_PID, user_helpers.DEFAULT_SLOT, grant_cap)\n"
+              "    WORKER_BINDING = user_helpers.empty_binding(WORKER_PID)\n"
+              "    LOG_SERVICE_STATE = LogService{ pid: LOG_PID, endpoint_id: LOG_ENDPOINT_ID, requests: 0, last_sender: 0, last_slot: 0, last_byte: 0 }\n"
+              "}\n"
+              "\n"
+              "func transfer_log_cap() user_helpers.TransferMessage {\n"
+              "    binding: user_helpers.ClientBinding = INIT_BINDING\n"
+              "    if binding.has_log_cap == 0 {\n"
+              "        return user_helpers.empty_transfer_message()\n"
+              "    }\n"
+              "    if !user_helpers.cap_matches_service(binding.log_cap, LOG_PID, LOG_ENDPOINT_ID) {\n"
+              "        return user_helpers.empty_transfer_message()\n"
+              "    }\n"
+              "    message: user_helpers.TransferMessage = user_helpers.make_transfer_message(binding.owner_pid, WORKER_PID, binding.received_slot, binding.log_cap)\n"
+              "    INIT_BINDING = user_helpers.empty_binding(binding.owner_pid)\n"
+              "    return message\n"
+              "}\n"
+              "\n"
+              "func log_service_call(cap: user_helpers.EndpointCapability, request: user_helpers.Message) user_helpers.Message {\n"
+              "    if !user_helpers.cap_matches_service(cap, LOG_SERVICE_STATE.pid, LOG_SERVICE_STATE.endpoint_id) {\n"
+              "        return user_helpers.empty_message()\n"
+              "    }\n"
+              "    if request.recipient != LOG_SERVICE_STATE.pid {\n"
+              "        return user_helpers.empty_message()\n"
+              "    }\n"
+              "    if user_helpers.tag_score(request.tag) != 4 {\n"
+              "        return user_helpers.empty_message()\n"
+              "    }\n"
+              "    if request.handle_slot != user_helpers.DEFAULT_SLOT {\n"
+              "        return user_helpers.empty_message()\n"
+              "    }\n"
+              "    if request.payload[0] != user_helpers.LOG_BYTE {\n"
+              "        return user_helpers.empty_message()\n"
+              "    }\n"
+              "    service: LogService = LOG_SERVICE_STATE\n"
+              "    service = LogService{ pid: service.pid, endpoint_id: service.endpoint_id, requests: service.requests + 1, last_sender: request.sender, last_slot: request.handle_slot, last_byte: request.payload[0] }\n"
+              "    LOG_SERVICE_STATE = service\n"
+              "    return user_helpers.make_ack(service.pid, request.sender, request.handle_slot)\n"
+              "}\n"
+              "\n"
+              "func worker_log_once(binding: user_helpers.ClientBinding) user_helpers.Message {\n"
+              "    request: user_helpers.Message = user_helpers.make_log_request(binding.owner_pid, binding)\n"
+              "    if user_helpers.tag_score(request.tag) != 4 {\n"
+              "        return user_helpers.empty_message()\n"
+              "    }\n"
+              "    return log_service_call(binding.log_cap, request)\n"
+              "}\n"
+              "\n"
+              "func bootstrap_main() i32 {\n"
+              "    kernel_boot()\n"
+              "    if INIT_BINDING.has_log_cap != 1 {\n"
+              "        return 10\n"
+              "    }\n"
+              "    if WORKER_BINDING.has_log_cap != 0 {\n"
+              "        return 11\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.requests != 0 {\n"
+              "        return 12\n"
+              "    }\n"
+              "    pre_transfer_reply: user_helpers.Message = worker_log_once(WORKER_BINDING)\n"
+              "    if user_helpers.tag_score(pre_transfer_reply.tag) != 1 {\n"
+              "        return 13\n"
+              "    }\n"
+              "    grant: user_helpers.TransferMessage = transfer_log_cap()\n"
+              "    if user_helpers.tag_score(grant.tag) != 2 {\n"
+              "        return 14\n"
+              "    }\n"
+              "    if INIT_BINDING.has_log_cap != 0 {\n"
+              "        return 15\n"
+              "    }\n"
+              "    second_grant: user_helpers.TransferMessage = transfer_log_cap()\n"
+              "    if user_helpers.tag_score(second_grant.tag) != 1 {\n"
+              "        return 16\n"
+              "    }\n"
+              "    wrong_install: user_helpers.ClientBinding = user_helpers.install_received_handle(INIT_PID, grant, LOG_PID, LOG_ENDPOINT_ID)\n"
+              "    if wrong_install.has_log_cap != 0 {\n"
+              "        return 17\n"
+              "    }\n"
+              "    WORKER_BINDING = user_helpers.install_received_handle(WORKER_PID, grant, LOG_PID, LOG_ENDPOINT_ID)\n"
+              "    if WORKER_BINDING.has_log_cap != 1 {\n"
+              "        return 18\n"
+              "    }\n"
+              "    if WORKER_BINDING.received_slot != user_helpers.DEFAULT_SLOT {\n"
+              "        return 19\n"
+              "    }\n"
+              "    post_transfer_init_reply: user_helpers.Message = worker_log_once(INIT_BINDING)\n"
+              "    if user_helpers.tag_score(post_transfer_init_reply.tag) != 1 {\n"
+              "        return 20\n"
+              "    }\n"
+              "    reply: user_helpers.Message = worker_log_once(WORKER_BINDING)\n"
+              "    if !user_helpers.ack_is_valid(reply, LOG_PID, WORKER_PID, user_helpers.DEFAULT_SLOT) {\n"
+              "        return 21\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.requests != 1 {\n"
+              "        return 22\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_sender != WORKER_PID {\n"
+              "        return 23\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_slot != user_helpers.DEFAULT_SLOT {\n"
+              "        return 24\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_byte != user_helpers.LOG_BYTE {\n"
+              "        return 25\n"
+              "    }\n"
+              "    return 91\n"
+              "}\n");
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase91-user-space-helpers\"\n"
+              "default = \"kernel\"\n"
+              "\n"
+              "[targets.kernel]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase91\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
+              "\n"
+              "[targets.kernel.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.kernel.runtime]\n"
+              "startup = \"bootstrap_main\"\n");
+
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path build_dir = binary_root / "user_space_helper_boundary_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "kernel",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "user_space_helper_boundary_build_output.txt",
+                                                                 "freestanding user-space helper boundary build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase91 freestanding user-space helper boundary build should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir);
+    const auto main_dump_targets = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir);
+    const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
+                                                             build_dir / "user_space_helper_boundary_run_output.txt",
+                                                             "freestanding user-space helper boundary run");
+    if (!run_outcome.exited || run_outcome.exit_code != 91) {
+        Fail("phase91 freestanding user-space helper boundary run should exit with the helper-boundary proof marker:\n" +
+             run_output);
+    }
+
+    const std::string main_mir = ReadFile(main_dump_targets.mir);
+    ExpectOutputContains(main_mir,
+                         "TypeDecl kind=struct name=user_helpers.ClientBinding",
+                         "phase91 main MIR should preserve the imported helper binding type");
+    ExpectOutputContains(main_mir,
+                         "Function name=transfer_log_cap",
+                         "phase91 main MIR should keep destructive transfer policy in the main proof module");
+    ExpectOutputContains(main_mir,
+                         "Function name=user_helpers.install_received_handle returns=[user_helpers.ClientBinding]",
+                         "phase91 merged MIR should keep handle installation inside an ordinary helper function boundary");
+    ExpectOutputContains(main_mir,
+                         "Function name=user_helpers.make_log_request returns=[user_helpers.Message]",
+                         "phase91 merged MIR should keep request construction inside an ordinary helper function boundary");
+    ExpectOutputContains(main_mir,
+                         "Function name=user_helpers.make_transfer_message returns=[user_helpers.TransferMessage]",
+                         "phase91 merged MIR should keep helper-owned transfer construction as an ordinary imported function");
+    ExpectOutputContains(main_mir,
+                         "aggregate_init %v",
+                         "phase91 merged MIR should use aggregate initialization for helper-owned transfer and binding state");
+    ExpectOutputContains(main_mir,
+                         "target_base=[4]u8",
+                         "phase91 merged MIR should preserve fixed payload storage through ordinary indexed array operations");
+}
+
 }  // namespace
 
 void RunPhase7WorkflowSuite(const std::filesystem::path& source_root,
@@ -6326,6 +6705,7 @@ void RunPhase7FreestandingSuite(const std::filesystem::path& source_root,
     TestPhase88KernelBuildIntegrationAudit(source_root, suite_root, mc_path);
     TestPhase89InitToLogServiceHandshake(source_root, suite_root, mc_path);
     TestPhase90CapabilityHandleTransferProof(source_root, suite_root, mc_path);
+    TestPhase91EarlyUserSpaceHelperBoundaryAudit(source_root, suite_root, mc_path);
 }
 
 int main(int argc, char** argv) {

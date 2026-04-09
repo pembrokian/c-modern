@@ -1,0 +1,192 @@
+Phase 91 -- Early User-Space Helper Boundary Audit
+==================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from the first explicit
+capability-transfer anchor into the first narrow user-space helper-boundary
+audit: prove that the repeated transfer-message, received-handle-install, and
+request-or-ack scaffolding can move into one ordinary helper module without
+admitting a public `sys` wrapper, hidden capability-runtime machinery, or a
+wider service framework.
+
+This document is both the Phase 91 execution note and its closeout.
+It does not claim a public Canopus std wrapper, general helper-library policy,
+process spawning, richer service startup, or full user-space lifecycle
+completion.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then published that first non-hosted tranche as a separate,
+  repository-bounded support statement with a focused audit.
+- Phase 85 then proved one bounded endpoint queue and message-buffer shape
+  through ordinary Modern C structs, enums, arrays, and pointer-based
+  mutation.
+- Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
+  path through an explicit task-state enum and explicit kernel-owned task
+  slots.
+- Phase 87 then proved that kernel-owned aggregate const templates and
+  mutable global storage survive the freestanding build and artifact path.
+- Phase 88 then proved that the emitted freestanding entry object and
+  generated runtime object compose honestly with one minimal external relink
+  step.
+- Phase 89 then proved that the kernel can start one init context, pass one
+  explicit log-service endpoint capability into that context, and complete
+  one bounded request-and-acknowledgment flow.
+- Phase 90 then proved that one user-space component can transfer one
+  explicit endpoint capability to another, lose local use of that authority,
+  and have the receiver complete one bounded acknowledged request through the
+  transferred handle.
+- The next strongest user-space question was no longer whether explicit
+  authority transfer was possible at all. It was whether the first repeated
+  protocol and handle-wrapper patterns should remain duplicated in each proof
+  program or could be admitted as one narrow ordinary helper slice without
+  collapsing back into a hidden runtime layer.
+
+Problem being solved
+--------------------
+- Phase 89 and Phase 90 left the first repeated user-space scaffolding shape
+  visible: transfer-message construction, receiver-side handle installation,
+  request construction, and acknowledgment validation.
+- Keeping that pattern duplicated forever would make later proofs noisier and
+  make it harder to tell whether user-space policy remains explicit by choice
+  or only because the repository lacks a disciplined helper boundary.
+- Admitting a public `sys` wrapper or capability-runtime family here would be
+  dishonest because the repository still has only one bounded service path,
+  one transferred handle shape, and no proof pressure for general helper
+  policy.
+- The next honest step is therefore one ordinary helper module on the
+  existing freestanding proof lane, not a public runtime boundary.
+
+Core rule
+---------
+- Admit at most one narrow ordinary helper module for the repeated transfer
+  and request scaffolding already exposed by Phase 89 and Phase 90.
+- Keep destructive handle transfer, kernel-owned policy, and service-owned
+  behavior explicit in the proof program rather than hiding them inside the
+  helper.
+- Do not admit a public `sys` module, capability-runtime helper family,
+  service registry, or broader user-space framework in this phase.
+- Reopen compiler work only if the proof exposes a concrete parser, sema,
+  MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target with a root proof module and one
+   imported helper module on the existing explicit freestanding build path
+2. one helper module that owns exactly the repeated transfer-message,
+   received-handle-install, request-construction, and acknowledgment-check
+   scaffolding using ordinary structs, enums, arrays, and functions
+3. one root proof module that still owns kernel boot state, destructive
+   sender-side authority removal, and log-service request handling
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first user-space helper-boundary question now
+by proving that the repeated explicit-authority scaffolding can live inside
+one ordinary module without implying a public runtime layer.
+
+What this phase proves
+----------------------
+- the current language and toolchain can carry one multi-module freestanding
+  proof where a user-space helper module owns repeated transfer and request
+  scaffolding
+- explicit policy still remains visible: the root proof module performs the
+  destructive sender-side transfer and the service-owned request handling,
+  while the helper module only packages repeated ordinary data manipulation
+- the existing freestanding build path can emit deterministic MIR for both
+  the root module and the imported helper module without admitting a new
+  language surface or runtime owner
+
+Deliverables
+------------
+- one canonical Phase 91 closeout note recording the implemented early
+  user-space helper-boundary audit
+- one focused freestanding tool regression that builds a multi-module target
+  with one imported helper module and one root proof module
+- deterministic runtime validation that the helper boundary preserves the
+  Phase 90 transfer truth: sender-side authority removal, receiver-side
+  installation, and one acknowledged receiver-issued request
+- MIR inspection proving that both the helper module and the root proof stay
+  within ordinary imported-module, struct, enum, aggregate-init, and fixed-
+  array lowering behavior rather than introducing a special runtime boundary
+- refreshed support and planning notes so Phase 91 is recorded as the first
+  narrow ordinary user-space helper anchor after the explicit transfer proof
+
+Suggested execution order
+-------------------------
+1. Move the repeated transfer and request scaffolding into one imported helper
+   module while keeping destructive transfer logic in the root proof module.
+2. Build that proof as one freestanding multi-module executable through the
+   existing target and startup path.
+3. Validate deterministic runtime behavior for helper-owned installation and
+   request construction plus root-owned authority removal and service reply.
+4. Inspect dumped MIR for both the root module and the helper module to
+   confirm that the boundary remains an ordinary module boundary.
+5. Refresh the support and planning surface so later phases build from this
+   helper-boundary anchor instead of rediscovering the same wrapper question.
+
+Exit criteria
+-------------
+- one freestanding target proves that repeated transfer and request
+  scaffolding can be expressed through one imported helper module
+- the root proof module still performs destructive sender-side transfer and
+  service-owned request handling explicitly
+- the receiver deterministically installs and uses the transferred handle via
+  the helper module and observes the expected acknowledgment reply
+- dumped MIR records helper-owned binding and request declarations plus
+  ordinary helper function boundaries and imported helper type use in the root
+  module
+- the planning surface records Phase 91 as concrete rather than speculative
+
+Non-goals
+---------
+- a public `sys` wrapper or broader Canopus std wrapper admission
+- general capability-table APIs, service registries, or helper-framework
+  design
+- process spawn, wait-handle transfer, or broader user-space lifecycle work
+- timer or interrupt wakeup sources
+- broader `hal` growth, linker-policy widening, or kernel-image packaging
+
+Implemented slice
+-----------------
+- the freestanding tool regression suite now includes one Phase 91 target
+  with `src/main.mc` and `src/user_helpers.mc`, where the helper module owns
+  the repeated transfer-message, received-handle-install, log-request, and
+  acknowledgment helpers while the root proof module keeps kernel boot state,
+  destructive transfer, and log-service handling explicit
+- the proof validates that init starts with the log-service capability, loses
+  it on successful transfer, cannot transfer it twice, the wrong recipient
+  cannot install it through the helper, the worker installs it locally
+  through the helper, and the worker then completes one acknowledged request
+  before the executable exits with the Phase 91 marker
+- the regression also inspects both the root-module MIR and the helper-module
+  MIR to confirm that the imported helper boundary preserves ordinary module
+  type imports, ordinary helper function boundaries, aggregate initialization,
+  and fixed-array payload lowering rather than collapsing into a special
+  runtime surface
+- the freestanding support statement, README, backlog, decision log, and
+  speculative `v0.3` roadmap now record Phase 91 as the first narrow
+  ordinary user-space helper anchor after the explicit capability-transfer
+  proof
+
+Closeout statement
+------------------
+Phase 91 is complete as an early user-space helper-boundary audit. The
+repository still does not claim a public Canopus `sys` wrapper, a capability-
+runtime helper family, process spawning, or full user-space lifecycle support,
+but it now has one honest proof that the admitted Modern C core and existing
+freestanding path can carry one imported helper module for repeated explicit-
+authority scaffolding while keeping destructive transfer and service policy in
+ordinary user code.

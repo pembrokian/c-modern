@@ -41,8 +41,8 @@ Repository numbering note
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation after the now-concrete first kernel
   representation proof.
-- This speculative continuation therefore starts at Phase 91, with Phase 81
-  through Phase 90 as the current concrete anchors.
+- This speculative continuation therefore starts at Phase 92, with Phase 81
+  through Phase 91 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -175,8 +175,19 @@ Phase 90 is now concrete as capability-handle transfer proof:
   installation, and receiver-issued handle use deterministically in the
   repository tool harness
 
+Phase 91 is now concrete as early user-space helper boundary audit:
+- it proves that the repeated transfer-message, received-handle-install,
+  request, and acknowledgment scaffolding from the first user-space proofs can
+  move into one ordinary imported helper module
+- it keeps the proof on the existing freestanding path rather than admitting
+  a public `sys` wrapper layer, capability-runtime helper family, or broader
+  service framework
+- it validates helper-owned ordinary module boundaries, sender-side authority
+  removal, receiver-side installation, and receiver-issued handle use
+  deterministically in the repository tool harness
+
 The remaining speculative continuation in this band therefore starts at Phase
-91.
+92.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof
@@ -223,9 +234,9 @@ Phase 88 -- Kernel Build Integration Audit
 
 Band C - Validate User-Space Policy Shape
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 91 through 92 likely move from the first concrete user-space policy
-stories to the next small user-space policy questions Canopus Lite actually
-cares about.
+Phase 92 likely moves from the first concrete user-space policy stories and
+the first ordinary helper-boundary proof to the next small user-space policy
+question Canopus Lite actually cares about.
 
 Likely themes:
 - init startup and one service handshake
@@ -239,10 +250,6 @@ Why this band is separate:
   without yet demanding a full operating-system completion story
 
 Possible phases in this band:
-
-Phase 91 -- Early User-Space Helper Boundary Audit
-- Exit criterion: repeated protocol or handle-wrapper patterns are either kept
-  explicit or admitted as one narrow ordinary-library helper slice.
 
 Phase 92 -- User-Space Lifecycle Follow-Through
 - Exit criterion: one minimal launch, ready, exit, and observation path is
