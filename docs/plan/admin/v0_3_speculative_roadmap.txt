@@ -41,8 +41,8 @@ Repository numbering note
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation after the now-concrete first kernel
   representation proof.
-- This speculative continuation therefore starts at Phase 88, with Phase 81
-  through Phase 87 as the current concrete anchors.
+- This speculative continuation therefore starts at Phase 89, with Phase 81
+  through Phase 88 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -144,8 +144,18 @@ Phase 87 is now concrete as kernel static-data and artifact follow-through:
 - it validates both runtime behavior and MIR global-declaration truth
   deterministically in the repository tool harness
 
+Phase 88 is now concrete as kernel build integration audit:
+- it proves that the emitted freestanding entry object and generated runtime
+  object compose with one minimal external relink step through the host
+  toolchain
+- it keeps the proof bounded to explicit emitted artifacts and one manual link
+  step rather than widening into linker scripts, kernel-image packaging, or a
+  broad external build-system contract
+- it validates both the driver-linked executable and the manually relinked
+  executable deterministically in the repository tool harness
+
 The remaining speculative continuation in this band therefore starts at Phase
-88.
+89.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof

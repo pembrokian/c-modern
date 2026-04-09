@@ -1,0 +1,159 @@
+Phase 88 -- Kernel Build Integration Audit
+=========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from kernel static-data follow-
+through into the first external build-integration check: prove that the
+freestanding artifacts emitted by `mc` compose honestly with one minimal
+kernel-owned link step rather than only through the driver's own final link
+path.
+
+This document is both the Phase 88 execution note and its closeout.
+It does not claim linker-script support, image packaging, or a general
+external build-system contract.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then published that first non-hosted tranche as a separate,
+  repository-bounded support statement with a focused audit.
+- Phase 85 then proved one bounded endpoint queue and message-buffer shape
+  through ordinary Modern C structs, enums, arrays, and pointer-based
+  mutation.
+- Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
+  path through an explicit task-state enum and explicit kernel-owned task
+  slots.
+- Phase 87 then proved that kernel-owned aggregate const templates and
+  mutable global storage survive the freestanding build and artifact path.
+- The next strongest Canopus proof was no longer whether the driver could link
+  one freestanding executable. It was whether the emitted entry object and
+  generated runtime object could participate in one honest external kernel
+  build step without hidden driver behavior.
+
+Problem being solved
+--------------------
+- Earlier freestanding phases proved explicit `link.inputs`, startup
+  selection, and emitted object or executable artifacts, but they still left
+  one build-model question open: whether the driver-owned final link step was
+  hiding assumptions that an external kernel build path could not reproduce.
+- Without one concrete external composition audit, it would be too easy to
+  treat `mc build` success as proof of broader kernel build integration even
+  though the repository had not yet validated emitted-object reuse directly.
+- The next honest step is therefore one bounded external relink proof, not
+  linker scripts, image layout, or broader packaging policy.
+
+Core rule
+---------
+- Prove one external relink step with emitted artifacts first.
+- Keep the proof freestanding, deterministic, and repository-bounded.
+- Do not widen into linker scripts, kernel-image shaping, or broad external
+  build-system support in this phase.
+- Reopen compiler or target work only if the proof exposes a concrete owner
+  gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target built through the existing `mc build`
+   path
+2. one target-owned support object linked through the manifest-owned
+   `link.inputs` surface for the driver-owned executable proof
+3. one manual external relink step that reuses the emitted Modern C entry
+   object plus the generated freestanding runtime object and swaps in a second
+   target-owned support object without rerunning `mc`
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first build-integration question now by
+proving that emitted freestanding artifacts remain honest outside the driver's
+own final link step instead of widening prematurely into broader linker or
+packaging policy.
+
+What this phase proves
+----------------------
+- the current freestanding build path emits an ordinary entry object and an
+  ordinary generated runtime object that the host toolchain can relink
+  directly
+- manifest-owned support objects remain sufficient for one bounded target-side
+  integration story
+- one external relink step can change target-owned support behavior without
+  requiring a frontend or MIR rebuild of the Modern C module
+
+Deliverables
+------------
+- one canonical Phase 88 closeout note recording the implemented kernel build
+  integration audit
+- one focused freestanding tool regression that builds a freestanding target,
+  captures the emitted entry object and generated runtime object, and links a
+  second executable manually through the host toolchain
+- deterministic runtime validation that the driver-linked executable and the
+  manually relinked executable both run successfully with their expected proof
+  markers
+- refreshed support and planning notes so Phase 88 is recorded as the first
+  concrete kernel build-integration anchor after the static-data proof
+
+Suggested execution order
+-------------------------
+1. Build one freestanding executable target through the existing explicit
+   target, startup, and `link.inputs` path.
+2. Validate that the driver-owned link still produces the expected executable
+   behavior.
+3. Reuse the emitted entry object and generated runtime object in one manual
+   host-toolchain relink step with a target-owned support object.
+4. Validate that the manually relinked executable runs with the expected,
+   intentionally different support-object result.
+5. Refresh the support and planning surface so later phases build from this
+   concrete external composition anchor.
+
+Exit criteria
+-------------
+- one freestanding target proves that `mc` emits an entry object and
+  freestanding runtime object suitable for one external relink step
+- the driver-linked executable still runs successfully on the admitted
+  bootstrap target family
+- one manually relinked executable built from the emitted Modern C object,
+  the generated runtime object, and a target-owned support object also runs
+  successfully with a deterministic proof marker
+- the planning surface records Phase 88 as concrete rather than still
+  speculative
+
+Non-goals
+---------
+- linker-script support or kernel-image layout policy
+- broad external build-system integration or packaging claims
+- `mc run` or `mc test` admission for freestanding targets
+- public `sys` admission, user-space bring-up, or scheduler policy
+- broader `hal` growth, interrupts, barriers, or device-framework work
+
+Implemented slice
+-----------------
+- the tool regression suite now includes one Phase 88 freestanding target that
+  builds through the existing driver path with one manifest-owned support
+  object, exits with a deterministic driver-linked marker, and emits the entry
+  object plus the generated freestanding runtime object
+- the same regression then compiles a second target-owned support object,
+  manually links a new executable from the emitted Modern C object plus the
+  generated runtime object through `xcrun clang`, and validates that the
+  relinked executable exits with a different deterministic marker without
+  rerunning `mc`
+- the freestanding proof statement, README, backlog, decision log, and
+  speculative `v0.3` roadmap now record Phase 88 as the first concrete kernel
+  build-integration anchor after the static-data proof
+
+Closeout statement
+------------------
+Phase 88 is complete as a kernel build integration audit. The repository still
+does not claim linker-script control, image packaging, or a general external
+build workflow, but it now has one honest proof that the emitted freestanding
+entry object and generated runtime object compose with a minimal kernel-owned
+relink step on the admitted bootstrap target family.
