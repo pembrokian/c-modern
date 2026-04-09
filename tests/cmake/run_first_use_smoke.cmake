@@ -2,7 +2,7 @@ if(NOT DEFINED MC OR NOT DEFINED SOURCE_ROOT OR NOT DEFINED BINARY_DIR)
   message(FATAL_ERROR "MC, SOURCE_ROOT, and BINARY_DIR must be defined")
 endif()
 
-set(FIRST_USE_ROOT "${BINARY_DIR}/phase75_first_use_smoke")
+set(FIRST_USE_ROOT "${BINARY_DIR}/audit/first_use_smoke")
 set(HELLO_BUILD_DIR "${FIRST_USE_ROOT}/hello_check")
 set(ISSUE_ROLLUP_BUILD_DIR "${FIRST_USE_ROOT}/issue_rollup")
 set(ISSUE_ROLLUP_PROJECT "${SOURCE_ROOT}/examples/real/issue_rollup/build.toml")

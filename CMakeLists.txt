@@ -16,6 +16,13 @@ add_library(mc_support STATIC
 
 target_include_directories(mc_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_library(mc_test_support STATIC
+    tests/support/fixture_utils.cpp
+    tests/support/process_utils.cpp
+)
+
+target_include_directories(mc_test_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_library(mc_frontend_stub STATIC
     compiler/ast/ast.cpp
     compiler/lex/lexer.cpp
@@ -95,33 +102,68 @@ add_executable(mc_codegen_llvm_tests
 target_include_directories(mc_codegen_llvm_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_codegen_llvm_tests PRIVATE mc_codegen_llvm mc_mir mc_support)
 
-add_executable(mc_phase7_tool_tests
-    tests/tool/phase7_tool_tests.cpp
+add_executable(mc_tool_workflow_tests
+    tests/tool/tool_workflow_tests.cpp
 )
 
-target_include_directories(mc_phase7_tool_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc_phase7_tool_tests PRIVATE mc_support)
+target_include_directories(mc_tool_workflow_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_tool_workflow_tests PRIVATE mc_support mc_test_support)
+
+add_executable(mc_tool_build_state_tests
+    tests/tool/tool_build_state_tests.cpp
+)
+
+target_include_directories(mc_tool_build_state_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_tool_build_state_tests PRIVATE mc_support mc_test_support)
+
+add_executable(mc_tool_real_project_tests
+    tests/tool/tool_real_project_tests.cpp
+)
+
+target_include_directories(mc_tool_real_project_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_tool_real_project_tests PRIVATE mc_support mc_test_support)
+
+add_executable(mc_tool_freestanding_tests
+    tests/tool/tool_freestanding_tests.cpp
+)
+
+target_include_directories(mc_tool_freestanding_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_tool_freestanding_tests PRIVATE mc_support mc_test_support)
 
 add_executable(mc_codegen_fixture_tests
     tests/codegen/codegen_fixture_tests.cpp
 )
 
 target_include_directories(mc_codegen_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc_codegen_fixture_tests PRIVATE mc_codegen_llvm mc_frontend_stub mc_mir mc_support)
+target_link_libraries(mc_codegen_fixture_tests PRIVATE mc_codegen_llvm mc_frontend_stub mc_mir mc_support mc_test_support)
 
-add_executable(mc_codegen_executable_tests
-    tests/codegen/codegen_executable_tests.cpp
+add_executable(mc_codegen_executable_core_tests
+    tests/codegen/codegen_executable_core_tests.cpp
 )
 
-target_include_directories(mc_codegen_executable_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc_codegen_executable_tests PRIVATE mc_support)
+target_include_directories(mc_codegen_executable_core_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_codegen_executable_core_tests PRIVATE mc_support mc_test_support)
+
+add_executable(mc_codegen_executable_stdlib_tests
+    tests/codegen/codegen_executable_stdlib_tests.cpp
+)
+
+target_include_directories(mc_codegen_executable_stdlib_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_codegen_executable_stdlib_tests PRIVATE mc_support mc_test_support)
+
+add_executable(mc_codegen_executable_project_tests
+    tests/codegen/codegen_executable_project_tests.cpp
+)
+
+target_include_directories(mc_codegen_executable_project_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mc_codegen_executable_project_tests PRIVATE mc_support mc_test_support)
 
 add_executable(mc_parser_fixture_tests
     tests/parser/parser_fixture_tests.cpp
 )
 
 target_include_directories(mc_parser_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc_parser_fixture_tests PRIVATE mc_frontend_stub mc_support)
+target_link_libraries(mc_parser_fixture_tests PRIVATE mc_frontend_stub mc_support mc_test_support)
 
 add_executable(mc_mir_tests
     tests/mir/mir_tests.cpp
@@ -135,20 +177,25 @@ add_executable(mc_mir_fixture_tests
 )
 
 target_include_directories(mc_mir_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc_mir_fixture_tests PRIVATE mc_mir mc_frontend_stub mc_support)
+target_link_libraries(mc_mir_fixture_tests PRIVATE mc_mir mc_frontend_stub mc_support mc_test_support)
 
 add_executable(mc_sema_fixture_tests
     tests/sema/sema_fixture_tests.cpp
 )
 
 target_include_directories(mc_sema_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc_sema_fixture_tests PRIVATE mc_sema_bootstrap mc_frontend_stub mc_support)
+target_link_libraries(mc_sema_fixture_tests PRIVATE mc_sema_bootstrap mc_frontend_stub mc_support mc_test_support)
 
 add_test(NAME mc_bootstrap_unit COMMAND mc_bootstrap_tests)
 add_test(NAME mc_codegen_llvm_unit COMMAND mc_codegen_llvm_tests)
-add_test(NAME mc_phase7_tool_unit COMMAND mc_phase7_tool_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_tool_workflow_unit COMMAND mc_tool_workflow_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_tool_build_state_unit COMMAND mc_tool_build_state_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_tool_real_project_unit COMMAND mc_tool_real_project_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_tool_freestanding_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME mc_codegen_executable_unit COMMAND mc_codegen_executable_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_codegen_executable_core_unit COMMAND mc_codegen_executable_core_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_codegen_executable_stdlib_unit COMMAND mc_codegen_executable_stdlib_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_codegen_executable_project_unit COMMAND mc_codegen_executable_project_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_parser_fixture_unit COMMAND mc_parser_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_sema_fixture_unit COMMAND mc_sema_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_mir_unit COMMAND mc_mir_tests)

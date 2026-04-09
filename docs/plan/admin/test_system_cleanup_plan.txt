@@ -3,7 +3,27 @@ Modern C -- Test System Cleanup Plan
 
 Status
 ------
-PROPOSED
+ACTIVE
+
+Implementation Progress
+-----------------------
+The initial cleanup slices described below are no longer hypothetical.
+
+- shared fixture text and diagnostic helpers have been extracted into a local
+  test-support layer
+- routine parser and backend dump fixtures now use adjacent-file autodiscovery
+- sema and MIR runners now share the basic fixture helper path while retaining
+  explicit metadata where required
+- repository-owned smoke outputs now use `audit/...` naming instead of fresh
+  phase-local roots
+- the two largest integration runners have been split into smaller
+  behavior-family CTest targets
+
+The next cleanup pressure point is shared subprocess, timeout, socket, and
+temporary-project helper extraction across the remaining integration suites.
+
+That follow-on helper extraction and the hybrid sema/MIR autodiscovery expansion
+have now landed as well.
 
 Purpose
 -------
@@ -102,8 +122,9 @@ Theme 4 -- Split oversized integration runners into coherent slices
 
 - break up monolithic executables when their size starts to hide intent or make
   failure triage expensive
-- the two biggest pressure points today are:
-  - `tests/tool/phase7_tool_tests.cpp`
+- this cleanup has already split the two largest pressure points into smaller
+  grouped CTest targets:
+  - `tests/tool/tool_suite_tests.cpp`
   - `tests/codegen/codegen_executable_tests.cpp`
 - split by behavior family rather than arbitrary file size
   Suggested shapes:
@@ -172,6 +193,10 @@ Step 4 -- Integration suite decomposition
 - split `phase7_tool_tests` into smaller binaries by tool area
 - wire each new binary as its own named CTest target
 
+This step has landed. The active grouped targets now separate workflow,
+build-state, real-project, and freestanding tool coverage along with core,
+stdlib, and project-oriented codegen executable coverage.
+
 Step 5 -- Documentation and gating cleanup
 
 - refresh `tests/README.md`
@@ -230,3 +255,12 @@ If this plan is executed incrementally, the first slice should be:
 
 That slice is small enough to land without destabilizing the active compiler
 work, and large enough to improve trust in the suite immediately.
+
+Current Next Slice
+------------------
+The currently proposed cleanup slices in this note are implemented:
+
+1. shared fixture helper extraction and routine parser/backend autodiscovery
+2. integration-runner decomposition by behavior family
+3. shared subprocess/socket/temp-project helper extraction plus hosted-assumption documentation
+4. hybrid sema/MIR autodiscovery with explicit metadata retained only for exceptional fixtures

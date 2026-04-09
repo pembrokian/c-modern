@@ -1,0 +1,135 @@
+Modern C -- Build And Test Cleanup Execution Plan
+=================================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Turn the existing build-tree and test-system cleanup proposals into a concrete,
+incremental repository slice that improves workspace clarity and lowers routine
+test maintenance cost without destabilizing active compiler bring-up work.
+
+This execution note is narrower than the speculative cleanup proposals.
+It names the order of work, the first slice to land immediately, and the
+follow-on slices that should remain separate until the first slice is green.
+
+Scope
+-----
+This cleanup covers two areas only:
+
+1. repository-owned test harness structure and documentation
+2. repository-facing build-tree naming for audit and probe outputs
+
+It does not attempt to broaden compiler behavior, delete user-local generated
+state automatically, or rewrite every historical plan note that still mentions
+older phase-local build directories.
+
+Non-goals
+---------
+- mass deletion of existing `build/` probe directories
+- churn-only renaming of historical phase notes
+- replacing the CMake + CTest test model
+- moving durable proof artifacts out of `tests/`, `examples/`, or `docs/`
+- large production-code refactors only for test aesthetics
+
+Execution Order
+---------------
+Slice 1 -- Shared fixture support and naming alignment
+- extract shared test helpers for fixture text loading, normalization, adjacent
+  fixture discovery, and expected-diagnostic substring checks
+- convert routine parser fixtures to adjacent-file autodiscovery
+- convert routine backend dump fixtures to adjacent-file autodiscovery
+- keep sema and MIR on a hybrid model while removing duplicated helper logic
+- rename repository-owned smoke and audit build dirs from phase-local names to
+  `audit/...`
+- update `README.md`, `examples/README.md`, and `tests/README.md` so new manual
+  commands prefer `build/debug/audit/...`, `build/debug/probes/...`, and
+  `build/debug/tmp/...`
+
+Slice 2 -- Integration-runner decomposition
+- split `tests/tool/tool_suite_tests.cpp` by behavior family
+- split `tests/codegen/codegen_executable_tests.cpp` by executable behavior
+  family
+- preserve clear CTest target names instead of one grab-bag executable per area
+
+Status: implemented
+
+Slice 3 -- Shared process helpers and host gating
+- extract repeated subprocess, timeout, socket, and temp-project helpers used by
+  the remaining integration runners
+- document hosted POSIX assumptions explicitly in test docs and gate where a
+  broader host matrix would otherwise be implied
+
+Status: implemented for the current admitted host; helper extraction landed and
+host assumptions are now explicit in test docs, with no extra CMake gating
+needed while the supported bootstrap host remains POSIX-like
+
+Slice 4 -- Optional hybrid fixture autodiscovery expansion
+- auto-discover ordinary sema fixtures that need no extra metadata
+- auto-discover ordinary MIR fixtures that need no extra metadata
+- retain small explicit metadata tables only for import-root, imported-module,
+  canonical-sync, or package-identity exceptions
+
+Status: implemented; ordinary sema and MIR fixtures now use adjacent-file
+autodiscovery, while metadata-heavy exceptions remain explicit. This slice also
+surfaced one stale sema golden that is now corrected.
+
+Immediate Acceptance Criteria
+-----------------------------
+Slice 1 is complete only when all of the following are true:
+
+- parser and backend dump fixture runners no longer require large hard-coded
+  case tables for ordinary adjacent fixtures
+- sema and MIR fixture runners no longer duplicate basic file and diagnostic
+  helper logic
+- repository-owned smoke scripts use `audit/...` build-dir naming instead of
+  new `phase*` names
+- contributor-facing docs describe the current naming and discovery rules
+- the affected test targets rebuild cleanly and pass
+
+Implementation Notes
+--------------------
+- treat existing `build/` contents as potentially active user work; do not prune
+  them automatically in this slice
+- prefer doc updates that change future examples and canonical commands rather
+  than rewriting every historic phase reference in archived notes
+- keep the fixture helper surface small and local to `tests/`
+
+Why this order
+--------------
+The highest-leverage cleanup is the one that removes repetitive fixture code,
+reduces routine test addition friction, and stops generating fresh phase-named
+audit outputs.  That improves the day-to-day repository surface immediately
+while leaving larger runner decomposition as a follow-on change with its own
+validation slice.
+
+Current State
+-------------
+Slice 1 through Slice 4 are landed and validated.
+
+- fixture helper extraction and routine autodiscovery are in place
+- audit/probe/tmp naming is reflected in active contributor docs
+- the former monolithic tool and codegen executable runners are now split into
+  grouped CTest targets by behavior family
+- shared process, timeout, socket, and temp-project helpers now live in the
+  local test-support layer, and hosted POSIX assumptions are documented next to
+  the grouped integration suite layout
+- ordinary sema and MIR fixtures are now adjacent-file autodiscovered, with
+  explicit metadata retained only for import-root, imported-module,
+  canonical-sync, and package-identity exceptions
+- active grouped tool targets now use semantic `mc_tool_*` names, and their
+  disposable suite outputs are rooted under `build/debug/tool/<family>/...`
+  instead of creating fresh top-level `phase*` paths
+- the grouped tool suites now also use semantic leaf project/build/output names
+  under those suite roots, so active tool runs no longer generate fresh
+  disposable `phase*` artifacts anywhere under `build/debug`
+- the grouped codegen executable suites were audited after the tool rename
+  follow-on and do not create fresh top-level `build/debug/phase*` trees;
+  their remaining historical identifiers are still confined to nested suite
+  work roots
+
+There is no further cleanup slice queued in this execution note. Future work,
+if any, should be a new follow-on cleanup note rather than extending this one
+indefinitely.

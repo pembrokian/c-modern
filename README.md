@@ -112,8 +112,8 @@ First-use smoke validation:
 ```sh
 build/debug/mc --help
 build/debug/mc check tests/cases/hello.mc
-build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase32_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase32_issue_rollup
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/first_use_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/first_use_smoke/issue_rollup
 ```
 
 Supported command patterns:
@@ -133,6 +133,9 @@ Artifact expectations:
 - `build/debug/mc` is the produced compiler entrypoint for the supported path
 - `build/` is disposable generated state
 - command-local `--build-dir` trees are disposable generated state and should be treated as build outputs, not source inputs
+- repository-owned smoke and audit runs should prefer `build/debug/audit/...`
+- manual probes should prefer `build/debug/probes/...`
+- short-lived scratch runs should prefer `build/debug/tmp/...`
 - `make build` and `make test` are convenience wrappers around the same CMake-based path, not a separate supported installation story
 - `make first-use-smoke` is the repo-owned convenience wrapper for the narrow documented first-use validation path, not a broader public-cut certification
 - `make public-cut-smoke` is the repo-owned convenience wrapper for the broader current public-cut smoke audit on the admitted hosted slice
@@ -161,30 +164,30 @@ cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/debug
 ctest --test-dir build/debug --output-on-failure
 build/debug/mc check tests/cases/hello.mc --dump-ast --emit-dump-paths
-build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/stage5_smoke --dump-backend
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/probes/smoke_return_zero --dump-backend
 build/debug/mc check tests/stdlib/hello_stdout.mc
-build/debug/mc build tests/stdlib/hello_stdout.mc --build-dir build/debug/phase6_stdout
+build/debug/mc build tests/stdlib/hello_stdout.mc --build-dir build/debug/probes/hello_stdout
 build/debug/mc check --project tests/tool/phase7_project/build.toml
-build/debug/mc build --project tests/tool/phase7_project/build.toml --build-dir build/debug/phase7_project_smoke
-build/debug/mc run --project tests/tool/phase7_project/build.toml --build-dir build/debug/phase7_project_smoke
-build/debug/mc run --project examples/real/grep_lite/build.toml --build-dir build/debug/phase8_grep -- alpha examples/real/grep_lite/tests/sample.txt
-build/debug/mc test --project examples/real/hash_tool/build.toml --build-dir build/debug/phase8_hash
-build/debug/mc run --project examples/real/arena_expr/build.toml --build-dir build/debug/phase8_expr -- examples/real/arena_expr/tests/sample.expr
-build/debug/mc run --project examples/real/worker_queue/build.toml --build-dir build/debug/phase20_worker_queue
-build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase20_worker_queue
-build/debug/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
-build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
-build/debug/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/phase43_pipe_ready
-build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/phase43_pipe_ready
-build/debug/mc run --project examples/real/line_filter_relay/build.toml --build-dir build/debug/phase46_line_filter_relay -- "phase forty five"
-build/debug/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/phase46_line_filter_relay
-build/debug/mc run --project examples/real/evented_echo/build.toml --build-dir build/debug/phase13_evented_echo -- 4040
-build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase13_evented_echo
-build/debug/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-core --build-dir build/debug/phase29_issue_rollup
-build/debug/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/phase74_issue_rollup
-build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase29_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/phase74_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase29_issue_rollup
+build/debug/mc build --project tests/tool/phase7_project/build.toml --build-dir build/debug/probes/phase7_project
+build/debug/mc run --project tests/tool/phase7_project/build.toml --build-dir build/debug/probes/phase7_project
+build/debug/mc run --project examples/real/grep_lite/build.toml --build-dir build/debug/probes/grep_lite -- alpha examples/real/grep_lite/tests/sample.txt
+build/debug/mc test --project examples/real/hash_tool/build.toml --build-dir build/debug/probes/hash_tool
+build/debug/mc run --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr -- examples/real/arena_expr/tests/sample.expr
+build/debug/mc run --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
+build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
+build/debug/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
+build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
+build/debug/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
+build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
+build/debug/mc run --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay -- "phase forty five"
+build/debug/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay
+build/debug/mc run --project examples/real/evented_echo/build.toml --build-dir build/debug/probes/evented_echo -- 4040
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/probes/evented_echo
+build/debug/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-core --build-dir build/debug/probes/issue_rollup
+build/debug/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/issue_rollup
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/issue_rollup
 ```
 
 Checked versus debug posture:
@@ -204,15 +207,15 @@ make public-cut-smoke
 
 ```sh
 build/debug/mc check tests/cases/hello.mc
-build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase33_smoke_return_zero
-build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup
-build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase33_worker_queue
-build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
-build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/phase43_pipe_ready
-build/debug/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/phase46_line_filter_relay
-build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase33_evented_echo
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/audit/public_cut_smoke/smoke_return_zero
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup
+build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/audit/public_cut_smoke/worker_queue
+build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/audit/public_cut_smoke/pipe_handoff
+build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/audit/public_cut_smoke/pipe_ready
+build/debug/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/audit/public_cut_smoke/line_filter_relay
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/audit/public_cut_smoke/evented_echo
 ```
 
 First public-cut hosted statement:

@@ -1,9 +1,8 @@
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <optional>
-#include <sstream>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -11,6 +10,7 @@
 #include "compiler/parse/parser.h"
 #include "compiler/sema/check.h"
 #include "compiler/support/diagnostics.h"
+#include "tests/support/fixture_utils.h"
 
 namespace {
 
@@ -36,29 +36,6 @@ bool PathWithinRoot(const std::filesystem::path& path, const std::filesystem::pa
     return true;
 }
 
-void Fail(const std::string& message) {
-    std::cerr << "test failure: " << message << '\n';
-    std::exit(1);
-}
-
-std::string ReadTextFile(const std::filesystem::path& path) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input) {
-        Fail("unable to read fixture file: " + path.generic_string());
-    }
-
-    std::ostringstream buffer;
-    buffer << input.rdbuf();
-    return buffer.str();
-}
-
-std::string NormalizeFixtureText(std::string text) {
-    while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) {
-        text.pop_back();
-    }
-    return text;
-}
-
 mc::parse::ParseResult ParseText(const std::string& source,
                                  const std::filesystem::path& path,
                                  mc::support::DiagnosticSink& diagnostics) {
@@ -66,18 +43,27 @@ mc::parse::ParseResult ParseText(const std::string& source,
     return mc::parse::Parse(lexed, path, diagnostics);
 }
 
+FixtureCase BuildFixtureCase(const mc::test_support::DiscoveredFixture& fixture) {
+    return {
+        .source_name = fixture.source_name,
+        .expected_output_name = fixture.expectation_name,
+        .import_roots = {},
+        .should_check = fixture.expects_success,
+    };
+}
+
 void RunFixture(const std::filesystem::path& source_root, const std::filesystem::path& fixture_dir, const FixtureCase& fixture) {
     const auto source_path = fixture_dir / fixture.source_name;
     const auto expected_path = fixture_dir / fixture.expected_output_name;
 
     mc::support::DiagnosticSink diagnostics;
-    const auto source_text = ReadTextFile(source_path);
-    const auto expected_text = NormalizeFixtureText(ReadTextFile(expected_path));
+    const auto source_text = mc::test_support::ReadTextFile(source_path);
+    const auto expected_text = mc::test_support::NormalizeFixtureText(mc::test_support::ReadTextFile(expected_path));
 
     const auto lexed = mc::lex::Lex(source_text, source_path.generic_string(), diagnostics);
     const auto parsed = mc::parse::Parse(lexed, source_path, diagnostics);
     if (!parsed.ok) {
-        Fail("fixture should parse successfully: " + source_path.generic_string() + "\n" + diagnostics.Render());
+        mc::test_support::Fail("fixture should parse successfully: " + source_path.generic_string() + "\n" + diagnostics.Render());
     }
 
     mc::sema::CheckOptions options;
@@ -109,10 +95,10 @@ void RunFixture(const std::filesystem::path& source_root, const std::filesystem:
     const auto checked = mc::sema::CheckProgram(*parsed.source_file, source_path, options, diagnostics);
     if (fixture.should_check) {
         if (!checked.ok) {
-            Fail("fixture should pass semantic checking: " + source_path.generic_string() + "\n" + diagnostics.Render());
+            mc::test_support::Fail("fixture should pass semantic checking: " + source_path.generic_string() + "\n" + diagnostics.Render());
         }
 
-        const auto actual_dump = NormalizeFixtureText(mc::sema::DumpModule(*checked.module));
+        const auto actual_dump = mc::test_support::NormalizeFixtureText(mc::sema::DumpModule(*checked.module));
         if (actual_dump != expected_text) {
             std::cerr << "fixture mismatch for " << source_path.generic_string() << "\n";
             std::cerr << "expected:\n" << expected_text << "\n";
@@ -123,23 +109,10 @@ void RunFixture(const std::filesystem::path& source_root, const std::filesystem:
     }
 
     if (checked.ok) {
-        Fail("fixture should fail semantic checking: " + source_path.generic_string());
+        mc::test_support::Fail("fixture should fail semantic checking: " + source_path.generic_string());
     }
 
-    const auto rendered = diagnostics.Render();
-    std::istringstream expected_lines(expected_text);
-    std::string expected_line;
-    while (std::getline(expected_lines, expected_line)) {
-        if (expected_line.empty()) {
-            continue;
-        }
-        if (rendered.find(expected_line) == std::string::npos) {
-            std::cerr << "missing expected diagnostic substring for " << source_path.generic_string() << "\n";
-            std::cerr << "expected substring: " << expected_line << "\n";
-            std::cerr << "actual diagnostics:\n" << rendered << "\n";
-            std::exit(1);
-        }
-    }
+    mc::test_support::RequireExpectedDiagnosticSubstrings(diagnostics.Render(), expected_text, source_path);
 }
 
 void TestImportedModuleSurfaceQualifiesNamedTypes() {
@@ -157,7 +130,7 @@ void TestImportedModuleSurfaceQualifiesNamedTypes() {
         "<imported-module-surface>",
         diagnostics);
     if (!parsed.ok) {
-        Fail("imported-module-surface fixture should parse successfully:\n" + diagnostics.Render());
+        mc::test_support::Fail("imported-module-surface fixture should parse successfully:\n" + diagnostics.Render());
     }
 
     mc::sema::Module imported_mem;
@@ -178,7 +151,7 @@ void TestImportedModuleSurfaceQualifiesNamedTypes() {
     options.imported_modules = &imported_modules;
     const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<imported-module-surface>", options, diagnostics);
     if (!checked.ok) {
-        Fail("imported module surfaces should qualify named types in options.imported_modules path:\n" + diagnostics.Render());
+        mc::test_support::Fail("imported module surfaces should qualify named types in options.imported_modules path:\n" + diagnostics.Render());
     }
 }
 
@@ -186,69 +159,35 @@ void TestImportedModuleSurfaceQualifiesNamedTypes() {
 
 int main(int argc, char** argv) {
     if (argc != 2) {
-        Fail("expected source root argument");
+        mc::test_support::Fail("expected source root argument");
     }
 
     const std::filesystem::path source_root = argv[1];
     const std::filesystem::path fixture_dir = source_root / "tests/sema";
-    const std::vector<FixtureCase> fixtures = {
-        {"alias_struct_ok.mc", "alias_struct_ok.sema.txt", {}, true},
-        {"basic_ok.mc", "basic_ok.sema.txt", {}, true},
-        {"constexpr_layout_ok.mc", "constexpr_layout_ok.sema.txt", {}, true},
-        {"constexpr_numeric_literals_ok.mc", "constexpr_numeric_literals_ok.sema.txt", {}, true},
-        {"const_explicit_conversion_ok.mc", "const_explicit_conversion_ok.sema.txt", {}, true},
-        {"const_wraparound_ok.mc", "const_wraparound_ok.sema.txt", {}, true},
-        {"global_zero_initialized_ok.mc", "global_zero_initialized_ok.sema.txt", {}, true},
-        {"generic_box_ok.mc", "generic_box_ok.sema.txt", {}, true},
-        {"import_aggregate_const_ok_main.mc", "import_aggregate_const_ok_main.sema.txt", {}, true},
-        {"import_alias_ok_main.mc", "import_alias_ok_main.sema.txt", {}, true},
-        {"import_const_array_ok_main.mc", "import_const_array_ok_main.sema.txt", {}, true},
-        {"import_ok_main.mc", "import_ok_main.sema.txt", {}, true},
-        {"internal_same_package/main.mc", "internal_same_package/main.sema.txt", {}, true, "pkg", {{"internal_same_package", "pkg"}}},
-        {"import_type_ok_main.mc", "import_type_ok_main.sema.txt", {}, true},
+    const std::vector<FixtureCase> explicit_fixtures = {
         {"import_root_ok_main.mc", "import_root_ok_main.sema.txt", {"tests/sema/import_roots"}, true},
-        {"layout_ok.mc", "layout_ok.sema.txt", {}, true},
-        {"noalias_signature_ok.mc", "noalias_signature_ok.sema.txt", {}, true},
-        {"tuple_return_ok.mc", "tuple_return_ok.sema.txt", {}, true},
-        {"array_length_non_constant_bad.mc", "array_length_non_constant_bad.errors.txt", {}, false},
-        {"distinct_type_safety_ok.mc", "distinct_type_safety_ok.sema.txt", {}, true},
-        {"distinct_cross_conversion_bad.mc", "distinct_cross_conversion_bad.errors.txt", {}, false},
-        {"distinct_implicit_conversion_bad.mc", "distinct_implicit_conversion_bad.errors.txt", {}, false},
-        {"distinct_non_scalar_bad.mc", "distinct_non_scalar_bad.errors.txt", {}, false},
-        {"enum_layout_ok.mc", "enum_layout_ok.sema.txt", {}, true},
-        {"error_return_order_bad.mc", "error_return_order_bad.errors.txt", {}, false},
-        {"missing_return_path_bad.mc", "missing_return_path_bad.errors.txt", {}, false},
-        {"noalias_args_bad.mc", "noalias_args_bad.errors.txt", {}, false},
-        {"noalias_duplicate_bad.mc", "noalias_duplicate_bad.errors.txt", {}, false},
-        {"noalias_non_pointer_bad.mc", "noalias_non_pointer_bad.errors.txt", {}, false},
-        {"unknown_name_bad.mc", "unknown_name_bad.errors.txt", {}, false},
-        {"unknown_callee_bad.mc", "unknown_callee_bad.errors.txt", {}, false},
-        {"missing_import_bad.mc", "missing_import_bad.errors.txt", {}, false},
-        {"import_cycle_a.mc", "import_cycle_a.errors.txt", {}, false},
-        {"const_bitwise_ok.mc", "const_bitwise_ok.sema.txt", {}, true},
-        {"const_initializer_non_constant_bad.mc", "const_initializer_non_constant_bad.errors.txt", {}, false},
-        {"bitwise_float_bad.mc", "bitwise_float_bad.errors.txt", {}, false},
-        {"const_shift_count_bad.mc", "const_shift_count_bad.errors.txt", {}, false},
-        {"global_initializer_type_bad.mc", "global_initializer_type_bad.errors.txt", {}, false},
-        {"generic_variant_ctor_ok.mc", "generic_variant_ctor_ok.sema.txt", {}, true},
+        {"internal_same_package/main.mc", "internal_same_package/main.sema.txt", {}, true, "pkg", {{"internal_same_package", "pkg"}}},
         {"internal_cross_package/pkg_a/main.mc", "internal_cross_package/pkg_a/main.errors.txt", {"tests/sema/internal_cross_package/pkg_b"}, false, "pkg_a", {{"internal_cross_package/pkg_a", "pkg_a"}, {"internal_cross_package/pkg_b", "pkg_b"}}},
-        {"internal_root/internal.mc", "internal_root.errors.txt", {}, false},
-        {"private_access_bad.mc", "private_access_bad.errors.txt", {}, false},
-        {"private_type_leak_bad.mc", "private_type_leak_bad.errors.txt", {}, false},
-        {"var_initializer_non_constant_bad.mc", "var_initializer_non_constant_bad.errors.txt", {}, false},
-        {"return_type_bad.mc", "return_type_bad.errors.txt", {}, false},
-        {"break_outside_loop_bad.mc", "break_outside_loop_bad.errors.txt", {}, false},
-        {"defer_non_call_bad.mc", "defer_non_call_bad.errors.txt", {}, false},
-        {"call_arity_bad.mc", "call_arity_bad.errors.txt", {}, false},
-        {"bare_conversion_syntax_bad.mc", "bare_conversion_syntax_bad.errors.txt", {}, false},
-        {"layout_cycle_bad.mc", "layout_cycle_bad.errors.txt", {}, false},
-        {"unknown_param_type_bad.mc", "unknown_param_type_bad.errors.txt", {}, false},
-        {"qualified_variant_ok.mc", "qualified_variant_ok.sema.txt", {}, true},
-        {"variant_is_type_mismatch_bad.mc", "variant_is_type_mismatch_bad.errors.txt", {}, false},
     };
 
-    for (const auto& fixture : fixtures) {
+    std::unordered_set<std::string> explicit_sources;
+    explicit_sources.reserve(explicit_fixtures.size());
+    for (const auto& fixture : explicit_fixtures) {
+        explicit_sources.insert(fixture.source_name);
         RunFixture(source_root, fixture_dir, fixture);
+    }
+
+    const auto discovered = mc::test_support::DiscoverAdjacentFixtures(
+        fixture_dir,
+        ".sema.txt",
+        ".errors.txt",
+        mc::test_support::FixtureDiscoveryMode::kExistingExpectationOnly);
+
+    for (const auto& discovered_fixture : discovered) {
+        if (explicit_sources.contains(discovered_fixture.source_name)) {
+            continue;
+        }
+        RunFixture(source_root, fixture_dir, BuildFixtureCase(discovered_fixture));
     }
 
     TestImportedModuleSurfaceQualifiesNamedTypes();
