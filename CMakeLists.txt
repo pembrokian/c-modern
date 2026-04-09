@@ -104,6 +104,8 @@ target_link_libraries(mc_codegen_llvm_tests PRIVATE mc_codegen_llvm mc_mir mc_su
 
 add_executable(mc_tool_workflow_tests
     tests/tool/tool_workflow_tests.cpp
+    tests/tool/tool_suite_common.cpp
+    tests/tool/tool_workflow_suite.cpp
 )
 
 target_include_directories(mc_tool_workflow_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -111,6 +113,8 @@ target_link_libraries(mc_tool_workflow_tests PRIVATE mc_support mc_test_support)
 
 add_executable(mc_tool_build_state_tests
     tests/tool/tool_build_state_tests.cpp
+    tests/tool/tool_suite_common.cpp
+    tests/tool/tool_build_state_suite.cpp
 )
 
 target_include_directories(mc_tool_build_state_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -118,6 +122,8 @@ target_link_libraries(mc_tool_build_state_tests PRIVATE mc_support mc_test_suppo
 
 add_executable(mc_tool_real_project_tests
     tests/tool/tool_real_project_tests.cpp
+    tests/tool/tool_suite_common.cpp
+    tests/tool/tool_real_project_suite.cpp
 )
 
 target_include_directories(mc_tool_real_project_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -125,6 +131,8 @@ target_link_libraries(mc_tool_real_project_tests PRIVATE mc_support mc_test_supp
 
 add_executable(mc_tool_freestanding_tests
     tests/tool/tool_freestanding_tests.cpp
+    tests/tool/tool_suite_common.cpp
+    tests/tool/tool_freestanding_suite.cpp
 )
 
 target_include_directories(mc_tool_freestanding_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
