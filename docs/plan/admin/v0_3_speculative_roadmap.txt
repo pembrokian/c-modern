@@ -41,8 +41,8 @@ Repository numbering note
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation after the now-concrete first kernel
   representation proof.
-- This speculative continuation therefore starts at Phase 94, with Phase 81
-  through Phase 93 as the current concrete anchors.
+- This speculative continuation therefore starts at Phase 95, with Phase 81
+  through Phase 94 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -206,8 +206,19 @@ Phase 93 is now concrete as timer wake proof:
   wake delivery, and single wake observation deterministically in the
   repository tool harness
 
+Phase 94 is now concrete as first-system demo integration:
+- it proves that kernel boot, init, one log service, one echo service, one
+  timer-backed client wake, one bounded request-reply path, and one explicit
+  client-exit observation can compose honestly in one bounded demo
+- it keeps the proof on the existing freestanding path rather than admitting
+  service discovery, namespace policy, a scheduler runtime surface, or full
+  Canopus completion
+- it validates deterministic boot-log order, single wake delivery, single
+  request-reply exchange, and single client-exit observation in the
+  repository tool harness
+
 The remaining speculative continuation in this band therefore starts at Phase
-94.
+95.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof
@@ -271,13 +282,13 @@ Why this band is separate:
 
 This band is now concrete through Phase 92.
 
-Band D - Add One Event Source And Integrate The First System
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 94 through 95 likely build from the now-concrete timer wake anchor and
-then combine the earlier proofs into one first-system demo.
+Band D - Harden The First Integrated Freestanding Slice
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phase 95 likely builds from the now-concrete first-system demo anchor and
+turns that integrated proof into the first honest freestanding `v0.3` support
+slice statement.
 
 Likely themes:
-- one timer or interrupt wake path
 - first end-to-end integration over kernel, init, and one small service set
 - support-note and proof-surface hardening for the first freestanding tranche
 
@@ -287,10 +298,6 @@ Why this band comes last:
   real
 
 Possible phases in this band:
-
-Phase 94 -- First-System Demo Integration
-- Exit criterion: one small end-to-end Canopus Lite bring-up demo combines the
-  earlier kernel, init, logging, and request or reply proofs honestly.
 
 Phase 95 -- Freestanding v0.3 Slice Audit
 - Exit criterion: the repository can state the first admitted `v0.3`

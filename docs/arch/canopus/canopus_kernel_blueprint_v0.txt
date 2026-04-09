@@ -61,6 +61,13 @@ The first kernel should not optimize for:
 - multicore scheduling sophistication
 - language-visible runtime policy
 
+Bring-up framing note:
+
+- for v0, the authority model should be read primarily as unforgeable
+  kernel-validated handles with explicit transfer semantics
+- do not let early terminology imply that a full capability algebra,
+  derivation tree, or revocation model already exists
+
 1. Kernel Object Model
 ----------------------
 
@@ -115,8 +122,10 @@ Admitted first capability targets:
 Recommended bring-up stance:
 
 - use one flat per-process handle table first
-- defer capability derivation trees, revocation algebra, and rights splitting
-  beyond what the first running services actually need
+- treat v0 primarily as a handle-and-transfer model rather than as a fully
+  elaborated capability algebra
+- defer capability derivation trees, revocation algebra, and fine-grained
+  rights splitting beyond what the first running services actually need
 
 3. IPC Model
 ------------
@@ -131,6 +140,27 @@ The first kernel should implement exactly one primary IPC primitive:
 - blocking semantics are acceptable
 - kernel-mediated copy transport is acceptable
 
+Recommended first message shape:
+
+- one fixed header containing byte length and attached-handle count
+- one bounded inline byte payload region
+- one bounded attached-handle region carried separately from raw bytes
+
+The first concrete kernel message representation should stay simple and
+inspectable, for example:
+
+```txt
+Message {
+    byte_len
+    handle_count
+    data[MAX_MSG_BYTES]
+    handles[MAX_MSG_HANDLES]
+}
+```
+
+The exact ABI can be refined in a dedicated IPC note, but v0 should assume a
+fixed-size message representation rather than an open-ended transport shape.
+
 Required semantics:
 
 - bytes and attached capabilities are delivered atomically as one message
@@ -138,7 +168,8 @@ Required semantics:
   failure
 - receive either obtains the whole message or reports that the caller-provided
   buffers are too small
-- message order should be FIFO per endpoint queue in v0
+- initial implementations should prefer FIFO endpoint queues because that
+  makes bring-up and debugging more legible
 
 Recommended initial queue model:
 
@@ -147,12 +178,24 @@ Recommended initial queue model:
   message
 - receive blocks when the queue is empty unless or until a non-blocking mode
   is added later
+- if later pressure exposes ambiguity around multiple senders or fairness,
+  those semantics should be documented explicitly rather than assumed
 
 Why this shape is recommended:
 
 - it proves explicit coordination honestly
 - it exercises capability flow early
 - it avoids premature async framework or shared-memory design pressure
+
+Required destruction and lifetime rules:
+
+- process exit closes all remaining local handles owned by that process
+- attached handles in a queued message are no longer usable by the sender after
+  successful send
+- queued messages remain kernel-owned until delivered or dropped by explicit
+  endpoint-teardown rules
+- endpoint destruction must define one deterministic queued-message rule; v0
+  should choose one simple behavior and keep it consistent everywhere
 
 4. Process And Task Model
 -------------------------
@@ -177,6 +220,13 @@ Recommended initial ownership model:
 - parent spawns child only from an explicit launchable program capability
 - child receives only the explicitly listed initial handles
 - no ambient inheritance of open handles or global namespace state occurs
+
+Bring-up simplification:
+
+- a launchable program capability may initially be implemented as a kernel-known
+  preloaded image reference or kernel-known image id
+- v0 does not need a rich executable-object taxonomy before the first image
+  format and spawn path are already working
 
 First implementation bias:
 
@@ -233,6 +283,9 @@ Recommended policy:
 - one CPU assumption is acceptable for first bring-up
 - no user-visible scheduling classes
 - no scheduler-visible language or runtime framework
+- if multiple waiters would exist for a resource, v0 should either reject that
+  configuration or define one deterministic single-waiter rule rather than
+  imply broader fairness guarantees
 
 The implementation should be easy to inspect in a debugger before it tries to
 be clever.
@@ -260,6 +313,15 @@ Recommended boundary rule:
 - MMIO and barrier reality stay in hardware-facing support code or `hal`
 - they do not become a general-purpose memory or synchronization abstraction
 
+Recommended first interrupt-delivery rule:
+
+- interrupts should first wake or unblock a kernel-owned waiter or
+  kernel-owned service path
+- do not begin by injecting general interrupt messages directly into arbitrary
+  user endpoints
+- if later user-visible interrupt delivery is required, prefer one explicit
+  kernel-mediated event or endpoint path and document that as a separate step
+
 8. Minimal Syscall Surface
 --------------------------
 
@@ -285,6 +347,26 @@ Recommended rule:
 
 This is enough for the first running system without committing to broad API
 surface area.
+
+Recommended minimal status model:
+
+- `Ok`
+- `Invalid`
+- `PermissionDenied`
+- `NotFound`
+- `Exhausted`
+- `TooLarge`
+- `WouldBlock`
+- `Unknown`
+
+Recommended interpretation:
+
+- `WouldBlock` means the operation cannot complete immediately under current
+  queue or readiness state
+- `TooLarge` means caller-provided storage or requested transfer size exceeds
+  the admitted bound
+- `Invalid` covers malformed arguments, invalid writable output locations, or
+  invalid local handle values
 
 9. Boot Flow
 ------------
@@ -360,6 +442,12 @@ Recommended first source of those capabilities:
 - boot-bundled executable set known to the kernel or trusted loader
 - a trusted init process receiving those program capabilities at boot
 
+Recommended first implementation bias:
+
+- keep program capabilities dumb at first
+- they only need to designate one kernel-recognized launchable image source
+- richer loader taxonomy can wait until a real image-loading path exists
+
 This keeps process creation authority explicit and prevents path lookup from
 leaking into the kernel syscall boundary.
 
@@ -403,6 +491,13 @@ The first implementation should proceed in this order:
 
 This order keeps the mechanism ladder honest and matches the current proof
 direction already visible in the repository planning notes.
+
+Recommended follow-on documentation order once this blueprint is accepted:
+
+1. exact IPC ABI and syscall argument layout
+2. handle lifetime and endpoint-destruction semantics
+3. spawn image-reference contract
+4. explicit interrupt-to-event delivery contract
 
 14. Deliberate Deferrals
 ------------------------

@@ -40,6 +40,10 @@ require_contains(
   "README"
   "${README_CONTENT}"
   "Phase 93 timer wake proof")
+require_contains(
+  "README"
+  "${README_CONTENT}"
+  "Phase 94 first-system demo integration proof")
 require_not_contains(
   "README"
   "${README_CONTENT}"
@@ -82,6 +86,10 @@ require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"
   "Phase 93 timer wake proof")
+require_contains(
+  "freestanding_support_statement.txt"
+  "${FREESTANDING_NOTE_CONTENT}"
+  "Phase 94 first-system demo integration proof")
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"

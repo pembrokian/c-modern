@@ -1,0 +1,189 @@
+Phase 94 -- First-System Demo Integration
+=========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the completed freestanding proof ladder through the first honest
+end-to-end Canopus Lite demo: prove that one kernel-owned bring-up path can
+boot init, launch one log service, launch one echo service, launch one client,
+ wake that client from one deterministic timer-backed block, route one bounded
+request-and-reply exchange, and preserve one deterministic boot log of the
+major milestones without widening into a public service framework, namespace
+layer, scheduler runtime, or full operating-system completion claim.
+
+This document is both the Phase 94 execution note and its closeout.
+It does not claim general service discovery, richer scheduler policy, multiple
+clients, multiple services per role, restart policy, namespace rewriting,
+packaging, or full Canopus Lite completion.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 84 made the first freestanding boot-marker,
+  manifest-hardening, narrow `hal`, and freestanding support-statement split
+  real.
+- Phase 85 through Phase 88 then proved kernel-owned endpoint state,
+  task-lifecycle state, static-data follow-through, and external relink
+  honesty on that same bounded freestanding lane.
+- Phase 89 through Phase 92 then proved one init-to-log-service handshake,
+  one explicit capability transfer, one ordinary user-space helper boundary,
+  and one explicit launch-and-observation lifecycle path without widening into
+  ambient authority, a public spawn layer, or a broader runtime helper family.
+- Phase 93 then proved that one explicit timer-backed wait can wake one
+  blocked worker at one deterministic tick and publish one explicit wake
+  observation without widening into a public timer or interrupt framework.
+- The next strongest Canopus question was no longer whether the individual
+  proof ingredients could stay explicit. It was whether one small first-system
+  bring-up slice could compose those ingredients honestly at the same time.
+
+Problem being solved
+--------------------
+- The Canopus Lite architecture note names a first system that can boot,
+  enter user space, launch a minimal service set, route one bounded request,
+  and keep the kernel-mechanism versus user-space-policy story explicit.
+- The repository already had those ingredients in isolation, but no integrated
+  proof yet demonstrated that they compose without hidden runtime help,
+  service-framework invention, or architecture drift.
+- Without one integrated demo, later work could too easily overclaim that the
+  repository already had a first system when it only had separate mechanism
+  proofs.
+
+Core rule
+---------
+- Compose only the already admitted proof ingredients.
+- Keep kernel mechanism explicit: launch capability checks, wait-handle
+  observation, timer arming, wake delivery, and request routing stay in the
+  root proof module.
+- Keep helper-owned logic limited to ordinary structs, enums, arrays, and
+  helper functions for process, message, timer, wake, and log records.
+- Do not admit a public service registry, namespace service, scheduler API,
+  timer API, or broader `hal` surface in this phase.
+- Reopen compiler work only if the integrated proof exposes a concrete parser,
+  sema, MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target with one root proof module and one
+   imported helper module
+2. one init context with explicit launch capabilities for one log service,
+   one echo service, and one client, plus one explicit log endpoint
+   capability, one explicit echo endpoint capability, and one explicit timer
+   capability
+3. one deterministic boot log containing kernel boot, init start, service
+   readiness, client readiness, timer wake, request, reply, and client-exit
+   milestones in a fixed order
+4. one deterministic timer wake that unblocks the client exactly once before
+   it sends one bounded echo request and receives one bounded echo reply
+5. one explicit wait-handle observation for the client exit at the end of the
+   demo
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first-system integration question now by
+proving one bounded end-to-end demo over the already landed proof ingredients
+instead of widening into service discovery, broader scheduler policy, or a
+larger OS framework.
+
+What this phase proves
+----------------------
+- the current language and toolchain can carry one integrated Canopus Lite
+  bring-up slice that composes explicit launch capabilities, endpoint
+  capabilities, timer wake, request-reply state, wait-handle observation, and
+  deterministic logs through ordinary code
+- the first-system story can stay explicit: kernel boot establishes init,
+  init launches one log service, one echo service, and one client, the timer
+  wakes the client once, the client issues one request, the echo service
+  replies once, and init observes the client exit once
+- the existing freestanding build path can validate that composition through
+  one ordinary imported helper module and merged MIR dump without admitting a
+  public service framework, runtime scheduler surface, or broader freestanding
+  support claim
+
+Deliverables
+------------
+- one canonical Phase 94 closeout note recording the implemented first-system
+  demo proof
+- one focused freestanding tool regression that composes launch, capability
+  routing, timer wake, bounded request or reply flow, deterministic boot logs,
+  and client-exit observation in a single executable
+- deterministic runtime validation that the log order, wake count, request or
+  reply exchange, and exit observation all match the bounded demo contract
+- MIR inspection proving the demo stays within ordinary imported-module,
+  struct, enum, aggregate-init, and enum-match lowering behavior rather than
+  through a new runtime or service boundary
+- refreshed support and planning notes so Phase 94 is recorded as the first
+  concrete integrated system demo and Phase 95 remains the next speculative
+  support-slice audit step
+
+Suggested execution order
+-------------------------
+1. Define one imported helper module for the integrated process, message,
+   timer, wake, wait, and log record shapes.
+2. Build one freestanding executable that keeps launch, wake, routing, and
+   observation policy explicit in the root proof module.
+3. Validate the deterministic log order, wake delivery, request or reply
+   exchange, and client exit in the repository harness.
+4. Inspect the merged MIR to confirm that helper-owned state shaping remains
+   an ordinary imported-module boundary.
+5. Refresh the freestanding support and planning surface so Phase 94 is
+   concrete and Phase 95 becomes the next honest speculative owner.
+
+Exit criteria
+-------------
+- one freestanding target proves a bounded end-to-end first-system demo over
+  kernel boot, init, one log service, one echo service, one client, one timer
+  wake, one request or reply exchange, and one client-exit observation
+- the timer wake fires exactly once, the client issues exactly one request,
+  the echo service issues exactly one reply, and init observes the client exit
+  exactly once
+- the boot log records the bounded milestone sequence deterministically
+- the merged MIR records imported helper declarations and ordinary helper
+  function boundaries for log append, request construction, and wake
+  observation
+- the planning surface records Phase 94 as concrete rather than speculative
+
+Non-goals
+---------
+- general service discovery, namespace policy, or a service registry
+- multiple clients, multiple request or reply exchanges, retries, or restart
+  policy
+- a public timer, scheduler, spawn, or capability-runtime API
+- claiming full Canopus Lite completion, broader freestanding workflow
+  admission, or packaging support
+
+Implemented slice
+-----------------
+- the freestanding tool regression suite now includes one Phase 94 target with
+  `src/main.mc` and `src/system_demo.mc`, where the helper module owns the
+  process, message, timer, wake, wait, and log record shapes while the root
+  proof module keeps launch, capability routing, timer wake, request routing,
+  reply observation, and client-exit observation explicit
+- the proof validates that kernel boot records one boot milestone, init starts
+  and records its own milestone, log service, echo service, and client launch
+  and record readiness milestones, the client blocks until one deterministic
+  timer tick, wakes exactly once, sends one echo request, receives one echo
+  reply, exits once, and is observed once through an explicit wait handle
+- the proof also validates that the boot log contains the expected bounded
+  milestone order and that the log service and echo service each handle only
+  the one bounded amount of work admitted by the demo
+- the README, freestanding support statement, backlog, decision log, focused
+  freestanding support audit, and speculative `v0.3` roadmap now record Phase
+  94 as the first concrete first-system demo integration proof while keeping
+  broader Canopus completion claims deferred
+
+Closeout statement
+------------------
+Phase 94 is complete as a first-system demo integration proof. The repository
+still does not claim full Canopus Lite completion, namespace policy,
+service-discovery generality, scheduler policy, or broader freestanding
+workflow admission, but it now has one honest integrated bring-up story that
+composes the admitted kernel, init, service, timer, request-reply, and
+exit-observation ingredients in ordinary code on the existing freestanding
+proof lane.
