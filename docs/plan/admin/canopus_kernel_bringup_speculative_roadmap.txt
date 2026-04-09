@@ -42,9 +42,11 @@ Repository numbering note
 - Phase 81 through Phase 95 are now occupied by the concrete freestanding
   bring-up and support-freeze wave.
 - The completed proof ladder now reaches a first admitted freestanding `v0.3`
-  slice and one bounded first-system demo, but those proofs still stop short
-  of a real kernel image, real syscall boundary, and real booted init over the
-  actual kernel implementation.
+  slice and one bounded first-system demo, and the repository-owned kernel
+  wave now reaches real boot, first user entry, explicit endpoint and handle
+  state, and one bounded syscall-owned byte-only IPC proof, but it still stops
+  short of attached-handle transfer, spawn, timer-backed blocking, and real
+  booted init over the actual kernel implementation.
 - This speculative continuation therefore starts at Phase 96.
 
 Repository status note
@@ -84,10 +86,8 @@ Roadmap bands
 
 Band A - Reify Kernel-Owned Boot And Object Core
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 96 through 97 are now concrete as kernel boot-entry, state-skeleton,
-and first-user-entry work, and Phase 98 should continue from that real
-kernel-owned artifact into the remaining object-core work around endpoint
-tables and handle-owned message state.
+Phases 96 through 98 are now concrete as kernel boot-entry, state-skeleton,
+first-user-entry, and endpoint-and-handle-core work.
 
 Likely themes:
 - architecture entry and early console truth
@@ -115,20 +115,28 @@ Phase 97 is now concrete as address space and first user entry:
   transfers control into one first user task without yet claiming spawn,
   syscall truth, or init-owned services.
 
-Possible remaining phases in this band:
+Phase 98 is now concrete as kernel endpoint and handle core:
 
-Phase 98 -- Kernel Endpoint And Handle Core
-- Exit criterion: the kernel owns one explicit endpoint table, one explicit
-  per-process handle table, and one bounded in-kernel message queue model with
-  deterministic slot and lifetime behavior.
+- that same owned kernel artifact now installs one explicit init-owned
+  endpoint, one explicit init-visible handle-table entry for that endpoint,
+  one bounded queued bootstrap message, and one deterministic consume-and-
+  reset message lifetime proof without yet claiming syscall entry or user-
+  visible IPC semantics.
 
-This band is now concrete through Phase 97.
+This band is now concrete through Phase 98.
 
 Band B - Make The Real Syscall And IPC Boundary Honest
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 99 through 102 likely turn the kernel object core into a real syscall
-surface over endpoints, message bytes plus handle transfer, process creation,
-wait or kill, and timer-backed blocking.
+Phase 99 is now concrete as syscall entry and byte-only IPC:
+
+- that same owned kernel artifact now opens one explicit syscall gate, admits
+  one bounded send plus one bounded receive over one init-visible endpoint
+  handle, preserves one delivered byte payload exactly once, and then reports
+  deterministic `WouldBlock` behavior after queue drain without yet claiming
+  attached-handle transfer, spawn, wait, or timer-backed blocking.
+
+Phases 100 through 102 likely turn that first syscall boundary into attached-
+handle transfer, process creation, wait or kill, and timer-backed blocking.
 
 Likely themes:
 - one-to-one syscall mapping from `sys v0`
@@ -139,6 +147,8 @@ Likely themes:
 Why this band comes next:
 - the kernel object core is only useful once the user boundary is honest, and
   the blueprints already name the minimal syscall families clearly.
+
+This band is now concrete through Phase 99.
 
 Possible phases in this band:
 

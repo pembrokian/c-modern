@@ -1,0 +1,192 @@
+Phase 99 -- Syscall Entry And Byte-Only IPC
+===========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 98 kernel endpoint-and-handle-core proof
+into the first Band B syscall-boundary owner: prove that the repository-owned
+kernel artifact can open one explicit syscall gate, admit one bounded send
+request and one bounded receive request over one init-visible endpoint handle,
+transfer one byte-only payload through that boundary, and reject an immediate
+second receive with deterministic `WouldBlock` behavior without yet claiming
+attached-handle transfer, process spawn, wait, timer-backed blocking, or a
+running init-owned service set.
+
+This document is both the Phase 99 execution note and its closeout.
+It does not claim attached-handle transfer across the syscall boundary,
+general blocking policy, process creation, wait or kill semantics, timer-backed
+wake delivery, or broader init-service bring-up.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 95 produced the bounded freestanding `v0.3` proof
+  ladder and froze that lane into the first admitted freestanding support
+  slice.
+- Phase 96 then made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 then widened that owned kernel target into one bounded address-
+  space and first-user-entry handoff.
+- Phase 98 then completed the remaining Band A object-core owner by making
+  explicit endpoint tables, per-process handle tables, and bounded queued-
+  message lifetime concrete inside the same repository-owned kernel artifact.
+- The strongest next kernel question was therefore no longer whether the
+  object core could exist. It was whether the repository could make the first
+  real user boundary honest through bounded send and receive syscall handling
+  without widening immediately into handle transfer, spawn, or timer-backed
+  blocking.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names Phase 99 as the first point
+  where the repository should turn the landed kernel object core into a real
+  syscall-owned byte-only IPC boundary.
+- The repository already had endpoint tables, handle tables, and bounded
+  queued-message state in the owned kernel tree, but it still had no active
+  proof that a user-visible handle can drive one kernel-owned send path and
+  one kernel-owned receive path through an explicit syscall gate.
+- Without this step, later handle-transfer, spawn, or timer planning could
+  overclaim that the kernel already had a real syscall boundary when the
+  repository still only had in-kernel object-state proofs.
+
+Core rule
+---------
+- Keep the phase to one explicit syscall gate and one explicit byte-only IPC
+  round trip.
+- Use the landed endpoint and handle-table state as the owner for endpoint and
+  handle lookup rather than inventing a new runtime or policy layer.
+- Keep the payload bounded to the existing fixed four-byte message buffer.
+- Make the failure mode explicit with deterministic `WouldBlock` behavior
+  after the queued message is consumed.
+- Stop before attached-handle transfer, spawn, wait, timer wake, or service
+  launch.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one widened syscall helper module that owns explicit syscall ids, status
+   enums, send and receive request records, and receive observation state
+2. one repository-owned kernel follow-through that opens the syscall gate,
+   resolves one init-visible endpoint handle through the landed handle table,
+   sends one bounded byte-only message into the landed endpoint queue, and
+   receives it back once
+3. one deterministic second receive attempt that returns `WouldBlock` after
+   the queue has been drained
+4. one runtime proof that validates the syscall gate state, send and receive
+   accounting, delivered payload contents, receive observation state, and
+   explicit `WouldBlock` outcome exactly
+5. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported types, aggregate initialization, enum
+   matching, and global-state updates rather than hidden syscall runtime help
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross the first syscall boundary now because Phase 98
+already proved that the necessary endpoint, handle-table, and queued-message
+state exists inside the owned kernel artifact. The next honest owner is not
+handle transfer or spawn. It is one bounded byte-only send and receive path.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact can now expose one honest syscall-owned IPC
+  boundary over the landed endpoint and handle-table object core
+- the current language, freestanding build path, and runtime startup can carry
+  explicit syscall request and observation records without new compiler work
+- the repository can stop honestly at byte-only send and receive truth without
+  implying attached-handle transfer, spawn, wait, timer-backed blocking, or a
+  broader running-kernel slice
+
+Deliverables
+------------
+- one canonical Phase 99 closeout note recording the implemented syscall-entry
+  and byte-only IPC proof
+- one widened `kernel/src/syscall.mc` helper module owning explicit syscall
+  request, status, and receive-observation state for byte-only IPC
+- one updated repository-owned kernel target that opens the syscall gate,
+  executes one bounded send and one bounded receive through an init-visible
+  endpoint handle, and observes one deterministic `WouldBlock` receive after
+  queue drain
+- one focused freestanding kernel regression and MIR inspection validating the
+  new syscall-entry slice
+- refreshed planning and orientation surfaces so Phase 99 is concrete and
+  Phase 100 becomes the next remaining attached-handle-transfer owner
+
+Suggested execution order
+-------------------------
+1. Widen the owned syscall helper module with explicit request, status, and
+   observation records for byte-only send and receive.
+2. Teach the repository-owned kernel target to open the syscall gate, resolve
+   one init-visible endpoint handle, send one bounded message, and receive it
+   once through the landed endpoint and handle-table state.
+3. Validate the resulting syscall gate state, receive observation, and
+   deterministic `WouldBlock` outcome exactly and emit the Phase 99 marker
+   only after that validation succeeds.
+4. Inspect the merged MIR to confirm that the proof remains ordinary imported
+   type and global-state lowering.
+5. Refresh the planning surface so Phase 99 is concrete and Phase 100 remains
+   the next syscall-boundary owner.
+
+Exit criteria
+-------------
+- one repository-owned kernel target opens one explicit syscall gate and
+  admits one bounded send plus one bounded receive over one init-visible
+  endpoint handle
+- the sent payload is byte-only, is delivered exactly once, and matches the
+  expected deterministic contents at receive time
+- one immediate second receive after queue drain returns deterministic
+  `WouldBlock` state rather than a hidden blocking policy
+- the runtime proof exits with exactly one bounded Phase 99 marker only after
+  validating the syscall gate, receive observation, and `WouldBlock` state
+- the merged MIR preserves imported syscall request and observation types,
+  helper functions, and explicit global writes for the new syscall-boundary
+  state
+- the planning surface records Phase 99 as concrete rather than speculative
+
+Non-goals
+---------
+- attached-handle transfer across the syscall boundary
+- process spawn, wait, kill, or broader lifecycle policy
+- timer-backed blocking, wake queues, or scheduler policy
+- init-owned service launch, namespace policy, or broader running-kernel
+  claims
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- widened `kernel/src/syscall.mc` so the owned kernel tree now includes one
+  bounded `SyscallStatus`, `SendRequest`, `ReceiveRequest`, and
+  `ReceiveObservation` model plus helper functions for gate opening, request
+  construction, handle validation, byte-only send, byte-only receive, and
+  deterministic `WouldBlock` receive results using only ordinary structs,
+  enums, arrays, and helper functions
+- updated `kernel/src/main.mc` so the repository-owned kernel target now keeps
+  one syscall receive-observation global, opens the syscall gate after the
+  Phase 98 object-core setup, issues one send request through the init-owned
+  endpoint handle, receives that message once through the syscall layer,
+  validates the delivered byte payload and drained endpoint state, then issues
+  one second receive that deterministically reports `WouldBlock`
+- added one focused Phase 99 freestanding kernel regression that builds and
+  runs the repository-owned kernel target, expects the Phase 99 marker, and
+  inspects merged MIR for imported syscall request and observation types plus
+  explicit global-state lowering for the syscall-boundary state
+- refreshed the kernel README, agent map, tool-test notes, backlog, decision
+  log, and speculative Canopus kernel roadmap so the repository records Phase
+  99 as concrete and leaves Phase 100 as the next remaining attached-handle-
+  transfer owner
+
+Closeout statement
+------------------
+Phase 99 is complete as a syscall-entry and byte-only IPC proof. The
+repository still does not claim attached-handle transfer, process spawn, wait,
+timer-backed blocking, or init-owned service truth, but it now has one honest
+real-kernel artifact that boots, reaches first user entry, owns explicit
+endpoint and handle state, opens one explicit syscall gate, completes one
+bounded byte-only send and receive over one init-visible endpoint handle,
+observes deterministic `WouldBlock` behavior after queue drain, and stops
+exactly at that boundary.

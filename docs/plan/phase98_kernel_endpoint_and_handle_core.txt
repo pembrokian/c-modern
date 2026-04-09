@@ -1,0 +1,184 @@
+Phase 98 -- Kernel Endpoint And Handle Core
+===========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 97 address-space and first-user-entry proof
+into the remaining Band A object-core owner: prove that the repository-owned
+kernel artifact can allocate one explicit endpoint object, install one
+explicit init-owned handle-table entry for that endpoint, queue one bounded
+kernel-owned message into that endpoint, and consume it deterministically
+without yet claiming syscall entry, user-visible IPC semantics, spawn, wait,
+or broader init-service bring-up.
+
+This document is both the Phase 98 execution note and its closeout.
+It does not claim real syscall handling, byte-stream IPC, attached-handle
+transfer at the user boundary, process spawning, timer-backed blocking, or a
+running service set.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 95 produced the bounded freestanding `v0.3` proof
+  ladder and froze that lane into the first admitted freestanding support
+  slice.
+- Phase 96 then made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 then widened that owned kernel target into one bounded address-
+  space and first-user-entry handoff.
+- The strongest remaining Band A question was therefore no longer whether the
+  kernel could boot or transfer into one first user task. It was whether that
+  same artifact could own the remaining object-core state around endpoints,
+  handle tables, and in-kernel queued-message lifetime without widening into
+  syscalls or user-space IPC policy.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names Phase 98 as the point where the
+  repository should turn the first-user-entry anchor into explicit endpoint-
+  and handle-owned kernel object state.
+- The repository already had placeholder capability and endpoint records in the
+  owned kernel tree, but it still had no active proof that one init-visible
+  handle table can install endpoint authority locally, that one endpoint can
+  own a bounded queue of kernel messages, or that message slot lifetime can be
+  consumed deterministically.
+- Without this step, later syscall and IPC planning could blur Phase 97's
+  first-user-entry truth into broader kernel support without an honest object-
+  core anchor.
+
+Core rule
+---------
+- Keep the phase inside kernel-owned object state only.
+- Represent endpoint tables, per-process handle tables, and queued messages as
+  ordinary imported structs, enums, arrays, and helper functions.
+- Use one bounded init-owned endpoint and one bounded delivered message rather
+  than widening into general IPC policy.
+- Stop before syscall entry, receive or send semantics at the user boundary,
+  blocking policy, or service launch.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one widened capability helper module that owns one bounded handle-slot and
+   handle-table shape in addition to the earlier bootstrap capability slots
+2. one widened endpoint helper module that owns one bounded endpoint object,
+   one two-slot queued-message ring, and explicit message-state lifetime
+3. one owned kernel follow-through that installs one init-owned endpoint
+   handle, enqueues one bounded bootstrap message, consumes it once, and
+   retains the delivered message in explicit kernel-owned state
+4. one runtime proof that validates endpoint ownership, handle-table contents,
+   queue-slot reset, delivered-message contents, and deterministic marker
+   emission exactly
+5. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported types, aggregate initialization, enum
+   matching, and global-state updates rather than hidden runtime help
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close this object-core owner now because Phase 97
+already proved the kernel can hand off to one first user task. The next honest
+owner is not syscall entry yet. It is explicit endpoint and handle-table state
+inside that same repository-owned kernel artifact.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact can now own the remaining small object-core
+  state around endpoints, handle tables, and queued kernel messages
+- the current language, freestanding build path, and runtime startup can carry
+  bounded ring-buffer message state and per-process handle tables without new
+  compiler work
+- the repository can stop honestly at kernel object-core truth without
+  implying real syscall entry, byte-only IPC, attached-handle transfer, or
+  init-owned service behavior
+
+Deliverables
+------------
+- one canonical Phase 98 closeout note recording the implemented endpoint and
+  handle-core proof
+- one widened `kernel/src/capability.mc` helper module owning bounded handle-
+  table state and one widened `kernel/src/endpoint.mc` helper module owning
+  bounded queued-message lifetime
+- one updated repository-owned kernel target that installs one init endpoint,
+  one init-owned handle-table entry, and one bounded delivered bootstrap
+  message
+- one focused freestanding kernel regression and MIR inspection validating the
+  new endpoint and handle-core slice
+- refreshed planning and orientation surfaces so Phase 98 is concrete and
+  Phase 99 becomes the next remaining syscall-boundary owner
+
+Suggested execution order
+-------------------------
+1. Define bounded handle-slot and handle-table helpers in the owned capability
+   module.
+2. Define bounded queued-message lifetime and endpoint installation helpers in
+   the owned endpoint module.
+3. Teach the repository-owned kernel target to install one init endpoint,
+   install one init-visible handle, enqueue one bootstrap message, consume it,
+   and retain the delivered-message observation explicitly.
+4. Validate the object-core state exactly and emit the Phase 98 marker only
+   after the endpoint table, handle table, and delivered-message state all
+   match the bounded contract.
+5. Refresh the planning surface so Phase 98 is concrete and Phase 99 remains
+   the next syscall-boundary owner.
+
+Exit criteria
+-------------
+- one repository-owned kernel target owns one explicit endpoint table and one
+  explicit per-process handle table
+- one bounded kernel-owned message queue model is installed, consumed once,
+  and left in a deterministic empty-slot state afterward
+- the runtime proof exits with exactly one bounded Phase 98 marker only after
+  validating endpoint ownership, handle ownership, and message lifetime
+- the merged MIR preserves imported handle-table and queued-message types,
+  helper functions, and explicit global writes for the new object-core state
+- the planning surface records Phase 98 as concrete rather than speculative
+
+Non-goals
+---------
+- syscall entry, byte-only send or receive semantics, or user-visible IPC APIs
+- attached-handle transfer across the syscall boundary
+- spawn, wait, timer-backed blocking, or scheduler policy
+- init-owned service launch, namespaces, or broader running-kernel claims
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- widened `kernel/src/capability.mc` so the owned kernel tree now includes one
+  bounded `HandleState`, one bounded `HandleSlot`, one bounded `HandleTable`,
+  deterministic zero-initialization helpers, and one explicit endpoint-handle
+  installation helper in addition to the earlier bootstrap capability slots
+- widened `kernel/src/endpoint.mc` so the owned kernel tree now includes one
+  bounded queued-message model, one endpoint-owned two-slot message ring, one
+  explicit endpoint installation helper, one enqueue path, one consume path,
+  and one delivered-message state transition using only ordinary structs,
+  enums, arrays, and helper functions
+- updated `kernel/src/main.mc` so the repository-owned kernel target now keeps
+  per-process handle tables and one delivered-message global, installs one
+  init-owned endpoint after the Phase 97 user-entry handoff, installs one init
+  handle-table entry for that endpoint, enqueues one bounded bootstrap
+  message, consumes it deterministically, validates the resulting object-core
+  state, and emits the Phase 98 marker only after that validation succeeds
+- replaced the active kernel freestanding regression with a focused Phase 98
+  proof that builds and runs the repository-owned kernel target, expects the
+  Phase 98 marker, and inspects merged MIR for the imported handle-table,
+  endpoint-message, and explicit global-state lowering surface
+- refreshed the kernel README, agent map, layout-and-test policy note,
+  backlog, decision log, and speculative Canopus kernel roadmap so the
+  repository records Phase 98 as concrete and leaves Phase 99 as the next
+  remaining syscall-boundary owner
+
+Closeout statement
+------------------
+Phase 98 is complete as a kernel endpoint and handle-core proof. The
+repository still does not claim real syscall handling, byte-only IPC,
+attached-handle transfer, timer-backed blocking, or init-owned service truth,
+but it now has one honest real-kernel artifact that boots, reaches first user
+entry, installs one explicit init-owned endpoint and handle-table entry,
+queues and consumes one bounded kernel-owned message with deterministic slot
+lifetime, and stops exactly at that boundary.
