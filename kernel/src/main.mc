@@ -16,11 +16,14 @@ const INIT_TASK_SLOT: u32 = 1
 const INIT_ASID: u32 = 1
 const INIT_ENDPOINT_ID: u32 = 1
 const INIT_ENDPOINT_HANDLE_SLOT: u32 = 1
+const TRANSFER_ENDPOINT_ID: u32 = 2
+const TRANSFER_SOURCE_HANDLE_SLOT: u32 = 2
+const TRANSFER_RECEIVED_HANDLE_SLOT: u32 = 3
 const KERNEL_MAGIC: u32 = 9701
 const BOOT_ENTRY_PC: usize = 4096
 const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
-const PHASE99_MARKER: i32 = 99
+const PHASE100_MARKER: i32 = 100
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [2]state.ProcessSlot
@@ -39,6 +42,8 @@ var ADDRESS_SPACE: address_space.AddressSpace
 var USER_FRAME: address_space.UserEntryFrame
 var DELIVERED_MESSAGE: endpoint.KernelMessage
 var RECEIVE_OBSERVATION: syscall.ReceiveObservation
+var ATTACHED_RECEIVE_OBSERVATION: syscall.ReceiveObservation
+var TRANSFERRED_HANDLE_USE_OBSERVATION: syscall.ReceiveObservation
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -58,6 +63,8 @@ func reset_kernel_state() {
     USER_FRAME = address_space.empty_frame()
     DELIVERED_MESSAGE = endpoint.empty_message()
     RECEIVE_OBSERVATION = syscall.empty_receive_observation()
+    ATTACHED_RECEIVE_OBSERVATION = syscall.empty_receive_observation()
+    TRANSFERRED_HANDLE_USE_OBSERVATION = syscall.empty_receive_observation()
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -503,6 +510,7 @@ func execute_syscall_byte_ipc() bool {
     SYSCALL_GATE = syscall.open_gate(SYSCALL_GATE)
     send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload))
     SYSCALL_GATE = send_result.gate
+    HANDLE_TABLES[1] = send_result.handle_table
     ENDPOINTS = send_result.endpoints
     if syscall.status_score(send_result.status) != 2 {
         return false
@@ -510,6 +518,7 @@ func execute_syscall_byte_ipc() bool {
 
     receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
     SYSCALL_GATE = receive_result.gate
+    HANDLE_TABLES[1] = receive_result.handle_table
     ENDPOINTS = receive_result.endpoints
     RECEIVE_OBSERVATION = receive_result.observation
     if syscall.status_score(RECEIVE_OBSERVATION.status) != 2 {
@@ -518,6 +527,7 @@ func execute_syscall_byte_ipc() bool {
 
     would_block_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
     SYSCALL_GATE = would_block_result.gate
+    HANDLE_TABLES[1] = would_block_result.handle_table
     ENDPOINTS = would_block_result.endpoints
     return syscall.status_score(would_block_result.observation.status) == 4
 }
@@ -571,6 +581,195 @@ func validate_syscall_byte_ipc() bool {
     return true
 }
 
+func seed_transfer_endpoint_handle() bool {
+    handle_tables: [2]capability.HandleTable = HANDLE_TABLES
+    endpoints: endpoint.EndpointTable = ENDPOINTS
+
+    endpoints = endpoint.install_endpoint(endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
+    handle_tables[1] = capability.install_endpoint_handle(handle_tables[1], TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, 5)
+
+    HANDLE_TABLES = handle_tables
+    ENDPOINTS = endpoints
+
+    if ENDPOINTS.count != 2 {
+        return false
+    }
+    if ENDPOINTS.slots[1].endpoint_id != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if ENDPOINTS.slots[1].owner_pid != INIT_PID {
+        return false
+    }
+    if ENDPOINTS.slots[1].active != 1 {
+        return false
+    }
+    if HANDLE_TABLES[1].count != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 5 {
+        return false
+    }
+    return true
+}
+
+func execute_capability_carrying_ipc_transfer() bool {
+    payload: [4]u8 = endpoint.zero_payload()
+    payload[0] = 67
+    payload[1] = 65
+    payload[2] = 80
+    payload[3] = 83
+
+    transfer_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_transfer_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload, TRANSFER_SOURCE_HANDLE_SLOT))
+    SYSCALL_GATE = transfer_send_result.gate
+    HANDLE_TABLES[1] = transfer_send_result.handle_table
+    ENDPOINTS = transfer_send_result.endpoints
+    if syscall.status_score(transfer_send_result.status) != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
+        return false
+    }
+
+    transfer_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_transfer_receive_request(INIT_ENDPOINT_HANDLE_SLOT, TRANSFER_RECEIVED_HANDLE_SLOT))
+    SYSCALL_GATE = transfer_receive_result.gate
+    HANDLE_TABLES[1] = transfer_receive_result.handle_table
+    ENDPOINTS = transfer_receive_result.endpoints
+    ATTACHED_RECEIVE_OBSERVATION = transfer_receive_result.observation
+    if syscall.status_score(ATTACHED_RECEIVE_OBSERVATION.status) != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+
+    follow_payload: [4]u8 = endpoint.zero_payload()
+    follow_payload[0] = 77
+    follow_payload[1] = 79
+    follow_payload[2] = 86
+    follow_payload[3] = 69
+
+    follow_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(TRANSFER_RECEIVED_HANDLE_SLOT, 4, follow_payload))
+    SYSCALL_GATE = follow_send_result.gate
+    HANDLE_TABLES[1] = follow_send_result.handle_table
+    ENDPOINTS = follow_send_result.endpoints
+    if syscall.status_score(follow_send_result.status) != 2 {
+        return false
+    }
+
+    follow_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(TRANSFER_RECEIVED_HANDLE_SLOT))
+    SYSCALL_GATE = follow_receive_result.gate
+    HANDLE_TABLES[1] = follow_receive_result.handle_table
+    ENDPOINTS = follow_receive_result.endpoints
+    TRANSFERRED_HANDLE_USE_OBSERVATION = follow_receive_result.observation
+    return syscall.status_score(TRANSFERRED_HANDLE_USE_OBSERVATION.status) == 2
+}
+
+func validate_capability_carrying_ipc_transfer() bool {
+    if SYSCALL_GATE.open != 1 {
+        return false
+    }
+    if syscall.id_score(SYSCALL_GATE.last_id) != 4 {
+        return false
+    }
+    if syscall.status_score(SYSCALL_GATE.last_status) != 2 {
+        return false
+    }
+    if SYSCALL_GATE.send_count != 3 {
+        return false
+    }
+    if SYSCALL_GATE.receive_count != 3 {
+        return false
+    }
+    if ENDPOINTS.count != 2 {
+        return false
+    }
+    if ENDPOINTS.slots[0].queued_messages != 0 {
+        return false
+    }
+    if ENDPOINTS.slots[1].queued_messages != 0 {
+        return false
+    }
+    if HANDLE_TABLES[1].count != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], INIT_ENDPOINT_HANDLE_SLOT) != INIT_ENDPOINT_ID {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != 5 {
+        return false
+    }
+    if syscall.status_score(ATTACHED_RECEIVE_OBSERVATION.status) != 2 {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.source_pid != INIT_PID {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.payload_len != 4 {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.received_handle_slot != TRANSFER_RECEIVED_HANDLE_SLOT {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.received_handle_count != 1 {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.payload[0] != 67 {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.payload[1] != 65 {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.payload[2] != 80 {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.payload[3] != 83 {
+        return false
+    }
+    if syscall.status_score(TRANSFERRED_HANDLE_USE_OBSERVATION.status) != 2 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.endpoint_id != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.source_pid != INIT_PID {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload_len != 4 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.received_handle_slot != 0 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.received_handle_count != 0 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload[0] != 77 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload[1] != 79 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload[2] != 86 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload[3] != 69 {
+        return false
+    }
+    return true
+}
+
 func bootstrap_main() i32 {
     if !architecture_entry() {
         return 10
@@ -606,46 +805,55 @@ func bootstrap_main() i32 {
     if !validate_syscall_byte_ipc() {
         return 20
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 99)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !seed_transfer_endpoint_handle() {
         return 21
     }
-    if BOOT_LOG.count != 5 {
+    if !execute_capability_carrying_ipc_transfer() {
         return 22
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if !validate_capability_carrying_ipc_transfer() {
         return 23
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 100)
+    if BOOT_MARKER_EMITTED != 1 {
         return 24
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if BOOT_LOG.count != 5 {
         return 25
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 26
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 27
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 99 {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 28
     }
-    if READY_QUEUE.count != 1 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 29
     }
-    if state.ready_slot_at(READY_QUEUE, 0) != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 30
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_detail_at(BOOT_LOG, 4) != 100 {
         return 31
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if READY_QUEUE.count != 1 {
         return 32
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if state.ready_slot_at(READY_QUEUE, 0) != INIT_TID {
         return 33
     }
-    return PHASE99_MARKER
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 34
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 35
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 36
+    }
+    return PHASE100_MARKER
 }

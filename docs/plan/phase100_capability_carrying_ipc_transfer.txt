@@ -1,0 +1,222 @@
+Phase 100 -- Capability-Carrying IPC Transfer
+=============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 99 syscall-entry and byte-only IPC proof
+into the next remaining Band B syscall-boundary owner: prove that the
+repository-owned kernel artifact can carry one attached endpoint handle along
+with one bounded byte payload through the landed syscall IPC path, remove that
+handle from the sender on send success, reinstall it into one distinct
+receiver-local slot on receive, and then use that received handle for one
+bounded follow-through action without yet claiming process spawn, wait,
+timer-backed blocking, or a running init-owned service set.
+
+This document is both the Phase 100 execution note and its closeout.
+It does not claim process-to-process transfer policy beyond this one bounded
+kernel-owned follow-through, general capability-table management, process
+spawn, wait or kill semantics, timer-backed blocking, or broader service
+bring-up.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 95 produced the bounded freestanding `v0.3` proof
+  ladder and froze that lane into the first admitted freestanding support
+  slice.
+- Phase 96 then made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 then widened that owned kernel target into one bounded address-
+  space and first-user-entry handoff.
+- Phase 98 then completed the remaining Band A object-core owner by making
+  explicit endpoint tables, per-process handle tables, and bounded queued-
+  message lifetime concrete inside the same repository-owned kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- The strongest next kernel question was therefore no longer whether one
+  explicit syscall send and receive path exists. It was whether that same
+  syscall boundary could now move one attached handle honestly, with
+  destructive-on-success send semantics and receiver-local reinstall, without
+  widening immediately into spawn, wait, or timer-backed blocking.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names Phase 100 as the next point
+  where the repository should turn the landed byte-only syscall boundary into
+  a capability-carrying IPC boundary.
+- The repository already had explicit endpoint tables, per-process handle
+  tables, bounded queued-message state, and one honest byte-only send plus
+  receive path, but it still had no active proof that an attached handle can
+  move through that boundary as kernel-owned message state rather than through
+  ambient lookup or hidden runtime help.
+- Without this step, later spawn or wait work could overclaim that the kernel
+  already supports explicit capability transfer at the syscall boundary when
+  the repository still only had byte payload delivery.
+
+Core rule
+---------
+- Keep the phase to one bounded attached-handle transfer carried by the landed
+  syscall IPC path.
+- Preserve atomic message ownership: bytes and the attached handle move as one
+  queued kernel-owned message.
+- Make sender-side authority removal happen only on successful send.
+- Make receiver-side reinstall explicit and deterministic at receive time.
+- Prove that the reinstalled handle is usable for one bounded follow-through
+  action.
+- Stop before spawn, wait, timer wake, service launch, or broader capability-
+  table policy.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one widened queued-message model that can carry one bounded attached
+   endpoint handle separately from the byte payload
+2. one widened capability helper layer that can remove one transferred handle
+   from a local handle table and reinstall one received handle into one
+   distinct receiver-local slot
+3. one widened syscall helper layer that accepts one attached-handle send
+   request, records that handle in kernel-owned message state, and returns one
+   receive observation naming the receiver-local reinstalled slot
+4. one repository-owned kernel follow-through that sends one byte payload plus
+   one attached endpoint handle, validates sender-side handle removal, receives
+   the message into one distinct local slot, and uses that reinstalled handle
+   for one bounded follow-through send plus receive
+5. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported types, aggregate initialization, enum
+   matching, and explicit global-state updates rather than hidden capability-
+   runtime helpers
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this handle-carrying syscall boundary now because
+Phase 99 already proved that the kernel can send and receive bytes honestly
+over the landed endpoint and handle object core. The next honest owner is not
+spawn or wait. It is one explicit attached-handle transfer with exact move
+semantics.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact can now deliver one byte payload plus one
+  attached endpoint handle atomically as one syscall-owned message
+- sender-side handle authority is removed only after the send succeeds, rather
+  than before queue admission or through hidden ambient policy
+- receive reinstalls the transferred endpoint authority into one explicit
+  receiver-local slot that can then be used for one bounded follow-through
+  action
+- the current language, freestanding build path, and runtime startup can carry
+  the necessary message, handle-table, and receive-observation state without
+  new compiler work
+- the repository can stop honestly at one bounded capability-carrying IPC
+  transfer without implying spawn, wait, timer-backed blocking, or a broader
+  running-kernel slice
+
+Deliverables
+------------
+- one canonical Phase 100 closeout note recording the implemented capability-
+  carrying IPC transfer proof
+- one widened `kernel/src/capability.mc` helper module owning explicit handle
+  removal and receiver-local reinstall operations for the bounded transfer
+  slice
+- one widened `kernel/src/endpoint.mc` helper module owning one attached-
+  handle field inside the bounded kernel-owned message model
+- one widened `kernel/src/syscall.mc` helper module owning explicit attached-
+  handle send and receive request plus observation state
+- one updated repository-owned kernel target that transfers one endpoint
+  handle through the landed syscall IPC path and uses the reinstalled handle
+  for one bounded follow-through action
+- one focused freestanding kernel regression and MIR inspection validating the
+  new capability-carrying syscall slice
+- refreshed planning and orientation surfaces so Phase 100 is concrete and
+  Phase 101 becomes the next remaining spawn-plus-wait owner
+
+Suggested execution order
+-------------------------
+1. Widen the owned capability, endpoint, and syscall helper modules with the
+   smallest bounded attached-handle transfer state needed for one honest move.
+2. Teach the repository-owned kernel target to seed one transferable endpoint
+   handle, send it through the landed syscall IPC path, and validate sender-
+   side removal on success.
+3. Reinstall the transferred handle into one distinct receiver-local slot at
+   receive time and use that reinstalled handle for one bounded follow-through
+   send plus receive.
+4. Inspect the merged MIR to confirm that the proof remains ordinary imported
+   type and global-state lowering.
+5. Refresh the planning surface so Phase 100 is concrete and Phase 101 remains
+   the next syscall-boundary owner.
+
+Exit criteria
+-------------
+- one repository-owned kernel target sends one bounded byte payload plus one
+  attached endpoint handle through the landed syscall IPC path
+- the transferred handle is removed from the sender only after successful send
+- receive reinstalls that handle into one distinct receiver-local slot with no
+  partial-transfer distortion
+- the reinstalled handle is then used successfully for one bounded follow-
+  through send plus receive action
+- the runtime proof exits with exactly one bounded Phase 100 marker only after
+  validating sender-side removal, receiver-side reinstall, and follow-through
+  handle use
+- the merged MIR preserves imported attached-handle request and observation
+  types, helper functions, and explicit global writes for the new transfer
+  state
+- the planning surface records Phase 100 as concrete rather than speculative
+
+Non-goals
+---------
+- process spawn, wait, kill, or broader lifecycle policy
+- timer-backed blocking, wake queues, or scheduler policy
+- general capability-table management, multi-handle transfer, or rights
+  refinement policy beyond this one bounded slice
+- init-owned service launch, namespace policy, or broader running-kernel
+  claims
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- widened `kernel/src/capability.mc` so the owned kernel tree now supports one
+  bounded four-slot handle table, deterministic handle lookup beyond a dense
+  prefix, explicit sender-side handle removal, explicit receiver-local
+  installation into a requested slot, and rights lookup for one transferred
+  endpoint handle using only ordinary structs, enums, arrays, and helper
+  functions
+- widened `kernel/src/endpoint.mc` so the bounded kernel-owned message model
+  now carries one explicit attached endpoint id plus attached-rights payload
+  alongside the existing byte payload and preserves those fields through queue,
+  peek, delivery, and consume operations
+- widened `kernel/src/syscall.mc` so the landed send and receive request plus
+  observation records now admit one bounded attached-handle transfer, remove
+  the transferred sender handle only after successful queue admission, and
+  reinstall that handle into one requested receiver-local slot only at receive
+  time
+- updated `kernel/src/main.mc` so the repository-owned kernel target now seeds
+  one second transferable endpoint handle, sends one `CAPS` payload plus that
+  attached handle over the landed init endpoint, validates sender-side handle
+  removal, receives the message into one distinct local slot, and then uses
+  the reinstalled handle to complete one bounded `MOVE` send plus receive
+  follow-through on the transferred endpoint before emitting the Phase 100
+  marker
+- added one focused Phase 100 freestanding kernel regression that builds and
+  runs the repository-owned kernel target, expects the Phase 100 marker, and
+  inspects merged MIR for imported attached-handle request and observation
+  types plus explicit global-state lowering for transferred-handle state
+- refreshed the kernel README, agent map, freestanding test notes, backlog,
+  decision log, and speculative Canopus kernel roadmap so the repository now
+  records Phase 100 as concrete and leaves Phase 101 as the next remaining
+  spawn-plus-wait owner
+
+Closeout statement
+------------------
+Phase 100 is complete as a capability-carrying IPC transfer proof. The
+repository still does not claim process spawn, wait, timer-backed blocking,
+or init-owned service truth, but it now has one honest real-kernel artifact
+that boots, reaches first user entry, owns explicit endpoint and handle state,
+opens one explicit syscall gate, completes one byte-only IPC round trip,
+transfers one attached endpoint handle with destructive-on-success send and
+receiver-local reinstall semantics, uses that reinstalled handle for one
+bounded follow-through action, and stops exactly at that boundary.

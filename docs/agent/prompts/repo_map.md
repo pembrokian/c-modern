@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 99 syscall-entry and byte-only IPC kernel target
+- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 100 capability-carrying IPC transfer kernel target
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Canopus source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
@@ -30,12 +30,12 @@ This file is a fast orientation map for agents working in this repository.
 - `kernel`
   - repository-owned Canopus kernel sources rather than disposable proof-only fixtures
   - `build.toml`: freestanding kernel manifest for the active bring-up slice
-  - `src/main.mc`: explicit architecture entry, bounded first-user-entry, bounded endpoint-and-handle-core validation, and bounded syscall-byte-IPC validation
+  - `src/main.mc`: explicit architecture entry, bounded first-user-entry, bounded endpoint-and-handle-core validation, bounded syscall-byte-IPC validation, and bounded capability-carrying transfer validation
   - `src/state.mc`: kernel descriptor, process-slot, task-slot, ready-queue, and boot-log records
   - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame records
-  - `src/capability.mc`: bounded bootstrap capability slots and per-process handle-table records
-  - `src/endpoint.mc`: bounded endpoint-table, queued-message, and message-lifetime records
-  - `src/syscall.mc`: bounded syscall gate, byte-only send-and-receive request, and receive-observation records
+  - `src/capability.mc`: bounded bootstrap capability slots, per-process handle-table records, and handle-move helpers
+  - `src/endpoint.mc`: bounded endpoint-table, queued-message, and attached-handle message records
+  - `src/syscall.mc`: bounded syscall gate, byte-plus-capability send-and-receive request, and receive-observation records
   - `src/interrupt.mc`, `src/init.mc`: bounded subsystem skeleton records for later kernel phases
 
 - `compiler/driver`
@@ -110,7 +110,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
     - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
     - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator
-    - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase99_syscall_byte_ipc.cpp`: one kernel proof per file
+    - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase100_capability_transfer.cpp`: one kernel proof per file
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
   - if freestanding or Canopus coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split

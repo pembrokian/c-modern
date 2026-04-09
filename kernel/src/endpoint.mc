@@ -10,6 +10,9 @@ struct KernelMessage {
     endpoint_id: u32
     handle_slot: u32
     len: usize
+    attached_count: usize
+    attached_endpoint_id: u32
+    attached_rights: u32
     state: MessageState
     payload: [4]u8
 }
@@ -39,7 +42,7 @@ func zero_payload() [4]u8 {
 }
 
 func empty_message() KernelMessage {
-    return KernelMessage{ message_id: 0, source_pid: 0, endpoint_id: 0, handle_slot: 0, len: 0, state: MessageState.Empty, payload: zero_payload() }
+    return KernelMessage{ message_id: 0, source_pid: 0, endpoint_id: 0, handle_slot: 0, len: 0, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, state: MessageState.Empty, payload: zero_payload() }
 }
 
 func bootstrap_init_message(source_pid: u32, endpoint_id: u32, handle_slot: u32) KernelMessage {
@@ -48,15 +51,19 @@ func bootstrap_init_message(source_pid: u32, endpoint_id: u32, handle_slot: u32)
     payload[1] = 78
     payload[2] = 73
     payload[3] = 84
-    return KernelMessage{ message_id: 1, source_pid: source_pid, endpoint_id: endpoint_id, handle_slot: handle_slot, len: 4, state: MessageState.Queued, payload: payload }
+    return KernelMessage{ message_id: 1, source_pid: source_pid, endpoint_id: endpoint_id, handle_slot: handle_slot, len: 4, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, state: MessageState.Queued, payload: payload }
 }
 
 func mark_delivered(message: KernelMessage) KernelMessage {
-    return KernelMessage{ message_id: message.message_id, source_pid: message.source_pid, endpoint_id: message.endpoint_id, handle_slot: message.handle_slot, len: message.len, state: MessageState.Delivered, payload: message.payload }
+    return KernelMessage{ message_id: message.message_id, source_pid: message.source_pid, endpoint_id: message.endpoint_id, handle_slot: message.handle_slot, len: message.len, attached_count: message.attached_count, attached_endpoint_id: message.attached_endpoint_id, attached_rights: message.attached_rights, state: MessageState.Delivered, payload: message.payload }
 }
 
 func byte_message(message_id: u32, source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8) KernelMessage {
-    return KernelMessage{ message_id: message_id, source_pid: source_pid, endpoint_id: endpoint_id, handle_slot: 0, len: payload_len, state: MessageState.Queued, payload: payload }
+    return KernelMessage{ message_id: message_id, source_pid: source_pid, endpoint_id: endpoint_id, handle_slot: 0, len: payload_len, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, state: MessageState.Queued, payload: payload }
+}
+
+func attached_message(message_id: u32, source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8, attached_endpoint_id: u32, attached_rights: u32) KernelMessage {
+    return KernelMessage{ message_id: message_id, source_pid: source_pid, endpoint_id: endpoint_id, handle_slot: 0, len: payload_len, attached_count: 1, attached_endpoint_id: attached_endpoint_id, attached_rights: attached_rights, state: MessageState.Queued, payload: payload }
 }
 
 func zero_messages() [2]KernelMessage {

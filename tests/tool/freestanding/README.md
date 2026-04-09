@@ -16,7 +16,7 @@ Structure
   - `phase88_build_integration.cpp`: emitted-object and relink proof.
   - `phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof.
   - `phase98_endpoint_handle_core.cpp`: real-kernel endpoint-and-handle-core proof.
-  - `phase99_syscall_byte_ipc.cpp`: real-kernel syscall-entry and byte-only IPC proof.
+  - `phase100_capability_transfer.cpp`: real-kernel capability-carrying IPC transfer proof.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 
