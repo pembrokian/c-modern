@@ -6628,6 +6628,373 @@ void TestPhase91EarlyUserSpaceHelperBoundaryAudit(const std::filesystem::path& s
                          "phase91 merged MIR should preserve fixed payload storage through ordinary indexed array operations");
 }
 
+void TestPhase92UserSpaceLifecycleFollowThrough(const std::filesystem::path& source_root,
+                                                const std::filesystem::path& binary_root,
+                                                const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "user_space_lifecycle_project";
+    std::filesystem::remove_all(project_root);
+
+    WriteFile(project_root / "src/user_lifecycle.mc",
+              "const CAP_RIGHT_LAUNCH: u32 = 1\n"
+              "\n"
+              "enum ProcessState {\n"
+              "    Empty,\n"
+              "    Created,\n"
+              "    Ready,\n"
+              "    Running,\n"
+              "    Exited,\n"
+              "    Observed,\n"
+              "}\n"
+              "\n"
+              "struct ProgramCapability {\n"
+              "    image_id: u32\n"
+              "    owner_pid: u32\n"
+              "    rights: u32\n"
+              "}\n"
+              "\n"
+              "struct WaitHandle {\n"
+              "    parent_pid: u32\n"
+              "    child_pid: u32\n"
+              "    active: u32\n"
+              "}\n"
+              "\n"
+              "struct ChildProcess {\n"
+              "    pid: u32\n"
+              "    parent_pid: u32\n"
+              "    image_id: u32\n"
+              "    state: ProcessState\n"
+              "    ready_seen: u32\n"
+              "    exit_code: i32\n"
+              "}\n"
+              "\n"
+              "struct WaitObservation {\n"
+              "    ok: u32\n"
+              "    child_pid: u32\n"
+              "    exit_code: i32\n"
+              "}\n"
+              "\n"
+              "func empty_program_cap() ProgramCapability {\n"
+              "    return ProgramCapability{ image_id: 0, owner_pid: 0, rights: 0 }\n"
+              "}\n"
+              "\n"
+              "func launchable_program_cap(owner_pid: u32, image_id: u32) ProgramCapability {\n"
+              "    return ProgramCapability{ image_id: image_id, owner_pid: owner_pid, rights: CAP_RIGHT_LAUNCH }\n"
+              "}\n"
+              "\n"
+              "func program_is_launchable(cap: ProgramCapability, owner_pid: u32, image_id: u32) bool {\n"
+              "    if cap.image_id != image_id {\n"
+              "        return false\n"
+              "    }\n"
+              "    if cap.owner_pid != owner_pid {\n"
+              "        return false\n"
+              "    }\n"
+              "    if cap.rights != CAP_RIGHT_LAUNCH {\n"
+              "        return false\n"
+              "    }\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func empty_wait_handle() WaitHandle {\n"
+              "    return WaitHandle{ parent_pid: 0, child_pid: 0, active: 0 }\n"
+              "}\n"
+              "\n"
+              "func active_wait_handle(parent_pid: u32, child_pid: u32) WaitHandle {\n"
+              "    return WaitHandle{ parent_pid: parent_pid, child_pid: child_pid, active: 1 }\n"
+              "}\n"
+              "\n"
+              "func empty_child() ChildProcess {\n"
+              "    return ChildProcess{ pid: 0, parent_pid: 0, image_id: 0, state: ProcessState.Empty, ready_seen: 0, exit_code: 0 }\n"
+              "}\n"
+              "\n"
+              "func created_child(parent_pid: u32, child_pid: u32, image_id: u32) ChildProcess {\n"
+              "    return ChildProcess{ pid: child_pid, parent_pid: parent_pid, image_id: image_id, state: ProcessState.Created, ready_seen: 0, exit_code: 0 }\n"
+              "}\n"
+              "\n"
+              "func mark_ready(child: ChildProcess) ChildProcess {\n"
+              "    return ChildProcess{ pid: child.pid, parent_pid: child.parent_pid, image_id: child.image_id, state: ProcessState.Ready, ready_seen: 1, exit_code: child.exit_code }\n"
+              "}\n"
+              "\n"
+              "func mark_running(child: ChildProcess) ChildProcess {\n"
+              "    return ChildProcess{ pid: child.pid, parent_pid: child.parent_pid, image_id: child.image_id, state: ProcessState.Running, ready_seen: child.ready_seen, exit_code: child.exit_code }\n"
+              "}\n"
+              "\n"
+              "func mark_exited(child: ChildProcess, exit_code: i32) ChildProcess {\n"
+              "    return ChildProcess{ pid: child.pid, parent_pid: child.parent_pid, image_id: child.image_id, state: ProcessState.Exited, ready_seen: child.ready_seen, exit_code: exit_code }\n"
+              "}\n"
+              "\n"
+              "func mark_observed(child: ChildProcess) ChildProcess {\n"
+              "    return ChildProcess{ pid: child.pid, parent_pid: child.parent_pid, image_id: child.image_id, state: ProcessState.Observed, ready_seen: child.ready_seen, exit_code: child.exit_code }\n"
+              "}\n"
+              "\n"
+              "func empty_observation() WaitObservation {\n"
+              "    return WaitObservation{ ok: 0, child_pid: 0, exit_code: 0 }\n"
+              "}\n"
+              "\n"
+              "func observe_exit(handle: WaitHandle, child: ChildProcess) WaitObservation {\n"
+              "    if handle.active == 0 {\n"
+              "        return empty_observation()\n"
+              "    }\n"
+              "    if handle.parent_pid != child.parent_pid {\n"
+              "        return empty_observation()\n"
+              "    }\n"
+              "    if handle.child_pid != child.pid {\n"
+              "        return empty_observation()\n"
+              "    }\n"
+              "    if state_score(child.state) != 16 {\n"
+              "        return empty_observation()\n"
+              "    }\n"
+              "    return WaitObservation{ ok: 1, child_pid: child.pid, exit_code: child.exit_code }\n"
+              "}\n"
+              "\n"
+              "func state_score(state: ProcessState) i32 {\n"
+              "    switch state {\n"
+              "    case ProcessState.Empty:\n"
+              "        return 1\n"
+              "    case ProcessState.Created:\n"
+              "        return 2\n"
+              "    case ProcessState.Ready:\n"
+              "        return 4\n"
+              "    case ProcessState.Running:\n"
+              "        return 8\n"
+              "    case ProcessState.Exited:\n"
+              "        return 16\n"
+              "    case ProcessState.Observed:\n"
+              "        return 32\n"
+              "    default:\n"
+              "        return 0\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n");
+    WriteFile(project_root / "src/main.mc",
+              "import user_lifecycle\n"
+              "\n"
+              "const INIT_PID: u32 = 1\n"
+              "const CHILD_PID: u32 = 2\n"
+              "const CHILD_IMAGE_ID: u32 = 77\n"
+              "const CHILD_EXIT_CODE: i32 = 29\n"
+              "\n"
+              "struct InitContext {\n"
+              "    pid: u32\n"
+              "    has_program_cap: u32\n"
+              "    program_cap: user_lifecycle.ProgramCapability\n"
+              "    has_wait_handle: u32\n"
+              "    wait_handle: user_lifecycle.WaitHandle\n"
+              "    child_ready: u32\n"
+              "    observed_exit: i32\n"
+              "}\n"
+              "\n"
+              "var INIT_CONTEXT: InitContext\n"
+              "var CHILD_CONTEXT: user_lifecycle.ChildProcess\n"
+              "\n"
+              "func kernel_boot() {\n"
+              "    cap: user_lifecycle.ProgramCapability = user_lifecycle.launchable_program_cap(INIT_PID, CHILD_IMAGE_ID)\n"
+              "    INIT_CONTEXT = InitContext{ pid: INIT_PID, has_program_cap: 1, program_cap: cap, has_wait_handle: 0, wait_handle: user_lifecycle.empty_wait_handle(), child_ready: 0, observed_exit: 0 }\n"
+              "    CHILD_CONTEXT = user_lifecycle.empty_child()\n"
+              "}\n"
+              "\n"
+              "func launch_child() bool {\n"
+              "    ctx: InitContext = INIT_CONTEXT\n"
+              "    if ctx.has_program_cap == 0 {\n"
+              "        return false\n"
+              "    }\n"
+              "    if !user_lifecycle.program_is_launchable(ctx.program_cap, ctx.pid, CHILD_IMAGE_ID) {\n"
+              "        return false\n"
+              "    }\n"
+              "    CHILD_CONTEXT = user_lifecycle.created_child(ctx.pid, CHILD_PID, ctx.program_cap.image_id)\n"
+              "    INIT_CONTEXT = InitContext{ pid: ctx.pid, has_program_cap: 0, program_cap: user_lifecycle.empty_program_cap(), has_wait_handle: 1, wait_handle: user_lifecycle.active_wait_handle(ctx.pid, CHILD_PID), child_ready: 0, observed_exit: 0 }\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func child_report_ready() bool {\n"
+              "    child: user_lifecycle.ChildProcess = CHILD_CONTEXT\n"
+              "    ctx: InitContext = INIT_CONTEXT\n"
+              "    if user_lifecycle.state_score(child.state) != 2 {\n"
+              "        return false\n"
+              "    }\n"
+              "    CHILD_CONTEXT = user_lifecycle.mark_ready(child)\n"
+              "    INIT_CONTEXT = InitContext{ pid: ctx.pid, has_program_cap: ctx.has_program_cap, program_cap: ctx.program_cap, has_wait_handle: ctx.has_wait_handle, wait_handle: ctx.wait_handle, child_ready: 1, observed_exit: ctx.observed_exit }\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func dispatch_child() bool {\n"
+              "    child: user_lifecycle.ChildProcess = CHILD_CONTEXT\n"
+              "    if user_lifecycle.state_score(child.state) != 4 {\n"
+              "        return false\n"
+              "    }\n"
+              "    CHILD_CONTEXT = user_lifecycle.mark_running(child)\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func child_exit() bool {\n"
+              "    child: user_lifecycle.ChildProcess = CHILD_CONTEXT\n"
+              "    if user_lifecycle.state_score(child.state) != 8 {\n"
+              "        return false\n"
+              "    }\n"
+              "    CHILD_CONTEXT = user_lifecycle.mark_exited(child, CHILD_EXIT_CODE)\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func observe_child_exit() bool {\n"
+              "    ctx: InitContext = INIT_CONTEXT\n"
+              "    observation: user_lifecycle.WaitObservation = user_lifecycle.observe_exit(ctx.wait_handle, CHILD_CONTEXT)\n"
+              "    if observation.ok == 0 {\n"
+              "        return false\n"
+              "    }\n"
+              "    INIT_CONTEXT = InitContext{ pid: ctx.pid, has_program_cap: ctx.has_program_cap, program_cap: ctx.program_cap, has_wait_handle: 0, wait_handle: user_lifecycle.empty_wait_handle(), child_ready: ctx.child_ready, observed_exit: observation.exit_code }\n"
+              "    CHILD_CONTEXT = user_lifecycle.mark_observed(CHILD_CONTEXT)\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func bootstrap_main() i32 {\n"
+              "    kernel_boot()\n"
+              "    if INIT_CONTEXT.has_program_cap != 1 {\n"
+              "        return 10\n"
+              "    }\n"
+              "    if INIT_CONTEXT.has_wait_handle != 0 {\n"
+              "        return 11\n"
+              "    }\n"
+              "    if !launch_child() {\n"
+              "        return 12\n"
+              "    }\n"
+              "    if INIT_CONTEXT.has_program_cap != 0 {\n"
+              "        return 13\n"
+              "    }\n"
+              "    if INIT_CONTEXT.has_wait_handle != 1 {\n"
+              "        return 14\n"
+              "    }\n"
+              "    if CHILD_CONTEXT.image_id != CHILD_IMAGE_ID {\n"
+              "        return 15\n"
+              "    }\n"
+              "    if user_lifecycle.state_score(CHILD_CONTEXT.state) != 2 {\n"
+              "        return 16\n"
+              "    }\n"
+              "    if launch_child() {\n"
+              "        return 17\n"
+              "    }\n"
+              "    pre_exit: user_lifecycle.WaitObservation = user_lifecycle.observe_exit(INIT_CONTEXT.wait_handle, CHILD_CONTEXT)\n"
+              "    if pre_exit.ok != 0 {\n"
+              "        return 18\n"
+              "    }\n"
+              "    wrong_parent: user_lifecycle.WaitObservation = user_lifecycle.observe_exit(user_lifecycle.active_wait_handle(99, CHILD_PID), CHILD_CONTEXT)\n"
+              "    if wrong_parent.ok != 0 {\n"
+              "        return 19\n"
+              "    }\n"
+              "    if !child_report_ready() {\n"
+              "        return 20\n"
+              "    }\n"
+              "    if INIT_CONTEXT.child_ready != 1 {\n"
+              "        return 21\n"
+              "    }\n"
+              "    if CHILD_CONTEXT.ready_seen != 1 {\n"
+              "        return 22\n"
+              "    }\n"
+              "    if user_lifecycle.state_score(CHILD_CONTEXT.state) != 4 {\n"
+              "        return 23\n"
+              "    }\n"
+              "    if !dispatch_child() {\n"
+              "        return 24\n"
+              "    }\n"
+              "    if user_lifecycle.state_score(CHILD_CONTEXT.state) != 8 {\n"
+              "        return 25\n"
+              "    }\n"
+              "    if !child_exit() {\n"
+              "        return 26\n"
+              "    }\n"
+              "    if user_lifecycle.state_score(CHILD_CONTEXT.state) != 16 {\n"
+              "        return 27\n"
+              "    }\n"
+              "    if !observe_child_exit() {\n"
+              "        return 28\n"
+              "    }\n"
+              "    if INIT_CONTEXT.observed_exit != CHILD_EXIT_CODE {\n"
+              "        return 29\n"
+              "    }\n"
+              "    if INIT_CONTEXT.has_wait_handle != 0 {\n"
+              "        return 30\n"
+              "    }\n"
+              "    if user_lifecycle.state_score(CHILD_CONTEXT.state) != 32 {\n"
+              "        return 31\n"
+              "    }\n"
+              "    if observe_child_exit() {\n"
+              "        return 32\n"
+              "    }\n"
+              "    return 92\n"
+              "}\n");
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase92-user-space-lifecycle\"\n"
+              "default = \"kernel\"\n"
+              "\n"
+              "[targets.kernel]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase92\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
+              "\n"
+              "[targets.kernel.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.kernel.runtime]\n"
+              "startup = \"bootstrap_main\"\n");
+
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path build_dir = binary_root / "user_space_lifecycle_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "kernel",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "user_space_lifecycle_build_output.txt",
+                                                                 "freestanding user-space lifecycle build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase92 freestanding user-space lifecycle build should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir);
+    const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
+                                                             build_dir / "user_space_lifecycle_run_output.txt",
+                                                             "freestanding user-space lifecycle run");
+    if (!run_outcome.exited || run_outcome.exit_code != 92) {
+        Fail("phase92 freestanding user-space lifecycle run should exit with the lifecycle proof marker:\n" +
+             run_output);
+    }
+
+    const std::string lifecycle_mir = ReadFile(dump_targets.mir);
+    ExpectOutputContains(lifecycle_mir,
+                         "TypeDecl kind=struct name=user_lifecycle.ProgramCapability",
+                         "phase92 merged MIR should preserve the imported program-capability type");
+    ExpectOutputContains(lifecycle_mir,
+                         "TypeDecl kind=struct name=user_lifecycle.WaitHandle",
+                         "phase92 merged MIR should preserve the imported wait-handle type");
+    ExpectOutputContains(lifecycle_mir,
+                         "TypeDecl kind=struct name=user_lifecycle.ChildProcess",
+                         "phase92 merged MIR should preserve the imported child-process type");
+    ExpectOutputContains(lifecycle_mir,
+                         "Function name=launch_child returns=[bool]",
+                         "phase92 merged MIR should keep launch policy in the root proof module");
+    ExpectOutputContains(lifecycle_mir,
+                         "Function name=user_lifecycle.observe_exit returns=[user_lifecycle.WaitObservation]",
+                         "phase92 merged MIR should keep exit observation inside an ordinary helper function boundary");
+    ExpectOutputContains(lifecycle_mir,
+                         "Function name=user_lifecycle.launchable_program_cap returns=[user_lifecycle.ProgramCapability]",
+                         "phase92 merged MIR should keep launchable capability construction inside an ordinary helper function boundary");
+    ExpectOutputContains(lifecycle_mir,
+                         "aggregate_init %v",
+                         "phase92 merged MIR should use aggregate initialization for lifecycle state");
+    ExpectOutputContains(lifecycle_mir,
+                         "variant_match",
+                         "phase92 merged MIR should lower lifecycle state classification through ordinary enum matching");
+}
+
 }  // namespace
 
 void RunPhase7WorkflowSuite(const std::filesystem::path& source_root,
@@ -6706,6 +7073,7 @@ void RunPhase7FreestandingSuite(const std::filesystem::path& source_root,
     TestPhase89InitToLogServiceHandshake(source_root, suite_root, mc_path);
     TestPhase90CapabilityHandleTransferProof(source_root, suite_root, mc_path);
     TestPhase91EarlyUserSpaceHelperBoundaryAudit(source_root, suite_root, mc_path);
+    TestPhase92UserSpaceLifecycleFollowThrough(source_root, suite_root, mc_path);
 }
 
 int main(int argc, char** argv) {

@@ -1,0 +1,188 @@
+Phase 92 -- User-Space Lifecycle Follow-Through
+===============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from the first helper-boundary
+anchor into the first explicit user-space lifecycle proof: prove that one
+minimal launch, ready, exit, and observation path can be expressed honestly
+across the first user-space bring-up boundary with explicit launchable program
+authority and an explicit wait handle rather than ambient launch policy,
+hidden runtime machinery, or a widened public `sys` surface.
+
+This document is both the Phase 92 execution note and its closeout.
+It does not claim a public spawn API, loader implementation, service-manager
+framework, restart policy, multi-child orchestration, or full user-space
+lifecycle completion.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then published that first non-hosted tranche as a separate,
+  repository-bounded support statement with a focused audit.
+- Phase 85 then proved one bounded endpoint queue and message-buffer shape
+  through ordinary Modern C structs, enums, arrays, and pointer-based
+  mutation.
+- Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
+  path through an explicit task-state enum and explicit kernel-owned task
+  slots.
+- Phase 87 then proved that kernel-owned aggregate const templates and
+  mutable global storage survive the freestanding build and artifact path.
+- Phase 88 then proved that the emitted freestanding entry object and
+  generated runtime object compose honestly with one minimal external relink
+  step.
+- Phase 89 then proved that the kernel can start one init context, pass one
+  explicit log-service endpoint capability into that context, and complete
+  one bounded request-and-acknowledgment flow.
+- Phase 90 then proved that one user-space component can transfer one
+  explicit endpoint capability to another and that the receiver can use it
+  for one bounded acknowledged action.
+- Phase 91 then proved that the first repeated transfer and request
+  scaffolding can live inside one ordinary imported helper module without
+  widening into a runtime layer.
+- The next strongest user-space question was no longer whether one process
+  could talk to another or whether one helper module was acceptable. It was
+  whether the first user-space lifecycle path itself could stay explicit:
+  init launches one child from one explicit program capability, observes one
+  ready signal locally, then observes child exit through one explicit wait
+  handle.
+
+Problem being solved
+--------------------
+- The Canopus planning surface already names explicit program capabilities and
+  parent-owned wait paths, but the repository had not yet exercised those
+  shapes in a concrete freestanding proof.
+- Without one explicit user-space lifecycle proof, it would be too easy to
+  blur launch authority into ambient policy or to treat exit observation as an
+  implicit property of the process tree instead of an explicit authority path.
+- The next honest step is therefore one bounded parent-and-child lifecycle
+  proof, not a public loader API or broader process framework.
+
+Core rule
+---------
+- Prove one explicit launch, ready, running, exit, and observation path first.
+- Keep launch authority explicit through one launchable program capability and
+  keep exit observation explicit through one wait handle.
+- Do not admit a public `sys` wrapper, loader framework, service manager, or
+  broader lifecycle runtime in this phase.
+- Reopen compiler work only if the proof exposes a concrete parser, sema,
+  MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target with one root proof module and one
+   imported lifecycle helper module
+2. one explicit init-owned launchable program capability for a single child
+   image
+3. one explicit parent-owned wait handle used to observe one child exit after
+   a deterministic ready and running path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first user-space lifecycle question now by
+proving one explicit child launch and observation path locally instead of
+widening into a public spawn or loader surface.
+
+What this phase proves
+----------------------
+- the current language and toolchain can carry one bounded user-space
+  lifecycle proof with explicit launchable program capability and explicit
+  wait-handle observation
+- user-space lifecycle policy can remain explicit: init consumes launch
+  authority once, the child progresses through ready and running states, then
+  init observes exit through a parent-owned wait path
+- the existing freestanding build path can validate that proof through an
+  ordinary imported helper module and merged MIR dump without admitting a new
+  runtime surface
+
+Deliverables
+------------
+- one canonical Phase 92 closeout note recording the implemented user-space
+  lifecycle proof
+- one focused freestanding tool regression that models init-owned launch
+  authority, one child process record, one explicit wait handle, and one exit
+  observation path
+- deterministic runtime validation that launch authority is consumed once,
+  pre-exit observation fails, the child reports ready and exits with the
+  expected code, and observation succeeds exactly once afterward
+- MIR inspection proving the proof stays within ordinary imported-module,
+  struct, enum, aggregate-init, and enum-match lowering behavior rather than
+  through a special loader or runtime boundary
+- refreshed support and planning notes so Phase 92 is recorded as the first
+  concrete user-space lifecycle anchor after the helper-boundary proof
+
+Suggested execution order
+-------------------------
+1. Define one launchable program capability, one wait handle, one child
+   record, and one observation record with ordinary structs and enums.
+2. Build that proof as one freestanding multi-module executable through the
+   existing target and startup path.
+3. Validate deterministic launch, ready, running, exit, and observation
+   behavior in the repository harness.
+4. Inspect the merged MIR to confirm that imported lifecycle-helper types and
+   functions remain ordinary module boundaries.
+5. Refresh the support and planning surface so later phases build from this
+   concrete lifecycle anchor.
+
+Exit criteria
+-------------
+- one freestanding target proves that init can launch one child from one
+  explicit program capability and then observe child exit through one wait
+  handle
+- the proof deterministically rejects launch after launch authority is
+  consumed and rejects exit observation before child exit
+- the child deterministically progresses through ready and running states,
+  exits with the expected code, and is observed exactly once
+- the merged MIR records imported lifecycle helper declarations and ordinary
+  helper function boundaries for launchable capability construction and exit
+  observation
+- the planning surface records Phase 92 as concrete rather than speculative
+
+Non-goals
+---------
+- a public spawn API, loader implementation, or `sys` wrapper admission
+- multi-child orchestration, restart policy, kill semantics, or service
+  registries
+- timer or interrupt wakeup sources
+- broader `hal` growth, linker-policy widening, or kernel-image packaging
+- claiming full user-space process-management completion
+
+Implemented slice
+-----------------
+- the freestanding tool regression suite now includes one Phase 92 target
+  with `src/main.mc` and `src/user_lifecycle.mc`, where the helper module
+  owns launch-capability, wait-handle, child-state, and exit-observation data
+  shapes while the root proof module keeps kernel boot state, launch
+  authority consumption, and parent observation policy explicit
+- the proof validates that init starts with one launchable child-program
+  capability, cannot launch twice after consuming that capability, cannot
+  observe child exit before the child exits, sees the child mark ready, sees
+  the child run and exit with the expected code, then observes that exit once
+  through the explicit wait handle before the executable exits with the Phase
+  92 marker
+- the regression also inspects the merged MIR to confirm that imported
+  lifecycle-helper types and helper functions remain ordinary module
+  boundaries with ordinary aggregate initialization and enum-match lowering
+- the freestanding support statement, README, backlog, decision log, and
+  speculative `v0.3` roadmap now record Phase 92 as the first concrete
+  user-space lifecycle anchor after the helper-boundary proof
+
+Closeout statement
+------------------
+Phase 92 is complete as a user-space lifecycle follow-through proof. The
+repository still does not claim a public spawn API, a loader framework,
+restart policy, or full user-space lifecycle support, but it now has one
+honest proof that the admitted Modern C core and existing freestanding path
+can carry one explicit launchable program capability, one child lifecycle
+path, and one parent-owned exit observation path directly in ordinary user
+code.

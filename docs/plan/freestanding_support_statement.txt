@@ -9,7 +9,7 @@ Purpose
 -------
 Record the current admitted freestanding proof slice separately from the hosted
 `v0.2` release-hardening note so the repository can state what the landed
-Phase 81 through Phase 91 work does and does not support.
+Phase 81 through Phase 92 work does and does not support.
 
 This note is intentionally narrower than the hosted release-hardening note.
 It does not claim general freestanding release readiness, broad non-hosted
@@ -48,6 +48,9 @@ Repository status note
   install, request, and acknowledgment scaffolding from the first user-space
   proofs can move into one ordinary imported helper module without widening
   into a public `sys` wrapper or capability-runtime layer.
+- Phase 92 then proved that init can launch one child from one explicit
+  launchable program capability and observe one child exit through one
+  explicit wait handle without widening into a public spawn or loader surface.
 - Before this note, those truths existed in phase closeouts and tool tests,
   but not yet as one explicit published support statement.
 
@@ -55,7 +58,7 @@ Core rule
 ---------
 - Keep this freestanding statement separate from the hosted `v0.2` support
   claim.
-- State only the Phase 81 through Phase 91 proof slice, not a larger
+- State only the Phase 81 through Phase 92 proof slice, not a larger
   freestanding ambition.
 - Keep target-owned support objects, startup choice, and `hal` scope explicit.
 - Reopen broader non-hosted claims only when a later proof lands them.
@@ -80,7 +83,7 @@ Frozen support matrix
   artifact follow-through proof, and Phase 88 kernel build integration audit,
   and Phase 89 init-to-log-service handshake proof, and Phase 90
   capability-handle transfer proof, and Phase 91 early user-space helper-
-  boundary audit
+  boundary audit, and Phase 92 user-space lifecycle follow-through proof
 - unsupported today: `mc run` or `mc test` freestanding workflow admission,
   general cross-compilation, non-bootstrap target families, linker scripts,
   arbitrary linker flags, shared libraries, kernel-image packaging, and
@@ -146,7 +149,7 @@ The current repository can honestly claim one repository-bounded freestanding
 executable proof slice on the bootstrap Darwin arm64 target family, with
 explicit freestanding manifest identity, explicit startup selection, optional
 manifest-owned extra link inputs, and the narrow public `hal` MMIO surface
-proved through the Phase 81 through Phase 91 tool regressions.
+proved through the Phase 81 through Phase 92 tool regressions.
 
 Everything outside that slice should be treated as explicitly unsupported
 until a later phase note and proof layer admit it.
