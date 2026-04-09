@@ -1,0 +1,189 @@
+Phase 88 -- Type Treatment Reference-Quality Follow-Through
+===========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Close the next compiler-owned quality gap exposed by the Phase 86 enum repair
+and its follow-up work: enums were not the only place where the compiler's
+type treatment still carried bootstrap shortcuts, phase-local blindspots, or
+non-reference-quality owner splits.
+
+This phase turns that audit into one bounded compiler follow-through.
+It is a repository execution plan, not a claim that Phase 88 is already
+implemented.
+
+Repository status note
+----------------------
+- Phase 86 and its immediate follow-up closed the most visible enum drift by
+  preserving enum identity through sema constant values and by keeping enum
+  lowering honest at the backend boundary instead of erasing semantic meaning
+  to plain integers too early.
+- That repair also established a stronger quality bar for types in general:
+  semantic type structure must survive across sema, MIR, import rewriting, and
+  backend lowering whenever the language surface says the distinction matters.
+- A focused audit of the remaining type surface found several smaller but real
+  quality gaps. Most are not broad architecture failures, but they are exactly
+  the kind of bootstrap shortcuts that can later turn into silent language
+  drift if they remain scattered and undocumented.
+- The strongest remaining owner is therefore not a new language feature. It is
+  a compiler follow-through phase that raises the treatment of existing types
+  toward reference quality.
+
+Problem being solved
+--------------------
+- The enum repair showed that type bugs in this compiler are more likely to
+  appear as cross-layer treatment drift than as parser-visible failures.
+- The audit found one high-severity semantic blindspot around `const` pointer
+  forms, one backend aggregate-lowering inconsistency for `bool`, one explicit
+  payload-enum backend limitation that remains narrower than sema or MIR, one
+  MIR address-of gap for dereferenced field lvalues, and one over-restrictive
+  `distinct` base-type validation rule.
+- If those gaps stay distributed across sema, MIR, and backend code, the
+  repository will keep claiming a stronger type surface than the implementation
+  actually honors.
+- The next honest step is therefore a bounded quality pass over existing type
+  treatment, not a new type-system feature admission.
+
+Core rule
+---------
+- Preserve semantic type distinctions until the owning layer has a justified,
+  explicit reason to collapse them.
+- Keep fixes owner-local: sema-owned type classification belongs in sema,
+  MIR-owned addressability gaps belong in MIR, and backend aggregate layout or
+  constant-emission gaps belong in the backend.
+- Prefer closing silent or latent type drift before widening language surface.
+- Treat tests and dump fixtures as part of the contract whenever type behavior
+  changes intentionally.
+
+Chosen slice for this phase
+---------------------------
+Targeted closure set:
+
+1. make `const` pointer forms behave like pointer-typed values everywhere that
+   pointer classification, nil-assignability, dereference checking, or
+   uintptr-conversion logic depends on that fact
+2. make aggregate bool lowering consistent across structs, tuples, and arrays
+   so backend aggregate storage rules do not depend on the surface container
+   kind
+3. either implement payload-enum constant and symbol-ref lowering in the LLVM
+   bootstrap backend or narrow the admitted surface explicitly at the owning
+   compiler boundary
+4. close the MIR-owned `&(*ptr).field` address-of gap so admitted dereferenced
+   field lvalues lower through explicit address metadata rather than failing as
+   unsupported
+5. align `distinct` base-type validation with the intended scalar-base rule so
+   alias and distinct expansion do not produce accidental over-restriction
+
+Compiler change boundary
+------------------------
+1. unify sema and MIR pointer-like predicates around a `const`-transparent
+   notion of pointer identity for operations where pointer-ness, not pointee
+   mutability, is the relevant question
+2. make backend aggregate-field storage rules explicit and consistent for
+   nested bool fields in tuples and arrays, matching the struct-field storage
+   treatment already used in the backend
+3. finish or deliberately bound payload-enum backend constant emission so
+   sema, MIR, and backend agree on what enum constant forms are actually owned
+   by the current executable and global-emission path
+4. extend MIR address lowering, validation, and backend materialization for
+   dereferenced field lvalues rather than leaving them as a generic unsupported
+   address-of form
+5. correct `distinct` base-type validation so canonical scalar truth does not
+   depend on whether the scalar base arrives directly or through an admitted
+   alias or distinct chain
+
+What this phase should try to prove
+-----------------------------------
+- the compiler's existing type surface is treated consistently across sema,
+  MIR, import rewriting, and backend lowering for the currently admitted forms
+  of `const`, pointer, enum, tuple, array, and `distinct` types
+- the remaining bootstrap limitations are explicit, narrow, and tested rather
+  than silent or latent
+- backend aggregate and constant emission paths do not quietly weaken the type
+  contract already established by sema or MIR
+
+Preferred pressure points
+-------------------------
+1. one focused sema regression proving `const *T`, `*const T`, and
+   `const *const T` are classified correctly for nil assignment, dereference,
+   and uintptr conversion according to the existing language specification
+2. one focused backend or executable regression proving bool fields lower
+   consistently inside struct, tuple, and array aggregate storage
+3. one enum regression covering payload-bearing constants through whichever
+   boundary Phase 88 chooses to admit honestly
+4. one MIR and executable regression proving `&(*ptr).field` lowers as an
+   addressable lvalue rather than as an unsupported special case
+5. one sema regression proving scalar-based `distinct` chains are accepted or
+   rejected only according to the scalar-base rule, not according to alias-path
+   accidents
+
+Deliverables
+------------
+- one canonical Phase 88 plan and closeout note for the type-treatment
+  reference-quality follow-through
+- one focused sema fix for `const` pointer classification and the downstream
+  rules that depend on it
+- one focused backend fix for aggregate bool storage consistency
+- one explicit decision and implementation on payload-enum backend constant and
+  symbol-ref support at the current bootstrap boundary
+- one MIR, validator, and backend fix for dereferenced-field address lowering
+- one focused sema fix for `distinct` scalar-base validation consistency
+- focused regressions in the narrowest owning suites for each repaired type
+  contract
+
+Suggested execution order
+-------------------------
+1. Close the `const` pointer predicate blindspot first because it is a latent
+   semantic correctness issue rather than a narrow backend limitation.
+2. Add focused sema and MIR regressions for pointer classification before any
+   broader cleanup so the fixed rule is frozen precisely.
+3. Normalize backend bool aggregate storage across structs, tuples, and arrays
+   and refresh the narrowest affected lowering or executable checks.
+4. Decide the honest Phase 88 boundary for payload-enum constants: either
+   finish backend support or explicitly narrow the admitted surface at the
+   owning compiler layer with corresponding diagnostics and tests.
+5. Close `&(*ptr).field` lowering in MIR, validation, and backend pointer
+   materialization.
+6. Correct `distinct` scalar-base validation and add targeted semantic-fail or
+   semantic-pass coverage.
+7. Re-run the focused owning test suites and refresh any impacted dump
+   fixtures deterministically.
+
+Exit criteria
+-------------
+- `const` pointer forms no longer fail pointer-only semantic operations such as
+  dereference, nil assignment, or uintptr conversion because of shallow
+  predicate classification
+- backend aggregate lowering treats bool storage consistently across struct,
+  tuple, and array containers
+- payload-enum constants are either supported through the current admitted
+  backend path or rejected earlier with an explicit, tested boundary rather
+  than a late backend surprise
+- dereferenced field lvalues no longer fail with a generic MIR address-of
+  rejection when the underlying lvalue is already admitted by sema
+- `distinct` scalar-base validation matches the intended scalar contract even
+  through alias or distinct expansion chains
+- the narrowest owning tests record each repaired behavior explicitly
+
+Non-goals
+---------
+- adding new language-level type forms or widening the v0.2 type system
+- reopening enum design after the Phase 86 and follow-up repair unless Phase 88
+  finds a new concrete owner-local bug
+- broad backend cleanup unrelated to the audited type-treatment gaps
+- refactoring sema, MIR, or backend subsystems for style alone
+- claiming full reference-quality completion for every future type feature that
+  is not yet admitted by the language surface
+
+Closeout statement
+------------------
+Phase 88 should close the next honest compiler-quality tranche after the enum
+repair: not by widening the language, but by making the already admitted type
+surface behave consistently and explicitly across sema, MIR, and backend
+owners. When complete, the repository should be able to say that the remaining
+type treatment gaps are either repaired or deliberately bounded, rather than
+left as bootstrap-era drift.
