@@ -5,4 +5,5 @@ SemanticModule
     Variant name=Green
     Variant name=Blue
       PayloadField name=value type=i32
+    Layout size=16 align=8 offsets=[]
   Function name=get_value params=[color_module.Color] returns=[i32]

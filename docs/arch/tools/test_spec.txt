@@ -46,6 +46,12 @@ Useful categories:
 
 These should share a common philosophy even if they are implemented with slightly different runners.
 
+Repository test-tree rule:
+- the repository should keep one canonical `tests/` tree for checked-in test
+  sources and expectations
+- generated runners, generated test binaries, and command-local build outputs
+  belong under the active build directory, not under `tests/`
+
 3. Ordinary Project Tests
 
 The simplest model is:
@@ -69,6 +75,11 @@ Why this shape fits:
 - it reuses the existing `Error` convention
 - it avoids adding a dedicated assertion result type
 - it keeps tests readable to anyone who understands ordinary language code
+
+Repository placement rule:
+- ordinary project tests live under `tests/`
+- ordinary test data lives under `tests/data/` or another explicit subdirectory
+- checked-in test sources are inputs, not generated outputs
 
 4. Discovery Model
 
@@ -97,7 +108,79 @@ Field meanings:
 - `mode`: build mode used for the test executable
 - `timeout_ms`: per-test-executable timeout unless overridden by command-line flags
 
-5. Test Execution Model
+5. Canonical Repository Test Tree
+
+The repository itself needs a slightly richer test layout than one ordinary
+user project.
+
+Canonical repository-facing tree:
+
+```text
+tests/
+  parser/
+  sema/
+  mir/
+  codegen/
+  stdlib/
+  tool/
+  cases/
+```
+
+Meanings:
+- `tests/parser/`: parser pass and parse-fail fixtures
+- `tests/sema/`: semantic pass/fail fixtures and semantic module dumps
+- `tests/mir/`: MIR lowering fixtures, MIR dumps, and MIR-fail expectations
+- `tests/codegen/`: backend dump fixtures and executable behavior tests
+- `tests/stdlib/`: checked-in stdlib proof programs and behavior fixtures
+- `tests/tool/`: `mc` driver, manifest, rebuild, and workflow tests
+- `tests/cases/`: tiny shared direct-source fixtures when centralization helps
+
+Design rule:
+- each test belongs at the narrowest layer that can prove the intended
+  contract honestly
+- end-to-end tool or executable tests should not replace narrower parser,
+  sema, or MIR coverage
+
+6. Canonical Fixture Naming
+
+Adjacent expectations should use stable suffix conventions.
+
+Canonical checked-in fixture shapes:
+- `<name>.mc`: source fixture
+- `<name>.errors.txt`: expected diagnostic substrings, one per line
+- `<name>.ast.txt`: expected AST dump
+- `<name>.sema.txt`: expected semantic module dump
+- `<name>.mir.txt`: expected MIR dump
+- `<name>.backend.txt`: expected backend or lowering dump
+
+Rules:
+- expectations should live adjacent to the source fixture when practical
+- `.errors.txt` expectations should prefer stable substrings over brittle
+  full transcript matching unless exact formatting is itself the contract
+- structural dumps should be deterministic enough for checked-in goldens
+
+7. Compiler Fixture Discovery Bias
+
+Ordinary project tests and compiler fixtures do not have to use identical
+discovery rules.
+
+Canonical bias:
+- ordinary project tests may be discovered by `_test.mc` file name and
+  `test_*` function shape
+- compiler-side fixture suites may instead discover or register fixtures by
+  naming convention and adjacent expectation files
+
+Why:
+- compiler fixtures often prove parser, sema, MIR, or backend contracts where
+  the whole file is the test unit
+- this keeps compile-fail and dump-golden tests simple and inspectable
+
+Any discovery model used for repository fixture suites should remain:
+- deterministic
+- explicit in naming
+- small enough that contributors can tell how to add a new fixture quickly
+
+8. Test Execution Model
 
 The first test runner should stay simple.
 
@@ -116,7 +199,7 @@ Possible future extension:
 - optional parallel test execution by command-line flag
 - not the default, and not required in v0.2
 
-6. Result Model
+9. Result Model
 
 Canonical result rules:
 - return `nil`: pass
@@ -138,7 +221,7 @@ PASS test_trim_space
 The output should stay plain and readable.
 Machine-readable output can be added later as a separate flag if needed.
 
-7. Assertion Style
+10. Assertion Style
 
 The core design should not depend on assertion macros.
 
@@ -176,7 +259,7 @@ Good minimal helper candidates:
 - output capture helpers
 - deterministic test-data location helpers
 
-8. Checked Mode As The Default
+11. Checked Mode As The Default
 
 Canonical default:
 - `mc test` should build tests in `checked` mode unless the user overrides it
@@ -186,7 +269,7 @@ Why:
 - this helps catch indexing mistakes, invalid shifts, or other faulting behavior earlier
 - it fits the language's explicit distinction between ordinary debug or release and checked execution
 
-9. Integration Tests
+12. Integration Tests
 
 Some tests need to exercise complete executables rather than internal functions.
 
@@ -208,7 +291,7 @@ tests/
 
 This keeps test inputs ordinary and version-controlled.
 
-10. Compiler Test Design
+13. Compiler Test Design
 
 The compiler itself needs a richer test matrix than ordinary projects do.
 
@@ -232,7 +315,7 @@ MIR or lowering tests:
 Standard-library tests:
 - ordinary tests for `mem`, `strings`, `fs`, `io`, `sync`, and other library modules
 
-11. Compile-Fail Test Format
+14. Compile-Fail Test Format
 
 A simple approach is best.
 
@@ -251,7 +334,22 @@ Rules:
 - matching should prefer stable diagnostic identifiers or stable substrings over exact byte-for-byte output
 - tests should not become fragile because wording changes slightly
 
-12. Test Isolation
+15. Test Build Output Rule
+
+Generated outputs from `mc test`, compiler fixtures, or repository audit paths
+should not live under `tests/`.
+
+Canonical rule:
+- checked-in test files under `tests/` are source inputs and expectations
+- generated test executables, generated runners, dumps, object files, and
+  command-local build trees belong under the active build directory
+- repository-owned smoke or audit paths may use named subdirectories under the
+  selected build tree, but those outputs remain disposable
+
+This keeps the test tree version-controlled and reviewable while keeping
+generated state clearly separate.
+
+16. Test Isolation
 
 The simplest runner model is one process per test target.
 

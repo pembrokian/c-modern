@@ -182,6 +182,26 @@ std::string CombineQualifiedName(const Expr& expr) {
     return expr.text;
 }
 
+std::optional<Expr> FlattenQualifiedBaseExpr(const Expr& expr) {
+    if (expr.kind != Expr::Kind::kQualifiedName || expr.text.empty()) {
+        return std::nullopt;
+    }
+
+    Expr base_expr;
+    base_expr.span = expr.span;
+    const std::size_t last_dot = expr.text.rfind('.');
+    if (last_dot == std::string::npos) {
+        base_expr.kind = Expr::Kind::kName;
+        base_expr.text = expr.text;
+        return base_expr;
+    }
+
+    base_expr.kind = Expr::Kind::kQualifiedName;
+    base_expr.text = expr.text.substr(0, last_dot);
+    base_expr.secondary_text = expr.text.substr(last_dot + 1);
+    return base_expr;
+}
+
 std::size_t AlignTo(std::size_t value, std::size_t alignment) {
     if (alignment == 0) {
         return value;
@@ -1185,6 +1205,56 @@ class Checker {
             return ComputeTypeLayout(InstantiateTypeDeclAliasedType(*type_decl, type), span, active_types);
         }
 
+        if (type_decl->kind == Decl::Kind::kEnum) {
+            if (type_decl->type_params.empty() && type_decl->layout.valid) {
+                return type_decl->layout;
+            }
+
+            const std::string active_key = FormatType(type);
+            if (!active_types.insert(active_key).second) {
+                Report(span, "type layout cycle requires indirection: " + active_key);
+                return {};
+            }
+
+            LayoutInfo layout;
+            layout.valid = true;
+            std::size_t payload_size = 0;
+            std::size_t payload_alignment = 1;
+            for (const auto& variant : type_decl->variants) {
+                std::size_t variant_size = 0;
+                std::size_t variant_alignment = 1;
+                for (const auto& payload_field : variant.payload_fields) {
+                    Type field_type = payload_field.second;
+                    if (!type_decl->type_params.empty()) {
+                        field_type = SubstituteTypeParams(std::move(field_type), type_decl->type_params, type.subtypes);
+                    }
+                    const LayoutInfo field_layout = ComputeTypeLayout(field_type, span, active_types);
+                    if (!field_layout.valid) {
+                        active_types.erase(active_key);
+                        return {};
+                    }
+                    variant_size = AlignTo(variant_size, field_layout.alignment);
+                    variant_size += field_layout.size;
+                    variant_alignment = std::max(variant_alignment, field_layout.alignment);
+                }
+                variant_size = AlignTo(variant_size, variant_alignment);
+                payload_size = std::max(payload_size, variant_size);
+                payload_alignment = std::max(payload_alignment, variant_alignment);
+            }
+
+            // Bootstrap enum layout matches the backend's current default
+            // tagged-union lowering: an i64 tag plus enough payload storage for
+            // the largest variant.
+            layout.alignment = std::max<std::size_t>(8, payload_alignment);
+            layout.size = AlignTo(8 + payload_size, layout.alignment);
+
+            active_types.erase(active_key);
+            if (type_decl->type_params.empty()) {
+                type_decl->layout = layout;
+            }
+            return layout;
+        }
+
         if (type_decl->kind != Decl::Kind::kStruct) {
             Report(span, "layout is not available for type " + type_decl->name + " in bootstrap sema");
             return {};
@@ -1229,7 +1299,7 @@ class Checker {
     void ComputeTypeLayouts() {
         std::unordered_set<std::string> active_types;
         for (auto& type_decl : module_->type_decls) {
-            if (type_decl.kind != Decl::Kind::kStruct) {
+            if (type_decl.kind != Decl::Kind::kStruct && type_decl.kind != Decl::Kind::kEnum) {
                 continue;
             }
             if (!type_decl.type_params.empty()) {
@@ -1647,6 +1717,32 @@ class Checker {
         return UnknownType();
     }
 
+    Type AnalyzeFlattenedQualifiedValue(const Expr& expr) {
+        const auto base_expr = FlattenQualifiedBaseExpr(expr);
+        if (!base_expr.has_value()) {
+            return UnknownType();
+        }
+
+        const Type base_type = AnalyzeExpr(*base_expr);
+        if (IsUnknown(base_type)) {
+            return UnknownType();
+        }
+
+        const Type stripped_base = StripType(base_type, *module_, TypeStripMode::kAliasesOnly);
+        if (stripped_base.kind == Type::Kind::kNamed) {
+            if (const auto* type_decl = FindTypeDecl(*module_, stripped_base.name);
+                type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
+                for (const auto& variant : type_decl->variants) {
+                    if (variant.name == expr.secondary_text) {
+                        return stripped_base;
+                    }
+                }
+            }
+        }
+
+        return AnalyzeFieldSelection(base_type, expr.secondary_text, expr.span);
+    }
+
     std::optional<VariantSummary> LookupVariant(const Type& selector_type, std::string_view variant_name) const {
         const Type stripped_selector = StripType(selector_type, *module_, TypeStripMode::kAliasesOnly);
         if (stripped_selector.kind != Type::Kind::kNamed) {
@@ -1885,6 +1981,9 @@ class Checker {
                 }
                 if (const Module* imported_module = FindImportedModule(expr.text); imported_module != nullptr) {
                     return record(AnalyzeQualifiedImportedModuleMember(expr, *imported_module));
+                }
+                if (expr.text.find('.') != std::string::npos) {
+                    return record(AnalyzeFlattenedQualifiedValue(expr));
                 }
                 return record(AnalyzeQualifiedFunctionOrEnum(expr));
             case Expr::Kind::kLiteral:

@@ -61,4 +61,8 @@ require_contains(
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"
+  "Phase 85 kernel endpoint queue smoke proof")
+require_contains(
+  "freestanding_support_statement.txt"
+  "${FREESTANDING_NOTE_CONTENT}"
   "unsupported today: `mc run` or `mc test` freestanding workflow admission,")

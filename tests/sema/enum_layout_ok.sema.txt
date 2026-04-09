@@ -1,0 +1,11 @@
+SemanticModule
+  TypeDecl name=MessageTag kind=enum
+    Variant name=Empty
+    Variant name=Ping
+    Variant name=Ack
+    Layout size=8 align=8 offsets=[]
+  TypeDecl name=Envelope kind=struct
+    Field name=tag type=MessageTag
+    Field name=sender type=u32
+    Layout size=16 align=8 offsets=[0, 8]
+  Function name=main params=[] returns=[i32]

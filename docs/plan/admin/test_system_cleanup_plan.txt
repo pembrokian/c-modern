@@ -1,0 +1,232 @@
+Modern C -- Test System Cleanup Plan
+====================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Raise the repository test system from "good bootstrap coverage with some rough
+edges" to a cleaner, more referenceable, and easier-to-maintain shape without
+disrupting ongoing compiler bring-up work.
+
+This plan is intentionally narrow.  It does not propose replacing the current
+test philosophy or introducing a heavyweight third-party framework.  It focuses
+on structure, clarity, robustness, and maintenance cost inside the existing
+CMake + C++20 + fixture-driven approach.
+
+Current Assessment
+------------------
+The current `tests/` tree has real strengths:
+
+- top-level layering matches compiler stage boundaries well
+- parser, sema, MIR, codegen, stdlib, and tool concerns are mostly separated
+- deterministic dump fixtures already exist and are useful
+- MIR fixture checks already go beyond snapshots and assert important
+  invariants such as determinism and structured metadata
+
+The current system also has quality gaps that make it fall short of
+reference-quality:
+
+- at least one checked-in fixture is stale, so the suite is not reliably green
+- fixture registration is manual in several runners, which makes coverage easy
+  to forget when adding files
+- large integration binaries have grown into monolithic sequential programs
+  that are hard to navigate and hard to isolate on failure
+- common harness utilities are duplicated across multiple test executables
+- test documentation no longer fully matches current reality
+- some host-specific assumptions are implicit rather than documented or gated
+
+Goals
+-----
+This cleanup should improve the test system along four axes:
+
+1. Green and trustworthy
+2. Simple to extend
+3. Clear to read and debug
+4. Honest about host scope and bootstrap limits
+
+Non-goals
+---------
+This cleanup plan does not aim to:
+
+- replace CTest with another framework
+- redesign compiler dump formats purely for testing convenience
+- refactor production compiler stages unless test cleanup reveals a direct
+  testing blocker
+- force every test into one generic meta-runner if that would reduce clarity
+- over-normalize away useful layer-specific checks
+
+Cleanup Themes
+--------------
+Theme 1 -- Restore a stable green baseline
+
+- fix stale checked-in goldens before structural cleanup begins
+- treat a red checked-in fixture suite as a blocking quality issue
+- add a short maintenance rule: behavior-changing compiler edits must update
+  the narrowest affected test fixture in the same change
+- verify the canonical local workflow remains documented and passing after each
+  cleanup slice
+
+Theme 2 -- Make fixture suites self-discovering where practical
+
+- remove hand-maintained fixture lists for parser, sema, MIR, and backend dump
+  suites where file naming conventions are already strong enough
+- prefer directory scanning with explicit suffix conventions over hard-coded
+  `std::vector<FixtureCase>` tables for simple pass/fail fixture suites
+- preserve explicit metadata only where the fixture truly needs it
+  Examples:
+  - sema package-identity overrides
+  - MIR canonical-example sync metadata
+  - import-root and imported-module setup
+- if full auto-discovery would hide important per-fixture setup, use a hybrid
+  model:
+  - discover ordinary fixtures automatically
+  - keep a small explicit table only for exceptional cases
+
+Theme 3 -- Extract shared harness utilities
+
+- create a small internal testing support layer for repeated helpers such as:
+  - `Fail`
+  - text-file loading and normalization
+  - expected-diagnostic substring matching
+  - command execution and output capture
+  - child-process waiting and timeout handling
+- keep this support local to repository tests rather than introducing a general
+  runtime utility layer
+- prefer straightforward helpers over abstraction-heavy templates
+- use extraction to remove duplication, not to hide test intent
+
+Theme 4 -- Split oversized integration runners into coherent slices
+
+- break up monolithic executables when their size starts to hide intent or make
+  failure triage expensive
+- the two biggest pressure points today are:
+  - `tests/tool/phase7_tool_tests.cpp`
+  - `tests/codegen/codegen_executable_tests.cpp`
+- split by behavior family rather than arbitrary file size
+  Suggested shapes:
+  - tool project model and discovery tests
+  - tool build/rebuild/cache behavior tests
+  - tool `mc test` behavior tests
+  - codegen executable smoke tests
+  - codegen checked-runtime behavior tests
+  - codegen stdlib execution tests
+  - codegen network / subprocess execution tests
+- prefer multiple smaller CTest targets over one giant fail-fast binary
+
+Theme 5 -- Improve failure isolation and diagnosis
+
+- ensure failures identify the fixture, command, and artifact path clearly
+- avoid one large binary preventing unrelated cases from running when a single
+  case fails, where reasonable
+- keep exact snapshot mismatches verbose and direct
+- preserve deterministic build-dir and dump-path behavior so reproducing a
+  failure stays easy
+
+Theme 6 -- Make host assumptions explicit
+
+- document that some executable and tool tests currently assume a hosted
+  POSIX-like environment
+- gate obviously host-specific tests in CMake if the repository begins to
+  target broader host development environments
+- keep bootstrap-host reality explicit rather than pretending the current suite
+  is equally portable everywhere
+
+Theme 7 -- Refresh test documentation
+
+- update `tests/README.md` so it matches current repository reality
+- document:
+  - which suites are fixture-driven
+  - naming conventions for `.ast.txt`, `.sema.txt`, `.mir.txt`,
+    `.backend.txt`, and `.errors.txt`
+  - when a new test requires only adding files versus adding runner metadata
+  - current hosted assumptions for executable/tool tests
+- keep the documentation short and operational
+
+Suggested Execution Order
+-------------------------
+Step 1 -- Baseline repair
+
+- fix stale goldens and confirm the currently intended suite is green
+- remove any known doc drift discovered during the review
+
+Step 2 -- Shared utility extraction
+
+- extract the repeated file-reading, normalization, and diagnostic-substring
+  helpers first
+- extract command and child-process helpers next if they can be shared without
+  obscuring intent
+
+Step 3 -- Fixture registration cleanup
+
+- convert parser and backend dump fixtures first because they have the simplest
+  conventions
+- convert sema and MIR fixtures next using a hybrid approach if needed for the
+  fixtures with special setup
+
+Step 4 -- Integration suite decomposition
+
+- split `codegen_executable_tests` into smaller binaries by behavior family
+- split `phase7_tool_tests` into smaller binaries by tool area
+- wire each new binary as its own named CTest target
+
+Step 5 -- Documentation and gating cleanup
+
+- refresh `tests/README.md`
+- add any needed CMake comments or host gating once the new target split lands
+
+Acceptance Criteria
+-------------------
+This cleanup plan should be considered complete only when all of the following
+are true:
+
+- the checked-in test baseline is green on the intended bootstrap host
+- ordinary fixture suites no longer require large hand-maintained case tables
+  for routine additions
+- repeated harness logic is consolidated into a small, readable local support
+  layer
+- no single test executable remains an oversized grab-bag for unrelated areas
+- test failures remain easy to map back to a fixture, command, or generated
+  artifact
+- `tests/README.md` accurately describes the current suite structure and
+  conventions
+- host-specific assumptions are documented and, where appropriate, gated
+
+Success Criteria For "Reference-Quality"
+----------------------------------------
+The repository test system does not need to become elaborate.  It should
+instead feel disciplined.
+
+Reference-quality for this repository should mean:
+
+- a contributor can tell where a new test belongs quickly
+- a contributor can add a routine fixture without editing a hard-coded list
+- a failing test points clearly at the broken layer and broken artifact
+- large end-to-end suites are grouped by intent rather than accumulated over
+  time into one file
+- docs match reality
+- the suite is green often enough that failures are trusted
+
+Do Not Over-Fix
+---------------
+- do not collapse distinct parser, sema, MIR, and backend needs into one
+  generic runner if the result becomes harder to understand
+- do not introduce reflection-like fixture magic that makes behavior implicit
+- do not refactor production compiler code solely to satisfy an aesthetic test
+  cleanup preference
+- do not claim portability broader than the current executable and tool tests
+  actually support
+
+Recommended First Cleanup Slice
+-------------------------------
+If this plan is executed incrementally, the first slice should be:
+
+1. repair stale fixture baselines and restore green status
+2. extract common text/diagnostic fixture helpers
+3. make parser fixture discovery automatic
+4. update `tests/README.md` to match current practice
+
+That slice is small enough to land without destabilizing the active compiler
+work, and large enough to improve trust in the suite immediately.

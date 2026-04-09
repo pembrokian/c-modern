@@ -424,7 +424,7 @@ Final Note
 This design gives you a cheap, repeatable way to use the kernel
 without committing to:
 	•	full service architecture
-	•	ASDL
+	•	SDL (service domain langauge and interface)
 	•	distributed abstractions
 	•	a premature language-level error model
 

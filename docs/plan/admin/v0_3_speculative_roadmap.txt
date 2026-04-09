@@ -39,9 +39,10 @@ Repository numbering note
   the hosted `v0.2` release-snapshot preparation wave.
 - The `v0.3` direction note, consumer matrix, and proof-program ladder now
   define the next plausible planning frame, but they do not yet provide one
-  multi-phase speculative continuation.
-- This speculative continuation therefore starts at Phase 85, with Phase 81
-  through Phase 84 as the current concrete anchors.
+  multi-phase speculative continuation after the now-concrete first kernel
+  representation proof.
+- This speculative continuation therefore starts at Phase 86, with Phase 81
+  through Phase 85 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -118,8 +119,16 @@ hardening:
   general freestanding support statement
 - it adds one repo-owned audit so future support drift is caught mechanically
 
+Phase 85 is now concrete as kernel endpoint queue smoke:
+- it proves one bounded endpoint queue and one bounded message shape through
+  ordinary Modern C structs, enums, arrays, and pointer-based mutation
+- it keeps the proof on the existing freestanding path rather than admitting a
+  `sys` wrapper layer, capability helper taxonomy, or scheduler-visible policy
+- it validates FIFO ordering and full-queue rejection deterministically in the
+  repository tool harness
+
 The remaining speculative continuation in this band therefore starts at Phase
-85.
+86.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof
@@ -150,11 +159,6 @@ Why this band comes next:
   mechanism data honestly without new syntax or runtime machinery
 
 Possible phases in this band:
-
-Phase 85 -- Kernel Endpoint Queue Smoke
-- Exit criterion: one bounded endpoint or message-queue proof is expressed and
-  validated through ordinary Modern C types without reopening speculative IPC
-  abstractions.
 
 Phase 86 -- Task Lifecycle Kernel Proof
 - Exit criterion: one minimal create, ready, exit, and wait lifecycle path is

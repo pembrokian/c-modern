@@ -215,6 +215,7 @@ int main(int argc, char** argv) {
         {"distinct_cross_conversion_bad.mc", "distinct_cross_conversion_bad.errors.txt", {}, false},
         {"distinct_implicit_conversion_bad.mc", "distinct_implicit_conversion_bad.errors.txt", {}, false},
         {"distinct_non_scalar_bad.mc", "distinct_non_scalar_bad.errors.txt", {}, false},
+        {"enum_layout_ok.mc", "enum_layout_ok.sema.txt", {}, true},
         {"error_return_order_bad.mc", "error_return_order_bad.errors.txt", {}, false},
         {"missing_return_path_bad.mc", "missing_return_path_bad.errors.txt", {}, false},
         {"noalias_args_bad.mc", "noalias_args_bad.errors.txt", {}, false},

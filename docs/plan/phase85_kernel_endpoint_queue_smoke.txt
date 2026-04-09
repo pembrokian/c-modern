@@ -1,0 +1,147 @@
+Phase 85 -- Kernel Endpoint Queue Smoke
+=======================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from freestanding and narrow `hal`
+bring-up into the first kernel-mechanism representation check: prove that one
+bounded endpoint queue and one bounded message shape can be expressed and
+validated with ordinary Modern C structs, enums, arrays, and functions rather
+than with new language machinery or premature `sys` or IPC library admission.
+
+This document is both the Phase 85 execution note and its closeout.
+It does not claim full kernel IPC, capability transfer, scheduler policy, or
+user-space service bring-up.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then turned that first non-hosted tranche into a published,
+  repository-bounded support statement and one tooling audit.
+- The next strongest Canopus proof was no longer another build-model or
+  hardware-boundary question. It was whether the admitted core language could
+  represent one kernel-owned endpoint queue honestly without reopening parser,
+  sema, MIR, or runtime policy work.
+
+Problem being solved
+--------------------
+- The Canopus proof ladder names endpoint queues and bounded message buffers as
+  the first kernel-mechanism representation pressure after the initial
+  freestanding crossing, but the repository had not yet exercised that shape in
+  a real proof.
+- Without one concrete queue proof, it would be too easy to speculate about
+  `sys`, capability wrappers, scheduler-visible helpers, or IPC abstractions
+  before validating that the current explicit language core already carries the
+  needed data-model work.
+- The next honest step is therefore a bounded kernel-side queue smoke, not a
+  broader user-space or syscall-layer design wave.
+
+Core rule
+---------
+- Prove endpoint and message representation with ordinary language constructs
+  first.
+- Keep the proof freestanding, deterministic, and repository-bounded.
+- Do not admit a public `sys` module, capability wrapper library, or IPC helper
+  taxonomy in this phase.
+- Reopen compiler work only if the proof exposes a concrete parser, sema, MIR,
+  or backend owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target representing a bounded endpoint queue
+2. one explicit message struct with enum tag, handle-like sender metadata, and
+   fixed payload storage
+3. one enqueue or dequeue path that proves FIFO behavior and bounded-capacity
+   failure semantics
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first kernel-representation question now by
+proving one endpoint queue locally with ordinary Modern C data types instead of
+inventing a larger kernel or user-space boundary prematurely.
+
+What this phase proves
+----------------------
+- the current explicit core language is sufficient for one bounded endpoint
+  queue and message-buffer representation
+- ordinary structs, enums, fixed arrays, and pointer-based mutation are enough
+  for one queue-owned send or receive path
+- the freestanding executable path can validate that proof without depending on
+  `hal`, host-side process APIs, or a wider `sys` boundary
+
+Deliverables
+------------
+- one canonical Phase 85 closeout note recording the implemented queue proof
+- one focused freestanding tool regression that models one endpoint queue and
+  two message values through ordinary Modern C types
+- deterministic runtime validation of FIFO ordering and bounded-queue failure
+  on the third enqueue attempt
+- MIR inspection proving the queue shape lowers through ordinary aggregate and
+  index operations rather than through special calls or hardware intrinsics
+- refreshed support and planning notes so Phase 85 is recorded as the first
+  concrete kernel-mechanism anchor after the initial freestanding wave
+
+Suggested execution order
+-------------------------
+1. Define one bounded queue and one message representation with ordinary
+   structs, enums, and fixed arrays.
+2. Build that proof as a freestanding executable through the existing explicit
+   target and startup path.
+3. Validate runtime FIFO behavior and bounded-capacity rejection deterministically.
+4. Inspect the dumped MIR to confirm the proof stays within ordinary aggregate,
+   field, and index operations.
+5. Refresh the support and planning surface so later phases build from this
+   concrete anchor.
+
+Exit criteria
+-------------
+- one freestanding target proves a bounded endpoint queue with ordinary Modern
+  C types
+- the proof validates enqueue or dequeue order and full-queue rejection
+  deterministically
+- the dumped MIR records explicit enum, struct, aggregate-init, and indexed
+  store or load operations for the proof
+- the planning surface records Phase 85 as concrete rather than still
+  speculative
+
+Non-goals
+---------
+- public `sys` module admission or kernel syscall wrapper design
+- capability-transfer semantics beyond explicit handle-like fields in the
+  bounded message shape
+- scheduler policy, blocking semantics, or wakeup sources
+- user-space init, service handshake, or namespace bring-up
+- broader `hal` growth, interrupts, barriers, or device-framework work
+
+Implemented slice
+-----------------
+- the tool regression suite now includes one freestanding endpoint-queue proof
+  that represents message tags as an ordinary enum and queue state as ordinary
+  structs and fixed arrays
+- the proof enqueues two messages, rejects a third enqueue on bounded capacity,
+  dequeues both messages in FIFO order, and exits with a deterministic Phase 85
+  marker
+- the regression also inspects the dumped MIR to confirm that the proof lowers
+  through ordinary enum or struct declarations, aggregate initialization, and
+  indexed stores instead of through `hal` or other special boundaries
+- the freestanding proof statement, README, backlog, decision log, and
+  speculative `v0.3` roadmap now record Phase 85 as the first concrete
+  kernel-mechanism representation anchor
+
+Closeout statement
+------------------
+Phase 85 is complete as a kernel endpoint queue smoke. The repository still
+does not claim `sys`, full IPC, capability transfer, or user-space service
+bring-up, but it now has one honest proof that the admitted Modern C core can
+represent a bounded endpoint queue and message-buffer workflow directly, using
+ordinary language constructs on the existing freestanding path.

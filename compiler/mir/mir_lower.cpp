@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <memory>
 #include <unordered_set>
 
 #include "compiler/support/assert.h"
@@ -156,11 +157,93 @@ class FunctionLowerer {
         return {type};
     }
 
+    std::optional<Expr> ExpandFlattenedQualifiedValueExpr(const Expr& expr) const {
+        if (expr.kind != Expr::Kind::kQualifiedName) {
+            return std::nullopt;
+        }
+
+        const std::size_t last_dot = expr.text.rfind('.');
+        if (last_dot == std::string::npos) {
+            return std::nullopt;
+        }
+
+        Expr base_expr;
+        base_expr.span = {};
+        base_expr.kind = Expr::Kind::kQualifiedName;
+        base_expr.text = expr.text.substr(0, last_dot);
+        base_expr.secondary_text = expr.text.substr(last_dot + 1);
+
+        Expr field_expr;
+        field_expr.kind = Expr::Kind::kField;
+        field_expr.span = expr.span;
+        field_expr.text = expr.secondary_text;
+        field_expr.left = std::make_unique<Expr>(std::move(base_expr));
+        return field_expr;
+    }
+
+    sema::Type InferSyntheticExprType(const Expr& expr) const {
+        switch (expr.kind) {
+            case Expr::Kind::kParen:
+                return expr.left != nullptr ? ExprTypeOrUnknown(*expr.left) : sema::UnknownType();
+            case Expr::Kind::kName:
+                if (local_types_.contains(expr.text)) {
+                    return local_types_.at(expr.text);
+                }
+                if (const auto* global = sema::FindGlobalSummary(sema_module_, expr.text); global != nullptr) {
+                    return global->type;
+                }
+                return sema::UnknownType();
+            case Expr::Kind::kQualifiedName: {
+                if (local_types_.contains(expr.text)) {
+                    const sema::Type base_type = local_types_.at(expr.text);
+                    if (const auto field_type = FindMirFieldType(module_, base_type, expr.secondary_text); field_type.has_value()) {
+                        return *field_type;
+                    }
+                }
+                if (const auto* global = sema::FindGlobalSummary(sema_module_, expr.text); global != nullptr) {
+                    if (const auto field_type = FindMirFieldType(module_, global->type, expr.secondary_text); field_type.has_value()) {
+                        return *field_type;
+                    }
+                }
+                if (const auto* type_decl = FindMirTypeDecl(module_, CombineQualifiedName(expr)); type_decl != nullptr) {
+                    return sema::NamedType(type_decl->name);
+                }
+                if (const auto expanded = ExpandFlattenedQualifiedValueExpr(expr); expanded.has_value()) {
+                    return InferSyntheticExprType(*expanded);
+                }
+                return sema::UnknownType();
+            }
+            case Expr::Kind::kField:
+            case Expr::Kind::kDerefField: {
+                if (expr.left == nullptr) {
+                    return sema::UnknownType();
+                }
+                const sema::Type base_type = ExprTypeOrUnknown(*expr.left);
+                if (const auto field_type = FindMirFieldType(module_, base_type, expr.text); field_type.has_value()) {
+                    return *field_type;
+                }
+                const sema::Type selector_type = StripMirAliasOrDistinct(module_, base_type);
+                if (selector_type.kind == sema::Type::Kind::kNamed) {
+                    if (const TypeDecl* type_decl = FindMirTypeDecl(module_, selector_type.name); type_decl != nullptr) {
+                        for (const auto& variant : type_decl->variants) {
+                            if (variant.name == expr.text) {
+                                return selector_type;
+                            }
+                        }
+                    }
+                }
+                return sema::UnknownType();
+            }
+            default:
+                return sema::UnknownType();
+        }
+    }
+
     sema::Type ExprTypeOrUnknown(const Expr& expr) const {
         if (const sema::Type* type = sema::FindExprType(sema_module_, expr); type != nullptr) {
             return *type;
         }
-        return sema::UnknownType();
+        return InferSyntheticExprType(expr);
     }
 
     std::string CalleeName(const Expr& expr) const {
@@ -292,6 +375,10 @@ class FunctionLowerer {
     StoreBaseMetadata StoreBaseMetadataForExpr(const Expr& expr) const {
         if (expr.kind == Expr::Kind::kParen && expr.left != nullptr) {
             return StoreBaseMetadataForExpr(*expr.left);
+        }
+
+        if (const auto expanded = ExpandFlattenedQualifiedValueExpr(expr); expanded.has_value()) {
+            return StoreBaseMetadataForExpr(*expanded);
         }
 
         if (!expr.text.empty() && local_types_.contains(expr.text)) {
@@ -1149,6 +1236,9 @@ class FunctionLowerer {
                     });
                     return {value, type};
                 }
+                if (const auto expanded = ExpandFlattenedQualifiedValueExpr(expr); expanded.has_value()) {
+                    return LowerExpr(*expanded);
+                }
                 const std::string value = NewValue();
                 const std::string qualified_name = CombineQualifiedName(expr);
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "symbol reference type for " + qualified_name);
@@ -1565,6 +1655,11 @@ class FunctionLowerer {
     }
 
     void EmitStoreTarget(const Expr& target, const ValueInfo& value) {
+        if (const auto expanded = ExpandFlattenedQualifiedValueExpr(target); expanded.has_value()) {
+            EmitStoreTarget(*expanded, value);
+            return;
+        }
+
         std::vector<std::string> target_operands = {value.value};
         const StoreBaseMetadata base_storage = target.left != nullptr ? StoreBaseMetadataForExpr(*target.left) : StoreBaseMetadata{};
         if (target.kind == Expr::Kind::kIndex && target.left != nullptr && target.right != nullptr) {

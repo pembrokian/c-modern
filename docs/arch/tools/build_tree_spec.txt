@@ -1,0 +1,181 @@
+Modern C - Build Tree Specification
+
+Purpose
+
+This document freezes the canonical repository-facing build-tree model for
+Modern C tool and workflow outputs.
+It complements `docs/arch/compiler/build_spec.txt`, which defines the build
+tool's command and manifest surface.
+This file is narrower: it defines where generated outputs should live, how
+they should be classified, and how the repository should keep `build/`
+disposable without turning it into an informal long-term archive.
+
+Core position
+
+`build/` is disposable generated state.
+
+That means:
+- anything under `build/` must be safe to delete without losing source truth
+- `build/` is a workspace output area, not a durable source location
+- if a proof, example, or expectation matters long-term, its durable home is
+  `tests/`, `examples/`, or `docs/`, not `build/`
+
+This rule applies both to:
+- the canonical local compiler build tree
+- command-local `--build-dir` outputs
+
+1. Design Bias
+
+If forced to choose, prefer:
+- a small number of stable build-tree namespaces over many historical one-off
+  top-level directories
+- functional names over phase-number names for any output expected to survive
+  beyond a short local session
+- explicit disposable output trees over hidden caches
+- reproducible audit outputs over ad hoc archival clutter
+
+2. Canonical Top-Level Build Namespaces
+
+The canonical build tree should use a small number of top-level namespaces:
+
+- `build/debug/`
+- `build/release/`
+- `build/audit/`
+- `build/probes/`
+- `build/tmp/`
+
+Meanings:
+- `build/debug/`: canonical local CMake build tree and the default supported
+  developer workflow
+- `build/release/`: optional release-oriented build output if a separate local
+  tree is needed
+- `build/audit/`: reproducible repository-owned smoke, audit, or gate outputs
+- `build/probes/`: active manual investigations and bounded engineering probes
+- `build/tmp/`: short-lived scratch outputs with no expectation of stability
+
+The repository does not need to populate every namespace at all times.
+The point is to keep the namespace small, readable, and disposable.
+
+3. Relationship To `--build-dir`
+
+`mc check`, `mc build`, `mc run`, and `mc test` may each write to an explicit
+`--build-dir`.
+
+Canonical rule:
+- a `--build-dir` tree is always generated state
+- it should live under `build/` for normal repository-local workflows unless a
+  caller has a specific reason to place it elsewhere
+- its naming should reflect current function, not act as a historical archive
+
+Examples:
+- `build/audit/first_use_smoke`
+- `build/audit/public_cut_smoke`
+- `build/probes/freestanding_console`
+- `build/tmp/manual_variant_probe`
+
+4. What Does Not Belong In `build/`
+
+The following should not be treated as durable `build/` content:
+
+- canonical source examples
+- long-term proof programs that should live under `examples/`
+- compiler-visible regression fixtures that should live under `tests/`
+- durable planning notes or historical rationale that belong in `docs/`
+
+If a local probe proves something important, capture that lesson in a durable
+repository location and then treat the build output as deletable.
+
+5. Naming Rules
+
+Preferred naming:
+- describe the output's current function
+- keep names short and readable
+- avoid accumulating multiple generations of the same probe indefinitely
+
+Prefer:
+- `build/probes/kernel_endpoint_queue`
+- `build/probes/freestanding_console`
+- `build/audit/release_snapshot`
+
+Avoid for new long-lived paths:
+- `build/phaseNN_some_probe`
+- `build/phaseNN_some_probe_v2`
+- `build/phaseNN_some_probe_v3`
+
+Phase labels still belong naturally in:
+- plan documents
+- milestone notes
+- issue summaries
+
+They are usually not the best long-term primary namespace for generated local
+build outputs.
+
+6. Build Tree Retention Rules
+
+Retention should follow purpose:
+
+Keep:
+- `build/debug/` while it is the active local compiler build tree
+- current reproducible audit outputs under `build/audit/` when they are part
+  of active repository workflow validation
+- active in-flight manual probes under `build/probes/`
+
+Delete freely:
+- `build/tmp/` outputs
+- superseded probe variants
+- old one-off project clones once their lessons are captured elsewhere
+- stale command-local build trees with no current owner
+
+7. Test-Generated Outputs
+
+Repository-owned tests and audits may generate command-local build trees.
+
+Canonical rule:
+- such generated outputs are still build outputs, not test inputs
+- they belong under the active build namespace, typically:
+  - `build/debug/...` for CTest-owned local runs
+  - `build/audit/...` for named repository-owned smoke or audit paths
+
+They should not be checked in under `tests/`.
+
+8. Workspace Hygiene Rule
+
+The repository should not rely on `build/` as an informal historical notebook.
+
+If a directory under `build/` is being kept because it is the only surviving
+record of why something mattered, the repository is probably missing one of:
+- a test
+- an example
+- a plan note
+- a decision log entry
+
+9. Minimal Supported Path
+
+The canonical local workflow remains:
+
+```text
+cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/debug -j4
+ctest --test-dir build/debug --output-on-failure
+```
+
+This supported path should stay obvious even if the repository also uses
+additional build-tree namespaces for audits or probes.
+
+10. Evolution Rule
+
+Future toolchain work may refine the exact naming or audit layout, but the
+following constraints should remain stable:
+
+- `build/` stays disposable
+- canonical local build output remains easy to identify
+- generated output is not treated as durable source truth
+- repository-owned audits and manual probes remain clearly separated
+
+Bottom line
+
+The build tree should be a clear workspace, not an accidental archive.
+Modern C should preserve inspectable generated outputs, but it should do so
+through a small number of explicit namespaces and a habit of moving durable
+truth back into `tests/`, `examples/`, or `docs/` once a probe has served its
+purpose.
