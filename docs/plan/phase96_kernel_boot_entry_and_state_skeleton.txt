@@ -1,0 +1,183 @@
+Phase 96 -- Kernel Boot Entry And State Skeleton
+================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Turn the completed Phase 95 freestanding `v0.3` slice into the first honest
+post-slice Canopus kernel bring-up step: prove that one real kernel-owned
+artifact can boot through an explicit architecture entry, initialize one
+deterministic set of fixed kernel state tables, emit one bounded boot marker,
+and stop without yet claiming user-space entry, syscall truth, IPC delivery,
+or broader kernel-image completion.
+
+This document is both the Phase 96 execution note and its closeout.
+It does not claim first user-space entry, real syscall handling, endpoint
+delivery, timer interrupts, scheduler policy, MMU setup, or full Canopus
+kernel bring-up completion.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 88 made freestanding boot-marker truth, manifest
+  hardening, narrow `hal` admission, kernel mechanism representation,
+  task-lifecycle state, static-data follow-through, and external build
+  integration real on the bounded freestanding lane.
+- Phase 89 through Phase 94 then proved one bounded init-owned service story,
+  one explicit capability transfer, one helper-boundary audit, one explicit
+  launch-and-observation path, one timer-backed wake path, and one integrated
+  first-system demo without widening into a public runtime or scheduler
+  framework.
+- Phase 95 then froze that proof ladder into the first admitted freestanding
+  `v0.3` slice statement without yet claiming a real kernel-owned bring-up
+  path.
+- The strongest next Canopus question was therefore no longer whether the
+  language could model the early kernel shapes. It was whether the repository
+  could turn those shapes back into one real kernel-owned boot artifact while
+  keeping the claim smaller than first user-space entry or syscall truth.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names Phase 96 as the first point
+  where the repository should stop talking only about freestanding proof
+  modules and start proving one real kernel-owned boot path.
+- The repository already had the component shapes needed for fixed kernel
+  state, but no active phase yet demonstrated that those shapes can be owned
+  by an explicit architecture entry and deterministic top-level kernel tables
+  in one bounded artifact.
+- Without this step, later kernel planning could overclaim that the first real
+  kernel bring-up had started when the repository still only had pre-kernel
+  freestanding proofs.
+
+Core rule
+---------
+- Keep the claim at kernel boot and kernel-owned state initialization only.
+- Make architecture entry explicit in the root proof module.
+- Keep fixed-size kernel tables, boot records, and ready-state bookkeeping in
+  ordinary structs, enums, arrays, globals, and helper functions.
+- Emit one bounded boot marker and stop before any user-space handoff.
+- Reopen compiler work only if this kernel-owned boot proof exposes a concrete
+  parser, sema, MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding kernel target with one root boot-entry module and one
+   imported helper module for fixed kernel record shapes
+2. one explicit architecture entry function that initializes deterministic
+   process, task, ready-queue, and boot-record state in kernel-owned globals
+3. one bounded boot marker emitted only after the kernel state tables are
+   fully initialized and validated
+4. one runtime proof that the kernel stops before any user-space entry while
+   preserving the exact initialized slot contents and queue shape
+5. one MIR inspection proving that the state skeleton is carried through
+   ordinary imported types, aggregate initialization, top-level globals, and
+   explicit global-address writes rather than through hidden runtime help
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross the kernel-owned boot boundary now because the
+freestanding proof ladder is already complete enough to support one explicit
+boot-entry and state-skeleton proof without inventing syscalls, IPC, or first
+user-space entry in the same step.
+
+What this phase proves
+----------------------
+- the existing language, freestanding build path, and runtime startup can
+  carry one explicit Canopus kernel entry artifact rather than only earlier
+  proof modules
+- kernel-owned fixed tables for processes, tasks, ready-state, and boot-log
+  records can be initialized deterministically at boot through ordinary code
+  and retained as top-level kernel state
+- the repository can stop honestly at boot-state skeleton truth without yet
+  implying real user-space handoff, syscall handling, or broader kernel-image
+  policy
+
+Deliverables
+------------
+- one canonical Phase 96 closeout note recording the implemented kernel boot
+  entry and state-skeleton proof
+- one focused freestanding tool regression that builds and runs a bounded
+  kernel artifact through explicit architecture entry and deterministic kernel
+  table initialization
+- runtime validation that the initialized kernel state matches the bounded
+  process-slot, task-slot, ready-queue, and boot-record contract and that no
+  user-space handoff occurs
+- MIR inspection proving the kernel state skeleton stays within ordinary
+  imported-module, aggregate-init, top-level-global, and pointer-based global
+  write behavior
+- refreshed planning notes so the Canopus kernel roadmap records Phase 96 as
+  concrete and Phase 97 becomes the next speculative owner
+
+Suggested execution order
+-------------------------
+1. Define one imported helper module for the kernel-owned table, record, and
+   state-enum shapes.
+2. Build one freestanding kernel target whose root module owns architecture
+   entry and boot-state policy explicitly.
+3. Validate that the process slots, task slots, ready queue, and boot records
+   are initialized exactly once and remain deterministic through program exit.
+4. Inspect the merged MIR to confirm that the proof remains ordinary imported
+   type and global-state lowering.
+5. Refresh the planning surface so Phase 96 is concrete and Phase 97 remains
+   the next kernel bring-up owner.
+
+Exit criteria
+-------------
+- one freestanding target boots through an explicit architecture entry and
+  initializes deterministic kernel-owned process, task, ready-queue, and boot
+  record tables
+- the boot path emits exactly one bounded Phase 96 marker and stops before any
+  user-space entry claim
+- the runtime proof validates the initialized slot contents and queue state
+  exactly
+- the merged MIR preserves imported helper declarations, aggregate
+  initialization, and explicit top-level kernel-state operations
+- the planning surface records Phase 96 as concrete rather than speculative
+
+Non-goals
+---------
+- first user-space entry, address-space setup, or program loading
+- syscall admission, IPC delivery, endpoint ownership, or handle tables
+- public scheduler, timer, or interrupt policy
+- claiming a general kernel image, broader target support, or full Canopus
+  kernel completion
+
+Implemented slice
+-----------------
+- the repository now includes a real `kernel/` tree with `kernel/build.toml`,
+  `kernel/src/main.mc`, `kernel/src/state.mc`, `kernel/src/capability.mc`,
+  `kernel/src/endpoint.mc`, `kernel/src/interrupt.mc`, `kernel/src/syscall.mc`,
+  and `kernel/src/init.mc`, and the Phase 96 freestanding tool regression now
+  builds that repository-owned kernel target directly instead of generating a
+  throwaway proof module inside the test harness
+- within that owned kernel tree, the state helper module owns the fixed
+  process-slot, task-slot, ready-queue, and boot-record shapes while the root
+  proof module keeps architecture entry, table seeding, boot validation, and
+  stop-before-user-space policy explicit
+- the proof validates that architecture entry seeds one kernel descriptor, one
+  boot process slot, one boot task slot, one single-entry ready queue, one
+  root capability slot, one empty endpoint table, one masked-then-quiescent
+  interrupt controller skeleton, one closed syscall gate, and one bounded boot
+  record sequence, then emits the Phase 96 marker only after the tables are
+  fully initialized and verified
+- the proof also validates that no user-space entry is recorded, the ready
+  queue contains only the boot task, and the boot log remains deterministic at
+  exit
+- the backlog, decision log, and speculative Canopus kernel roadmap now record
+  Phase 96 as the first concrete real-kernel bring-up step while keeping Phase
+  97 as the next explicit owner for address-space and first-user-entry work
+
+Closeout statement
+------------------
+Phase 96 is complete as a kernel boot entry and state-skeleton proof. The
+repository still does not claim address-space setup, user-space entry,
+syscall truth, or broader Canopus kernel completion, but it now has one honest
+real-kernel artifact that boots through explicit architecture entry, seeds
+deterministic kernel-owned state tables, emits one bounded boot marker, and
+stops at exactly that boundary.

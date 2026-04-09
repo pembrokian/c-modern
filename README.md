@@ -26,7 +26,7 @@ What is in place:
 - the admitted repository-bounded Lane B package-grouping slice with `examples/real/issue_rollup/`, proving one library-first hosted project layout with grouped internal module roots beyond one source root before the later static-library admission
 - the admitted repository-bounded Phase 29 static-library slice with `examples/real/issue_rollup/`, proving one hosted `staticlib` target consumed through executable targets and ordinary `mc test` workflow through the same archive boundary
 - the admitted repository-bounded Phase 30 plus Phase 74 hardening slice with the same `examples/real/issue_rollup/` proof, now covering deterministic same-build-dir selected-target reuse across the shipped executable consumers linked through the admitted static-library boundary
-- the admitted repository-bounded freestanding proof slice with explicit `env = "freestanding"` executable targets, explicit target identity and startup selection, optional manifest-owned extra link inputs, narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>` support, one bounded endpoint-queue representation proof, one minimal task-lifecycle representation proof, one kernel static-data follow-through proof with ordinary top-level consts, globals, structs, and enums, one bounded kernel build-integration audit proving emitted objects compose with a minimal external relink step, one bounded init-to-log-service handshake proof for the first small user-space policy path, one bounded capability-handle transfer proof showing explicit user-space authority handoff and use, one bounded ordinary helper-module proof showing repeated transfer and request scaffolding can stay in user space without a widened runtime surface, one bounded user-space lifecycle proof showing explicit launch authority and exit observation can stay in ordinary user code, one bounded timer wake proof showing one deterministic event source can wake one blocked worker without widening into a general interrupt or scheduler framework, and one bounded first-system demo integration proof showing kernel boot, init, two small services, one timer wake, one request-reply exchange, and one client-exit observation can compose honestly without widening into a service framework or full OS-completion claim, proved by the Phase 81 boot-marker, Phase 82 explicit link-input, Phase 83 polling-console, Phase 85 kernel queue, Phase 86 task lifecycle, Phase 87 static-data, Phase 88 manual-link, Phase 89 init-to-log-service, Phase 90 capability-transfer, Phase 91 helper-boundary, Phase 92 user-space-lifecycle, Phase 93 timer-wake, and Phase 94 first-system-demo tool regressions without claiming broad freestanding packaging or cross-compilation
+- the admitted repository-bounded freestanding proof slice with explicit `env = "freestanding"` executable targets, explicit target identity and startup selection, optional manifest-owned extra link inputs, narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>` support, one bounded endpoint-queue representation proof, one minimal task-lifecycle representation proof, one kernel static-data follow-through proof with ordinary top-level consts, globals, structs, and enums, one bounded kernel build-integration audit proving emitted objects compose with a minimal external relink step, one bounded init-to-log-service handshake proof for the first small user-space policy path, one bounded capability-handle transfer proof showing explicit user-space authority handoff and use, one bounded ordinary helper-module proof showing repeated transfer and request scaffolding can stay in user space without a widened runtime surface, one bounded user-space lifecycle proof showing explicit launch authority and exit observation can stay in ordinary user code, and one bounded timer wake proof showing one deterministic event source can wake one blocked worker without widening into a general interrupt or scheduler framework, proved by the Phase 81 boot-marker, Phase 82 explicit link-input, Phase 83 polling-console, Phase 85 kernel queue, Phase 86 task lifecycle, Phase 87 static-data, Phase 88 manual-link, Phase 89 init-to-log-service, Phase 90 capability-transfer, Phase 91 helper-boundary, Phase 92 user-space-lifecycle, and Phase 93 timer-wake tool regressions without claiming broad freestanding packaging or cross-compilation
 - parser, sema, MIR, and tool smoke tests wired through CTest and exposed through the same `make` command path used for local development
 
 Supported hosted slice:
@@ -48,7 +48,7 @@ Supported freestanding proof slice:
 - admitted project command path: `mc build --project <build.toml> --target <name> --build-dir <dir>`
 - admitted manifest boundary: freestanding `exe` targets with explicit `target`, explicit `[targets.<name>.runtime] startup`, and optional explicit `[targets.<name>.link] inputs = [...]`
 - admitted public stdlib boundary: narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>`
-- admitted proof set: Phase 81 boot-marker executable proof, Phase 82 explicit manifest-owned link-input proof, Phase 83 deterministic polling-console proof, Phase 85 kernel endpoint queue smoke proof, Phase 86 task lifecycle kernel proof, Phase 87 kernel static-data and artifact follow-through proof, Phase 88 kernel build integration audit, Phase 89 init-to-log-service handshake proof, Phase 90 capability-handle transfer proof, Phase 91 early user-space helper-boundary audit, Phase 92 user-space lifecycle follow-through proof, Phase 93 timer wake proof, and Phase 94 first-system demo integration proof
+- admitted proof set: Phase 81 boot-marker executable proof, Phase 82 explicit manifest-owned link-input proof, Phase 83 deterministic polling-console proof, Phase 85 kernel endpoint queue smoke proof, Phase 86 task lifecycle kernel proof, Phase 87 kernel static-data and artifact follow-through proof, Phase 88 kernel build integration audit, Phase 89 init-to-log-service handshake proof, Phase 90 capability-handle transfer proof, Phase 91 early user-space helper-boundary audit, Phase 92 user-space lifecycle follow-through proof, and Phase 93 timer wake proof
 - unsupported today: `mc run` or `mc test` freestanding workflow admission, general cross-compilation, non-bootstrap target families, linker scripts, arbitrary linker flags, shared libraries, kernel-image packaging, and broader `hal` taxonomy
 
 Supported host assumptions:
@@ -104,22 +104,22 @@ make release-snapshot-prep
 Compiler entrypoint on the supported path:
 
 ```sh
-build/debug/bin/mc
+build/debug/mc
 ```
 
 First-use smoke validation:
 
 ```sh
-build/debug/bin/mc --help
-build/debug/bin/mc check tests/cases/hello.mc
-build/debug/bin/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/first_use_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/bin/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/first_use_smoke/issue_rollup
+build/debug/mc --help
+build/debug/mc check tests/cases/hello.mc
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/first_use_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/first_use_smoke/issue_rollup
 ```
 
 Supported command patterns:
 
-- direct-source inspection or build: `build/debug/bin/mc check <file.mc>` and `build/debug/bin/mc build <file.mc> --build-dir <dir>`
-- project inspection, build, run, or test: `build/debug/bin/mc check --project <build.toml>`, `build/debug/bin/mc build --project <build.toml> --build-dir <dir>`, `build/debug/bin/mc run --project <build.toml> --build-dir <dir> -- <args>`, and `build/debug/bin/mc test --project <build.toml> --build-dir <dir>`
+- direct-source inspection or build: `build/debug/mc check <file.mc>` and `build/debug/mc build <file.mc> --build-dir <dir>`
+- project inspection, build, run, or test: `build/debug/mc check --project <build.toml>`, `build/debug/mc build --project <build.toml> --build-dir <dir>`, `build/debug/mc run --project <build.toml> --build-dir <dir> -- <args>`, and `build/debug/mc test --project <build.toml> --build-dir <dir>`
 
 Current module-model contract:
 
@@ -130,17 +130,15 @@ Current module-model contract:
 
 Artifact expectations:
 
-- `build/debug/bin/mc` is the produced compiler entrypoint for the supported path
-- primary compiled targets now live under `build/debug/bin/...` and `build/debug/lib/...` instead of the binary root
+- `build/debug/mc` is the produced compiler entrypoint for the supported path
 - `build/` is disposable generated state
 - command-local `--build-dir` trees are disposable generated state and should be treated as build outputs, not source inputs
 - repository-owned smoke and audit runs should prefer `build/debug/audit/...`
 - manual probes should prefer `build/debug/probes/...`
 - short-lived scratch runs should prefer `build/debug/tmp/...`
 - the grouped tool regression suites now root disposable outputs under semantic suite directories such as `build/debug/tool/workflow/...`, `build/debug/tool/build_state/...`, `build/debug/tool/real_projects/...`, and `build/debug/tool/freestanding/...`
-- the grouped codegen executable suites now keep disposable executable proof trees under semantic suite roots such as `build/debug/codegen/executable/core/...`, `build/debug/codegen/executable/stdlib/...`, and `build/debug/codegen/executable/project/...`
+- the grouped codegen executable suites now keep disposable executable proof trees under nested semantic work roots such as `build/debug/stage5_exec_stdlib_tests/...` and `build/debug/stage5_exec_project_tests/...` rather than creating fresh top-level `phase*` trees
 - remaining top-level `build/debug/phase*` entries are reserved for intentionally preserved manual or probe work, not active repository-owned regression outputs
-- `make clean-legacy-build-debris` prunes obsolete root-level binaries and libraries plus legacy top-level `phase*`, `stage*`, and `tmp_*` debris while preserving manual, probe, repro, and check paths
 - `make build` and `make test` are convenience wrappers around the same CMake-based path, not a separate supported installation story
 - `make first-use-smoke` is the repo-owned convenience wrapper for the narrow documented first-use validation path, not a broader public-cut certification
 - `make public-cut-smoke` is the repo-owned convenience wrapper for the broader current public-cut smoke audit on the admitted hosted slice
@@ -161,7 +159,6 @@ make release-readiness-audit
 make v0_2_gate
 make freestanding-support-audit
 make release-snapshot-prep
-make clean-legacy-build-debris
 make dump-paths FILE=tests/cases/hello.mc
 make check FILE=tests/cases/hello.mc
 
@@ -170,31 +167,31 @@ cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/debug
 ctest --test-dir build/debug --output-on-failure
 ctest --test-dir build/debug -R 'mc_tool_|mc_codegen_executable_(stdlib|project)_unit' --output-on-failure
-build/debug/bin/mc check tests/cases/hello.mc --dump-ast --emit-dump-paths
-build/debug/bin/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/probes/smoke_return_zero --dump-backend
-build/debug/bin/mc check tests/stdlib/hello_stdout.mc
-build/debug/bin/mc build tests/stdlib/hello_stdout.mc --build-dir build/debug/probes/hello_stdout
-build/debug/bin/mc check --project tests/tool/phase7_project/build.toml
-build/debug/bin/mc build --project tests/tool/phase7_project/build.toml --build-dir build/debug/probes/phase7_project
-build/debug/bin/mc run --project tests/tool/phase7_project/build.toml --build-dir build/debug/probes/phase7_project
-build/debug/bin/mc run --project examples/real/grep_lite/build.toml --build-dir build/debug/probes/grep_lite -- alpha examples/real/grep_lite/tests/sample.txt
-build/debug/bin/mc test --project examples/real/hash_tool/build.toml --build-dir build/debug/probes/hash_tool
-build/debug/bin/mc run --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr -- examples/real/arena_expr/tests/sample.expr
-build/debug/bin/mc run --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
-build/debug/bin/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
-build/debug/bin/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
-build/debug/bin/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
-build/debug/bin/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
-build/debug/bin/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
-build/debug/bin/mc run --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay -- "phase forty five"
-build/debug/bin/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay
-build/debug/bin/mc run --project examples/real/evented_echo/build.toml --build-dir build/debug/probes/evented_echo -- 4040
-build/debug/bin/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/probes/evented_echo
-build/debug/bin/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-core --build-dir build/debug/probes/issue_rollup
-build/debug/bin/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/issue_rollup
-build/debug/bin/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/bin/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/bin/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/issue_rollup
+build/debug/mc check tests/cases/hello.mc --dump-ast --emit-dump-paths
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/probes/smoke_return_zero --dump-backend
+build/debug/mc check tests/stdlib/hello_stdout.mc
+build/debug/mc build tests/stdlib/hello_stdout.mc --build-dir build/debug/probes/hello_stdout
+build/debug/mc check --project tests/tool/phase7_project/build.toml
+build/debug/mc build --project tests/tool/phase7_project/build.toml --build-dir build/debug/probes/phase7_project
+build/debug/mc run --project tests/tool/phase7_project/build.toml --build-dir build/debug/probes/phase7_project
+build/debug/mc run --project examples/real/grep_lite/build.toml --build-dir build/debug/probes/grep_lite -- alpha examples/real/grep_lite/tests/sample.txt
+build/debug/mc test --project examples/real/hash_tool/build.toml --build-dir build/debug/probes/hash_tool
+build/debug/mc run --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr -- examples/real/arena_expr/tests/sample.expr
+build/debug/mc run --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
+build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
+build/debug/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
+build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
+build/debug/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
+build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
+build/debug/mc run --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay -- "phase forty five"
+build/debug/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay
+build/debug/mc run --project examples/real/evented_echo/build.toml --build-dir build/debug/probes/evented_echo -- 4040
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/probes/evented_echo
+build/debug/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-core --build-dir build/debug/probes/issue_rollup
+build/debug/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/issue_rollup
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/issue_rollup
 ```
 
 Grouped regression targets:
@@ -222,16 +219,16 @@ make public-cut-smoke
 ```
 
 ```sh
-build/debug/bin/mc check tests/cases/hello.mc
-build/debug/bin/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/audit/public_cut_smoke/smoke_return_zero
-build/debug/bin/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/bin/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/bin/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup
-build/debug/bin/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/audit/public_cut_smoke/worker_queue
-build/debug/bin/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/audit/public_cut_smoke/pipe_handoff
-build/debug/bin/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/audit/public_cut_smoke/pipe_ready
-build/debug/bin/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/audit/public_cut_smoke/line_filter_relay
-build/debug/bin/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/audit/public_cut_smoke/evented_echo
+build/debug/mc check tests/cases/hello.mc
+build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/audit/public_cut_smoke/smoke_return_zero
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup
+build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/audit/public_cut_smoke/worker_queue
+build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/audit/public_cut_smoke/pipe_handoff
+build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/audit/public_cut_smoke/pipe_ready
+build/debug/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/audit/public_cut_smoke/line_filter_relay
+build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/audit/public_cut_smoke/evented_echo
 ```
 
 First public-cut hosted statement:
@@ -280,7 +277,7 @@ Notes:
 - the documented current `v0.2` gate is now also automated through `make v0_2_gate` and the `mc_v0_2_gate` CTest entry; keep those aligned with the written tag-or-defer outcome.
 - the documented freestanding support split is now also automated through `make freestanding-support-audit` and the `mc_freestanding_support_audit` CTest entry; keep those aligned with the published freestanding proof statement.
 - the documented release-snapshot preparation path is now also automated through `make release-snapshot-prep`, validated through the `mc_release_snapshot_prep` audit entry, and writes `build/debug/release/v0.2-snapshot.txt`; keep those aligned with the written maintainer release-execution path.
-- `make clean-legacy-build-debris` now provides the conservative in-place cleanup path for obsolete root-level binaries and libraries plus legacy top-level `phase*`, `stage*`, and `tmp_*` residue while preserving manual, probe, repro, and check paths.
-- the shared grouped tool implementation source now lives at `tests/tool/tool_suite_tests.cpp`; `tests/tool/phase7_tool_tests.cpp` remains only as a compatibility shim for older references in archived notes.
+- the grouped tool test implementation is now split across `tests/tool/tool_suite_common.cpp`, `tests/tool/tool_workflow_suite.cpp`, `tests/tool/tool_build_state_suite.cpp`, and `tests/tool/tool_real_project_suite.cpp`; `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` remain only as thin compatibility runners for older references in archived notes.
+- the grouped tool test implementation is now split across `tests/tool/tool_suite_common.cpp`, `tests/tool/tool_workflow_suite.cpp`, `tests/tool/tool_build_state_suite.cpp`, `tests/tool/tool_real_project_suite.cpp`, and the freestanding subtree under `tests/tool/freestanding/`; `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` remain only as thin compatibility runners for older references in archived notes.
 - known limitations remain explicit: the supported host target is still Darwin arm64 only, the admitted freestanding slice is still only a repository-bounded proof path rather than a general non-hosted workflow claim, the admitted networking surface remains narrow IPv4 TCP plus poller support rather than a broader async or portability claim, the admitted hosted `sync` slice still excludes public compare-exchange, exchange, fetch-add, schedulers, and broader portability claims even though `condvar_broadcast(...)` is implemented, and the admitted `time` plus `path` helper slice still stops short of sleep, wall-clock, timezone, normalization, or broader platform APIs.
 - `make` is a thin convenience wrapper around the canonical CMake workflow above.

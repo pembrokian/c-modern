@@ -948,8 +948,8 @@ void TestPrivateAndInternalIncrementalBehavior(const std::filesystem::path& bina
 
 namespace mc::tool_tests {
 
-void RunPhase7BuildStateSuite(const std::filesystem::path& binary_root,
-                              const std::filesystem::path& mc_path) {
+void RunBuildStateToolSuite(const std::filesystem::path& binary_root,
+                            const std::filesystem::path& mc_path) {
     const std::filesystem::path suite_root = binary_root / "tool" / "build_state";
 
     TestProjectBuildAndMciEmission(suite_root, mc_path);

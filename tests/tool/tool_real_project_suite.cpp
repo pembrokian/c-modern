@@ -2377,9 +2377,9 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
 
 namespace mc::tool_tests {
 
-void RunPhase7RealProjectSuite(const std::filesystem::path& source_root,
-                               const std::filesystem::path& binary_root,
-                               const std::filesystem::path& mc_path) {
+void RunRealProjectToolSuite(const std::filesystem::path& source_root,
+                             const std::filesystem::path& binary_root,
+                             const std::filesystem::path& mc_path) {
     const std::filesystem::path suite_root = binary_root / "tool" / "real_projects";
 
     TestRealGrepLiteProject(source_root, suite_root, mc_path);

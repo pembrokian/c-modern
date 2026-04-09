@@ -1,0 +1,17 @@
+schema = 1
+project = "canopus-kernel"
+default = "kernel"
+
+[targets.kernel]
+kind = "exe"
+package = "kernel"
+root = "src/main.mc"
+mode = "debug"
+env = "freestanding"
+target = "arm64-apple-darwin25.4.0"
+
+[targets.kernel.search_paths]
+modules = ["src", "../stdlib"]
+
+[targets.kernel.runtime]
+startup = "bootstrap_main"

@@ -1,0 +1,168 @@
+Phase 95 -- Freestanding v0.3 Slice Audit
+==========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Turn the completed Phase 81 through Phase 94 freestanding proof ladder into
+the first honest admitted freestanding `v0.3` slice statement so the
+repository can describe what that Canopus-driven wave now supports without
+implying full Canopus Lite completion, broad non-hosted workflow support,
+broad target expansion, or a reopened core-language redesign.
+
+This document is both the Phase 95 execution note and its closeout.
+It does not add a new compiler, runtime, or stdlib feature family.
+It closes a support-truth gap at the documentation and audit boundary after
+the first integrated freestanding demo already landed.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 84 made freestanding boot-marker truth, manifest
+  hardening, narrow `hal` admission, and the first freestanding support-note
+  split real.
+- Phase 85 through Phase 88 then proved bounded kernel mechanism
+  representation, task lifecycle, static-data follow-through, and external
+  relink honesty on that same freestanding lane.
+- Phase 89 through Phase 94 then proved the first bounded user-space policy
+  stories, one deterministic timer wake, and one integrated first-system
+  demo without widening into a service framework, scheduler runtime,
+  namespace policy, or full OS completion claim.
+- The strongest remaining gap after Phase 94 was no longer missing freestanding
+  proof behavior. It was support truth: the repository still described that
+  lane primarily as a freestanding proof slice rather than as the first
+  admitted freestanding `v0.3` slice, and the focused audit still guarded the
+  older wording rather than the fuller post-Phase-94 support statement.
+
+Problem being solved
+--------------------
+- The repository now has a real bounded Canopus-driven freestanding wave, but
+  public support wording still risked underselling that result as only a
+  scattered proof set or overselling it as broad freestanding or Canopus
+  support.
+- The existing freestanding support note was correctly separate from the
+  hosted `v0.2` note, but it still needed one final tightening step so the
+  repository could say what the first admitted freestanding `v0.3` slice is,
+  what proof ladder backs it, and what remains explicitly deferred.
+- Without a Phase 95 closeout, later planning could too easily treat the
+  first-system demo as equivalent to general non-hosted support or treat the
+  `v0.3` direction note as still purely speculative even though the first
+  bounded slice is now materially real.
+
+Core rule
+---------
+- Keep the hosted `v0.2` statement and the freestanding `v0.3` statement
+  separate.
+- Describe exactly the admitted Phase 81 through Phase 94 proof-backed slice.
+- Name the still-deferred boundaries explicitly.
+- Refresh the focused support audit so drift is caught mechanically.
+- Do not widen the slice while documenting it.
+
+Chosen slice for this phase
+---------------------------
+Targeted implementation shape:
+
+1. one canonical Phase 95 closeout note recording the first admitted
+   freestanding `v0.3` slice audit
+2. one refresh of the published freestanding support note so it states the
+   first admitted freestanding `v0.3` slice rather than only a generic proof
+   slice
+3. one README and hosted-note refresh keeping the hosted-versus-freestanding
+   split explicit while reflecting the new `v0.3` wording
+4. one focused refresh of the existing `mc_freestanding_support_audit` so the
+   support-surface checks match the new statement exactly
+5. one planning-surface refresh so the speculative roadmap records Phase 95 as
+   concrete rather than still pending
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first freestanding `v0.3` support question
+now because the proof ladder already exists. The honest remaining work is to
+freeze that ladder into a published bounded support statement and explicit
+deferred set rather than inventing another technical proof first.
+
+What this phase proves
+----------------------
+- the repository can now state one first admitted freestanding `v0.3` slice
+  grounded in concrete Phase 81 through Phase 94 proofs rather than only in
+  roadmap intent
+- that statement can remain separate from the hosted `v0.2` claim while still
+  naming the concrete freestanding command path, manifest boundary, `hal`
+  boundary, proof ladder, and deferred fronts
+- the existing documentation audit surface is sufficient to keep that support
+  statement honest once its assertions are refreshed to the Phase 95 wording
+
+Deliverables
+------------
+- one canonical Phase 95 closeout note recording the implemented freestanding
+  `v0.3` slice audit
+- one refreshed `docs/plan/freestanding_support_statement.txt` that states the
+  first admitted freestanding `v0.3` slice and its deferred boundaries
+- one README refresh and one hosted release-note refresh keeping the hosted
+  and freestanding support statements aligned and separate
+- one refreshed focused `mc_freestanding_support_audit` validating the Phase
+  95 wording mechanically
+- aligned backlog, decision-log, and speculative-roadmap updates recording
+  Phase 95 as concrete
+
+Suggested execution order
+-------------------------
+1. Write the Phase 95 closeout note around the already landed freestanding
+   proof ladder.
+2. Refresh the published freestanding support note to state the first admitted
+   freestanding `v0.3` slice explicitly.
+3. Refresh README and the hosted release note so the split remains explicit.
+4. Tighten the focused freestanding support audit around the new wording.
+5. Update the planning surface so the roadmap no longer leaves Phase 95
+   speculative.
+
+Exit criteria
+-------------
+- the repository has one published statement for the first admitted
+  freestanding `v0.3` slice
+- that statement names both the admitted Phase 81 through Phase 94 proof set
+  and the still-deferred fronts explicitly
+- the hosted `v0.2` statement remains separate and unchanged in scope
+- the focused freestanding support audit enforces the Phase 95 wording
+- the planning surface records Phase 95 as concrete rather than speculative
+
+Non-goals
+---------
+- adding a new freestanding command beyond the admitted `mc build` proof path
+- claiming full Canopus Lite completion, namespace policy, or general service
+  frameworks
+- admitting broad target support, cross-compilation, multi-architecture
+  packaging, or broader linker control
+- reopening core-language work without a fresh proof-owned compiler gap
+
+Implemented slice
+-----------------
+- published this Phase 95 closeout note as the canonical record that the
+  completed Phase 81 through Phase 94 proof ladder now constitutes the first
+  admitted freestanding `v0.3` slice
+- refreshed `docs/plan/freestanding_support_statement.txt` so it now speaks in
+  terms of the first admitted freestanding `v0.3` slice, keeps the proof set
+  frozen at Phase 81 through Phase 94, and names full Canopus completion,
+  broad target support, broader non-hosted workflows, and language redesign as
+  still deferred
+- refreshed README and the hosted release-hardening note so they point to the
+  same freestanding `v0.3` slice statement without broadening the hosted claim
+- refreshed `tests/cmake/run_freestanding_support_audit.cmake` so the focused
+  audit now checks the Phase 95 `v0.3` wording rather than only the earlier
+  generic freestanding-proof wording
+- aligned backlog, decision log, and the speculative `v0.3` roadmap so Phase
+  95 is now concrete and the roadmap horizon through Phase 95 is fully
+  occupied by implemented anchors
+
+Closeout statement
+------------------
+Phase 95 is complete as a freestanding `v0.3` slice audit. The repository
+still does not claim full Canopus Lite completion, broad non-hosted workflow
+support, broad target or packaging support, or a reopened core-language wave,
+but it can now state the first admitted freestanding `v0.3` slice honestly,
+tie that statement directly to the Phase 81 through Phase 94 proof ladder,
+and keep it mechanically separated from the hosted `v0.2` support claim.

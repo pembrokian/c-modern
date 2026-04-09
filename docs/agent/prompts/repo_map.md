@@ -7,6 +7,8 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
+- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 96 boot-entry and state-skeleton kernel target
+- `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Canopus source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
 - `docs/plan/decision_log.txt`: record of intentional limited solutions and deferred fuller fixes
@@ -24,6 +26,13 @@ This file is a fast orientation map for agents working in this repository.
 5. `compiler/codegen_llvm`
 
 ### Key Directories
+
+- `kernel`
+  - repository-owned Canopus kernel sources rather than disposable proof-only fixtures
+  - `build.toml`: freestanding kernel manifest for the active bring-up slice
+  - `src/main.mc`: explicit architecture entry and bounded boot-state validation
+  - `src/state.mc`: kernel descriptor, process-slot, task-slot, ready-queue, and boot-log records
+  - `src/capability.mc`, `src/endpoint.mc`, `src/interrupt.mc`, `src/syscall.mc`, `src/init.mc`: bounded subsystem skeleton records for later kernel phases
 
 - `compiler/driver`
   - CLI entrypoint and pipeline orchestration
@@ -84,13 +93,24 @@ This file is a fast orientation map for agents working in this repository.
 
 - `tests/tool`
   - smoke and support-layer tests for the driver/tooling path
+  - Canopus-facing execution proofs still stay here for now; do not create a separate `tests/tool/canopus/` subtree yet
   - grouped tool coverage now lives in:
-    - `tests/tool/tool_suite_tests.cpp`: shared grouped tool regression implementation
+    - `tests/tool/tool_suite_common.cpp`: shared grouped tool helpers
     - `tests/tool/tool_workflow_tests.cpp`: workflow and CLI/project validation driver
+    - `tests/tool/tool_workflow_suite.cpp`: workflow and CLI/project grouped implementation
     - `tests/tool/tool_build_state_tests.cpp`: build-state and incremental rebuild driver
+    - `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
     - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
+    - `tests/tool/tool_real_project_suite.cpp`: real-project grouped implementation
     - `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
-  - `tests/tool/phase7_tool_tests.cpp` is now only a compatibility shim that includes `tool_suite_tests.cpp`
+    - `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
+    - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
+    - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator
+    - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase96_boot_entry.cpp`: one kernel proof per file
+    - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
+    - `tests/tool/README.md`: local structure and validation note for the tool test family
+  - if freestanding or Canopus coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split
+  - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` are thin compatibility runners only
 
 - `tests/support`
   - local test harness support code
@@ -110,6 +130,7 @@ This file is a fast orientation map for agents working in this repository.
 - Full Phase 3 from `docs/plan/plan.txt` is still not complete.
 - Primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`.
 - Repository-owned smoke and regression outputs should prefer semantic build-tree roots such as `build/debug/audit/...`, `build/debug/probes/...`, `build/debug/tmp/...`, `build/debug/tool/...`, and `build/debug/codegen/executable/...`.
+- Canopus-specific disposable outputs should stay under those same roots, usually beneath `build/debug/tool/freestanding/...` for repo-owned regressions or `build/debug/probes/canopus/...` for manual experiments.
 - Remaining top-level `build/debug/phase*` paths are preserved manual or probe areas rather than active regression output policy.
 
 ## Where To Change Things

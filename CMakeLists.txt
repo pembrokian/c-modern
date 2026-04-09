@@ -146,7 +146,15 @@ target_link_libraries(mc_tool_real_project_tests PRIVATE mc_support mc_test_supp
 add_executable(mc_tool_freestanding_tests
     tests/tool/tool_freestanding_tests.cpp
     tests/tool/tool_suite_common.cpp
-    tests/tool/tool_freestanding_suite.cpp
+    tests/tool/freestanding/bootstrap/suite.cpp
+    tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp
+    tests/tool/freestanding/kernel/phase86_task_lifecycle.cpp
+    tests/tool/freestanding/kernel/phase87_static_data.cpp
+    tests/tool/freestanding/kernel/phase88_build_integration.cpp
+    tests/tool/freestanding/kernel/phase96_boot_entry.cpp
+    tests/tool/freestanding/kernel/suite.cpp
+    tests/tool/freestanding/system/suite.cpp
+    tests/tool/freestanding/suite.cpp
 )
 
 target_include_directories(mc_tool_freestanding_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -689,9 +689,9 @@ void TestExecutableTargetRejectsNonStaticLibraryLink(const std::filesystem::path
 
 namespace mc::tool_tests {
 
-void RunPhase7WorkflowSuite(const std::filesystem::path& source_root,
-                            const std::filesystem::path& binary_root,
-                            const std::filesystem::path& mc_path) {
+void RunWorkflowToolSuite(const std::filesystem::path& source_root,
+                          const std::filesystem::path& binary_root,
+                          const std::filesystem::path& mc_path) {
     const std::filesystem::path suite_root = binary_root / "tool" / "workflow";
 
     TestHelpMentionsRun(suite_root, mc_path);

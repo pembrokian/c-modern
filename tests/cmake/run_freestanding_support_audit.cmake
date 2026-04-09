@@ -27,11 +27,15 @@ endfunction()
 require_contains(
   "README"
   "${README_CONTENT}"
-  "Supported freestanding proof slice:")
+  "Supported freestanding v0.3 slice:")
 require_contains(
   "README"
   "${README_CONTENT}"
   "make freestanding-support-audit")
+require_contains(
+  "README"
+  "${README_CONTENT}"
+  "first admitted freestanding `v0.3` slice")
 require_contains(
   "README"
   "${README_CONTENT}"
@@ -52,16 +56,24 @@ require_not_contains(
 require_contains(
   "release_hardening_hosted_slice.txt"
   "${HOSTED_NOTE_CONTENT}"
-  "This note is intentionally separate from the repository-bounded freestanding")
+  "This note is intentionally separate from the first admitted freestanding")
 require_contains(
   "release_hardening_hosted_slice.txt"
   "${HOSTED_NOTE_CONTENT}"
-  "For the separate repository-bounded freestanding proof statement, see")
+  "For the separate first admitted freestanding `v0.3` slice statement, see")
 
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"
+  "first admitted freestanding `v0.3` slice statement")
+require_contains(
+  "freestanding_support_statement.txt"
+  "${FREESTANDING_NOTE_CONTENT}"
   "admitted public stdlib boundary: narrow `hal` `mmio_ptr<T>`,")
+require_contains(
+  "freestanding_support_statement.txt"
+  "${FREESTANDING_NOTE_CONTENT}"
+  "admitted support-statement posture: first admitted freestanding `v0.3`")
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"
@@ -90,6 +102,10 @@ require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"
   "Phase 94 first-system demo integration proof")
+require_contains(
+  "freestanding_support_statement.txt"
+  "${FREESTANDING_NOTE_CONTENT}"
+  "the repository still does not claim full Canopus Lite completion")
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"

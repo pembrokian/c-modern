@@ -11,6 +11,6 @@ int main(int argc, char** argv) {
 	const std::filesystem::path binary_root = argv[2];
 	const std::filesystem::path mc_path = binary_root / "bin" / "mc";
 
-	mc::tool_tests::RunPhase7BuildStateSuite(binary_root, mc_path);
+	mc::tool_tests::RunBuildStateToolSuite(binary_root, mc_path);
 	return 0;
 }

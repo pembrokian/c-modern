@@ -66,11 +66,24 @@ ctest --test-dir build/debug -R mc_tool_freestanding_unit --output-on-failure
 
 Active grouped regression layout:
 
-- `tests/tool/tool_suite_tests.cpp`: shared grouped tool regression implementation
+- `tests/tool/tool_suite_common.cpp`: shared grouped tool helpers
 - `tests/tool/tool_workflow_tests.cpp`: workflow and CLI/project validation driver
+- `tests/tool/tool_workflow_suite.cpp`: workflow and CLI/project grouped implementation
 - `tests/tool/tool_build_state_tests.cpp`: build-state, imported-artifact, and incremental rebuild driver
+- `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
 - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
+- `tests/tool/tool_real_project_suite.cpp`: real-project grouped implementation
 - `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
+- `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
+- `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
+- `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding grouped orchestrator
+- `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`: endpoint-queue proof
+- `tests/tool/freestanding/kernel/phase86_task_lifecycle.cpp`: task-lifecycle proof
+- `tests/tool/freestanding/kernel/phase87_static_data.cpp`: kernel static-data proof
+- `tests/tool/freestanding/kernel/phase88_build_integration.cpp`: freestanding kernel build-integration proof
+- `tests/tool/freestanding/kernel/phase96_boot_entry.cpp`: real-kernel boot-entry proof
+- `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
+- `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`: compatibility runners only, not the active implementation owners
 - `tests/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation
 - primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`
 - grouped tool outputs now belong under semantic suite roots such as `build/debug/tool/workflow/...`

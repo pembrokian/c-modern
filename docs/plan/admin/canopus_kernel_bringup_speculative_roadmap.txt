@@ -1,0 +1,257 @@
+Phase 96 Through Phase 108 -- Speculative Canopus Kernel Bring-Up Roadmap
+=========================================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the completed Phase 95 freestanding
+`v0.3` slice audit if the repository now chooses to turn the Canopus proof
+ladder into a real first kernel bring-up.
+
+This document is intentionally forward-looking and tentative.
+It does not replace `docs/plan/plan.txt`.
+It does not replace the existing Canopus architecture notes.
+It gives one plausible implementation ordering for the first kernel wave if
+the repository keeps following the same evidence-first rules used so far:
+
+- one owner-local gap at a time
+- one real mechanism or service proof at a time
+- one explicit exit criterion per phase
+- no broad architecture claims before the smallest running system is honest
+
+Relationship to companion notes
+-------------------------------
+This roadmap is meant to stay aligned with:
+
+- `docs/plan/admin/modern_c_canopus_readiness_position.txt`
+- `docs/arch/canopus/canopus_lite_v0.txt`
+- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_sys_interface_v0.txt`
+- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+
+If those notes define readiness, architecture, and kernel-boundary shape,
+this roadmap suggests one practical phase ordering for turning them into a
+running kernel.
+
+Repository numbering note
+-------------------------
+- Phase 81 through Phase 95 are now occupied by the concrete freestanding
+  bring-up and support-freeze wave.
+- The completed proof ladder now reaches a first admitted freestanding `v0.3`
+  slice and one bounded first-system demo, but those proofs still stop short
+  of a real kernel image, real syscall boundary, and real booted init over the
+  actual kernel implementation.
+- This speculative continuation therefore starts at Phase 96.
+
+Repository status note
+----------------------
+- The repository can now honestly claim a bounded freestanding `v0.3` slice.
+- The Canopus blueprints now describe a small capability-based microkernel,
+  but that kernel remains architectural and proof-guided rather than yet a
+  landed repository-owned implementation wave.
+- The strongest next question is no longer whether the language can model the
+  early kernel shapes in principle. It is whether those same shapes can move
+  from proof modules into a real kernel-owned boot, syscall, IPC, spawn, and
+  service path without forcing broader language or architecture churn.
+
+What this roadmap is trying to answer
+-------------------------------------
+- In what order should the repository turn the bounded proof models into a
+  real Canopus kernel bring-up?
+- Which fronts belong first to kernel implementation, target and build
+  integration, or user-space service follow-through rather than to new
+  language machinery?
+- Where should the repository stop before it drifts into full OS completion,
+  broad target promises, or speculative subsystem growth?
+
+Core rule
+---------
+- Keep the current Modern C core closed unless a real kernel step exposes a
+  concrete parser, sema, MIR, backend, or ABI owner gap.
+- Prefer real kernel boot, real syscall truth, and real user-space service
+  handoff over widening architecture prose alone.
+- Keep the first implementation as small, table-driven, and inspectable as the
+  Canopus implementation blueprint recommends.
+- Do not let scheduler policy, namespace policy, or general service frameworks
+  outrun the first working kernel path.
+
+Roadmap bands
+-------------
+
+Band A - Reify Kernel-Owned Boot And Object Core
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phase 96 is now concrete as kernel boot entry and state skeleton, and Phases
+97 through 98 should continue from that first real kernel-owned artifact into
+the remaining object-core work around address-space setup, endpoint tables,
+and handle-owned message state.
+
+Likely themes:
+- architecture entry and early console truth
+- fixed-size kernel state tables
+- one process, one task, one ready queue, one blocked receiver model
+- explicit endpoint and handle-table objects in kernel-owned state
+
+Why this band comes first:
+- the current proof ladder already validated the semantic shapes; the next
+  honest owner is turning those shapes into real kernel state before exposing
+  broader syscalls or services.
+
+Phase 96 is now concrete as kernel boot entry and state skeleton:
+
+- one real Canopus kernel artifact now boots through explicit architecture
+  entry, initializes deterministic kernel-owned descriptor, process-slot,
+  task-slot, ready-queue, and boot-record tables, emits one bounded boot
+  marker, and stops before claiming user-space entry.
+
+Possible remaining phases in this band:
+
+Phase 97 -- Address Space And First User Entry Path
+- Exit criterion: the kernel can construct one bounded address space, map one
+  launchable image or boot-bundled user entry, and transfer control into one
+  first task without yet claiming full spawn or syscall coverage.
+
+Phase 98 -- Kernel Endpoint And Handle Core
+- Exit criterion: the kernel owns one explicit endpoint table, one explicit
+  per-process handle table, and one bounded in-kernel message queue model with
+  deterministic slot and lifetime behavior.
+
+This band is now concrete through Phase 96.
+
+Band B - Make The Real Syscall And IPC Boundary Honest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 99 through 102 likely turn the kernel object core into a real syscall
+surface over endpoints, message bytes plus handle transfer, process creation,
+wait or kill, and timer-backed blocking.
+
+Likely themes:
+- one-to-one syscall mapping from `sys v0`
+- byte-only IPC first, then attached-handle transfer
+- explicit spawn from program capability
+- explicit wait or kill or sleep semantics through real kernel paths
+
+Why this band comes next:
+- the kernel object core is only useful once the user boundary is honest, and
+  the blueprints already name the minimal syscall families clearly.
+
+Possible phases in this band:
+
+Phase 99 -- Syscall Entry And Byte-Only IPC
+- Exit criterion: one real syscall boundary admits endpoint creation, message
+  send, and message receive with bounded byte payloads and deterministic
+  blocking or `WouldBlock` behavior, without attached capabilities yet.
+
+Phase 100 -- Capability-Carrying IPC Transfer
+- Exit criterion: attached-handle transfer is real at the syscall boundary,
+  with destructive-on-success send behavior, receiver-local reinstall on
+  receive, and no partial-transfer distortion.
+
+Phase 101 -- Program-Cap Spawn And Wait Path
+- Exit criterion: one process can spawn one child from one explicit launchable
+  program capability, observe that child through one wait handle or process
+  handle, and reap it deterministically without ambient authority.
+
+Phase 102 -- Timer Sleep And Scheduler Block-Wake Proof
+- Exit criterion: one real kernel timer source and one simple ready queue can
+  block and wake tasks for receive, wait, and sleep without widening into a
+  public scheduler framework or multicore policy.
+
+Band C - Boot Real Init-Owned User Policy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 103 through 106 likely prove that the real kernel can hand off only an
+explicit bootstrap capability set to init and that init can then launch the
+same first service stories the proof ladder already modeled.
+
+Likely themes:
+- explicit boot capability handoff
+- one log service over real syscalls
+- one request-reply service over real kernel IPC
+- one explicit user-to-user capability transfer over the real kernel boundary
+
+Why this band is separate:
+- the current proof ladder already showed the policy shapes, but the next real
+  question is whether the actual kernel preserves those explicit boundaries
+  once syscalls, boot handoff, and service launch are no longer simulated.
+
+Possible phases in this band:
+
+Phase 103 -- Init Bootstrap Capability Handoff
+- Exit criterion: the kernel starts one isolated init process and gives it one
+  explicit bounded bootstrap capability set with no ambient global authority.
+
+Phase 104 -- Real Log-Service Handshake
+- Exit criterion: init launches one real log service from one program
+  capability and completes one bounded request-and-acknowledgment flow over
+  the real kernel IPC path.
+
+Phase 105 -- Real Echo-Service Request Or Reply Proof
+- Exit criterion: init launches one second bounded service and one client so
+  the system completes one real request-reply exchange through the real kernel
+  IPC boundary.
+
+Phase 106 -- Real User-To-User Capability Transfer
+- Exit criterion: one user-space component transfers one explicit endpoint or
+  wait-style authority to another over real kernel IPC, and the receiver uses
+  it for one bounded action without ambient shortcuts.
+
+Band D - Freeze The First Running Kernel Slice
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 107 and 108 likely harden the first real kernel slice around image and
+build truth, documentation, and one first-running-system statement.
+
+Likely themes:
+- explicit kernel image and relink contract
+- narrow loader or program-cap contract hardening
+- first running system support statement and audit
+
+Why this band comes last:
+- image and support truth are only honest after boot, syscalls, init, and the
+  first services already work on the real kernel implementation.
+
+Possible phases in this band:
+
+Phase 107 -- Kernel Image And Program-Cap Audit
+- Exit criterion: the kernel image build path, program-cap source contract,
+  and emitted artifact ownership are documented and validated honestly without
+  widening into broad packaging or install claims.
+
+Phase 108 -- First Running Canopus Kernel Slice Audit
+- Exit criterion: the repository can state one first running Canopus kernel
+  slice honestly, name exactly which boot, syscall, IPC, spawn, timer, and
+  service paths are admitted, and keep broader OS and target claims deferred.
+
+Likely ordering bias
+--------------------
+If the repository keeps following the same pattern, the safest order is:
+
+1. make kernel boot and kernel-owned object state real first
+2. make the actual syscall and IPC boundary real second
+3. boot one explicit init and one or two explicit services third
+4. freeze image and support truth last
+
+That ordering keeps the repository from confusing proof-model success with
+permission to claim a running kernel platform too early.
+
+Non-goals
+---------
+- treating this note as a committed execution plan
+- claiming full Canopus Lite completion inside this roadmap horizon
+- implying broad target support, cross-compilation, or packaging support
+- adding broad driver frameworks, VFS layers, or network stacks before the
+  first running kernel slice is honest
+- reopening core-language design before a real kernel step proves that the
+  right owner is the language
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- The current Canopus blueprints remain the architectural owners.
+- The freestanding `v0.3` support note remains the current admitted support
+  boundary until a later phase lands a real running-kernel statement.
+- If the real kernel path exposes an actual compiler or language distortion,
+  reopen the narrowest owning layer only at that proof boundary.
+- If the repository reaches a smaller honest running-kernel plateau earlier
+  than Phase 108, that is a success, not a roadmap failure.

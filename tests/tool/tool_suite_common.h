@@ -76,19 +76,31 @@ std::string RunProjectTestTargetAndExpectSuccess(const std::filesystem::path& mc
                                                  std::string_view output_name,
                                                  const std::string& context);
 
-void RunPhase7WorkflowSuite(const std::filesystem::path& source_root,
-                            const std::filesystem::path& binary_root,
+void RunWorkflowToolSuite(const std::filesystem::path& source_root,
+                          const std::filesystem::path& binary_root,
+                          const std::filesystem::path& mc_path);
+
+void RunBuildStateToolSuite(const std::filesystem::path& binary_root,
                             const std::filesystem::path& mc_path);
 
-void RunPhase7BuildStateSuite(const std::filesystem::path& binary_root,
+void RunRealProjectToolSuite(const std::filesystem::path& source_root,
+                             const std::filesystem::path& binary_root,
+                             const std::filesystem::path& mc_path);
+
+void RunFreestandingBootstrapToolSuite(const std::filesystem::path& source_root,
+                                       const std::filesystem::path& binary_root,
+                                       const std::filesystem::path& mc_path);
+
+void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
+                                    const std::filesystem::path& binary_root,
+                                    const std::filesystem::path& mc_path);
+
+void RunFreestandingSystemToolSuite(const std::filesystem::path& source_root,
+                                    const std::filesystem::path& binary_root,
+                                    const std::filesystem::path& mc_path);
+
+void RunFreestandingToolSuite(const std::filesystem::path& source_root,
+                              const std::filesystem::path& binary_root,
                               const std::filesystem::path& mc_path);
-
-void RunPhase7RealProjectSuite(const std::filesystem::path& source_root,
-                               const std::filesystem::path& binary_root,
-                               const std::filesystem::path& mc_path);
-
-void RunPhase7FreestandingSuite(const std::filesystem::path& source_root,
-                                const std::filesystem::path& binary_root,
-                                const std::filesystem::path& mc_path);
 
 }  // namespace mc::tool_tests
