@@ -1,0 +1,152 @@
+Phase 86 -- Task Lifecycle Kernel Proof
+======================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from kernel message representation
+into the first explicit lifecycle check: prove that one minimal create,
+ready, exit, and wait path can be modeled at the kernel boundary with
+ordinary Modern C enums, structs, and functions rather than with a new `sys`
+surface, scheduler-visible language machinery, or hidden runtime policy.
+
+This document is both the Phase 86 execution note and its closeout.
+It does not claim general process management, blocking semantics, capability
+transfer, or full scheduler design.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then published that first non-hosted tranche as a separate,
+  repository-bounded support statement with a focused audit.
+- Phase 85 then proved that one bounded endpoint queue and message-buffer
+  shape can already be expressed through ordinary Modern C structs, enums,
+  arrays, and pointer-based mutation on the same freestanding path.
+- The next strongest Canopus proof was no longer queue representation alone.
+  It was whether the admitted core language could carry one honest task
+  lifecycle path without reopening parser, sema, MIR, or runtime-policy work.
+
+Problem being solved
+--------------------
+- The Canopus proof ladder names child-task lifecycle as the next minimal
+  kernel mechanism after endpoint representation, but the repository had not
+  yet exercised that shape in a real proof.
+- Without one concrete lifecycle proof, it would be too easy to speculate
+  about `sys` wrappers, scheduler policy, task-handle helpers, or user-space
+  launch semantics before validating that the current explicit core already
+  carries the needed state-model work.
+- The next honest step is therefore a bounded kernel lifecycle proof, not a
+  wider process or service model.
+
+Core rule
+---------
+- Prove one create, ready, exit, and wait path with ordinary language
+  constructs first.
+- Keep the proof freestanding, deterministic, and repository-bounded.
+- Do not admit a public `sys` module, task-handle helper family, or
+  scheduler-visible policy surface in this phase.
+- Reopen compiler work only if the proof exposes a concrete parser, sema,
+  MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target representing a kernel-owned task table
+2. one explicit task-state enum covering create, ready, running, exit, and
+   reap transitions
+3. one deterministic parent-observed wait path that fails before child exit
+   and succeeds after child completion
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first lifecycle-representation question now by
+proving one bounded task path locally with ordinary Modern C data types
+instead of widening prematurely into scheduler or syscall design.
+
+What this phase proves
+----------------------
+- the current explicit core language is sufficient for one minimal task-table
+  and task-state representation
+- ordinary enums, structs, and pointer-based mutation are enough for one
+  create, ready, dispatch, exit, and wait lifecycle path
+- the freestanding executable path can validate that proof without depending
+  on broader `hal`, host-side process APIs, or a wider `sys` boundary
+
+Deliverables
+------------
+- one canonical Phase 86 closeout note recording the implemented lifecycle
+  proof
+- one focused freestanding tool regression that models one boot task and one
+  child task through ordinary Modern C types
+- deterministic runtime validation that wait fails before child exit and then
+  succeeds with the expected exit code after the child lifecycle completes
+- MIR inspection proving the task-state and kernel-state shapes lower through
+  ordinary enum, struct, switch, and aggregate-update operations
+- refreshed support and planning notes so Phase 86 is recorded as the first
+  concrete task-lifecycle anchor after the endpoint queue proof
+
+Suggested execution order
+-------------------------
+1. Define one bounded task-state enum and one kernel-owned task table with
+   ordinary structs.
+2. Build that proof as a freestanding executable through the existing
+   explicit target and startup path.
+3. Validate deterministic create, ready, exit, and wait behavior locally in
+   the repository harness.
+4. Inspect the dumped MIR to confirm the proof stays within ordinary enum,
+   switch, field, and aggregate operations.
+5. Refresh the support and planning surface so later phases build from this
+   concrete anchor.
+
+Exit criteria
+-------------
+- one freestanding target proves a minimal create, ready, exit, and wait
+  lifecycle path with ordinary Modern C types
+- the proof deterministically rejects waiting before child exit and then
+  returns the expected exit status after child completion
+- the dumped MIR records explicit enum and struct declarations plus ordinary
+  aggregate-update and switch operations for the proof
+- the planning surface records Phase 86 as concrete rather than still
+  speculative
+
+Non-goals
+---------
+- public `sys` module admission or task-handle helper design
+- blocking wait queues, wakeup sources, or scheduler policy
+- capability-transfer semantics or user-space launch APIs
+- broader `hal` growth, interrupts, barriers, or device-framework work
+- claiming full process-tree or namespace bring-up
+
+Implemented slice
+-----------------
+- the tool regression suite now includes one Phase 86 freestanding target
+  that models one boot task and one child task through an explicit task-state
+  enum and explicit kernel-owned task slots
+- the proof creates a child, transitions it through ready and running states,
+  exits it with a deterministic exit code, rejects waiting before exit, then
+  reaps the child successfully after completion and exits with a deterministic
+  Phase 86 marker
+- the regression also inspects the dumped MIR to confirm that the lifecycle
+  path lowers through ordinary enum or struct declarations, aggregate
+  initialization, and switch-based state classification instead of through
+  special runtime or hardware boundaries
+- the freestanding proof statement, README, backlog, decision log, and
+  speculative `v0.3` roadmap now record Phase 86 as the first concrete
+  task-lifecycle representation anchor after the endpoint queue proof
+
+Closeout statement
+------------------
+Phase 86 is complete as a task lifecycle kernel proof. The repository still
+does not claim scheduler policy, blocking wait queues, capability transfer, or
+user-space service bring-up, but it now has one honest proof that the
+admitted Modern C core can represent a minimal create, ready, exit, and wait
+kernel workflow directly, using ordinary language constructs on the existing
+freestanding path.

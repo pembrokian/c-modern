@@ -17,7 +17,9 @@ namespace {
 
 using mc::support::DiagnosticSeverity;
 
-constexpr int kFormatVersion = 6;
+constexpr int kFormatVersion = 7;
+
+std::optional<sema::Type> ParseTypeText(std::string_view text);
 
 bool ParseBoolField(std::string_view text, bool& value);
 
@@ -141,6 +143,23 @@ std::string SerializeConstValue(const std::optional<sema::ConstValue>& value) {
             return "s:" + value->text;
         case sema::ConstValue::Kind::kNil:
             return "n:";
+        case sema::ConstValue::Kind::kEnum: {
+            std::string encoded = "e:";
+            AppendLengthPrefixed(encoded, sema::FormatType(value->enum_type));
+            AppendLengthPrefixed(encoded, value->variant_name);
+            encoded += std::to_string(value->variant_tag);
+            encoded.push_back(':');
+            encoded += std::to_string(value->elements.size());
+            encoded.push_back(':');
+            for (std::size_t index = 0; index < value->elements.size(); ++index) {
+                const std::string_view field_name = index < value->field_names.size() ? std::string_view(value->field_names[index])
+                                                                                       : std::string_view {};
+                AppendLengthPrefixed(encoded, field_name);
+                const std::string child = SerializeConstValue(value->elements[index]);
+                AppendLengthPrefixed(encoded, child);
+            }
+            return encoded;
+        }
         case sema::ConstValue::Kind::kAggregate: {
             std::string encoded = "a:" + std::to_string(value->elements.size()) + ':';
             for (std::size_t index = 0; index < value->elements.size(); ++index) {
@@ -331,6 +350,44 @@ std::optional<sema::ConstValue> ParseConstValue(std::string_view text) {
             value.kind = sema::ConstValue::Kind::kNil;
             value.text = "nil";
             return value;
+        case 'e': {
+            std::string_view payload = text.substr(2);
+            const auto type_text = ConsumeLengthPrefixed(payload);
+            const auto variant_name = ConsumeLengthPrefixed(payload);
+            const auto variant_tag = ParseLengthPrefix(payload);
+            const auto field_count = ParseLengthPrefix(payload);
+            if (!type_text.has_value() || !variant_name.has_value() || !variant_tag.has_value() || !field_count.has_value()) {
+                return std::nullopt;
+            }
+            const auto enum_type = ParseTypeText(*type_text);
+            if (!enum_type.has_value()) {
+                return std::nullopt;
+            }
+            value.kind = sema::ConstValue::Kind::kEnum;
+            value.enum_type = *enum_type;
+            value.variant_name = std::string(*variant_name);
+            value.variant_tag = static_cast<std::int64_t>(*variant_tag);
+            value.field_names.reserve(*field_count);
+            value.elements.reserve(*field_count);
+            for (std::size_t index = 0; index < *field_count; ++index) {
+                const auto field_name = ConsumeLengthPrefixed(payload);
+                const auto child_text = ConsumeLengthPrefixed(payload);
+                if (!field_name.has_value() || !child_text.has_value()) {
+                    return std::nullopt;
+                }
+                const auto child = ParseConstValue(*child_text);
+                if (!child.has_value()) {
+                    return std::nullopt;
+                }
+                value.field_names.push_back(std::string(*field_name));
+                value.elements.push_back(*child);
+            }
+            if (!payload.empty()) {
+                return std::nullopt;
+            }
+            value.text = sema::RenderConstValue(value);
+            return value;
+        }
         case 'a': {
             std::string_view payload = text.substr(2);
             const auto field_count = ParseLengthPrefix(payload);

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <unordered_set>
 
+#include "compiler/sema/const_eval.h"
 #include "compiler/sema/type_utils.h"
 
 namespace mc::sema {
@@ -62,6 +63,20 @@ Type RewriteImportedTypeNames(Type type,
         type.name = QualifyImportedName(module_name, type.name);
     }
     return type;
+}
+
+ConstValue RewriteImportedConstValue(ConstValue value,
+                                     std::string_view module_name,
+                                     const std::unordered_set<std::string>& local_type_names,
+                                     const std::vector<std::string>& type_params = {}) {
+    if (value.kind == ConstValue::Kind::kEnum) {
+        value.enum_type = RewriteImportedTypeNames(std::move(value.enum_type), module_name, local_type_names, type_params);
+    }
+    for (auto& element : value.elements) {
+        element = RewriteImportedConstValue(std::move(element), module_name, local_type_names, type_params);
+    }
+    value.text = RenderConstValue(value);
+    return value;
 }
 
 bool EquivalentLayoutInfo(const LayoutInfo& left, const LayoutInfo& right) {
@@ -198,6 +213,12 @@ Module RewriteImportedModuleSurfaceTypes(const Module& module,
     }
     for (auto& global : rewritten.globals) {
         global.type = RewriteImportedTypeNames(std::move(global.type), module_name, local_type_names);
+        for (auto& value : global.constant_values) {
+            if (!value.has_value()) {
+                continue;
+            }
+            value = RewriteImportedConstValue(std::move(*value), module_name, local_type_names);
+        }
     }
     for (auto& function : rewritten.functions) {
         for (auto& param_type : function.param_types) {

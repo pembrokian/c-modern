@@ -485,7 +485,118 @@ class Checker {
             }
             return std::nullopt;
         }
+        if (canonical_target.kind == Type::Kind::kNamed) {
+            const Type stripped_value_type = CanonicalizeBuiltinType(StripType(value.enum_type, *module_, TypeStripMode::kAliasesAndDistinct));
+            if (value.kind == ConstValue::Kind::kEnum && stripped_value_type == canonical_target) {
+                return value;
+            }
+        }
         return std::nullopt;
+    }
+
+    struct EnumConstDesignator {
+        Type enum_type;
+        std::string variant_name;
+        std::vector<std::pair<std::string, Type>> payload_fields;
+        std::size_t variant_index = 0;
+    };
+
+    std::optional<EnumConstDesignator> ResolveEnumConstDesignator(const Expr& expr, bool report_errors) {
+        const Expr* type_expr = nullptr;
+        std::string enum_name;
+        std::string variant_name;
+
+        if (expr.kind == Expr::Kind::kQualifiedName) {
+            type_expr = &expr;
+            enum_name = expr.text;
+            variant_name = expr.secondary_text;
+        } else if (expr.kind == Expr::Kind::kField && expr.left != nullptr &&
+                   (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {
+            type_expr = expr.left.get();
+            enum_name = CombineQualifiedName(*expr.left);
+            variant_name = expr.text;
+        } else {
+            return std::nullopt;
+        }
+
+        const TypeDeclSummary* type_decl = FindTypeDecl(*module_, enum_name);
+        if (type_decl == nullptr || type_decl->kind != Decl::Kind::kEnum || type_expr == nullptr) {
+            return std::nullopt;
+        }
+
+        const std::size_t expected = type_decl->type_params.size();
+        const std::size_t actual = type_expr->type_args.size();
+        if (expected != actual) {
+            if (report_errors && actual != 0) {
+                Report(expr.span,
+                       "generic type " + enum_name + " expects " + std::to_string(expected) +
+                           " type arguments but got " + std::to_string(actual));
+            }
+            if (expected != 0 || actual != 0) {
+                return std::nullopt;
+            }
+        }
+
+        Type enum_type = NamedType(type_decl->name);
+        enum_type.subtypes.reserve(actual);
+        for (const auto& type_arg : type_expr->type_args) {
+            ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
+            enum_type.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
+        }
+
+        for (std::size_t index = 0; index < type_decl->variants.size(); ++index) {
+            if (type_decl->variants[index].name != variant_name) {
+                continue;
+            }
+            return EnumConstDesignator {
+                .enum_type = enum_type,
+                .variant_name = variant_name,
+                .payload_fields = InstantiateVariantSummary(type_decl->variants[index], *type_decl, enum_type).payload_fields,
+                .variant_index = index,
+            };
+        }
+
+        return std::nullopt;
+    }
+
+    std::optional<ConstValue> EvaluateEnumConst(const Expr& designator,
+                                                const std::vector<std::unique_ptr<Expr>>* payload_args,
+                                                bool report_errors,
+                                                std::unordered_set<std::string>& active_names) {
+        const auto resolved = ResolveEnumConstDesignator(designator, report_errors);
+        if (!resolved.has_value()) {
+            return std::nullopt;
+        }
+
+        const std::size_t arg_count = payload_args != nullptr ? payload_args->size() : 0;
+        if (resolved->payload_fields.size() != arg_count) {
+            if (report_errors) {
+                Report(designator.span,
+                       "enum constant " + FormatType(resolved->enum_type) + '.' + resolved->variant_name +
+                           " expects " + std::to_string(resolved->payload_fields.size()) +
+                           " payload values but got " + std::to_string(arg_count));
+            }
+            return std::nullopt;
+        }
+
+        std::vector<std::string> field_names;
+        std::vector<ConstValue> elements;
+        field_names.reserve(arg_count);
+        elements.reserve(arg_count);
+        for (std::size_t index = 0; index < arg_count; ++index) {
+            const auto field_value = EvaluateConstExpr(*(*payload_args)[index], report_errors, active_names);
+            if (!field_value.has_value()) {
+                return std::nullopt;
+            }
+            field_names.push_back(resolved->payload_fields[index].first);
+            elements.push_back(*field_value);
+        }
+
+        return MakeEnumConstValue(resolved->enum_type,
+                                  resolved->variant_name,
+                                  static_cast<std::int64_t>(resolved->variant_index),
+                                  std::move(field_names),
+                                  std::move(elements));
     }
 
     bool IsConstExpr(const Expr& expr, bool report_errors, std::unordered_set<std::string>& active_names) {
@@ -519,7 +630,7 @@ class Checker {
                         return ParseGlobalConstValue(*global, expr.secondary_text);
                     }
                 }
-                return std::nullopt;
+                return EvaluateEnumConst(expr, nullptr, report_errors, active_names);
             case Expr::Kind::kLiteral:
                 return ParseLiteralConstValue(expr);
             case Expr::Kind::kUnary: {
@@ -561,6 +672,12 @@ class Checker {
                 return EvaluateConstBinaryOp(expr.text, *left, *right);
             }
             case Expr::Kind::kCall: {
+                if (expr.type_target == nullptr && expr.left != nullptr) {
+                    if (const auto enum_const = EvaluateEnumConst(*expr.left, &expr.args, report_errors, active_names);
+                        enum_const.has_value()) {
+                        return enum_const;
+                    }
+                }
                 if (expr.type_target == nullptr || expr.args.size() != 1) {
                     return std::nullopt;
                 }
@@ -572,6 +689,8 @@ class Checker {
                 const Type target_type = SemanticTypeFromAst(expr.type_target.get(), CurrentTypeParams());
                 return ConvertConstValue(target_type, *operand);
             }
+            case Expr::Kind::kField:
+                return EvaluateEnumConst(expr, nullptr, report_errors, active_names);
             case Expr::Kind::kAggregateInit: {
                 Type aggregate_type = UnknownType();
                 if (expr.left != nullptr && (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {

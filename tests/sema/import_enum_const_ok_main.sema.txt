@@ -1,0 +1,14 @@
+SemanticModule
+  Import name=helper_enum_const
+  TypeDecl name=helper_enum_const.TaskState kind=enum
+    Variant name=Ready
+    Variant name=Running
+    Layout size=8 align=8 offsets=[]
+  TypeDecl name=helper_enum_const.Option kind=enum
+    typeParams=[T]
+    Variant name=Some
+      PayloadField name=value type=T
+    Variant name=None
+  Const names=[COPIED_STATE] type=helper_enum_const.TaskState values=[helper_enum_const.TaskState.Running]
+  Const names=[COPIED_VALUE] type=helper_enum_const.Option<i32> values=[helper_enum_const.Option<i32>.Some(value: 7)]
+  Function name=main params=[] returns=[i32]

@@ -41,8 +41,8 @@ Repository numbering note
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation after the now-concrete first kernel
   representation proof.
-- This speculative continuation therefore starts at Phase 86, with Phase 81
-  through Phase 85 as the current concrete anchors.
+- This speculative continuation therefore starts at Phase 88, with Phase 81
+  through Phase 87 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -127,8 +127,25 @@ Phase 85 is now concrete as kernel endpoint queue smoke:
 - it validates FIFO ordering and full-queue rejection deterministically in the
   repository tool harness
 
+Phase 86 is now concrete as task lifecycle kernel proof:
+- it proves one minimal create, ready, running, exit, and wait path through
+  an ordinary task-state enum and explicit kernel-owned task slots
+- it keeps the proof on the existing freestanding path rather than admitting a
+  `sys` wrapper layer, task-handle helper taxonomy, or scheduler-visible
+  policy
+- it validates wait-before-exit rejection and post-exit reap semantics
+  deterministically in the repository tool harness
+
+Phase 87 is now concrete as kernel static-data and artifact follow-through:
+- it proves that kernel-owned aggregate const templates and zero-initialized
+  mutable globals survive the freestanding build and artifact path
+- it keeps the proof on the existing freestanding path rather than widening
+  into linker scripts, image packaging, or broader kernel build integration
+- it validates both runtime behavior and MIR global-declaration truth
+  deterministically in the repository tool harness
+
 The remaining speculative continuation in this band therefore starts at Phase
-86.
+88.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof

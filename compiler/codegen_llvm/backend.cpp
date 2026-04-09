@@ -676,6 +676,74 @@ std::string FormatLLVMLiteral(const BackendTypeInfo& type_info,
     return std::string(value);
 }
 
+bool RenderLLVMEnumConstValue(const mir::Module& module,
+                              const sema::Type& enum_type,
+                              const sema::ConstValue& value,
+                              const std::filesystem::path& source_path,
+                              support::DiagnosticSink& diagnostics,
+                              std::string& rendered) {
+    if (value.kind != sema::ConstValue::Kind::kEnum || enum_type.kind != sema::Type::Kind::kNamed) {
+        return false;
+    }
+
+    if (value.enum_type != enum_type) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend received mismatched enum constant type " +
+                               sema::FormatType(value.enum_type) + " for " + sema::FormatType(enum_type),
+                           diagnostics);
+        return false;
+    }
+
+    const auto* type_decl = FindTypeDecl(module, enum_type.name);
+    if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kEnum) {
+        return false;
+    }
+
+    if (value.variant_tag < 0 ||
+        value.variant_tag >= static_cast<std::int64_t>(type_decl->variants.size())) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend received enum constant tag out of range for type " +
+                               sema::FormatType(enum_type),
+                           diagnostics);
+        return false;
+    }
+
+    const auto variant_index = static_cast<std::size_t>(value.variant_tag);
+    const auto& variant = type_decl->variants[variant_index];
+    if (variant.name != value.variant_name) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend received enum constant variant mismatch for type " +
+                               sema::FormatType(enum_type),
+                           diagnostics);
+        return false;
+    }
+    if (!variant.payload_fields.empty()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend does not yet support payload enum global constants for type " +
+                               sema::FormatType(enum_type),
+                           diagnostics);
+        return false;
+    }
+
+    const auto lowered_layout = LowerEnumLayout(module, *type_decl, enum_type);
+    if (!lowered_layout.has_value()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend cannot lower enum global constant type " +
+                               sema::FormatType(enum_type),
+                           diagnostics);
+        return false;
+    }
+
+    std::ostringstream stream;
+    stream << "{ i64 " << value.variant_tag;
+    if (lowered_layout->payload_size != 0) {
+        stream << ", " << lowered_layout->payload_type.backend_name << " zeroinitializer";
+    }
+    stream << " }";
+    rendered = stream.str();
+    return true;
+}
+
 bool RenderLLVMGlobalConstValue(const mir::Module& module,
                                 sema::Type type,
                                 const sema::ConstValue& value,
@@ -697,6 +765,9 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
     }
 
     if (value.kind != sema::ConstValue::Kind::kAggregate) {
+        if (RenderLLVMEnumConstValue(module, canonical_type, value, source_path, diagnostics, rendered)) {
+            return true;
+        }
         rendered = FormatLLVMLiteral(*lowered_type, value.text);
         return true;
     }

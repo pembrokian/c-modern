@@ -1,0 +1,13 @@
+SemanticModule
+  TypeDecl name=TaskState kind=enum
+    Variant name=Empty
+    Variant name=Ready
+    Variant name=Running
+    Layout size=8 align=8 offsets=[]
+  TypeDecl name=Task kind=struct
+    Field name=pid type=u32
+    Field name=state type=TaskState
+    Layout size=16 align=8 offsets=[0, 8]
+  Const names=[READY_STATE] type=TaskState values=[TaskState.Ready]
+  Const names=[BOOT_TASK] type=Task values=[{pid: 1, state: TaskState.Running}]
+  Function name=main params=[] returns=[i32]

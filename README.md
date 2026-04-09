@@ -26,7 +26,7 @@ What is in place:
 - the admitted repository-bounded Lane B package-grouping slice with `examples/real/issue_rollup/`, proving one library-first hosted project layout with grouped internal module roots beyond one source root before the later static-library admission
 - the admitted repository-bounded Phase 29 static-library slice with `examples/real/issue_rollup/`, proving one hosted `staticlib` target consumed through executable targets and ordinary `mc test` workflow through the same archive boundary
 - the admitted repository-bounded Phase 30 plus Phase 74 hardening slice with the same `examples/real/issue_rollup/` proof, now covering deterministic same-build-dir selected-target reuse across the shipped executable consumers linked through the admitted static-library boundary
-- the admitted repository-bounded freestanding proof slice with explicit `env = "freestanding"` executable targets, explicit target identity and startup selection, optional manifest-owned extra link inputs, narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>` support, and one bounded endpoint-queue representation proof with ordinary structs, enums, and fixed arrays, proved by the Phase 81 boot-marker, Phase 82 explicit link-input, Phase 83 polling-console, and Phase 85 kernel queue tool regressions without claiming broad freestanding packaging or cross-compilation
+- the admitted repository-bounded freestanding proof slice with explicit `env = "freestanding"` executable targets, explicit target identity and startup selection, optional manifest-owned extra link inputs, narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>` support, one bounded endpoint-queue representation proof, one minimal task-lifecycle representation proof, and one kernel static-data follow-through proof with ordinary top-level consts, globals, structs, and enums, proved by the Phase 81 boot-marker, Phase 82 explicit link-input, Phase 83 polling-console, Phase 85 kernel queue, Phase 86 task lifecycle, and Phase 87 static-data tool regressions without claiming broad freestanding packaging or cross-compilation
 - parser, sema, MIR, and tool smoke tests wired through CTest and exposed through the same `make` command path used for local development
 
 Supported hosted slice:
@@ -48,7 +48,7 @@ Supported freestanding proof slice:
 - admitted project command path: `mc build --project <build.toml> --target <name> --build-dir <dir>`
 - admitted manifest boundary: freestanding `exe` targets with explicit `target`, explicit `[targets.<name>.runtime] startup`, and optional explicit `[targets.<name>.link] inputs = [...]`
 - admitted public stdlib boundary: narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>`
-- admitted proof set: Phase 81 boot-marker executable proof, Phase 82 explicit manifest-owned link-input proof, Phase 83 deterministic polling-console proof, and Phase 85 kernel endpoint queue smoke proof
+- admitted proof set: Phase 81 boot-marker executable proof, Phase 82 explicit manifest-owned link-input proof, Phase 83 deterministic polling-console proof, Phase 85 kernel endpoint queue smoke proof, Phase 86 task lifecycle kernel proof, and Phase 87 kernel static-data and artifact follow-through proof
 - unsupported today: `mc run` or `mc test` freestanding workflow admission, general cross-compilation, non-bootstrap target families, linker scripts, arbitrary linker flags, shared libraries, kernel-image packaging, and broader `hal` taxonomy
 
 Supported host assumptions:

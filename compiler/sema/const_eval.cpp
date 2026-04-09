@@ -154,9 +154,59 @@ bool EvaluateOrderedComparison(std::string_view op, std::int64_t lhs, std::int64
     return lhs >= rhs;
 }
 
+bool ConstValuesEqual(const ConstValue& left, const ConstValue& right) {
+    if (left.kind != right.kind) {
+        return false;
+    }
+
+    switch (left.kind) {
+        case ConstValue::Kind::kBool:
+            return left.bool_value == right.bool_value;
+        case ConstValue::Kind::kInteger:
+            return left.integer_value == right.integer_value;
+        case ConstValue::Kind::kFloat:
+            return left.float_value == right.float_value;
+        case ConstValue::Kind::kString:
+            return left.text == right.text;
+        case ConstValue::Kind::kNil:
+            return true;
+        case ConstValue::Kind::kEnum:
+            if (left.enum_type != right.enum_type || left.variant_name != right.variant_name ||
+                left.variant_tag != right.variant_tag || left.field_names != right.field_names ||
+                left.elements.size() != right.elements.size()) {
+                return false;
+            }
+            for (std::size_t index = 0; index < left.elements.size(); ++index) {
+                if (!ConstValuesEqual(left.elements[index], right.elements[index])) {
+                    return false;
+                }
+            }
+            return true;
+        case ConstValue::Kind::kAggregate:
+            if (left.field_names != right.field_names || left.elements.size() != right.elements.size()) {
+                return false;
+            }
+            for (std::size_t index = 0; index < left.elements.size(); ++index) {
+                if (!ConstValuesEqual(left.elements[index], right.elements[index])) {
+                    return false;
+                }
+            }
+            return true;
+    }
+
+    return false;
+}
+
 std::optional<ConstValue> EvaluateConstComparison(std::string_view op, const ConstValue& left, const ConstValue& right) {
     if (!IsConstComparisonOp(op)) {
         return std::nullopt;
+    }
+    if (left.kind == ConstValue::Kind::kEnum || right.kind == ConstValue::Kind::kEnum) {
+        if (left.kind != ConstValue::Kind::kEnum || right.kind != ConstValue::Kind::kEnum || op != "==" && op != "!=") {
+            return std::nullopt;
+        }
+        const bool equal = ConstValuesEqual(left, right);
+        return MakeConstValue(op == "==" ? equal : !equal);
     }
     if (left.kind == ConstValue::Kind::kFloat || right.kind == ConstValue::Kind::kFloat) {
         const double lhs = left.kind == ConstValue::Kind::kFloat ? left.float_value : left.integer_value;
@@ -212,6 +262,24 @@ std::string RenderConstValue(const ConstValue& value) {
             return value.text;
         case ConstValue::Kind::kNil:
             return "nil";
+        case ConstValue::Kind::kEnum: {
+            std::ostringstream stream;
+            stream << FormatType(value.enum_type) << '.' << value.variant_name;
+            if (!value.elements.empty()) {
+                stream << '(';
+                for (std::size_t index = 0; index < value.elements.size(); ++index) {
+                    if (index > 0) {
+                        stream << ", ";
+                    }
+                    if (index < value.field_names.size() && !value.field_names[index].empty()) {
+                        stream << value.field_names[index] << ": ";
+                    }
+                    stream << RenderConstValue(value.elements[index]);
+                }
+                stream << ')';
+            }
+            return stream.str();
+        }
         case ConstValue::Kind::kAggregate: {
             std::ostringstream stream;
             stream << '{';
@@ -252,6 +320,22 @@ ConstValue MakeConstValue(double value) {
     ConstValue result;
     result.kind = ConstValue::Kind::kFloat;
     result.float_value = value;
+    result.text = RenderConstValue(result);
+    return result;
+}
+
+ConstValue MakeEnumConstValue(Type enum_type,
+                              std::string variant_name,
+                              std::int64_t variant_tag,
+                              std::vector<std::string> field_names,
+                              std::vector<ConstValue> elements) {
+    ConstValue result;
+    result.kind = ConstValue::Kind::kEnum;
+    result.enum_type = std::move(enum_type);
+    result.variant_name = std::move(variant_name);
+    result.variant_tag = variant_tag;
+    result.field_names = std::move(field_names);
+    result.elements = std::move(elements);
     result.text = RenderConstValue(result);
     return result;
 }

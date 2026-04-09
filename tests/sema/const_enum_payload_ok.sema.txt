@@ -1,0 +1,9 @@
+SemanticModule
+  TypeDecl name=Option kind=enum
+    typeParams=[T]
+    Variant name=Some
+      PayloadField name=value type=T
+    Variant name=None
+  Const names=[SOME_VALUE] type=Option<i32> values=[Option<i32>.Some(value: 7)]
+  Const names=[NONE_VALUE] type=Option<i32> values=[Option<i32>.None]
+  Function name=main params=[] returns=[i32]

@@ -13,6 +13,11 @@ std::string RenderConstValue(const ConstValue& value);
 ConstValue MakeConstValue(bool value);
 ConstValue MakeConstValue(std::int64_t value);
 ConstValue MakeConstValue(double value);
+ConstValue MakeEnumConstValue(Type enum_type,
+							  std::string variant_name,
+							  std::int64_t variant_tag,
+							  std::vector<std::string> field_names = {},
+							  std::vector<ConstValue> elements = {});
 
 std::optional<ConstValue> ParseLiteralConstValue(const ast::Expr& expr);
 std::optional<ConstValue> EvaluateConstUnaryOp(std::string_view op, ConstValue value);

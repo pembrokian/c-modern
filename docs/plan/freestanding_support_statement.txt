@@ -9,7 +9,7 @@ Purpose
 -------
 Record the current admitted freestanding proof slice separately from the hosted
 `v0.2` release-hardening note so the repository can state what the landed
-Phase 81 through Phase 85 work does and does not support.
+Phase 81 through Phase 87 work does and does not support.
 
 This note is intentionally narrower than the hosted release-hardening note.
 It does not claim general freestanding release readiness, broad non-hosted
@@ -26,6 +26,12 @@ Repository status note
 - Phase 85 then proved one bounded endpoint queue and message-buffer
   representation with ordinary Modern C structs, enums, arrays, and functions
   on the same freestanding path.
+- Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
+  path with an ordinary kernel-owned task table and task-state enum on that
+  same freestanding path.
+- Phase 87 then proved that kernel-owned aggregate const templates and
+  zero-initialized mutable globals survive the freestanding build and artifact
+  path on that same repository-bounded proof lane.
 - Before this note, those truths existed in phase closeouts and tool tests,
   but not yet as one explicit published support statement.
 
@@ -33,7 +39,7 @@ Core rule
 ---------
 - Keep this freestanding statement separate from the hosted `v0.2` support
   claim.
-- State only the Phase 81 through Phase 85 proof slice, not a larger
+- State only the Phase 81 through Phase 87 proof slice, not a larger
   freestanding ambition.
 - Keep target-owned support objects, startup choice, and `hal` scope explicit.
 - Reopen broader non-hosted claims only when a later proof lands them.
@@ -52,8 +58,10 @@ Frozen support matrix
 - admitted public stdlib boundary: narrow `hal` `mmio_ptr<T>`,
   `volatile_load<T>`, and `volatile_store<T>`
 - admitted proof set: Phase 81 boot-marker executable proof, Phase 82
-  explicit manifest-owned link-input proof, and Phase 83 deterministic
-  polling-console proof, and Phase 85 kernel endpoint queue smoke proof
+  explicit manifest-owned link-input proof, Phase 83 deterministic
+  polling-console proof, Phase 85 kernel endpoint queue smoke proof, and
+  Phase 86 task lifecycle kernel proof, and Phase 87 kernel static-data and
+  artifact follow-through proof
 - unsupported today: `mc run` or `mc test` freestanding workflow admission,
   general cross-compilation, non-bootstrap target families, linker scripts,
   arbitrary linker flags, shared libraries, kernel-image packaging, and
@@ -119,7 +127,7 @@ The current repository can honestly claim one repository-bounded freestanding
 executable proof slice on the bootstrap Darwin arm64 target family, with
 explicit freestanding manifest identity, explicit startup selection, optional
 manifest-owned extra link inputs, and the narrow public `hal` MMIO surface
-proved through the Phase 81 through Phase 85 tool regressions.
+proved through the Phase 81 through Phase 87 tool regressions.
 
 Everything outside that slice should be treated as explicitly unsupported
 until a later phase note and proof layer admit it.

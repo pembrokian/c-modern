@@ -1,0 +1,158 @@
+Phase 87 -- Kernel Static-Data And Artifact Follow-Through
+==========================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from lifecycle state into the first
+kernel-owned static-data and artifact check: prove that the constants and
+mutable storage required by the earlier endpoint and task proofs survive the
+freestanding build and artifact path honestly rather than only as local stack
+state inside one proof function.
+
+This document is both the Phase 87 execution note and its closeout.
+It does not claim general image packaging, linker-script support, or broad
+kernel build integration.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then published that first non-hosted tranche as a separate,
+  repository-bounded support statement with a focused audit.
+- Phase 85 then proved one bounded endpoint queue and message-buffer shape
+  through ordinary Modern C structs, enums, arrays, and pointer-based
+  mutation.
+- Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
+  path through an explicit task-state enum and explicit kernel-owned task
+  slots.
+- The next strongest Canopus proof was no longer whether those shapes could
+  exist locally. It was whether the kernel-owned constants and mutable static
+  storage those mechanisms want could survive the freestanding build and
+  artifact path honestly.
+
+Problem being solved
+--------------------
+- The earlier kernel proofs validated representation and lifecycle logic, but
+  they did not yet force the freestanding build path to carry kernel-owned
+  static data such as task templates, zero-initialized storage, and global
+  wait-state through object and executable emission.
+- Without one concrete static-data proof, it would be too easy to assume that
+  earlier local proof state automatically extends to kernel-owned storage
+  without checking the actual freestanding artifact path.
+- The next honest step is therefore a bounded static-data follow-through, not
+  broader linker, image, or packaging policy.
+
+Core rule
+---------
+- Prove kernel-owned constants and mutable static storage with ordinary
+  language constructs first.
+- Keep the proof freestanding, deterministic, and repository-bounded.
+- Do not widen into linker scripts, binary-image shaping, or general build
+  integration policy in this phase.
+- Reopen compiler work only if the proof exposes a concrete parser, sema,
+  MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. top-level aggregate `const` globals for kernel-owned task templates
+2. top-level zero-initialized and mutable `var` globals for active task,
+   child task, and wait-state storage
+3. one freestanding executable target that seeds those globals, mutates them
+   through ordinary stores and pointer-based global-address lowering, and
+   proves the emitted object and executable artifacts exist
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first kernel static-data question now by
+proving that the existing freestanding artifact path can carry the constants
+and mutable storage needed by the earlier kernel proofs instead of leaving
+them as local-only examples.
+
+What this phase proves
+----------------------
+- the current explicit core language is sufficient for one kernel-owned set of
+  aggregate const templates and zero-initialized mutable globals
+- ordinary top-level `const`, top-level `var`, and explicit pointer-based
+  writes are enough for one kernel-side static-data story
+- the freestanding build path emits both object and executable artifacts while
+  preserving those globals through MIR and execution
+
+Deliverables
+------------
+- one canonical Phase 87 closeout note recording the implemented static-data
+  proof
+- one focused freestanding tool regression that models kernel-owned task
+  templates and mutable wait-state storage as top-level globals
+- deterministic runtime validation that the zero-initialized globals seed
+  correctly, mutate correctly, and still drive the earlier lifecycle shape
+- MIR inspection proving the proof lowers through explicit const globals,
+  mutable globals, global stores, and explicit global-address lowering
+- refreshed support and planning notes so Phase 87 is recorded as the first
+  concrete kernel static-data and artifact anchor after the lifecycle proof
+
+Suggested execution order
+-------------------------
+1. Define one bounded set of kernel-owned aggregate const templates and
+   mutable globals with ordinary top-level declarations.
+2. Build that proof as a freestanding executable through the existing target
+   and startup path.
+3. Validate deterministic runtime behavior over the seeded and mutated global
+   storage.
+4. Inspect the dumped MIR to confirm that globals survive as explicit const or
+   mutable global declarations and explicit global-address lowering.
+5. Refresh the support and planning surface so later phases build from this
+   concrete anchor.
+
+Exit criteria
+-------------
+- one freestanding target proves kernel-owned aggregate const templates and
+  mutable global storage on the admitted freestanding path
+- the proof deterministically validates both zero-initialized global state and
+  seeded static-data mutation through runtime behavior
+- the dumped MIR records explicit const globals, mutable globals, global
+  stores, and global-address lowering for the proof
+- the build emits the expected object and executable artifacts for that proof
+- the planning surface records Phase 87 as concrete rather than still
+  speculative
+
+Non-goals
+---------
+- linker-script support or binary-image layout policy
+- broad kernel build integration beyond one proof artifact path
+- shared-library, archive-packaging, or install-tree work
+- public `sys` admission, scheduler policy, or user-space service bring-up
+- broader `hal` growth, interrupts, barriers, or device-framework work
+
+Implemented slice
+-----------------
+- the tool regression suite now includes one Phase 87 freestanding target that
+  models kernel-owned task templates as aggregate const globals and active
+  kernel state as top-level mutable globals
+- the proof validates that those globals start zero-initialized, seed from the
+  const templates correctly, mutate through ordinary global stores and
+  pointer-based wait-status writes, and still complete the earlier lifecycle
+  shape before exiting with a deterministic Phase 87 marker
+- the regression also inspects the dumped MIR to confirm that the proof keeps
+  explicit const globals, mutable globals, and explicit global-address
+  lowering rather than collapsing static data into local-only state
+- the freestanding proof statement, README, backlog, decision log, and
+  speculative `v0.3` roadmap now record Phase 87 as the first concrete kernel
+  static-data and artifact follow-through anchor after the lifecycle proof
+
+Closeout statement
+------------------
+Phase 87 is complete as kernel static-data and artifact follow-through. The
+repository still does not claim linker-script support, image packaging, or
+full kernel build integration, but it now has one honest proof that the
+admitted Modern C core and freestanding build path can carry kernel-owned
+aggregate const templates and mutable global storage through object and
+executable emission on the existing freestanding path.

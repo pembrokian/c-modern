@@ -65,4 +65,12 @@ require_contains(
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"
+  "Phase 86 task lifecycle kernel proof")
+require_contains(
+  "freestanding_support_statement.txt"
+  "${FREESTANDING_NOTE_CONTENT}"
+  "Phase 87 kernel static-data and")
+require_contains(
+  "freestanding_support_statement.txt"
+  "${FREESTANDING_NOTE_CONTENT}"
   "unsupported today: `mc run` or `mc test` freestanding workflow admission,")

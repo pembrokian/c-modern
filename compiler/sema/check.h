@@ -60,6 +60,7 @@ struct ConstValue {
         kFloat,
         kString,
         kNil,
+        kEnum,
         kAggregate,
     };
 
@@ -68,6 +69,9 @@ struct ConstValue {
     double float_value = 0.0;
     bool bool_value = false;
     std::string text;
+    Type enum_type;
+    std::string variant_name;
+    std::int64_t variant_tag = 0;
     std::vector<std::string> field_names;
     std::vector<ConstValue> elements;
 };
