@@ -21,6 +21,10 @@ func bootstrap_root_slot(owner_pid: u32) CapabilitySlot {
     return CapabilitySlot{ slot_id: 1, owner_pid: owner_pid, kind: CapabilityKind.Root, rights: 255, object_id: 1 }
 }
 
+func bootstrap_init_program_slot(owner_pid: u32) CapabilitySlot {
+    return CapabilitySlot{ slot_id: 2, owner_pid: owner_pid, kind: CapabilityKind.InitProgram, rights: 7, object_id: 1 }
+}
+
 func kind_score(kind: CapabilityKind) i32 {
     switch kind {
     case CapabilityKind.Empty:

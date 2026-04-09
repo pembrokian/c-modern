@@ -84,15 +84,15 @@ Roadmap bands
 
 Band A - Reify Kernel-Owned Boot And Object Core
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phase 96 is now concrete as kernel boot entry and state skeleton, and Phases
-97 through 98 should continue from that first real kernel-owned artifact into
-the remaining object-core work around address-space setup, endpoint tables,
-and handle-owned message state.
+Phases 96 through 97 are now concrete as kernel boot-entry, state-skeleton,
+and first-user-entry work, and Phase 98 should continue from that real
+kernel-owned artifact into the remaining object-core work around endpoint
+tables and handle-owned message state.
 
 Likely themes:
 - architecture entry and early console truth
 - fixed-size kernel state tables
-- one process, one task, one ready queue, one blocked receiver model
+- one process, one address space, one first user task, one ready queue
 - explicit endpoint and handle-table objects in kernel-owned state
 
 Why this band comes first:
@@ -107,19 +107,22 @@ Phase 96 is now concrete as kernel boot entry and state skeleton:
   task-slot, ready-queue, and boot-record tables, emits one bounded boot
   marker, and stops before claiming user-space entry.
 
-Possible remaining phases in this band:
+Phase 97 is now concrete as address space and first user entry:
 
-Phase 97 -- Address Space And First User Entry Path
-- Exit criterion: the kernel can construct one bounded address space, map one
-  launchable image or boot-bundled user entry, and transfer control into one
-  first task without yet claiming full spawn or syscall coverage.
+- that same owned kernel artifact now constructs one bounded address-space
+  object, maps one boot-bundled init image and stack, seeds one init process
+  slot and one init task slot, prepares one saved user-entry frame, and
+  transfers control into one first user task without yet claiming spawn,
+  syscall truth, or init-owned services.
+
+Possible remaining phases in this band:
 
 Phase 98 -- Kernel Endpoint And Handle Core
 - Exit criterion: the kernel owns one explicit endpoint table, one explicit
   per-process handle table, and one bounded in-kernel message queue model with
   deterministic slot and lifetime behavior.
 
-This band is now concrete through Phase 96.
+This band is now concrete through Phase 97.
 
 Band B - Make The Real Syscall And IPC Boundary Honest
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

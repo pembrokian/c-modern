@@ -81,7 +81,7 @@ Active grouped regression layout:
 - `tests/tool/freestanding/kernel/phase86_task_lifecycle.cpp`: task-lifecycle proof
 - `tests/tool/freestanding/kernel/phase87_static_data.cpp`: kernel static-data proof
 - `tests/tool/freestanding/kernel/phase88_build_integration.cpp`: freestanding kernel build-integration proof
-- `tests/tool/freestanding/kernel/phase96_boot_entry.cpp`: real-kernel boot-entry proof
+- `tests/tool/freestanding/kernel/phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof
 - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
 - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`: compatibility runners only, not the active implementation owners
 - `tests/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation

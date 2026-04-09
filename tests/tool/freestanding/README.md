@@ -14,7 +14,7 @@ Structure
   - `phase86_task_lifecycle.cpp`: task lifecycle proof.
   - `phase87_static_data.cpp`: kernel static-data proof.
   - `phase88_build_integration.cpp`: emitted-object and relink proof.
-  - `phase96_boot_entry.cpp`: real-kernel boot-entry and state-skeleton proof.
+  - `phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

@@ -1,3 +1,4 @@
+import address_space
 import capability
 import endpoint
 import init
@@ -9,10 +10,15 @@ const ARCH_ACTOR: u32 = 0
 const BOOT_PID: u32 = 1
 const BOOT_TID: u32 = 1
 const BOOT_TASK_SLOT: u32 = 0
-const KERNEL_MAGIC: u32 = 9601
+const INIT_PID: u32 = 2
+const INIT_TID: u32 = 2
+const INIT_TASK_SLOT: u32 = 1
+const INIT_ASID: u32 = 1
+const KERNEL_MAGIC: u32 = 9701
 const BOOT_ENTRY_PC: usize = 4096
 const BOOT_STACK_TOP: usize = 8192
-const PHASE96_MARKER: i32 = 96
+const INIT_ROOT_PAGE_TABLE: usize = 32768
+const PHASE97_MARKER: i32 = 97
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [2]state.ProcessSlot
@@ -21,10 +27,13 @@ var READY_QUEUE: state.ReadyQueue
 var BOOT_LOG: state.BootLog
 var BOOT_MARKER_EMITTED: u32
 var ROOT_CAPABILITY: capability.CapabilitySlot
+var INIT_PROGRAM_CAPABILITY: capability.CapabilitySlot
 var ENDPOINTS: endpoint.EndpointTable
 var INTERRUPTS: interrupt.InterruptController
 var SYSCALL_GATE: syscall.SyscallGate
 var INIT_IMAGE: init.InitImage
+var ADDRESS_SPACE: address_space.AddressSpace
+var USER_FRAME: address_space.UserEntryFrame
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -34,10 +43,13 @@ func reset_kernel_state() {
     BOOT_LOG = state.empty_log()
     BOOT_MARKER_EMITTED = 0
     ROOT_CAPABILITY = capability.empty_slot()
+    INIT_PROGRAM_CAPABILITY = capability.empty_slot()
     ENDPOINTS = endpoint.empty_table()
     INTERRUPTS = interrupt.reset_controller()
     SYSCALL_GATE = syscall.gate_closed()
     INIT_IMAGE = init.bootstrap_image()
+    ADDRESS_SPACE = address_space.empty_space()
+    USER_FRAME = address_space.empty_frame()
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -66,10 +78,13 @@ func seed_ready_queue() {
 
 func seed_kernel_owners() {
     ROOT_CAPABILITY = capability.bootstrap_root_slot(BOOT_PID)
+    INIT_PROGRAM_CAPABILITY = capability.empty_slot()
     ENDPOINTS = endpoint.empty_table()
     INTERRUPTS = interrupt.unmask_timer(INTERRUPTS, 32)
     SYSCALL_GATE = syscall.gate_closed()
     INIT_IMAGE = init.bootstrap_image()
+    ADDRESS_SPACE = address_space.empty_space()
+    USER_FRAME = address_space.empty_frame()
 }
 
 func validate_seeded_tables() bool {
@@ -80,6 +95,9 @@ func validate_seeded_tables() bool {
         return false
     }
     if KERNEL.current_tid != BOOT_TID {
+        return false
+    }
+    if KERNEL.active_asid != 0 {
         return false
     }
     if KERNEL.booted != 0 {
@@ -94,6 +112,9 @@ func validate_seeded_tables() bool {
     if PROCESS_SLOTS[0].task_slot != BOOT_TASK_SLOT {
         return false
     }
+    if PROCESS_SLOTS[0].address_space_id != 0 {
+        return false
+    }
     if state.process_state_score(PROCESS_SLOTS[0].state) != 2 {
         return false
     }
@@ -104,6 +125,9 @@ func validate_seeded_tables() bool {
         return false
     }
     if TASK_SLOTS[0].owner_pid != BOOT_PID {
+        return false
+    }
+    if TASK_SLOTS[0].address_space_id != 0 {
         return false
     }
     if TASK_SLOTS[0].entry_pc != BOOT_ENTRY_PC {
@@ -130,6 +154,9 @@ func validate_seeded_tables() bool {
     if ROOT_CAPABILITY.owner_pid != BOOT_PID {
         return false
     }
+    if capability.kind_score(INIT_PROGRAM_CAPABILITY.kind) != 1 {
+        return false
+    }
     if ENDPOINTS.count != 0 {
         return false
     }
@@ -146,6 +173,12 @@ func validate_seeded_tables() bool {
         return false
     }
     if INIT_IMAGE.image_id != 1 {
+        return false
+    }
+    if address_space.state_score(ADDRESS_SPACE.state) != 1 {
+        return false
+    }
+    if USER_FRAME.task_id != 0 {
         return false
     }
     if BOOT_LOG.count != 2 {
@@ -173,19 +206,151 @@ func architecture_entry() bool {
         return false
     }
     KERNEL = state.mark_booted(KERNEL)
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 96)
     return true
 }
 
-func halt_without_user_entry() bool {
+func construct_first_user_address_space() {
+    slots: [2]state.ProcessSlot = PROCESS_SLOTS
+    tasks: [2]state.TaskSlot = TASK_SLOTS
+    ADDRESS_SPACE = address_space.bootstrap_space(INIT_ASID, INIT_PID, INIT_ROOT_PAGE_TABLE, INIT_IMAGE.image_base, INIT_IMAGE.image_size, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_base, INIT_IMAGE.stack_size, INIT_IMAGE.stack_top)
+    INIT_PROGRAM_CAPABILITY = capability.bootstrap_init_program_slot(INIT_PID)
+    slots[1] = state.init_process_slot(INIT_PID, INIT_TASK_SLOT, INIT_ASID)
+    tasks[1] = state.user_task_slot(INIT_TID, INIT_PID, INIT_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
+    PROCESS_SLOTS = slots
+    TASK_SLOTS = tasks
+    READY_QUEUE = state.user_ready_queue(INIT_TID)
+    USER_FRAME = address_space.bootstrap_user_frame(ADDRESS_SPACE, INIT_TID)
+    record_boot_stage(state.BootStage.AddressSpaceReady, INIT_ASID)
+}
+
+func validate_first_user_entry_ready() bool {
+    if KERNEL.booted != 1 {
+        return false
+    }
     if KERNEL.user_entry_started != 0 {
         return false
     }
-    if BOOT_MARKER_EMITTED != 1 {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return false
     }
-    record_boot_stage(state.BootStage.Halted, BOOT_PID)
+    if PROCESS_SLOTS[1].task_slot != INIT_TASK_SLOT {
+        return false
+    }
+    if PROCESS_SLOTS[1].address_space_id != INIT_ASID {
+        return false
+    }
+    if state.process_state_score(PROCESS_SLOTS[1].state) != 4 {
+        return false
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return false
+    }
+    if TASK_SLOTS[1].owner_pid != INIT_PID {
+        return false
+    }
+    if TASK_SLOTS[1].address_space_id != INIT_ASID {
+        return false
+    }
+    if TASK_SLOTS[1].entry_pc != INIT_IMAGE.entry_pc {
+        return false
+    }
+    if TASK_SLOTS[1].stack_top != INIT_IMAGE.stack_top {
+        return false
+    }
+    if state.task_state_score(TASK_SLOTS[1].state) != 4 {
+        return false
+    }
+    if capability.kind_score(INIT_PROGRAM_CAPABILITY.kind) != 4 {
+        return false
+    }
+    if INIT_PROGRAM_CAPABILITY.owner_pid != INIT_PID {
+        return false
+    }
+    if address_space.state_score(ADDRESS_SPACE.state) != 2 {
+        return false
+    }
+    if ADDRESS_SPACE.asid != INIT_ASID {
+        return false
+    }
+    if ADDRESS_SPACE.owner_pid != INIT_PID {
+        return false
+    }
+    if ADDRESS_SPACE.root_page_table != INIT_ROOT_PAGE_TABLE {
+        return false
+    }
+    if ADDRESS_SPACE.mapping_count != 2 {
+        return false
+    }
+    if address_space.kind_score(address_space.mapping_kind_at(ADDRESS_SPACE, 0)) != 2 {
+        return false
+    }
+    if address_space.kind_score(address_space.mapping_kind_at(ADDRESS_SPACE, 1)) != 4 {
+        return false
+    }
+    if ADDRESS_SPACE.mappings[0].base != INIT_IMAGE.image_base {
+        return false
+    }
+    if ADDRESS_SPACE.mappings[0].size != INIT_IMAGE.image_size {
+        return false
+    }
+    if ADDRESS_SPACE.mappings[0].writable != 0 {
+        return false
+    }
+    if ADDRESS_SPACE.mappings[0].executable != 1 {
+        return false
+    }
+    if ADDRESS_SPACE.mappings[1].base != INIT_IMAGE.stack_base {
+        return false
+    }
+    if ADDRESS_SPACE.mappings[1].size != INIT_IMAGE.stack_size {
+        return false
+    }
+    if ADDRESS_SPACE.mappings[1].writable != 1 {
+        return false
+    }
+    if ADDRESS_SPACE.mappings[1].executable != 0 {
+        return false
+    }
+    if USER_FRAME.entry_pc != INIT_IMAGE.entry_pc {
+        return false
+    }
+    if USER_FRAME.stack_top != INIT_IMAGE.stack_top {
+        return false
+    }
+    if USER_FRAME.address_space_id != INIT_ASID {
+        return false
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return false
+    }
+    if READY_QUEUE.count != 1 {
+        return false
+    }
+    if state.ready_slot_at(READY_QUEUE, 0) != INIT_TID {
+        return false
+    }
+    if BOOT_LOG.count != 3 {
+        return false
+    }
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 2)) != 4 {
+        return false
+    }
+    if state.log_detail_at(BOOT_LOG, 2) != INIT_ASID {
+        return false
+    }
+    return true
+}
+
+func transfer_to_first_user_entry() bool {
+    construct_first_user_address_space()
+    if !validate_first_user_entry_ready() {
+        return false
+    }
+    ADDRESS_SPACE = address_space.activate(ADDRESS_SPACE)
+    KERNEL = state.start_user_entry(KERNEL, INIT_PID, INIT_TID, INIT_ASID)
+    record_boot_stage(state.BootStage.UserEntryReady, INIT_TID)
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 97)
     return true
 }
 
@@ -193,50 +358,65 @@ func bootstrap_main() i32 {
     if !architecture_entry() {
         return 10
     }
-    if KERNEL.booted != 1 {
+    if !transfer_to_first_user_entry() {
         return 11
     }
-    if BOOT_LOG.count != 3 {
+    if KERNEL.booted != 1 {
         return 12
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 2)) != 4 {
+    if KERNEL.current_pid != INIT_PID {
         return 13
     }
-    if state.log_actor_at(BOOT_LOG, 2) != ARCH_ACTOR {
+    if KERNEL.current_tid != INIT_TID {
         return 14
     }
-    if state.log_detail_at(BOOT_LOG, 2) != 96 {
+    if KERNEL.active_asid != INIT_ASID {
         return 15
     }
-    if !halt_without_user_entry() {
+    if KERNEL.user_entry_started != 1 {
         return 16
     }
-    if BOOT_LOG.count != 4 {
+    if address_space.state_score(ADDRESS_SPACE.state) != 4 {
         return 17
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_MARKER_EMITTED != 1 {
         return 18
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 19
     }
-    if state.log_detail_at(BOOT_LOG, 3) != BOOT_PID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 20
     }
-    if KERNEL.user_entry_started != 0 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 21
     }
-    if READY_QUEUE.count != 1 {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 22
     }
-    if state.ready_slot_at(READY_QUEUE, 0) != BOOT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 23
     }
-    if PROCESS_SLOTS[0].pid != BOOT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 24
     }
-    if TASK_SLOTS[0].tid != BOOT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 97 {
         return 25
     }
-    return PHASE96_MARKER
+    if READY_QUEUE.count != 1 {
+        return 26
+    }
+    if state.ready_slot_at(READY_QUEUE, 0) != INIT_TID {
+        return 27
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 28
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 29
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 30
+    }
+    return PHASE97_MARKER
 }

@@ -71,7 +71,7 @@ Test layout rule
   `tests/tool/` before introducing a deeper subtree. For example:
   - `freestanding/kernel/suite.cpp`
   - `freestanding/system/suite.cpp`
-  - `freestanding/kernel/phase96_boot_entry.cpp`
+  - `freestanding/kernel/phase97_user_entry.cpp`
 - Only introduce a dedicated `tests/tool/canopus/` subtree later if Canopus
   gains enough repository-owned source and harness code that folder ownership
   becomes clearer than suite-based naming.

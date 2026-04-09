@@ -1,0 +1,181 @@
+Phase 97 -- Address Space And First User Entry
+================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 96 kernel boot-entry and state-skeleton
+proof into the next smallest real-kernel owner: prove that the repository can
+construct one bounded address-space object, map one boot-bundled init image
+and stack, prepare one explicit user-entry frame, and transfer control into
+one first user task without yet claiming spawn, syscall execution, endpoint
+delivery, timer scheduling, or broader service bring-up.
+
+This document is both the Phase 97 execution note and its closeout.
+It does not claim a general loader, multi-process spawn path, real syscall
+handling, endpoint traffic, interrupt delivery, or a running init-owned
+service set.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 95 produced the bounded freestanding `v0.3` proof
+  ladder and froze that lane into the first admitted freestanding support
+  slice.
+- Phase 96 then crossed from proof-only modules into the first real
+  repository-owned kernel artifact by making explicit architecture entry,
+  deterministic kernel tables, bounded owner skeletons, and stop-before-user-
+  space behavior real.
+- The strongest remaining immediate kernel question was therefore no longer
+  whether one kernel-owned artifact could boot. It was whether that same
+  artifact could perform one honest address-space and first-user-entry handoff
+  without widening into spawn, syscall, or service policy.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names Phase 97 as the first point
+  where the repository should turn boot-state truth into one bounded
+  address-space and user-entry path.
+- The repository already had explicit boot-owned kernel state and a bounded
+  boot-bundled init image descriptor, but it still had no active proof that a
+  process can own one address space, that the boot image can be mapped into
+  it, or that the kernel can prepare one user-entry frame and hand off control
+  honestly.
+- Without this step, later kernel planning could jump straight from boot-state
+  truth to syscall or init-service claims without a real first-user-entry
+  anchor.
+
+Core rule
+---------
+- Keep the phase to one process, one address space, one initial user task, and
+  one explicit transfer into that task.
+- Keep mapping metadata kernel-owned and explicit.
+- Use a trusted boot-bundled init image descriptor rather than inventing a
+  general executable loader.
+- Make the saved user-entry frame explicit in ordinary kernel-owned data.
+- Stop before syscall handling, capability transfer, endpoint delivery, timer
+  wake, or init-owned service policy.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one imported address-space helper module that owns the bounded address-
+   space, mapping, and user-entry-frame records
+2. one boot-bundled init image descriptor carrying explicit image and stack
+   metadata for the first user entry path
+3. one kernel-owned handoff step that allocates one bounded address-space
+   object, records one image mapping and one stack mapping, seeds one init
+   process slot and one init task slot, and narrows the ready queue to that
+   first task
+4. one explicit transfer step that activates the address space, marks the
+   kernel descriptor as having started user entry, and emits one bounded Phase
+   97 marker only after the handoff state validates exactly
+5. one freestanding tool regression and MIR inspection proving that the slice
+   stays inside ordinary imported types, aggregate initialization, enum
+   matching, and global-state updates rather than hidden runtime help
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because Phase 96 already proved the
+real kernel-owned boot anchor. The next honest owner is not broader syscall or
+service work. It is one bounded address-space and first-user-entry path.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact can now move from boot-only state seeding
+  into one explicit user-entry handoff
+- the current language, freestanding build path, and runtime startup can carry
+  one kernel-owned address-space object, two explicit mappings, and one saved
+  user-entry frame without new compiler work
+- the repository can stop honestly at first-user-entry truth without implying
+  spawn, syscall execution, init services, or broader running-kernel support
+
+Deliverables
+------------
+- one canonical Phase 97 closeout note recording the implemented address-space
+  and first-user-entry proof
+- one owned `kernel/src/address_space.mc` helper module plus the bounded init-
+  image metadata needed by the new handoff path
+- one updated repository-owned kernel target that constructs one address space,
+  maps one boot-bundled init image and stack, seeds one init process and task,
+  and transfers control into that first task
+- one focused freestanding kernel regression and MIR inspection validating the
+  new address-space and user-entry slice
+- refreshed planning and orientation surfaces so Phase 97 is concrete and
+  Phase 98 becomes the next remaining kernel object-core owner
+
+Suggested execution order
+-------------------------
+1. Define one bounded address-space helper module and extend the boot-bundled
+   init image descriptor with explicit mapping metadata.
+2. Teach the repository-owned kernel target to seed one init process and task,
+   construct one address space, and prepare one user-entry frame.
+3. Validate the handoff state exactly and emit the Phase 97 marker only after
+   the kernel descriptor, ready queue, address-space state, and user-entry
+   frame all match the bounded contract.
+4. Inspect the merged MIR to confirm that the proof remains ordinary imported
+   type and global-state lowering.
+5. Refresh the planning surface so Phase 97 is concrete and Phase 98 remains
+   the next kernel bring-up owner.
+
+Exit criteria
+-------------
+- one repository-owned kernel target constructs one bounded address-space
+  object for one boot-bundled init image and stack
+- one init process slot and one init task slot become ready for the first user
+  entry path
+- the kernel prepares one explicit user-entry frame and marks user entry as
+  started only after validating the bounded handoff state
+- the runtime proof exits with exactly one bounded Phase 97 marker
+- the merged MIR preserves imported address-space types, helper functions, and
+  explicit global writes for the new handoff state
+- the planning surface records Phase 97 as concrete rather than speculative
+
+Non-goals
+---------
+- general executable loading, relocation, or loader policy
+- syscall admission, endpoint delivery, handle transfer, or wait semantics
+- multi-process spawn, kill, or parent-child lifecycle policy
+- init-owned service launch, scheduler policy, timer wake, or interrupt
+  delivery
+- claiming a full running kernel slice or broader target support
+
+Implemented slice
+-----------------
+- added `kernel/src/address_space.mc` as the owned kernel helper for bounded
+  address-space state, mapping records, and saved user-entry-frame state, and
+  widened `kernel/src/init.mc` so the trusted boot-bundled init image now
+  carries explicit image-base, image-size, stack-base, and stack-size metadata
+- widened `kernel/src/state.mc` so the kernel descriptor now tracks the active
+  address-space id, process and task slots record address-space ownership, the
+  boot log can record the address-space and user-entry stages explicitly, and
+  the phase still uses only ordinary structs, enums, arrays, and helper
+  functions
+- updated `kernel/src/main.mc` so the owned kernel target now seeds one init
+  process slot, one init task slot, one init-program capability, one address-
+  space object with explicit image and stack mappings, one saved user-entry
+  frame, and one narrowed ready queue for the init task before marking user
+  entry started and emitting the Phase 97 marker
+- replaced the active kernel freestanding regression with a focused Phase 97
+  proof that builds and runs the repository-owned kernel target, expects the
+  Phase 97 marker, and inspects merged MIR for the new address-space and user-
+  entry lowering surface
+- refreshed the kernel README, agent map, testing notes, decision log,
+  backlog, and speculative Canopus kernel roadmap so the repository records
+  Phase 97 as concrete and leaves Phase 98 as the next remaining kernel
+  object-core owner
+
+Closeout statement
+------------------
+Phase 97 is complete as an address-space and first-user-entry proof. The
+repository still does not claim a general loader, syscall execution, endpoint
+delivery, timer-backed scheduling, or init-owned service truth, but it now has
+one honest real-kernel artifact that boots, constructs one bounded address
+space, maps one boot-bundled init image and stack, prepares one explicit user-
+entry frame, transfers control into one first user task, and stops exactly at
+that boundary.
