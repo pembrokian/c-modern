@@ -1,0 +1,186 @@
+Phase 93 -- Timer Wake Proof
+============================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from the first explicit user-space
+lifecycle anchor into the first narrow event-source proof: prove that one
+explicit timer-owned wake path can unblock one waiting task and publish one
+deterministic wake observation without widening into a public timer API,
+general interrupt framework, hidden scheduler runtime, or broader `hal`
+admission.
+
+This document is both the Phase 93 execution note and its closeout.
+It does not claim general interrupt handling, timer queues, multi-source wake
+routing, preemption, or scheduler completion.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then published that first non-hosted tranche as a separate,
+  repository-bounded support statement with a focused audit.
+- Phase 85 then proved one bounded endpoint queue and message-buffer shape
+  through ordinary Modern C structs, enums, arrays, and pointer-based
+  mutation.
+- Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
+  path through an explicit task-state enum and explicit kernel-owned task
+  slots.
+- Phase 87 then proved that kernel-owned aggregate const templates and
+  mutable global storage survive the freestanding build and artifact path.
+- Phase 88 then proved that the emitted freestanding entry object and
+  generated runtime object compose honestly with one minimal external relink
+  step.
+- Phase 89 then proved that the kernel can start one init context, pass one
+  explicit log-service endpoint capability into that context, and complete
+  one bounded request-and-acknowledgment flow.
+- Phase 90 then proved that one user-space component can transfer one
+  explicit endpoint capability to another and that the receiver can use it
+  for one bounded acknowledged action.
+- Phase 91 then proved that the first repeated transfer and request
+  scaffolding can live inside one ordinary imported helper module without
+  widening into a runtime layer.
+- Phase 92 then proved that init can launch one child from one explicit
+  program capability and observe one child exit through one explicit wait
+  handle.
+- The next strongest Canopus question was no longer whether one launch or
+  wake-free lifecycle path could stay explicit. It was whether the first real
+  event source beyond pure synchronous setup could stay equally narrow and
+  honest.
+
+Problem being solved
+--------------------
+- The Canopus planning surface already names timer or interrupt delivery as a
+  required kernel mechanism, but the repository had not yet exercised any
+  event-source proof on the freestanding lane.
+- Without one narrow wake proof, it would be too easy to blur later work into
+  a general interrupt subsystem, public timer API, or broader scheduler claim
+  before validating that the current explicit core can already model one
+  deadline-fired wake path honestly.
+- The next honest step is therefore one bounded timer wake proof, not a broad
+  interrupt framework or timer-service layer.
+
+Core rule
+---------
+- Prove one explicit timer-arm, fire, deliver, and observe path first.
+- Keep blocking and wake-delivery policy explicit in the root proof module.
+- Keep helper-owned data shaping limited to ordinary structs, enums, and
+  helper functions for timer and wake records.
+- Do not admit a public timer stdlib surface, general interrupt controller,
+  scheduler framework, or broader `hal` taxonomy in this phase.
+- Reopen compiler work only if the proof exposes a concrete parser, sema,
+  MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target with one root proof module and one
+   imported timer-helper module
+2. one explicit init-owned timer capability, one explicit timer device record,
+   one explicit wake endpoint, and one waiting worker task record
+3. one deterministic deadline tick that fires once, delivers one wake reason,
+   wakes one blocked worker, and is observed once by init
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first event-source question now by proving one
+timer-owned wake path locally instead of widening into a general interrupt or
+scheduler surface.
+
+What this phase proves
+----------------------
+- the current language and toolchain can carry one bounded event-source proof
+  with explicit timer capability, explicit device state, explicit wake
+  endpoint, and explicit waiting-task state
+- timer wake policy can remain explicit: init arms one timer-backed wait,
+  the timer fires at one deterministic tick, the kernel delivers one wake
+  reason, and init observes that wake exactly once
+- the existing freestanding build path can validate that proof through an
+  ordinary imported helper module and merged MIR dump without admitting a
+  public timer, interrupt, or scheduler runtime surface
+
+Deliverables
+------------
+- one canonical Phase 93 closeout note recording the implemented timer wake
+  proof
+- one focused freestanding tool regression that models init-owned timer
+  authority, one timer device, one wake endpoint, one blocked worker, and one
+  deterministic wake delivery path
+- deterministic runtime validation that pre-fire wake observation fails, the
+  timer fires only at the expected tick, the blocked worker wakes exactly
+  once, and init observes the delivered wake reason exactly once
+- MIR inspection proving the proof stays within ordinary imported-module,
+  struct, enum, aggregate-init, and enum-match lowering behavior rather than
+  through a special interrupt or scheduler boundary
+- refreshed support and planning notes so Phase 93 is recorded as the first
+  concrete event-source anchor after the explicit user-space lifecycle proof
+
+Suggested execution order
+-------------------------
+1. Define one timer capability, one timer device, one wake endpoint, one wake
+   observation record, and one waiting worker record with ordinary structs and
+   enums.
+2. Build that proof as one freestanding multi-module executable through the
+   existing target and startup path.
+3. Validate deterministic block, arm, tick, fire, deliver, observe, and wake
+   behavior in the repository harness.
+4. Inspect the merged MIR to confirm that imported timer-helper types and
+   functions remain ordinary module boundaries.
+5. Refresh the support and planning surface so later phases build from this
+   concrete event-source anchor.
+
+Exit criteria
+-------------
+- one freestanding target proves that one explicit timer-backed wait can wake
+  one blocked worker and produce one explicit wake observation
+- the proof deterministically rejects wake observation before timer delivery
+  and rejects delivery before the timer reaches its configured tick
+- the timer fires exactly once at the expected tick, the worker wakes exactly
+  once with the expected reason, and init observes that wake exactly once
+- the merged MIR records imported timer-helper declarations and ordinary
+  helper function boundaries for timer arming and wake observation
+- the planning surface records Phase 93 as concrete rather than speculative
+
+Non-goals
+---------
+- a public timer API, interrupt controller API, or scheduler framework
+- multi-timer queues, repeated periodic wakes, or preemption policy
+- broader `hal` growth, barrier admission, or kernel-image packaging
+- claiming full interrupt support or first-system integration
+
+Implemented slice
+-----------------
+- the freestanding tool regression suite now includes one Phase 93 target
+  with `src/main.mc` and `src/user_timer.mc`, where the helper module owns
+  timer-capability, timer-device, wake-endpoint, wake-observation, and
+  waiting-worker data shapes while the root proof module keeps timer arming,
+  blocked-wait policy, and wake delivery explicit
+- the proof validates that init starts with one timer capability, cannot
+  observe wake before arming and firing, cannot deliver the wake before the
+  configured deadline tick, sees the timer fire exactly once at the deadline,
+  sees the blocked worker wake exactly once with the expected reason, and then
+  observes that wake once before the executable exits with the Phase 93 marker
+- the regression also inspects the merged MIR to confirm that imported
+  timer-helper types and helper functions remain ordinary module boundaries
+  with ordinary aggregate initialization and enum-match lowering
+- the freestanding support statement, README, backlog, decision log, focused
+  freestanding support audit, and speculative `v0.3` roadmap now record Phase
+  93 as the first concrete narrow timer wake anchor after the explicit
+  user-space lifecycle proof
+
+Closeout statement
+------------------
+Phase 93 is complete as a timer wake proof. The repository still does not
+claim a public timer API, general interrupt handling, scheduler policy, or
+full Canopus first-system integration, but it now has one honest proof that
+the admitted Modern C core and existing freestanding path can carry one
+explicit timer-owned wake source, one blocked worker, and one deterministic
+wake observation path directly in ordinary code.

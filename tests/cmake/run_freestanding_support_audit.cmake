@@ -36,6 +36,10 @@ require_contains(
   "README"
   "${README_CONTENT}"
   "admitted manifest boundary: freestanding `exe` targets with explicit `target`, explicit `[targets.<name>.runtime] startup`, and optional explicit `[targets.<name>.link] inputs = [...]`")
+require_contains(
+  "README"
+  "${README_CONTENT}"
+  "Phase 93 timer wake proof")
 require_not_contains(
   "README"
   "${README_CONTENT}"
@@ -74,6 +78,10 @@ require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"
   "Phase 89 init-to-log-service handshake proof")
+require_contains(
+  "freestanding_support_statement.txt"
+  "${FREESTANDING_NOTE_CONTENT}"
+  "Phase 93 timer wake proof")
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"

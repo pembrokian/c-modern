@@ -41,8 +41,8 @@ Repository numbering note
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation after the now-concrete first kernel
   representation proof.
-- This speculative continuation therefore starts at Phase 93, with Phase 81
-  through Phase 92 as the current concrete anchors.
+- This speculative continuation therefore starts at Phase 94, with Phase 81
+  through Phase 93 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -196,8 +196,18 @@ Phase 92 is now concrete as user-space lifecycle follow-through:
   ready-state observation, and single observation of child exit
   deterministically in the repository tool harness
 
+Phase 93 is now concrete as timer wake proof:
+- it proves that one explicit timer-backed wait can fire at one deterministic
+  tick, wake one blocked worker, and publish one explicit wake observation
+- it keeps the proof on the existing freestanding path rather than admitting
+  a public timer API, general interrupt framework, ambient scheduler runtime,
+  or broader `hal` taxonomy
+- it validates pre-fire observation rejection, deadline-tick firing, single
+  wake delivery, and single wake observation deterministically in the
+  repository tool harness
+
 The remaining speculative continuation in this band therefore starts at Phase
-93.
+94.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof
@@ -263,8 +273,8 @@ This band is now concrete through Phase 92.
 
 Band D - Add One Event Source And Integrate The First System
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 93 through 95 likely add the narrowest wakeup source beyond synchronous
-boot and then combine the earlier proofs into one first-system demo.
+Phases 94 through 95 likely build from the now-concrete timer wake anchor and
+then combine the earlier proofs into one first-system demo.
 
 Likely themes:
 - one timer or interrupt wake path
@@ -277,10 +287,6 @@ Why this band comes last:
   real
 
 Possible phases in this band:
-
-Phase 93 -- Timer Or Interrupt Wake Proof
-- Exit criterion: one narrow wakeup source beyond simple synchronous setup is
-  admitted without widening into a general interrupt or scheduler framework.
 
 Phase 94 -- First-System Demo Integration
 - Exit criterion: one small end-to-end Canopus Lite bring-up demo combines the
@@ -298,7 +304,7 @@ If the repository keeps following the same pattern, the safest order is:
 1. Make one freestanding path and one narrow `hal` path real first.
 2. Prove kernel mechanisms with the existing explicit core language.
 3. Prove one small user-space policy story.
-4. Add one wakeup source and integrate the first-system demo.
+4. Build from the first landed wakeup source into the first-system demo.
 5. Freeze the first freestanding `v0.3` support statement last.
 
 That ordering keeps the repository from confusing Canopus pressure with
