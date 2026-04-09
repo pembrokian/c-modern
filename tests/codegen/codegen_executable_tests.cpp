@@ -459,7 +459,7 @@ void RunBuiltProjectPartialWriteFixture(const std::filesystem::path& mc_path,
 void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                                    const std::filesystem::path& binary_root,
                                    const std::filesystem::path& mc_path) {
-    const std::filesystem::path work_root = binary_root / "stage5_exec_core_tests";
+    const std::filesystem::path work_root = binary_root / "codegen" / "executable" / "core";
 
     RunBuiltFixture(mc_path,
                     source_root / "tests/codegen/smoke_return_zero.mc",
@@ -969,7 +969,7 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
 void RunCodegenExecutableStdlibSuite(const std::filesystem::path& source_root,
                                      const std::filesystem::path& binary_root,
                                      const std::filesystem::path& mc_path) {
-    const std::filesystem::path work_root = binary_root / "stage5_exec_stdlib_tests";
+    const std::filesystem::path work_root = binary_root / "codegen" / "executable" / "stdlib";
 
     RunBuiltOutputFixture(mc_path,
                           source_root / "tests/stdlib/hello_stdout.mc",
@@ -1200,7 +1200,7 @@ void RunCodegenExecutableStdlibSuite(const std::filesystem::path& source_root,
 void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
                                       const std::filesystem::path& binary_root,
                                       const std::filesystem::path& mc_path) {
-    const std::filesystem::path work_root = binary_root / "stage5_exec_project_tests";
+    const std::filesystem::path work_root = binary_root / "codegen" / "executable" / "project";
 
     const std::filesystem::path imported_project_root = work_root / "imported_globals_project";
     WriteFile(imported_project_root / "build.toml",
@@ -1523,7 +1523,7 @@ int main(int argc, char** argv) {
 
     const std::filesystem::path source_root = argv[1];
     const std::filesystem::path binary_root = argv[2];
-    const std::filesystem::path mc_path = binary_root / "mc";
+    const std::filesystem::path mc_path = binary_root / "bin" / "mc";
 
 #if defined(MC_CODEGEN_EXECUTABLE_CORE_MAIN)
     RunCodegenExecutableCoreSuite(source_root, binary_root, mc_path);

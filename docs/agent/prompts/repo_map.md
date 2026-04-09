@@ -108,7 +108,8 @@ This file is a fast orientation map for agents working in this repository.
 - Configured import roots are supported through the sema API and `mc check --import-root`.
 - Struct layout dumps now include deterministic size, alignment, and field offsets.
 - Full Phase 3 from `docs/plan/plan.txt` is still not complete.
-- Repository-owned smoke and regression outputs should prefer semantic build-tree roots such as `build/debug/audit/...`, `build/debug/probes/...`, `build/debug/tmp/...`, `build/debug/tool/...`, and the grouped codegen suite work roots.
+- Primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`.
+- Repository-owned smoke and regression outputs should prefer semantic build-tree roots such as `build/debug/audit/...`, `build/debug/probes/...`, `build/debug/tmp/...`, `build/debug/tool/...`, and `build/debug/codegen/executable/...`.
 - Remaining top-level `build/debug/phase*` paths are preserved manual or probe areas rather than active regression output policy.
 
 ## Where To Change Things

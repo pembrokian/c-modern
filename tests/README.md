@@ -87,8 +87,11 @@ roots are also semantic now, so routine runs no longer create new disposable
 `phase*` artifacts anywhere under the active build root.
 
 The grouped codegen executable suites were audited as part of the same cleanup.
-They still use historical identifiers inside their own nested suite work roots,
-but they do not create fresh top-level `build/debug/phase*` trees.
+They now root their disposable outputs under semantic suite directories such as
+`build/debug/codegen/executable/core/...`,
+`build/debug/codegen/executable/stdlib/...`, and
+`build/debug/codegen/executable/project/...`, and they do not create fresh
+top-level `build/debug/phase*` trees.
 
 # Hosted Assumptions
 

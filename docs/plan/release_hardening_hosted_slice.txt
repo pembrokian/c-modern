@@ -76,16 +76,16 @@ cmake --build build/debug -j4
 The produced compiler entrypoint on the supported path is:
 
 ```sh
-build/debug/mc
+build/debug/bin/mc
 ```
 
 First-use smoke validation on the supported path:
 
 ```sh
-build/debug/mc --help
-build/debug/mc check tests/cases/hello.mc
-build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase32_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase32_issue_rollup
+build/debug/bin/mc --help
+build/debug/bin/mc check tests/cases/hello.mc
+build/debug/bin/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/first_use_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/bin/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/first_use_smoke/issue_rollup
 ```
 
 Repo-owned convenience entrypoint for that same narrow supported path:
@@ -122,17 +122,18 @@ make release-snapshot-prep
 
 Supported command patterns:
 
-- direct-source inspection or build: `build/debug/mc check <file.mc>` and
-  `build/debug/mc build <file.mc> --build-dir <dir>`
+- direct-source inspection or build: `build/debug/bin/mc check <file.mc>` and
+  `build/debug/bin/mc build <file.mc> --build-dir <dir>`
 - project inspection, build, run, or test:
-  `build/debug/mc check --project <build.toml>`,
-  `build/debug/mc build --project <build.toml> --build-dir <dir>`,
-  `build/debug/mc run --project <build.toml> --build-dir <dir> -- <args>`, and
-  `build/debug/mc test --project <build.toml> --build-dir <dir>`
+  `build/debug/bin/mc check --project <build.toml>`,
+  `build/debug/bin/mc build --project <build.toml> --build-dir <dir>`,
+  `build/debug/bin/mc run --project <build.toml> --build-dir <dir> -- <args>`, and
+  `build/debug/bin/mc test --project <build.toml> --build-dir <dir>`
 
 Artifact expectations:
 
-- `build/debug/mc` is the produced compiler entrypoint for the supported path
+- `build/debug/bin/mc` is the produced compiler entrypoint for the supported path
+- primary compiled targets now live under `build/debug/bin/...` and `build/debug/lib/...`
 - `build/` is disposable generated state
 - command-local `--build-dir` trees are disposable generated state and should
   be treated as build outputs, not source inputs
@@ -172,16 +173,16 @@ Public-cut smoke audit
 The narrowest honest public-cut smoke set for the current hosted plateau is:
 
 ```sh
-build/debug/mc check tests/cases/hello.mc
-build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/phase33_smoke_return_zero
-build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/phase33_issue_rollup -- examples/real/issue_rollup/tests/sample.txt
-build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/phase33_issue_rollup
-build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/phase33_worker_queue
-build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/phase43_pipe_handoff
-build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/phase43_pipe_ready
-build/debug/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/phase46_line_filter_relay
-build/debug/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/phase33_evented_echo
+build/debug/bin/mc check tests/cases/hello.mc
+build/debug/bin/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/audit/public_cut_smoke/smoke_return_zero
+build/debug/bin/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/bin/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/bin/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup
+build/debug/bin/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/audit/public_cut_smoke/worker_queue
+build/debug/bin/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/audit/public_cut_smoke/pipe_handoff
+build/debug/bin/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/audit/public_cut_smoke/pipe_ready
+build/debug/bin/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/audit/public_cut_smoke/line_filter_relay
+build/debug/bin/mc test --project examples/real/evented_echo/build.toml --build-dir build/debug/audit/public_cut_smoke/evented_echo
 ```
 
 This smoke set proves, at the narrowest honest level:

@@ -1,7 +1,8 @@
 BUILD_DIR ?= build/debug
 CONFIG ?= Debug
+MC ?= $(BUILD_DIR)/bin/mc
 
-.PHONY: build test first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate freestanding-support-audit release-snapshot-prep format dump-paths clean
+.PHONY: build test first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate freestanding-support-audit release-snapshot-prep clean-legacy-build-debris format dump-paths clean
 
 build:
 	cmake -S . -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE="$(CONFIG)"
@@ -28,12 +29,15 @@ freestanding-support-audit: build
 release-snapshot-prep: build
 	./tools/release/prepare_v0_2_snapshot.sh --source-root . --build-dir "$(BUILD_DIR)"
 
+clean-legacy-build-debris:
+	./tools/cleanup/prune_legacy_build_debris.sh --source-root . --build-dir "$(BUILD_DIR)"
+
 format:
 	find compiler tests -type f \( -name '*.cpp' -o -name '*.h' \) -print0 | xargs -0 clang-format -i
 
 dump-paths: build
 	@test -n "$(FILE)" || { echo "usage: make dump-paths FILE=tests/cases/hello.mc"; exit 1; }
-	"$(BUILD_DIR)/mc" dump-paths "$(FILE)" --build-dir "$(BUILD_DIR)"
+	"$(MC)" dump-paths "$(FILE)" --build-dir "$(BUILD_DIR)"
 
 clean:
 	rm -rf build

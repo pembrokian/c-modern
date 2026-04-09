@@ -46,9 +46,9 @@ ctest --test-dir build/debug --output-on-failure
 Useful focused commands:
 
 ```sh
-build/debug/mc --help
-build/debug/mc check tests/cases/hello.mc
-build/debug/mc check tests/cases/hello.mc --dump-mir --build-dir build/debug
+build/debug/bin/mc --help
+build/debug/bin/mc check tests/cases/hello.mc
+build/debug/bin/mc check tests/cases/hello.mc --dump-mir --build-dir build/debug
 ctest --test-dir build/debug -R mc_sema_fixture_unit --output-on-failure
 ctest --test-dir build/debug -R mc_mir_fixture_unit --output-on-failure
 ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure
@@ -72,8 +72,9 @@ Active grouped regression layout:
 - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
 - `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
 - `tests/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation
+- primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`
 - grouped tool outputs now belong under semantic suite roots such as `build/debug/tool/workflow/...`
-- grouped codegen executable outputs now belong under nested suite roots such as `build/debug/stage5_exec_stdlib_tests/...` and `build/debug/stage5_exec_project_tests/...`
+- grouped codegen executable outputs now belong under semantic suite roots such as `build/debug/codegen/executable/core/...`, `build/debug/codegen/executable/stdlib/...`, and `build/debug/codegen/executable/project/...`
 - treat remaining top-level `build/debug/phase*` paths as preserved manual or probe areas unless you have explicit reason to clean them
 
 Diagnostic fixture convention:
@@ -101,3 +102,4 @@ If you add a feature that changes compiler-visible behavior, update the narrowes
 - Layout support exists, but it is still first-cut bootstrap behavior and not full ABI completion.
 - The build tree under `build/` is disposable.
 - Do not reintroduce fresh top-level `build/debug/phase*` regression output trees for repository-owned tests; prefer the semantic `audit`, `probes`, `tmp`, `tool`, or grouped suite work roots already in use.
+- If you need to tidy an existing build tree in place, prefer `make clean-legacy-build-debris` over ad hoc manual deletion.

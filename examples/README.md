@@ -24,19 +24,19 @@ Current repository-specific admitted real projects:
 Typical project-driven workflows:
 
 ```sh
-build/debug/mc run --project examples/real/grep_lite/build.toml --build-dir build/debug/probes/grep_lite -- alpha examples/real/grep_lite/tests/sample.txt
-build/debug/mc run --project examples/real/file_walker/build.toml --build-dir build/debug/probes/file_walker -- examples/real/file_walker/tests/sample_tree
-build/debug/mc run --project examples/real/hash_tool/build.toml --build-dir build/debug/probes/hash_tool -- examples/real/hash_tool/tests/sample.txt
-build/debug/mc run --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr -- examples/real/arena_expr/tests/sample.expr
-build/debug/mc run --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
-build/debug/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
-build/debug/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
-build/debug/mc run --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay -- "phase forty five"
-build/debug/mc test --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr_tests
-build/debug/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
-build/debug/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
-build/debug/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
-build/debug/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay
+build/debug/bin/mc run --project examples/real/grep_lite/build.toml --build-dir build/debug/probes/grep_lite -- alpha examples/real/grep_lite/tests/sample.txt
+build/debug/bin/mc run --project examples/real/file_walker/build.toml --build-dir build/debug/probes/file_walker -- examples/real/file_walker/tests/sample_tree
+build/debug/bin/mc run --project examples/real/hash_tool/build.toml --build-dir build/debug/probes/hash_tool -- examples/real/hash_tool/tests/sample.txt
+build/debug/bin/mc run --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr -- examples/real/arena_expr/tests/sample.expr
+build/debug/bin/mc run --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
+build/debug/bin/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
+build/debug/bin/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
+build/debug/bin/mc run --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay -- "phase forty five"
+build/debug/bin/mc test --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr_tests
+build/debug/bin/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
+build/debug/bin/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
+build/debug/bin/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
+build/debug/bin/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay
 ```
 
 These projects are repository-owned proof artifacts for the admitted repository slice, not claims that the broader long-term real-program surface is complete.

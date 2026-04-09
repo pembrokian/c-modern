@@ -111,13 +111,13 @@ cmake --build build/debug -j4
 The produced compiler entrypoint on the supported host is:
 
 ```sh
-build/debug/mc
+build/debug/bin/mc
 ```
 
 Supported command pattern for the admitted freestanding proof slice:
 
 ```sh
-build/debug/mc build --project <build.toml> --target <name> --build-dir <dir>
+build/debug/bin/mc build --project <build.toml> --target <name> --build-dir <dir>
 ```
 
 Repo-owned audit entrypoint for this support statement:
@@ -128,8 +128,9 @@ make freestanding-support-audit
 
 Artifact expectations
 ---------------------
-- `build/debug/mc` is the produced compiler entrypoint for the admitted proof
+- `build/debug/bin/mc` is the produced compiler entrypoint for the admitted proof
   slice on the supported host
+- primary compiled targets now live under `build/debug/bin/...` and `build/debug/lib/...`
 - `build/` is disposable generated state
 - command-local `--build-dir` trees are disposable generated state and should
   be treated as build outputs, not source inputs
