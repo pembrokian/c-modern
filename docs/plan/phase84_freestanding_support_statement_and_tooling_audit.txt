@@ -1,0 +1,147 @@
+Phase 84 -- Freestanding Support Statement And Tooling Audit
+============================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Turn the landed Phase 81 through Phase 83 freestanding proof wave into one
+explicit published support statement and one repo-owned audit path so the
+repository can describe that slice honestly without collapsing it into either
+the hosted `v0.2` claim or a broader non-hosted promise.
+
+This document is both the Phase 84 execution note and its closeout.
+It does not claim general freestanding release readiness, broad target-model
+ completion, or wider `hal` admission than the first proof wave already landed.
+
+Repository status note
+----------------------
+- Phase 81 already made the first freestanding boot-marker and narrow `hal`
+  proof real.
+- Phase 82 then hardened the build-model contract around explicit freestanding
+  `target` identity and manifest-owned extra link inputs.
+- Phase 83 closed the initial `hal` loop with one deterministic polling-
+  console proof.
+- The immediate remaining gap was no longer another compiler or stdlib owner
+  inside that slice. It was support truth: the repository still lacked one
+  published freestanding statement and one mechanical audit that kept it
+  separate from the hosted note.
+
+Problem being solved
+--------------------
+- The repository already had real freestanding proofs, but public support
+  wording still centered on the hosted `v0.2` slice and could read as if
+  non-hosted work were either wholly unsupported or already implied by the
+  existence of the proofs.
+- The hosted release-hardening note was intentionally scoped to hosted use,
+  but it had no explicit companion note telling readers what the freestanding
+  proofs now admit.
+- Without a dedicated audit hook, future README or support-note edits could
+  silently erase the freestanding slice or overstate it.
+
+Core rule
+---------
+- Keep the hosted `v0.2` support claim and the freestanding proof statement
+  separate.
+- Publish only the landed Phase 81 through Phase 83 proof slice.
+- Add one focused audit that checks the split mechanically.
+- Do not widen the freestanding slice in this phase; describe it accurately.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape: one freestanding support note, one README refresh, one
+hosted-note refresh clarifying scope separation, and one focused repo-owned
+audit that keeps those statements aligned.
+
+Audited support drift
+---------------------
+README drift:
+- The README still described the supported hosted slice honestly, but its
+  unsupported wording still treated non-hosted targets too broadly and had no
+  separate freestanding proof section.
+- The README also lacked a repo-owned entrypoint for auditing that split.
+
+Support-note drift:
+- The hosted release-hardening note remained the right owner for the hosted
+  `v0.2` claim, but it had no explicit companion statement for the landed
+  freestanding proofs.
+- The repository therefore had phase-closeout truth without one stable
+  published freestanding support note.
+
+Tooling drift:
+- The repository already had focused hosted support audits, but nothing
+  analogous for the freestanding statement split.
+
+What this phase proves
+----------------------
+- the repository can now state the first admitted freestanding proof slice
+  explicitly without broadening it into a general non-hosted support claim
+- the hosted release-hardening note remains hosted-only and points to the
+  separate freestanding statement instead of absorbing it implicitly
+- future drift on the key freestanding support wording is caught by one
+  focused repo-owned audit rather than waiting for a broader release-hardening
+  refresh
+
+Deliverables
+------------
+- one canonical Phase 84 closeout note recording the implemented support-
+  statement split and tooling audit
+- one published freestanding support note scoped to the Phase 81 through Phase
+  83 proof slice
+- one README refresh that states the separate freestanding proof slice and the
+  audit entrypoint
+- one hosted release-hardening note refresh clarifying that it remains hosted-
+  only and separate from the freestanding proof note
+- one focused `mc_freestanding_support_audit` CTest plus
+  `make freestanding-support-audit`
+- aligned backlog, decision-log, and speculative-roadmap updates
+
+Suggested execution order
+-------------------------
+1. Publish one freestanding support note scoped only to the landed proof
+   slice.
+2. Refresh README so the freestanding statement is visible and separate.
+3. Refresh the hosted release-hardening note so the scope split is explicit.
+4. Add one focused audit that checks the key split statements mechanically.
+5. Refresh the planning surface so Phase 84 is concrete rather than still
+   speculative.
+
+Exit criteria
+-------------
+- the repository has one published freestanding support statement
+- the hosted `v0.2` note remains explicitly hosted-only
+- README describes both support statements without merging them
+- the repository has one focused validation hook guarding the freestanding
+  support split
+
+Non-goals
+---------
+- widening the admitted freestanding command set beyond the existing `mc build`
+  proof path
+- admitting broader `hal`, interrupt, barrier, or device-framework surface
+- claiming general cross-compilation, linker-script support, or kernel-image
+  packaging
+- revisiting the hosted `v0.2` release-readiness conclusion
+
+Implemented slice
+-----------------
+- published `docs/plan/freestanding_support_statement.txt` as the canonical
+  repository-bounded statement of the admitted freestanding proof slice
+- refreshed README so it now states a separate supported freestanding proof
+  slice and exposes `make freestanding-support-audit`
+- refreshed the hosted release-hardening note so it explicitly remains
+  separate from the freestanding statement
+- added `mc_freestanding_support_audit` as a focused repo-owned CTest and
+  `make freestanding-support-audit` as its convenience wrapper
+- aligned backlog, decision log, and the speculative `v0.3` roadmap around
+  Phase 84 as a completed concrete anchor
+
+Closeout statement
+------------------
+Phase 84 is complete as a freestanding support-statement and tooling audit.
+The repository still does not claim broad non-hosted workflow support,
+cross-compilation, packaging, or richer `hal` coverage, but it can now state
+the first landed freestanding proof slice honestly and keep that statement
+separate from the hosted `v0.2` support claim through one repeatable audit.

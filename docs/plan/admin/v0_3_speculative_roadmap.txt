@@ -32,19 +32,25 @@ Repository numbering note
 - Phase 83 is now occupied by the concrete narrow-`hal` console-proof note
   that validates one deterministic polling console path through the admitted
   MMIO surface.
+- Phase 84 is now occupied by the concrete freestanding support-statement and
+  tooling-audit note that publishes the first repository-bounded freestanding
+  proof statement separately from the hosted `v0.2` support claim.
 - The earlier Phase 67 through Phase 80 speculative roadmap already ended with
   the hosted `v0.2` release-snapshot preparation wave.
 - The `v0.3` direction note, consumer matrix, and proof-program ladder now
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation.
-- This speculative continuation therefore starts at Phase 84, with Phase 81
-  through Phase 83 as the current concrete anchors.
+- This speculative continuation therefore starts at Phase 85, with Phase 81
+  through Phase 84 as the current concrete anchors.
 
 Repository status note
 ----------------------
 - The repository now has a repository-bounded hosted `v0.2` plateau, release
-  hardening, a final `v0.2` gate, and a release-snapshot preparation path.
-- The admitted implementation slice remains hosted Darwin arm64 only.
+  hardening, a final `v0.2` gate, a release-snapshot preparation path, and a
+  separate repository-bounded freestanding proof statement.
+- The admitted implementation slice remains Darwin arm64 only, with the
+  freestanding side still limited to a narrow proof path rather than a broad
+  non-hosted workflow claim.
 - The core-language plateau remains closed unless a new proof exposes a real
   parser, sema, MIR, backend, or ABI owner gap.
 - The first concrete next consumer is Canopus Lite bring-up, which changes the
@@ -104,8 +110,16 @@ Phase 83 is now concrete as narrow `hal` console proof hardening:
 - it uses a manifest-owned target support object only as a repository-bounded
   MMIO shim, not as a broader hardware abstraction layer
 
+Phase 84 is now concrete as freestanding support-statement and tooling-audit
+hardening:
+- it keeps the freestanding claim explicitly separate from the hosted `v0.2`
+  support note
+- it publishes only the Phase 81 through Phase 83 proof slice rather than a
+  general freestanding support statement
+- it adds one repo-owned audit so future support drift is caught mechanically
+
 The remaining speculative continuation in this band therefore starts at Phase
-84.
+85.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof

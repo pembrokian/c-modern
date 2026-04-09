@@ -1,0 +1,122 @@
+Freestanding Proof Slice Support Note
+=====================================
+
+Status
+------
+PUBLISHED (repository-bounded proof statement, support-statement split, and tooling audit)
+
+Purpose
+-------
+Record the first admitted freestanding proof slice separately from the hosted
+`v0.2` release-hardening note so the repository can state what the landed
+Phase 81 through Phase 83 work does and does not support.
+
+This note is intentionally narrower than the hosted release-hardening note.
+It does not claim general freestanding release readiness, broad non-hosted
+workflow support, cross-compilation, kernel-image packaging, or a wider `hal`
+surface than the proofs already require.
+
+Repository status note
+----------------------
+- Phase 81 made the first freestanding boot-marker and narrow `hal` proof real.
+- Phase 82 hardened that path around explicit freestanding `target` identity
+  and manifest-owned `link.inputs`.
+- Phase 83 then proved one deterministic polling-console path through the
+  admitted `hal` MMIO surface.
+- Before this note, those truths existed in phase closeouts and tool tests,
+  but not yet as one explicit published support statement.
+
+Core rule
+---------
+- Keep this freestanding statement separate from the hosted `v0.2` support
+  claim.
+- State only the Phase 81 through Phase 83 proof slice, not a larger
+  freestanding ambition.
+- Keep target-owned support objects, startup choice, and `hal` scope explicit.
+- Reopen broader non-hosted claims only when a later proof lands them.
+
+Frozen support matrix
+---------------------
+- supported compiler host and produced proof-artifact target family: Darwin
+  arm64 bootstrap target family only
+- admitted runtime environment: freestanding project `exe` targets with
+  explicit `env = "freestanding"`
+- admitted project command path: `mc build --project <build.toml> --target
+  <name> --build-dir <dir>`
+- admitted manifest boundary: freestanding `exe` targets with explicit
+  `target`, explicit `[targets.<name>.runtime] startup`, and optional explicit
+  `[targets.<name>.link] inputs = [...]`
+- admitted public stdlib boundary: narrow `hal` `mmio_ptr<T>`,
+  `volatile_load<T>`, and `volatile_store<T>`
+- admitted proof set: Phase 81 boot-marker executable proof, Phase 82
+  explicit manifest-owned link-input proof, and Phase 83 deterministic
+  polling-console proof
+- unsupported today: `mc run` or `mc test` freestanding workflow admission,
+  general cross-compilation, non-bootstrap target families, linker scripts,
+  arbitrary linker flags, shared libraries, kernel-image packaging, and
+  broader `hal` taxonomy
+
+Usage and audit
+---------------
+Build from source on the supported host:
+
+```sh
+cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/debug -j4
+```
+
+The produced compiler entrypoint on the supported host is:
+
+```sh
+build/debug/mc
+```
+
+Supported command pattern for the admitted freestanding proof slice:
+
+```sh
+build/debug/mc build --project <build.toml> --target <name> --build-dir <dir>
+```
+
+Repo-owned audit entrypoint for this support statement:
+
+```sh
+make freestanding-support-audit
+```
+
+Artifact expectations
+---------------------
+- `build/debug/mc` is the produced compiler entrypoint for the admitted proof
+  slice on the supported host
+- `build/` is disposable generated state
+- command-local `--build-dir` trees are disposable generated state and should
+  be treated as build outputs, not source inputs
+- `make freestanding-support-audit` is the repo-owned convenience wrapper for
+  the focused documentation audit that keeps this note, the hosted note, and
+  README aligned around the admitted freestanding proof slice
+
+Known limitations
+-----------------
+- the supported host target remains Darwin arm64 only
+- the freestanding side is still a repository-bounded proof path, not a broad
+  non-hosted workflow guarantee
+- the repository still does not claim `mc run` or `mc test` as freestanding
+  command paths
+- the repository still does not claim general cross-compilation, linker-script
+  control, arbitrary linker-flag passthrough, or non-bootstrap target-family
+  admission
+- the repository still does not claim kernel-image assembly, init packaging,
+  early-service packaging, interrupt support, barriers, or richer hardware
+  abstractions
+- the public `hal` boundary remains intentionally narrow: `mmio_ptr<T>`,
+  `volatile_load<T>`, and `volatile_store<T>` only
+
+Practical support statement
+---------------------------
+The current repository can honestly claim one repository-bounded freestanding
+executable proof slice on the bootstrap Darwin arm64 target family, with
+explicit freestanding manifest identity, explicit startup selection, optional
+manifest-owned extra link inputs, and the narrow public `hal` MMIO surface
+proved through the Phase 81 through Phase 83 tool regressions.
+
+Everything outside that slice should be treated as explicitly unsupported
+until a later phase note and proof layer admit it.

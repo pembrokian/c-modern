@@ -26,6 +26,7 @@ What is in place:
 - the admitted repository-bounded Lane B package-grouping slice with `examples/real/issue_rollup/`, proving one library-first hosted project layout with grouped internal module roots beyond one source root before the later static-library admission
 - the admitted repository-bounded Phase 29 static-library slice with `examples/real/issue_rollup/`, proving one hosted `staticlib` target consumed through executable targets and ordinary `mc test` workflow through the same archive boundary
 - the admitted repository-bounded Phase 30 plus Phase 74 hardening slice with the same `examples/real/issue_rollup/` proof, now covering deterministic same-build-dir selected-target reuse across the shipped executable consumers linked through the admitted static-library boundary
+- the admitted repository-bounded freestanding proof slice with explicit `env = "freestanding"` executable targets, explicit target identity and startup selection, optional manifest-owned extra link inputs, and narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>` support, proved by the Phase 81 boot-marker, Phase 82 explicit link-input, and Phase 83 polling-console tool regressions without claiming broad freestanding packaging or cross-compilation
 - parser, sema, MIR, and tool smoke tests wired through CTest and exposed through the same `make` command path used for local development
 
 Supported hosted slice:
@@ -38,7 +39,17 @@ Supported hosted slice:
 - admitted adjacent helper boundary: narrow hosted `time` `Duration` plus `monotonic()` and pure slash-separated `path` `join(...)`, `basename(...)`, and `dirname(...)`
 - admitted richer real-project proof set: `examples/real/issue_rollup/`, `examples/real/worker_queue/`, `examples/real/pipe_handoff/`, `examples/real/pipe_ready/`, `examples/real/line_filter_relay/`, and `examples/real/evented_echo/`, where `worker_queue` is the low-level shared-memory sync proof, `pipe_handoff` is the direct blocking handle-first communication proof, `pipe_ready` is the pipe-readiness proof over `io.poller_*`, `line_filter_relay` is the narrow subprocess plus stdio proof over `os.spawn_pipe_argv(...)`, `os.spawn_pipe_argv_merged_output(...)`, `os.spawn_pipe_argv_split_output(...)`, and `os.wait(...)`, and `evented_echo` remains the stronger networking proof over the same handle model
 - supported workflow guarantee on the admitted richer proof: deterministic same-build-dir selected-target reuse without non-selected-target churn, now exposed directly on the shipped `issue_rollup` project through its default and report executable consumers over the admitted static-library boundary
-- unsupported today: non-hosted targets, cross-compilation, shared libraries, external system-library links in project manifests, package management, and any public portability claim beyond Darwin arm64
+- unsupported today beyond this hosted support claim: the separate freestanding proof slice recorded below, general cross-compilation, shared libraries, external system-library links in project manifests, package management, and any public portability claim beyond Darwin arm64
+
+Supported freestanding proof slice:
+
+- supported compiler host and produced proof-artifact target family: Darwin arm64 bootstrap target family only
+- admitted runtime environment: freestanding project `exe` targets with explicit `env = "freestanding"`
+- admitted project command path: `mc build --project <build.toml> --target <name> --build-dir <dir>`
+- admitted manifest boundary: freestanding `exe` targets with explicit `target`, explicit `[targets.<name>.runtime] startup`, and optional explicit `[targets.<name>.link] inputs = [...]`
+- admitted public stdlib boundary: narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>`
+- admitted proof set: Phase 81 boot-marker executable proof, Phase 82 explicit manifest-owned link-input proof, and Phase 83 deterministic polling-console proof
+- unsupported today: `mc run` or `mc test` freestanding workflow admission, general cross-compilation, non-bootstrap target families, linker scripts, arbitrary linker flags, shared libraries, kernel-image packaging, and broader `hal` taxonomy
 
 Supported host assumptions:
 
@@ -76,6 +87,12 @@ Repeat the current `v0.2` gate with:
 
 ```sh
 make v0_2_gate
+```
+
+Repeat the freestanding support audit with:
+
+```sh
+make freestanding-support-audit
 ```
 
 Prepare a reviewed `v0.2` release snapshot from clean committed state with:
@@ -121,6 +138,7 @@ Artifact expectations:
 - `make public-cut-smoke` is the repo-owned convenience wrapper for the broader current public-cut smoke audit on the admitted hosted slice
 - `make release-readiness-audit` is the repo-owned convenience wrapper for the current aggregate release-readiness re-audit on the admitted hosted slice
 - `make v0_2_gate` is the repo-owned convenience wrapper for the final documented `v0.2` gate outcome on the admitted hosted slice
+- `make freestanding-support-audit` is the repo-owned convenience wrapper for the focused audit that keeps the published freestanding proof statement separate from the hosted `v0.2` note
 - `make release-snapshot-prep` is the repo-owned convenience wrapper for the real maintainer release-snapshot preparation path after the final gate passes
 - `build/debug/release/v0.2-snapshot.txt` is disposable generated state capturing the exact reviewed commit hash plus the suggested `git tag -a v0.2 ...` command for the current release snapshot candidate
 
@@ -133,6 +151,7 @@ make first-use-smoke
 make public-cut-smoke
 make release-readiness-audit
 make v0_2_gate
+make freestanding-support-audit
 make release-snapshot-prep
 make dump-paths FILE=tests/cases/hello.mc
 make check FILE=tests/cases/hello.mc
@@ -217,10 +236,10 @@ Notes:
 - `build/` is disposable and ignored by Git.
 - `make format` expects `clang-format` to be available on the host machine.
 - The current `mc check` command runs the bootstrap frontend, semantic checker, and MIR pipeline and can emit deterministic AST, MIR, and backend dumps.
-- The bootstrap `mc build` command now lowers one checked module through the LLVM backend, emits deterministic LLVM IR and object artifacts under `build/`, and links one hosted executable on Darwin arm64 through the ordinary host Clang toolchain.
+- The bootstrap `mc build` command now lowers one checked module through the LLVM backend, emits deterministic LLVM IR and object artifacts under `build/`, links one hosted executable on Darwin arm64 through the ordinary host Clang toolchain, and also carries one separate repo-bounded freestanding executable proof path on the same bootstrap target family when the manifest uses explicit freestanding target and startup settings.
 - direct-source `mc check` and `mc build` discover `stdlib/` automatically for the admitted hosted Phase 6 slice.
 - target-driven `mc check --project ...` and `mc build --project ...` now read a narrow `build.toml` schema v1 slice, resolve imports through ordered `search_paths.modules`, and emit deterministic `.mci` files under the active build directory.
-- the current project-driven bootstrap slice now admits hosted executable targets plus one bounded hosted `staticlib` target kind; `mc run`, `mc test`, archive reuse, and interface-hash-driven project rebuild reuse are implemented, while non-default runtime startup, `sharedlib`, non-hosted targets, and broader linker surface remain out of the admitted bootstrap slice.
+- the current project-driven bootstrap slice now admits hosted executable targets plus one bounded hosted `staticlib` target kind on the hosted claim, and also admits one separate repo-bounded freestanding executable proof slice with explicit `target`, explicit `runtime.startup`, optional `link.inputs`, and narrow `hal` coverage; `mc run` and `mc test` remain hosted-only, while `sharedlib` and broader linker surface remain out of the admitted bootstrap slice.
 - the admitted repository-specific first-pass Phase 8 slice now includes deterministic canonical program proof and four bounded real utility projects under `examples/real/`; the follow-on hosted networking slice now additionally admits the bounded `examples/real/evented_echo/` project and its normal project workflow proof, the hosted `sync` slice now admits the shared-counter, producer-consumer, and atomic-publication executables plus the real `examples/real/worker_queue/` project as an explicit low-level shared-memory proof without widening into broader scheduler or atomic read-modify-write claims, Phase 43 adds the bounded `examples/real/pipe_handoff/` project as the direct handle-first communication proof over the admitted `io.pipe()` surface, and Phase 45/46 now add the bounded `examples/real/line_filter_relay/` project as the real consumer proof for the admitted narrow hosted subprocess slice.
 - the repository also admits one narrow hosted `time` and `path` helper boundary: `time.Duration`, `time.monotonic()`, and pure slash-separated `path.join(...)`, `path.basename(...)`, and `path.dirname(...)`; sleep, wall-clock, timezone, normalization, and broader platform APIs remain deferred.
 - the admitted project-workflow slice now also includes one grouped multi-root library-first proof through `examples/real/issue_rollup/`; Phase 29 narrows that proof further by admitting one hosted `staticlib` target consumed through ordinary `mc build`, `mc run`, and `mc test` workflow, Phase 30 hardens the target-switching contract, and Phase 74 now exposes that same multi-target proof directly on the shipped project rather than only through a cloned regression harness while keeping `sharedlib`, package management, and external library linking deferred.
@@ -235,10 +254,12 @@ Notes:
 - the current repository Phase 8 work now covers the admitted first-pass closure described in `docs/plan/phase8_implementation_summary.txt`, but the broader long-term architecture-specified Phase 8 surface remains open.
 - `docs/plan/phase65_language_surface_plateau_decision.txt` now records that the admitted v0.2 core is semantically complete enough for repository-bounded release hardening; remaining work should be read as support hardening, portability, or adjacent-surface follow-through unless a new admitted core-language owner gap is found.
 - the current hosted release-hardening statement is recorded in `docs/plan/release_hardening_hosted_slice.txt`; keep that note and this README aligned whenever the supported slice changes.
+- the separate freestanding proof statement is recorded in `docs/plan/freestanding_support_statement.txt`; keep that note, the hosted note, and this README aligned whenever the admitted freestanding proof slice changes.
 - the documented supported first-use path is now also automated through `make first-use-smoke` and the `mc_first_use_smoke` CTest entry; keep those aligned with the written install-and-usage guidance.
 - the documented current public-cut smoke path is now also automated through `make public-cut-smoke` and the `mc_public_cut_smoke` CTest entry; keep those aligned with the written public-cut audit commands.
 - the documented current release-readiness re-audit is now also automated through `make release-readiness-audit` and the `mc_release_readiness_audit` CTest entry; keep those aligned with the written release-readiness statement.
 - the documented current `v0.2` gate is now also automated through `make v0_2_gate` and the `mc_v0_2_gate` CTest entry; keep those aligned with the written tag-or-defer outcome.
+- the documented freestanding support split is now also automated through `make freestanding-support-audit` and the `mc_freestanding_support_audit` CTest entry; keep those aligned with the published freestanding proof statement.
 - the documented release-snapshot preparation path is now also automated through `make release-snapshot-prep`, validated through the `mc_release_snapshot_prep` audit entry, and writes `build/debug/release/v0.2-snapshot.txt`; keep those aligned with the written maintainer release-execution path.
-- known limitations remain explicit: the supported host target is still Darwin arm64 only, the admitted networking surface remains narrow IPv4 TCP plus poller support rather than a broader async or portability claim, the admitted hosted `sync` slice still excludes public compare-exchange, exchange, fetch-add, schedulers, and broader portability claims even though `condvar_broadcast(...)` is implemented, and the admitted `time` plus `path` helper slice still stops short of sleep, wall-clock, timezone, normalization, or broader platform APIs.
+- known limitations remain explicit: the supported host target is still Darwin arm64 only, the admitted freestanding slice is still only a repository-bounded proof path rather than a general non-hosted workflow claim, the admitted networking surface remains narrow IPv4 TCP plus poller support rather than a broader async or portability claim, the admitted hosted `sync` slice still excludes public compare-exchange, exchange, fetch-add, schedulers, and broader portability claims even though `condvar_broadcast(...)` is implemented, and the admitted `time` plus `path` helper slice still stops short of sleep, wall-clock, timezone, normalization, or broader platform APIs.
 - `make` is a thin convenience wrapper around the canonical CMake workflow above.

@@ -1,7 +1,7 @@
 BUILD_DIR ?= build/debug
 CONFIG ?= Debug
 
-.PHONY: build test first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate release-snapshot-prep format dump-paths clean
+.PHONY: build test first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate freestanding-support-audit release-snapshot-prep format dump-paths clean
 
 build:
 	cmake -S . -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE="$(CONFIG)"
@@ -21,6 +21,9 @@ release-readiness-audit: build
 
 v0_2_gate: build
 	ctest --test-dir "$(BUILD_DIR)" -R '^mc_v0_2_gate$$' --output-on-failure
+
+freestanding-support-audit: build
+	ctest --test-dir "$(BUILD_DIR)" -R '^mc_freestanding_support_audit$$' --output-on-failure
 
 release-snapshot-prep: build
 	./tools/release/prepare_v0_2_snapshot.sh --source-root . --build-dir "$(BUILD_DIR)"

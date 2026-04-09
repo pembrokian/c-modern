@@ -21,6 +21,11 @@ This note is the repository-bounded realization of the original bootstrap-plan
 Phase 9 release-hardening work. It is not a claim that the entire language,
 toolchain, or long-term architecture roadmap is finished.
 
+This note is intentionally separate from the repository-bounded freestanding
+proof slice recorded in `docs/plan/freestanding_support_statement.txt`.
+That separate proof note does not widen the hosted `v0.2` support claim
+recorded here.
+
 Frozen support matrix
 ---------------------
 - supported compiler host and produced executable target: Darwin arm64 only
@@ -47,9 +52,10 @@ Frozen support matrix
   now exposed directly on the shipped `issue_rollup` project through its
   default and report executable consumers over the admitted static-library
   boundary
-- unsupported today: non-hosted targets, cross-compilation, shared library
-  targets, external system-library links in project manifests, package
-  management, and any portability claim beyond Darwin arm64
+- unsupported today as part of this hosted support claim: non-hosted targets,
+  cross-compilation, shared library targets, external system-library links in
+  project manifests, package management, and any portability claim beyond
+  Darwin arm64
 
 Installation and usage
 ----------------------
@@ -318,3 +324,6 @@ as semantically complete enough for repository-bounded release hardening. New
 core-language closure work should therefore reopen only when a fresh admitted
 parser, sema, MIR, or backend distortion is found on the already admitted
 slice.
+
+For the separate repository-bounded freestanding proof statement, see
+`docs/plan/freestanding_support_statement.txt`.

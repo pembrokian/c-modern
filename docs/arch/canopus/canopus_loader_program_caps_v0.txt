@@ -1,0 +1,170 @@
+Canopus sys v0 — Loader Contract For Program Capabilities
+
+Status: companion to sys v0
+Scope: how launchable program capabilities are created and used with spawn
+Audience: loader + kernel + runtime implementers
+
+⸻
+
+1. Purpose
+
+`spawn` in sys v0 takes an explicit `image: Capability` instead of a path.
+This note defines what that capability means and how it is expected to be produced.
+
+The core rule is:
+	•	the kernel launches only from an explicit program capability
+	•	path resolution, package lookup, and image loading are outside sys
+	•	loaders and parent processes are responsible for obtaining or minting launchable capabilities
+
+⸻
+
+2. Roles
+
+kernel:
+	•	validates launchable program capabilities during spawn
+	•	creates the new process from the referenced executable image
+
+loader:
+	•	finds executable content using whatever policy it owns
+	•	validates format, metadata, and launch permissions
+	•	obtains a launchable program capability from the kernel
+	•	hands that capability to parent processes or spawns directly
+
+parent process:
+	•	receives or stores program capabilities
+	•	passes one explicitly to spawn
+	•	chooses the child argument vector and initial capabilities
+
+child process:
+	•	starts with only the capabilities explicitly supplied at spawn time
+
+⸻
+
+3. What A Program Capability Represents
+
+A program capability is a capability designating one launchable executable object.
+At minimum it implies:
+	•	a stable reference to executable image contents
+	•	permission to instantiate a new process from that image
+	•	enough metadata for the kernel to select the image entry contract
+
+The capability is still surfaced as plain `Capability` in sys v0.
+The type distinction is semantic, not a separate source-level handle family yet.
+
+⸻
+
+4. Minimal Loader Lifecycle
+
+4.1 Locate
+
+The loader locates a candidate executable artifact.
+How it does this is intentionally out of scope for sys.
+Possible sources include:
+	•	a filesystem service
+	•	a boot bundle provided by init
+	•	a package manager or image registry
+	•	a static in-memory manifest during bring-up
+
+4.2 Validate
+
+The loader validates:
+	•	image format
+	•	target architecture
+	•	entrypoint contract
+	•	required relocation or mapping metadata
+	•	any signing or trust policy the system chooses to enforce
+
+4.3 Materialize
+
+The loader asks the kernel to materialize a launchable program capability.
+This may be done by:
+	•	a dedicated loader syscall family
+	•	a privileged loader service cooperating with the kernel
+	•	a boot-time handoff for the initial process set
+
+4.4 Transfer
+
+The resulting program capability is retained by the loader, transferred to another process over IPC, or used immediately with spawn.
+
+⸻
+
+5. Proposed Kernel-Loader Boundary
+
+The exact loader internals may evolve, but v0 needs one stable kernel concept:
+	•	there exists a kernel-recognized executable object that can be named by a capability
+
+A minimal conceptual loader-facing operation is:
+
+loader_make_program(image_source, out_program_cap) -> Status
+
+This is not part of sys v0 for ordinary applications.
+It is a privileged loader boundary.
+
+The important separation is:
+	•	ordinary user code uses `spawn(image_cap, ...)`
+	•	privileged loader code is responsible for producing `image_cap`
+
+⸻
+
+6. Spawn Contract
+
+When `spawn` receives `ProcSpec.image`:
+	•	the kernel validates that the capability refers to a launchable image
+	•	the kernel does not perform string lookup or filesystem traversal
+	•	the kernel instantiates the child using that image's recorded entry contract
+
+If validation fails, `spawn` returns:
+	•	PermissionDenied for insufficient launch rights
+	•	NotFound for stale or revoked program capabilities
+	•	Invalid for malformed launch metadata at the call boundary
+
+⸻
+
+7. Rights And Transfer
+
+A program capability should be transferable like any other capability, subject to its rights.
+
+Useful rights split for later refinement:
+	•	Spawn: may instantiate a process from this image
+	•	Transfer: may send this program capability to another process
+	•	Derive: may mint a reduced-rights child program capability
+
+v0 does not need to standardize all refinement operations.
+It only needs the semantic fact that program capabilities can exist and be passed explicitly.
+
+⸻
+
+8. Bring-Up-Friendly Sources
+
+For early bring-up, the simplest admitted sources are:
+	•	boot-provided capabilities for a fixed set of bundled executables
+	•	a trusted init process that receives those capabilities and redistributes them
+	•	a single loader service that turns image artifacts into program capabilities
+
+This is enough to support examples equivalent to `spawn("/bin/echo")` without smuggling path lookup into sys.
+The path lookup, if any, occurs in the loader layer.
+
+⸻
+
+9. Consequences For User Space
+
+This design forces one healthy discipline:
+	•	process creation authority becomes explicit data
+
+That means:
+	•	program launch can be delegated by transferring capabilities
+	•	sandboxes can spawn only approved images
+	•	the system avoids ambient executable namespaces at the sys boundary
+
+This is more capability-consistent than path-based spawn and gives a cleaner long-term service model.
+
+⸻
+
+10. Summary
+
+To make `spawn(image: Capability, ...)` real, v0 needs a loader contract where:
+	•	loaders own lookup and validation policy
+	•	the kernel owns launch from validated executable capabilities
+	•	program capabilities are explicit, transferable authority
+
+That keeps sys minimal while still giving the system a practical process-launch path.

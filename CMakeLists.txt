@@ -195,6 +195,10 @@ add_test(NAME mc_supported_slice_doc_audit
      COMMAND ${CMAKE_COMMAND}
          -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_supported_slice_doc_audit.cmake)
+add_test(NAME mc_freestanding_support_audit
+     COMMAND ${CMAKE_COMMAND}
+         -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_freestanding_support_audit.cmake)
 add_test(NAME mc_public_cut_smoke
      COMMAND ${CMAKE_COMMAND}
          -DMC=$<TARGET_FILE:mc>
