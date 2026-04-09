@@ -41,8 +41,8 @@ Repository numbering note
   define the next plausible planning frame, but they do not yet provide one
   multi-phase speculative continuation after the now-concrete first kernel
   representation proof.
-- This speculative continuation therefore starts at Phase 89, with Phase 81
-  through Phase 88 as the current concrete anchors.
+- This speculative continuation therefore starts at Phase 90, with Phase 81
+  through Phase 89 as the current concrete anchors.
 
 Repository status note
 ----------------------
@@ -154,8 +154,18 @@ Phase 88 is now concrete as kernel build integration audit:
 - it validates both the driver-linked executable and the manually relinked
   executable deterministically in the repository tool harness
 
+Phase 89 is now concrete as init-to-log-service handshake:
+- it proves that kernel boot can start one init context, pass one explicit
+  log-service endpoint capability into that context, and complete one bounded
+  request-and-acknowledgment flow
+- it keeps the proof on the existing freestanding path rather than admitting
+  a `sys` wrapper layer, service-manager API, capability-runtime helper
+  family, or namespace policy surface
+- it validates the kernel-issued capability, observed request shape, and
+  acknowledgment reply deterministically in the repository tool harness
+
 The remaining speculative continuation in this band therefore starts at Phase
-89.
+90.
 
 Likely themes:
 - first admitted `hal` boundary beyond the bootstrap proof
@@ -202,8 +212,9 @@ Phase 88 -- Kernel Build Integration Audit
 
 Band C - Validate User-Space Policy Shape
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 89 through 92 likely move from kernel-only mechanism proofs to the
-first small user-space policy story Canopus Lite actually cares about.
+Phases 90 through 92 likely move from the first concrete user-space policy
+story to the next small user-space policy questions Canopus Lite actually
+cares about.
 
 Likely themes:
 - init startup and one service handshake
@@ -217,10 +228,6 @@ Why this band is separate:
   without yet demanding a full operating-system completion story
 
 Possible phases in this band:
-
-Phase 89 -- Init To Log-Service Handshake
-- Exit criterion: init starts, acquires one logging path or endpoint, and
-  completes one bounded request or acknowledgment flow.
 
 Phase 90 -- Capability-Handle Transfer Proof
 - Exit criterion: one user-space component receives and uses one explicit

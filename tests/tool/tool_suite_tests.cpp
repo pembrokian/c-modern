@@ -5617,6 +5617,274 @@ void TestPhase88KernelBuildIntegrationAudit(const std::filesystem::path& source_
     }
 }
 
+void TestPhase89InitToLogServiceHandshake(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "init_log_service_project";
+    std::filesystem::remove_all(project_root);
+
+    WriteFile(project_root / "src/main.mc",
+              "const INIT_PID: u32 = 1\n"
+              "const LOG_PID: u32 = 2\n"
+              "const LOG_ENDPOINT_ID: u32 = 7\n"
+              "const CAP_RIGHT_SEND: u32 = 1\n"
+              "const ACK_BYTE: u8 = 64\n"
+              "\n"
+              "enum MessageTag {\n"
+              "    Empty,\n"
+              "    LogOpen,\n"
+              "    Ack,\n"
+              "}\n"
+              "\n"
+              "struct EndpointCapability {\n"
+              "    endpoint_id: u32\n"
+              "    service_pid: u32\n"
+              "    rights: u32\n"
+              "}\n"
+              "\n"
+              "struct Message {\n"
+              "    tag: MessageTag\n"
+              "    sender: u32\n"
+              "    recipient: u32\n"
+              "    len: usize\n"
+              "    payload: [4]u8\n"
+              "}\n"
+              "\n"
+              "struct InitContext {\n"
+              "    pid: u32\n"
+              "    log_cap: EndpointCapability\n"
+              "}\n"
+              "\n"
+              "struct LogService {\n"
+              "    pid: u32\n"
+              "    endpoint_id: u32\n"
+              "    requests: u32\n"
+              "    last_sender: u32\n"
+              "    last_len: usize\n"
+              "    last_byte: u8\n"
+              "}\n"
+              "\n"
+              "var KERNEL_NEXT_PID: u32\n"
+              "var INIT_CONTEXT: InitContext\n"
+              "var LOG_SERVICE_STATE: LogService\n"
+              "\n"
+              "func zero_payload() [4]u8 {\n"
+              "    payload: [4]u8\n"
+              "    payload[0] = 0\n"
+              "    payload[1] = 0\n"
+              "    payload[2] = 0\n"
+              "    payload[3] = 0\n"
+              "    return payload\n"
+              "}\n"
+              "\n"
+              "func empty_message() Message {\n"
+              "    return Message{ tag: MessageTag.Empty, sender: 0, recipient: 0, len: 0, payload: zero_payload() }\n"
+              "}\n"
+              "\n"
+              "func tag_score(tag: MessageTag) i32 {\n"
+              "    switch tag {\n"
+              "    case MessageTag.Empty:\n"
+              "        return 1\n"
+              "    case MessageTag.LogOpen:\n"
+              "        return 2\n"
+              "    case MessageTag.Ack:\n"
+              "        return 4\n"
+              "    default:\n"
+              "        return 0\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n"
+              "\n"
+              "func kernel_boot() {\n"
+              "    log_cap: EndpointCapability = EndpointCapability{ endpoint_id: LOG_ENDPOINT_ID, service_pid: LOG_PID, rights: CAP_RIGHT_SEND }\n"
+              "    INIT_CONTEXT = InitContext{ pid: INIT_PID, log_cap: log_cap }\n"
+              "    LOG_SERVICE_STATE = LogService{ pid: LOG_PID, endpoint_id: LOG_ENDPOINT_ID, requests: 0, last_sender: 0, last_len: 0, last_byte: 0 }\n"
+              "    KERNEL_NEXT_PID = 3\n"
+              "}\n"
+              "\n"
+              "func log_open_message(sender: u32, recipient: u32) Message {\n"
+              "    payload: [4]u8 = zero_payload()\n"
+              "    payload[0] = 73\n"
+              "    payload[1] = 78\n"
+              "    payload[2] = 73\n"
+              "    return Message{ tag: MessageTag.LogOpen, sender: sender, recipient: recipient, len: 3, payload: payload }\n"
+              "}\n"
+              "\n"
+              "func ack_message(sender: u32, recipient: u32) Message {\n"
+              "    payload: [4]u8 = zero_payload()\n"
+              "    payload[0] = ACK_BYTE\n"
+              "    return Message{ tag: MessageTag.Ack, sender: sender, recipient: recipient, len: 1, payload: payload }\n"
+              "}\n"
+              "\n"
+              "func cap_matches_log_service(cap: EndpointCapability) bool {\n"
+              "    if cap.endpoint_id != LOG_SERVICE_STATE.endpoint_id {\n"
+              "        return false\n"
+              "    }\n"
+              "    if cap.service_pid != LOG_SERVICE_STATE.pid {\n"
+              "        return false\n"
+              "    }\n"
+              "    if cap.rights != CAP_RIGHT_SEND {\n"
+              "        return false\n"
+              "    }\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func request_is_log_open(request: Message) bool {\n"
+              "    if request.recipient != LOG_SERVICE_STATE.pid {\n"
+              "        return false\n"
+              "    }\n"
+              "    if tag_score(request.tag) != 2 {\n"
+              "        return false\n"
+              "    }\n"
+              "    if request.len != 3 {\n"
+              "        return false\n"
+              "    }\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func log_service_call(request: Message) Message {\n"
+              "    service: LogService = LOG_SERVICE_STATE\n"
+              "    service = LogService{ pid: service.pid, endpoint_id: service.endpoint_id, requests: service.requests + 1, last_sender: request.sender, last_len: request.len, last_byte: request.payload[2] }\n"
+              "    LOG_SERVICE_STATE = service\n"
+              "    return ack_message(service.pid, request.sender)\n"
+              "}\n"
+              "\n"
+              "func init_main(ctx: InitContext) Message {\n"
+              "    if ctx.pid != INIT_PID {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    request: Message = log_open_message(ctx.pid, ctx.log_cap.service_pid)\n"
+              "    if !cap_matches_log_service(ctx.log_cap) {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    if !request_is_log_open(request) {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    return log_service_call(request)\n"
+              "}\n"
+              "\n"
+              "func bootstrap_main() i32 {\n"
+              "    kernel_boot()\n"
+              "    if KERNEL_NEXT_PID != 3 {\n"
+              "        return 10\n"
+              "    }\n"
+              "    if INIT_CONTEXT.pid != INIT_PID {\n"
+              "        return 11\n"
+              "    }\n"
+              "    if INIT_CONTEXT.log_cap.endpoint_id != LOG_ENDPOINT_ID {\n"
+              "        return 12\n"
+              "    }\n"
+              "    if INIT_CONTEXT.log_cap.service_pid != LOG_PID {\n"
+              "        return 13\n"
+              "    }\n"
+              "    if INIT_CONTEXT.log_cap.rights != CAP_RIGHT_SEND {\n"
+              "        return 14\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.requests != 0 {\n"
+              "        return 15\n"
+              "    }\n"
+              "    reply: Message = init_main(INIT_CONTEXT)\n"
+              "    if tag_score(reply.tag) != 4 {\n"
+              "        return 16\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.requests != 1 {\n"
+              "        return 17\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_sender != INIT_PID {\n"
+              "        return 18\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_len != 3 {\n"
+              "        return 19\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_byte != 73 {\n"
+              "        return 20\n"
+              "    }\n"
+              "    if tag_score(reply.tag) != 4 {\n"
+              "        return 21\n"
+              "    }\n"
+              "    if reply.sender != LOG_PID {\n"
+              "        return 22\n"
+              "    }\n"
+              "    if reply.recipient != INIT_PID {\n"
+              "        return 23\n"
+              "    }\n"
+              "    if reply.len != 1 {\n"
+              "        return 24\n"
+              "    }\n"
+              "    if reply.payload[0] != ACK_BYTE {\n"
+              "        return 25\n"
+              "    }\n"
+              "    return 89\n"
+              "}\n");
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase89-init-log-service\"\n"
+              "default = \"kernel\"\n"
+              "\n"
+              "[targets.kernel]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase89\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
+              "\n"
+              "[targets.kernel.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.kernel.runtime]\n"
+              "startup = \"bootstrap_main\"\n");
+
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path build_dir = binary_root / "init_log_service_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "kernel",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "init_log_service_build_output.txt",
+                                                                 "freestanding init to log-service handshake build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase89 freestanding init-to-log-service build should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir);
+    const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
+                                                             build_dir / "init_log_service_run_output.txt",
+                                                             "freestanding init to log-service handshake run");
+    if (!run_outcome.exited || run_outcome.exit_code != 89) {
+        Fail("phase89 freestanding init-to-log-service run should exit with the handshake proof marker:\n" +
+             run_output);
+    }
+
+    const std::string handshake_mir = ReadFile(dump_targets.mir);
+    ExpectOutputContains(handshake_mir,
+                         "TypeDecl kind=struct name=EndpointCapability",
+                         "phase89 handshake MIR should declare the endpoint capability struct");
+    ExpectOutputContains(handshake_mir,
+                         "TypeDecl kind=struct name=InitContext",
+                         "phase89 handshake MIR should declare the init context struct");
+    ExpectOutputContains(handshake_mir,
+                         "TypeDecl kind=struct name=Message",
+                         "phase89 handshake MIR should declare the message struct");
+    ExpectOutputContains(handshake_mir,
+                         "Function name=init_main returns=[Message]",
+                         "phase89 handshake MIR should keep init startup as an ordinary function boundary with an explicit reply value");
+    ExpectOutputContains(handshake_mir,
+                         "aggregate_init %v",
+                         "phase89 handshake MIR should use aggregate initialization for capability and message state");
+    ExpectOutputContains(handshake_mir,
+                         "target_base=[4]u8",
+                         "phase89 handshake MIR should preserve fixed payload storage through ordinary indexed array operations");
+}
+
 }  // namespace
 
 void RunPhase7WorkflowSuite(const std::filesystem::path& source_root,
@@ -5692,6 +5960,7 @@ void RunPhase7FreestandingSuite(const std::filesystem::path& source_root,
     TestPhase86TaskLifecycleKernelProof(source_root, suite_root, mc_path);
     TestPhase87KernelStaticDataAndArtifactFollowThrough(source_root, suite_root, mc_path);
     TestPhase88KernelBuildIntegrationAudit(source_root, suite_root, mc_path);
+    TestPhase89InitToLogServiceHandshake(source_root, suite_root, mc_path);
 }
 
 int main(int argc, char** argv) {

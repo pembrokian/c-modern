@@ -1,0 +1,173 @@
+Phase 89 -- Init To Log-Service Handshake
+========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from kernel build integration into
+the first user-space policy check: prove that the kernel can start one init
+context, pass one explicit log-service endpoint capability into that init
+path, and complete one bounded log request or acknowledgment flow with
+ordinary Modern C structs, enums, arrays, and functions rather than with a
+new `sys` surface, hidden capability runtime, or scheduler-visible policy.
+
+This document is both the Phase 89 execution note and its closeout.
+It does not claim general service management, ambient authority, namespace
+rewiring, multi-service startup, or full user-space lifecycle completion.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then published that first non-hosted tranche as a separate,
+  repository-bounded support statement with a focused audit.
+- Phase 85 then proved one bounded endpoint queue and message-buffer shape
+  through ordinary Modern C structs, enums, arrays, and pointer-based
+  mutation.
+- Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
+  path through an explicit task-state enum and explicit kernel-owned task
+  slots.
+- Phase 87 then proved that kernel-owned aggregate const templates and
+  mutable global storage survive the freestanding build and artifact path.
+- Phase 88 then proved that the emitted freestanding entry object and
+  generated runtime object compose honestly with one minimal external relink
+  step.
+- The next strongest Canopus proof was no longer another kernel-only storage
+  or build question. It was whether the repository could express the first
+  small user-space policy boundary honestly without reopening compiler or
+  runtime-policy work.
+
+Problem being solved
+--------------------
+- The Canopus proof ladder names init startup plus one service handshake as
+  the first small user-space policy story, but the repository had not yet
+  exercised that shape in a real freestanding proof.
+- Without one concrete handshake proof, it would be too easy to speculate
+  about `sys` wrappers, service registries, capability helper families, or
+  broader init orchestration before validating that the current explicit core
+  already carries one bounded request or reply path honestly.
+- The next honest step is therefore one explicit init-to-service handshake,
+  not a wider service framework or user-space runtime model.
+
+Core rule
+---------
+- Prove one kernel-started init context and one bounded service handshake
+  with ordinary language constructs first.
+- Keep the proof freestanding, deterministic, and repository-bounded.
+- Do not admit a public `sys` module, ambient authority shortcut, or helper
+  taxonomy for service discovery or capability propagation in this phase.
+- Reopen compiler work only if the proof exposes a concrete parser, sema,
+  MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target representing kernel-owned boot state,
+   one init context, and one log-service state
+2. one explicit endpoint capability value passed from the kernel-owned boot
+   state into init
+3. one deterministic init-issued log-open request and one log-service
+   acknowledgment reply
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first user-space policy question now by
+proving one explicit init-to-log-service handshake locally with ordinary
+Modern C data types instead of widening prematurely into a general service or
+capability framework.
+
+What this phase proves
+----------------------
+- the current explicit core language is sufficient for one bounded init
+  context, one explicit endpoint capability record, and one request or reply
+  protocol shape
+- ordinary structs, enums, arrays, and explicit parameter passing are enough
+  to keep the first policy handoff in user space rather than in hidden kernel
+  or runtime machinery
+- the current freestanding build path can validate that proof without
+  admitting broader init orchestration, namespace policy, or capability
+  helper libraries
+
+Deliverables
+------------
+- one canonical Phase 89 closeout note recording the implemented
+  init-to-log-service handshake proof
+- one focused freestanding tool regression that models kernel boot state,
+  init context, one explicit log-service endpoint capability, and one bounded
+  request or reply flow
+- deterministic runtime validation that init uses the kernel-issued
+  capability, the log service observes the request, and the acknowledgment
+  returns with the expected marker
+- MIR inspection proving the handshake lowers through ordinary enum, struct,
+  aggregate-init, and fixed-array payload operations rather than through a
+  special `sys` or capability-runtime boundary
+- refreshed support and planning notes so Phase 89 is recorded as the first
+  concrete user-space policy anchor after the kernel build-integration audit
+
+Suggested execution order
+-------------------------
+1. Define one bounded endpoint capability, init context, message shape, and
+   log-service state with ordinary structs and enums.
+2. Build that proof as a freestanding executable through the existing target
+   and startup path.
+3. Validate deterministic runtime behavior for kernel-issued capability handoff,
+   one init-issued request, and one acknowledgment reply.
+4. Inspect the dumped MIR to confirm the proof stays within ordinary enum,
+   struct, aggregate-init, and fixed-array payload operations.
+5. Refresh the support and planning surface so later phases build from this
+   concrete user-space anchor.
+
+Exit criteria
+-------------
+- one freestanding target proves that kernel boot can start init with one
+  explicit log-service endpoint capability
+- the proof deterministically validates one init-issued request and one
+  bounded acknowledgment reply on that capability path
+- the dumped MIR records explicit enum and struct declarations plus ordinary
+  aggregate-init and fixed-array payload operations for the proof
+- the planning surface records Phase 89 as concrete rather than still
+  speculative
+
+Non-goals
+---------
+- a public `sys` module, service-manager API, or namespace design
+- capability transfer beyond one kernel-issued endpoint capability record
+- multi-service startup, restart policy, or user-space scheduler design
+- timer or interrupt wakeup sources
+- broader `hal` growth, linker-policy widening, or kernel-image packaging
+
+Implemented slice
+-----------------
+- the tool regression suite now includes one Phase 89 freestanding target
+  that models kernel boot state, one init context, one explicit log-service
+  endpoint capability, and one bounded log-open request or acknowledgment
+  flow through ordinary Modern C structs, enums, arrays, and functions
+- the proof validates that kernel boot seeds init with the expected endpoint
+  capability, init issues exactly one request to the log service, the log
+  service records the observed sender and payload shape, and the reply returns
+  with a deterministic acknowledgment marker before the executable exits with
+  the Phase 89 marker
+- the regression also inspects the dumped MIR to confirm that the handshake
+  keeps explicit endpoint-capability, init-context, and message declarations
+  plus ordinary aggregate-init and fixed-array payload lowering rather than
+  collapsing into a special runtime boundary
+- the freestanding proof statement, README, backlog, decision log, and
+  speculative `v0.3` roadmap now record Phase 89 as the first concrete
+  user-space policy anchor after the kernel build-integration audit
+
+Closeout statement
+------------------
+Phase 89 is complete as an init-to-log-service handshake proof. The
+repository still does not claim general service management, capability
+transfer, namespace policy, or full user-space bring-up, but it now has one
+honest proof that the admitted Modern C core and existing freestanding path
+can express a kernel-started init context, one explicit endpoint capability,
+and one bounded service request or acknowledgment flow directly, using
+ordinary language constructs on the existing proof lane.
