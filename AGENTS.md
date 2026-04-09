@@ -51,6 +51,10 @@ build/debug/mc check tests/cases/hello.mc
 build/debug/mc check tests/cases/hello.mc --dump-mir --build-dir build/debug
 ctest --test-dir build/debug -R mc_sema_fixture_unit --output-on-failure
 ctest --test-dir build/debug -R mc_mir_fixture_unit --output-on-failure
+ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure
+ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure
+ctest --test-dir build/debug -R mc_tool_real_project_unit --output-on-failure
+ctest --test-dir build/debug -R mc_tool_freestanding_unit --output-on-failure
 ```
 
 ## Testing Conventions
@@ -59,6 +63,18 @@ ctest --test-dir build/debug -R mc_mir_fixture_unit --output-on-failure
 - `tests/sema`: semantic module dumps and semantic-fail diagnostics
 - `tests/mir`: MIR dumps and lowering failures
 - `tests/tool`: driver and support-layer smoke/unit tests
+
+Active grouped regression layout:
+
+- `tests/tool/tool_suite_tests.cpp`: shared grouped tool regression implementation
+- `tests/tool/tool_workflow_tests.cpp`: workflow and CLI/project validation driver
+- `tests/tool/tool_build_state_tests.cpp`: build-state, imported-artifact, and incremental rebuild driver
+- `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
+- `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
+- `tests/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation
+- grouped tool outputs now belong under semantic suite roots such as `build/debug/tool/workflow/...`
+- grouped codegen executable outputs now belong under nested suite roots such as `build/debug/stage5_exec_stdlib_tests/...` and `build/debug/stage5_exec_project_tests/...`
+- treat remaining top-level `build/debug/phase*` paths as preserved manual or probe areas unless you have explicit reason to clean them
 
 Diagnostic fixture convention:
 
@@ -84,3 +100,4 @@ If you add a feature that changes compiler-visible behavior, update the narrowes
 - Import handling currently lives in bootstrap sema and is intentionally simpler than a future interface-artifact system.
 - Layout support exists, but it is still first-cut bootstrap behavior and not full ABI completion.
 - The build tree under `build/` is disposable.
+- Do not reintroduce fresh top-level `build/debug/phase*` regression output trees for repository-owned tests; prefer the semantic `audit`, `probes`, `tmp`, `tool`, or grouped suite work roots already in use.

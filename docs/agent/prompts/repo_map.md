@@ -76,10 +76,26 @@ This file is a fast orientation map for agents working in this repository.
 
 - `tests/codegen`
   - deterministic backend inspectability fixtures
-  - executable coverage will expand here later in Phase 5
+  - grouped executable coverage now lives in:
+    - `tests/codegen/codegen_executable_tests.cpp`: shared grouped executable implementation
+    - `tests/codegen/codegen_executable_core_tests.cpp`: core executable behavior driver
+    - `tests/codegen/codegen_executable_stdlib_tests.cpp`: stdlib and canonical executable behavior driver
+    - `tests/codegen/codegen_executable_project_tests.cpp`: project and imported-module executable behavior driver
 
 - `tests/tool`
   - smoke and support-layer tests for the driver/tooling path
+  - grouped tool coverage now lives in:
+    - `tests/tool/tool_suite_tests.cpp`: shared grouped tool regression implementation
+    - `tests/tool/tool_workflow_tests.cpp`: workflow and CLI/project validation driver
+    - `tests/tool/tool_build_state_tests.cpp`: build-state and incremental rebuild driver
+    - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
+    - `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
+  - `tests/tool/phase7_tool_tests.cpp` is now only a compatibility shim that includes `tool_suite_tests.cpp`
+
+- `tests/support`
+  - local test harness support code
+  - `fixture_utils.*`: adjacent fixture discovery, normalization, and diagnostic substring helpers
+  - `process_utils.*`: subprocess, socket, timeout, and temp-tree helpers for grouped integration suites
 
 - `tests/cases`
   - small end-to-end example inputs used by smoke tests
@@ -92,6 +108,8 @@ This file is a fast orientation map for agents working in this repository.
 - Configured import roots are supported through the sema API and `mc check --import-root`.
 - Struct layout dumps now include deterministic size, alignment, and field offsets.
 - Full Phase 3 from `docs/plan/plan.txt` is still not complete.
+- Repository-owned smoke and regression outputs should prefer semantic build-tree roots such as `build/debug/audit/...`, `build/debug/probes/...`, `build/debug/tmp/...`, `build/debug/tool/...`, and the grouped codegen suite work roots.
+- Remaining top-level `build/debug/phase*` paths are preserved manual or probe areas rather than active regression output policy.
 
 ## Where To Change Things
 
@@ -112,7 +130,8 @@ This file is a fast orientation map for agents working in this repository.
 
 - New command-line behavior:
   - `compiler/driver/driver.cpp`
-  - tool smoke tests and possibly `CMakeLists.txt`
+  - grouped tool regression drivers under `tests/tool/`
+  - possibly `CMakeLists.txt`
 
 ## Safe Default Workflow For Agents
 
@@ -121,3 +140,10 @@ This file is a fast orientation map for agents working in this repository.
 3. Change the smallest correct layer.
 4. Update the narrowest relevant fixtures.
 5. Run `cmake --build build/debug -j4 && ctest --test-dir build/debug --output-on-failure` when behavior changes.
+
+Focused grouped-suite checks that are often enough for tool or workflow work:
+
+- `ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure`
+- `ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure`
+- `ctest --test-dir build/debug -R mc_tool_real_project_unit --output-on-failure`
+- `ctest --test-dir build/debug -R mc_tool_freestanding_unit --output-on-failure`
