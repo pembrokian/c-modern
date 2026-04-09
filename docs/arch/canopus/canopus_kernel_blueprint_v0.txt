@@ -1,0 +1,458 @@
+Canopus Lite v0 - Initial Kernel Blueprint
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define one concrete initial kernel architecture for the first Canopus Lite
+bring-up slice.
+
+This note is intentionally narrower than a full operating-system design.
+It translates the existing Canopus Lite direction into one small executable
+kernel plan that can guide early implementation decisions without pretending
+that the full long-term architecture is already settled.
+
+Relationship to companion notes
+-------------------------------
+This blueprint is intended to align with and operationalize:
+
+- `docs/arch/canopus/canopus_lite_v0.txt`
+- `docs/arch/canopus/canopus_sys_interface_v0.txt`
+- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+- `docs/arch/canopus/canopus_loader_program_caps_v0.txt`
+
+If those notes define architectural direction, this document defines the first
+kernel shape that should be built.
+
+Core recommendation
+-------------------
+The first Canopus kernel should be a small capability-based microkernel built
+around:
+
+- processes and tasks
+- address spaces and mappings
+- endpoint-based IPC
+- process-local capability handles
+- minimal timer and scheduler support
+- a narrow interrupt and device boundary
+
+The kernel should provide mechanisms only.
+All naming, launch policy, filesystem policy, service orchestration, and most
+device policy should remain in user space.
+
+Architectural stance
+--------------------
+The first kernel should optimize for:
+
+- explicit authority
+- inspectable control flow
+- deterministic small-scope behavior
+- honest isolation boundaries
+- minimal mechanism count
+
+The first kernel should not optimize for:
+
+- Unix compatibility
+- broad syscall coverage
+- zero-copy transport on day one
+- sophisticated namespace algebra
+- multicore scheduling sophistication
+- language-visible runtime policy
+
+1. Kernel Object Model
+----------------------
+
+The first kernel should be explainable in terms of a very small object set:
+
+- Process
+    - owns one address space and one process handle table
+- Task
+    - one executing control flow inside one process
+- Endpoint
+    - a kernel-owned message queue and receive target
+- Capability handle
+    - a process-local reference to a kernel object or authority-bearing action
+- Address space
+    - a mapping domain for executable code, data, stacks, and future shared
+      regions
+- Memory object or mapping authority
+    - the smallest kernel-recognized unit of mapping or mapping rights needed
+      for bring-up
+- Timer event source
+    - enough kernel-owned timing support to block and wake tasks
+
+Recommended first simplification:
+
+- each process starts with exactly one task
+- additional tasks inside one process are deferred until ordinary boot, init,
+  and service IPC already work
+
+This keeps process isolation real while postponing internal threading policy.
+
+2. Protection And Authority Model
+---------------------------------
+
+Authority should be represented only by kernel-validated process-local handles.
+
+Required rules:
+
+- user code cannot forge authority from integers or raw bytes
+- every privileged operation names a handle explicitly
+- handles are valid only in the process that currently owns them
+- handles may move across processes only through explicit kernel-mediated
+  transfer
+
+Admitted first capability targets:
+
+- endpoints
+- child-process wait handles or process handles
+- launchable program capabilities
+- memory or mapping rights if needed for bring-up
+- interrupt or device-facing handles only when boot requires them
+
+Recommended bring-up stance:
+
+- use one flat per-process handle table first
+- defer capability derivation trees, revocation algebra, and rights splitting
+  beyond what the first running services actually need
+
+3. IPC Model
+------------
+
+IPC should be the central coordination mechanism from the start.
+
+The first kernel should implement exactly one primary IPC primitive:
+
+- bounded message send to endpoint
+- bounded message receive from endpoint
+- byte payload plus attached capability payload
+- blocking semantics are acceptable
+- kernel-mediated copy transport is acceptable
+
+Required semantics:
+
+- bytes and attached capabilities are delivered atomically as one message
+- capability transfer is destructive on send success and a no-op on send
+  failure
+- receive either obtains the whole message or reports that the caller-provided
+  buffers are too small
+- message order should be FIFO per endpoint queue in v0
+
+Recommended initial queue model:
+
+- each endpoint owns a small bounded FIFO queue
+- send returns `WouldBlock` or `Exhausted` when the queue cannot admit a new
+  message
+- receive blocks when the queue is empty unless or until a non-blocking mode
+  is added later
+
+Why this shape is recommended:
+
+- it proves explicit coordination honestly
+- it exercises capability flow early
+- it avoids premature async framework or shared-memory design pressure
+
+4. Process And Task Model
+-------------------------
+
+The first kernel should use a simple process model:
+
+- one process owns one address space
+- one initial task runs inside that process
+- exit is process-scoped in the first slice
+
+Required operations:
+
+- create process from explicit program capability
+- create initial task and initial stack or register state
+- exit task
+- mark process exited
+- wait for child completion
+- kill child process
+
+Recommended initial ownership model:
+
+- parent spawns child only from an explicit launchable program capability
+- child receives only the explicitly listed initial handles
+- no ambient inheritance of open handles or global namespace state occurs
+
+First implementation bias:
+
+- keep process trees simple
+- treat wait as an explicit parent-owned authority path
+- defer detached tasks, reparenting, restart policy, and structured shutdown
+  protocols
+
+5. Address Spaces And Memory Mappings
+-------------------------------------
+
+The first kernel needs honest isolation, but not a complete final VM story.
+
+Required kernel mechanisms:
+
+- create address space
+- map executable image contents into a new process
+- map stack and static data
+- unmap or tear down mappings on process exit
+- expose explicit mapping or memory rights only when bring-up requires them
+
+Recommended bring-up shape:
+
+- kernel owns the minimum executable-image mapping path needed by spawn
+- copy-based IPC uses kernel message storage rather than shared-memory
+  transport
+- shared memory is absent or narrowly scoped in the initial implementation
+
+The first system should not add:
+
+- kernel heap-allocation policy for user programs
+- zero-copy IPC as a requirement
+- advanced page-cache policy
+- a full region-only public memory model
+
+6. Scheduler And Blocking Model
+-------------------------------
+
+Scheduling is necessary but should not define the architecture story.
+
+The first scheduler only needs to:
+
+- run ready tasks
+- block tasks on receive
+- block tasks on wait
+- block tasks on sleep
+- wake tasks on message arrival
+- wake tasks on child exit
+- wake tasks on timer expiry
+
+Recommended policy:
+
+- single ready queue or one equally simple policy
+- one CPU assumption is acceptable for first bring-up
+- no user-visible scheduling classes
+- no scheduler-visible language or runtime framework
+
+The implementation should be easy to inspect in a debugger before it tries to
+be clever.
+
+7. Interrupt And Device Boundary
+--------------------------------
+
+The first kernel should keep hardware-facing behavior narrow and explicit.
+
+Kernel responsibilities:
+
+- initialize the minimum hardware state needed for boot
+- own interrupt receipt and routing
+- expose explicit wakeups, endpoint delivery, or device-facing handles only
+  where needed
+
+First device set should be limited to:
+
+- boot console path
+- timer source
+- one storage or transport path only if later bring-up requires it
+
+Recommended boundary rule:
+
+- MMIO and barrier reality stay in hardware-facing support code or `hal`
+- they do not become a general-purpose memory or synchronization abstraction
+
+8. Minimal Syscall Surface
+--------------------------
+
+The initial syscall surface should remain very small and match the current
+Canopus `sys v0` direction.
+
+Recommended kernel syscall families:
+
+- `sys_endpoint_create`
+- `sys_ipc_send`
+- `sys_ipc_recv`
+- `sys_proc_spawn`
+- `sys_proc_wait`
+- `sys_proc_kill`
+- `sys_time_now`
+- `sys_time_sleep`
+
+Recommended rule:
+
+- each user-visible `sys` operation maps to exactly one kernel syscall
+- syscalls return status codes and write outputs into caller-provided storage
+- syscalls perform no path lookup, no service lookup, and no hidden policy
+
+This is enough for the first running system without committing to broad API
+surface area.
+
+9. Boot Flow
+------------
+
+The first kernel boot sequence should be intentionally small:
+
+1. architecture entry and early memory setup
+2. kernel object tables and scheduler initialization
+3. timer and minimal console initialization
+4. creation of the initial user process: `init`
+5. installation of a tiny bootstrap capability set into `init`
+6. transfer of control into `init`
+
+The bootstrap capability set should be minimal and explicit.
+
+Recommended initial contents:
+
+- one capability naming a log-service endpoint or bootstrap service endpoint
+- one or more program capabilities for bundled early services
+- one process or wait capability if needed for child control
+
+Recommended boot discipline:
+
+- do not give `init` ambient global authority
+- do not let the kernel perform service naming or policy decisions after
+  startup
+- make every handed-off authority item visible in the boot contract
+
+10. First User-Space Policy Slice
+---------------------------------
+
+The first useful user-space slice should remain very small:
+
+- `init`
+- `log_service`
+- one `echo_service`, `ping_service`, or tiny `registry_service`
+
+Recommended early responsibilities:
+
+`init`
+- receives the bootstrap capability set from the kernel
+- spawns the first service set from explicit program capabilities
+- passes only the capabilities each child actually needs
+
+`log_service`
+- receives one log request
+- records or emits deterministic boot diagnostics
+- replies with one acknowledgment if the protocol uses request or reply
+
+`echo_service` or `ping_service`
+- receives one request over IPC
+- returns one reply
+- proves endpoint delivery, message copying, and capability-aware protocol flow
+
+If discovery is needed, prefer:
+
+- a fixed init-known service table first
+- or one tiny registry service second
+
+Do not begin with a general namespace graph.
+
+11. Loader And Spawn Boundary
+-----------------------------
+
+The kernel should not spawn from paths.
+
+Required rule:
+
+- spawn always takes an explicit launchable program capability
+
+Recommended first source of those capabilities:
+
+- boot-bundled executable set known to the kernel or trusted loader
+- a trusted init process receiving those program capabilities at boot
+
+This keeps process creation authority explicit and prevents path lookup from
+leaking into the kernel syscall boundary.
+
+12. Observability
+-----------------
+
+The first kernel should be observable without inventing a large tracing
+framework.
+
+Required observability:
+
+- deterministic boot marker output
+- explicit service start or failure reporting
+- one small kernel log path or log-service path
+- deterministic failure codes where practical
+
+Recommended first observability split:
+
+- kernel prints only the minimum early boot diagnostics
+- ordinary ongoing logging moves to the log service as soon as `init` and IPC
+  work
+
+This keeps observability real while preserving the user-space policy boundary.
+
+13. Recommended Implementation Order
+------------------------------------
+
+The first implementation should proceed in this order:
+
+1. boot and early console
+2. address-space creation and one-process entry path
+3. endpoint object and bounded FIFO message queue
+4. blocking send or receive semantics
+5. process-local handle table and explicit handle validation
+6. spawn from explicit program capability
+7. wait and exit semantics
+8. `init` handoff with one bootstrap capability
+9. log-service handshake
+10. one additional request or reply service proof
+11. explicit user-to-user capability transfer
+
+This order keeps the mechanism ladder honest and matches the current proof
+direction already visible in the repository planning notes.
+
+14. Deliberate Deferrals
+------------------------
+
+The following should be explicitly deferred until the first running system is
+stable:
+
+- zero-copy IPC
+- shared-memory-first service designs
+- generalized capability derivation and revocation algebra
+- broad rights-refinement API families
+- rewritable namespace graph
+- filesystem API in the kernel boundary
+- networking API in the kernel boundary
+- multicore scheduling policy
+- user-visible threads API
+- hidden async runtime or scheduler framework
+- language-level channel or capability features
+- broad driver framework
+- full packaging, install, or boot-image assembly inside `mc`
+
+15. Success Statement
+---------------------
+
+The initial kernel architecture is successful when the system can honestly be
+described as follows:
+
+- the kernel boots
+- the kernel starts one isolated `init` process
+- `init` spawns one small service from an explicit program capability
+- the service and its client communicate through endpoint IPC
+- capability handles are transferred explicitly and validated by the kernel
+- the system remains understandable in terms of tasks, address spaces,
+  endpoints, capability handles, and mappings
+
+If a proposed addition does not strengthen that first running story, it is
+probably too early.
+
+Bottom line
+-----------
+
+The recommended initial Canopus kernel is a small capability-based microkernel
+with message-first coordination and user-space-owned policy.
+
+The kernel should do only enough to make these claims honest:
+
+- isolated processes are real
+- explicit authority is real
+- endpoint IPC is real
+- `init`-owned service policy is real
+
+Everything else should wait until the first system boots, exchanges messages,
+and can be debugged without architectural guesswork.

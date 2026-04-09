@@ -5885,6 +5885,370 @@ void TestPhase89InitToLogServiceHandshake(const std::filesystem::path& source_ro
                          "phase89 handshake MIR should preserve fixed payload storage through ordinary indexed array operations");
 }
 
+void TestPhase90CapabilityHandleTransferProof(const std::filesystem::path& source_root,
+                                              const std::filesystem::path& binary_root,
+                                              const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "capability_transfer_project";
+    std::filesystem::remove_all(project_root);
+
+    WriteFile(project_root / "src/main.mc",
+              "const INIT_PID: u32 = 1\n"
+              "const LOG_PID: u32 = 2\n"
+              "const WORKER_PID: u32 = 3\n"
+              "const LOG_ENDPOINT_ID: u32 = 7\n"
+              "const CAP_RIGHT_SEND: u32 = 1\n"
+              "const WORKER_LOG_SLOT: u32 = 5\n"
+              "const GRANT_BYTE: u8 = 71\n"
+              "const LOG_BYTE: u8 = 90\n"
+              "const ACK_BYTE: u8 = 33\n"
+              "\n"
+              "enum MessageTag {\n"
+              "    Empty,\n"
+              "    GrantHandle,\n"
+              "    LogWrite,\n"
+              "    Ack,\n"
+              "}\n"
+              "\n"
+              "struct EndpointCapability {\n"
+              "    endpoint_id: u32\n"
+              "    service_pid: u32\n"
+              "    rights: u32\n"
+              "}\n"
+              "\n"
+              "struct Message {\n"
+              "    tag: MessageTag\n"
+              "    sender: u32\n"
+              "    recipient: u32\n"
+              "    handle_slot: u32\n"
+              "    len: usize\n"
+              "    payload: [4]u8\n"
+              "}\n"
+              "\n"
+              "struct TransferMessage {\n"
+              "    tag: MessageTag\n"
+              "    sender: u32\n"
+              "    recipient: u32\n"
+              "    handle_slot: u32\n"
+              "    handle_count: usize\n"
+              "    transferred_cap: EndpointCapability\n"
+              "    payload_len: usize\n"
+              "    payload: [4]u8\n"
+              "}\n"
+              "\n"
+              "struct InitContext {\n"
+              "    pid: u32\n"
+              "    has_log_cap: u32\n"
+              "    log_cap: EndpointCapability\n"
+              "    worker_pid: u32\n"
+              "}\n"
+              "\n"
+              "struct WorkerContext {\n"
+              "    pid: u32\n"
+              "    has_log_cap: u32\n"
+              "    log_cap: EndpointCapability\n"
+              "    received_slot: u32\n"
+              "}\n"
+              "\n"
+              "struct LogService {\n"
+              "    pid: u32\n"
+              "    endpoint_id: u32\n"
+              "    requests: u32\n"
+              "    last_sender: u32\n"
+              "    last_slot: u32\n"
+              "    last_byte: u8\n"
+              "}\n"
+              "\n"
+              "var INIT_CONTEXT: InitContext\n"
+              "var WORKER_CONTEXT: WorkerContext\n"
+              "var LOG_SERVICE_STATE: LogService\n"
+              "\n"
+              "func zero_payload() [4]u8 {\n"
+              "    payload: [4]u8\n"
+              "    payload[0] = 0\n"
+              "    payload[1] = 0\n"
+              "    payload[2] = 0\n"
+              "    payload[3] = 0\n"
+              "    return payload\n"
+              "}\n"
+              "\n"
+              "func empty_cap() EndpointCapability {\n"
+              "    return EndpointCapability{ endpoint_id: 0, service_pid: 0, rights: 0 }\n"
+              "}\n"
+              "\n"
+              "func empty_message() Message {\n"
+              "    return Message{ tag: MessageTag.Empty, sender: 0, recipient: 0, handle_slot: 0, len: 0, payload: zero_payload() }\n"
+              "}\n"
+              "\n"
+              "func empty_transfer_message() TransferMessage {\n"
+              "    return TransferMessage{ tag: MessageTag.Empty, sender: 0, recipient: 0, handle_slot: 0, handle_count: 0, transferred_cap: empty_cap(), payload_len: 0, payload: zero_payload() }\n"
+              "}\n"
+              "\n"
+              "func tag_score(tag: MessageTag) i32 {\n"
+              "    switch tag {\n"
+              "    case MessageTag.Empty:\n"
+              "        return 1\n"
+              "    case MessageTag.GrantHandle:\n"
+              "        return 2\n"
+              "    case MessageTag.LogWrite:\n"
+              "        return 4\n"
+              "    case MessageTag.Ack:\n"
+              "        return 8\n"
+              "    default:\n"
+              "        return 0\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n"
+              "\n"
+              "func cap_matches_log_service(cap: EndpointCapability) bool {\n"
+              "    if cap.endpoint_id != LOG_SERVICE_STATE.endpoint_id {\n"
+              "        return false\n"
+              "    }\n"
+              "    if cap.service_pid != LOG_SERVICE_STATE.pid {\n"
+              "        return false\n"
+              "    }\n"
+              "    if cap.rights != CAP_RIGHT_SEND {\n"
+              "        return false\n"
+              "    }\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func kernel_boot() {\n"
+              "    grant_cap: EndpointCapability = EndpointCapability{ endpoint_id: LOG_ENDPOINT_ID, service_pid: LOG_PID, rights: CAP_RIGHT_SEND }\n"
+              "    INIT_CONTEXT = InitContext{ pid: INIT_PID, has_log_cap: 1, log_cap: grant_cap, worker_pid: WORKER_PID }\n"
+              "    WORKER_CONTEXT = WorkerContext{ pid: WORKER_PID, has_log_cap: 0, log_cap: empty_cap(), received_slot: 0 }\n"
+              "    LOG_SERVICE_STATE = LogService{ pid: LOG_PID, endpoint_id: LOG_ENDPOINT_ID, requests: 0, last_sender: 0, last_slot: 0, last_byte: 0 }\n"
+              "}\n"
+              "\n"
+              "func build_grant_message(sender: u32, recipient: u32, cap: EndpointCapability) TransferMessage {\n"
+              "    payload: [4]u8 = zero_payload()\n"
+              "    payload[0] = GRANT_BYTE\n"
+              "    payload[1] = 82\n"
+              "    payload[2] = 78\n"
+              "    return TransferMessage{ tag: MessageTag.GrantHandle, sender: sender, recipient: recipient, handle_slot: WORKER_LOG_SLOT, handle_count: 1, transferred_cap: cap, payload_len: 3, payload: payload }\n"
+              "}\n"
+              "\n"
+              "func build_log_request(sender: u32, recipient: u32, handle_slot: u32) Message {\n"
+              "    payload: [4]u8 = zero_payload()\n"
+              "    payload[0] = LOG_BYTE\n"
+              "    payload[1] = 0\n"
+              "    payload[2] = 0\n"
+              "    return Message{ tag: MessageTag.LogWrite, sender: sender, recipient: recipient, handle_slot: handle_slot, len: 1, payload: payload }\n"
+              "}\n"
+              "\n"
+              "func build_ack(sender: u32, recipient: u32, handle_slot: u32) Message {\n"
+              "    payload: [4]u8 = zero_payload()\n"
+              "    payload[0] = ACK_BYTE\n"
+              "    return Message{ tag: MessageTag.Ack, sender: sender, recipient: recipient, handle_slot: handle_slot, len: 1, payload: payload }\n"
+              "}\n"
+              "\n"
+              "func transfer_log_cap() TransferMessage {\n"
+              "    ctx: InitContext = INIT_CONTEXT\n"
+              "    if ctx.has_log_cap == 0 {\n"
+              "        return empty_transfer_message()\n"
+              "    }\n"
+              "    if !cap_matches_log_service(ctx.log_cap) {\n"
+              "        return empty_transfer_message()\n"
+              "    }\n"
+              "    message: TransferMessage = build_grant_message(ctx.pid, ctx.worker_pid, ctx.log_cap)\n"
+              "    INIT_CONTEXT = InitContext{ pid: ctx.pid, has_log_cap: 0, log_cap: empty_cap(), worker_pid: ctx.worker_pid }\n"
+              "    return message\n"
+              "}\n"
+              "\n"
+              "func install_transferred_cap(message: TransferMessage) bool {\n"
+              "    ctx: WorkerContext = WORKER_CONTEXT\n"
+              "    if tag_score(message.tag) != 2 {\n"
+              "        return false\n"
+              "    }\n"
+              "    if message.recipient != ctx.pid {\n"
+              "        return false\n"
+              "    }\n"
+              "    if message.handle_count != 1 {\n"
+              "        return false\n"
+              "    }\n"
+              "    if message.payload_len != 3 {\n"
+              "        return false\n"
+              "    }\n"
+              "    if message.payload[0] != GRANT_BYTE {\n"
+              "        return false\n"
+              "    }\n"
+              "    if !cap_matches_log_service(message.transferred_cap) {\n"
+              "        return false\n"
+              "    }\n"
+              "    WORKER_CONTEXT = WorkerContext{ pid: ctx.pid, has_log_cap: 1, log_cap: message.transferred_cap, received_slot: message.handle_slot }\n"
+              "    return true\n"
+              "}\n"
+              "\n"
+              "func log_service_call(cap: EndpointCapability, request: Message) Message {\n"
+              "    if !cap_matches_log_service(cap) {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    if request.recipient != LOG_SERVICE_STATE.pid {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    if tag_score(request.tag) != 4 {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    if request.handle_slot != WORKER_LOG_SLOT {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    if request.payload[0] != LOG_BYTE {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    service: LogService = LOG_SERVICE_STATE\n"
+              "    service = LogService{ pid: service.pid, endpoint_id: service.endpoint_id, requests: service.requests + 1, last_sender: request.sender, last_slot: request.handle_slot, last_byte: request.payload[0] }\n"
+              "    LOG_SERVICE_STATE = service\n"
+              "    return build_ack(service.pid, request.sender, request.handle_slot)\n"
+              "}\n"
+              "\n"
+              "func worker_log_once(ctx: WorkerContext) Message {\n"
+              "    if ctx.has_log_cap == 0 {\n"
+              "        return empty_message()\n"
+              "    }\n"
+              "    request: Message = build_log_request(ctx.pid, ctx.log_cap.service_pid, ctx.received_slot)\n"
+              "    return log_service_call(ctx.log_cap, request)\n"
+              "}\n"
+              "\n"
+              "func bootstrap_main() i32 {\n"
+              "    kernel_boot()\n"
+              "    if INIT_CONTEXT.has_log_cap != 1 {\n"
+              "        return 10\n"
+              "    }\n"
+              "    if WORKER_CONTEXT.has_log_cap != 0 {\n"
+              "        return 11\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.requests != 0 {\n"
+              "        return 12\n"
+              "    }\n"
+              "    pre_transfer_reply: Message = worker_log_once(WORKER_CONTEXT)\n"
+              "    if tag_score(pre_transfer_reply.tag) != 1 {\n"
+              "        return 13\n"
+              "    }\n"
+              "    grant: TransferMessage = transfer_log_cap()\n"
+              "    if tag_score(grant.tag) != 2 {\n"
+              "        return 14\n"
+              "    }\n"
+              "    if INIT_CONTEXT.has_log_cap != 0 {\n"
+              "        return 15\n"
+              "    }\n"
+              "    if INIT_CONTEXT.log_cap.endpoint_id != 0 {\n"
+              "        return 16\n"
+              "    }\n"
+              "    second_grant: TransferMessage = transfer_log_cap()\n"
+              "    if tag_score(second_grant.tag) != 1 {\n"
+              "        return 17\n"
+              "    }\n"
+              "    if !install_transferred_cap(grant) {\n"
+              "        return 18\n"
+              "    }\n"
+              "    if WORKER_CONTEXT.has_log_cap != 1 {\n"
+              "        return 19\n"
+              "    }\n"
+              "    if WORKER_CONTEXT.received_slot != WORKER_LOG_SLOT {\n"
+              "        return 20\n"
+              "    }\n"
+              "    post_transfer_init_reply: Message = worker_log_once(WorkerContext{ pid: INIT_CONTEXT.pid, has_log_cap: INIT_CONTEXT.has_log_cap, log_cap: INIT_CONTEXT.log_cap, received_slot: WORKER_LOG_SLOT })\n"
+              "    if tag_score(post_transfer_init_reply.tag) != 1 {\n"
+              "        return 21\n"
+              "    }\n"
+              "    reply: Message = worker_log_once(WORKER_CONTEXT)\n"
+              "    if tag_score(reply.tag) != 8 {\n"
+              "        return 22\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.requests != 1 {\n"
+              "        return 23\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_sender != WORKER_PID {\n"
+              "        return 24\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_slot != WORKER_LOG_SLOT {\n"
+              "        return 25\n"
+              "    }\n"
+              "    if LOG_SERVICE_STATE.last_byte != LOG_BYTE {\n"
+              "        return 26\n"
+              "    }\n"
+              "    if reply.sender != LOG_PID {\n"
+              "        return 27\n"
+              "    }\n"
+              "    if reply.recipient != WORKER_PID {\n"
+              "        return 28\n"
+              "    }\n"
+              "    if reply.handle_slot != WORKER_LOG_SLOT {\n"
+              "        return 29\n"
+              "    }\n"
+              "    if reply.payload[0] != ACK_BYTE {\n"
+              "        return 30\n"
+              "    }\n"
+              "    return 90\n"
+              "}\n");
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase90-capability-transfer\"\n"
+              "default = \"kernel\"\n"
+              "\n"
+              "[targets.kernel]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase90\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
+              "\n"
+              "[targets.kernel.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.kernel.runtime]\n"
+              "startup = \"bootstrap_main\"\n");
+
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path build_dir = binary_root / "capability_transfer_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "kernel",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "capability_transfer_build_output.txt",
+                                                                 "freestanding capability-handle transfer build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase90 freestanding capability-handle transfer build should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir);
+    const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
+                                                             build_dir / "capability_transfer_run_output.txt",
+                                                             "freestanding capability-handle transfer run");
+    if (!run_outcome.exited || run_outcome.exit_code != 90) {
+        Fail("phase90 freestanding capability-handle transfer run should exit with the transfer proof marker:\n" +
+             run_output);
+    }
+
+    const std::string transfer_mir = ReadFile(dump_targets.mir);
+    ExpectOutputContains(transfer_mir,
+                         "TypeDecl kind=struct name=TransferMessage",
+                         "phase90 transfer MIR should declare the transfer message struct");
+    ExpectOutputContains(transfer_mir,
+                         "TypeDecl kind=struct name=WorkerContext",
+                         "phase90 transfer MIR should declare the receiver context struct");
+    ExpectOutputContains(transfer_mir,
+                         "Function name=install_transferred_cap returns=[bool]",
+                         "phase90 transfer MIR should keep receiver-side handle installation as an ordinary function boundary");
+    ExpectOutputContains(transfer_mir,
+                         "Function name=transfer_log_cap returns=[TransferMessage]",
+                         "phase90 transfer MIR should keep sender-side transfer as an ordinary function boundary");
+    ExpectOutputContains(transfer_mir,
+                         "aggregate_init %v",
+                         "phase90 transfer MIR should use aggregate initialization for capability and transfer state");
+    ExpectOutputContains(transfer_mir,
+                         "target_base=[4]u8",
+                         "phase90 transfer MIR should preserve fixed payload storage through ordinary indexed array operations");
+}
+
 }  // namespace
 
 void RunPhase7WorkflowSuite(const std::filesystem::path& source_root,
@@ -5961,6 +6325,7 @@ void RunPhase7FreestandingSuite(const std::filesystem::path& source_root,
     TestPhase87KernelStaticDataAndArtifactFollowThrough(source_root, suite_root, mc_path);
     TestPhase88KernelBuildIntegrationAudit(source_root, suite_root, mc_path);
     TestPhase89InitToLogServiceHandshake(source_root, suite_root, mc_path);
+    TestPhase90CapabilityHandleTransferProof(source_root, suite_root, mc_path);
 }
 
 int main(int argc, char** argv) {

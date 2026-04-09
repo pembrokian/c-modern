@@ -1,0 +1,186 @@
+Phase 90 -- Capability-Handle Transfer Proof
+============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Take the next Canopus-driven `v0.3` proof from the first bounded user-space
+service handshake into the first explicit capability-transfer check: prove
+that one user-space component can receive and use one explicitly transferred
+handle for one bounded action rather than relying on ambient authority,
+hidden capability-runtime helpers, or a widened `sys` surface.
+
+This document is both the Phase 90 execution note and its closeout.
+It does not claim general capability-table policy, multi-handle transfer,
+service registries, process spawning, or full user-space lifecycle
+completion.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 83 already made the first freestanding build path,
+  explicit startup contract, explicit target-owned link-input contract, and
+  narrow `hal` console proof real.
+- Phase 84 then published that first non-hosted tranche as a separate,
+  repository-bounded support statement with a focused audit.
+- Phase 85 then proved one bounded endpoint queue and message-buffer shape
+  through ordinary Modern C structs, enums, arrays, and pointer-based
+  mutation.
+- Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
+  path through an explicit task-state enum and explicit kernel-owned task
+  slots.
+- Phase 87 then proved that kernel-owned aggregate const templates and
+  mutable global storage survive the freestanding build and artifact path.
+- Phase 88 then proved that the emitted freestanding entry object and
+  generated runtime object compose honestly with one minimal external relink
+  step.
+- Phase 89 then proved that the kernel can start one init context, pass one
+  explicit log-service endpoint capability into that context, and complete
+  one bounded request-and-acknowledgment flow.
+- The next strongest Canopus proof was no longer whether one user-space
+  component could talk to a service at all. It was whether explicit handle
+  ownership could move between user-space components without collapsing back
+  into ambient authority.
+
+Problem being solved
+--------------------
+- The Canopus proof ladder names explicit handle transfer as a central
+  architectural claim, but the repository had not yet exercised that shape in
+  a real freestanding proof.
+- Without one concrete transfer proof, it would be too easy to treat the
+  Phase 89 kernel-issued handle as if all later user-space components could
+  simply see the same authority implicitly, which would undercut the
+  user-space-owned policy stance.
+- The next honest step is therefore one explicit capability-handle transfer
+  and one receiver-issued action, not a wider handle-table API, process
+  launcher, or service-manager framework.
+
+Core rule
+---------
+- Prove one explicit transferred handle and one bounded receiver action
+  first.
+- Keep the proof freestanding, deterministic, and repository-bounded.
+- Do not admit a public `sys` module, capability-runtime helper family,
+  ambient authority shortcut, or general handle-table API in this phase.
+- Reopen compiler work only if the proof exposes a concrete parser, sema,
+  MIR, backend, or ABI owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one freestanding executable target representing kernel-owned boot state,
+   one init context, one receiver task context, and one log-service state
+2. one explicit transfer message that carries exactly one endpoint capability
+   and one receiver-visible slot id
+3. one deterministic receiver-issued log request using that transferred
+   handle, plus one acknowledgment reply
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should close the first explicit capability-transfer question
+now by proving one user-space handoff locally with ordinary Modern C data
+types instead of widening prematurely into a handle-runtime abstraction or
+broader service framework.
+
+What this phase proves
+----------------------
+- the current explicit core language is sufficient for one bounded transfer
+  message carrying one explicit endpoint capability and one receiver-visible
+  slot id
+- user-space policy can remain explicit: init transfers authority, the
+  receiver installs it locally, and the receiver uses that handle for one
+  bounded action without ambient lookup
+- the current freestanding build path can validate that proof without
+  admitting general capability tables, spawn APIs, or richer namespace policy
+
+Deliverables
+------------
+- one canonical Phase 90 closeout note recording the implemented
+  capability-handle transfer proof
+- one focused freestanding tool regression that models init-owned authority,
+  one explicit transfer message, one receiver context, and one bounded log
+  request sent through the transferred handle
+- deterministic runtime validation that the sender loses the transferred
+  handle, the receiver installs it, and the receiver uses it to complete one
+  acknowledged service request
+- MIR inspection proving the transfer and use stay within ordinary enum,
+  struct, aggregate-init, whole-context update, and fixed-array payload
+  operations rather than through a special runtime boundary
+- refreshed support and planning notes so Phase 90 is recorded as the second
+  concrete user-space policy anchor after the init-to-log-service handshake
+
+Suggested execution order
+-------------------------
+1. Define one bounded transfer message carrying one capability and one slot
+   id with ordinary structs and enums.
+2. Build that proof as a freestanding executable through the existing target
+   and startup path.
+3. Validate deterministic runtime behavior for sender-owned capability
+   transfer, sender-side authority removal, receiver-side installation, and
+   one acknowledged receiver-issued request.
+4. Inspect the dumped MIR to confirm that the proof stays within ordinary
+  enum, struct, aggregate-init, whole-context update, and fixed-array payload
+   operations.
+5. Refresh the support and planning surface so later phases build from this
+   concrete explicit-authority anchor.
+
+Exit criteria
+-------------
+- one freestanding target proves that one user-space component can receive
+  one explicit transferred handle from another user-space component
+- the sender no longer retains usable authority through that transferred
+  handle after the transfer succeeds
+- the receiver deterministically uses the transferred handle for one bounded
+  action and observes the expected acknowledgment reply
+- the dumped MIR records explicit transfer-message and task-context
+  declarations plus ordinary aggregate-init and whole-context update
+  operations
+  for the proof
+- the planning surface records Phase 90 as concrete rather than still
+  speculative
+
+Non-goals
+---------
+- general capability-table APIs or multi-handle transfer
+- a public `sys` module, service-manager API, or namespace design
+- process spawn, wait-handle transfer, or broader user-space lifecycle work
+- timer or interrupt wakeup sources
+- broader `hal` growth, linker-policy widening, or kernel-image packaging
+
+Implemented slice
+-----------------
+- the tool regression suite now includes one Phase 90 freestanding target
+  that models kernel boot state, one init context, one receiver task context,
+  one explicit transfer message carrying one log-service endpoint capability,
+  and one receiver-issued log request through that transferred handle using
+  ordinary Modern C structs, enums, arrays, and functions
+- the proof validates that init starts with the log-service capability,
+  cannot transfer it twice, loses local use of that capability after the
+  transfer, the receiver installs the transferred handle into its own local
+  context, and the receiver then completes one acknowledged request with the
+  expected deterministic markers before the executable exits with the Phase 90
+  marker
+- the regression also inspects the dumped MIR to confirm that the transfer
+  and receiver-side use keep explicit capability, transfer-message, and task-
+  context declarations plus ordinary aggregate-init, whole-context update, and
+  fixed-array payload lowering rather than collapsing into a special runtime
+  boundary
+- the freestanding proof statement, README, backlog, decision log, and
+  speculative `v0.3` roadmap now record Phase 90 as the first concrete
+  capability-handle transfer anchor after the initial init-to-log-service
+  handshake proof
+
+Closeout statement
+------------------
+Phase 90 is complete as a capability-handle transfer proof. The repository
+still does not claim general capability-table management, ambient authority,
+process spawning, or full user-space lifecycle support, but it now has one
+honest proof that the admitted Modern C core and existing freestanding path
+can express explicit user-space authority transfer directly, with one sender,
+one receiver, one transferred endpoint capability, and one bounded receiver-
+issued service action on the existing proof lane.
