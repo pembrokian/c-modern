@@ -145,8 +145,17 @@ Phase 100 is now concrete as capability-carrying IPC transfer:
   received handle works for one bounded follow-through send plus receive
   without yet claiming spawn, wait, or timer-backed blocking.
 
-Phases 100 through 102 likely turn that first syscall boundary into attached-
-handle transfer, process creation, wait or kill, and timer-backed blocking.
+Phase 101 is now concrete as program-cap spawn and wait path:
+
+- that same owned kernel artifact now consumes one explicit launchable program
+  capability, seeds one bounded child process plus task plus address-space
+  path, returns one explicit parent-owned wait handle, rejects pre-exit wait
+  with deterministic `WouldBlock`, and then observes plus reaps that child
+  exactly once without yet claiming timer-backed blocking, kill semantics, or
+  init-owned service launch.
+
+Phase 102 is now the next remaining Band B owner around timer-backed blocking
+and scheduler block-wake truth.
 
 Likely themes:
 - one-to-one syscall mapping from `sys v0`
@@ -158,7 +167,7 @@ Why this band comes next:
 - the kernel object core is only useful once the user boundary is honest, and
   the blueprints already name the minimal syscall families clearly.
 
-This band is now concrete through Phase 100.
+This band is now concrete through Phase 101.
 
 Possible phases in this band:
 
@@ -171,11 +180,6 @@ Phase 100 -- Capability-Carrying IPC Transfer
 - Exit criterion: attached-handle transfer is real at the syscall boundary,
   with destructive-on-success send behavior, receiver-local reinstall on
   receive, and no partial-transfer distortion.
-
-Phase 101 -- Program-Cap Spawn And Wait Path
-- Exit criterion: one process can spawn one child from one explicit launchable
-  program capability, observe that child through one wait handle or process
-  handle, and reap it deterministically without ambient authority.
 
 Phase 102 -- Timer Sleep And Scheduler Block-Wake Proof
 - Exit criterion: one real kernel timer source and one simple ready queue can

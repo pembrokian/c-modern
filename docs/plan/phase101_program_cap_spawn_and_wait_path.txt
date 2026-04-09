@@ -1,0 +1,220 @@
+Phase 101 -- Program-Cap Spawn And Wait Path
+============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 100 capability-carrying IPC transfer proof
+into the next remaining Band B syscall-boundary owner: prove that the
+repository-owned kernel artifact can consume one explicit launchable program
+capability, spawn one bounded child process plus task plus address-space
+state from that capability, return one explicit parent-owned wait handle, and
+then observe and reap that child deterministically through that wait handle
+without yet claiming timer-backed blocking, kill semantics, service launch,
+or a running init-owned service set.
+
+This document is both the Phase 101 execution note and its closeout.
+It does not claim a general loader, multi-child orchestration, process-kill
+policy, timer-backed wait behavior, or broader service bring-up.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 95 produced the bounded freestanding `v0.3` proof
+  ladder and froze that lane into the first admitted freestanding support
+  slice.
+- Phase 96 then made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 then widened that owned kernel target into one bounded address-
+  space and first-user-entry handoff.
+- Phase 98 then completed the remaining Band A object-core owner by making
+  explicit endpoint tables, per-process handle tables, and bounded queued-
+  message lifetime concrete inside the same repository-owned kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- Phase 100 then made one attached-handle transfer concrete across that same
+  syscall IPC boundary.
+- The strongest next kernel question was therefore no longer whether the
+  kernel could move one explicit handle through IPC. It was whether that same
+  real kernel artifact could now consume one explicit program capability,
+  produce one explicit wait handle, and preserve deterministic parent-owned
+  exit observation without widening immediately into timer-backed blocking or
+  service launch.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names Phase 101 as the next point
+  where the repository should turn the landed syscall boundary into one honest
+  spawn-and-wait path.
+- The repository already had one bounded init image descriptor, one consumed-
+  on-success attached-handle transfer path, and one explicit task and process
+  slot model, but it still had no active proof that a launchable program
+  capability can create one child lifecycle path and that the parent can then
+  observe child exit through one explicit wait handle.
+- Without this step, later timer or service work could overclaim that the
+  kernel already has explicit lifecycle ownership at the syscall boundary when
+  the repository still only had boot, IPC, and handle-transfer truth.
+
+Core rule
+---------
+- Keep the phase to one consumed launchable program capability and one
+  explicit parent-owned wait handle.
+- Make spawn install exactly one bounded child process slot, one bounded child
+  task slot, and one bounded child address-space record.
+- Make wait reject observation before child exit with deterministic
+  `WouldBlock` behavior.
+- Make successful wait both report the child's exit code and reap the child
+  deterministically.
+- Stop before timer-backed blocking, kill semantics, multi-child policy,
+  loader generalization, or service bring-up.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one widened capability helper layer that owns one bounded wait-handle
+   table in addition to the landed endpoint-handle table
+2. one widened state layer that admits one third process slot and one third
+   task slot plus explicit exited-state classification for the bounded child
+   lifecycle
+3. one widened syscall helper layer that owns explicit spawn and wait request,
+   result, and observation state
+4. one repository-owned kernel follow-through that consumes one init-owned
+   program capability, spawns one child into one deterministic slot set,
+   rejects pre-exit wait with `WouldBlock`, marks the child exited, then waits
+   and reaps exactly once through the explicit wait handle
+5. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported types, aggregate initialization, enum
+   matching, and explicit global-state updates rather than hidden loader or
+   runtime helpers
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this spawn-and-wait boundary now because Phase 100
+already proved that the kernel can carry explicit authority through the landed
+syscall IPC path. The next honest owner is not timer-backed blocking or
+service launch. It is one explicit program-capability spawn and one explicit
+wait-handle observation path.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact can now consume one explicit launchable
+  program capability and turn it into one bounded child process, task, and
+  address-space record
+- the parent receives one explicit wait handle rather than relying on ambient
+  process-tree observation
+- wait rejects observation before child exit with deterministic `WouldBlock`
+  behavior, then returns the expected exit code and reaps the child exactly
+  once after exit
+- the current language, freestanding build path, and runtime startup can carry
+  the necessary wait-handle, spawn-observation, and child-state records
+  without new compiler work
+- the repository can stop honestly at one bounded spawn-and-wait path without
+  implying timer-backed blocking, kill semantics, or a broader running-kernel
+  slice
+
+Deliverables
+------------
+- one canonical Phase 101 closeout note recording the implemented program-cap
+  spawn and wait proof
+- one widened `kernel/src/capability.mc` helper module owning explicit wait-
+  handle installation, exit signaling, lookup, and one-shot consumption
+- one widened `kernel/src/state.mc` helper module owning explicit exited-state
+  classification for the bounded child process and task
+- one widened `kernel/src/syscall.mc` helper module owning explicit spawn and
+  wait request, result, and observation state
+- one updated repository-owned kernel target that consumes one init-owned
+  program capability, spawns one child, rejects pre-exit wait with
+  `WouldBlock`, then observes and reaps that child through one explicit wait
+  handle
+- one focused freestanding kernel regression and MIR inspection validating the
+  new spawn-and-wait syscall slice
+- refreshed planning and orientation surfaces so Phase 101 is concrete and
+  Phase 102 becomes the next remaining timer-backed blocking owner
+
+Suggested execution order
+-------------------------
+1. Widen the owned capability, state, and syscall helper modules with the
+   smallest bounded wait-handle and exited-state support needed for one honest
+   child lifecycle path.
+2. Teach the repository-owned kernel target to consume one init-owned program
+   capability, seed one child process plus task plus address space, and return
+   one explicit wait handle.
+3. Reject one pre-exit wait with deterministic `WouldBlock`, then mark the
+   child exited and complete one successful wait that reaps the child.
+4. Inspect the merged MIR to confirm that the proof remains ordinary imported
+   type and global-state lowering.
+5. Refresh the planning surface so Phase 101 is concrete and Phase 102 remains
+   the next syscall-boundary owner.
+
+Exit criteria
+-------------
+- one repository-owned kernel target consumes one explicit launchable program
+  capability to spawn one bounded child process plus task plus address-space
+  record
+- spawn installs one explicit parent-owned wait handle for that child
+- one wait attempt before child exit returns deterministic `WouldBlock`
+- one later wait attempt after child exit returns the expected exit code and
+  reaps the child exactly once
+- the runtime proof exits with exactly one bounded Phase 101 marker only after
+  validating spawn observation, pre-exit wait rejection, post-exit wait
+  success, and deterministic child reap
+- the merged MIR preserves imported spawn and wait request and observation
+  types, helper functions, and explicit global writes for the new lifecycle
+  state
+- the planning surface records Phase 101 as concrete rather than speculative
+
+Non-goals
+---------
+- timer-backed blocking, wake queues, or scheduler policy
+- kill semantics, multi-child orchestration, or broader process-management
+  policy
+- loader generalization or broader program-capability taxonomy beyond this one
+  bounded init image
+- init-owned service launch, namespace policy, or broader running-kernel
+  claims
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- widened `kernel/src/capability.mc` so the owned kernel tree now supports one
+  bounded two-slot wait-handle table with explicit installation, child-exit
+  signaling, one-shot wait consumption, and exit-code lookup in addition to
+  the landed endpoint-handle table
+- widened `kernel/src/state.mc` so the bounded process-slot, task-slot, and
+  ready-queue model now admits one third child slot plus explicit exited-state
+  classification for the bounded lifecycle follow-through
+- widened `kernel/src/syscall.mc` so the landed syscall layer now includes one
+  bounded spawn request plus observation path, one bounded wait request plus
+  observation path, consumed-on-success program capability handling, and
+  deterministic reaping through one explicit wait handle
+- updated `kernel/src/main.mc` so the repository-owned kernel target now seeds
+  one init-owned wait table, consumes the init program capability to spawn one
+  child into deterministic process, task, and address-space slots, rejects one
+  pre-exit wait with `WouldBlock`, marks the child exited with the expected
+  exit code, then waits and reaps exactly once before emitting the Phase 101
+  marker
+- added one focused Phase 101 freestanding kernel regression that builds and
+  runs the repository-owned kernel target, expects the Phase 101 marker, and
+  inspects merged MIR for imported spawn and wait types plus explicit global-
+  state lowering for wait-handle and child lifecycle state
+- refreshed the kernel README, agent map, tool-test notes, backlog, decision
+  log, and speculative Canopus kernel roadmap so the repository now records
+  Phase 101 as concrete and leaves Phase 102 as the next remaining timer-
+  backed blocking owner
+
+Closeout statement
+------------------
+Phase 101 is complete as a program-cap spawn and wait proof. The repository
+still does not claim timer-backed blocking, kill semantics, service truth, or
+full process-management policy, but it now has one honest real-kernel artifact
+that boots, reaches first user entry, owns explicit endpoint and handle state,
+opens one explicit syscall gate, completes byte-only IPC, transfers one
+attached endpoint handle, consumes one launchable program capability to spawn
+one child, rejects pre-exit wait with deterministic `WouldBlock`, observes and
+reaps that child exactly once through one explicit wait handle, and stops
+exactly at that boundary.

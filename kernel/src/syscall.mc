@@ -1,11 +1,15 @@
+import address_space
 import capability
 import endpoint
+import init
+import state
 
 enum SyscallId {
     None,
     Send,
     Receive,
     Spawn,
+    Wait,
 }
 
 enum SyscallStatus {
@@ -15,6 +19,8 @@ enum SyscallStatus {
     InvalidHandle,
     InvalidEndpoint,
     Closed,
+    InvalidCapability,
+    Exhausted,
 }
 
 struct SyscallGate {
@@ -48,6 +54,29 @@ struct ReceiveObservation {
     payload: [4]u8
 }
 
+struct SpawnRequest {
+    wait_handle_slot: u32
+}
+
+struct WaitRequest {
+    wait_handle_slot: u32
+}
+
+struct SpawnObservation {
+    status: SyscallStatus
+    child_pid: u32
+    child_tid: u32
+    child_asid: u32
+    wait_handle_slot: u32
+}
+
+struct WaitObservation {
+    status: SyscallStatus
+    child_pid: u32
+    exit_code: i32
+    wait_handle_slot: u32
+}
+
 struct SendResult {
     gate: SyscallGate
     handle_table: capability.HandleTable
@@ -60,6 +89,25 @@ struct ReceiveResult {
     handle_table: capability.HandleTable
     endpoints: endpoint.EndpointTable
     observation: ReceiveObservation
+}
+
+struct SpawnResult {
+    gate: SyscallGate
+    program_capability: capability.CapabilitySlot
+    process_slots: [3]state.ProcessSlot
+    task_slots: [3]state.TaskSlot
+    wait_table: capability.WaitTable
+    child_address_space: address_space.AddressSpace
+    child_frame: address_space.UserEntryFrame
+    observation: SpawnObservation
+}
+
+struct WaitResult {
+    gate: SyscallGate
+    process_slots: [3]state.ProcessSlot
+    task_slots: [3]state.TaskSlot
+    wait_table: capability.WaitTable
+    observation: WaitObservation
 }
 
 func gate_closed() SyscallGate {
@@ -86,8 +134,24 @@ func build_transfer_receive_request(handle_slot: u32, receive_handle_slot: u32) 
     return ReceiveRequest{ handle_slot: handle_slot, receive_handle_slot: receive_handle_slot }
 }
 
+func build_spawn_request(wait_handle_slot: u32) SpawnRequest {
+    return SpawnRequest{ wait_handle_slot: wait_handle_slot }
+}
+
+func build_wait_request(wait_handle_slot: u32) WaitRequest {
+    return WaitRequest{ wait_handle_slot: wait_handle_slot }
+}
+
 func empty_receive_observation() ReceiveObservation {
     return ReceiveObservation{ status: SyscallStatus.None, endpoint_id: 0, source_pid: 0, payload_len: 0, received_handle_slot: 0, received_handle_count: 0, payload: endpoint.zero_payload() }
+}
+
+func empty_spawn_observation() SpawnObservation {
+    return SpawnObservation{ status: SyscallStatus.None, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 }
+}
+
+func empty_wait_observation() WaitObservation {
+    return WaitObservation{ status: SyscallStatus.None, child_pid: 0, exit_code: 0, wait_handle_slot: 0 }
 }
 
 func send_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, status: SyscallStatus) SendResult {
@@ -96,6 +160,14 @@ func send_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoi
 
 func receive_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, observation: ReceiveObservation) ReceiveResult {
     return ReceiveResult{ gate: gate, handle_table: handle_table, endpoints: endpoints, observation: observation }
+}
+
+func spawn_result(gate: SyscallGate, program_capability: capability.CapabilitySlot, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, child_address_space: address_space.AddressSpace, child_frame: address_space.UserEntryFrame, observation: SpawnObservation) SpawnResult {
+    return SpawnResult{ gate: gate, program_capability: program_capability, process_slots: process_slots, task_slots: task_slots, wait_table: wait_table, child_address_space: child_address_space, child_frame: child_frame, observation: observation }
+}
+
+func wait_result(gate: SyscallGate, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, observation: WaitObservation) WaitResult {
+    return WaitResult{ gate: gate, process_slots: process_slots, task_slots: task_slots, wait_table: wait_table, observation: observation }
 }
 
 func update_gate(gate: SyscallGate, id: SyscallId, status: SyscallStatus, send_delta: u32, receive_delta: u32) SyscallGate {
@@ -171,6 +243,55 @@ func perform_receive(gate: SyscallGate, handle_table: capability.HandleTable, en
     return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Ok, 0, 1), updated_handle_table, updated_endpoints, observation)
 }
 
+func perform_spawn(gate: SyscallGate, program_capability: capability.CapabilitySlot, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, child_image: init.InitImage, request: SpawnRequest, child_pid: u32, child_tid: u32, child_task_slot: u32, child_asid: u32, child_root_page_table: usize) SpawnResult {
+    if gate.open == 0 {
+        return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.Closed, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: SyscallStatus.Closed, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
+    }
+    if capability.kind_score(program_capability.kind) != 4 {
+        return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.InvalidCapability, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: SyscallStatus.InvalidCapability, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
+    }
+    if request.wait_handle_slot == 0 {
+        return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.InvalidHandle, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: SyscallStatus.InvalidHandle, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
+    }
+    if state.process_state_score(process_slots[2].state) != 1 || state.task_state_score(task_slots[2].state) != 1 {
+        return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.Exhausted, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: SyscallStatus.Exhausted, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
+    }
+    updated_wait_table: capability.WaitTable = capability.install_wait_handle(wait_table, request.wait_handle_slot, child_pid)
+    if updated_wait_table.count != wait_table.count + 1 {
+        return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.Exhausted, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: SyscallStatus.Exhausted, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
+    }
+    updated_process_slots: [3]state.ProcessSlot = process_slots
+    updated_task_slots: [3]state.TaskSlot = task_slots
+    child_space: address_space.AddressSpace = address_space.bootstrap_space(child_asid, child_pid, child_root_page_table, child_image.image_base, child_image.image_size, child_image.entry_pc, child_image.stack_base, child_image.stack_size, child_image.stack_top)
+    child_frame: address_space.UserEntryFrame = address_space.bootstrap_user_frame(child_space, child_tid)
+    updated_process_slots[2] = state.init_process_slot(child_pid, child_task_slot, child_asid)
+    updated_task_slots[2] = state.user_task_slot(child_tid, child_pid, child_asid, child_image.entry_pc, child_image.stack_top)
+    return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.Ok, 0, 0), capability.empty_slot(), updated_process_slots, updated_task_slots, updated_wait_table, child_space, child_frame, SpawnObservation{ status: SyscallStatus.Ok, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, wait_handle_slot: request.wait_handle_slot })
+}
+
+func perform_wait(gate: SyscallGate, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, request: WaitRequest) WaitResult {
+    if gate.open == 0 {
+        return wait_result(update_gate(gate, SyscallId.Wait, SyscallStatus.Closed, 0, 0), process_slots, task_slots, wait_table, WaitObservation{ status: SyscallStatus.Closed, child_pid: 0, exit_code: 0, wait_handle_slot: 0 })
+    }
+    child_pid: u32 = capability.find_child_for_wait_handle(wait_table, request.wait_handle_slot)
+    if child_pid == 0 {
+        return wait_result(update_gate(gate, SyscallId.Wait, SyscallStatus.InvalidHandle, 0, 0), process_slots, task_slots, wait_table, WaitObservation{ status: SyscallStatus.InvalidHandle, child_pid: 0, exit_code: 0, wait_handle_slot: 0 })
+    }
+    if capability.wait_handle_signaled(wait_table, request.wait_handle_slot) == 0 {
+        return wait_result(update_gate(gate, SyscallId.Wait, SyscallStatus.WouldBlock, 0, 0), process_slots, task_slots, wait_table, WaitObservation{ status: SyscallStatus.WouldBlock, child_pid: child_pid, exit_code: 0, wait_handle_slot: request.wait_handle_slot })
+    }
+    updated_wait_table: capability.WaitTable = capability.consume_wait_handle(wait_table, request.wait_handle_slot)
+    updated_process_slots: [3]state.ProcessSlot = process_slots
+    updated_task_slots: [3]state.TaskSlot = task_slots
+    if updated_process_slots[2].pid == child_pid {
+        updated_process_slots[2] = state.empty_process_slot()
+    }
+    if updated_task_slots[2].owner_pid == child_pid {
+        updated_task_slots[2] = state.empty_task_slot()
+    }
+    return wait_result(update_gate(gate, SyscallId.Wait, SyscallStatus.Ok, 0, 0), updated_process_slots, updated_task_slots, updated_wait_table, WaitObservation{ status: SyscallStatus.Ok, child_pid: child_pid, exit_code: capability.find_exit_code_for_wait_handle(wait_table, request.wait_handle_slot), wait_handle_slot: request.wait_handle_slot })
+}
+
 func id_score(id: SyscallId) i32 {
     switch id {
     case SyscallId.None:
@@ -181,6 +302,8 @@ func id_score(id: SyscallId) i32 {
         return 4
     case SyscallId.Spawn:
         return 8
+    case SyscallId.Wait:
+        return 16
     default:
         return 0
     }
@@ -201,6 +324,10 @@ func status_score(status: SyscallStatus) i32 {
         return 16
     case SyscallStatus.Closed:
         return 32
+    case SyscallStatus.InvalidCapability:
+        return 64
+    case SyscallStatus.Exhausted:
+        return 128
     default:
         return 0
     }

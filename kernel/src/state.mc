@@ -2,12 +2,14 @@ enum ProcessState {
     Empty,
     BootOwned,
     Ready,
+    Exited,
 }
 
 enum TaskState {
     Empty,
     Boot,
     Ready,
+    Exited,
 }
 
 enum BootStage {
@@ -46,7 +48,7 @@ struct TaskSlot {
 
 struct ReadyQueue {
     count: usize
-    slots: [2]u32
+    slots: [3]u32
 }
 
 struct BootRecord {
@@ -100,24 +102,27 @@ func user_task_slot(tid: u32, owner_pid: u32, address_space_id: u32, entry_pc: u
     return TaskSlot{ tid: tid, owner_pid: owner_pid, address_space_id: address_space_id, state: TaskState.Ready, entry_pc: entry_pc, stack_top: stack_top }
 }
 
-func zero_ready_slots() [2]u32 {
-    slots: [2]u32
+func zero_ready_slots() [3]u32 {
+    slots: [3]u32
     slots[0] = 0
     slots[1] = 0
+    slots[2] = 0
     return slots
 }
 
-func zero_process_slots() [2]ProcessSlot {
-    slots: [2]ProcessSlot
+func zero_process_slots() [3]ProcessSlot {
+    slots: [3]ProcessSlot
     slots[0] = empty_process_slot()
     slots[1] = empty_process_slot()
+    slots[2] = empty_process_slot()
     return slots
 }
 
-func zero_task_slots() [2]TaskSlot {
-    slots: [2]TaskSlot
+func zero_task_slots() [3]TaskSlot {
+    slots: [3]TaskSlot
     slots[0] = empty_task_slot()
     slots[1] = empty_task_slot()
+    slots[2] = empty_task_slot()
     return slots
 }
 
@@ -126,7 +131,7 @@ func empty_queue() ReadyQueue {
 }
 
 func single_ready_queue(tid: u32) ReadyQueue {
-    slots: [2]u32 = zero_ready_slots()
+    slots: [3]u32 = zero_ready_slots()
     slots[0] = tid
     return ReadyQueue{ count: 1, slots: slots }
 }
@@ -181,6 +186,14 @@ func log_stage_at(log: BootLog, index: usize) BootStage {
     return log.entries[index].stage
 }
 
+func exit_process_slot(slot: ProcessSlot) ProcessSlot {
+    return ProcessSlot{ pid: slot.pid, task_slot: slot.task_slot, address_space_id: slot.address_space_id, state: ProcessState.Exited }
+}
+
+func exit_task_slot(slot: TaskSlot) TaskSlot {
+    return TaskSlot{ tid: slot.tid, owner_pid: slot.owner_pid, address_space_id: slot.address_space_id, state: TaskState.Exited, entry_pc: slot.entry_pc, stack_top: slot.stack_top }
+}
+
 func log_actor_at(log: BootLog, index: usize) u32 {
     if index >= log.count {
         return 0
@@ -203,6 +216,8 @@ func process_state_score(state: ProcessState) i32 {
         return 2
     case ProcessState.Ready:
         return 4
+    case ProcessState.Exited:
+        return 8
     default:
         return 0
     }
@@ -217,6 +232,8 @@ func task_state_score(state: TaskState) i32 {
         return 2
     case TaskState.Ready:
         return 4
+    case TaskState.Exited:
+        return 8
     default:
         return 0
     }

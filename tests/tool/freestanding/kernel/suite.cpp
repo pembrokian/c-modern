@@ -16,9 +16,9 @@ void RunFreestandingKernelPhase87StaticDataProof(const std::filesystem::path& so
 void RunFreestandingKernelPhase88BuildIntegrationAudit(const std::filesystem::path& source_root,
                                                        const std::filesystem::path& binary_root,
                                                        const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase100CapabilityTransfer(const std::filesystem::path& source_root,
-                                                     const std::filesystem::path& binary_root,
-                                                     const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase101SpawnWait(const std::filesystem::path& source_root,
+                                            const std::filesystem::path& binary_root,
+                                            const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -27,7 +27,7 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase86TaskLifecycleProof(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase87StaticDataProof(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase88BuildIntegrationAudit(source_root, binary_root, mc_path);
-    RunFreestandingKernelPhase100CapabilityTransfer(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase101SpawnWait(source_root, binary_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

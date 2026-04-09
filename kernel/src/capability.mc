@@ -10,6 +10,11 @@ enum HandleState {
     Installed,
 }
 
+enum WaitHandleState {
+    Empty,
+    Installed,
+}
+
 struct CapabilitySlot {
     slot_id: u32
     owner_pid: u32
@@ -32,12 +37,31 @@ struct HandleTable {
     slots: [4]HandleSlot
 }
 
+struct WaitHandle {
+    slot_id: u32
+    owner_pid: u32
+    child_pid: u32
+    exit_code: i32
+    signaled: u32
+    state: WaitHandleState
+}
+
+struct WaitTable {
+    owner_pid: u32
+    count: usize
+    slots: [2]WaitHandle
+}
+
 func empty_slot() CapabilitySlot {
     return CapabilitySlot{ slot_id: 0, owner_pid: 0, kind: CapabilityKind.Empty, rights: 0, object_id: 0 }
 }
 
 func empty_handle_slot() HandleSlot {
     return HandleSlot{ slot_id: 0, owner_pid: 0, endpoint_id: 0, rights: 0, state: HandleState.Empty }
+}
+
+func empty_wait_handle() WaitHandle {
+    return WaitHandle{ slot_id: 0, owner_pid: 0, child_pid: 0, exit_code: 0, signaled: 0, state: WaitHandleState.Empty }
 }
 
 func zero_handle_slots() [4]HandleSlot {
@@ -53,14 +77,38 @@ func empty_handle_table() HandleTable {
     return HandleTable{ owner_pid: 0, count: 0, slots: zero_handle_slots() }
 }
 
+func zero_wait_handles() [2]WaitHandle {
+    slots: [2]WaitHandle
+    slots[0] = empty_wait_handle()
+    slots[1] = empty_wait_handle()
+    return slots
+}
+
+func empty_wait_table() WaitTable {
+    return WaitTable{ owner_pid: 0, count: 0, slots: zero_wait_handles() }
+}
+
 func handle_table_for_owner(owner_pid: u32) HandleTable {
     return HandleTable{ owner_pid: owner_pid, count: 0, slots: zero_handle_slots() }
 }
 
-func zero_handle_tables() [2]HandleTable {
-    tables: [2]HandleTable
+func wait_table_for_owner(owner_pid: u32) WaitTable {
+    return WaitTable{ owner_pid: owner_pid, count: 0, slots: zero_wait_handles() }
+}
+
+func zero_handle_tables() [3]HandleTable {
+    tables: [3]HandleTable
     tables[0] = empty_handle_table()
     tables[1] = empty_handle_table()
+    tables[2] = empty_handle_table()
+    return tables
+}
+
+func zero_wait_tables() [3]WaitTable {
+    tables: [3]WaitTable
+    tables[0] = empty_wait_table()
+    tables[1] = empty_wait_table()
+    tables[2] = empty_wait_table()
     return tables
 }
 
@@ -86,6 +134,16 @@ func find_handle_index(table: HandleTable, slot_id: u32) usize {
         return 3
     }
     return 4
+}
+
+func find_wait_index(table: WaitTable, slot_id: u32) usize {
+    if wait_handle_state_score(table.slots[0].state) == 2 && table.slots[0].slot_id == slot_id {
+        return 0
+    }
+    if wait_handle_state_score(table.slots[1].state) == 2 && table.slots[1].slot_id == slot_id {
+        return 1
+    }
+    return 2
 }
 
 func install_endpoint_handle(table: HandleTable, slot_id: u32, endpoint_id: u32, rights: u32) HandleTable {
@@ -125,6 +183,72 @@ func remove_handle(table: HandleTable, slot_id: u32) HandleTable {
     return HandleTable{ owner_pid: table.owner_pid, count: table.count - 1, slots: slots }
 }
 
+func install_wait_handle(table: WaitTable, slot_id: u32, child_pid: u32) WaitTable {
+    if table.count >= 2 {
+        return table
+    }
+    if find_wait_index(table, slot_id) < 2 {
+        return table
+    }
+    slots: [2]WaitHandle = table.slots
+    if wait_handle_state_score(slots[0].state) == 1 {
+        slots[0] = WaitHandle{ slot_id: slot_id, owner_pid: table.owner_pid, child_pid: child_pid, exit_code: 0, signaled: 0, state: WaitHandleState.Installed }
+        return WaitTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
+    }
+    if wait_handle_state_score(slots[1].state) == 1 {
+        slots[1] = WaitHandle{ slot_id: slot_id, owner_pid: table.owner_pid, child_pid: child_pid, exit_code: 0, signaled: 0, state: WaitHandleState.Installed }
+        return WaitTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
+    }
+    return table
+}
+
+func mark_wait_handle_exited(table: WaitTable, child_pid: u32, exit_code: i32) WaitTable {
+    slots: [2]WaitHandle = table.slots
+    if wait_handle_state_score(slots[0].state) == 2 && slots[0].child_pid == child_pid {
+        slots[0] = WaitHandle{ slot_id: slots[0].slot_id, owner_pid: slots[0].owner_pid, child_pid: child_pid, exit_code: exit_code, signaled: 1, state: slots[0].state }
+        return WaitTable{ owner_pid: table.owner_pid, count: table.count, slots: slots }
+    }
+    if wait_handle_state_score(slots[1].state) == 2 && slots[1].child_pid == child_pid {
+        slots[1] = WaitHandle{ slot_id: slots[1].slot_id, owner_pid: slots[1].owner_pid, child_pid: child_pid, exit_code: exit_code, signaled: 1, state: slots[1].state }
+        return WaitTable{ owner_pid: table.owner_pid, count: table.count, slots: slots }
+    }
+    return table
+}
+
+func find_child_for_wait_handle(table: WaitTable, slot_id: u32) u32 {
+    index: usize = find_wait_index(table, slot_id)
+    if index >= 2 {
+        return 0
+    }
+    return table.slots[index].child_pid
+}
+
+func wait_handle_signaled(table: WaitTable, slot_id: u32) u32 {
+    index: usize = find_wait_index(table, slot_id)
+    if index >= 2 {
+        return 0
+    }
+    return table.slots[index].signaled
+}
+
+func find_exit_code_for_wait_handle(table: WaitTable, slot_id: u32) i32 {
+    index: usize = find_wait_index(table, slot_id)
+    if index >= 2 {
+        return 0
+    }
+    return table.slots[index].exit_code
+}
+
+func consume_wait_handle(table: WaitTable, slot_id: u32) WaitTable {
+    index: usize = find_wait_index(table, slot_id)
+    if index >= 2 {
+        return table
+    }
+    slots: [2]WaitHandle = table.slots
+    slots[index] = empty_wait_handle()
+    return WaitTable{ owner_pid: table.owner_pid, count: table.count - 1, slots: slots }
+}
+
 func find_endpoint_for_handle(table: HandleTable, slot_id: u32) u32 {
     index: usize = find_handle_index(table, slot_id)
     if index >= 4 {
@@ -146,6 +270,18 @@ func handle_state_score(state: HandleState) i32 {
     case HandleState.Empty:
         return 1
     case HandleState.Installed:
+        return 2
+    default:
+        return 0
+    }
+    return 0
+}
+
+func wait_handle_state_score(state: WaitHandleState) i32 {
+    switch state {
+    case WaitHandleState.Empty:
+        return 1
+    case WaitHandleState.Installed:
         return 2
     default:
         return 0
