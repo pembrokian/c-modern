@@ -1,0 +1,153 @@
+Phase 110 -- Kernel Ownership Split Audit
+=========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 109 first running Canopus kernel slice
+audit by making the current repository-owned kernel easier to evolve along
+real owner seams without widening the admitted running slice.
+
+This document is both the Phase 110 execution note and its closeout.
+It does not claim broader scheduler completion, broader syscall families,
+broader interrupt ownership, a larger in-kernel policy layer, or a wider
+running-system statement. It records one bounded ownership split inside the
+already admitted first running kernel slice.
+
+Repository status note
+----------------------
+- Phase 109 closed the first running Canopus kernel slice support statement
+  over the landed repository-owned kernel artifact.
+- That slice was honest, but the root proof module still directly owned too
+  many subsystem-local validation paths.
+- In particular, scheduler and lifecycle validation still lived in
+  `kernel/src/main.mc`, and the aggregate running-slice and image-contract
+  audits were also still rooted there.
+- Without one narrow ownership split now, the next kernel work would keep
+  growing inside a single root proof file and blur where scheduler- and
+  debug-owned truth actually lives.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-109 roadmap reserved Phase 110 for a kernel
+  ownership split audit before wider kernel behavior changes.
+- The repository already had explicit files for `init`, `syscall`,
+  `capability`, `endpoint`, `address_space`, and state-bearing support, but
+  scheduler-owned lifecycle validation and debug-owned aggregate phase audits
+  still remained interleaved in `kernel/src/main.mc`.
+- That meant the current kernel slice could still drift toward a monolithic
+  root proof lane even while the rest of the kernel tree was already split by
+  owner-visible files.
+
+Core rule
+---------
+- Preserve current kernel behavior exactly.
+- Split only where at least one owner boundary becomes mechanically more
+  enforceable through source-file ownership and a narrower explicit interface.
+- Keep `main.mc` as the thin root orchestration owner rather than the home of
+  subsystem-local validation logic.
+- Prove the split with one focused regression over the real kernel artifact.
+
+Chosen slice for this phase
+---------------------------
+Targeted audit shape:
+
+1. one canonical Phase 110 note recording the ownership split and the exact
+   boundaries it makes explicit
+2. one new scheduler-owned module carrying the existing spawn, wait, sleep,
+   and wake validation contract behind an explicit lifecycle-audit record
+3. one new debug-owned module carrying the existing Phase 108 image/program-
+   cap audit, the Phase 109 running-slice audit, and a new Phase 110
+   ownership-split audit behind explicit audit records
+4. one focused freestanding regression that builds and runs the real kernel
+   target, proves the new module-object split is emitted, checks current docs,
+   and inspects MIR for the scheduler and debug audit owners
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this split now because the current running slice is
+already honest and the next highest-value step is making future owners easier
+to name and keep thin.
+
+What this phase proves
+----------------------
+- the current first running kernel slice can stay behaviorally unchanged while
+  becoming more explicit about where scheduler and debug ownership live
+- `kernel/src/main.mc` can remain the root boot and orchestration owner
+  without also owning scheduler-local lifecycle validation and aggregate phase
+  audit logic
+- the repository can validate that split mechanically through distinct module
+  objects, explicit imported call sites, and MIR-visible owner functions
+
+Deliverables
+------------
+- one canonical Phase 110 closeout note in `docs/plan/`
+- one new `kernel/src/sched.mc` module owning lifecycle and scheduler-facing
+  validation over the landed spawn, wait, sleep, and wake slice
+- one new `kernel/src/debug.mc` module owning the aggregate Phase 108,
+  Phase 109, and Phase 110 audit functions
+- refreshed kernel-facing documentation and one focused Phase 110 freestanding
+  kernel regression
+- one refreshed speculative continuation note that now treats Phase 110 as the
+  landed historical bridge into the next Canopus wave rather than as future
+  work
+
+Suggested execution order
+-------------------------
+1. Move scheduler-owned lifecycle validation behind one explicit scheduler
+   audit record and keep the runtime path unchanged.
+2. Move aggregate phase audits behind one explicit debug audit record and add
+   the new Phase 110 ownership-split audit.
+3. Advance the current kernel proof marker only after the new scheduler and
+   debug ownership boundaries are wired through the real root module.
+4. Add the narrow Phase 110 freestanding regression and refresh the current
+   kernel documentation surfaces.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 110 marker without
+  widening the admitted running slice
+- scheduler-owned lifecycle validation is no longer defined in
+  `kernel/src/main.mc` and instead lives behind an explicit `sched` module
+  interface
+- aggregate Phase 108, Phase 109, and Phase 110 audit functions live in a
+  `debug` module rather than in `kernel/src/main.mc`
+- the build emits distinct module objects for the new ownership files and MIR
+  exposes their validation functions explicitly
+- the kernel README, repository map, and freestanding test notes all describe
+  Phase 110 as the current kernel boundary consistently
+
+Non-goals
+---------
+- broader preemption, kill, or scheduler-policy claims
+- new syscall families or broader marshalling work
+- interrupt, MMU, or target-surface widening beyond the landed Phase 109
+  kernel slice
+- broader init-owned multi-service system bring-up
+
+Implemented slice
+-----------------
+- added `kernel/src/sched.mc` so the landed spawn, wait, sleep, and wake
+  validation path is now scheduler-owned through one explicit lifecycle audit
+  record rather than remaining defined in the root proof module
+- added `kernel/src/debug.mc` so the landed Phase 108 image/program-cap audit,
+  the landed Phase 109 first-running-kernel-slice audit, and the new Phase 110
+  ownership-split audit now live behind debug-owned audit records
+- updated `kernel/src/main.mc` so it now imports those owners, builds the
+  narrow records they consume, and stays focused on boot, setup, and proof
+  sequencing rather than subsystem-local validation internals
+- added one focused Phase 110 freestanding regression that checks the current
+  documentation statement, distinct `sched` and `debug` module objects, and
+  MIR visibility of the new owner functions
+
+Closeout statement
+------------------
+Phase 110 is complete as a kernel ownership split audit. The repository still
+claims only one bounded first running Canopus kernel slice, but that slice now
+has clearer scheduler and debug ownership boundaries that are mechanically
+visible in the source tree, build artifacts, and regression surface.

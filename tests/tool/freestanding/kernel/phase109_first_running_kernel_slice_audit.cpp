@@ -44,7 +44,7 @@ void RunFreestandingKernelPhase109FirstRunningKernelSliceAudit(const std::filesy
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase109_running_slice_run_output.txt",
                                                              "freestanding kernel phase109 running-slice audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 109) {
+    if (!run_outcome.exited || run_outcome.exit_code != 110) {
         Fail("phase109 freestanding kernel running-slice audit run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -62,29 +62,29 @@ void RunFreestandingKernelPhase109FirstRunningKernelSliceAudit(const std::filesy
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 109 has moved the repository-owned kernel artifact beyond the landed",
-                         "phase109 kernel README should record the running-kernel slice as current status");
+                         "Phase 110 has moved the repository-owned kernel artifact beyond the landed",
+                         "phase109 kernel README should record the current kernel status while preserving the phase109 slice");
     ExpectOutputContains(kernel_readme,
-                         "first running Canopus kernel slice",
-                         "phase109 kernel README should publish the current support statement");
+                         "Phase 110 ownership split",
+                         "phase109 kernel README should preserve the landed running-slice support statement");
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 109 first-running-kernel-slice-audited kernel target",
-                         "phase109 repository map should describe the current kernel boundary");
+                         "currently a Phase 110 kernel-ownership-split-audited kernel target",
+                         "phase109 repository map should describe the current kernel boundary while retaining the phase109 slice");
     ExpectOutputContains(repo_map,
-                         "one bounded Phase 109 first-running-kernel-slice audit",
-                         "phase109 repository map should list the new kernel proof owner");
+                         "Phase 109 first-running-kernel-slice audit",
+                         "phase109 repository map should still list the landed phase109 kernel proof owner");
 
     const std::string kernel_mir = ReadFile(dump_targets.mir);
     ExpectOutputContains(kernel_mir,
-                         "ConstGlobal names=[PHASE109_MARKER] type=i32",
+                         "ConstGlobal names=[PHASE110_MARKER] type=i32",
                          "phase109 merged MIR should expose the current running-kernel marker");
     ExpectOutputContains(kernel_mir,
-                         "Function name=validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
+                         "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
                          "phase109 merged MIR should preserve the landed phase108 image/program-cap audit path");
     ExpectOutputContains(kernel_mir,
-                         "Function name=validate_phase109_first_running_kernel_slice returns=[bool]",
+                         "Function name=debug.validate_phase109_first_running_kernel_slice returns=[bool]",
                          "phase109 merged MIR should retain the aggregate first-running-kernel audit path");
 }
 

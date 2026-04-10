@@ -21,6 +21,7 @@ Structure
   - `phase107_real_user_to_user_capability_transfer.cpp`: real-kernel user-to-user capability transfer proof.
   - `phase108_kernel_image_program_cap_audit.cpp`: real-kernel image-input and program-cap audit.
   - `phase109_first_running_kernel_slice_audit.cpp`: real-kernel first-running-kernel-slice support audit.
+  - `phase110_kernel_ownership_split_audit.cpp`: real-kernel ownership split audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

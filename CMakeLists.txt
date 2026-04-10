@@ -156,6 +156,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase107_real_user_to_user_capability_transfer.cpp
     tests/tool/freestanding/kernel/phase108_kernel_image_program_cap_audit.cpp
     tests/tool/freestanding/kernel/phase109_first_running_kernel_slice_audit.cpp
+    tests/tool/freestanding/kernel/phase110_kernel_ownership_split_audit.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp

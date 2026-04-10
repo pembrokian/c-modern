@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 109 first-running-kernel-slice-audited kernel target
+- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 110 kernel-ownership-split-audited kernel target
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Canopus source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
@@ -30,7 +30,9 @@ This file is a fast orientation map for agents working in this repository.
 - `kernel`
   - repository-owned Canopus kernel sources rather than disposable proof-only fixtures
   - `build.toml`: freestanding kernel manifest for the active bring-up slice
-  - `src/main.mc`: explicit architecture entry, bounded first-user-entry, bounded endpoint-and-handle-core validation, bounded syscall-byte-IPC validation, bounded capability-carrying transfer validation, bounded spawn-and-wait validation, bounded timer sleep-and-wake validation, bounded init bootstrap-capability handoff validation, bounded Phase 104 contract-hardening regressions, one bounded Phase 105 real log-service handshake proof, one bounded Phase 106 real echo-service request-reply proof, one bounded Phase 107 real user-to-user capability transfer proof, one bounded Phase 108 kernel image-and-program-cap audit, and one bounded Phase 109 first-running-kernel-slice audit
+  - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed first-user-entry, endpoint core, syscall IPC, service, scheduler, and debug audit owners through the Phase 110 kernel ownership split audit
+  - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
+  - `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109 first-running-kernel-slice audit, and Phase 110 ownership-split audit
   - `src/log_service.mc`: bounded log-service protocol state, acknowledgment payload, and handshake observation records
   - `src/echo_service.mc`: bounded echo-service protocol state, request-derived reply payload, and exchange observation records
   - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
