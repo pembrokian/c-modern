@@ -33,6 +33,12 @@ struct TimerWakeResult {
     observation: TimerWakeObservation
 }
 
+struct TimerInterruptDelivery {
+    timer_state: TimerState
+    observation: TimerWakeObservation
+    delivered: u32
+}
+
 func empty_sleep_wait() SleepWait {
     return SleepWait{ task_id: 0, deadline_tick: 0, wake_tick: 0, state: SleepState.Empty }
 }
@@ -46,6 +52,10 @@ func zero_sleepers() [2]SleepWait {
 
 func empty_timer_state() TimerState {
     return TimerState{ monotonic_tick: 0, wake_count: 0, count: 0, sleepers: zero_sleepers() }
+}
+
+func empty_wake_observation(wake_count: u32) TimerWakeObservation {
+    return TimerWakeObservation{ task_id: 0, deadline_tick: 0, wake_tick: 0, wake_count: wake_count }
 }
 
 func sleep_state_is_empty(state_value: SleepState) bool {
@@ -150,4 +160,53 @@ func consume_wake(timer_state: TimerState, task_id: u32) TimerState {
         return TimerState{ monotonic_tick: timer_state.monotonic_tick, wake_count: timer_state.wake_count, count: timer_state.count - 1, sleepers: sleepers }
     }
     return timer_state
+}
+
+func deliver_interrupt_tick(timer_state: TimerState, now_tick: u64) TimerInterruptDelivery {
+    advanced_timer: TimerState = advance_tick(timer_state, now_tick)
+    wake_result: TimerWakeResult = wake_fired_sleepers(advanced_timer)
+    if wake_result.observation.task_id == 0 {
+        return TimerInterruptDelivery{ timer_state: wake_result.timer_state, observation: empty_wake_observation(wake_result.timer_state.wake_count), delivered: 0 }
+    }
+    return TimerInterruptDelivery{ timer_state: consume_wake(wake_result.timer_state, wake_result.observation.task_id), observation: wake_result.observation, delivered: 1 }
+}
+
+func validate_interrupt_delivery_boundary() bool {
+    armed_timer: TimerState = arm_sleep(empty_timer_state(), 7, 1)
+    first_delivery: TimerInterruptDelivery = deliver_interrupt_tick(armed_timer, 1)
+    if first_delivery.delivered != 1 {
+        return false
+    }
+    if first_delivery.observation.task_id != 7 {
+        return false
+    }
+    if first_delivery.observation.deadline_tick != 1 {
+        return false
+    }
+    if first_delivery.observation.wake_tick != 1 {
+        return false
+    }
+    if first_delivery.observation.wake_count != 1 {
+        return false
+    }
+    if first_delivery.timer_state.monotonic_tick != 1 {
+        return false
+    }
+    if first_delivery.timer_state.wake_count != 1 {
+        return false
+    }
+    if first_delivery.timer_state.count != 0 {
+        return false
+    }
+    second_delivery: TimerInterruptDelivery = deliver_interrupt_tick(first_delivery.timer_state, 1)
+    if second_delivery.delivered != 0 {
+        return false
+    }
+    if second_delivery.observation.task_id != 0 {
+        return false
+    }
+    if second_delivery.observation.wake_count != 1 {
+        return false
+    }
+    return second_delivery.timer_state.count == 0
 }

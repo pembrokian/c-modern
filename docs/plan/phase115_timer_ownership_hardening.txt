@@ -1,0 +1,161 @@
+Phase 115 -- Timer Ownership Hardening
+======================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 114 address-space and MMU ownership split by
+moving timer-backed wake delivery fully into the timer owner instead of leaving
+tick advancement, wake selection, and single-delivery consumption split across
+interrupt dispatch and root-proof sequencing.
+
+This document is both the Phase 115 execution note and its closeout.
+It does not claim a broad timer framework, device policy layer, preemption,
+barrier work, broader interrupt completion, or a compiler wave.
+It records one narrow timer-boundary hardening step inside the already admitted
+first running Canopus kernel slice.
+
+Repository status note
+----------------------
+- Phase 114 separated generic address-space layout from MMU-owned
+  translation-root mechanics without widening the admitted running slice.
+- That left the next hardware-facing ownership question explicit: the current
+  kernel still routed timer-backed wake delivery partly through
+  `kernel/src/interrupt.mc`, while the timer owner already held the sleep and
+  wake records that later timer work must keep consistent.
+- Without one bounded timer step now, later timer or low-level work would keep
+  growing as mixed interrupt and root-proof sequencing instead of through one
+  visible timer owner.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-114 roadmap reserved Phase 115 for one timer
+  ownership hardening step before any later barrier or low-level hook work.
+- The landed kernel already had explicit interrupt, timer, lifecycle,
+  scheduler, and debug owners, but `kernel/src/interrupt.mc` still advanced
+  timer state and chose wake observations directly.
+- That left the next boundary question unanswered: does the interrupt owner
+  only classify one timer interrupt, or does it also own timer wake delivery
+  semantics?
+
+Core rule
+---------
+- Preserve current kernel behavior exactly.
+- Keep interrupt ownership at architecture-local entry and generic dispatch
+  classification only.
+- Move timer tick advancement, wake observation, and single-delivery
+  consumption into the timer owner.
+- Keep scheduler-ready restoration separate from timer-owned wake delivery.
+- Do not expand the compiler or language surface unless this kernel step
+  proves a concrete owner gap. It does not.
+- Prove the boundary mechanically with one focused regression over the real
+  kernel artifact.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 115 note recording the timer-ownership hardening step
+   plus the explicit decision not to reopen compiler work
+2. one update to `kernel/src/timer.mc` so the timer owner exposes one
+   interrupt-tick delivery record, one owner-local delivery helper, and one
+   focused validator for single-delivery wake truth
+3. one update to `kernel/src/interrupt.mc` so the interrupt owner stops at
+   entry and dispatch classification instead of advancing timer state itself
+4. one update to `kernel/src/main.mc` so the real wake path dispatches through
+   interrupt classification, then routes timer tick delivery through the timer
+   owner before the existing lifecycle ready transition
+5. one update to `kernel/src/debug.mc` plus one focused freestanding kernel
+   regression proving docs, source call sites, emitted objects, and MIR all
+   expose the new boundary
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current running slice is
+already honest and the next highest-value timer move is making wake delivery
+mechanically timer-owned before later low-level hook or broader system work.
+
+What this phase proves
+----------------------
+- the current first running kernel slice can keep the same timer-backed wake
+  behavior while expressing interrupt dispatch as classification-only and timer
+  delivery as timer-owned state mutation
+- the timer owner can preserve single-delivery wake truth without turning the
+  interrupt owner into a broader timer-policy or device-policy layer
+- the repository can record an intentional decision not to reopen compiler
+  work because this boundary closes entirely inside the landed kernel tree
+
+Deliverables
+------------
+- one canonical Phase 115 closeout note in `docs/plan/`
+- updated `kernel/src/timer.mc` with explicit interrupt-tick delivery helpers
+  and one focused owner-local validator
+- updated `kernel/src/interrupt.mc` so dispatch stays at classification only
+- updated `kernel/src/main.mc` so the real wake transition routes timer-owned
+  delivery through the timer owner before lifecycle-ready restoration
+- one new debug-owned Phase 115 audit
+- refreshed kernel-facing documentation, roadmap wording, decision records,
+  and one focused Phase 115 freestanding kernel regression
+
+Suggested execution order
+-------------------------
+1. Add the timer-owned interrupt-tick delivery helper and validator.
+2. Simplify interrupt dispatch so it reports classification only.
+3. Rewire the real wake path to call timer-owned delivery after interrupt
+   classification while preserving the same scheduler-ready result.
+4. Add the Phase 115 debug audit and documentation updates.
+5. Advance the current kernel proof marker only after the new regression
+   proves the boundary mechanically.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 115 marker without
+  widening the admitted running slice
+- `kernel/src/interrupt.mc` no longer advances timer state or selects wake
+  observations directly and instead stops at entry and dispatch
+  classification
+- `kernel/src/timer.mc` now owns interrupt-tick advancement, wake observation,
+  and single-delivery wake consumption for the landed timer-backed path
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 115 boundary consistently
+
+Non-goals
+---------
+- a broad timer or device framework
+- preemption, multicore, or broader scheduler work
+- barrier-facing or target-entry work beyond this timer boundary
+- new public timer APIs or general interrupt completion claims
+- reopening sema, MIR, backend, ABI, or language design without a concrete
+  kernel-owned failure
+
+Implemented slice
+-----------------
+- expanded `kernel/src/timer.mc` so the timer owner now exposes one
+  interrupt-tick delivery record, one delivery helper, and one focused
+  validator for single-delivery wake truth
+- simplified `kernel/src/interrupt.mc` so the interrupt owner now stops at
+  explicit architecture entry plus dispatch classification over the landed
+  timer vector
+- updated `kernel/src/main.mc` so the real child wake transition now routes
+  timer tick delivery through the timer owner after interrupt dispatch and
+  before the existing lifecycle-ready restoration
+- added one debug-owned Phase 115 timer-boundary audit and one focused
+  freestanding regression covering docs, source imports, object emission, and
+  MIR visibility
+- refreshed the current kernel status docs, roadmap wording, decision log,
+  and backlog so the repository records both the landed timer boundary and the
+  decision not to widen compiler work here
+
+Closeout statement
+------------------
+Phase 115 is complete as a timer ownership hardening step.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now expresses its timer-backed wake path more honestly:
+interrupt ownership stops at entry and dispatch classification, timer-owned
+tick delivery now owns wake observation and single-delivery consumption, and
+the compiler remains intentionally closed for this step.

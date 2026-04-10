@@ -7,8 +7,7 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position after Phase 114 closed the first
-address-space and MMU ownership clarification over the running kernel slice.
+Record one maintained repository position after Phase 115 closed the timer ownership hardening over the landed running kernel slice.
 
 This note answers four questions that now matter:
 
@@ -19,7 +18,7 @@ This note answers four questions that now matter:
 
 This note is not a support statement, a full phase plan, or a claim that the
 full Canopus architecture is implemented.
-It does not replace the Phase 109 through Phase 114 closeouts, the Canopus
+It does not replace the Phase 109 through Phase 115 closeouts, the Canopus
 architecture notes, or the narrower hosted and freestanding support
 statements.
 
@@ -34,6 +33,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/phase112_syscall_boundary_thinness_audit.txt`
 - `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`
 - `docs/plan/phase114_address_space_and_mmu_ownership_split.txt`
+- `docs/plan/phase115_timer_ownership_hardening.txt`
 - `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
 - `docs/plan/freestanding_support_statement.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
@@ -59,7 +59,7 @@ Current repository truth
   Phase 110 ownership split, a landed Phase 111 lifecycle-owner
   clarification, a landed Phase 112 syscall-boundary thinness audit, a landed
   Phase 113 interrupt-entry and generic-dispatch boundary, and a landed Phase
-  114 address-space and MMU ownership split.
+  114 address-space and MMU ownership split, and a landed Phase 115 timer ownership hardening.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   implementation slice rather than only for freestanding representation proofs.
@@ -86,7 +86,7 @@ It means:
 
 The speculative Phase 96 through Phase 109 roadmap is complete as a roadmap
 horizon, and the first ownership-hardening plus hardware-boundary wave
-through Phase 114 is now also concrete, but the implementation itself is
+through Phase 115 is now also concrete, but the implementation itself is
 still at an early kernel plateau rather than at architectural completion.
 
 Kernel maturity and quality
@@ -152,7 +152,7 @@ What it still does not prove:
 
 Working engineering stance
 --------------------------
-The right stance after Phase 114 is still conservative.
+The right stance after Phase 115 is still conservative.
 
 - treat the current core language as sufficient until a real next kernel step
   proves otherwise
@@ -252,7 +252,8 @@ speculative language machinery.
 Bottom line
 -----------
 Canopus should currently be described as a bounded first running kernel with a
-landed address-space/MMU ownership split, and Modern C should currently be
+landed timer ownership hardening over the timer-backed wake path and the
+earlier address-space/MMU ownership split, and Modern C should currently be
 described as capable of carrying that running kernel slice.
 
 Both statements are meaningful, but both remain intentionally narrow.

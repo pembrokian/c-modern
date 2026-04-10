@@ -323,3 +323,16 @@ func validate_phase114_address_space_and_mmu_ownership_split(audit: RunningKerne
     }
     return validate_phase113_interrupt_entry_and_generic_dispatch_boundary(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, interrupt.InterruptDispatchKind.TimerWake)
 }
+
+func validate_phase115_timer_ownership_hardening(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32) bool {
+    if timer_contract_hardened == 0 {
+        return false
+    }
+    if audit.timer_wake_observation.task_id != audit.child_tid {
+        return false
+    }
+    if audit.timer_wake_observation.wake_count != 1 {
+        return false
+    }
+    return validate_phase114_address_space_and_mmu_ownership_split(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened)
+}

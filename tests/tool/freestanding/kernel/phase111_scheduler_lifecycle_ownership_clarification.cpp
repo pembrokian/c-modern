@@ -19,7 +19,7 @@ void ExpectPhase111BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase111_lifecycle_ownership_run_output.txt",
                                                              "freestanding kernel phase111 lifecycle-ownership audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 114) {
+    if (!run_outcome.exited || run_outcome.exit_code != 115) {
         Fail("phase111 freestanding kernel lifecycle-ownership audit run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -47,7 +47,7 @@ void ExpectPhase111PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 114 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 115 has moved the repository-owned kernel artifact beyond the landed",
                          "phase111 kernel README should record the lifecycle clarification as current status");
     ExpectOutputContains(kernel_readme,
                          "src/lifecycle.mc",
@@ -55,7 +55,7 @@ void ExpectPhase111PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 114 address-space-and-mmu-ownership-bounded kernel target",
+                         "currently a Phase 115 timer-ownership-hardened kernel target",
                          "phase111 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "src/lifecycle.mc",
@@ -73,7 +73,7 @@ void ExpectPhase111MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE114_MARKER] type=i32",
+            "ConstGlobal names=[PHASE115_MARKER] type=i32",
             "Function name=lifecycle.install_spawned_child returns=[lifecycle.SpawnInstallResult]",
             "Function name=lifecycle.block_task_on_timer returns=[lifecycle.TaskTransition]",
             "Function name=lifecycle.ready_task returns=[lifecycle.TaskTransition]",

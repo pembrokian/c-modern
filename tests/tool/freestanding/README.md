@@ -26,6 +26,7 @@ Structure
   - `phase112_syscall_boundary_thinness_audit.cpp`: real-kernel syscall boundary thinness audit.
   - `phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`: real-kernel interrupt-entry and generic-dispatch boundary audit.
   - `phase114_address_space_and_mmu_ownership_split.cpp`: real-kernel address-space and MMU ownership split audit.
+  - `phase115_timer_ownership_hardening.cpp`: real-kernel timer ownership hardening audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

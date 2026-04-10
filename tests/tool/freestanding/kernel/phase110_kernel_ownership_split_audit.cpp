@@ -19,7 +19,7 @@ void ExpectPhase110BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase110_ownership_split_run_output.txt",
                                                              "freestanding kernel phase110 ownership-split audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 114) {
+    if (!run_outcome.exited || run_outcome.exit_code != 115) {
         Fail("phase110 freestanding kernel ownership-split audit run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -50,7 +50,7 @@ void ExpectPhase110PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 114 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 115 has moved the repository-owned kernel artifact beyond the landed",
                          "phase110 kernel README should record the ownership split as current status");
     ExpectOutputContains(kernel_readme,
                          "src/sched.mc",
@@ -61,7 +61,7 @@ void ExpectPhase110PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 114 address-space-and-mmu-ownership-bounded kernel target",
+                         "currently a Phase 115 timer-ownership-hardened kernel target",
                          "phase110 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "src/debug.mc",
@@ -82,7 +82,7 @@ void ExpectPhase110MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE114_MARKER] type=i32",
+            "ConstGlobal names=[PHASE115_MARKER] type=i32",
             "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
             "Function name=debug.validate_phase109_first_running_kernel_slice returns=[bool]",
             "Function name=debug.validate_phase110_kernel_ownership_split returns=[bool]",

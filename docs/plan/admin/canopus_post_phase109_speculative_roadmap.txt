@@ -151,8 +151,11 @@ over the landed timer-backed wake path.
 Phase 114 is now concrete as one address-space and MMU ownership split over
 the landed first-user and spawn translation-root path.
 
-Phases 115 through 116 should widen only the smallest hardware-facing truth
-required by the next real kernel steps.
+Phase 115 is now concrete as one timer ownership hardening step over the
+landed timer-backed wake path.
+
+Phase 116 should widen only the smallest remaining hardware-facing truth
+required by the next real kernel step.
 
 Likely themes:
 - clearer trap or interrupt handoff shape
@@ -169,20 +172,16 @@ Why this band comes next:
 Historical bridge into this band:
 - Phase 113 is now concrete as `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`.
 - Phase 114 is now concrete as `docs/plan/phase114_address_space_and_mmu_ownership_split.txt`.
+- Phase 115 is now concrete as `docs/plan/phase115_timer_ownership_hardening.txt`.
 - Those phases turned one landed timer-backed wake path into an explicit
-  architecture-entry plus generic-dispatch boundary and then separated generic
-  address-space layout from translation-root mechanics without widening the
-  admitted running slice, and they leave the next open question centered on
-  later timer hardening or low-level hooks rather than on whether one honest
-  interrupt or MMU boundary exists at all.
+  architecture-entry plus generic-dispatch boundary, then separated generic
+  address-space layout from translation-root mechanics, and then moved timer
+  tick advancement plus single-delivery wake consumption fully into the timer
+  owner without widening the admitted running slice. They leave the next open
+  question centered on later barrier or low-level hook work rather than on
+  whether one honest interrupt, MMU, or timer boundary exists at all.
 
 Possible phases in this band:
-
-Phase 115 -- Timer Ownership Hardening
-- Exit criterion: the timer-backed wake path is owned through a clearer
-  interrupt or timer boundary that preserves single-delivery wake truth while
-  keeping device and scheduler policy separate, after the mapping and memory-
-  visibility assumptions it depends on are already explicit.
 
 Phase 116 -- Barrier Or Low-Level Hook Follow-Through
 - Exit criterion: only if required by the prior phases, the repository admits
