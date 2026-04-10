@@ -322,15 +322,8 @@ func install_received_handle(handle_table: capability.HandleTable, request: Rece
     if request.receive_handle_slot == 0 {
         return ReceiveHandleInstall{ handle_table: handle_table, received_handle_slot: 0, received_handle_count: 0, status: SyscallStatus.InvalidHandle }
     }
-    if handle_table.owner_pid != message.source_pid {
-        return ReceiveHandleInstall{ handle_table: handle_table, received_handle_slot: 0, received_handle_count: 0, status: SyscallStatus.InvalidHandle }
-    }
-    removed_handle_table: capability.HandleTable = capability.remove_handle(handle_table, message.attached_source_handle_slot)
-    if !capability.handle_remove_succeeded(handle_table, removed_handle_table, message.attached_source_handle_slot) {
-        return ReceiveHandleInstall{ handle_table: handle_table, received_handle_slot: 0, received_handle_count: 0, status: SyscallStatus.InvalidHandle }
-    }
-    updated_handle_table: capability.HandleTable = capability.install_endpoint_handle(removed_handle_table, request.receive_handle_slot, message.attached_endpoint_id, message.attached_rights)
-    if !capability.handle_install_succeeded(removed_handle_table, updated_handle_table, request.receive_handle_slot) {
+    updated_handle_table: capability.HandleTable = capability.install_endpoint_handle(handle_table, request.receive_handle_slot, message.attached_endpoint_id, message.attached_rights)
+    if !capability.handle_install_succeeded(handle_table, updated_handle_table, request.receive_handle_slot) {
         return ReceiveHandleInstall{ handle_table: handle_table, received_handle_slot: 0, received_handle_count: 0, status: SyscallStatus.InvalidHandle }
     }
     return ReceiveHandleInstall{ handle_table: updated_handle_table, received_handle_slot: request.receive_handle_slot, received_handle_count: message.attached_count, status: SyscallStatus.Ok }
@@ -420,12 +413,19 @@ func perform_send(gate: SyscallGate, handle_table: capability.HandleTable, endpo
     if status_score(attached.status) != 2 {
         return send_result(update_gate(gate, SyscallId.Send, attached.status, 0, 0), handle_table, endpoints, attached.status, BlockReason.None)
     }
+    updated_handle_table: capability.HandleTable = handle_table
+    if request.attached_handle_count == 1 {
+        updated_handle_table = capability.remove_handle(handle_table, request.attached_handle_slot)
+        if !capability.handle_remove_succeeded(handle_table, updated_handle_table, request.attached_handle_slot) {
+            return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None)
+        }
+    }
     message: endpoint.KernelMessage = build_send_message(gate, sender_pid, resolved_endpoint.endpoint_id, request, attached)
     updated_endpoints: endpoint.EndpointTable = endpoint.enqueue_message(endpoints, resolved_endpoint.endpoint_index, message)
     if !endpoint.enqueue_succeeded(endpoints, updated_endpoints, resolved_endpoint.endpoint_index) {
         return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.WouldBlock, 0, 0), handle_table, endpoints, SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull)
     }
-    return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Ok, 1, 0), handle_table, updated_endpoints, SyscallStatus.Ok, BlockReason.None)
+    return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Ok, 1, 0), updated_handle_table, updated_endpoints, SyscallStatus.Ok, BlockReason.None)
 }
 
 func perform_receive(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, request: ReceiveRequest) ReceiveResult {

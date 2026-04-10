@@ -23,6 +23,9 @@ void RunFreestandingKernelPhase105RealLogServiceHandshake(const std::filesystem:
 void RunFreestandingKernelPhase106RealEchoServiceRequestReply(const std::filesystem::path& source_root,
                                                               const std::filesystem::path& binary_root,
                                                               const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(const std::filesystem::path& source_root,
+                                                                   const std::filesystem::path& binary_root,
+                                                                   const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -33,6 +36,7 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase88BuildIntegrationAudit(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase105RealLogServiceHandshake(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase106RealEchoServiceRequestReply(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

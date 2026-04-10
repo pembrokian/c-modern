@@ -18,6 +18,7 @@ Structure
   - `phase98_endpoint_handle_core.cpp`: real-kernel endpoint-and-handle-core proof.
   - `phase105_real_log_service_handshake.cpp`: real-kernel log-service handshake proof.
   - `phase106_real_echo_service_request_reply.cpp`: real-kernel echo-service request-reply proof.
+  - `phase107_real_user_to_user_capability_transfer.cpp`: real-kernel user-to-user capability transfer proof.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

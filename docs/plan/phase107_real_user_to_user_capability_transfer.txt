@@ -1,0 +1,234 @@
+Phase 107 -- Real User-To-User Capability Transfer
+=================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 106 real echo-service request-reply proof
+into the next remaining Band C owner: prove that one real user-space
+component can transfer one explicit endpoint authority to another over the
+landed real kernel IPC boundary, that the receiver gains that authority only
+through the transfer rather than ambient installation, and that the receiver
+can use the transferred handle for one bounded action without widening into a
+general service framework, multi-hop capability routing, or broader user-space
+policy.
+
+This document is both the Phase 107 execution note and its closeout.
+It does not claim a general service registry, multi-service startup policy,
+wait-handle transfer, or a running general user-space system.
+
+Repository status note
+----------------------
+- Phase 96 made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 widened that owned target into one bounded address-space and first
+  user-entry handoff.
+- Phase 98 then made explicit endpoint tables, per-process handle tables, and
+  bounded queued-message lifetime concrete inside the same repository-owned
+  kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- Phase 100 then made one attached-handle transfer concrete across that same
+  syscall IPC boundary.
+- Phase 101 then made the first explicit program-capability spawn and wait
+  path concrete.
+- Phase 102 then made the first explicit timer-backed sleep, wake, and ready-
+  restoration path concrete.
+- Phase 103 then made one explicit bounded init bootstrap-capability handoff
+  concrete.
+- Phase 104 then hardened that same owned kernel lane around explicit helper
+  contracts, layout validation, and deterministic proof sequencing.
+- Phase 105 then proved that one real service task can launch and complete
+  one bounded request-and-acknowledgment flow over the landed syscall IPC
+  path.
+- Phase 106 then proved that one second bounded service task can preserve a
+  request-derived reply over that same landed boundary.
+- The next strongest kernel question was therefore no longer whether the
+  repository could move one attached handle at all. It was whether that same
+  transfer path could now cross a real user-to-user boundary rather than stay
+  inside a same-owner follow-through.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names explicit user-to-user
+  capability transfer as the next bounded user-policy owner after the landed
+  real echo-service proof.
+- The repository already had the necessary ingredients spread across the
+  owned kernel lane: one explicit attached-handle transfer message shape, one
+  real service spawn path, one explicit service-visible control endpoint, and
+  one retained init-visible endpoint capability that could observe follow-
+  through behavior on the transferred endpoint.
+- The landed syscall transfer helper still removed the transferred sender
+  handle only when receive completed against the sender-owned table, which was
+  sufficient for the earlier bounded same-owner proof but not for a real
+  user-to-user transfer.
+- Without this step, later service or authority phases could overclaim that
+  the repository already preserves user-to-user capability movement over the
+  real kernel boundary when the actual landed path still stopped at one same-
+  owner follow-through.
+
+Core rule
+---------
+- Keep the phase to one explicit init-to-service endpoint transfer only.
+- Fix the transfer boundary at the syscall owner so sender-side removal occurs
+  on successful send and receiver-side installation occurs against the real
+  receiver table.
+- Reuse the already-landed spawn, wait, endpoint, handle, and IPC owners.
+- Add only the smallest helper module needed to keep the service-local
+  transfer observation explicit and inspectable.
+- Stop before general authority routing, multi-service policy, wait-handle
+  transfer, or a broader runtime framework.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one syscall-boundary correction that removes an attached sender handle on
+   successful send and installs the received handle into the actual receiver-
+   local table at receive time
+2. one bounded `transfer_service` helper module owning service-local transfer
+   state, copied emit payload construction, and final observation records
+3. one repository-owned kernel follow-through that retains one init-visible
+   endpoint capability locally, transfers one duplicate endpoint handle to one
+   spawned service task over the landed real IPC path, and proves that the
+   transferred sender slot disappears immediately after send success
+4. one service-issued bounded follow-through send on the transferred endpoint
+   so the receiver uses the newly acquired authority for one real action with
+   no ambient shortcut
+5. one explicit service-exit and wait-handle reap follow-through so the proof
+   cleans up the reused child slot after the transfer succeeds
+6. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported structs, enums, aggregate
+   initialization, fixed-array payload construction, and explicit helper
+   boundaries while preserving the landed Phase 106 proof
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this user-to-user boundary now because the earlier
+attached-handle work already proved the queued message shape and the later
+service phases already proved one real spawned receiver. The next honest owner
+is not a general service framework. It is one real transfer from one user
+component to another with the smallest necessary syscall correction.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact now removes one transferred endpoint handle
+  from the sender on successful send and installs it only into the real
+  receiver-local table at receive time
+- init can transfer one explicit endpoint capability to one spawned service
+  task over the landed real kernel IPC path without ambient reinstallation
+- the receiving service can then use that transferred handle for one bounded
+  send over the transferred endpoint, and init can observe that follow-through
+  through its separately retained local handle
+- the current language, freestanding build path, and kernel-owned proof lane
+  can carry the required service-local transfer state and final observation
+  without new compiler work
+- the repository can stop honestly at one bounded user-to-user endpoint
+  transfer without implying general authority routing or a running multi-
+  service user-space system
+
+Deliverables
+------------
+- one canonical Phase 107 closeout note recording the implemented real user-
+  to-user capability transfer proof
+- one corrected `kernel/src/syscall.mc` transfer path that matches the landed
+  Phase 100 contract for destructive-on-success send and receiver-local
+  installation
+- one bounded `kernel/src/transfer_service.mc` helper module owning service-
+  local transfer state, emitted payload construction, and final observation
+  records
+- one updated repository-owned kernel target that spawns a transfer service,
+  transfers one endpoint handle to it, validates sender-side removal, proves
+  receiver-side installation, observes one follow-through message on the
+  transferred endpoint, and reaps the service cleanly after the landed Phase
+  106 proof
+- one focused Phase 107 freestanding kernel regression and MIR inspection
+  validating the new slice while preserving the landed Phase 106 coverage
+- refreshed planning and orientation surfaces so Phase 107 is concrete and
+  the next speculative owner shifts upward accordingly
+
+Suggested execution order
+-------------------------
+1. Correct the syscall transfer owner so attached-handle removal happens on
+   successful send and receiver-side installation targets the real receiver
+   table.
+2. Add the smallest bounded `transfer_service` helper module needed to keep
+   grant, emit, and final transfer state explicit.
+3. Teach the repository-owned kernel target to spawn one transfer service,
+   transfer one endpoint handle to it over the landed control endpoint, and
+   validate immediate sender-side removal.
+4. Drive one service-issued follow-through send on the transferred endpoint
+   and observe it through init's retained local handle.
+5. Reap the bounded service task through the landed wait path.
+6. Inspect the merged MIR and refresh planning surfaces so Phase 107 is
+   concrete rather than still speculative.
+
+Exit criteria
+-------------
+- one repository-owned kernel target transfers one explicit endpoint handle
+  from init to one spawned service task over the landed real IPC path
+- the transferred sender slot is removed immediately on successful send
+- receive installs that handle into the real receiver-local table with no
+  ambient shortcut
+- the receiving service then uses that transferred handle for one bounded
+  follow-through send
+- the proof exits with exactly one bounded Phase 107 marker only after the
+  landed Phase 106 proof, the user-to-user transfer, the transferred-handle
+  follow-through send, and the bounded service reap succeed
+- the merged MIR preserves explicit `transfer_service` helper-module records
+  and helper functions instead of collapsing the slice into the root proof
+  body or a special runtime boundary
+- the planning surface records Phase 107 as concrete rather than speculative
+
+Non-goals
+---------
+- general service registries, multi-service startup policy, or namespace
+  discovery
+- wait-handle transfer, capability delegation graphs, or broader authority
+  routing policy
+- service restart policy, loader generalization, or a running general user-
+  space system claim
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- corrected `kernel/src/syscall.mc` so the owned kernel transfer path now
+  removes attached sender handles on successful send and installs transferred
+  handles into the real receiver-local table at receive time instead of
+  assuming the sender and receiver share one owner table
+- added `kernel/src/transfer_service.mc` so the owned kernel tree now supports
+  one bounded transfer-service state record, one final transfer observation
+  record, one explicit grant observation, and one copied emit-payload helper
+  through ordinary imported structs, enums, and fixed arrays
+- updated `kernel/src/main.mc` so the repository-owned kernel target now
+  preserves the landed Phase 106 proof, seeds one fresh transferable endpoint
+  handle alongside init's retained local handle, spawns one bounded transfer
+  service task, transfers that handle to the service over the landed control
+  endpoint, validates immediate sender-side removal, observes receiver-side
+  installation, drives one service-issued follow-through send on the
+  transferred endpoint, reaps that service through the landed wait path, and
+  then emits the Phase 107 marker
+- added one focused Phase 107 freestanding kernel regression that builds and
+  runs the repository-owned kernel target, expects the Phase 107 marker, and
+  inspects merged MIR for preserved Phase 106 coverage plus explicit
+  `transfer_service` helper-module records and functions
+- refreshed the speculative Canopus kernel roadmap, repository map, kernel
+  README, freestanding test notes, and decision log so the repository now
+  records Phase 107 as concrete and shifts the next speculative owner upward
+
+Closeout statement
+------------------
+Phase 107 is complete as a real user-to-user capability transfer proof. The
+repository still does not claim a general service framework, wait-handle
+transfer policy, or a running general user-space system, but it now has one
+honest real-kernel artifact that boots, reaches first user entry, owns
+explicit endpoint and handle state, drives real syscall IPC, preserves the
+landed hardening and Phase 105 through Phase 106 service contracts, and moves
+one endpoint authority from init to one spawned service task with immediate
+sender-side removal, explicit receiver-side installation, one bounded
+follow-through use, and one bounded service reap.

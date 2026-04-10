@@ -6,9 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 106 has moved the repository-owned kernel artifact beyond the landed
-  real log-service handshake into one bounded real echo-service request-reply
-  proof.
+- Phase 107 has moved the repository-owned kernel artifact beyond the landed
+  real echo-service request-reply proof into one bounded real user-to-user
+  capability transfer proof.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -24,8 +24,10 @@ Current status
   reap path, one bounded timer sleep path with explicit wake delivery, one
   explicit init bootstrap-capability handoff, one landed helper-contract
   hardening pass over that bounded proof kernel, one bounded real log-service
-  request-and-acknowledgment flow with explicit service reap, and no broader
-  multi-service bring-up yet.
+  request-and-acknowledgment flow with explicit service reap, one bounded real
+  echo-service request-reply flow with explicit service reap, one bounded real
+  user-to-user endpoint transfer with explicit sender-side removal and
+  receiver-side installation, and no broader multi-service bring-up yet.
 
 Current files
 -------------
@@ -37,11 +39,14 @@ Current files
   validation, bounded timer sleep and wake validation, bounded init
   bootstrap-capability handoff validation, bounded Phase 104 contract-
   hardening regressions, one bounded Phase 105 real log-service handshake
-  proof, and one bounded Phase 106 real echo-service request-reply proof
+  proof, one bounded Phase 106 real echo-service request-reply proof, and one
+  bounded Phase 107 real user-to-user capability transfer proof
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
   reply payload, and final exchange observation records
+- `src/transfer_service.mc`: bounded transfer-service grant state, emitted
+  payload construction, and final transfer observation records
 - `src/state.mc`: kernel-owned descriptor, slot, queue, and boot-log records
 - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame
   records
@@ -65,7 +70,8 @@ Phase boundary
   handle transfer, one bounded spawn-and-wait lifecycle path, one explicit
   critique-response hardening pass over helper and proof contracts, one
   bounded real log-service request-and-acknowledgment flow with explicit
-  service reap, and one bounded real echo-service request-reply flow with
-  explicit service reap.
+  service reap, one bounded real echo-service request-reply flow with explicit
+  service reap, and one bounded real user-to-user endpoint transfer with
+  explicit service-side follow-through.
 - It does not yet claim general loading, multi-service launch, namespace
   policy, kill semantics, or a running init-owned service set.

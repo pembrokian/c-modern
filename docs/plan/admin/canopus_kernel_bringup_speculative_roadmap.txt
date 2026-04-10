@@ -169,10 +169,10 @@ Phase 103 is concrete as init bootstrap capability handoff:
   that later child-control handles still appear only through explicit spawn
   rather than ambient boot inheritance.
 
-Phase 105 and Phase 106 are now concrete as real log-service handshake and
-real echo-service request-reply proofs, and Phase 107 is now the next
-remaining Band C owner around first explicit user-to-user capability
-transfer.
+Phase 105 through Phase 107 are now concrete as real log-service handshake,
+real echo-service request-reply, and real user-to-user capability-transfer
+proofs, and Phase 108 is now the next remaining Band D owner around image and
+support truth.
 
 Likely themes:
 - one-to-one syscall mapping from `sys v0`
@@ -204,9 +204,9 @@ Phase 103 -- Init Bootstrap Capability Handoff
 
 Band C - Boot Real Init-Owned User Policy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 105 and 106 are now concrete as the first real service-policy proofs,
-and Phase 107 remains the next bounded user-policy owner for the same landed
-kernel boundary.
+Phases 105 through 107 are now concrete as the first real service-policy and
+user-to-user authority proofs, and Phase 108 remains the next bounded image
+and support owner for the same landed kernel boundary.
 
 Likely themes:
 - explicit boot capability handoff
@@ -219,7 +219,7 @@ Why this band is separate:
   question is whether the actual kernel preserves those explicit boundaries
   once syscalls, boot handoff, and service launch are no longer simulated.
 
-Concrete and remaining phases in this band:
+Concrete phases in this band:
 
 Phase 105 -- Real Log-Service Handshake
 - Exit criterion: init launches one real log service from one program

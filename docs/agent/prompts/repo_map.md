@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 106 real echo-service request-reply kernel target
+- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 107 real user-to-user capability-transfer kernel target
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Canopus source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
@@ -30,9 +30,10 @@ This file is a fast orientation map for agents working in this repository.
 - `kernel`
   - repository-owned Canopus kernel sources rather than disposable proof-only fixtures
   - `build.toml`: freestanding kernel manifest for the active bring-up slice
-  - `src/main.mc`: explicit architecture entry, bounded first-user-entry, bounded endpoint-and-handle-core validation, bounded syscall-byte-IPC validation, bounded capability-carrying transfer validation, bounded spawn-and-wait validation, bounded timer sleep-and-wake validation, bounded init bootstrap-capability handoff validation, bounded Phase 104 contract-hardening regressions, one bounded Phase 105 real log-service handshake proof, and one bounded Phase 106 real echo-service request-reply proof
+  - `src/main.mc`: explicit architecture entry, bounded first-user-entry, bounded endpoint-and-handle-core validation, bounded syscall-byte-IPC validation, bounded capability-carrying transfer validation, bounded spawn-and-wait validation, bounded timer sleep-and-wake validation, bounded init bootstrap-capability handoff validation, bounded Phase 104 contract-hardening regressions, one bounded Phase 105 real log-service handshake proof, one bounded Phase 106 real echo-service request-reply proof, and one bounded Phase 107 real user-to-user capability transfer proof
   - `src/log_service.mc`: bounded log-service protocol state, acknowledgment payload, and handshake observation records
   - `src/echo_service.mc`: bounded echo-service protocol state, request-derived reply payload, and exchange observation records
+  - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
   - `src/state.mc`: kernel descriptor, process-slot, task-slot, ready-queue, and boot-log records
   - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame records
   - `src/capability.mc`: bounded bootstrap capability slots, per-process handle-table records, explicit wait-handle records, and handle-move helpers
@@ -113,7 +114,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
     - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
     - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator
-    - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase103_init_bootstrap_handoff.cpp`, `phase105_real_log_service_handshake.cpp`, `phase106_real_echo_service_request_reply.cpp`: one kernel proof per file
+    - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase103_init_bootstrap_handoff.cpp`, `phase105_real_log_service_handshake.cpp`, `phase106_real_echo_service_request_reply.cpp`, `phase107_real_user_to_user_capability_transfer.cpp`: one kernel proof per file
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
   - if freestanding or Canopus coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split

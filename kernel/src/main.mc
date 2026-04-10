@@ -8,6 +8,7 @@ import log_service
 import state
 import syscall
 import timer
+import transfer_service
 
 const ARCH_ACTOR: u32 = 0
 const BOOT_PID: u32 = 1
@@ -46,7 +47,17 @@ const ECHO_SERVICE_ENDPOINT_HANDLE_SLOT: u32 = 1
 const ECHO_SERVICE_REQUEST_BYTE0: u8 = 69
 const ECHO_SERVICE_REQUEST_BYTE1: u8 = 67
 const ECHO_SERVICE_EXIT_CODE: i32 = 53
-const PHASE106_MARKER: i32 = 106
+const TRANSFER_SERVICE_PROGRAM_SLOT: u32 = 5
+const TRANSFER_SERVICE_PROGRAM_OBJECT_ID: u32 = 4
+const TRANSFER_SERVICE_WAIT_HANDLE_SLOT: u32 = 4
+const TRANSFER_SERVICE_CONTROL_HANDLE_SLOT: u32 = 1
+const TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT: u32 = 2
+const TRANSFER_SERVICE_GRANT_BYTE0: u8 = 71
+const TRANSFER_SERVICE_GRANT_BYTE1: u8 = 73
+const TRANSFER_SERVICE_GRANT_BYTE2: u8 = 86
+const TRANSFER_SERVICE_GRANT_BYTE3: u8 = 69
+const TRANSFER_SERVICE_EXIT_CODE: i32 = 54
+const PHASE107_MARKER: i32 = 107
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -59,6 +70,7 @@ var ROOT_CAPABILITY: capability.CapabilitySlot
 var INIT_PROGRAM_CAPABILITY: capability.CapabilitySlot
 var LOG_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
 var ECHO_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
+var TRANSFER_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
 var HANDLE_TABLES: [3]capability.HandleTable
 var WAIT_TABLES: [3]capability.WaitTable
 var ENDPOINTS: endpoint.EndpointTable
@@ -75,6 +87,8 @@ var LOG_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
 var LOG_SERVICE_USER_FRAME: address_space.UserEntryFrame
 var ECHO_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
 var ECHO_SERVICE_USER_FRAME: address_space.UserEntryFrame
+var TRANSFER_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
+var TRANSFER_SERVICE_USER_FRAME: address_space.UserEntryFrame
 var TIMER_STATE: timer.TimerState
 var DELIVERED_MESSAGE: endpoint.KernelMessage
 var RECEIVE_OBSERVATION: syscall.ReceiveObservation
@@ -98,6 +112,12 @@ var ECHO_SERVICE_RECEIVE_OBSERVATION: syscall.ReceiveObservation
 var ECHO_SERVICE_REPLY_OBSERVATION: syscall.ReceiveObservation
 var ECHO_SERVICE_EXCHANGE: echo_service.EchoExchangeObservation
 var ECHO_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
+var TRANSFER_SERVICE_STATE: transfer_service.TransferServiceState
+var TRANSFER_SERVICE_SPAWN_OBSERVATION: syscall.SpawnObservation
+var TRANSFER_SERVICE_GRANT_OBSERVATION: syscall.ReceiveObservation
+var TRANSFER_SERVICE_EMIT_OBSERVATION: syscall.ReceiveObservation
+var TRANSFER_SERVICE_TRANSFER: transfer_service.TransferObservation
+var TRANSFER_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -111,6 +131,7 @@ func reset_kernel_state() {
     INIT_PROGRAM_CAPABILITY = capability.empty_slot()
     LOG_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
     ECHO_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
+    TRANSFER_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
     HANDLE_TABLES = capability.zero_handle_tables()
     WAIT_TABLES = capability.zero_wait_tables()
     ENDPOINTS = endpoint.empty_table()
@@ -127,6 +148,8 @@ func reset_kernel_state() {
     LOG_SERVICE_USER_FRAME = address_space.empty_frame()
     ECHO_SERVICE_ADDRESS_SPACE = address_space.empty_space()
     ECHO_SERVICE_USER_FRAME = address_space.empty_frame()
+    TRANSFER_SERVICE_ADDRESS_SPACE = address_space.empty_space()
+    TRANSFER_SERVICE_USER_FRAME = address_space.empty_frame()
     TIMER_STATE = timer.empty_timer_state()
     DELIVERED_MESSAGE = endpoint.empty_message()
     RECEIVE_OBSERVATION = syscall.empty_receive_observation()
@@ -150,6 +173,12 @@ func reset_kernel_state() {
     ECHO_SERVICE_REPLY_OBSERVATION = syscall.empty_receive_observation()
     ECHO_SERVICE_EXCHANGE = echo_service.EchoExchangeObservation{ service_pid: 0, client_pid: 0, endpoint_id: 0, tag: echo_service.EchoMessageTag.None, request_len: 0, request_byte0: 0, request_byte1: 0, reply_len: 0, reply_byte0: 0, reply_byte1: 0, request_count: 0, reply_count: 0 }
     ECHO_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
+    TRANSFER_SERVICE_STATE = transfer_service.service_state(0, 0, 0)
+    TRANSFER_SERVICE_SPAWN_OBSERVATION = syscall.empty_spawn_observation()
+    TRANSFER_SERVICE_GRANT_OBSERVATION = syscall.empty_receive_observation()
+    TRANSFER_SERVICE_EMIT_OBSERVATION = syscall.empty_receive_observation()
+    TRANSFER_SERVICE_TRANSFER = transfer_service.TransferObservation{ service_pid: 0, client_pid: 0, control_endpoint_id: 0, transferred_endpoint_id: 0, transferred_rights: 0, tag: transfer_service.CapabilityTransferTag.None, grant_len: 0, grant_byte0: 0, grant_byte1: 0, grant_byte2: 0, grant_byte3: 0, emit_len: 0, emit_byte0: 0, emit_byte1: 0, emit_byte2: 0, emit_byte3: 0, grant_count: 0, emit_count: 0 }
+    TRANSFER_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -859,7 +888,7 @@ func execute_capability_carrying_ipc_transfer() bool {
     if syscall.status_score(transfer_send_result.status) != 2 {
         return false
     }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
         return false
     }
 
@@ -1231,7 +1260,7 @@ func validate_syscall_contract_hardening() bool {
     transfer_endpoints: endpoint.EndpointTable = endpoint.empty_table()
     transfer_endpoints = endpoint.install_endpoint(transfer_endpoints, INIT_PID, INIT_ENDPOINT_ID)
     transfer_send: syscall.SendResult = syscall.perform_send(local_gate, transfer_handles, transfer_endpoints, INIT_PID, syscall.build_transfer_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload, TRANSFER_SOURCE_HANDLE_SLOT))
-    if capability.find_endpoint_for_handle(transfer_send.handle_table, TRANSFER_SOURCE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+    if capability.find_endpoint_for_handle(transfer_send.handle_table, TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
         return false
     }
     blocked_receive: syscall.ReceiveResult = syscall.perform_receive(transfer_send.gate, transfer_send.handle_table, transfer_send.endpoints, syscall.build_transfer_receive_request(INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_HANDLE_SLOT))
@@ -1241,7 +1270,7 @@ func validate_syscall_contract_hardening() bool {
     if blocked_receive.endpoints.slots[0].queued_messages != 1 {
         return false
     }
-    return capability.find_endpoint_for_handle(blocked_receive.handle_table, TRANSFER_SOURCE_HANDLE_SLOT) == TRANSFER_ENDPOINT_ID
+    return capability.find_endpoint_for_handle(blocked_receive.handle_table, TRANSFER_SOURCE_HANDLE_SLOT) == 0
 }
 
 func validate_phase104_contract_hardening() bool {
@@ -1812,6 +1841,394 @@ func validate_phase106_echo_service_request_reply() bool {
     return true
 }
 
+func seed_transfer_service_program_capability() bool {
+    TRANSFER_SERVICE_PROGRAM_CAPABILITY = capability.CapabilitySlot{ slot_id: TRANSFER_SERVICE_PROGRAM_SLOT, owner_pid: INIT_PID, kind: capability.CapabilityKind.InitProgram, rights: 7, object_id: TRANSFER_SERVICE_PROGRAM_OBJECT_ID }
+    return capability.is_program_capability(TRANSFER_SERVICE_PROGRAM_CAPABILITY)
+}
+
+func seed_transfer_service_sender_handle() bool {
+    HANDLE_TABLES[1] = capability.install_endpoint_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, 5)
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != 5 {
+        return false
+    }
+    return capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) == TRANSFER_ENDPOINT_ID
+}
+
+func spawn_transfer_service() bool {
+    WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
+    HANDLE_TABLES[2] = capability.handle_table_for_owner(CHILD_PID)
+
+    spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(TRANSFER_SERVICE_WAIT_HANDLE_SLOT)
+    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, TRANSFER_SERVICE_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
+    SYSCALL_GATE = spawn_result.gate
+    TRANSFER_SERVICE_PROGRAM_CAPABILITY = spawn_result.program_capability
+    PROCESS_SLOTS = spawn_result.process_slots
+    TASK_SLOTS = spawn_result.task_slots
+    WAIT_TABLES[1] = spawn_result.wait_table
+    TRANSFER_SERVICE_ADDRESS_SPACE = spawn_result.child_address_space
+    TRANSFER_SERVICE_USER_FRAME = spawn_result.child_frame
+    TRANSFER_SERVICE_SPAWN_OBSERVATION = spawn_result.observation
+    if syscall.status_score(TRANSFER_SERVICE_SPAWN_OBSERVATION.status) != 2 {
+        return false
+    }
+
+    HANDLE_TABLES[2] = capability.install_endpoint_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
+    TRANSFER_SERVICE_STATE = transfer_service.service_state(CHILD_PID, TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT)
+    READY_QUEUE = state.user_ready_queue(CHILD_TID)
+    return capability.find_endpoint_for_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_CONTROL_HANDLE_SLOT) == INIT_ENDPOINT_ID
+}
+
+func execute_user_to_user_capability_transfer() bool {
+    grant_payload: [4]u8 = endpoint.zero_payload()
+    grant_payload[0] = TRANSFER_SERVICE_GRANT_BYTE0
+    grant_payload[1] = TRANSFER_SERVICE_GRANT_BYTE1
+    grant_payload[2] = TRANSFER_SERVICE_GRANT_BYTE2
+    grant_payload[3] = TRANSFER_SERVICE_GRANT_BYTE3
+
+    transfer_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_transfer_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, grant_payload, TRANSFER_SOURCE_HANDLE_SLOT))
+    SYSCALL_GATE = transfer_send_result.gate
+    HANDLE_TABLES[1] = transfer_send_result.handle_table
+    ENDPOINTS = transfer_send_result.endpoints
+    if syscall.status_score(transfer_send_result.status) != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+
+    service_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, syscall.build_transfer_receive_request(TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT))
+    SYSCALL_GATE = service_receive_result.gate
+    HANDLE_TABLES[2] = service_receive_result.handle_table
+    ENDPOINTS = service_receive_result.endpoints
+    TRANSFER_SERVICE_GRANT_OBSERVATION = service_receive_result.observation
+    if syscall.status_score(TRANSFER_SERVICE_GRANT_OBSERVATION.status) != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+
+    transferred_endpoint_id: u32 = capability.find_endpoint_for_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT)
+    transferred_rights: u32 = capability.find_rights_for_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT)
+    TRANSFER_SERVICE_STATE = transfer_service.record_grant(TRANSFER_SERVICE_STATE, TRANSFER_SERVICE_GRANT_OBSERVATION, transferred_endpoint_id, transferred_rights)
+
+    emit_payload: [4]u8 = transfer_service.emit_payload(TRANSFER_SERVICE_STATE)
+    emit_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, CHILD_PID, syscall.build_send_request(TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT, 4, emit_payload))
+    SYSCALL_GATE = emit_send_result.gate
+    HANDLE_TABLES[2] = emit_send_result.handle_table
+    ENDPOINTS = emit_send_result.endpoints
+    if syscall.status_score(emit_send_result.status) != 2 {
+        return false
+    }
+
+    init_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(TRANSFER_RECEIVED_HANDLE_SLOT))
+    SYSCALL_GATE = init_receive_result.gate
+    HANDLE_TABLES[1] = init_receive_result.handle_table
+    ENDPOINTS = init_receive_result.endpoints
+    TRANSFER_SERVICE_EMIT_OBSERVATION = init_receive_result.observation
+    if syscall.status_score(TRANSFER_SERVICE_EMIT_OBSERVATION.status) != 2 {
+        return false
+    }
+
+    TRANSFER_SERVICE_STATE = transfer_service.record_emit(TRANSFER_SERVICE_STATE, TRANSFER_SERVICE_EMIT_OBSERVATION)
+    TRANSFER_SERVICE_TRANSFER = transfer_service.observe_transfer(TRANSFER_SERVICE_STATE)
+    return true
+}
+
+func simulate_transfer_service_exit() {
+    processes: [3]state.ProcessSlot = PROCESS_SLOTS
+    tasks: [3]state.TaskSlot = TASK_SLOTS
+    wait_tables: [3]capability.WaitTable = WAIT_TABLES
+
+    processes[2] = state.exit_process_slot(processes[2])
+    tasks[2] = state.exit_task_slot(tasks[2])
+    wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, TRANSFER_SERVICE_EXIT_CODE)
+
+    PROCESS_SLOTS = processes
+    TASK_SLOTS = tasks
+    WAIT_TABLES = wait_tables
+    READY_QUEUE = state.empty_queue()
+}
+
+func execute_phase107_user_to_user_capability_transfer() bool {
+    if !seed_transfer_service_program_capability() {
+        return false
+    }
+    if !seed_transfer_service_sender_handle() {
+        return false
+    }
+    if !spawn_transfer_service() {
+        return false
+    }
+    if !execute_user_to_user_capability_transfer() {
+        return false
+    }
+    simulate_transfer_service_exit()
+
+    wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(TRANSFER_SERVICE_WAIT_HANDLE_SLOT))
+    SYSCALL_GATE = wait_result.gate
+    PROCESS_SLOTS = wait_result.process_slots
+    TASK_SLOTS = wait_result.task_slots
+    WAIT_TABLES[1] = wait_result.wait_table
+    TRANSFER_SERVICE_WAIT_OBSERVATION = wait_result.observation
+    HANDLE_TABLES[2] = capability.empty_handle_table()
+    READY_QUEUE = state.empty_queue()
+    return syscall.status_score(TRANSFER_SERVICE_WAIT_OBSERVATION.status) == 2
+}
+
+func validate_phase107_user_to_user_capability_transfer() bool {
+    if capability.kind_score(TRANSFER_SERVICE_PROGRAM_CAPABILITY.kind) != 1 {
+        return false
+    }
+    if syscall.id_score(SYSCALL_GATE.last_id) != 16 {
+        return false
+    }
+    if syscall.status_score(SYSCALL_GATE.last_status) != 2 {
+        return false
+    }
+    if SYSCALL_GATE.send_count != 9 {
+        return false
+    }
+    if SYSCALL_GATE.receive_count != 9 {
+        return false
+    }
+    if TRANSFER_SERVICE_SPAWN_OBSERVATION.child_pid != CHILD_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_SPAWN_OBSERVATION.child_tid != CHILD_TID {
+        return false
+    }
+    if TRANSFER_SERVICE_SPAWN_OBSERVATION.child_asid != CHILD_ASID {
+        return false
+    }
+    if TRANSFER_SERVICE_SPAWN_OBSERVATION.wait_handle_slot != TRANSFER_SERVICE_WAIT_HANDLE_SLOT {
+        return false
+    }
+    if syscall.status_score(TRANSFER_SERVICE_SPAWN_OBSERVATION.status) != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != 5 {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.source_pid != INIT_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload_len != 4 {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.received_handle_slot != TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.received_handle_count != 1 {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload[0] != TRANSFER_SERVICE_GRANT_BYTE0 {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload[1] != TRANSFER_SERVICE_GRANT_BYTE1 {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload[2] != TRANSFER_SERVICE_GRANT_BYTE2 {
+        return false
+    }
+    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload[3] != TRANSFER_SERVICE_GRANT_BYTE3 {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.endpoint_id != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.source_pid != CHILD_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload_len != 4 {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.received_handle_slot != 0 {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.received_handle_count != 0 {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload[0] != TRANSFER_SERVICE_GRANT_BYTE0 {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload[1] != TRANSFER_SERVICE_GRANT_BYTE1 {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload[2] != TRANSFER_SERVICE_GRANT_BYTE2 {
+        return false
+    }
+    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload[3] != TRANSFER_SERVICE_GRANT_BYTE3 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.owner_pid != CHILD_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.control_handle_slot != TRANSFER_SERVICE_CONTROL_HANDLE_SLOT {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.transferred_handle_slot != TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.grant_count != 1 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.emit_count != 1 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_client_pid != INIT_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_control_endpoint_id != INIT_ENDPOINT_ID {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_transferred_endpoint_id != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_transferred_rights != 5 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_grant_len != 4 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_grant_byte0 != TRANSFER_SERVICE_GRANT_BYTE0 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_grant_byte1 != TRANSFER_SERVICE_GRANT_BYTE1 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_grant_byte2 != TRANSFER_SERVICE_GRANT_BYTE2 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_grant_byte3 != TRANSFER_SERVICE_GRANT_BYTE3 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_emit_len != 4 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_emit_byte0 != TRANSFER_SERVICE_GRANT_BYTE0 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_emit_byte1 != TRANSFER_SERVICE_GRANT_BYTE1 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_emit_byte2 != TRANSFER_SERVICE_GRANT_BYTE2 {
+        return false
+    }
+    if TRANSFER_SERVICE_STATE.last_emit_byte3 != TRANSFER_SERVICE_GRANT_BYTE3 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.service_pid != CHILD_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.client_pid != INIT_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.control_endpoint_id != INIT_ENDPOINT_ID {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.transferred_endpoint_id != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.transferred_rights != 5 {
+        return false
+    }
+    if transfer_service.tag_score(TRANSFER_SERVICE_TRANSFER.tag) != 4 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.grant_len != 4 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.grant_byte0 != TRANSFER_SERVICE_GRANT_BYTE0 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.grant_byte1 != TRANSFER_SERVICE_GRANT_BYTE1 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.grant_byte2 != TRANSFER_SERVICE_GRANT_BYTE2 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.grant_byte3 != TRANSFER_SERVICE_GRANT_BYTE3 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.emit_len != 4 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.emit_byte0 != TRANSFER_SERVICE_GRANT_BYTE0 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.emit_byte1 != TRANSFER_SERVICE_GRANT_BYTE1 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.emit_byte2 != TRANSFER_SERVICE_GRANT_BYTE2 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.emit_byte3 != TRANSFER_SERVICE_GRANT_BYTE3 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.grant_count != 1 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.emit_count != 1 {
+        return false
+    }
+    if syscall.status_score(TRANSFER_SERVICE_WAIT_OBSERVATION.status) != 2 {
+        return false
+    }
+    if TRANSFER_SERVICE_WAIT_OBSERVATION.child_pid != CHILD_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_WAIT_OBSERVATION.exit_code != TRANSFER_SERVICE_EXIT_CODE {
+        return false
+    }
+    if TRANSFER_SERVICE_WAIT_OBSERVATION.wait_handle_slot != TRANSFER_SERVICE_WAIT_HANDLE_SLOT {
+        return false
+    }
+    if WAIT_TABLES[1].count != 0 {
+        return false
+    }
+    if capability.find_child_for_wait_handle(WAIT_TABLES[1], TRANSFER_SERVICE_WAIT_HANDLE_SLOT) != 0 {
+        return false
+    }
+    if HANDLE_TABLES[2].count != 0 {
+        return false
+    }
+    if READY_QUEUE.count != 0 {
+        return false
+    }
+    if state.process_state_score(PROCESS_SLOTS[2].state) != 1 {
+        return false
+    }
+    if state.task_state_score(TASK_SLOTS[2].state) != 1 {
+        return false
+    }
+    if address_space.state_score(TRANSFER_SERVICE_ADDRESS_SPACE.state) != 2 {
+        return false
+    }
+    if TRANSFER_SERVICE_ADDRESS_SPACE.owner_pid != CHILD_PID {
+        return false
+    }
+    if TRANSFER_SERVICE_USER_FRAME.task_id != CHILD_TID {
+        return false
+    }
+    return true
+}
+
 func execute_spawn_child_process() bool {
     WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
 
@@ -2157,43 +2574,49 @@ func bootstrap_main() i32 {
     if !validate_phase106_echo_service_request_reply() {
         return 32
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 106)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !execute_phase107_user_to_user_capability_transfer() {
         return 33
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !validate_phase107_user_to_user_capability_transfer() {
         return 34
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 107)
+    if BOOT_MARKER_EMITTED != 1 {
         return 35
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 36
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 37
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 38
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 39
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 40
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 106 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 41
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 42
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 107 {
         return 43
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 44
     }
-    return PHASE106_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 45
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 46
+    }
+    return PHASE107_MARKER
 }
