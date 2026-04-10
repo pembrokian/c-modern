@@ -13,8 +13,8 @@ See these files first:
 
 - `README.md`
 - `docs/plan/admin/bootstrap_plan.txt`
-- `docs/plan/phase3_bootstrap_finish.txt`
-- `docs/agent/repo_map.md`
+- `docs/plan/archive/phase3_bootstrap_finish.txt`
+- `docs/agent/prompts/repo_map.md`
 
 Documentation routing:
 

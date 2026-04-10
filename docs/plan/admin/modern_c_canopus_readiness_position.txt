@@ -1,5 +1,5 @@
-Modern C -- Canopus Kernel Bring-Up Readiness Position
-======================================================
+Modern C / Canopus -- Current Position Assessment
+================================================
 
 Status
 ------
@@ -7,195 +7,242 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position on three questions that now matter
-after the first admitted freestanding `v0.3` slice landed:
+Record one maintained repository position after Phase 109 closed the first
+speculative Canopus kernel roadmap horizon.
 
-- what Modern C currently is in repository terms
-- whether it is ready to start the first real Canopus kernel bring-up
-- what future language or toolchain development should remain plausible but
-  deferred until proof pressure makes it necessary
+This note answers four questions that now matter:
 
-This note is not a phase plan.
-It does not itself admit a new support slice.
-It does not replace the Canopus architecture notes or the freestanding `v0.3`
-support statement.
+- what Canopus currently is in repository terms
+- what maturity and quality the landed kernel slice currently has
+- what Modern C currently proves, and what it still does not prove
+- what the next milestone themes and work areas should be
+
+This note is not a support statement, a full phase plan, or a claim that the
+full Canopus architecture is implemented.
+It does not replace the Phase 109 closeout, the Canopus architecture notes, or
+the narrower hosted and freestanding support statements.
 
 Relationship to companion notes
 -------------------------------
 This position statement is meant to stay aligned with:
 
+- `docs/plan/admin/canopus_post_phase109_speculative_roadmap.txt`
+- `docs/plan/phase109_first_running_canopus_kernel_slice_audit.txt`
+- `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
 - `docs/plan/freestanding_support_statement.txt`
-- `docs/plan/phase94_first_system_demo_integration.txt`
-- `docs/plan/admin/v0_3_direction_canopus.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
 - `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
 - `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 
-If those notes describe the proven slice, the Canopus direction, and the
-target kernel shape, this document describes the repository's current working
-position on readiness.
+If those notes describe the landed running slice, the kernel architecture, and
+the longer-term ownership target, this document describes the repository's
+current working position after that first running slice became real.
 
 Current repository truth
 ------------------------
-- Modern C has a repository-bounded hosted `v0.2` plateau and a separate first
-  admitted freestanding `v0.3` slice.
-- That freestanding slice is real enough to support boot-marker proof, narrow
-  `hal` MMIO proof, bounded kernel mechanism representation, bounded
-  user-space policy proofs, deterministic timer wake, and one bounded
-  first-system demo.
-- The repository now therefore proves that the current language and toolchain
-  can carry one small integrated Canopus bring-up story in ordinary code.
-- The repository still does not claim full Canopus Lite completion, broad
-  target support, broad freestanding workflow support, kernel-image assembly,
-  or broader `hal` and interrupt frameworks.
+- Modern C still has a repository-bounded hosted `v0.2` plateau, and it now
+  also has a separate bounded freestanding or kernel lane that reaches one
+  first running Canopus kernel slice.
+- The repository-owned kernel is no longer merely a proof sketch. It now
+  builds and runs one explicit bounded kernel artifact with real boot entry,
+  first user entry, endpoint and handle state, syscall-owned byte IPC,
+  attached-handle transfer, program-cap spawn and wait, timer-backed wake,
+  bootstrap-capability handoff, bounded service follow-through, kernel image
+  and program-cap audit, and an aggregate Phase 109 running-slice audit.
+- The repository therefore proves that the current language, sema, MIR,
+  backend, runtime, and build path are sufficient for one honest small kernel
+  implementation slice rather than only for freestanding representation proofs.
+- The repository still does not claim full Canopus Lite completion, a general
+  Canopus platform, broad target support, general loading or packaging,
+  multicore truth, broader device policy, or a mature freestanding workflow
+  surface beyond the explicitly admitted kernel path.
 
-Position statement
-------------------
-The current repository is ready to begin Canopus kernel development if that
-work is understood in the same bounded way the existing proofs are bounded.
+Canopus position
+----------------
+Canopus is now in a first running-kernel state, not merely a readiness state.
 
-That means:
+That statement is intentionally narrow.
+It means:
 
-- starting the kernel as a small capability-based microkernel is in scope
-- starting with explicit processes, tasks, endpoints, handle tables, mappings,
-  timer wakeups, and one init-driven service path is in scope
-- implementing the first kernel in a fixed-size, table-driven, single-core,
-  inspectable style is in scope
-- claiming a general kernel platform, a broad non-hosted product surface, or a
-  mature cross-target toolchain is out of scope
+- the repository owns one real Canopus kernel artifact rather than only a
+  speculative roadmap or proof-model ladder
+- the current admitted slice is still a small capability-based microkernel in
+  a fixed-size, table-driven, single-core, inspectable form
+- explicit boot, user entry, IPC, authority transfer, spawn, wait, sleep or
+  wake, and bounded user-space service policy are now real inside that slice
+- broader platform, packaging, target-family, loader, namespace, kill, and
+  scheduler-completion claims remain out of scope
 
-This is a meaningful readiness statement, but it is intentionally narrower
-than a general statement that Modern C is now a finished kernel language.
+The speculative Phase 96 through Phase 109 roadmap is therefore complete as a
+roadmap horizon, but the implementation itself is still at an early kernel
+plateau rather than at architectural completion.
 
-Why the current language is sufficient to start
------------------------------------------------
-The current proof ladder already validates the kinds of shapes the first
-Canopus kernel blueprints ask for:
+Kernel maturity and quality
+---------------------------
+The current kernel should be treated as an early but real implementation
+slice with better evidence quality than its size might suggest.
 
-- ordinary structs, enums, arrays, and explicit pointer-based mutation are now
-  sufficient for bounded endpoint queues, task tables, and message records
-- top-level consts, globals, and aggregate initialization are now sufficient
-  for bounded kernel-owned static state
-- explicit capability transfer and explicit wait semantics are now sufficient
-  to model the first handle-table and process-lifecycle stories
-- the current freestanding path already carries one bounded integrated demo
-  where kernel boot, init, services, timer wake, request or reply, and exit
-  observation compose honestly without hidden runtime policy
+Quality strengths:
 
-In repository terms, that is enough evidence to start building the kernel that
-the current Canopus blueprints describe.
+- the slice is backed by ordered phase proofs rather than by architecture prose
+  alone
+- the running artifact is tied to deterministic build, MIR, and regression
+  checks rather than to hand-waved bring-up claims
+- authority remains explicit through endpoints, handles, wait handles, and
+  program capabilities instead of through ambient shortcuts
+- user-space policy is still visible as user-space policy; the kernel has not
+  yet drifted into an in-kernel service framework
+- the implementation pressure so far has been answered mostly with explicit
+  helper contracts, build truth, and audit functions rather than with hidden
+  runtime machinery
 
-Readiness boundary
-------------------
-Modern C should currently be treated as ready for:
+Quality limits:
 
-- the first real kernel-owned boot path
-- fixed-size kernel object tables
-- explicit process and task state machines
-- bounded FIFO endpoint queues
-- copy-based byte-plus-handle IPC
-- flat process-local handle tables with explicit move semantics
-- one-process, one-task initial bring-up
-- one ready queue scheduler plus timer-backed sleep or wake
-- init bootstrap-capability handoff and one or two small user services
+- the owned kernel tree is still flat and tightly staged; it is not yet close
+  to the end-state subsystem layout
+- the current artifact is still one bounded kernel lane on the bootstrap
+  Darwin arm64 target family, not a broad kernel-product support matrix
+- scheduler, trap, MMU, loader, namespace, device, and service management are
+  still admitted only in the narrow forms already proved
+- the current quality bar is honest bring-up quality with explicit audits, not
+  broad robustness claims such as multicore, fault recovery, driver breadth,
+  packaging, or ABI portability
 
-Modern C should not yet be treated as admitted for:
+Modern C position
+-----------------
+Modern C should now be treated as kernel-slice-capable in repository terms.
 
-- broad target portability beyond the bootstrap Darwin arm64 proof lane
-- kernel-image packaging as a supported public workflow
-- broad interrupt taxonomies, broad `hal` surface, or mature device frameworks
-- full loader generality, image-format breadth, or cross-compilation claims
-- general freestanding `mc run` or `mc test` workflow support
-- any claim that the full Canopus architecture is already implemented or that
-  the language needs no more systems-facing work
+That is stronger than the older readiness statement.
+The repository now proves that Modern C can carry one first running kernel
+slice, not just that it seems suitable to start one.
+
+It is still intentionally weaker than any claim that Modern C is a finished
+kernel platform language.
+
+What the current repository now proves well:
+
+- bounded freestanding startup and target-owned kernel builds
+- kernel-owned static state, process or task records, endpoint queues, handle
+  tables, and explicit authority transfer in ordinary Modern C code
+- user-to-kernel and user-to-user state transitions without hidden runtime or
+  language-level scheduler machinery
+- enough compiler and backend truth to keep the real kernel artifact, its MIR,
+  and its emitted image inputs aligned through regression tests
+
+What it still does not prove:
+
+- broad target portability beyond the bootstrap proof lane
+- a public freestanding workflow comparable to hosted `mc run` or `mc test`
+- complete trap, interrupt, MMU, barrier, or device frameworks
+- a general loader, namespace, or service-discovery model
+- evidence that new core-language machinery is the next owner by default
 
 Working engineering stance
 --------------------------
-The right engineering stance is conservative:
+The right stance after Phase 109 is still conservative.
 
-- treat the current core language as sufficient until the kernel proves
-  otherwise
-- expect the next likely blockers to come from target, backend, ABI, image,
-  `hal`, or build-integration owners rather than from missing syntax
-- prefer small kernel bring-up proofs over broad subsystem frameworks
-- keep policy in user space and keep that pressure out of the language unless
-  repeated real kernels or services force a different answer
+- treat the current core language as sufficient until a real next kernel step
+  proves otherwise
+- expect the next meaningful pressure to land first on kernel ownership split,
+  target and build truth, ABI or backend edges, and narrow `hal` or hardware
+  hooks rather than on new syntax
+- preserve the small-microkernel and user-space-policy bias while the current
+  kernel grows from one bounded slice into a slightly broader running system
+- refuse claims that outrun the proof surface, especially on portability,
+  packaging, loader scope, or service-management generality
 
-What future development is most likely
---------------------------------------
-The most likely near-term follow-on work is not a broad new language wave.
+Assessment of the end-state architecture note
+---------------------------------------------
+The draft end-state kernel architecture is directionally sound and should now
+be treated as reviewed guidance for later ownership splits.
 
-Most likely follow-on owners:
+Why it is a good fit:
 
-- narrower backend and ABI follow-through if a real kernel path exposes a
-  concrete mismatch in calling convention, volatile behavior, aggregate
-  layout, global emission, or low-level codegen truth
-- build and target follow-through for real kernel image production, relink
-  control, and explicit target support beyond the current bootstrap proof lane
-- narrow `hal` follow-through for barriers, interrupt-facing hooks, or other
-  hardware-boundary primitives only if the first real kernel path requires
-  them
-- loader and program-capability contract hardening if a real spawn path needs
-  more than the current bounded proof assumptions
+- it keeps `sys/` thin and pushes real semantics into owning subsystems
+- it preserves the explicit separation between capability mechanics, IPC,
+  address-space ownership, scheduling, and user-space policy
+- it fits the current landed file families already visible in `kernel/src/`
+  even though the tree has not yet been reorganized into the final directory
+  shape
+- it correctly treats `debug/` as part of the implementation strategy rather
+  than as optional convenience
 
-Possible but explicitly deferred language work:
+What still needs discipline as implementation grows:
 
-- richer low-level constant or layout support if a real kernel artifact cannot
-  be modeled honestly with the current surface
-- narrow low-level ownership or representation support if real kernel code
-  exposes an ABI or MIR boundary distortion
-- carefully bounded compile-time or target-facing features only when proof
-  pressure shows that the right owner is the language rather than the build or
-  target boundary
+- do not force a full directory churn before ownership pressure makes the
+  split real
+- clarify process and task ownership boundaries as spawn, wait, and scheduler
+  flows widen so that `core/`, `sched/`, `mm/`, `cap/`, and the lifecycle
+  owner do not blur together
+- keep the interrupt, timer, and device boundary narrow so timer truth does
+  not accidentally turn into a large in-kernel device policy layer
+- keep init sequencing distinct from long-lived service or namespace policy
 
-What should stay deferred by default
+Next milestone themes and work areas
 ------------------------------------
-The following should stay deferred unless a real kernel proof makes one of
-them unavoidable:
+The next milestones should not be described as “more of the same roadmap”.
+They should be described as consolidation and selective widening from the
+first running slice.
 
-- language-level channels, actors, or capability systems
-- scheduler-visible runtime abstractions
-- hidden async-runtime or event-runtime machinery
-- broad `os` growth as a substitute for kernel bring-up
-- broad namespace or service-framework machinery in the language
-- speculative multicore features
-- speculative zero-copy or shared-memory-first abstractions
+Recommended work themes:
+
+- kernel ownership hardening: begin extracting clearer `arch`, `init`, `sys`,
+  `ipc`, `cap`, `mm`, `sched`, and `debug` seams from the current flat kernel
+  tree only where real implementation pressure already exists
+- hardware-boundary truth: widen only the narrow architecture, trap, timer,
+  MMU, barrier, and interrupt hooks required for the next real kernel step
+- running-system follow-through: grow from bounded service proofs toward a
+  slightly broader init-owned running system without skipping straight to a
+  general namespace, loader, or service framework
+- target and image hardening: keep manifest, relink, emitted-artifact, and
+  kernel-image ownership explicit as the kernel build path grows beyond the
+  current bootstrap lane
+- compiler boundary discipline: reopen sema, MIR, backend, ABI, or `hal`
+  surfaces only when the next real kernel proof exposes a concrete owner gap
+
+Deferred by default
+-------------------
+The following should still stay deferred unless a concrete kernel proof makes
+one of them unavoidable:
+
+- language-level channels, actors, or capability runtimes
+- hidden scheduler or async-runtime abstractions
+- broad namespace, discovery, or service-framework policy inside the kernel
+- speculative multicore work
+- speculative zero-copy-first IPC growth
+- broad driver or filesystem frameworks
+- broad portability, packaging, or install claims
 
 Decision rule for reopening language work
 -----------------------------------------
-Reopen core language or compiler design only when a real kernel bring-up step
-demonstrates a concrete owned failure such as:
+Reopen core language or compiler design only when a real next kernel step
+demonstrates a concrete owned failure in representation, layout, ABI,
+volatile or barrier semantics, target entry convention, or emitted-artifact
+truth.
 
-- inability to represent a required kernel object shape honestly
-- inability to preserve a required static-data or layout fact through sema,
-  MIR, and backend
-- inability to express the required freestanding call or entry convention
-- inability to preserve the required volatile, barrier, interrupt, or ABI
-  semantics at the real codegen boundary
-
-Do not reopen the language merely because the operating-system domain is large
-or because the eventual architecture is ambitious.
+Do not reopen the language merely because the operating-system domain remains
+large or because the end-state architecture is more ambitious than the current
+slice.
 
 Recommended practical reading
-----------------------------
+-----------------------------
 The best current practical reading is:
 
-Modern C is ready to start the first Canopus kernel if the work stays within
-the bounded microkernel bring-up shape already described by the Canopus Lite
-blueprints and already foreshadowed by the repository's freestanding proof
-ladder.
+The repository now has one honest first running Canopus kernel slice, and the
+current Modern C implementation is strong enough to grow that slice further
+without assuming a new language wave first.
 
-That is a strong enough statement to justify implementation.
-It is not a strong enough statement to justify broad platform, packaging,
-target, or OS-completion claims.
+The next honest work is to harden ownership boundaries and widen the smallest
+necessary real kernel mechanisms, not to claim platform completion or to chase
+speculative language machinery.
 
 Bottom line
 -----------
-Modern C should currently be treated as kernel-bring-up-capable, not as
-kernel-complete.
+Canopus should currently be described as a bounded first running kernel, and
+Modern C should currently be described as capable of carrying that running
+kernel slice.
 
-The repository has enough evidence to start implementing the first Canopus
-kernel mechanisms honestly.
-The next likely work is primarily target, `hal`, build, image, and backend
-follow-through, with language reopening reserved for concrete proof-owned
-failures rather than speculative ambition.
+Both statements are meaningful, but both remain intentionally narrow.
+The repository is beyond readiness and beyond pure proof sketches, yet still
+well short of a general kernel platform or a finished systems-language story.

@@ -1,0 +1,297 @@
+Phase 110 Through Phase 123 -- Speculative Post-Phase-109 Canopus Roadmap
+=========================================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the completed Phase 109 first running
+Canopus kernel slice audit.
+
+This document is intentionally forward-looking and tentative.
+It does not replace `docs/plan/plan.txt`.
+It does not replace the concrete Phase 109 closeout.
+It gives one plausible ordering for the next Canopus wave if the repository
+keeps following the same evidence-first rules used so far:
+
+- one owner-local gap at a time
+- one real mechanism, service, or boundary proof at a time
+- one explicit exit criterion per phase
+- no broader platform claim before the next running slice is honest
+
+Relationship to companion notes
+-------------------------------
+This roadmap is meant to stay aligned with:
+
+- `docs/plan/admin/modern_c_canopus_readiness_position.txt`
+- `docs/plan/phase109_first_running_canopus_kernel_slice_audit.txt`
+- `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
+- `docs/arch/canopus/canopus_lite_v0.txt`
+- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_sys_interface_v0.txt`
+- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+
+If those notes define the current admitted slice, the longer-term ownership
+target, and the intended kernel boundary, this roadmap suggests one practical
+phase ordering for the next bounded implementation wave after the first
+running kernel became real.
+
+Repository numbering note
+-------------------------
+- Phase 81 through Phase 95 are occupied by the concrete freestanding bring-up
+  and support-freeze wave.
+- Phase 96 through Phase 109 are occupied by the concrete first real kernel
+  bring-up wave through the first running-kernel slice audit.
+- The next speculative continuation therefore starts at Phase 110.
+
+Repository status note
+----------------------
+- The repository can now honestly claim one bounded first running Canopus
+  kernel slice.
+- That slice remains intentionally small: fixed-size tables, explicit
+  authority, bounded IPC and lifecycle paths, bounded service proofs, and one
+  image plus support audit over the real kernel artifact.
+- The strongest next question is no longer whether the repository can produce
+  a real kernel artifact at all. It is how to widen that artifact without
+  blurring subsystem ownership, overselling platform maturity, or reopening
+  language work before a concrete owner gap exists.
+
+What this roadmap is trying to answer
+-------------------------------------
+- What likely comes after the first running-kernel statement if the repository
+  keeps growing Canopus conservatively?
+- Which follow-on fronts belong first to kernel ownership hardening,
+  hardware-boundary truth, running-system follow-through, or image and target
+  hardening rather than to new language machinery?
+- In what order should the repository make the next kernel slice broader
+  without drifting into full OS-completion, broad target promises, or a large
+  in-kernel policy framework?
+
+Core rule
+---------
+- Keep the current Modern C core closed unless a real next kernel step exposes
+  a concrete parser, sema, MIR, backend, ABI, or target owner gap.
+- Prefer subsystem ownership clarity, real hardware-boundary truth, and real
+  running-system follow-through over new architecture prose alone.
+- Keep the kernel small, explicit, table-driven, and inspectable while the
+  owned tree is still young.
+- Do not let namespace policy, loader ambition, device growth, or scheduler
+  policy outrun the next honest running-system proof.
+
+Kernel invariants
+-----------------
+These invariants apply across all phases in this roadmap:
+
+- no subsystem may require knowledge of another subsystem's internal state in
+  order to perform its normal owned behavior
+- all cross-subsystem interaction must pass through explicit interfaces,
+  ownership-visible helpers, or dependency-visible boundaries
+- no new syscall should be added without either removing an older redundant
+  path or explicitly justifying why the widened syscall surface is the right
+  owner
+- no kernel feature should encode user-space policy that could remain explicit
+  in init or in ordinary services
+- ownership-improvement work is only honest when at least one boundary becomes
+  mechanically more enforceable, not merely better named
+
+Roadmap bands
+-------------
+
+Band A - Harden Kernel Ownership Boundaries
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 110 through 112 should turn the current flat kernel tree into clearer
+subsystem ownership without pretending the full end-state layout already
+exists.
+
+Likely themes:
+- split current flat kernel files along real ownership seams
+- preserve current behavior while making future owners easier to name
+- keep `sys/` thin and avoid letting helper growth turn into hidden policy
+
+Why this band comes first:
+- after Phase 109, the highest-value next step is making the current kernel
+  easier to evolve without accidental boundary smear.
+
+Possible phases in this band:
+
+Phase 110 -- Kernel Ownership Split Audit
+- Exit criterion: the current kernel-owned code is reorganized only where at
+  least one ownership boundary becomes mechanically more enforceable through
+  dependency-visible structure, interface narrowing, or build-visible
+  separation; cosmetic file moves or comments alone do not count. The result
+  makes `core`, `init`, `sys`, `ipc`, `cap`, `mm`, `sched`, and `debug`
+  ownership more explicit at the file-family boundary, with no behavior
+  widening and one regression or documentation audit that proves the running
+  slice stayed unchanged.
+
+Phase 111 -- Scheduler And Lifecycle Ownership Clarification
+- Exit criterion: the current ready, block, wake, spawn, wait, and reap paths
+  are factored so scheduler policy, lifecycle bookkeeping, and wait-handle
+  mechanics have explicit owners rather than remaining interleaved in one
+  staged kernel lane, again without claiming broader preemption or kill
+  semantics. This phase must also answer one singular question explicitly:
+  who owns the state transition of a task?
+
+Phase 112 -- Syscall Boundary Thinness Audit
+- Exit criterion: the kernel proves that syscall decode and marshalling stay
+  thin while IPC, capability, address-space, and lifecycle semantics remain in
+  their owning subsystems, with one focused audit against the landed syscall
+  families.
+
+Band B - Reify Narrow Hardware-Boundary Truth
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 113 through 116 should widen only the smallest hardware-facing truth
+required by the next real kernel steps.
+
+Likely themes:
+- clearer trap or interrupt handoff shape
+- first architecture-local versus generic MMU or address-space split if needed
+- timer ownership that stays distinct from broader device policy
+- barriers or low-level hooks only when real code requires them
+
+Why this band comes next:
+- the current kernel slice already proves timer-backed behavior, but it still
+  carries a deliberately shallow hardware boundary, and the next honest timer
+  and scheduler hardening work should come only after the mapping and memory-
+  ownership split it depends on is clearer.
+
+Possible phases in this band:
+
+Phase 113 -- Interrupt Entry And Generic Dispatch Boundary
+- Exit criterion: one bounded interrupt or trap path is expressed as an
+  architecture-local entry plus one generic interrupt handoff without widening
+  into a broad interrupt framework or public timer API.
+
+Phase 114 -- Address-Space And MMU Ownership Split
+- Exit criterion: the kernel separates generic mapping ownership from whatever
+  architecture-local page-table or translation mechanics the next real kernel
+  step requires, without claiming a broad VM subsystem or richer loader
+  contract yet.
+
+Phase 115 -- Timer Ownership Hardening
+- Exit criterion: the timer-backed wake path is owned through a clearer
+  interrupt or timer boundary that preserves single-delivery wake truth while
+  keeping device and scheduler policy separate, after the mapping and memory
+  visibility assumptions it depends on are already explicit.
+
+Phase 116 -- Barrier Or Low-Level Hook Follow-Through
+- Exit criterion: only if required by the prior phases, the repository admits
+  one narrow low-level hook such as barrier-facing or entry-convention truth,
+  and proves that the right owner is the target or language boundary rather
+  than ad hoc kernel-local workaround code.
+
+Band C - Grow From One Running Kernel To One Small Running System
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 117 through 120 should widen the user-space side carefully from the
+first bounded service proofs toward a slightly broader init-owned system.
+
+Likely themes:
+- explicit init orchestration rather than ambient boot inheritance
+- more than one service relationship without claiming a general namespace
+- richer request-reply or authority-passing follow-through
+- keep service policy in user space rather than in kernel helpers
+
+Why this band is separate:
+- the first running kernel statement is already honest, but the next real
+  system question is whether init can orchestrate a slightly broader service
+  set while preserving the same explicit authority style.
+
+Possible phases in this band:
+
+Phase 117 -- Init-Orchestrated Multi-Service Bring-Up
+- Exit criterion: init launches and observes a bounded multi-service set with
+  explicit program-cap and endpoint authority, without implying general
+  service discovery, dynamic loading, or a broader runtime framework.
+
+Phase 118 -- Request-Reply And Delegation Follow-Through
+- Exit criterion: one bounded service interaction widens beyond the current
+  single-hop proofs to show explicit delegation or reply routing across more
+  than one user-space participant without ambient authority shortcuts,
+  including at least one bounded failure, invalidation, or refused-action path
+  that crosses IPC and lifecycle boundaries without turning failure policy
+  into a new kernel-owned framework.
+
+Phase 119 -- Namespace-Pressure Audit
+- Exit criterion: the repository records the smallest explicit answer to the
+  next namespace or service-discovery pressure point, which may still be to
+  defer a broader namespace model if the bounded running-system proof does not
+  yet require one. An explicit decision that no namespace abstraction is yet
+  the right answer is an acceptable and potentially preferred outcome.
+
+Phase 120 -- Running-System Support Statement
+- Exit criterion: if the prior phases land honestly, the repository can
+  publish one updated support statement for a slightly broader running system
+  while still naming all remaining deferrals explicitly.
+
+Band D - Harden Image, Target, And Support Truth For The Next Plateau
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 121 through 123 should freeze the next slice around build, image,
+target, and documentation truth after the broader running-system proof is
+real.
+
+Likely themes:
+- emitted artifact ownership stays explicit
+- target-family and build claims remain narrow and reviewable
+- the next support statement is attached to real regression-owned artifacts
+
+Why this band comes last:
+- image, target, and support claims should move only after the underlying
+  implementation slice actually widened.
+
+Possible phases in this band:
+
+Phase 121 -- Kernel Image Contract Hardening
+- Exit criterion: the next running-system slice has one refreshed image-input,
+  relink, or artifact-ownership audit that remains explicit about what the
+  repository builds and what it still leaves to external tooling. No image-
+  contract change is allowed here if it forces retroactive kernel ownership
+  changes in lifecycle, VM, capability, or syscall owners.
+
+Phase 122 -- Target-Surface Audit
+- Exit criterion: the repository either keeps the bootstrap target-family
+  claim unchanged with refreshed justification, or admits one narrowly wider
+  target truth with explicit build, runtime, and testing boundaries.
+
+Phase 123 -- Next Plateau Audit
+- Exit criterion: the repository can publish one honest post-Phase-109 plateau
+  statement naming the admitted kernel, running-system, image, and target
+  truths exactly, together with the still-deferred areas that remain outside
+  that plateau.
+
+Likely ordering bias
+--------------------
+If the repository keeps following the same pattern, the safest order is:
+
+1. clarify kernel ownership before widening kernel behavior
+2. widen only the narrow hardware-boundary truths the next kernel step really
+   needs
+3. grow init-owned running-system behavior only after those boundaries are
+   clearer
+4. freeze image, target, and support truth last
+
+That ordering keeps the repository from confusing a first running-kernel
+statement with permission to claim a broader platform too early.
+
+Non-goals
+---------
+- treating this roadmap as a committed execution plan
+- claiming full Canopus Lite completion inside this horizon
+- implying broad portability, packaging, install, or cross-compilation support
+- adding a broad namespace or service-discovery framework before bounded
+  running-system pressure proves one is honest
+- adding a large driver-resident kernel or monolithic policy layer
+- reopening the Modern C core before a real owner gap appears
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- The current position note remains the canonical statement of present truth.
+- The completed Phase 96 through Phase 109 roadmap remains the historical map
+  for the first running-kernel wave.
+- If a smaller honest plateau appears earlier than Phase 123, that is success,
+  not roadmap failure.
+- If a real next kernel step exposes a compiler or language distortion,
+  reopen the narrowest owning layer only at that proof boundary.

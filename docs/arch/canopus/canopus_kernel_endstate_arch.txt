@@ -3,7 +3,7 @@ Canopus Kernel End-State Architecture
 
 Status
 ------
-PROPOSED
+REVIEWED DRAFT
 
 Purpose
 -------
@@ -24,10 +24,12 @@ This document should be read after:
 - `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
 - `docs/arch/canopus/canopus_sys_interface_v0.txt`
 - `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
-- `docs/plan/admin/canopus_kernel_bringup_speculative_roadmap.txt`
+- `docs/plan/phase109_first_running_canopus_kernel_slice_audit.txt`
+- `docs/plan/admin/modern_c_canopus_readiness_position.txt`
 
-Those notes define the first admitted Canopus shape and one plausible bring-up
-ordering.
+Those notes define the first admitted Canopus shape, the landed first running
+kernel slice, and the repository's current position after that first roadmap
+horizon closed.
 This note answers a different question: once the first kernel path is real,
 what stable internal architecture should later implementation work grow into?
 
@@ -48,6 +50,47 @@ This document is not:
 - a complete driver model
 - a full multicore design
 - a package, image, or distribution specification
+
+Review outcome
+--------------
+This draft is directionally accepted as the right long-term ownership target
+for the landed Canopus kernel slice.
+
+Current review judgment:
+
+- the subsystem split matches the microkernel stance already visible in the
+  landed boot, IPC, capability, syscall, init, and timer-backed wake proofs
+- the note correctly keeps user-space policy out of the kernel and keeps
+  `sys/` as boundary glue rather than as a second home for kernel semantics
+- the note should guide future extraction and file-family ownership, not force
+  premature tree churn while the current kernel remains small and staged
+
+The main review caution is practical rather than architectural: preserve the
+ownership split as code grows, but do not reorganize the repository into the
+full end-state directory tree before the real codebase has enough pressure to
+make those seams meaningful.
+
+Current fit against the landed slice
+------------------------------------
+The current repository-owned kernel tree is still flatter than this target,
+but the main ownership families are already visible:
+
+- `state.mc` carries the shared table and slot records that will later need a
+  cleaner `core/` plus scheduler or lifecycle split
+- `address_space.mc` already points toward `mm/`
+- `capability.mc` already points toward `cap/`
+- `endpoint.mc` already points toward `ipc/`
+- `syscall.mc` already points toward `sys/`
+- `interrupt.mc` and `timer.mc` already point toward `interrupt/` and later
+  `arch/` hooks
+- `init.mc` already points toward `init/`
+
+What is still intentionally absent is just as important:
+
+- no broad device tree or driver framework yet
+- no broad namespace or service-discovery layer yet
+- no full trap, MMU, or multicore architecture split yet
+- no claim that the current flat file tree should be reorganized immediately
 
 Architectural stance
 --------------------
@@ -426,6 +469,18 @@ clear owners:
 - trap entry and machine context: `arch/`
 - interrupt routing and tick integration: `interrupt/`
 - boot sequencing and first handoff: `init/`
+
+Near-term clarification points
+------------------------------
+As implementation grows beyond the current first running slice, these are the
+main places where the ownership split will need extra care:
+
+- keep process and task lifecycle ownership explicit so `core/`, `sched/`,
+  `mm/`, `cap/`, and spawn or wait paths do not blur together
+- keep timer, interrupt, and device responsibilities separate so one narrow
+  timer wake path does not expand into a broad in-kernel device-policy layer
+- keep debug and panic facilities broadly usable without letting them become a
+  hidden control-path owner
 
 If an object has no obvious owning subsystem, either the object is too vague
 or the architecture boundary needs to be simplified before code lands.

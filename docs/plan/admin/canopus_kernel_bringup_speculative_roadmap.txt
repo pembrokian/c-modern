@@ -3,7 +3,7 @@ Phase 96 Through Phase 109 -- Speculative Canopus Kernel Bring-Up Roadmap
 
 Status
 ------
-SPECULATIVE
+COMPLETED HORIZON (historical speculative roadmap)
 
 Purpose
 -------
@@ -22,10 +22,15 @@ the repository keeps following the same evidence-first rules used so far:
 - one explicit exit criterion per phase
 - no broad architecture claims before the smallest running system is honest
 
+That roadmap horizon is now complete through Phase 109.
+This note should therefore be read as historical ordering guidance for the
+first kernel wave rather than as the current next-step planning owner.
+
 Relationship to companion notes
 -------------------------------
 This roadmap is meant to stay aligned with:
 
+- `docs/plan/admin/canopus_post_phase109_speculative_roadmap.txt`
 - `docs/plan/admin/modern_c_canopus_readiness_position.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
 - `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
