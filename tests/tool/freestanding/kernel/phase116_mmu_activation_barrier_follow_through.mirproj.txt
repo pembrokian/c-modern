@@ -1,4 +1,4 @@
-  ConstGlobal names=[PHASE118_MARKER] type=i32
+  ConstGlobal names=[PHASE119_MARKER] type=i32
   TypeDecl kind=struct name=mmu.ActivationBarrierObservation
   Function name=hal.memory_barrier extern=c
   Function name=mmu.activate_with_barrier returns=[mmu.ActivationBarrierObservation]

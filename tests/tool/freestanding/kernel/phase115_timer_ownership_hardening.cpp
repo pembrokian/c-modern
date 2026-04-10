@@ -19,7 +19,7 @@ void ExpectPhase115BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase115_timer_ownership_run_output.txt",
                                                              "freestanding kernel phase115 timer-ownership run");
-    if (!run_outcome.exited || run_outcome.exit_code != 118) {
+    if (!run_outcome.exited || run_outcome.exit_code != 119) {
         Fail("phase115 freestanding kernel timer-ownership run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -56,15 +56,15 @@ void ExpectPhase115PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string position = ReadFile(position_path);
     ExpectOutputContains(position,
-                         "after Phase 118 landed the delegated request-reply follow-through",
+                         "after Phase 119 landed the namespace-pressure audit",
                          "phase115 position note should advance the current repository position");
     ExpectOutputContains(position,
-                         "landed Phase 118 delegated request-reply follow-through.",
+                         "landed Phase 119 namespace-pressure audit.",
                          "phase115 position note should reference the new closeout");
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 118 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 119 has moved the repository-owned kernel artifact beyond the landed",
                          "phase115 kernel README should record the timer boundary as current status");
     ExpectOutputContains(kernel_readme,
                          "timer ownership hardening",
@@ -72,7 +72,7 @@ void ExpectPhase115PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 118 delegated-request-reply kernel target",
+                         "currently a Phase 119 namespace-pressure kernel target",
                          "phase115 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase115_timer_ownership_hardening.cpp",
@@ -100,7 +100,7 @@ void ExpectPhase115MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE118_MARKER] type=i32",
+            "ConstGlobal names=[PHASE119_MARKER] type=i32",
             "TypeDecl kind=struct name=timer.TimerInterruptDelivery",
             "Function name=timer.deliver_interrupt_tick returns=[timer.TimerInterruptDelivery]",
             "Function name=timer.validate_interrupt_delivery_boundary returns=[bool]",

@@ -1,4 +1,4 @@
-Phase 119 Through Phase 123 -- Speculative Post-Phase-118 Canopus Roadmap
+Phase 120 Through Phase 123 -- Speculative Post-Phase-119 Canopus Roadmap
 =========================================================================
 
 Status
@@ -7,12 +7,12 @@ SPECULATIVE
 
 Purpose
 -------
-Sketch one plausible continuation after the completed Phase 118 delegated
-request-reply and source-invalidation follow-through.
+Sketch one plausible continuation after the completed Phase 119 namespace-
+pressure audit.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
-It does not replace the concrete Phase 109 through Phase 118 closeout notes.
+It does not replace the concrete Phase 109 through Phase 119 closeout notes.
 It gives one plausible ordering for the next Canopus wave if the repository
 keeps following the same evidence-first rules used so far:
 
@@ -36,6 +36,7 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/phase116_mmu_activation_barrier_follow_through.txt`
 - `docs/plan/phase117_init_orchestrated_multi_service_bring_up.txt`
 - `docs/plan/phase118_request_reply_and_delegation_follow_through.txt`
+- `docs/plan/phase119_namespace_pressure_audit.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
 - `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
@@ -56,7 +57,7 @@ Repository numbering note
 - Phase 96 through Phase 113 are occupied by the concrete first real kernel
   bring-up wave through the first interrupt-entry and generic-dispatch
   boundary.
-- The next speculative continuation therefore starts at Phase 119.
+- The next speculative continuation therefore starts at Phase 120.
 
 Repository status note
 ----------------------
@@ -66,8 +67,9 @@ Repository status note
   interrupt-entry and generic-dispatch boundary, one landed address-space and
   MMU ownership split, one landed timer ownership hardening step, one landed
   MMU activation barrier follow-through, one landed init-orchestrated
-  multi-service bring-up, and one landed delegated request-reply plus
-  invalidated-source follow-through over that same artifact.
+  multi-service bring-up, one landed delegated request-reply plus
+  invalidated-source follow-through, and one landed fixed service-directory
+  namespace-pressure audit over that same artifact.
 - That slice remains intentionally small: fixed-size tables, explicit
   authority, bounded IPC and lifecycle paths, bounded service proofs, one
   image plus support audit over the real kernel artifact, one explicit
@@ -84,8 +86,9 @@ What this roadmap is trying to answer
 - What likely comes after the first running-kernel statement, first ownership
   split, first lifecycle-owner clarification, first syscall-boundary
   thinness audit, first interrupt-boundary clarification, first MMU barrier
-  follow-through, first bounded multi-service bring-up, and first delegated
-  request-reply follow-through if the
+  follow-through, first bounded multi-service bring-up, first delegated
+  request-reply follow-through, and first namespace-pressure audit if the
+  
   repository keeps
   growing Canopus conservatively?
 - Which follow-on fronts belong first to kernel ownership hardening,
@@ -200,8 +203,11 @@ over the landed log, echo, and transfer service owners.
 
 Phase 118 is now concrete as one delegated request-reply and source-invalidation follow-through over the landed transfer-service owner.
 
-Phases 119 through 120 should widen the user-space side carefully from that
-bounded aggregate bring-up toward a slightly broader init-owned system.
+Phase 119 is now concrete as one init-owned fixed service-directory and namespace-pressure audit over the landed log, echo, and transfer service owners.
+
+Phase 120 should widen the user-space side carefully from that bounded answer
+toward a slightly broader init-owned system only if a real support statement
+becomes honest.
 
 Likely themes:
 - explicit init orchestration rather than ambient boot inheritance
@@ -214,15 +220,6 @@ Why this band is separate:
   system question is how to widen a now-landed init-orchestrated service set
   while preserving the same explicit authority style.
 
-Possible phases in this band:
-
-Phase 119 -- Namespace-Pressure Audit
-- Exit criterion: the repository records the smallest explicit answer to the
-  next namespace or service-discovery pressure point, which may still be to
-  defer a broader namespace model if the bounded running-system proof does not
-  yet require one. An explicit decision that no namespace abstraction is yet
-  the right answer is an acceptable and potentially preferred outcome.
-
 Phase 120 -- Running-System Support Statement
 - Exit criterion: if the prior phases land honestly, the repository can
   publish one updated support statement for a slightly broader running system
@@ -231,13 +228,15 @@ Phase 120 -- Running-System Support Statement
 Historical bridge into this band:
 - Phase 117 is now concrete as `docs/plan/phase117_init_orchestrated_multi_service_bring_up.txt`.
 - Phase 118 is now concrete as `docs/plan/phase118_request_reply_and_delegation_follow_through.txt`.
+- Phase 119 is now concrete as `docs/plan/phase119_namespace_pressure_audit.txt`.
 - Those phases turned the already-landed log, echo, and transfer service
   proofs into one explicit init-owned aggregate bring-up and then one
   delegated request-reply plus invalidated-source follow-through over the real
-  kernel artifact without widening compiler work, dynamic loading, or
-  namespace policy. They leave the next open question centered on namespace
-  pressure and slightly broader running-system policy rather than on whether
-  the repository can express delegated service interaction honestly at all.
+  kernel artifact and then one explicit fixed-directory answer to the next
+  namespace pressure point without widening compiler work, dynamic loading, or
+  a general namespace model. They leave the next open question centered on a
+  slightly broader running-system support statement rather than on whether the
+  repository needs service discovery machinery already.
 
 Band D - Harden Image, Target, And Support Truth For The Next Plateau
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

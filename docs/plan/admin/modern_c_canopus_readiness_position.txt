@@ -7,7 +7,7 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position after Phase 118 landed the delegated request-reply follow-through over the landed running kernel slice.
+Record one maintained repository position after Phase 119 landed the namespace-pressure audit over the landed running kernel slice.
 
 This note answers four questions that now matter:
 
@@ -18,7 +18,7 @@ This note answers four questions that now matter:
 
 This note is not a support statement, a full phase plan, or a claim that the
 full Canopus architecture is implemented.
-It does not replace the Phase 109 through Phase 118 closeouts, the Canopus
+It does not replace the Phase 109 through Phase 119 closeouts, the Canopus
 architecture notes, or the narrower hosted and freestanding support
 statements.
 
@@ -37,6 +37,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/phase116_mmu_activation_barrier_follow_through.txt`
 - `docs/plan/phase117_init_orchestrated_multi_service_bring_up.txt`
 - `docs/plan/phase118_request_reply_and_delegation_follow_through.txt`
+- `docs/plan/phase119_namespace_pressure_audit.txt`
 - `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
 - `docs/plan/freestanding_support_statement.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
@@ -65,7 +66,8 @@ Current repository truth
   address-space and MMU ownership split, a landed Phase 115 timer ownership
   hardening, a landed Phase 116 MMU activation barrier follow-through, a
   landed Phase 117 init-orchestrated multi-service bring-up, and a landed
-  Phase 118 delegated request-reply follow-through.
+  Phase 118 delegated request-reply follow-through, and a landed Phase 119
+  namespace-pressure audit.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   implementation slice rather than only for freestanding representation proofs.
@@ -93,12 +95,13 @@ It means:
 The speculative Phase 96 through Phase 109 roadmap is complete as a roadmap
 horizon, the first ownership-hardening plus hardware-boundary wave through
 Phase 116 is now concrete. That wave closed with the MMU activation barrier follow-through.
-The first bounded running-system follow-through at Phase 117 and the next
-bounded delegated request-reply follow-through at Phase 118 are now also
-concrete, but the implementation itself is still at an early kernel plateau
-rather than at architectural completion.
+The first bounded running-system follow-through at Phase 117, the next
+bounded delegated request-reply follow-through at Phase 118, and the next
+fixed-directory namespace-pressure answer at Phase 119 are now also concrete,
+but the implementation itself is still at an early kernel plateau rather than
+at architectural completion.
 
-This position also records the landed Phase 118 delegated request-reply follow-through.
+This position also records the landed Phase 119 namespace-pressure audit.
 
 Kernel maturity and quality
 ---------------------------
@@ -150,8 +153,8 @@ What the current repository now proves well:
 - user-to-kernel and user-to-user state transitions without hidden runtime or
   language-level scheduler machinery
 - enough compiler and backend truth to keep the real kernel artifact, its MIR,
-  its delegated request-reply contract, and its emitted image inputs aligned
-  through regression tests
+  its delegated request-reply contract, its fixed service-directory answer,
+  and its emitted image inputs aligned through regression tests
 
 What it still does not prove:
 
@@ -164,7 +167,7 @@ What it still does not prove:
 
 Working engineering stance
 --------------------------
-The right stance after Phase 118 is still conservative.
+The right stance after Phase 119 is still conservative.
 
 - treat the current core language as sufficient until a real next kernel step
   proves otherwise
@@ -254,23 +257,24 @@ Recommended practical reading
 The best current practical reading is:
 
 The repository now has one honest first running Canopus kernel slice with one
-bounded init-orchestrated multi-service bring-up and one bounded delegated
-request-reply follow-through, and the current Modern C implementation is
-strong enough to grow that slice further without assuming a new language wave
-first.
+bounded init-orchestrated multi-service bring-up, one bounded delegated
+request-reply follow-through, and one bounded fixed service-directory answer,
+and the current Modern C implementation is strong enough to grow that slice
+further without assuming a new language wave first.
 
-The next honest work is to answer the smallest necessary namespace and
-running-system pressure after the landed delegated request-reply slice, then
-harden image, target, and support truth around that slice, not to claim
-platform completion or to chase speculative language machinery.
+The next honest work is to publish a slightly broader running-system support
+statement only if the fixed-directory answer and the next real kernel step
+justify it, then harden image, target, and support truth around that slice,
+not to claim platform completion or to chase speculative language machinery.
 
 Bottom line
 -----------
 Canopus should currently be described as a bounded first running kernel with a
-landed Phase 118 delegated request-reply follow-through over the earlier
-Phase 117 init-orchestrated multi-service bring-up, timer-owned wake path,
-and MMU publication boundary, and Modern C should currently be described as
-capable of carrying that running kernel slice.
+landed Phase 119 namespace-pressure audit over the earlier Phase 118
+delegated request-reply follow-through, Phase 117 init-orchestrated multi-
+service bring-up, timer-owned wake path, and MMU publication boundary, and
+Modern C should currently be described as capable of carrying that running
+kernel slice.
 
 Both statements are meaningful, but both remain intentionally narrow.
 The repository is beyond readiness and beyond pure proof sketches, yet still

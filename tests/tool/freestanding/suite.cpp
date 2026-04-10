@@ -8,6 +8,7 @@ void RunFreestandingToolSuite(const std::filesystem::path& source_root,
                               const std::filesystem::path& binary_root,
                               const std::filesystem::path& mc_path) {
     const std::filesystem::path suite_root = binary_root / "tool" / "freestanding";
+    std::filesystem::remove_all(suite_root);
 
     RunFreestandingBootstrapToolSuite(source_root, suite_root, mc_path);
     RunFreestandingKernelToolSuite(source_root, suite_root, mc_path);

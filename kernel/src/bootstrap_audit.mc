@@ -187,6 +187,26 @@ struct Phase118DelegatedRequestReplyAuditInputs {
     retained_receive_endpoint_id: u32
 }
 
+struct Phase119NamespacePressureAuditInputs {
+    phase118: debug.Phase118DelegatedRequestReplyAudit
+    directory_owner_pid: u32
+    directory_entry_count: usize
+    log_service_key: u32
+    echo_service_key: u32
+    transfer_service_key: u32
+    shared_directory_endpoint_id: u32
+    log_service_program_slot: u32
+    echo_service_program_slot: u32
+    transfer_service_program_slot: u32
+    log_service_program_object_id: u32
+    echo_service_program_object_id: u32
+    transfer_service_program_object_id: u32
+    log_service_wait_handle_slot: u32
+    echo_service_wait_handle_slot: u32
+    transfer_service_wait_handle_slot: u32
+    dynamic_namespace_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1079,4 +1099,8 @@ func build_phase117_multi_service_bring_up_audit(inputs: Phase117MultiServiceBri
 
 func build_phase118_delegated_request_reply_audit(inputs: Phase118DelegatedRequestReplyAuditInputs) debug.Phase118DelegatedRequestReplyAudit {
     return debug.Phase118DelegatedRequestReplyAudit{ phase117: inputs.phase117, transfer_service_transfer: inputs.transfer_service_transfer, invalidated_source_send_status: inputs.invalidated_source_send_status, invalidated_source_handle_slot: inputs.invalidated_source_handle_slot, retained_receive_handle_slot: inputs.retained_receive_handle_slot, retained_receive_endpoint_id: inputs.retained_receive_endpoint_id }
+}
+
+func build_phase119_namespace_pressure_audit(inputs: Phase119NamespacePressureAuditInputs) debug.Phase119NamespacePressureAudit {
+    return debug.Phase119NamespacePressureAudit{ phase118: inputs.phase118, directory_owner_pid: inputs.directory_owner_pid, directory_entry_count: inputs.directory_entry_count, log_service_key: inputs.log_service_key, echo_service_key: inputs.echo_service_key, transfer_service_key: inputs.transfer_service_key, shared_directory_endpoint_id: inputs.shared_directory_endpoint_id, log_service_program_slot: inputs.log_service_program_slot, echo_service_program_slot: inputs.echo_service_program_slot, transfer_service_program_slot: inputs.transfer_service_program_slot, log_service_program_object_id: inputs.log_service_program_object_id, echo_service_program_object_id: inputs.echo_service_program_object_id, transfer_service_program_object_id: inputs.transfer_service_program_object_id, log_service_wait_handle_slot: inputs.log_service_wait_handle_slot, echo_service_wait_handle_slot: inputs.echo_service_wait_handle_slot, transfer_service_wait_handle_slot: inputs.transfer_service_wait_handle_slot, dynamic_namespace_visible: inputs.dynamic_namespace_visible }
 }

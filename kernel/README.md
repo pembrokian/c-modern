@@ -6,8 +6,8 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 118 has moved the repository-owned kernel artifact beyond the landed
-  Phase 117 init-orchestrated multi-service bring-up into one bounded delegated request-reply follow-through step.
+- Phase 119 has moved the repository-owned kernel artifact beyond the landed
+  Phase 118 delegated request-reply follow-through into one bounded init-owned fixed service-directory step.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -33,7 +33,8 @@ Current status
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
   MMU ownership split, one bounded timer ownership hardening step, one bounded
   MMU activation barrier follow-through step, one bounded init-orchestrated multi-service
-  bring-up step, and one bounded delegated request-reply follow-through step.
+  bring-up step, one bounded delegated request-reply follow-through step, and
+  one bounded init-owned fixed service-directory step.
 
 The landed slice still includes one bounded init-orchestrated multi-service bring-up step.
 
@@ -41,16 +42,16 @@ Current files
 -------------
 
 - `build.toml`: freestanding kernel manifest for the current proof slice and
-  the explicit kernel image-input contract carried through the Phase 118
-  delegated request-reply follow-through step
+  the explicit kernel image-input contract carried through the Phase 119
+  namespace-pressure audit step
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core setup, bounded syscall-byte-IPC setup, bounded capability-
   carrying transfer setup, bounded init-owned multi-service orchestration,
-  one bounded delegated request-reply follow-through, and thin root
-  orchestration across the owned scheduler, lifecycle, bootstrap helper, and
-  debug audit modules
+  one bounded delegated request-reply follow-through, one bounded fixed
+  service-directory publication step, and thin root orchestration across the
+  owned scheduler, lifecycle, bootstrap helper, and debug audit modules
 - `src/bootstrap_audit.mc`: extracted Phase 104 contract hardening helpers,
-  bounded service validation helpers, and Phase 108-118 audit builders used by
+  bounded service validation helpers, and Phase 108-119 audit builders used by
   the root proof module
 - `src/bootstrap_services.mc`: extracted bounded log, echo, and transfer
   service execution flows plus explicit service config and state packaging used
@@ -64,8 +65,8 @@ Current files
   lifecycle-ownership audit, Phase 112 syscall-boundary audit, Phase 113
   interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115
   timer-ownership audit, Phase 116 MMU activation-barrier audit, Phase 117
-  init-orchestrated multi-service audit, and Phase 118 delegated request-
-  reply audit
+  init-orchestrated multi-service audit, Phase 118 delegated request-reply
+  audit, and Phase 119 namespace-pressure audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -112,10 +113,11 @@ Phase boundary
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
   MMU ownership split, one bounded timer ownership hardening step, one
   bounded MMU activation barrier follow-through step, one bounded init-orchestrated
-  multi-service bring-up step, and one bounded delegated request-reply follow-through step.
+  multi-service bring-up step, one bounded delegated request-reply follow-through step,
+  and one bounded init-owned fixed service-directory step.
 - The repository can now honestly claim one first running Canopus kernel
-  slice with an explicit Phase 118 delegated request-reply follow-through
-  over the landed Phase 117 init-orchestrated multi-service bring-up:
+  slice with an explicit Phase 119 namespace-pressure audit over the landed
+  Phase 118 delegated request-reply follow-through:
   explicit
   boot
   entry,
@@ -133,7 +135,9 @@ Phase boundary
   barrier hook, and with init explicitly orchestrating one bounded multi-
   service set over the landed service owners, and with one delegated reply
   route plus one invalidated-source refusal published explicitly over the
-  landed transfer-service owner.
+  landed transfer-service owner, and with one fixed init-owned three-entry
+  service directory published explicitly as the current namespace-pressure
+  answer.
 - It does not yet claim general loading, dynamic service discovery,
   namespace policy, kill semantics, or a general running init-owned service
   framework.

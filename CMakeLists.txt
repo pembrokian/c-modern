@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.24)
 
 project(c_modern VERSION 0.1.0 LANGUAGES CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -19,8 +21,6 @@ foreach(config Debug Release RelWithDebInfo MinSizeRel)
     set("CMAKE_LIBRARY_OUTPUT_DIRECTORY_${config_upper}" "${MC_LIBRARY_OUTPUT_DIRECTORY}")
     set("CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${config_upper}" "${MC_LIBRARY_OUTPUT_DIRECTORY}")
 endforeach()
-
-enable_testing()
 
 add_library(mc_support STATIC
     compiler/support/diagnostics.cpp
@@ -165,6 +165,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase116_mmu_activation_barrier_follow_through.cpp
     tests/tool/freestanding/kernel/phase117_init_orchestrated_multi_service_bring_up.cpp
     tests/tool/freestanding/kernel/phase118_request_reply_and_delegation_follow_through.cpp
+    tests/tool/freestanding/kernel/phase119_namespace_pressure_audit.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp

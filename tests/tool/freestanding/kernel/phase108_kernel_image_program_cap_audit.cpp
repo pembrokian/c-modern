@@ -78,7 +78,7 @@ void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesyst
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase108_image_program_cap_run_output.txt",
                                                              "freestanding kernel phase108 image-and-program-cap audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 118) {
+    if (!run_outcome.exited || run_outcome.exit_code != 119) {
         Fail("phase108 freestanding kernel image-and-program-cap audit run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -102,7 +102,7 @@ void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesyst
     const auto [manual_run_outcome, manual_run_output] = RunCommandCapture({manual_executable.generic_string()},
                                                                            build_dir / "phase108_manual_link_run_output.txt",
                                                                            "phase108 manual kernel image run");
-    if (!manual_run_outcome.exited || manual_run_outcome.exit_code != 118) {
+    if (!manual_run_outcome.exited || manual_run_outcome.exit_code != 119) {
         Fail("phase108 manual kernel image run should preserve the current kernel proof marker after target-owned relink:\n" +
              manual_run_output);
     }

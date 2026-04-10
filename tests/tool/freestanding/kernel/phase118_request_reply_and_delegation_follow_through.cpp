@@ -19,7 +19,7 @@ void ExpectPhase118BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase118_delegation_run_output.txt",
                                                              "freestanding kernel phase118 request-reply and delegation run");
-    if (!run_outcome.exited || run_outcome.exit_code != 118) {
+    if (!run_outcome.exited || run_outcome.exit_code != 119) {
         Fail("phase118 freestanding kernel delegated request-reply run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -56,15 +56,15 @@ void ExpectPhase118PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string position = ReadFile(position_path);
     ExpectOutputContains(position,
-                         "after Phase 118 landed the delegated request-reply follow-through",
+                         "after Phase 119 landed the namespace-pressure audit",
                          "phase118 position note should advance the current repository position");
     ExpectOutputContains(position,
-                         "landed Phase 118 delegated request-reply follow-through.",
+                         "landed Phase 119 namespace-pressure audit.",
                          "phase118 position note should reference the new closeout");
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 118 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 119 has moved the repository-owned kernel artifact beyond the landed",
                          "phase118 kernel README should record the new running-system status");
     ExpectOutputContains(kernel_readme,
                          "bounded delegated request-reply follow-through",
@@ -72,7 +72,7 @@ void ExpectPhase118PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 118 delegated-request-reply kernel target",
+                         "currently a Phase 119 namespace-pressure kernel target",
                          "phase118 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase118_request_reply_and_delegation_follow_through.cpp",
@@ -100,7 +100,7 @@ void ExpectPhase118MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE118_MARKER] type=i32",
+            "ConstGlobal names=[PHASE119_MARKER] type=i32",
             "TypeDecl kind=struct name=debug.Phase118DelegatedRequestReplyAudit",
             "Function name=bootstrap_audit.build_phase118_delegated_request_reply_audit returns=[debug.Phase118DelegatedRequestReplyAudit]",
             "Function name=debug.validate_phase118_request_reply_and_delegation_follow_through returns=[bool]",

@@ -1,0 +1,169 @@
+Phase 119 -- Namespace Pressure Audit
+=====================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 118 delegated request-reply follow-through
+by answering the next bounded running-system question explicitly: does the
+repository now need a broader namespace or service-discovery framework in
+order to widen the admitted kernel slice honestly, or is one smaller
+init-owned answer enough for the current pressure?
+
+This document is both the Phase 119 execution note and its closeout.
+It does not claim general namespace policy, dynamic service discovery,
+ambient capability lookup, a service manager, or a compiler wave.
+It records one narrow namespace-pressure answer inside the already admitted
+first running Canopus kernel slice.
+
+Repository status note
+----------------------
+- Phase 117 already published one bounded init-orchestrated multi-service
+  bring-up over the landed log, echo, and transfer owners.
+- Phase 118 then published one bounded delegated request-reply path together
+  with one explicit refused action on the invalidated source slot.
+- That left the next running-system question narrower and clearer: the
+  repository now had multiple real services and one delegated reply path, but
+  it still had not published the smallest explicit answer to the next
+  namespace pressure point.
+- The real kernel artifact already had enough stable truth to answer that
+  question without widening the kernel or compiler surface: init already owns
+  the stable program capabilities, stable wait-handle slots, and the shared
+  control endpoint used to start and observe the bounded service set.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-118 roadmap reserved Phase 119 for one
+  namespace-pressure audit.
+- The repository needed to state whether the next honest step was a broader
+  namespace mechanism or a narrower publication decision.
+- Leaving that pressure implicit would have made later work too easy to blur
+  into premature claims about service discovery, naming frameworks, or new
+  compiler-owned machinery.
+
+Core rule
+---------
+- Keep the current kernel owners and service topology intact.
+- Keep service policy in init and the landed service helpers rather than
+  moving it into a kernel-resident namespace framework.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Do not widen into dynamic discovery, general namespaces, ambient authority
+  lookup, broader init frameworks, or a service manager.
+- Answer the current pressure mechanically with one fixed init-owned service
+  directory audit over the real kernel artifact and one focused freestanding
+  regression.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 119 note recording the namespace-pressure audit and
+   the decision to keep compiler work closed
+2. one debug-owned Phase 119 audit that packages the landed Phase 118
+   boundary together with one fixed init-owned three-entry service directory
+3. one narrow audit builder and one root-proof helper that publish the stable
+   directory owner, stable service keys, shared control endpoint, stable wait
+   slots, and the absence of dynamic discovery explicitly
+4. one advance of the real kernel proof marker from Phase 118 to Phase 119
+   only after the namespace-pressure audit succeeds
+5. refreshed roadmap, current-position note, kernel status, repository map,
+   freestanding test README, decision log, backlog notes, and one focused
+   Phase 119 freestanding regression
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current namespace
+pressure is real, but it is still narrow. The landed service slice already
+has stable init-owned program capabilities, stable wait-handle slots, and one
+shared control endpoint. The next honest gain is publishing that fixed
+directory answer explicitly rather than inventing a broader namespace model
+before a real kernel step requires one.
+
+What this phase proves
+----------------------
+- init can own one fixed three-entry service directory over the landed log,
+  echo, and transfer service set
+- the current service directory answer is explicit and stable: each service
+  keeps one distinct key, one distinct program capability, and one distinct
+  wait-handle slot while sharing the existing init-owned control endpoint
+- the current pressure does not yet require dynamic discovery, a general
+  namespace model, or compiler work
+- the repository can answer the next namespace question honestly while
+  keeping both the kernel and compiler surfaces closed
+
+Deliverables
+------------
+- one canonical Phase 119 closeout note in `docs/plan/`
+- one debug-owned namespace-pressure audit plus the narrow audit builder and
+  root-proof helper needed to publish the fixed service-directory answer
+  honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 119 marker only after the namespace-pressure audit succeeds
+- refreshed roadmap, current-position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog entries
+- one focused Phase 119 freestanding kernel regression with a projected MIR
+  golden for the new audit surface
+
+Suggested execution order
+-------------------------
+1. Add the namespace-pressure audit shape and builder over the landed Phase
+   118 delegated request-reply boundary.
+2. Publish the fixed init-owned service-directory answer through the root
+   proof using the already-landed stable service authorities.
+3. Advance the root proof marker to 119 only after the namespace-pressure
+   audit succeeds.
+4. Add the focused Phase 119 freestanding regression.
+5. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 119 marker without
+  widening the admitted running slice beyond one fixed init-owned service-
+  directory answer
+- the debug-owned audit proves that the current namespace pressure is answered
+  by one stable three-entry directory rather than by dynamic discovery or a
+  broader service framework
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 119 boundary consistently
+
+Non-goals
+---------
+- dynamic service discovery or a general namespace model
+- ambient capability lookup or a kernel-resident service manager
+- broader init or running-system framework growth
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase119NamespacePressureAudit` and validator that
+  package the landed Phase 118 delegated request-reply boundary together with
+  one fixed init-owned three-entry service directory
+- added one narrow audit builder and one root-proof helper so the real kernel
+  artifact publishes the stable directory owner, service keys, shared control
+  endpoint, wait slots, and no-dynamic-discovery decision explicitly
+- advanced the real kernel proof marker to 119 only after the namespace-
+  pressure audit succeeds, while keeping the compiler and service-owner
+  surfaces unchanged
+- added one focused freestanding kernel regression plus a projected MIR
+  golden for the Phase 119 namespace-pressure boundary
+- refreshed the roadmap, current-position note, kernel README, repository
+  map, freestanding test README, decision log, and backlog so the repository
+  records both the landed fixed-directory answer and the decision not to
+  expand compiler work in this phase
+
+Closeout statement
+------------------
+Phase 119 is complete as a namespace-pressure audit.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now publishes one more running-system truth honestly:
+the current namespace pressure is answered by one fixed init-owned service
+directory over the landed log, echo, and transfer service set, dynamic
+discovery remains out of scope, and the compiler stays closed because this
+phase needed no new language or backend surface.

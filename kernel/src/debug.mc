@@ -95,6 +95,26 @@ struct Phase118DelegatedRequestReplyAudit {
     retained_receive_endpoint_id: u32
 }
 
+struct Phase119NamespacePressureAudit {
+    phase118: Phase118DelegatedRequestReplyAudit
+    directory_owner_pid: u32
+    directory_entry_count: usize
+    log_service_key: u32
+    echo_service_key: u32
+    transfer_service_key: u32
+    shared_directory_endpoint_id: u32
+    log_service_program_slot: u32
+    echo_service_program_slot: u32
+    transfer_service_program_slot: u32
+    log_service_program_object_id: u32
+    echo_service_program_object_id: u32
+    transfer_service_program_object_id: u32
+    log_service_wait_handle_slot: u32
+    echo_service_wait_handle_slot: u32
+    transfer_service_wait_handle_slot: u32
+    dynamic_namespace_visible: u32
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -443,4 +463,95 @@ func validate_phase118_request_reply_and_delegation_follow_through(audit: Phase1
         return false
     }
     return true
+}
+
+func validate_phase119_namespace_pressure_audit(audit: Phase119NamespacePressureAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase118_request_reply_and_delegation_follow_through(audit.phase118, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.directory_owner_pid != audit.phase118.phase117.running_slice.init_pid {
+        return false
+    }
+    if audit.directory_entry_count != 3 {
+        return false
+    }
+    if audit.log_service_key != 1 {
+        return false
+    }
+    if audit.echo_service_key != 2 {
+        return false
+    }
+    if audit.transfer_service_key != 3 {
+        return false
+    }
+    if audit.log_service_key == audit.echo_service_key {
+        return false
+    }
+    if audit.log_service_key == audit.transfer_service_key {
+        return false
+    }
+    if audit.echo_service_key == audit.transfer_service_key {
+        return false
+    }
+    if audit.shared_directory_endpoint_id != audit.phase118.phase117.init_endpoint_id {
+        return false
+    }
+    if audit.shared_directory_endpoint_id == audit.phase118.phase117.transfer_endpoint_id {
+        return false
+    }
+    if audit.log_service_program_slot == 0 {
+        return false
+    }
+    if audit.echo_service_program_slot == 0 {
+        return false
+    }
+    if audit.transfer_service_program_slot == 0 {
+        return false
+    }
+    if audit.log_service_program_slot == audit.echo_service_program_slot {
+        return false
+    }
+    if audit.log_service_program_slot == audit.transfer_service_program_slot {
+        return false
+    }
+    if audit.echo_service_program_slot == audit.transfer_service_program_slot {
+        return false
+    }
+    if audit.log_service_program_object_id == 0 {
+        return false
+    }
+    if audit.echo_service_program_object_id == 0 {
+        return false
+    }
+    if audit.transfer_service_program_object_id == 0 {
+        return false
+    }
+    if audit.log_service_program_object_id == audit.echo_service_program_object_id {
+        return false
+    }
+    if audit.log_service_program_object_id == audit.transfer_service_program_object_id {
+        return false
+    }
+    if audit.echo_service_program_object_id == audit.transfer_service_program_object_id {
+        return false
+    }
+    if audit.log_service_wait_handle_slot != audit.phase118.phase117.log_service_spawn.wait_handle_slot {
+        return false
+    }
+    if audit.echo_service_wait_handle_slot != audit.phase118.phase117.echo_service_spawn.wait_handle_slot {
+        return false
+    }
+    if audit.transfer_service_wait_handle_slot != audit.phase118.phase117.transfer_service_spawn.wait_handle_slot {
+        return false
+    }
+    if audit.phase118.phase117.log_service_handshake.endpoint_id != audit.shared_directory_endpoint_id {
+        return false
+    }
+    if audit.phase118.phase117.echo_service_exchange.endpoint_id != audit.shared_directory_endpoint_id {
+        return false
+    }
+    if audit.phase118.phase117.transfer_service_transfer.control_endpoint_id != audit.shared_directory_endpoint_id {
+        return false
+    }
+    return audit.dynamic_namespace_visible == 0
 }
