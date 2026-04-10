@@ -124,14 +124,17 @@ void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesyst
                          "VarGlobal names=[TRANSFER_SERVICE_PROGRAM_CAPABILITY] type=capability.CapabilitySlot",
                          "phase108 merged MIR should retain explicit transfer-service program-cap ownership");
     ExpectOutputContains(kernel_mir,
-                         "Function name=seed_log_service_program_capability returns=[bool]",
-                         "phase108 merged MIR should keep log-service program-cap seeding explicit in the root proof module");
+                         "Function name=build_phase108_program_cap_contract returns=[debug.Phase108ProgramCapContract]",
+                         "phase108 merged MIR should keep the root provenance contract builder explicit in the root proof module");
     ExpectOutputContains(kernel_mir,
-                         "Function name=seed_echo_service_program_capability returns=[bool]",
-                         "phase108 merged MIR should keep echo-service program-cap seeding explicit in the root proof module");
+                         "Function name=bootstrap_services.seed_log_service_program_capability returns=[bootstrap_services.LogServiceExecutionState]",
+                         "phase108 merged MIR should keep log-service program-cap seeding explicit without forcing a root helper name");
     ExpectOutputContains(kernel_mir,
-                         "Function name=seed_transfer_service_program_capability returns=[bool]",
-                         "phase108 merged MIR should keep transfer-service program-cap seeding explicit in the root proof module");
+                         "Function name=bootstrap_services.seed_echo_service_program_capability returns=[bootstrap_services.EchoServiceExecutionState]",
+                         "phase108 merged MIR should keep echo-service program-cap seeding explicit without forcing a root helper name");
+    ExpectOutputContains(kernel_mir,
+                         "Function name=bootstrap_services.seed_transfer_service_program_capability returns=[bootstrap_services.TransferServiceExecutionState]",
+                         "phase108 merged MIR should keep transfer-service program-cap seeding explicit without forcing a root helper name");
     ExpectOutputContains(kernel_mir,
                          "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
                          "phase108 merged MIR should retain the bounded kernel-image and program-cap audit path");

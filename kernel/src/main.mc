@@ -1,4 +1,6 @@
 import address_space
+import bootstrap_audit
+import bootstrap_services
 import capability
 import debug
 import echo_service
@@ -37,29 +39,6 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const LOG_SERVICE_PROGRAM_SLOT: u32 = 3
-const LOG_SERVICE_PROGRAM_OBJECT_ID: u32 = 2
-const LOG_SERVICE_WAIT_HANDLE_SLOT: u32 = 2
-const LOG_SERVICE_ENDPOINT_HANDLE_SLOT: u32 = 1
-const LOG_SERVICE_REQUEST_BYTE: u8 = 76
-const LOG_SERVICE_EXIT_CODE: i32 = 52
-const ECHO_SERVICE_PROGRAM_SLOT: u32 = 4
-const ECHO_SERVICE_PROGRAM_OBJECT_ID: u32 = 3
-const ECHO_SERVICE_WAIT_HANDLE_SLOT: u32 = 3
-const ECHO_SERVICE_ENDPOINT_HANDLE_SLOT: u32 = 1
-const ECHO_SERVICE_REQUEST_BYTE0: u8 = 69
-const ECHO_SERVICE_REQUEST_BYTE1: u8 = 67
-const ECHO_SERVICE_EXIT_CODE: i32 = 53
-const TRANSFER_SERVICE_PROGRAM_SLOT: u32 = 5
-const TRANSFER_SERVICE_PROGRAM_OBJECT_ID: u32 = 4
-const TRANSFER_SERVICE_WAIT_HANDLE_SLOT: u32 = 4
-const TRANSFER_SERVICE_CONTROL_HANDLE_SLOT: u32 = 1
-const TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT: u32 = 2
-const TRANSFER_SERVICE_GRANT_BYTE0: u8 = 71
-const TRANSFER_SERVICE_GRANT_BYTE1: u8 = 73
-const TRANSFER_SERVICE_GRANT_BYTE2: u8 = 86
-const TRANSFER_SERVICE_GRANT_BYTE3: u8 = 69
-const TRANSFER_SERVICE_EXIT_CODE: i32 = 54
 const PHASE113_MARKER: i32 = 113
 
 var KERNEL: state.KernelDescriptor
@@ -1047,1211 +1026,162 @@ func validate_capability_carrying_ipc_transfer() bool {
 }
 
 func validate_timer_hardening_contracts() bool {
-    premature_timer: timer.TimerState = timer.empty_timer_state()
-    premature_timer = timer.arm_sleep(premature_timer, 41, 5)
-    premature_consumed: timer.TimerState = timer.consume_wake(premature_timer, 41)
-    if premature_consumed.count != 1 {
-        return false
-    }
-    if timer.find_sleep_index(premature_consumed, 41) != 0 {
-        return false
-    }
-    if timer.sleep_state_score(premature_consumed.sleepers[0].state) != 2 {
-        return false
-    }
-
-    dual_timer: timer.TimerState = timer.empty_timer_state()
-    dual_timer = timer.arm_sleep(dual_timer, 51, 1)
-    dual_timer = timer.arm_sleep(dual_timer, 52, 1)
-    dual_timer = timer.advance_tick(dual_timer, 1)
-    if timer.has_fired_sleeper(dual_timer) == 0 {
-        return false
-    }
-    first_wake: timer.TimerWakeResult = timer.wake_fired_sleepers(dual_timer)
-    if first_wake.observation.task_id != 51 {
-        return false
-    }
-    dual_timer = timer.consume_wake(first_wake.timer_state, first_wake.observation.task_id)
-    if dual_timer.count != 1 {
-        return false
-    }
-    if timer.has_fired_sleeper(dual_timer) == 0 {
-        return false
-    }
-    second_wake: timer.TimerWakeResult = timer.wake_fired_sleepers(dual_timer)
-    if second_wake.observation.task_id != 52 {
-        return false
-    }
-    if second_wake.observation.wake_count != 2 {
-        return false
-    }
-    dual_timer = timer.consume_wake(second_wake.timer_state, second_wake.observation.task_id)
-    if dual_timer.count != 0 {
-        return false
-    }
-    return timer.has_fired_sleeper(dual_timer) == 0
+    return bootstrap_audit.validate_timer_hardening_contracts()
 }
 
 func validate_bootstrap_layout_contracts() bool {
-    if !init.bootstrap_image_valid(INIT_IMAGE) {
-        return false
-    }
-    invalid_image: init.InitImage = init.InitImage{ image_id: 9, image_base: 65536, image_size: 4096, entry_pc: 70000, stack_base: 67584, stack_top: 71680, stack_size: 4096 }
-    if init.bootstrap_image_valid(invalid_image) {
-        return false
-    }
-    invalid_space: address_space.AddressSpace = address_space.bootstrap_space(3, 7, INIT_ROOT_PAGE_TABLE, invalid_image.image_base, invalid_image.image_size, invalid_image.entry_pc, invalid_image.stack_base, invalid_image.stack_size, invalid_image.stack_top)
-    if address_space.state_score(invalid_space.state) != 1 {
-        return false
-    }
-    if address_space.can_activate(address_space.empty_space()) {
-        return false
-    }
-    still_empty: address_space.AddressSpace = address_space.activate(address_space.empty_space())
-    return address_space.state_score(still_empty.state) == 1
+    return bootstrap_audit.validate_bootstrap_layout_contracts(bootstrap_audit.BootstrapLayoutAudit{ init_image: INIT_IMAGE, init_root_page_table: INIT_ROOT_PAGE_TABLE })
 }
 
 func validate_endpoint_and_capability_contracts() bool {
-    payload: [4]u8 = endpoint.zero_payload()
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, INIT_ENDPOINT_ID)
-    enqueue_one: endpoint.EndpointTable = endpoint.enqueue_message(local_endpoints, 0, endpoint.byte_message(2, INIT_PID, INIT_ENDPOINT_ID, 0, payload))
-    if !endpoint.enqueue_succeeded(local_endpoints, enqueue_one, 0) {
-        return false
-    }
-    enqueue_two: endpoint.EndpointTable = endpoint.enqueue_message(enqueue_one, 0, endpoint.byte_message(3, INIT_PID, INIT_ENDPOINT_ID, 0, payload))
-    if !endpoint.enqueue_succeeded(enqueue_one, enqueue_two, 0) {
-        return false
-    }
-    enqueue_three: endpoint.EndpointTable = endpoint.enqueue_message(enqueue_two, 0, endpoint.byte_message(4, INIT_PID, INIT_ENDPOINT_ID, 0, payload))
-    if endpoint.enqueue_succeeded(enqueue_two, enqueue_three, 0) {
-        return false
-    }
-
-    local_handles: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    installed_handle: capability.HandleTable = capability.install_endpoint_handle(local_handles, 1, INIT_ENDPOINT_ID, 7)
-    if !capability.handle_install_succeeded(local_handles, installed_handle, 1) {
-        return false
-    }
-    duplicate_handle: capability.HandleTable = capability.install_endpoint_handle(installed_handle, 1, TRANSFER_ENDPOINT_ID, 7)
-    if capability.handle_install_succeeded(installed_handle, duplicate_handle, 1) {
-        return false
-    }
-    invalid_rights_handle: capability.HandleTable = capability.install_endpoint_handle(local_handles, 2, TRANSFER_ENDPOINT_ID, 8)
-    if capability.handle_install_succeeded(local_handles, invalid_rights_handle, 2) {
-        return false
-    }
-    if capability.attenuate_endpoint_rights(8) != 0 {
-        return false
-    }
-    if capability.find_transfer_rights_for_handle(installed_handle, 1) != 7 {
-        return false
-    }
-
-    local_waits: capability.WaitTable = capability.wait_table_for_owner(INIT_PID)
-    installed_wait: capability.WaitTable = capability.install_wait_handle(local_waits, CHILD_WAIT_HANDLE_SLOT, CHILD_PID)
-    if !capability.wait_install_succeeded(local_waits, installed_wait, CHILD_WAIT_HANDLE_SLOT) {
-        return false
-    }
-    duplicate_wait: capability.WaitTable = capability.install_wait_handle(installed_wait, CHILD_WAIT_HANDLE_SLOT, CHILD_PID)
-    return !capability.wait_install_succeeded(installed_wait, duplicate_wait, CHILD_WAIT_HANDLE_SLOT)
+    return bootstrap_audit.validate_endpoint_and_capability_contracts(bootstrap_audit.EndpointCapabilityAudit{ init_pid: INIT_PID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT })
 }
 
 func validate_state_hardening_contracts() bool {
-    boot_task: state.TaskSlot = state.boot_task_slot(BOOT_TID, BOOT_PID, BOOT_ENTRY_PC, BOOT_STACK_TOP)
-    if state.can_block_task(boot_task) {
-        return false
-    }
-    if state.task_state_score(state.blocked_task_slot(boot_task).state) != 2 {
-        return false
-    }
-    ready_task: state.TaskSlot = state.user_task_slot(CHILD_TID, CHILD_PID, CHILD_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
-    if !state.can_block_task(ready_task) {
-        return false
-    }
-    if state.task_state_score(state.blocked_task_slot(ready_task).state) != 8 {
-        return false
-    }
-
-    local_log: state.BootLog = state.empty_log()
-    append0: state.BootLogAppendResult = state.append_record(local_log, state.BootStage.Reset, ARCH_ACTOR, 1)
-    append1: state.BootLogAppendResult = state.append_record(append0.log, state.BootStage.TablesSeeded, ARCH_ACTOR, 2)
-    append2: state.BootLogAppendResult = state.append_record(append1.log, state.BootStage.AddressSpaceReady, ARCH_ACTOR, 3)
-    append3: state.BootLogAppendResult = state.append_record(append2.log, state.BootStage.UserEntryReady, ARCH_ACTOR, 4)
-    append4: state.BootLogAppendResult = state.append_record(append3.log, state.BootStage.MarkerEmitted, ARCH_ACTOR, 5)
-    append5: state.BootLogAppendResult = state.append_record(append4.log, state.BootStage.Halted, ARCH_ACTOR, 6)
-    overflow: state.BootLogAppendResult = state.append_record(append5.log, state.BootStage.Halted, ARCH_ACTOR, 7)
-    if overflow.appended != 0 {
-        return false
-    }
-    return overflow.log.count == 6
+    return bootstrap_audit.validate_state_hardening_contracts(bootstrap_audit.StateHardeningAudit{ boot_tid: BOOT_TID, boot_pid: BOOT_PID, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, child_tid: CHILD_TID, child_pid: CHILD_PID, child_asid: CHILD_ASID, init_image: INIT_IMAGE, arch_actor: ARCH_ACTOR })
 }
 
 func validate_syscall_contract_hardening() bool {
-    local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    payload: [4]u8 = endpoint.zero_payload()
-    payload[0] = 81
-    payload[1] = 85
-    payload[2] = 69
-    payload[3] = 85
-
-    local_handles: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    local_handles = capability.install_endpoint_handle(local_handles, INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, INIT_ENDPOINT_ID)
-
-    send_one: syscall.SendResult = syscall.perform_send(local_gate, local_handles, local_endpoints, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload))
-    send_two: syscall.SendResult = syscall.perform_send(send_one.gate, send_one.handle_table, send_one.endpoints, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload))
-    send_block: syscall.SendResult = syscall.perform_send(send_two.gate, send_two.handle_table, send_two.endpoints, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload))
-    if syscall.status_score(send_block.status) != 4 {
-        return false
-    }
-    if syscall.block_reason_score(send_block.block_reason) != 2 {
-        return false
-    }
-    if send_block.endpoints.slots[0].queued_messages != 2 {
-        return false
-    }
-
-    receive_one: syscall.ReceiveResult = syscall.perform_receive(send_block.gate, send_block.handle_table, send_block.endpoints, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
-    receive_two: syscall.ReceiveResult = syscall.perform_receive(receive_one.gate, receive_one.handle_table, receive_one.endpoints, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
-    receive_block: syscall.ReceiveResult = syscall.perform_receive(receive_two.gate, receive_two.handle_table, receive_two.endpoints, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
-    if syscall.status_score(receive_block.observation.status) != 4 {
-        return false
-    }
-    if syscall.block_reason_score(receive_block.observation.block_reason) != 4 {
-        return false
-    }
-
-    local_waits: capability.WaitTable = capability.wait_table_for_owner(INIT_PID)
-    local_waits = capability.install_wait_handle(local_waits, CHILD_WAIT_HANDLE_SLOT, CHILD_PID)
-    wait_block: syscall.WaitResult = syscall.perform_wait(local_gate, state.zero_process_slots(), state.zero_task_slots(), local_waits, syscall.build_wait_request(CHILD_WAIT_HANDLE_SLOT))
-    if syscall.status_score(wait_block.observation.status) != 4 {
-        return false
-    }
-    if syscall.block_reason_score(wait_block.observation.block_reason) != 8 {
-        return false
-    }
-
-    sleep_tasks: [3]state.TaskSlot = state.zero_task_slots()
-    sleep_tasks[1] = state.user_task_slot(CHILD_TID, CHILD_PID, CHILD_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
-    sleep_block: syscall.SleepResult = syscall.perform_sleep(local_gate, sleep_tasks, timer.empty_timer_state(), syscall.build_sleep_request(1, 2))
-    if syscall.status_score(sleep_block.observation.status) != 4 {
-        return false
-    }
-    if syscall.block_reason_score(sleep_block.observation.block_reason) != 16 {
-        return false
-    }
-
-    spawn_process_slots: [3]state.ProcessSlot = state.zero_process_slots()
-    spawn_process_slots[0] = state.boot_process_slot(BOOT_PID, BOOT_TASK_SLOT)
-    spawn_process_slots[2] = state.init_process_slot(9, 2, 9)
-    spawn_task_slots: [3]state.TaskSlot = state.zero_task_slots()
-    spawn_task_slots[0] = state.boot_task_slot(BOOT_TID, BOOT_PID, BOOT_ENTRY_PC, BOOT_STACK_TOP)
-    spawn_task_slots[2] = state.user_task_slot(9, 9, 9, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
-    spawn_waits: capability.WaitTable = capability.wait_table_for_owner(INIT_PID)
-    local_program_capability: capability.CapabilitySlot = capability.bootstrap_init_program_slot(INIT_PID)
-    local_spawn: syscall.SpawnResult = syscall.perform_spawn(local_gate, local_program_capability, spawn_process_slots, spawn_task_slots, spawn_waits, INIT_IMAGE, syscall.build_spawn_request(CHILD_WAIT_HANDLE_SLOT), CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
-    if syscall.status_score(local_spawn.observation.status) != 2 {
-        return false
-    }
-    if local_spawn.process_slots[1].pid != CHILD_PID {
-        return false
-    }
-    if local_spawn.process_slots[2].pid != 9 {
-        return false
-    }
-    if local_spawn.task_slots[1].tid != CHILD_TID {
-        return false
-    }
-    if local_spawn.task_slots[2].tid != 9 {
-        return false
-    }
-    if !capability.wait_handle_installed(local_spawn.wait_table, CHILD_WAIT_HANDLE_SLOT) {
-        return false
-    }
-
-    transfer_handles: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    transfer_handles = capability.install_endpoint_handle(transfer_handles, INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
-    transfer_handles = capability.install_endpoint_handle(transfer_handles, TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, 5)
-    transfer_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    transfer_endpoints = endpoint.install_endpoint(transfer_endpoints, INIT_PID, INIT_ENDPOINT_ID)
-    transfer_send: syscall.SendResult = syscall.perform_send(local_gate, transfer_handles, transfer_endpoints, INIT_PID, syscall.build_transfer_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload, TRANSFER_SOURCE_HANDLE_SLOT))
-    if capability.find_endpoint_for_handle(transfer_send.handle_table, TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
-        return false
-    }
-    blocked_receive: syscall.ReceiveResult = syscall.perform_receive(transfer_send.gate, transfer_send.handle_table, transfer_send.endpoints, syscall.build_transfer_receive_request(INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_HANDLE_SLOT))
-    if syscall.status_score(blocked_receive.observation.status) != 8 {
-        return false
-    }
-    if blocked_receive.endpoints.slots[0].queued_messages != 1 {
-        return false
-    }
-    return capability.find_endpoint_for_handle(blocked_receive.handle_table, TRANSFER_SOURCE_HANDLE_SLOT) == 0
+    return bootstrap_audit.validate_syscall_contract_hardening(bootstrap_audit.SyscallHardeningAudit{ init_pid: INIT_PID, init_endpoint_handle_slot: INIT_ENDPOINT_HANDLE_SLOT, init_endpoint_id: INIT_ENDPOINT_ID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, child_root_page_table: CHILD_ROOT_PAGE_TABLE, boot_pid: BOOT_PID, boot_tid: BOOT_TID, boot_task_slot: BOOT_TASK_SLOT, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, init_image: INIT_IMAGE, transfer_source_handle_slot: TRANSFER_SOURCE_HANDLE_SLOT })
 }
 
 func validate_phase104_contract_hardening() bool {
-    if BOOT_LOG_APPEND_FAILED != 0 {
-        return false
+    timer_hardened: u32 = 0
+    if validate_timer_hardening_contracts() {
+        timer_hardened = 1
     }
-    if !validate_timer_hardening_contracts() {
-        return false
-    }
-    if !validate_bootstrap_layout_contracts() {
-        return false
-    }
-    if !validate_endpoint_and_capability_contracts() {
-        return false
-    }
-    if !validate_state_hardening_contracts() {
-        return false
-    }
-    return validate_syscall_contract_hardening()
+    return bootstrap_audit.validate_phase104_contract_hardening(bootstrap_audit.Phase104HardeningAudit{ boot_log_append_failed: BOOT_LOG_APPEND_FAILED, timer_hardened: timer_hardened, bootstrap_layout: bootstrap_audit.BootstrapLayoutAudit{ init_image: INIT_IMAGE, init_root_page_table: INIT_ROOT_PAGE_TABLE }, endpoint_capability: bootstrap_audit.EndpointCapabilityAudit{ init_pid: INIT_PID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT }, state_hardening: bootstrap_audit.StateHardeningAudit{ boot_tid: BOOT_TID, boot_pid: BOOT_PID, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, child_tid: CHILD_TID, child_pid: CHILD_PID, child_asid: CHILD_ASID, init_image: INIT_IMAGE, arch_actor: ARCH_ACTOR }, syscall_hardening: bootstrap_audit.SyscallHardeningAudit{ init_pid: INIT_PID, init_endpoint_handle_slot: INIT_ENDPOINT_HANDLE_SLOT, init_endpoint_id: INIT_ENDPOINT_ID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, child_root_page_table: CHILD_ROOT_PAGE_TABLE, boot_pid: BOOT_PID, boot_tid: BOOT_TID, boot_task_slot: BOOT_TASK_SLOT, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, init_image: INIT_IMAGE, transfer_source_handle_slot: TRANSFER_SOURCE_HANDLE_SLOT } })
 }
 
-func seed_log_service_program_capability() bool {
-    LOG_SERVICE_PROGRAM_CAPABILITY = capability.CapabilitySlot{ slot_id: LOG_SERVICE_PROGRAM_SLOT, owner_pid: INIT_PID, kind: capability.CapabilityKind.InitProgram, rights: 7, object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
-    return capability.is_program_capability(LOG_SERVICE_PROGRAM_CAPABILITY)
+func build_log_service_config() bootstrap_services.LogServiceConfig {
+    return bootstrap_services.log_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, CHILD_ROOT_PAGE_TABLE)
 }
 
-func spawn_log_service() bool {
-    WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
-    HANDLE_TABLES[2] = capability.handle_table_for_owner(CHILD_PID)
-
-    spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(LOG_SERVICE_WAIT_HANDLE_SLOT)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, LOG_SERVICE_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
-    SYSCALL_GATE = spawn_result.gate
-    LOG_SERVICE_PROGRAM_CAPABILITY = spawn_result.program_capability
-    PROCESS_SLOTS = spawn_result.process_slots
-    TASK_SLOTS = spawn_result.task_slots
-    WAIT_TABLES[1] = spawn_result.wait_table
-    LOG_SERVICE_ADDRESS_SPACE = spawn_result.child_address_space
-    LOG_SERVICE_USER_FRAME = spawn_result.child_frame
-    LOG_SERVICE_SPAWN_OBSERVATION = spawn_result.observation
-    if syscall.status_score(LOG_SERVICE_SPAWN_OBSERVATION.status) != 2 {
-        return false
-    }
-
-    HANDLE_TABLES[2] = capability.install_endpoint_handle(HANDLE_TABLES[2], LOG_SERVICE_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-    LOG_SERVICE_STATE = log_service.service_state(CHILD_PID, LOG_SERVICE_ENDPOINT_HANDLE_SLOT)
-    READY_QUEUE = state.user_ready_queue(CHILD_TID)
-    return capability.find_endpoint_for_handle(HANDLE_TABLES[2], LOG_SERVICE_ENDPOINT_HANDLE_SLOT) == INIT_ENDPOINT_ID
+func build_log_service_execution_state() bootstrap_services.LogServiceExecutionState {
+    return bootstrap_services.LogServiceExecutionState{ program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: LOG_SERVICE_ADDRESS_SPACE, child_user_frame: LOG_SERVICE_USER_FRAME, service_state: LOG_SERVICE_STATE, spawn_observation: LOG_SERVICE_SPAWN_OBSERVATION, receive_observation: LOG_SERVICE_RECEIVE_OBSERVATION, ack_observation: LOG_SERVICE_ACK_OBSERVATION, handshake: LOG_SERVICE_HANDSHAKE, wait_observation: LOG_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
 }
 
-func execute_log_service_request_reply() bool {
-    request_payload: [4]u8 = endpoint.zero_payload()
-    request_payload[0] = LOG_SERVICE_REQUEST_BYTE
-
-    request_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 1, request_payload))
-    SYSCALL_GATE = request_send_result.gate
-    HANDLE_TABLES[1] = request_send_result.handle_table
-    ENDPOINTS = request_send_result.endpoints
-    if syscall.status_score(request_send_result.status) != 2 {
-        return false
-    }
-
-    service_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, syscall.build_receive_request(LOG_SERVICE_ENDPOINT_HANDLE_SLOT))
-    SYSCALL_GATE = service_receive_result.gate
-    HANDLE_TABLES[2] = service_receive_result.handle_table
-    ENDPOINTS = service_receive_result.endpoints
-    LOG_SERVICE_RECEIVE_OBSERVATION = service_receive_result.observation
-    if syscall.status_score(LOG_SERVICE_RECEIVE_OBSERVATION.status) != 2 {
-        return false
-    }
-    LOG_SERVICE_STATE = log_service.record_open_request(LOG_SERVICE_STATE, LOG_SERVICE_RECEIVE_OBSERVATION)
-
-    ack_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, CHILD_PID, syscall.build_send_request(LOG_SERVICE_ENDPOINT_HANDLE_SLOT, 1, log_service.ack_payload()))
-    SYSCALL_GATE = ack_send_result.gate
-    HANDLE_TABLES[2] = ack_send_result.handle_table
-    ENDPOINTS = ack_send_result.endpoints
-    if syscall.status_score(ack_send_result.status) != 2 {
-        return false
-    }
-
-    init_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
-    SYSCALL_GATE = init_receive_result.gate
-    HANDLE_TABLES[1] = init_receive_result.handle_table
-    ENDPOINTS = init_receive_result.endpoints
-    LOG_SERVICE_ACK_OBSERVATION = init_receive_result.observation
-    if syscall.status_score(LOG_SERVICE_ACK_OBSERVATION.status) != 2 {
-        return false
-    }
-
-    LOG_SERVICE_STATE = log_service.record_ack(LOG_SERVICE_STATE, LOG_SERVICE_ACK_OBSERVATION.payload[0])
-    LOG_SERVICE_HANDSHAKE = log_service.observe_handshake(LOG_SERVICE_STATE)
-    return true
-}
-
-func simulate_log_service_exit() {
-    processes: [3]state.ProcessSlot = PROCESS_SLOTS
-    tasks: [3]state.TaskSlot = TASK_SLOTS
-    wait_tables: [3]capability.WaitTable = WAIT_TABLES
-
-    processes = lifecycle.exit_process(processes, 2)
-    tasks = lifecycle.exit_task(tasks, 2)
-    wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, LOG_SERVICE_EXIT_CODE)
-
-    PROCESS_SLOTS = processes
-    TASK_SLOTS = tasks
-    WAIT_TABLES = wait_tables
-    READY_QUEUE = state.empty_queue()
+func install_log_service_execution_state(next_state: bootstrap_services.LogServiceExecutionState) {
+    LOG_SERVICE_PROGRAM_CAPABILITY = next_state.program_capability
+    SYSCALL_GATE = next_state.gate
+    PROCESS_SLOTS = next_state.process_slots
+    TASK_SLOTS = next_state.task_slots
+    HANDLE_TABLES[1] = next_state.init_handle_table
+    HANDLE_TABLES[2] = next_state.child_handle_table
+    WAIT_TABLES[1] = next_state.wait_table
+    ENDPOINTS = next_state.endpoints
+    LOG_SERVICE_ADDRESS_SPACE = next_state.child_address_space
+    LOG_SERVICE_USER_FRAME = next_state.child_user_frame
+    LOG_SERVICE_STATE = next_state.service_state
+    LOG_SERVICE_SPAWN_OBSERVATION = next_state.spawn_observation
+    LOG_SERVICE_RECEIVE_OBSERVATION = next_state.receive_observation
+    LOG_SERVICE_ACK_OBSERVATION = next_state.ack_observation
+    LOG_SERVICE_HANDSHAKE = next_state.handshake
+    LOG_SERVICE_WAIT_OBSERVATION = next_state.wait_observation
+    READY_QUEUE = next_state.ready_queue
 }
 
 func execute_phase105_log_service_handshake() bool {
-    if !seed_log_service_program_capability() {
-        return false
-    }
-    if !spawn_log_service() {
-        return false
-    }
-    if !execute_log_service_request_reply() {
-        return false
-    }
-    simulate_log_service_exit()
-
-    wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(LOG_SERVICE_WAIT_HANDLE_SLOT))
-    SYSCALL_GATE = wait_result.gate
-    PROCESS_SLOTS = wait_result.process_slots
-    TASK_SLOTS = wait_result.task_slots
-    WAIT_TABLES[1] = wait_result.wait_table
-    LOG_SERVICE_WAIT_OBSERVATION = wait_result.observation
-    HANDLE_TABLES[2] = capability.empty_handle_table()
-    READY_QUEUE = state.empty_queue()
-    return syscall.status_score(LOG_SERVICE_WAIT_OBSERVATION.status) == 2
+    result: bootstrap_services.LogServiceExecutionResult = bootstrap_services.execute_phase105_log_service_handshake(build_log_service_config(), build_log_service_execution_state())
+    install_log_service_execution_state(result.state)
+    return result.succeeded != 0
 }
 
 func validate_phase105_log_service_handshake() bool {
-    if capability.kind_score(LOG_SERVICE_PROGRAM_CAPABILITY.kind) != 1 {
-        return false
-    }
-    if syscall.id_score(SYSCALL_GATE.last_id) != 16 {
-        return false
-    }
-    if syscall.status_score(SYSCALL_GATE.last_status) != 2 {
-        return false
-    }
-    if SYSCALL_GATE.send_count != 5 {
-        return false
-    }
-    if SYSCALL_GATE.receive_count != 5 {
-        return false
-    }
-    if LOG_SERVICE_SPAWN_OBSERVATION.child_pid != CHILD_PID {
-        return false
-    }
-    if LOG_SERVICE_SPAWN_OBSERVATION.child_tid != CHILD_TID {
-        return false
-    }
-    if LOG_SERVICE_SPAWN_OBSERVATION.child_asid != CHILD_ASID {
-        return false
-    }
-    if LOG_SERVICE_SPAWN_OBSERVATION.wait_handle_slot != LOG_SERVICE_WAIT_HANDLE_SLOT {
-        return false
-    }
-    if syscall.status_score(LOG_SERVICE_SPAWN_OBSERVATION.status) != 2 {
-        return false
-    }
-    if LOG_SERVICE_RECEIVE_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if LOG_SERVICE_RECEIVE_OBSERVATION.source_pid != INIT_PID {
-        return false
-    }
-    if LOG_SERVICE_RECEIVE_OBSERVATION.payload_len != 1 {
-        return false
-    }
-    if LOG_SERVICE_RECEIVE_OBSERVATION.payload[0] != LOG_SERVICE_REQUEST_BYTE {
-        return false
-    }
-    if LOG_SERVICE_ACK_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if LOG_SERVICE_ACK_OBSERVATION.source_pid != CHILD_PID {
-        return false
-    }
-    if LOG_SERVICE_ACK_OBSERVATION.payload_len != 1 {
-        return false
-    }
-    if LOG_SERVICE_ACK_OBSERVATION.payload[0] != 33 {
-        return false
-    }
-    if LOG_SERVICE_STATE.owner_pid != CHILD_PID {
-        return false
-    }
-    if LOG_SERVICE_STATE.endpoint_handle_slot != LOG_SERVICE_ENDPOINT_HANDLE_SLOT {
-        return false
-    }
-    if LOG_SERVICE_STATE.handled_request_count != 1 {
-        return false
-    }
-    if LOG_SERVICE_STATE.ack_count != 1 {
-        return false
-    }
-    if LOG_SERVICE_STATE.last_client_pid != INIT_PID {
-        return false
-    }
-    if LOG_SERVICE_STATE.last_endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if LOG_SERVICE_STATE.last_request_len != 1 {
-        return false
-    }
-    if LOG_SERVICE_STATE.last_request_byte != LOG_SERVICE_REQUEST_BYTE {
-        return false
-    }
-    if LOG_SERVICE_STATE.last_ack_byte != 33 {
-        return false
-    }
-    if LOG_SERVICE_HANDSHAKE.service_pid != CHILD_PID {
-        return false
-    }
-    if LOG_SERVICE_HANDSHAKE.client_pid != INIT_PID {
-        return false
-    }
-    if LOG_SERVICE_HANDSHAKE.endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if log_service.tag_score(LOG_SERVICE_HANDSHAKE.tag) != 4 {
-        return false
-    }
-    if LOG_SERVICE_HANDSHAKE.request_len != 1 {
-        return false
-    }
-    if LOG_SERVICE_HANDSHAKE.request_byte != LOG_SERVICE_REQUEST_BYTE {
-        return false
-    }
-    if LOG_SERVICE_HANDSHAKE.ack_byte != 33 {
-        return false
-    }
-    if LOG_SERVICE_HANDSHAKE.request_count != 1 {
-        return false
-    }
-    if LOG_SERVICE_HANDSHAKE.ack_count != 1 {
-        return false
-    }
-    if syscall.status_score(LOG_SERVICE_WAIT_OBSERVATION.status) != 2 {
-        return false
-    }
-    if LOG_SERVICE_WAIT_OBSERVATION.child_pid != CHILD_PID {
-        return false
-    }
-    if LOG_SERVICE_WAIT_OBSERVATION.exit_code != LOG_SERVICE_EXIT_CODE {
-        return false
-    }
-    if LOG_SERVICE_WAIT_OBSERVATION.wait_handle_slot != LOG_SERVICE_WAIT_HANDLE_SLOT {
-        return false
-    }
-    if WAIT_TABLES[1].count != 0 {
-        return false
-    }
-    if capability.find_child_for_wait_handle(WAIT_TABLES[1], LOG_SERVICE_WAIT_HANDLE_SLOT) != 0 {
-        return false
-    }
-    if HANDLE_TABLES[2].count != 0 {
-        return false
-    }
-    if READY_QUEUE.count != 0 {
-        return false
-    }
-    if state.process_state_score(PROCESS_SLOTS[2].state) != 1 {
-        return false
-    }
-    if state.task_state_score(TASK_SLOTS[2].state) != 1 {
-        return false
-    }
-    if address_space.state_score(LOG_SERVICE_ADDRESS_SPACE.state) != 2 {
-        return false
-    }
-    if LOG_SERVICE_ADDRESS_SPACE.owner_pid != CHILD_PID {
-        return false
-    }
-    if LOG_SERVICE_USER_FRAME.task_id != CHILD_TID {
-        return false
-    }
-    return true
+    config: bootstrap_services.LogServiceConfig = build_log_service_config()
+    return bootstrap_audit.validate_phase105_log_service_handshake(bootstrap_audit.LogServicePhaseAudit{ program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, spawn_observation: LOG_SERVICE_SPAWN_OBSERVATION, receive_observation: LOG_SERVICE_RECEIVE_OBSERVATION, ack_observation: LOG_SERVICE_ACK_OBSERVATION, service_state: LOG_SERVICE_STATE, handshake: LOG_SERVICE_HANDSHAKE, wait_observation: LOG_SERVICE_WAIT_OBSERVATION, wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: LOG_SERVICE_ADDRESS_SPACE, child_user_frame: LOG_SERVICE_USER_FRAME, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, endpoint_handle_slot: config.endpoint_handle_slot, request_byte: config.request_byte, exit_code: config.exit_code })
 }
 
-func seed_echo_service_program_capability() bool {
-    ECHO_SERVICE_PROGRAM_CAPABILITY = capability.CapabilitySlot{ slot_id: ECHO_SERVICE_PROGRAM_SLOT, owner_pid: INIT_PID, kind: capability.CapabilityKind.InitProgram, rights: 7, object_id: ECHO_SERVICE_PROGRAM_OBJECT_ID }
-    return capability.is_program_capability(ECHO_SERVICE_PROGRAM_CAPABILITY)
+func build_echo_service_config() bootstrap_services.EchoServiceConfig {
+    return bootstrap_services.echo_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, CHILD_ROOT_PAGE_TABLE)
 }
 
-func spawn_echo_service() bool {
-    WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
-    HANDLE_TABLES[2] = capability.handle_table_for_owner(CHILD_PID)
-
-    spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(ECHO_SERVICE_WAIT_HANDLE_SLOT)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, ECHO_SERVICE_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
-    SYSCALL_GATE = spawn_result.gate
-    ECHO_SERVICE_PROGRAM_CAPABILITY = spawn_result.program_capability
-    PROCESS_SLOTS = spawn_result.process_slots
-    TASK_SLOTS = spawn_result.task_slots
-    WAIT_TABLES[1] = spawn_result.wait_table
-    ECHO_SERVICE_ADDRESS_SPACE = spawn_result.child_address_space
-    ECHO_SERVICE_USER_FRAME = spawn_result.child_frame
-    ECHO_SERVICE_SPAWN_OBSERVATION = spawn_result.observation
-    if syscall.status_score(ECHO_SERVICE_SPAWN_OBSERVATION.status) != 2 {
-        return false
-    }
-
-    HANDLE_TABLES[2] = capability.install_endpoint_handle(HANDLE_TABLES[2], ECHO_SERVICE_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-    ECHO_SERVICE_STATE = echo_service.service_state(CHILD_PID, ECHO_SERVICE_ENDPOINT_HANDLE_SLOT)
-    READY_QUEUE = state.user_ready_queue(CHILD_TID)
-    return capability.find_endpoint_for_handle(HANDLE_TABLES[2], ECHO_SERVICE_ENDPOINT_HANDLE_SLOT) == INIT_ENDPOINT_ID
+func build_echo_service_execution_state() bootstrap_services.EchoServiceExecutionState {
+    return bootstrap_services.EchoServiceExecutionState{ program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: ECHO_SERVICE_ADDRESS_SPACE, child_user_frame: ECHO_SERVICE_USER_FRAME, service_state: ECHO_SERVICE_STATE, spawn_observation: ECHO_SERVICE_SPAWN_OBSERVATION, receive_observation: ECHO_SERVICE_RECEIVE_OBSERVATION, reply_observation: ECHO_SERVICE_REPLY_OBSERVATION, exchange: ECHO_SERVICE_EXCHANGE, wait_observation: ECHO_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
 }
 
-func execute_echo_service_request_reply() bool {
-    request_payload: [4]u8 = endpoint.zero_payload()
-    request_payload[0] = ECHO_SERVICE_REQUEST_BYTE0
-    request_payload[1] = ECHO_SERVICE_REQUEST_BYTE1
-
-    request_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 2, request_payload))
-    SYSCALL_GATE = request_send_result.gate
-    HANDLE_TABLES[1] = request_send_result.handle_table
-    ENDPOINTS = request_send_result.endpoints
-    if syscall.status_score(request_send_result.status) != 2 {
-        return false
-    }
-
-    service_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, syscall.build_receive_request(ECHO_SERVICE_ENDPOINT_HANDLE_SLOT))
-    SYSCALL_GATE = service_receive_result.gate
-    HANDLE_TABLES[2] = service_receive_result.handle_table
-    ENDPOINTS = service_receive_result.endpoints
-    ECHO_SERVICE_RECEIVE_OBSERVATION = service_receive_result.observation
-    if syscall.status_score(ECHO_SERVICE_RECEIVE_OBSERVATION.status) != 2 {
-        return false
-    }
-    ECHO_SERVICE_STATE = echo_service.record_request(ECHO_SERVICE_STATE, ECHO_SERVICE_RECEIVE_OBSERVATION)
-
-    reply_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, CHILD_PID, syscall.build_send_request(ECHO_SERVICE_ENDPOINT_HANDLE_SLOT, 2, echo_service.reply_payload(ECHO_SERVICE_STATE)))
-    SYSCALL_GATE = reply_send_result.gate
-    HANDLE_TABLES[2] = reply_send_result.handle_table
-    ENDPOINTS = reply_send_result.endpoints
-    if syscall.status_score(reply_send_result.status) != 2 {
-        return false
-    }
-
-    init_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
-    SYSCALL_GATE = init_receive_result.gate
-    HANDLE_TABLES[1] = init_receive_result.handle_table
-    ENDPOINTS = init_receive_result.endpoints
-    ECHO_SERVICE_REPLY_OBSERVATION = init_receive_result.observation
-    if syscall.status_score(ECHO_SERVICE_REPLY_OBSERVATION.status) != 2 {
-        return false
-    }
-
-    ECHO_SERVICE_STATE = echo_service.record_reply(ECHO_SERVICE_STATE, ECHO_SERVICE_REPLY_OBSERVATION)
-    ECHO_SERVICE_EXCHANGE = echo_service.observe_exchange(ECHO_SERVICE_STATE)
-    return true
-}
-
-func simulate_echo_service_exit() {
-    processes: [3]state.ProcessSlot = PROCESS_SLOTS
-    tasks: [3]state.TaskSlot = TASK_SLOTS
-    wait_tables: [3]capability.WaitTable = WAIT_TABLES
-
-    processes = lifecycle.exit_process(processes, 2)
-    tasks = lifecycle.exit_task(tasks, 2)
-    wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, ECHO_SERVICE_EXIT_CODE)
-
-    PROCESS_SLOTS = processes
-    TASK_SLOTS = tasks
-    WAIT_TABLES = wait_tables
-    READY_QUEUE = state.empty_queue()
+func install_echo_service_execution_state(next_state: bootstrap_services.EchoServiceExecutionState) {
+    ECHO_SERVICE_PROGRAM_CAPABILITY = next_state.program_capability
+    SYSCALL_GATE = next_state.gate
+    PROCESS_SLOTS = next_state.process_slots
+    TASK_SLOTS = next_state.task_slots
+    HANDLE_TABLES[1] = next_state.init_handle_table
+    HANDLE_TABLES[2] = next_state.child_handle_table
+    WAIT_TABLES[1] = next_state.wait_table
+    ENDPOINTS = next_state.endpoints
+    ECHO_SERVICE_ADDRESS_SPACE = next_state.child_address_space
+    ECHO_SERVICE_USER_FRAME = next_state.child_user_frame
+    ECHO_SERVICE_STATE = next_state.service_state
+    ECHO_SERVICE_SPAWN_OBSERVATION = next_state.spawn_observation
+    ECHO_SERVICE_RECEIVE_OBSERVATION = next_state.receive_observation
+    ECHO_SERVICE_REPLY_OBSERVATION = next_state.reply_observation
+    ECHO_SERVICE_EXCHANGE = next_state.exchange
+    ECHO_SERVICE_WAIT_OBSERVATION = next_state.wait_observation
+    READY_QUEUE = next_state.ready_queue
 }
 
 func execute_phase106_echo_service_request_reply() bool {
-    if !seed_echo_service_program_capability() {
-        return false
-    }
-    if !spawn_echo_service() {
-        return false
-    }
-    if !execute_echo_service_request_reply() {
-        return false
-    }
-    simulate_echo_service_exit()
-
-    wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(ECHO_SERVICE_WAIT_HANDLE_SLOT))
-    SYSCALL_GATE = wait_result.gate
-    PROCESS_SLOTS = wait_result.process_slots
-    TASK_SLOTS = wait_result.task_slots
-    WAIT_TABLES[1] = wait_result.wait_table
-    ECHO_SERVICE_WAIT_OBSERVATION = wait_result.observation
-    HANDLE_TABLES[2] = capability.empty_handle_table()
-    READY_QUEUE = state.empty_queue()
-    return syscall.status_score(ECHO_SERVICE_WAIT_OBSERVATION.status) == 2
+    result: bootstrap_services.EchoServiceExecutionResult = bootstrap_services.execute_phase106_echo_service_request_reply(build_echo_service_config(), build_echo_service_execution_state())
+    install_echo_service_execution_state(result.state)
+    return result.succeeded != 0
 }
 
 func validate_phase106_echo_service_request_reply() bool {
-    if capability.kind_score(ECHO_SERVICE_PROGRAM_CAPABILITY.kind) != 1 {
-        return false
-    }
-    if syscall.id_score(SYSCALL_GATE.last_id) != 16 {
-        return false
-    }
-    if syscall.status_score(SYSCALL_GATE.last_status) != 2 {
-        return false
-    }
-    if SYSCALL_GATE.send_count != 7 {
-        return false
-    }
-    if SYSCALL_GATE.receive_count != 7 {
-        return false
-    }
-    if ECHO_SERVICE_SPAWN_OBSERVATION.child_pid != CHILD_PID {
-        return false
-    }
-    if ECHO_SERVICE_SPAWN_OBSERVATION.child_tid != CHILD_TID {
-        return false
-    }
-    if ECHO_SERVICE_SPAWN_OBSERVATION.child_asid != CHILD_ASID {
-        return false
-    }
-    if ECHO_SERVICE_SPAWN_OBSERVATION.wait_handle_slot != ECHO_SERVICE_WAIT_HANDLE_SLOT {
-        return false
-    }
-    if syscall.status_score(ECHO_SERVICE_SPAWN_OBSERVATION.status) != 2 {
-        return false
-    }
-    if ECHO_SERVICE_RECEIVE_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if ECHO_SERVICE_RECEIVE_OBSERVATION.source_pid != INIT_PID {
-        return false
-    }
-    if ECHO_SERVICE_RECEIVE_OBSERVATION.payload_len != 2 {
-        return false
-    }
-    if ECHO_SERVICE_RECEIVE_OBSERVATION.payload[0] != ECHO_SERVICE_REQUEST_BYTE0 {
-        return false
-    }
-    if ECHO_SERVICE_RECEIVE_OBSERVATION.payload[1] != ECHO_SERVICE_REQUEST_BYTE1 {
-        return false
-    }
-    if ECHO_SERVICE_REPLY_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if ECHO_SERVICE_REPLY_OBSERVATION.source_pid != CHILD_PID {
-        return false
-    }
-    if ECHO_SERVICE_REPLY_OBSERVATION.payload_len != 2 {
-        return false
-    }
-    if ECHO_SERVICE_REPLY_OBSERVATION.payload[0] != ECHO_SERVICE_REQUEST_BYTE0 {
-        return false
-    }
-    if ECHO_SERVICE_REPLY_OBSERVATION.payload[1] != ECHO_SERVICE_REQUEST_BYTE1 {
-        return false
-    }
-    if ECHO_SERVICE_STATE.owner_pid != CHILD_PID {
-        return false
-    }
-    if ECHO_SERVICE_STATE.endpoint_handle_slot != ECHO_SERVICE_ENDPOINT_HANDLE_SLOT {
-        return false
-    }
-    if ECHO_SERVICE_STATE.request_count != 1 {
-        return false
-    }
-    if ECHO_SERVICE_STATE.reply_count != 1 {
-        return false
-    }
-    if ECHO_SERVICE_STATE.last_client_pid != INIT_PID {
-        return false
-    }
-    if ECHO_SERVICE_STATE.last_endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if ECHO_SERVICE_STATE.last_request_len != 2 {
-        return false
-    }
-    if ECHO_SERVICE_STATE.last_request_byte0 != ECHO_SERVICE_REQUEST_BYTE0 {
-        return false
-    }
-    if ECHO_SERVICE_STATE.last_request_byte1 != ECHO_SERVICE_REQUEST_BYTE1 {
-        return false
-    }
-    if ECHO_SERVICE_STATE.last_reply_len != 2 {
-        return false
-    }
-    if ECHO_SERVICE_STATE.last_reply_byte0 != ECHO_SERVICE_REQUEST_BYTE0 {
-        return false
-    }
-    if ECHO_SERVICE_STATE.last_reply_byte1 != ECHO_SERVICE_REQUEST_BYTE1 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.service_pid != CHILD_PID {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.client_pid != INIT_PID {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if echo_service.tag_score(ECHO_SERVICE_EXCHANGE.tag) != 4 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.request_len != 2 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.request_byte0 != ECHO_SERVICE_REQUEST_BYTE0 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.request_byte1 != ECHO_SERVICE_REQUEST_BYTE1 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.reply_len != 2 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.reply_byte0 != ECHO_SERVICE_REQUEST_BYTE0 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.reply_byte1 != ECHO_SERVICE_REQUEST_BYTE1 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.request_count != 1 {
-        return false
-    }
-    if ECHO_SERVICE_EXCHANGE.reply_count != 1 {
-        return false
-    }
-    if syscall.status_score(ECHO_SERVICE_WAIT_OBSERVATION.status) != 2 {
-        return false
-    }
-    if ECHO_SERVICE_WAIT_OBSERVATION.child_pid != CHILD_PID {
-        return false
-    }
-    if ECHO_SERVICE_WAIT_OBSERVATION.exit_code != ECHO_SERVICE_EXIT_CODE {
-        return false
-    }
-    if ECHO_SERVICE_WAIT_OBSERVATION.wait_handle_slot != ECHO_SERVICE_WAIT_HANDLE_SLOT {
-        return false
-    }
-    if WAIT_TABLES[1].count != 0 {
-        return false
-    }
-    if capability.find_child_for_wait_handle(WAIT_TABLES[1], ECHO_SERVICE_WAIT_HANDLE_SLOT) != 0 {
-        return false
-    }
-    if HANDLE_TABLES[2].count != 0 {
-        return false
-    }
-    if READY_QUEUE.count != 0 {
-        return false
-    }
-    if state.process_state_score(PROCESS_SLOTS[2].state) != 1 {
-        return false
-    }
-    if state.task_state_score(TASK_SLOTS[2].state) != 1 {
-        return false
-    }
-    if address_space.state_score(ECHO_SERVICE_ADDRESS_SPACE.state) != 2 {
-        return false
-    }
-    if ECHO_SERVICE_ADDRESS_SPACE.owner_pid != CHILD_PID {
-        return false
-    }
-    if ECHO_SERVICE_USER_FRAME.task_id != CHILD_TID {
-        return false
-    }
-    return true
+    config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
+    return bootstrap_audit.validate_phase106_echo_service_request_reply(bootstrap_audit.EchoServicePhaseAudit{ program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, spawn_observation: ECHO_SERVICE_SPAWN_OBSERVATION, receive_observation: ECHO_SERVICE_RECEIVE_OBSERVATION, reply_observation: ECHO_SERVICE_REPLY_OBSERVATION, service_state: ECHO_SERVICE_STATE, exchange: ECHO_SERVICE_EXCHANGE, wait_observation: ECHO_SERVICE_WAIT_OBSERVATION, wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: ECHO_SERVICE_ADDRESS_SPACE, child_user_frame: ECHO_SERVICE_USER_FRAME, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, endpoint_handle_slot: config.endpoint_handle_slot, request_byte0: config.request_byte0, request_byte1: config.request_byte1, exit_code: config.exit_code })
 }
 
-func seed_transfer_service_program_capability() bool {
-    TRANSFER_SERVICE_PROGRAM_CAPABILITY = capability.CapabilitySlot{ slot_id: TRANSFER_SERVICE_PROGRAM_SLOT, owner_pid: INIT_PID, kind: capability.CapabilityKind.InitProgram, rights: 7, object_id: TRANSFER_SERVICE_PROGRAM_OBJECT_ID }
-    return capability.is_program_capability(TRANSFER_SERVICE_PROGRAM_CAPABILITY)
+func build_transfer_service_config() bootstrap_services.TransferServiceConfig {
+    return bootstrap_services.transfer_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, CHILD_ROOT_PAGE_TABLE, TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_RECEIVED_HANDLE_SLOT)
 }
 
-func seed_transfer_service_sender_handle() bool {
-    HANDLE_TABLES[1] = capability.install_endpoint_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, 5)
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != 5 {
-        return false
-    }
-    return capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) == TRANSFER_ENDPOINT_ID
+func build_transfer_service_execution_state() bootstrap_services.TransferServiceExecutionState {
+    return bootstrap_services.TransferServiceExecutionState{ program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: TRANSFER_SERVICE_ADDRESS_SPACE, child_user_frame: TRANSFER_SERVICE_USER_FRAME, service_state: TRANSFER_SERVICE_STATE, spawn_observation: TRANSFER_SERVICE_SPAWN_OBSERVATION, grant_observation: TRANSFER_SERVICE_GRANT_OBSERVATION, emit_observation: TRANSFER_SERVICE_EMIT_OBSERVATION, transfer: TRANSFER_SERVICE_TRANSFER, wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
 }
 
-func spawn_transfer_service() bool {
-    WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
-    HANDLE_TABLES[2] = capability.handle_table_for_owner(CHILD_PID)
-
-    spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(TRANSFER_SERVICE_WAIT_HANDLE_SLOT)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, TRANSFER_SERVICE_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
-    SYSCALL_GATE = spawn_result.gate
-    TRANSFER_SERVICE_PROGRAM_CAPABILITY = spawn_result.program_capability
-    PROCESS_SLOTS = spawn_result.process_slots
-    TASK_SLOTS = spawn_result.task_slots
-    WAIT_TABLES[1] = spawn_result.wait_table
-    TRANSFER_SERVICE_ADDRESS_SPACE = spawn_result.child_address_space
-    TRANSFER_SERVICE_USER_FRAME = spawn_result.child_frame
-    TRANSFER_SERVICE_SPAWN_OBSERVATION = spawn_result.observation
-    if syscall.status_score(TRANSFER_SERVICE_SPAWN_OBSERVATION.status) != 2 {
-        return false
-    }
-
-    HANDLE_TABLES[2] = capability.install_endpoint_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-    TRANSFER_SERVICE_STATE = transfer_service.service_state(CHILD_PID, TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT)
-    READY_QUEUE = state.user_ready_queue(CHILD_TID)
-    return capability.find_endpoint_for_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_CONTROL_HANDLE_SLOT) == INIT_ENDPOINT_ID
-}
-
-func execute_user_to_user_capability_transfer() bool {
-    grant_payload: [4]u8 = endpoint.zero_payload()
-    grant_payload[0] = TRANSFER_SERVICE_GRANT_BYTE0
-    grant_payload[1] = TRANSFER_SERVICE_GRANT_BYTE1
-    grant_payload[2] = TRANSFER_SERVICE_GRANT_BYTE2
-    grant_payload[3] = TRANSFER_SERVICE_GRANT_BYTE3
-
-    transfer_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_transfer_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, grant_payload, TRANSFER_SOURCE_HANDLE_SLOT))
-    SYSCALL_GATE = transfer_send_result.gate
-    HANDLE_TABLES[1] = transfer_send_result.handle_table
-    ENDPOINTS = transfer_send_result.endpoints
-    if syscall.status_score(transfer_send_result.status) != 2 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-
-    service_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, syscall.build_transfer_receive_request(TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT))
-    SYSCALL_GATE = service_receive_result.gate
-    HANDLE_TABLES[2] = service_receive_result.handle_table
-    ENDPOINTS = service_receive_result.endpoints
-    TRANSFER_SERVICE_GRANT_OBSERVATION = service_receive_result.observation
-    if syscall.status_score(TRANSFER_SERVICE_GRANT_OBSERVATION.status) != 2 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-
-    transferred_endpoint_id: u32 = capability.find_endpoint_for_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT)
-    transferred_rights: u32 = capability.find_rights_for_handle(HANDLE_TABLES[2], TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT)
-    TRANSFER_SERVICE_STATE = transfer_service.record_grant(TRANSFER_SERVICE_STATE, TRANSFER_SERVICE_GRANT_OBSERVATION, transferred_endpoint_id, transferred_rights)
-
-    emit_payload: [4]u8 = transfer_service.emit_payload(TRANSFER_SERVICE_STATE)
-    emit_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, CHILD_PID, syscall.build_send_request(TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT, 4, emit_payload))
-    SYSCALL_GATE = emit_send_result.gate
-    HANDLE_TABLES[2] = emit_send_result.handle_table
-    ENDPOINTS = emit_send_result.endpoints
-    if syscall.status_score(emit_send_result.status) != 2 {
-        return false
-    }
-
-    init_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(TRANSFER_RECEIVED_HANDLE_SLOT))
-    SYSCALL_GATE = init_receive_result.gate
-    HANDLE_TABLES[1] = init_receive_result.handle_table
-    ENDPOINTS = init_receive_result.endpoints
-    TRANSFER_SERVICE_EMIT_OBSERVATION = init_receive_result.observation
-    if syscall.status_score(TRANSFER_SERVICE_EMIT_OBSERVATION.status) != 2 {
-        return false
-    }
-
-    TRANSFER_SERVICE_STATE = transfer_service.record_emit(TRANSFER_SERVICE_STATE, TRANSFER_SERVICE_EMIT_OBSERVATION)
-    TRANSFER_SERVICE_TRANSFER = transfer_service.observe_transfer(TRANSFER_SERVICE_STATE)
-    return true
-}
-
-func simulate_transfer_service_exit() {
-    processes: [3]state.ProcessSlot = PROCESS_SLOTS
-    tasks: [3]state.TaskSlot = TASK_SLOTS
-    wait_tables: [3]capability.WaitTable = WAIT_TABLES
-
-    processes = lifecycle.exit_process(processes, 2)
-    tasks = lifecycle.exit_task(tasks, 2)
-    wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, TRANSFER_SERVICE_EXIT_CODE)
-
-    PROCESS_SLOTS = processes
-    TASK_SLOTS = tasks
-    WAIT_TABLES = wait_tables
-    READY_QUEUE = state.empty_queue()
+func install_transfer_service_execution_state(next_state: bootstrap_services.TransferServiceExecutionState) {
+    TRANSFER_SERVICE_PROGRAM_CAPABILITY = next_state.program_capability
+    SYSCALL_GATE = next_state.gate
+    PROCESS_SLOTS = next_state.process_slots
+    TASK_SLOTS = next_state.task_slots
+    HANDLE_TABLES[1] = next_state.init_handle_table
+    HANDLE_TABLES[2] = next_state.child_handle_table
+    WAIT_TABLES[1] = next_state.wait_table
+    ENDPOINTS = next_state.endpoints
+    TRANSFER_SERVICE_ADDRESS_SPACE = next_state.child_address_space
+    TRANSFER_SERVICE_USER_FRAME = next_state.child_user_frame
+    TRANSFER_SERVICE_STATE = next_state.service_state
+    TRANSFER_SERVICE_SPAWN_OBSERVATION = next_state.spawn_observation
+    TRANSFER_SERVICE_GRANT_OBSERVATION = next_state.grant_observation
+    TRANSFER_SERVICE_EMIT_OBSERVATION = next_state.emit_observation
+    TRANSFER_SERVICE_TRANSFER = next_state.transfer
+    TRANSFER_SERVICE_WAIT_OBSERVATION = next_state.wait_observation
+    READY_QUEUE = next_state.ready_queue
 }
 
 func execute_phase107_user_to_user_capability_transfer() bool {
-    if !seed_transfer_service_program_capability() {
-        return false
-    }
-    if !seed_transfer_service_sender_handle() {
-        return false
-    }
-    if !spawn_transfer_service() {
-        return false
-    }
-    if !execute_user_to_user_capability_transfer() {
-        return false
-    }
-    simulate_transfer_service_exit()
-
-    wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(TRANSFER_SERVICE_WAIT_HANDLE_SLOT))
-    SYSCALL_GATE = wait_result.gate
-    PROCESS_SLOTS = wait_result.process_slots
-    TASK_SLOTS = wait_result.task_slots
-    WAIT_TABLES[1] = wait_result.wait_table
-    TRANSFER_SERVICE_WAIT_OBSERVATION = wait_result.observation
-    HANDLE_TABLES[2] = capability.empty_handle_table()
-    READY_QUEUE = state.empty_queue()
-    return syscall.status_score(TRANSFER_SERVICE_WAIT_OBSERVATION.status) == 2
+    result: bootstrap_services.TransferServiceExecutionResult = bootstrap_services.execute_phase107_user_to_user_capability_transfer(build_transfer_service_config(), build_transfer_service_execution_state())
+    install_transfer_service_execution_state(result.state)
+    return result.succeeded != 0
 }
 
 func validate_phase107_user_to_user_capability_transfer() bool {
-    if capability.kind_score(TRANSFER_SERVICE_PROGRAM_CAPABILITY.kind) != 1 {
-        return false
-    }
-    if syscall.id_score(SYSCALL_GATE.last_id) != 16 {
-        return false
-    }
-    if syscall.status_score(SYSCALL_GATE.last_status) != 2 {
-        return false
-    }
-    if SYSCALL_GATE.send_count != 9 {
-        return false
-    }
-    if SYSCALL_GATE.receive_count != 9 {
-        return false
-    }
-    if TRANSFER_SERVICE_SPAWN_OBSERVATION.child_pid != CHILD_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_SPAWN_OBSERVATION.child_tid != CHILD_TID {
-        return false
-    }
-    if TRANSFER_SERVICE_SPAWN_OBSERVATION.child_asid != CHILD_ASID {
-        return false
-    }
-    if TRANSFER_SERVICE_SPAWN_OBSERVATION.wait_handle_slot != TRANSFER_SERVICE_WAIT_HANDLE_SLOT {
-        return false
-    }
-    if syscall.status_score(TRANSFER_SERVICE_SPAWN_OBSERVATION.status) != 2 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != 5 {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.source_pid != INIT_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload_len != 4 {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.received_handle_slot != TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.received_handle_count != 1 {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload[0] != TRANSFER_SERVICE_GRANT_BYTE0 {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload[1] != TRANSFER_SERVICE_GRANT_BYTE1 {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload[2] != TRANSFER_SERVICE_GRANT_BYTE2 {
-        return false
-    }
-    if TRANSFER_SERVICE_GRANT_OBSERVATION.payload[3] != TRANSFER_SERVICE_GRANT_BYTE3 {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.endpoint_id != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.source_pid != CHILD_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload_len != 4 {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.received_handle_slot != 0 {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.received_handle_count != 0 {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload[0] != TRANSFER_SERVICE_GRANT_BYTE0 {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload[1] != TRANSFER_SERVICE_GRANT_BYTE1 {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload[2] != TRANSFER_SERVICE_GRANT_BYTE2 {
-        return false
-    }
-    if TRANSFER_SERVICE_EMIT_OBSERVATION.payload[3] != TRANSFER_SERVICE_GRANT_BYTE3 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.owner_pid != CHILD_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.control_handle_slot != TRANSFER_SERVICE_CONTROL_HANDLE_SLOT {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.transferred_handle_slot != TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.grant_count != 1 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.emit_count != 1 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_client_pid != INIT_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_control_endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_transferred_endpoint_id != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_transferred_rights != 5 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_grant_len != 4 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_grant_byte0 != TRANSFER_SERVICE_GRANT_BYTE0 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_grant_byte1 != TRANSFER_SERVICE_GRANT_BYTE1 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_grant_byte2 != TRANSFER_SERVICE_GRANT_BYTE2 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_grant_byte3 != TRANSFER_SERVICE_GRANT_BYTE3 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_emit_len != 4 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_emit_byte0 != TRANSFER_SERVICE_GRANT_BYTE0 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_emit_byte1 != TRANSFER_SERVICE_GRANT_BYTE1 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_emit_byte2 != TRANSFER_SERVICE_GRANT_BYTE2 {
-        return false
-    }
-    if TRANSFER_SERVICE_STATE.last_emit_byte3 != TRANSFER_SERVICE_GRANT_BYTE3 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.service_pid != CHILD_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.client_pid != INIT_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.control_endpoint_id != INIT_ENDPOINT_ID {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.transferred_endpoint_id != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.transferred_rights != 5 {
-        return false
-    }
-    if transfer_service.tag_score(TRANSFER_SERVICE_TRANSFER.tag) != 4 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.grant_len != 4 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.grant_byte0 != TRANSFER_SERVICE_GRANT_BYTE0 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.grant_byte1 != TRANSFER_SERVICE_GRANT_BYTE1 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.grant_byte2 != TRANSFER_SERVICE_GRANT_BYTE2 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.grant_byte3 != TRANSFER_SERVICE_GRANT_BYTE3 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.emit_len != 4 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.emit_byte0 != TRANSFER_SERVICE_GRANT_BYTE0 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.emit_byte1 != TRANSFER_SERVICE_GRANT_BYTE1 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.emit_byte2 != TRANSFER_SERVICE_GRANT_BYTE2 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.emit_byte3 != TRANSFER_SERVICE_GRANT_BYTE3 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.grant_count != 1 {
-        return false
-    }
-    if TRANSFER_SERVICE_TRANSFER.emit_count != 1 {
-        return false
-    }
-    if syscall.status_score(TRANSFER_SERVICE_WAIT_OBSERVATION.status) != 2 {
-        return false
-    }
-    if TRANSFER_SERVICE_WAIT_OBSERVATION.child_pid != CHILD_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_WAIT_OBSERVATION.exit_code != TRANSFER_SERVICE_EXIT_CODE {
-        return false
-    }
-    if TRANSFER_SERVICE_WAIT_OBSERVATION.wait_handle_slot != TRANSFER_SERVICE_WAIT_HANDLE_SLOT {
-        return false
-    }
-    if WAIT_TABLES[1].count != 0 {
-        return false
-    }
-    if capability.find_child_for_wait_handle(WAIT_TABLES[1], TRANSFER_SERVICE_WAIT_HANDLE_SLOT) != 0 {
-        return false
-    }
-    if HANDLE_TABLES[2].count != 0 {
-        return false
-    }
-    if READY_QUEUE.count != 0 {
-        return false
-    }
-    if state.process_state_score(PROCESS_SLOTS[2].state) != 1 {
-        return false
-    }
-    if state.task_state_score(TASK_SLOTS[2].state) != 1 {
-        return false
-    }
-    if address_space.state_score(TRANSFER_SERVICE_ADDRESS_SPACE.state) != 2 {
-        return false
-    }
-    if TRANSFER_SERVICE_ADDRESS_SPACE.owner_pid != CHILD_PID {
-        return false
-    }
-    if TRANSFER_SERVICE_USER_FRAME.task_id != CHILD_TID {
-        return false
-    }
-    return true
+    config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
+    return bootstrap_audit.validate_phase107_user_to_user_capability_transfer(bootstrap_audit.TransferServicePhaseAudit{ program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, spawn_observation: TRANSFER_SERVICE_SPAWN_OBSERVATION, grant_observation: TRANSFER_SERVICE_GRANT_OBSERVATION, emit_observation: TRANSFER_SERVICE_EMIT_OBSERVATION, service_state: TRANSFER_SERVICE_STATE, transfer: TRANSFER_SERVICE_TRANSFER, wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, init_handle_table: HANDLE_TABLES[1], wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: TRANSFER_SERVICE_ADDRESS_SPACE, child_user_frame: TRANSFER_SERVICE_USER_FRAME, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, source_handle_slot: config.source_handle_slot, control_handle_slot: config.control_handle_slot, init_received_handle_slot: config.init_received_handle_slot, service_received_handle_slot: config.service_received_handle_slot, grant_byte0: config.grant_byte0, grant_byte1: config.grant_byte1, grant_byte2: config.grant_byte2, grant_byte3: config.grant_byte3, exit_code: config.exit_code })
 }
 
 func build_phase108_program_cap_contract() debug.Phase108ProgramCapContract {
-    return debug.Phase108ProgramCapContract{ init_pid: INIT_PID, log_service_program_object_id: LOG_SERVICE_PROGRAM_OBJECT_ID, echo_service_program_object_id: ECHO_SERVICE_PROGRAM_OBJECT_ID, transfer_service_program_object_id: TRANSFER_SERVICE_PROGRAM_OBJECT_ID, log_service_wait_handle_slot: LOG_SERVICE_WAIT_HANDLE_SLOT, echo_service_wait_handle_slot: ECHO_SERVICE_WAIT_HANDLE_SLOT, transfer_service_wait_handle_slot: TRANSFER_SERVICE_WAIT_HANDLE_SLOT, log_service_exit_code: LOG_SERVICE_EXIT_CODE, echo_service_exit_code: ECHO_SERVICE_EXIT_CODE, transfer_service_exit_code: TRANSFER_SERVICE_EXIT_CODE, bootstrap_program_capability: INIT_BOOTSTRAP_CAPS.program_capability, log_service_program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, echo_service_program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, transfer_service_program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, log_service_spawn: LOG_SERVICE_SPAWN_OBSERVATION, echo_service_spawn: ECHO_SERVICE_SPAWN_OBSERVATION, transfer_service_spawn: TRANSFER_SERVICE_SPAWN_OBSERVATION, log_service_wait: LOG_SERVICE_WAIT_OBSERVATION, echo_service_wait: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_wait: TRANSFER_SERVICE_WAIT_OBSERVATION }
+    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
+    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
+    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
+    return bootstrap_audit.build_phase108_program_cap_contract(bootstrap_audit.Phase108ProgramCapContractInputs{ init_pid: INIT_PID, log_service_program_object_id: log_config.program_object_id, echo_service_program_object_id: echo_config.program_object_id, transfer_service_program_object_id: transfer_config.program_object_id, log_service_wait_handle_slot: log_config.wait_handle_slot, echo_service_wait_handle_slot: echo_config.wait_handle_slot, transfer_service_wait_handle_slot: transfer_config.wait_handle_slot, log_service_exit_code: log_config.exit_code, echo_service_exit_code: echo_config.exit_code, transfer_service_exit_code: transfer_config.exit_code, bootstrap_program_capability: INIT_BOOTSTRAP_CAPS.program_capability, log_service_program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, echo_service_program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, transfer_service_program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, log_service_spawn: LOG_SERVICE_SPAWN_OBSERVATION, echo_service_spawn: ECHO_SERVICE_SPAWN_OBSERVATION, transfer_service_spawn: TRANSFER_SERVICE_SPAWN_OBSERVATION, log_service_wait: LOG_SERVICE_WAIT_OBSERVATION, echo_service_wait: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_wait: TRANSFER_SERVICE_WAIT_OBSERVATION })
 }
 
 func build_phase109_running_kernel_slice_audit(phase104_contract_hardened: u32, phase108_contract_hardened: u32) debug.RunningKernelSliceAudit {
-    return debug.RunningKernelSliceAudit{ kernel: KERNEL, init_pid: INIT_PID, init_tid: INIT_TID, init_asid: INIT_ASID, child_tid: CHILD_TID, child_exit_code: CHILD_EXIT_CODE, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_request_byte: LOG_SERVICE_REQUEST_BYTE, echo_service_request_byte0: ECHO_SERVICE_REQUEST_BYTE0, echo_service_request_byte1: ECHO_SERVICE_REQUEST_BYTE1, log_service_exit_code: LOG_SERVICE_EXIT_CODE, echo_service_exit_code: ECHO_SERVICE_EXIT_CODE, transfer_service_exit_code: TRANSFER_SERVICE_EXIT_CODE, init_bootstrap_handoff: INIT_BOOTSTRAP_HANDOFF, receive_observation: RECEIVE_OBSERVATION, attached_receive_observation: ATTACHED_RECEIVE_OBSERVATION, transferred_handle_use_observation: TRANSFERRED_HANDLE_USE_OBSERVATION, pre_exit_wait_observation: PRE_EXIT_WAIT_OBSERVATION, exit_wait_observation: EXIT_WAIT_OBSERVATION, sleep_observation: SLEEP_OBSERVATION, timer_wake_observation: TIMER_WAKE_OBSERVATION, log_service_handshake: LOG_SERVICE_HANDSHAKE, log_service_wait_observation: LOG_SERVICE_WAIT_OBSERVATION, echo_service_exchange: ECHO_SERVICE_EXCHANGE, echo_service_wait_observation: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER, transfer_service_wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, phase104_contract_hardened: phase104_contract_hardened, phase108_contract_hardened: phase108_contract_hardened, init_process: PROCESS_SLOTS[1], init_task: TASK_SLOTS[1], init_user_frame: USER_FRAME, boot_log_append_failed: BOOT_LOG_APPEND_FAILED }
+    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
+    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
+    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
+    return bootstrap_audit.build_phase109_running_kernel_slice_audit(bootstrap_audit.RunningKernelSliceAuditInputs{ kernel: KERNEL, init_pid: INIT_PID, init_tid: INIT_TID, init_asid: INIT_ASID, child_tid: CHILD_TID, child_exit_code: CHILD_EXIT_CODE, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_request_byte: log_config.request_byte, echo_service_request_byte0: echo_config.request_byte0, echo_service_request_byte1: echo_config.request_byte1, log_service_exit_code: log_config.exit_code, echo_service_exit_code: echo_config.exit_code, transfer_service_exit_code: transfer_config.exit_code, init_bootstrap_handoff: INIT_BOOTSTRAP_HANDOFF, receive_observation: RECEIVE_OBSERVATION, attached_receive_observation: ATTACHED_RECEIVE_OBSERVATION, transferred_handle_use_observation: TRANSFERRED_HANDLE_USE_OBSERVATION, pre_exit_wait_observation: PRE_EXIT_WAIT_OBSERVATION, exit_wait_observation: EXIT_WAIT_OBSERVATION, sleep_observation: SLEEP_OBSERVATION, timer_wake_observation: TIMER_WAKE_OBSERVATION, log_service_handshake: LOG_SERVICE_HANDSHAKE, log_service_wait_observation: LOG_SERVICE_WAIT_OBSERVATION, echo_service_exchange: ECHO_SERVICE_EXCHANGE, echo_service_wait_observation: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER, transfer_service_wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, phase104_contract_hardened: phase104_contract_hardened, phase108_contract_hardened: phase108_contract_hardened, init_process: PROCESS_SLOTS[1], init_task: TASK_SLOTS[1], init_user_frame: USER_FRAME, boot_log_append_failed: BOOT_LOG_APPEND_FAILED })
 }
 
 func execute_spawn_child_process() bool {

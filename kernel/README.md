@@ -42,8 +42,15 @@ Current files
   interrupt-entry and generic-dispatch boundary
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core setup, bounded syscall-byte-IPC setup, bounded capability-
-  carrying transfer setup, bounded service proof sequencing, and thin root
-  orchestration across the owned scheduler, lifecycle, and debug audit modules
+  carrying transfer setup, thin service-proof orchestration, and thin root
+  orchestration across the owned scheduler, lifecycle, bootstrap helper, and
+  debug audit modules
+- `src/bootstrap_audit.mc`: extracted Phase 104 contract hardening helpers,
+  bounded service validation helpers, and Phase 108-109 audit builders used by
+  the root proof module
+- `src/bootstrap_services.mc`: extracted bounded log, echo, and transfer
+  service execution flows plus explicit service config/state packaging used by
+  the root proof module
 - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn,
   wait, sleep, and wake follow-through
 - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for

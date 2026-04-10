@@ -76,7 +76,7 @@ Core rule
   new runtime path.
 - Validate the actual emitted image-input artifacts the current build already
   produces.
-- Keep program-cap provenance explicit in the root proof module and bootstrap
+- Keep program-cap provenance explicit in the root proof surface and bootstrap
   handoff rather than implying a general loader or ambient authority source.
 - Stop before boot-image assembly, linker scripts, install trees, shared
   libraries, or general target-family promises.
@@ -92,10 +92,10 @@ Targeted audit shape:
    the emitted module object and generated freestanding runtime object exist,
    and manually re-links those emitted artifacts through the host Clang tool
    to prove target-owned image follow-through without hidden driver state
-3. one narrow root-module audit function that verifies the landed bootstrap
-   program capability remains explicit, that later service program
-   capabilities are consumed rather than ambient, and that each bounded
-   service proof still terminates through explicit wait-handle observation
+3. one narrow root proof-surface audit function that verifies the landed
+  bootstrap program capability remains explicit, that later service program
+  capabilities are consumed rather than ambient, and that each bounded
+  service proof still terminates through explicit wait-handle observation
 4. refreshed planning and orientation surfaces so the repository records
    Phase 108 as concrete and moves the next speculative owner to the first
    running-kernel support statement rather than leaving image truth implied
@@ -144,7 +144,8 @@ Suggested execution order
    contract plus emitted image-input artifacts.
 3. Manually relink the emitted module objects and runtime object through the
    host toolchain to prove target-owned image follow-through.
-4. Inspect merged MIR for explicit program-cap globals and seed helpers.
+4. Inspect merged MIR for explicit program-cap globals, the root provenance
+  contract builder, and explicit non-ambient service program-cap seeding.
 5. Refresh planning and orientation surfaces so Phase 108 is concrete rather
    than still speculative.
 
@@ -155,7 +156,7 @@ Exit criteria
 - the same regression proves that the real kernel build emits reusable image-
   input artifacts and that those artifacts can be manually re-linked into a
   running kernel artifact
-- the root proof module keeps explicit bootstrap and service program-cap
+- the root proof surface keeps explicit bootstrap and service program-cap
   ownership visible and validates that the bounded service program caps are
   consumed rather than ambient
 - the proof exits with exactly one bounded Phase 108 marker only after the
