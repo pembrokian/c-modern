@@ -4,6 +4,7 @@ import echo_service
 import endpoint
 import init
 import lifecycle
+import mmu
 import log_service
 import state
 import syscall
@@ -40,7 +41,7 @@ struct LogServiceConfig {
     child_asid: u32
     init_endpoint_id: u32
     init_endpoint_handle_slot: u32
-    child_root_page_table: usize
+    child_translation_root: mmu.TranslationRoot
     wait_handle_slot: u32
     endpoint_handle_slot: u32
     request_byte: u8
@@ -82,7 +83,7 @@ struct EchoServiceConfig {
     child_asid: u32
     init_endpoint_id: u32
     init_endpoint_handle_slot: u32
-    child_root_page_table: usize
+    child_translation_root: mmu.TranslationRoot
     wait_handle_slot: u32
     endpoint_handle_slot: u32
     request_byte0: u8
@@ -125,7 +126,7 @@ struct TransferServiceConfig {
     child_asid: u32
     init_endpoint_id: u32
     init_endpoint_handle_slot: u32
-    child_root_page_table: usize
+    child_translation_root: mmu.TranslationRoot
     wait_handle_slot: u32
     control_handle_slot: u32
     source_handle_slot: u32
@@ -166,24 +167,24 @@ struct TransferServiceExecutionResult {
     succeeded: u32
 }
 
-func log_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_root_page_table: usize) LogServiceConfig {
-    return LogServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_root_page_table: child_root_page_table, wait_handle_slot: LOG_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: LOG_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte: LOG_SERVICE_REQUEST_BYTE, exit_code: LOG_SERVICE_EXIT_CODE, program_slot: LOG_SERVICE_PROGRAM_SLOT, program_object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
+func log_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_translation_root: mmu.TranslationRoot) LogServiceConfig {
+    return LogServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: LOG_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: LOG_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte: LOG_SERVICE_REQUEST_BYTE, exit_code: LOG_SERVICE_EXIT_CODE, program_slot: LOG_SERVICE_PROGRAM_SLOT, program_object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
 }
 
 func log_service_result(state: LogServiceExecutionState, succeeded: u32) LogServiceExecutionResult {
     return LogServiceExecutionResult{ state: state, succeeded: succeeded }
 }
 
-func echo_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_root_page_table: usize) EchoServiceConfig {
-    return EchoServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_root_page_table: child_root_page_table, wait_handle_slot: ECHO_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: ECHO_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte0: ECHO_SERVICE_REQUEST_BYTE0, request_byte1: ECHO_SERVICE_REQUEST_BYTE1, exit_code: ECHO_SERVICE_EXIT_CODE, program_slot: ECHO_SERVICE_PROGRAM_SLOT, program_object_id: ECHO_SERVICE_PROGRAM_OBJECT_ID }
+func echo_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_translation_root: mmu.TranslationRoot) EchoServiceConfig {
+    return EchoServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: ECHO_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: ECHO_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte0: ECHO_SERVICE_REQUEST_BYTE0, request_byte1: ECHO_SERVICE_REQUEST_BYTE1, exit_code: ECHO_SERVICE_EXIT_CODE, program_slot: ECHO_SERVICE_PROGRAM_SLOT, program_object_id: ECHO_SERVICE_PROGRAM_OBJECT_ID }
 }
 
 func echo_service_result(state: EchoServiceExecutionState, succeeded: u32) EchoServiceExecutionResult {
     return EchoServiceExecutionResult{ state: state, succeeded: succeeded }
 }
 
-func transfer_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_root_page_table: usize, source_handle_slot: u32, init_received_handle_slot: u32) TransferServiceConfig {
-    return TransferServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_root_page_table: child_root_page_table, wait_handle_slot: TRANSFER_SERVICE_WAIT_HANDLE_SLOT, control_handle_slot: TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, source_handle_slot: source_handle_slot, init_received_handle_slot: init_received_handle_slot, service_received_handle_slot: TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT, grant_byte0: TRANSFER_SERVICE_GRANT_BYTE0, grant_byte1: TRANSFER_SERVICE_GRANT_BYTE1, grant_byte2: TRANSFER_SERVICE_GRANT_BYTE2, grant_byte3: TRANSFER_SERVICE_GRANT_BYTE3, exit_code: TRANSFER_SERVICE_EXIT_CODE, program_slot: TRANSFER_SERVICE_PROGRAM_SLOT, program_object_id: TRANSFER_SERVICE_PROGRAM_OBJECT_ID }
+func transfer_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_translation_root: mmu.TranslationRoot, source_handle_slot: u32, init_received_handle_slot: u32) TransferServiceConfig {
+    return TransferServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: TRANSFER_SERVICE_WAIT_HANDLE_SLOT, control_handle_slot: TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, source_handle_slot: source_handle_slot, init_received_handle_slot: init_received_handle_slot, service_received_handle_slot: TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT, grant_byte0: TRANSFER_SERVICE_GRANT_BYTE0, grant_byte1: TRANSFER_SERVICE_GRANT_BYTE1, grant_byte2: TRANSFER_SERVICE_GRANT_BYTE2, grant_byte3: TRANSFER_SERVICE_GRANT_BYTE3, exit_code: TRANSFER_SERVICE_EXIT_CODE, program_slot: TRANSFER_SERVICE_PROGRAM_SLOT, program_object_id: TRANSFER_SERVICE_PROGRAM_OBJECT_ID }
 }
 
 func transfer_service_result(state: TransferServiceExecutionState, succeeded: u32) TransferServiceExecutionResult {
@@ -199,7 +200,7 @@ func spawn_log_service(config: LogServiceConfig, execution: LogServiceExecutionS
     wait_table: capability.WaitTable = capability.wait_table_for_owner(config.init_pid)
 
     spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(config.wait_handle_slot)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(execution.gate, execution.program_capability, execution.process_slots, execution.task_slots, wait_table, execution.init_image, spawn_request, config.child_pid, config.child_tid, config.child_asid, config.child_root_page_table)
+    spawn_result: syscall.SpawnResult = syscall.perform_spawn(execution.gate, execution.program_capability, execution.process_slots, execution.task_slots, wait_table, execution.init_image, spawn_request, config.child_pid, config.child_tid, config.child_asid, config.child_translation_root)
     next_state: LogServiceExecutionState = LogServiceExecutionState{ program_capability: spawn_result.program_capability, gate: spawn_result.gate, process_slots: spawn_result.process_slots, task_slots: spawn_result.task_slots, init_handle_table: execution.init_handle_table, child_handle_table: child_handles, wait_table: spawn_result.wait_table, endpoints: execution.endpoints, init_image: execution.init_image, child_address_space: spawn_result.child_address_space, child_user_frame: spawn_result.child_frame, service_state: execution.service_state, spawn_observation: spawn_result.observation, receive_observation: execution.receive_observation, ack_observation: execution.ack_observation, handshake: execution.handshake, wait_observation: execution.wait_observation, ready_queue: execution.ready_queue }
     if syscall.status_score(next_state.spawn_observation.status) != 2 {
         return log_service_result(next_state, 0)
@@ -285,7 +286,7 @@ func spawn_echo_service(config: EchoServiceConfig, execution: EchoServiceExecuti
     child_handles: capability.HandleTable = capability.handle_table_for_owner(config.child_pid)
     wait_table: capability.WaitTable = capability.wait_table_for_owner(config.init_pid)
     spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(config.wait_handle_slot)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(execution.gate, execution.program_capability, execution.process_slots, execution.task_slots, wait_table, execution.init_image, spawn_request, config.child_pid, config.child_tid, config.child_asid, config.child_root_page_table)
+    spawn_result: syscall.SpawnResult = syscall.perform_spawn(execution.gate, execution.program_capability, execution.process_slots, execution.task_slots, wait_table, execution.init_image, spawn_request, config.child_pid, config.child_tid, config.child_asid, config.child_translation_root)
     next_state: EchoServiceExecutionState = EchoServiceExecutionState{ program_capability: spawn_result.program_capability, gate: spawn_result.gate, process_slots: spawn_result.process_slots, task_slots: spawn_result.task_slots, init_handle_table: execution.init_handle_table, child_handle_table: child_handles, wait_table: spawn_result.wait_table, endpoints: execution.endpoints, init_image: execution.init_image, child_address_space: spawn_result.child_address_space, child_user_frame: spawn_result.child_frame, service_state: execution.service_state, spawn_observation: spawn_result.observation, receive_observation: execution.receive_observation, reply_observation: execution.reply_observation, exchange: execution.exchange, wait_observation: execution.wait_observation, ready_queue: execution.ready_queue }
     if syscall.status_score(next_state.spawn_observation.status) != 2 {
         return echo_service_result(next_state, 0)
@@ -379,7 +380,7 @@ func spawn_transfer_service(config: TransferServiceConfig, execution: TransferSe
     child_handles: capability.HandleTable = capability.handle_table_for_owner(config.child_pid)
     wait_table: capability.WaitTable = capability.wait_table_for_owner(config.init_pid)
     spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(config.wait_handle_slot)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(execution.gate, execution.program_capability, execution.process_slots, execution.task_slots, wait_table, execution.init_image, spawn_request, config.child_pid, config.child_tid, config.child_asid, config.child_root_page_table)
+    spawn_result: syscall.SpawnResult = syscall.perform_spawn(execution.gate, execution.program_capability, execution.process_slots, execution.task_slots, wait_table, execution.init_image, spawn_request, config.child_pid, config.child_tid, config.child_asid, config.child_translation_root)
     next_state: TransferServiceExecutionState = TransferServiceExecutionState{ program_capability: spawn_result.program_capability, gate: spawn_result.gate, process_slots: spawn_result.process_slots, task_slots: spawn_result.task_slots, init_handle_table: execution.init_handle_table, child_handle_table: child_handles, wait_table: spawn_result.wait_table, endpoints: execution.endpoints, init_image: execution.init_image, child_address_space: spawn_result.child_address_space, child_user_frame: spawn_result.child_frame, service_state: execution.service_state, spawn_observation: spawn_result.observation, grant_observation: execution.grant_observation, emit_observation: execution.emit_observation, transfer: execution.transfer, wait_observation: execution.wait_observation, ready_queue: execution.ready_queue }
     if syscall.status_score(next_state.spawn_observation.status) != 2 {
         return transfer_service_result(next_state, 0)

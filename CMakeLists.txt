@@ -160,6 +160,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase111_scheduler_lifecycle_ownership_clarification.cpp
     tests/tool/freestanding/kernel/phase112_syscall_boundary_thinness_audit.cpp
     tests/tool/freestanding/kernel/phase113_interrupt_entry_and_generic_dispatch_boundary.cpp
+    tests/tool/freestanding/kernel/phase114_address_space_and_mmu_ownership_split.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp

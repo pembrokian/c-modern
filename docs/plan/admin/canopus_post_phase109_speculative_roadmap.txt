@@ -1,4 +1,4 @@
-Phase 113 Through Phase 123 -- Speculative Post-Phase-112 Canopus Roadmap
+Phase 114 Through Phase 123 -- Speculative Post-Phase-113 Canopus Roadmap
 =========================================================================
 
 Status
@@ -7,13 +7,13 @@ SPECULATIVE
 
 Purpose
 -------
-Sketch one plausible continuation after the completed Phase 112 syscall
-boundary thinness audit.
+Sketch one plausible continuation after the completed Phase 113 interrupt
+entry and generic dispatch boundary.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
-It does not replace the concrete Phase 109, Phase 110, Phase 111, or Phase
-112 closeout notes.
+It does not replace the concrete Phase 109, Phase 110, Phase 111, Phase 112,
+or Phase 113 closeout notes.
 It gives one plausible ordering for the next Canopus wave if the repository
 keeps following the same evidence-first rules used so far:
 
@@ -31,6 +31,7 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/phase110_kernel_ownership_split_audit.txt`
 - `docs/plan/phase111_scheduler_lifecycle_ownership_clarification.txt`
 - `docs/plan/phase112_syscall_boundary_thinness_audit.txt`
+- `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
 - `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
@@ -48,16 +49,17 @@ Repository numbering note
 -------------------------
 - Phase 81 through Phase 95 are occupied by the concrete freestanding bring-up
   and support-freeze wave.
-- Phase 96 through Phase 112 are occupied by the concrete first real kernel
-  bring-up wave through the first syscall-boundary thinness audit.
-- The next speculative continuation therefore starts at Phase 113.
+- Phase 96 through Phase 113 are occupied by the concrete first real kernel
+  bring-up wave through the first interrupt-entry and generic-dispatch
+  boundary.
+- The next speculative continuation therefore starts at Phase 114.
 
 Repository status note
 ----------------------
 - The repository can now honestly claim one bounded first running Canopus
   kernel slice with one landed ownership split, one landed lifecycle-owner
-  clarification, and one landed syscall-boundary thinness audit over that
-  same artifact.
+  clarification, one landed syscall-boundary thinness audit, and one landed
+  interrupt-entry and generic-dispatch boundary over that same artifact.
 - That slice remains intentionally small: fixed-size tables, explicit
   authority, bounded IPC and lifecycle paths, bounded service proofs, one
   image plus support audit over the real kernel artifact, one explicit
@@ -65,15 +67,16 @@ Repository status note
   the root proof lane.
 - The strongest next question is no longer whether the repository can produce
   a real kernel artifact at all. It is how to widen that artifact after the
-  first syscall-boundary thinness audit without blurring subsystem ownership,
+  first interrupt-boundary clarification without blurring subsystem ownership,
   overselling platform maturity, or reopening language work before a concrete
   owner gap exists.
 
 What this roadmap is trying to answer
 -------------------------------------
 - What likely comes after the first running-kernel statement, first ownership
-  split, first lifecycle-owner clarification, and first syscall-boundary
-  thinness audit if the repository keeps
+  split, first lifecycle-owner clarification, first syscall-boundary
+  thinness audit, and first interrupt-boundary clarification if the
+  repository keeps
   growing Canopus conservatively?
 - Which follow-on fronts belong first to kernel ownership hardening,
   hardware-boundary truth, running-system follow-through, or image and target
@@ -145,7 +148,10 @@ Band B - Reify Narrow Hardware-Boundary Truth
 Phase 113 is now concrete as one interrupt-entry and generic-dispatch boundary
 over the landed timer-backed wake path.
 
-Phases 114 through 116 should widen only the smallest hardware-facing truth
+Phase 114 is now concrete as one address-space and MMU ownership split over
+the landed first-user and spawn translation-root path.
+
+Phases 115 through 116 should widen only the smallest hardware-facing truth
 required by the next real kernel steps.
 
 Likely themes:
@@ -162,19 +168,15 @@ Why this band comes next:
 
 Historical bridge into this band:
 - Phase 113 is now concrete as `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`.
-- That phase turned one landed timer-backed wake path into an explicit
-  architecture-entry plus generic-dispatch boundary without widening the
-  admitted running slice, and it leaves the next open question centered on
-  address-space, MMU, and later timer hardening rather than on whether one
-  interrupt path exists honestly at all.
+- Phase 114 is now concrete as `docs/plan/phase114_address_space_and_mmu_ownership_split.txt`.
+- Those phases turned one landed timer-backed wake path into an explicit
+  architecture-entry plus generic-dispatch boundary and then separated generic
+  address-space layout from translation-root mechanics without widening the
+  admitted running slice, and they leave the next open question centered on
+  later timer hardening or low-level hooks rather than on whether one honest
+  interrupt or MMU boundary exists at all.
 
 Possible phases in this band:
-
-Phase 114 -- Address-Space And MMU Ownership Split
-- Exit criterion: the kernel separates generic mapping ownership from whatever
-  architecture-local page-table or translation mechanics the next real kernel
-  step requires, without claiming a broad VM subsystem or richer loader
-  contract yet.
 
 Phase 115 -- Timer Ownership Hardening
 - Exit criterion: the timer-backed wake path is owned through a clearer
@@ -295,9 +297,10 @@ Interpretation guide
 --------------------
 - Treat this as a rough map, not a contract.
 - The current position note remains the canonical statement of present truth.
-- The completed Phase 96 through Phase 111 notes now form the historical map
-  through the first running-kernel, first ownership-split, and first
-  lifecycle-owner-clarification wave.
+- The completed Phase 96 through Phase 114 notes now form the historical map
+  through the first running-kernel, first ownership-split, first lifecycle-
+  owner clarification, first syscall-boundary clarification, first interrupt-
+  boundary clarification, and first address-space/MMU split wave.
 - If a smaller honest plateau appears earlier than Phase 123, that is success,
   not roadmap failure.
 - If a real next kernel step exposes a compiler or language distortion,

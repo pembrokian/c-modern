@@ -1,0 +1,158 @@
+Phase 114 -- Address-Space And MMU Ownership Split
+==================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 113 interrupt-entry and generic-dispatch
+boundary by separating generic address-space layout ownership from the
+architecture-local translation-root mechanics that were still carried inside
+the address-space owner.
+
+This document is both the Phase 114 execution note and its closeout.
+It does not claim a broad VM subsystem, richer loader policy, paging
+algorithms, broader MMU APIs, public mapping management, or a compiler wave.
+It records one narrow ownership split inside the already admitted first
+running Canopus kernel slice.
+
+Repository status note
+----------------------
+- Phase 113 made one timer-backed wake path arrive through explicit
+  interrupt entry plus generic dispatch without widening the admitted running
+  slice.
+- That left the next hardware-facing boundary explicit: `kernel/src/address_space.mc`
+  still mixed generic mapping and user-entry facts with the architecture-local
+  translation-root detail that later MMU work must own more directly.
+- Without one bounded split now, later address-space or MMU work would keep
+  growing as extra fields and checks inside the address-space owner instead of
+  through one visible MMU boundary.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-113 roadmap reserved Phase 114 for one
+  address-space and MMU ownership split before later timer or low-level hook
+  hardening.
+- The landed kernel already had explicit address-space records, saved user
+  frames, spawn follow-through, and scheduler or lifecycle audits, but the
+  same owner still stored and validated the translation root directly as a raw
+  page-table value.
+- That left the next kernel-boundary question unanswered: which owner keeps
+  the generic mapping and entry facts, and which owner keeps the architecture-
+  local translation-root mechanics?
+
+Core rule
+---------
+- Preserve current kernel behavior exactly.
+- Keep generic mapping layout and user-entry shaping in `address_space`.
+- Move translation-root construction and activation into one narrow `mmu`
+  owner instead of leaving page-table mechanics inside `address_space`.
+- Do not expand the compiler or language surface unless this kernel step
+  proves a concrete owner gap. It does not.
+- Prove the split mechanically with one focused regression over the real
+  kernel artifact.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 114 note recording the address-space/MMU ownership
+   split plus the explicit decision not to reopen compiler work
+2. one new `kernel/src/mmu.mc` owner exposing translation-root records plus
+   bounded bootstrap and activation helpers
+3. one update to `kernel/src/address_space.mc` so it depends on the MMU owner
+   for translation-root state while keeping generic mappings and saved user
+   frames in the address-space owner
+4. one update to the current spawn, scheduler, and service follow-through so
+   translation roots move as explicit MMU-owned values instead of raw page-
+   table integers
+5. one new debug-owned Phase 114 audit and one focused freestanding kernel
+   regression covering docs, source call sites, emitted objects, and MIR
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current running slice is
+already honest and the next highest-value hardware-boundary move is making
+translation-root ownership explicit before later timer, MMU, or target work.
+
+What this phase proves
+----------------------
+- the current first running kernel slice can keep the same address-space and
+  spawn behavior while expressing translation-root mechanics through a narrow
+  MMU owner
+- the address-space owner can stay focused on mappings, entry layout, and
+  user-frame shaping rather than carrying architecture-local page-table detail
+- the repository can record an intentional decision not to reopen compiler
+  work because this boundary closes entirely inside the landed kernel tree
+
+Deliverables
+------------
+- one canonical Phase 114 closeout note in `docs/plan/`
+- one new `kernel/src/mmu.mc` owner for translation-root construction and
+  activation
+- updated `kernel/src/address_space.mc`, `kernel/src/main.mc`,
+  `kernel/src/syscall.mc`, `kernel/src/bootstrap_services.mc`, and
+  `kernel/src/sched.mc` so they route translation-root facts through the MMU
+  owner instead of raw page-table values
+- one new debug-owned Phase 114 audit
+- refreshed kernel-facing documentation, roadmap wording, decision records,
+  and one focused Phase 114 freestanding kernel regression
+
+Suggested execution order
+-------------------------
+1. Add the MMU owner and move translation-root construction and activation
+   there.
+2. Rewire first-user construction and child spawn paths to pass MMU-owned
+   translation roots while preserving the same running-slice behavior.
+3. Add the Phase 114 debug audit and documentation updates.
+4. Advance the current kernel proof marker only after the new regression
+   proves the boundary mechanically.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 114 marker without
+  widening the admitted running slice
+- `kernel/src/address_space.mc` no longer owns raw translation-root mechanics
+  directly and instead depends on one narrow MMU owner for those facts
+- the real first-user and child-spawn paths route translation-root state
+  through the MMU owner instead of through raw page-table integers
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 114 boundary consistently
+
+Non-goals
+---------
+- a broad virtual-memory subsystem
+- loader redesign, dynamic mapping policy, or broader paging contracts
+- timer hardening, barrier work, or target-surface widening beyond this split
+- reopening sema, MIR, backend, ABI, or language design without a concrete
+  kernel-owned failure
+
+Implemented slice
+-----------------
+- added `kernel/src/mmu.mc` so the MMU owner now exposes one translation-root
+  record plus bounded bootstrap and activation helpers
+- updated `kernel/src/address_space.mc` so the address-space owner keeps
+  mappings and saved user frames while translation-root state now flows in as
+  an MMU-owned value
+- updated the real first-user, spawn, scheduler, and service follow-through so
+  the running kernel slice carries translation roots explicitly through the MMU
+  owner instead of raw page-table integers
+- added one debug-owned Phase 114 address-space/MMU boundary audit and one
+  focused freestanding regression covering docs, source imports, object
+  emission, and MIR visibility
+- refreshed the current kernel status docs, roadmap wording, decision log,
+  and backlog so the repository records both the landed ownership split and
+  the decision not to widen compiler work here
+
+Closeout statement
+------------------
+Phase 114 is complete as an address-space and MMU ownership split.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now expresses its translation-root boundary more
+honestly: address-space layout stays generic, MMU mechanics are explicit,
+spawn and first-user construction no longer move raw page-table facts through
+generic owners, and the compiler remains intentionally closed for this step.

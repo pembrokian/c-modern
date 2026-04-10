@@ -44,6 +44,9 @@ void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesy
 void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const std::filesystem::path& source_root,
                                                                            const std::filesystem::path& binary_root,
                                                                            const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit(const std::filesystem::path& source_root,
+                                                                   const std::filesystem::path& binary_root,
+                                                                   const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -61,6 +64,7 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

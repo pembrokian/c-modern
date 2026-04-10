@@ -7,8 +7,8 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position after Phase 113 closed the first
-hardware-boundary clarification over the running kernel slice.
+Record one maintained repository position after Phase 114 closed the first
+address-space and MMU ownership clarification over the running kernel slice.
 
 This note answers four questions that now matter:
 
@@ -19,7 +19,7 @@ This note answers four questions that now matter:
 
 This note is not a support statement, a full phase plan, or a claim that the
 full Canopus architecture is implemented.
-It does not replace the Phase 109 through Phase 113 closeouts, the Canopus
+It does not replace the Phase 109 through Phase 114 closeouts, the Canopus
 architecture notes, or the narrower hosted and freestanding support
 statements.
 
@@ -33,6 +33,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/phase111_scheduler_lifecycle_ownership_clarification.txt`
 - `docs/plan/phase112_syscall_boundary_thinness_audit.txt`
 - `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`
+- `docs/plan/phase114_address_space_and_mmu_ownership_split.txt`
 - `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
 - `docs/plan/freestanding_support_statement.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
@@ -56,8 +57,9 @@ Current repository truth
   bootstrap-capability handoff, bounded service follow-through, kernel image
   and program-cap audit, an aggregate Phase 109 running-slice audit, a landed
   Phase 110 ownership split, a landed Phase 111 lifecycle-owner
-  clarification, a landed Phase 112 syscall-boundary thinness audit, and a
-  landed Phase 113 interrupt-entry and generic-dispatch boundary.
+  clarification, a landed Phase 112 syscall-boundary thinness audit, a landed
+  Phase 113 interrupt-entry and generic-dispatch boundary, and a landed Phase
+  114 address-space and MMU ownership split.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   implementation slice rather than only for freestanding representation proofs.
@@ -83,8 +85,8 @@ It means:
   scheduler-completion claims remain out of scope
 
 The speculative Phase 96 through Phase 109 roadmap is complete as a roadmap
-horizon, and the first ownership-hardening plus interrupt-boundary wave
-through Phase 113 is now also concrete, but the implementation itself is
+horizon, and the first ownership-hardening plus hardware-boundary wave
+through Phase 114 is now also concrete, but the implementation itself is
 still at an early kernel plateau rather than at architectural completion.
 
 Kernel maturity and quality
@@ -143,13 +145,14 @@ What it still does not prove:
 
 - broad target portability beyond the bootstrap proof lane
 - a public freestanding workflow comparable to hosted `mc run` or `mc test`
-- complete trap, interrupt, MMU, barrier, or device frameworks
+- complete trap, interrupt, MMU, barrier, or device frameworks beyond the
+  landed translation-root split
 - a general loader, namespace, or service-discovery model
 - evidence that new core-language machinery is the next owner by default
 
 Working engineering stance
 --------------------------
-The right stance after Phase 113 is still conservative.
+The right stance after Phase 114 is still conservative.
 
 - treat the current core language as sufficient until a real next kernel step
   proves otherwise
@@ -248,9 +251,9 @@ speculative language machinery.
 
 Bottom line
 -----------
-Canopus should currently be described as a bounded first running kernel, and
-Modern C should currently be described as capable of carrying that running
-kernel slice.
+Canopus should currently be described as a bounded first running kernel with a
+landed address-space/MMU ownership split, and Modern C should currently be
+described as capable of carrying that running kernel slice.
 
 Both statements are meaningful, but both remain intentionally narrow.
 The repository is beyond readiness and beyond pure proof sketches, yet still

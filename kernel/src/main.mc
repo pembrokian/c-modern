@@ -9,6 +9,7 @@ import init
 import interrupt
 import lifecycle
 import log_service
+import mmu
 import sched
 import state
 import syscall
@@ -39,7 +40,7 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const PHASE113_MARKER: i32 = 113
+const PHASE114_MARKER: i32 = 114
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -58,6 +59,8 @@ var WAIT_TABLES: [3]capability.WaitTable
 var ENDPOINTS: endpoint.EndpointTable
 var INTERRUPTS: interrupt.InterruptController
 var LAST_INTERRUPT_KIND: interrupt.InterruptDispatchKind
+var INIT_TRANSLATION_ROOT: mmu.TranslationRoot
+var CHILD_TRANSLATION_ROOT: mmu.TranslationRoot
 var SYSCALL_GATE: syscall.SyscallGate
 var INIT_IMAGE: init.InitImage
 var INIT_BOOTSTRAP_CAPS: init.BootstrapCapabilitySet
@@ -120,6 +123,8 @@ func reset_kernel_state() {
     ENDPOINTS = endpoint.empty_table()
     INTERRUPTS = interrupt.reset_controller()
     LAST_INTERRUPT_KIND = interrupt.InterruptDispatchKind.None
+    INIT_TRANSLATION_ROOT = mmu.empty_translation_root()
+    CHILD_TRANSLATION_ROOT = mmu.empty_translation_root()
     SYSCALL_GATE = syscall.gate_closed()
     INIT_IMAGE = init.bootstrap_image()
     INIT_BOOTSTRAP_CAPS = init.empty_bootstrap_capability_set()
@@ -398,7 +403,8 @@ func construct_first_user_address_space() bool {
     }
     slots: [3]state.ProcessSlot = PROCESS_SLOTS
     tasks: [3]state.TaskSlot = TASK_SLOTS
-    ADDRESS_SPACE = address_space.bootstrap_space(INIT_ASID, INIT_PID, INIT_ROOT_PAGE_TABLE, INIT_IMAGE.image_base, INIT_IMAGE.image_size, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_base, INIT_IMAGE.stack_size, INIT_IMAGE.stack_top)
+    INIT_TRANSLATION_ROOT = mmu.bootstrap_translation_root(INIT_ASID, INIT_ROOT_PAGE_TABLE)
+    ADDRESS_SPACE = address_space.bootstrap_space(INIT_ASID, INIT_PID, INIT_TRANSLATION_ROOT, INIT_IMAGE.image_base, INIT_IMAGE.image_size, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_base, INIT_IMAGE.stack_size, INIT_IMAGE.stack_top)
     if address_space.state_score(ADDRESS_SPACE.state) != 2 {
         return false
     }
@@ -471,7 +477,13 @@ func validate_first_user_entry_ready() bool {
     if ADDRESS_SPACE.owner_pid != INIT_PID {
         return false
     }
-    if ADDRESS_SPACE.root_page_table != INIT_ROOT_PAGE_TABLE {
+    if ADDRESS_SPACE.translation_root.page_table_base != INIT_ROOT_PAGE_TABLE {
+        return false
+    }
+    if ADDRESS_SPACE.translation_root.owner_asid != INIT_ASID {
+        return false
+    }
+    if mmu.state_score(ADDRESS_SPACE.translation_root.state) != 2 {
         return false
     }
     if ADDRESS_SPACE.mapping_count != 2 {
@@ -1054,7 +1066,7 @@ func validate_phase104_contract_hardening() bool {
 }
 
 func build_log_service_config() bootstrap_services.LogServiceConfig {
-    return bootstrap_services.log_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, CHILD_ROOT_PAGE_TABLE)
+    return bootstrap_services.log_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
 }
 
 func build_log_service_execution_state() bootstrap_services.LogServiceExecutionState {
@@ -1093,7 +1105,7 @@ func validate_phase105_log_service_handshake() bool {
 }
 
 func build_echo_service_config() bootstrap_services.EchoServiceConfig {
-    return bootstrap_services.echo_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, CHILD_ROOT_PAGE_TABLE)
+    return bootstrap_services.echo_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
 }
 
 func build_echo_service_execution_state() bootstrap_services.EchoServiceExecutionState {
@@ -1132,7 +1144,7 @@ func validate_phase106_echo_service_request_reply() bool {
 }
 
 func build_transfer_service_config() bootstrap_services.TransferServiceConfig {
-    return bootstrap_services.transfer_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, CHILD_ROOT_PAGE_TABLE, TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_RECEIVED_HANDLE_SLOT)
+    return bootstrap_services.transfer_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE), TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_RECEIVED_HANDLE_SLOT)
 }
 
 func build_transfer_service_execution_state() bootstrap_services.TransferServiceExecutionState {
@@ -1186,9 +1198,10 @@ func build_phase109_running_kernel_slice_audit(phase104_contract_hardened: u32, 
 
 func execute_spawn_child_process() bool {
     WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
+    CHILD_TRANSLATION_ROOT = mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
 
     spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(CHILD_WAIT_HANDLE_SLOT)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, INIT_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
+    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, INIT_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_TRANSLATION_ROOT)
     SYSCALL_GATE = spawn_result.gate
     INIT_PROGRAM_CAPABILITY = spawn_result.program_capability
     PROCESS_SLOTS = spawn_result.process_slots
@@ -1318,7 +1331,7 @@ func execute_program_cap_spawn_and_wait() bool {
 }
 
 func build_scheduler_lifecycle_audit() sched.LifecycleAudit {
-    return sched.LifecycleAudit{ init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, child_root_page_table: CHILD_ROOT_PAGE_TABLE, child_exit_code: CHILD_EXIT_CODE, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, init_entry_pc: INIT_IMAGE.entry_pc, init_stack_top: INIT_IMAGE.stack_top, spawn: SPAWN_OBSERVATION, pre_exit_wait: PRE_EXIT_WAIT_OBSERVATION, exit_wait: EXIT_WAIT_OBSERVATION, sleep: SLEEP_OBSERVATION, timer_wake: TIMER_WAKE_OBSERVATION, timer_state: TIMER_STATE, wake_ready_queue: WAKE_READY_QUEUE, wait_table: WAIT_TABLES[1], child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: CHILD_ADDRESS_SPACE, child_user_frame: CHILD_USER_FRAME, ready_queue: READY_QUEUE }
+    return sched.LifecycleAudit{ init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, child_translation_root: CHILD_TRANSLATION_ROOT, child_exit_code: CHILD_EXIT_CODE, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, init_entry_pc: INIT_IMAGE.entry_pc, init_stack_top: INIT_IMAGE.stack_top, spawn: SPAWN_OBSERVATION, pre_exit_wait: PRE_EXIT_WAIT_OBSERVATION, exit_wait: EXIT_WAIT_OBSERVATION, sleep: SLEEP_OBSERVATION, timer_wake: TIMER_WAKE_OBSERVATION, timer_state: TIMER_STATE, wake_ready_queue: WAKE_READY_QUEUE, wait_table: WAIT_TABLES[1], child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: CHILD_ADDRESS_SPACE, child_user_frame: CHILD_USER_FRAME, ready_queue: READY_QUEUE }
 }
 
 func bootstrap_main() i32 {
@@ -1402,89 +1415,95 @@ func bootstrap_main() i32 {
         return 31
     }
     address_space_contract_hardened = 1
-    if !interrupt.validate_interrupt_entry_and_dispatch_boundary() {
+    if !mmu.validate_address_space_mmu_boundary() {
         return 32
+    }
+    if !interrupt.validate_interrupt_entry_and_dispatch_boundary() {
+        return 33
     }
     interrupt_contract_hardened = 1
     if !validate_phase104_contract_hardening() {
-        return 33
+        return 34
     }
     phase104_contract_hardened = 1
     if !execute_phase105_log_service_handshake() {
-        return 34
-    }
-    if !validate_phase105_log_service_handshake() {
         return 35
     }
-    if !execute_phase106_echo_service_request_reply() {
+    if !validate_phase105_log_service_handshake() {
         return 36
     }
-    if !validate_phase106_echo_service_request_reply() {
+    if !execute_phase106_echo_service_request_reply() {
         return 37
     }
-    if !execute_phase107_user_to_user_capability_transfer() {
+    if !validate_phase106_echo_service_request_reply() {
         return 38
     }
-    if !validate_phase107_user_to_user_capability_transfer() {
+    if !execute_phase107_user_to_user_capability_transfer() {
         return 39
     }
-    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+    if !validate_phase107_user_to_user_capability_transfer() {
         return 40
+    }
+    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+        return 41
     }
     phase108_contract_hardened = 1
     running_slice_audit: debug.RunningKernelSliceAudit = build_phase109_running_kernel_slice_audit(phase104_contract_hardened, phase108_contract_hardened)
     if !debug.validate_phase109_first_running_kernel_slice(running_slice_audit) {
-        return 41
-    }
-    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
         return 42
     }
-    if !debug.validate_phase111_scheduler_and_lifecycle_ownership(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened) {
+    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
         return 43
     }
-    if !debug.validate_phase112_syscall_boundary_thinness(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened) {
+    if !debug.validate_phase111_scheduler_and_lifecycle_ownership(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened) {
         return 44
     }
-    if !debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, LAST_INTERRUPT_KIND) {
+    if !debug.validate_phase112_syscall_boundary_thinness(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened) {
         return 45
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 113)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, LAST_INTERRUPT_KIND) {
         return 46
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase114_address_space_and_mmu_ownership_split(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened) {
         return 47
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 114)
+    if BOOT_MARKER_EMITTED != 1 {
         return 48
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 49
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 50
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 51
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 52
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 53
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 113 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 54
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 55
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 114 {
         return 56
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 57
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 58
     }
     if USER_FRAME.task_id != INIT_TID {
         return 57
     }
-    return PHASE113_MARKER
+    return PHASE114_MARKER
 }

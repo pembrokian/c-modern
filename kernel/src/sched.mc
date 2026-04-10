@@ -1,5 +1,6 @@
 import address_space
 import capability
+import mmu
 import state
 import syscall
 import timer
@@ -9,7 +10,7 @@ struct LifecycleAudit {
     child_pid: u32
     child_tid: u32
     child_asid: u32
-    child_root_page_table: usize
+    child_translation_root: mmu.TranslationRoot
     child_exit_code: i32
     child_wait_handle_slot: u32
     init_entry_pc: usize
@@ -141,7 +142,13 @@ func validate_program_cap_spawn_and_wait(audit: LifecycleAudit) bool {
     if audit.child_address_space.owner_pid != audit.child_pid {
         return false
     }
-    if audit.child_address_space.root_page_table != audit.child_root_page_table {
+    if audit.child_address_space.translation_root.page_table_base != audit.child_translation_root.page_table_base {
+        return false
+    }
+    if audit.child_address_space.translation_root.owner_asid != audit.child_translation_root.owner_asid {
+        return false
+    }
+    if mmu.state_score(audit.child_address_space.translation_root.state) != 2 {
         return false
     }
     if audit.child_address_space.entry_pc != audit.init_entry_pc {

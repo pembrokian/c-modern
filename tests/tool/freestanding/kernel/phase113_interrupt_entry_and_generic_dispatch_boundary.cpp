@@ -19,7 +19,7 @@ void ExpectPhase113BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase113_interrupt_boundary_run_output.txt",
                                                              "freestanding kernel phase113 interrupt boundary run");
-    if (!run_outcome.exited || run_outcome.exit_code != 113) {
+    if (!run_outcome.exited || run_outcome.exit_code != 114) {
         Fail("phase113 freestanding kernel interrupt boundary run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -56,23 +56,23 @@ void ExpectPhase113PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string position = ReadFile(position_path);
     ExpectOutputContains(position,
-                         "after Phase 113 closed the first",
+                         "after Phase 114 closed the first",
                          "phase113 position note should advance the current repository position");
     ExpectOutputContains(position,
-                         "interrupt-entry and generic-dispatch boundary.",
+                         "address-space and MMU ownership split.",
                          "phase113 position note should reference the new closeout");
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 113 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 114 has moved the repository-owned kernel artifact beyond the landed",
                          "phase113 kernel README should record the interrupt boundary as current status");
     ExpectOutputContains(kernel_readme,
-                         "interrupt-entry and generic-dispatch boundary",
+                         "address-space and MMU ownership split",
                          "phase113 kernel README should describe the interrupt owner");
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 113 interrupt-entry-and-generic-dispatch-bounded kernel target",
+                         "currently a Phase 114 address-space-and-mmu-ownership-bounded kernel target",
                          "phase113 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase113_interrupt_entry_and_generic_dispatch_boundary.cpp",
@@ -82,6 +82,9 @@ void ExpectPhase113PublicationSlice(const std::filesystem::path& phase_doc_path,
     ExpectOutputContains(freestanding_readme,
                          "phase113_interrupt_entry_and_generic_dispatch_boundary.cpp",
                          "phase113 freestanding README should list the new kernel proof owner");
+    ExpectOutputContains(freestanding_readme,
+                         "phase114_address_space_and_mmu_ownership_split.cpp",
+                         "phase113 freestanding README should reflect the next landed kernel proof owner");
 
     const std::string decision_log = ReadFile(decision_log_path);
     ExpectOutputContains(decision_log,
@@ -100,7 +103,7 @@ void ExpectPhase113MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE113_MARKER] type=i32",
+            "ConstGlobal names=[PHASE114_MARKER] type=i32",
             "Function name=interrupt.arch_enter_interrupt returns=[interrupt.InterruptEntry]",
             "Function name=interrupt.dispatch_interrupt returns=[interrupt.InterruptDispatchResult]",
             "Function name=interrupt.validate_interrupt_entry_and_dispatch_boundary returns=[bool]",

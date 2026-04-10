@@ -3,6 +3,7 @@ import capability
 import endpoint
 import init
 import lifecycle
+import mmu
 import state
 import timer
 
@@ -349,7 +350,7 @@ func perform_receive(gate: SyscallGate, handle_table: capability.HandleTable, en
     return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Ok, 0, 1), install.handle_table, received.endpoints, observation)
 }
 
-func perform_spawn(gate: SyscallGate, program_capability: capability.CapabilitySlot, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, child_image: init.InitImage, request: SpawnRequest, child_pid: u32, child_tid: u32, child_asid: u32, child_root_page_table: usize) SpawnResult {
+func perform_spawn(gate: SyscallGate, program_capability: capability.CapabilitySlot, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, child_image: init.InitImage, request: SpawnRequest, child_pid: u32, child_tid: u32, child_asid: u32, child_translation_root: mmu.TranslationRoot) SpawnResult {
     if gate.open == 0 {
         return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.Closed, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: SyscallStatus.Closed, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
     }
@@ -357,7 +358,7 @@ func perform_spawn(gate: SyscallGate, program_capability: capability.CapabilityS
     if status_score(admission.status) != 2 {
         return spawn_result(update_gate(gate, SyscallId.Spawn, admission.status, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: admission.status, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
     }
-    child_bootstrap: address_space.SpawnBootstrap = address_space.build_child_bootstrap_context(child_pid, child_tid, child_asid, child_root_page_table, child_image.image_base, child_image.image_size, child_image.entry_pc, child_image.stack_base, child_image.stack_size, child_image.stack_top)
+    child_bootstrap: address_space.SpawnBootstrap = address_space.build_child_bootstrap_context(child_pid, child_tid, child_asid, child_translation_root, child_image.image_base, child_image.image_size, child_image.entry_pc, child_image.stack_base, child_image.stack_size, child_image.stack_top)
     if child_bootstrap.valid == 0 {
         return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.InvalidCapability, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: SyscallStatus.InvalidCapability, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
     }

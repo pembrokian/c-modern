@@ -310,3 +310,16 @@ func validate_phase113_interrupt_entry_and_generic_dispatch_boundary(audit: Runn
     }
     return validate_phase112_syscall_boundary_thinness(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened)
 }
+
+func validate_phase114_address_space_and_mmu_ownership_split(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32) bool {
+    if interrupt_contract_hardened == 0 {
+        return false
+    }
+    if audit.kernel.active_asid != audit.init_asid {
+        return false
+    }
+    if audit.init_user_frame.address_space_id != audit.init_asid {
+        return false
+    }
+    return validate_phase113_interrupt_entry_and_generic_dispatch_boundary(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, interrupt.InterruptDispatchKind.TimerWake)
+}

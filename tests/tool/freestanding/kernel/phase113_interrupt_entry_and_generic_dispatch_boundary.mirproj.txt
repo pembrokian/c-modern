@@ -1,9 +1,9 @@
-  ConstGlobal names=[PHASE113_MARKER] type=i32
+  ConstGlobal names=[PHASE114_MARKER] type=i32
   Function name=interrupt.arch_enter_interrupt returns=[interrupt.InterruptEntry]
   Function name=interrupt.dispatch_interrupt returns=[interrupt.InterruptDispatchResult]
   Function name=interrupt.validate_interrupt_entry_and_dispatch_boundary returns=[bool]
   Function name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary returns=[bool]
       symbol_ref %v14:proc(interrupt.InterruptController, u32, u32)->interrupt.InterruptEntry target=interrupt.arch_enter_interrupt target_kind=function target_name=interrupt.arch_enter_interrupt
       symbol_ref %v49:proc(interrupt.InterruptEntry, timer.TimerState, u64)->interrupt.InterruptDispatchResult target=interrupt.dispatch_interrupt target_kind=function target_name=interrupt.dispatch_interrupt
-      symbol_ref %v115:proc()->bool target=interrupt.validate_interrupt_entry_and_dispatch_boundary target_kind=function target_name=interrupt.validate_interrupt_entry_and_dispatch_boundary
-      symbol_ref %v196:proc(debug.RunningKernelSliceAudit, u32, u32, u32, u32, u32, u32, interrupt.InterruptDispatchKind)->bool target=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary target_kind=function target_name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary
+      symbol_ref %v119:proc()->bool target=interrupt.validate_interrupt_entry_and_dispatch_boundary target_kind=function target_name=interrupt.validate_interrupt_entry_and_dispatch_boundary
+      symbol_ref %v29:proc(debug.RunningKernelSliceAudit, u32, u32, u32, u32, u32, u32, interrupt.InterruptDispatchKind)->bool target=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary target_kind=function target_name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary

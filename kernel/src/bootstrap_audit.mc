@@ -5,6 +5,7 @@ import echo_service
 import endpoint
 import init
 import log_service
+import mmu
 import state
 import syscall
 import timer
@@ -264,7 +265,7 @@ func validate_bootstrap_layout_contracts(audit: BootstrapLayoutAudit) bool {
     if init.bootstrap_image_valid(invalid_image) {
         return false
     }
-    invalid_space: address_space.AddressSpace = address_space.bootstrap_space(3, 7, audit.init_root_page_table, invalid_image.image_base, invalid_image.image_size, invalid_image.entry_pc, invalid_image.stack_base, invalid_image.stack_size, invalid_image.stack_top)
+    invalid_space: address_space.AddressSpace = address_space.bootstrap_space(3, 7, mmu.bootstrap_translation_root(3, audit.init_root_page_table), invalid_image.image_base, invalid_image.image_size, invalid_image.entry_pc, invalid_image.stack_base, invalid_image.stack_size, invalid_image.stack_top)
     if address_space.state_score(invalid_space.state) != 1 {
         return false
     }
@@ -415,7 +416,7 @@ func validate_syscall_contract_hardening(audit: SyscallHardeningAudit) bool {
     spawn_task_slots[2] = state.user_task_slot(9, 9, 9, audit.init_image.entry_pc, audit.init_image.stack_top)
     spawn_waits: capability.WaitTable = capability.wait_table_for_owner(audit.init_pid)
     local_program_capability: capability.CapabilitySlot = capability.bootstrap_init_program_slot(audit.init_pid)
-    local_spawn: syscall.SpawnResult = syscall.perform_spawn(local_gate, local_program_capability, spawn_process_slots, spawn_task_slots, spawn_waits, audit.init_image, syscall.build_spawn_request(audit.child_wait_handle_slot), audit.child_pid, audit.child_tid, audit.child_asid, audit.child_root_page_table)
+    local_spawn: syscall.SpawnResult = syscall.perform_spawn(local_gate, local_program_capability, spawn_process_slots, spawn_task_slots, spawn_waits, audit.init_image, syscall.build_spawn_request(audit.child_wait_handle_slot), audit.child_pid, audit.child_tid, audit.child_asid, mmu.bootstrap_translation_root(audit.child_asid, audit.child_root_page_table))
     if syscall.status_score(local_spawn.observation.status) != 2 {
         return false
     }
