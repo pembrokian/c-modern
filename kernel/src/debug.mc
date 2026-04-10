@@ -2,6 +2,7 @@ import address_space
 import capability
 import echo_service
 import init
+import interrupt
 import log_service
 import state
 import syscall
@@ -298,4 +299,14 @@ func validate_phase112_syscall_boundary_thinness(audit: RunningKernelSliceAudit,
         return false
     }
     return validate_phase111_scheduler_and_lifecycle_ownership(audit, scheduler_contract_hardened, lifecycle_contract_hardened)
+}
+
+func validate_phase113_interrupt_entry_and_generic_dispatch_boundary(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, interrupt_dispatch_kind: interrupt.InterruptDispatchKind) bool {
+    if interrupt_contract_hardened == 0 {
+        return false
+    }
+    if interrupt.dispatch_kind_score(interrupt_dispatch_kind) != 2 {
+        return false
+    }
+    return validate_phase112_syscall_boundary_thinness(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened)
 }

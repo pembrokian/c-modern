@@ -6,9 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 112 has moved the repository-owned kernel artifact beyond the landed
-  Phase 111 scheduler and lifecycle ownership clarification into one bounded
-  syscall boundary thinness audit.
+- Phase 113 has moved the repository-owned kernel artifact beyond the landed
+  Phase 112 syscall boundary thinness audit into one bounded interrupt-entry
+  and generic-dispatch boundary.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -30,15 +30,16 @@ Current status
   receiver-side installation, one bounded kernel image-input and program-cap
   audit, one bounded first running Canopus kernel slice audit, one bounded
   kernel ownership split audit, one bounded scheduler and lifecycle ownership
-  clarification, one bounded syscall boundary thinness audit, and no broader
-  multi-service bring-up yet.
+  clarification, one bounded syscall boundary thinness audit, one bounded
+  interrupt-entry and generic-dispatch boundary, and no broader multi-service
+  bring-up yet.
 
 Current files
 -------------
 
 - `build.toml`: freestanding kernel manifest for the current proof slice and
-  the explicit kernel image-input contract carried through the Phase 112
-  syscall-boundary thinness audit
+  the explicit kernel image-input contract carried through the Phase 113
+  interrupt-entry and generic-dispatch boundary
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core setup, bounded syscall-byte-IPC setup, bounded capability-
   carrying transfer setup, bounded service proof sequencing, and thin root
@@ -49,7 +50,8 @@ Current files
   spawn, block, ready, exit, and waited-child release follow-through
 - `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109
   running-slice audit, Phase 110 ownership-split audit, Phase 111
-  lifecycle-ownership audit, and Phase 112 syscall-boundary audit
+  lifecycle-ownership audit, Phase 112 syscall-boundary audit, and Phase 113
+  interrupt-boundary audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -65,7 +67,8 @@ Current files
 - `src/endpoint.mc`: bounded endpoint table, queued-message ring, and
   attached-handle message state plus endpoint-owned runtime queue helpers for
   the landed syscall slice
-- `src/interrupt.mc`: bounded interrupt controller skeleton
+- `src/interrupt.mc`: bounded interrupt controller, architecture-entry
+  records, and generic dispatch handoff for the landed timer-backed wake path
 - `src/syscall.mc`: bounded syscall gate, byte-plus-capability request,
   spawn-and-wait request, and thin observation state over capability,
   endpoint, address-space, and lifecycle owners
@@ -86,9 +89,11 @@ Phase boundary
   service-side follow-through, one bounded kernel image-and-program-cap audit,
   one bounded first running Canopus kernel slice audit, one bounded kernel
   ownership split audit, one bounded scheduler and lifecycle ownership
-  clarification, and one bounded syscall boundary thinness audit.
+  clarification, one bounded syscall boundary thinness audit, and one bounded
+  interrupt-entry and generic-dispatch boundary.
 - The repository can now honestly claim one first running Canopus kernel
-  slice with an explicit Phase 112 syscall-boundary thinness audit: explicit
+  slice with an explicit Phase 113 interrupt-entry and generic-dispatch
+  boundary: explicit
   boot
   entry,
   first user entry, endpoint-and-handle object core, syscall-owned byte-only
@@ -96,6 +101,8 @@ Phase boundary
   wake, init bootstrap-capability handoff, real log-service handshake, real
   echo-service request-reply, real user-to-user capability transfer, and
   kernel image/program-cap audit, with syscall decode and observation shaping
-  separated from capability, endpoint, address-space, and lifecycle semantics.
+  separated from capability, endpoint, address-space, and lifecycle
+  semantics, and with one bounded interrupt path expressed as explicit
+  architecture entry plus generic dispatch.
 - It does not yet claim general loading, multi-service launch, namespace
   policy, kill semantics, or a running init-owned service set.

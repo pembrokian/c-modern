@@ -142,7 +142,10 @@ Historical bridge into this band:
 
 Band B - Reify Narrow Hardware-Boundary Truth
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 113 through 116 should widen only the smallest hardware-facing truth
+Phase 113 is now concrete as one interrupt-entry and generic-dispatch boundary
+over the landed timer-backed wake path.
+
+Phases 114 through 116 should widen only the smallest hardware-facing truth
 required by the next real kernel steps.
 
 Likely themes:
@@ -157,12 +160,15 @@ Why this band comes next:
   and scheduler hardening work should come only after the mapping and memory-
   ownership split it depends on is clearer.
 
-Possible phases in this band:
+Historical bridge into this band:
+- Phase 113 is now concrete as `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`.
+- That phase turned one landed timer-backed wake path into an explicit
+  architecture-entry plus generic-dispatch boundary without widening the
+  admitted running slice, and it leaves the next open question centered on
+  address-space, MMU, and later timer hardening rather than on whether one
+  interrupt path exists honestly at all.
 
-Phase 113 -- Interrupt Entry And Generic Dispatch Boundary
-- Exit criterion: one bounded interrupt or trap path is expressed as an
-  architecture-local entry plus one generic interrupt handoff without widening
-  into a broad interrupt framework or public timer API.
+Possible phases in this band:
 
 Phase 114 -- Address-Space And MMU Ownership Split
 - Exit criterion: the kernel separates generic mapping ownership from whatever

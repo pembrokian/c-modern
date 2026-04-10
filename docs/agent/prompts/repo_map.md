@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 112 syscall-boundary-thinness-audited kernel target
+- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 113 interrupt-entry-and-generic-dispatch-bounded kernel target
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Canopus source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
@@ -30,10 +30,10 @@ This file is a fast orientation map for agents working in this repository.
 - `kernel`
   - repository-owned Canopus kernel sources rather than disposable proof-only fixtures
   - `build.toml`: freestanding kernel manifest for the active bring-up slice
-  - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed first-user-entry, endpoint core, syscall IPC, service, scheduler, lifecycle, and debug audit owners through the Phase 112 syscall-boundary thinness audit
+  - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed first-user-entry, endpoint core, syscall IPC, interrupt handoff, service, scheduler, lifecycle, and debug audit owners through the Phase 113 interrupt-entry and generic-dispatch boundary
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
   - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for spawn, timer block, wake-to-ready, exit, and waited-child release follow-through
-  - `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109 first-running-kernel-slice audit, Phase 110 ownership-split audit, Phase 111 lifecycle-ownership audit, and Phase 112 syscall-boundary audit
+  - `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109 first-running-kernel-slice audit, Phase 110 ownership-split audit, Phase 111 lifecycle-ownership audit, Phase 112 syscall-boundary audit, and Phase 113 interrupt-boundary audit
   - `src/log_service.mc`: bounded log-service protocol state, acknowledgment payload, and handshake observation records
   - `src/echo_service.mc`: bounded echo-service protocol state, request-derived reply payload, and exchange observation records
   - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
@@ -42,7 +42,7 @@ This file is a fast orientation map for agents working in this repository.
   - `src/capability.mc`: bounded bootstrap capability slots, per-process handle-table records, explicit wait-handle records, and handle-move helpers
   - `src/endpoint.mc`: bounded endpoint-table, queued-message, attached-handle message, and runtime queue helper records
   - `src/syscall.mc`: bounded syscall gate, byte-plus-capability send-and-receive request, bounded spawn-and-wait request, and thin observation records over the landed owner modules
-  - `src/interrupt.mc`: bounded interrupt controller skeleton
+  - `src/interrupt.mc`: bounded interrupt controller, architecture-entry records, and generic dispatch handoff for the landed timer-backed wake path
   - `src/init.mc`: bounded boot-bundled init image descriptor plus explicit init bootstrap-capability handoff records
 
 - `compiler/driver`
@@ -117,7 +117,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
     - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
     - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator
-    - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase103_init_bootstrap_handoff.cpp`, `phase105_real_log_service_handshake.cpp`, `phase106_real_echo_service_request_reply.cpp`, `phase107_real_user_to_user_capability_transfer.cpp`, `phase108_kernel_image_program_cap_audit.cpp`, `phase109_first_running_kernel_slice_audit.cpp`, `phase110_kernel_ownership_split_audit.cpp`, `phase111_scheduler_lifecycle_ownership_clarification.cpp`, `phase112_syscall_boundary_thinness_audit.cpp`: one kernel proof per file
+    - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase103_init_bootstrap_handoff.cpp`, `phase105_real_log_service_handshake.cpp`, `phase106_real_echo_service_request_reply.cpp`, `phase107_real_user_to_user_capability_transfer.cpp`, `phase108_kernel_image_program_cap_audit.cpp`, `phase109_first_running_kernel_slice_audit.cpp`, `phase110_kernel_ownership_split_audit.cpp`, `phase111_scheduler_lifecycle_ownership_clarification.cpp`, `phase112_syscall_boundary_thinness_audit.cpp`, `phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`: one kernel proof per file
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
   - if freestanding or Canopus coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split

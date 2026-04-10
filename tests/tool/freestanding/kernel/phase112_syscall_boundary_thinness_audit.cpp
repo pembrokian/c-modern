@@ -50,7 +50,7 @@ void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesy
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase112_syscall_boundary_run_output.txt",
                                                              "freestanding kernel phase112 syscall-boundary audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 112) {
+    if (!run_outcome.exited || run_outcome.exit_code != 113) {
         Fail("phase112 freestanding kernel syscall-boundary audit run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -79,7 +79,7 @@ void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesy
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 112 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 113 has moved the repository-owned kernel artifact beyond the landed",
                          "phase112 kernel README should record the syscall-boundary audit as current status");
     ExpectOutputContains(kernel_readme,
                          "thin observation state over capability,",
@@ -87,7 +87,7 @@ void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesy
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 112 syscall-boundary-thinness-audited kernel target",
+                         "currently a Phase 113 interrupt-entry-and-generic-dispatch-bounded kernel target",
                          "phase112 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase112_syscall_boundary_thinness_audit.cpp",
@@ -100,7 +100,7 @@ void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesy
 
     const std::string main_source = ReadFile(main_source_path);
     ExpectOutputContains(main_source,
-                         "const PHASE112_MARKER: i32 = 112",
+                         "const PHASE113_MARKER: i32 = 113",
                          "phase112 main module should advance the current kernel marker");
     ExpectOutputContains(main_source,
                          "capability.validate_syscall_capability_boundary",
@@ -175,7 +175,7 @@ void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesy
 
     const std::string kernel_mir = ReadFile(dump_targets.mir);
     ExpectOutputContains(kernel_mir,
-                         "ConstGlobal names=[PHASE112_MARKER] type=i32",
+                         "ConstGlobal names=[PHASE113_MARKER] type=i32",
                          "phase112 merged MIR should expose the current kernel marker");
     ExpectOutputContains(kernel_mir,
                          "Function name=capability.validate_syscall_capability_boundary returns=[bool]",

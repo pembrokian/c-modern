@@ -60,7 +60,7 @@ const TRANSFER_SERVICE_GRANT_BYTE1: u8 = 73
 const TRANSFER_SERVICE_GRANT_BYTE2: u8 = 86
 const TRANSFER_SERVICE_GRANT_BYTE3: u8 = 69
 const TRANSFER_SERVICE_EXIT_CODE: i32 = 54
-const PHASE112_MARKER: i32 = 112
+const PHASE113_MARKER: i32 = 113
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -78,6 +78,7 @@ var HANDLE_TABLES: [3]capability.HandleTable
 var WAIT_TABLES: [3]capability.WaitTable
 var ENDPOINTS: endpoint.EndpointTable
 var INTERRUPTS: interrupt.InterruptController
+var LAST_INTERRUPT_KIND: interrupt.InterruptDispatchKind
 var SYSCALL_GATE: syscall.SyscallGate
 var INIT_IMAGE: init.InitImage
 var INIT_BOOTSTRAP_CAPS: init.BootstrapCapabilitySet
@@ -139,6 +140,7 @@ func reset_kernel_state() {
     WAIT_TABLES = capability.zero_wait_tables()
     ENDPOINTS = endpoint.empty_table()
     INTERRUPTS = interrupt.reset_controller()
+    LAST_INTERRUPT_KIND = interrupt.InterruptDispatchKind.None
     SYSCALL_GATE = syscall.gate_closed()
     INIT_IMAGE = init.bootstrap_image()
     INIT_BOOTSTRAP_CAPS = init.empty_bootstrap_capability_set()
@@ -276,6 +278,18 @@ func validate_seeded_owner_state() bool {
         return false
     }
     if INTERRUPTS.timer_vector != 32 {
+        return false
+    }
+    if INTERRUPTS.last_vector != 0 {
+        return false
+    }
+    if INTERRUPTS.last_source_actor != 0 {
+        return false
+    }
+    if INTERRUPTS.entry_count != 0 {
+        return false
+    }
+    if INTERRUPTS.dispatch_count != 0 {
         return false
     }
     if syscall.id_score(SYSCALL_GATE.last_id) != 1 {
@@ -2283,10 +2297,13 @@ func execute_child_sleep_transition() bool {
 }
 
 func execute_child_timer_wake_transition() bool {
-    TIMER_STATE = timer.advance_tick(TIMER_STATE, 1)
-    wake_result: timer.TimerWakeResult = timer.wake_fired_sleepers(TIMER_STATE)
-    TIMER_STATE = wake_result.timer_state
-    TIMER_WAKE_OBSERVATION = wake_result.observation
+    interrupt_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, 32, ARCH_ACTOR)
+    INTERRUPTS = interrupt_entry.controller
+    dispatch_result: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(interrupt_entry, TIMER_STATE, 1)
+    INTERRUPTS = dispatch_result.controller
+    TIMER_STATE = dispatch_result.timer_state
+    TIMER_WAKE_OBSERVATION = dispatch_result.wake_observation
+    LAST_INTERRUPT_KIND = dispatch_result.kind
     TIMER_STATE = timer.consume_wake(TIMER_STATE, TIMER_WAKE_OBSERVATION.task_id)
     wake_transition: lifecycle.TaskTransition = lifecycle.ready_task(TASK_SLOTS, 2)
     TASK_SLOTS = wake_transition.task_slots
@@ -2302,6 +2319,9 @@ func execute_child_timer_wake_transition() bool {
         return false
     }
     if TIMER_WAKE_OBSERVATION.wake_count != 1 {
+        return false
+    }
+    if interrupt.dispatch_kind_score(LAST_INTERRUPT_KIND) != 2 {
         return false
     }
     if TIMER_STATE.monotonic_tick != 1 {
@@ -2379,6 +2399,7 @@ func bootstrap_main() i32 {
     capability_contract_hardened: u32 = 0
     ipc_contract_hardened: u32 = 0
     address_space_contract_hardened: u32 = 0
+    interrupt_contract_hardened: u32 = 0
     if !architecture_entry() {
         return 10
     }
@@ -2451,82 +2472,89 @@ func bootstrap_main() i32 {
         return 31
     }
     address_space_contract_hardened = 1
-    if !validate_phase104_contract_hardening() {
+    if !interrupt.validate_interrupt_entry_and_dispatch_boundary() {
         return 32
+    }
+    interrupt_contract_hardened = 1
+    if !validate_phase104_contract_hardening() {
+        return 33
     }
     phase104_contract_hardened = 1
     if !execute_phase105_log_service_handshake() {
-        return 33
-    }
-    if !validate_phase105_log_service_handshake() {
         return 34
     }
-    if !execute_phase106_echo_service_request_reply() {
+    if !validate_phase105_log_service_handshake() {
         return 35
     }
-    if !validate_phase106_echo_service_request_reply() {
+    if !execute_phase106_echo_service_request_reply() {
         return 36
     }
-    if !execute_phase107_user_to_user_capability_transfer() {
+    if !validate_phase106_echo_service_request_reply() {
         return 37
     }
-    if !validate_phase107_user_to_user_capability_transfer() {
+    if !execute_phase107_user_to_user_capability_transfer() {
         return 38
     }
-    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+    if !validate_phase107_user_to_user_capability_transfer() {
         return 39
+    }
+    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+        return 40
     }
     phase108_contract_hardened = 1
     running_slice_audit: debug.RunningKernelSliceAudit = build_phase109_running_kernel_slice_audit(phase104_contract_hardened, phase108_contract_hardened)
     if !debug.validate_phase109_first_running_kernel_slice(running_slice_audit) {
-        return 40
-    }
-    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
         return 41
     }
-    if !debug.validate_phase111_scheduler_and_lifecycle_ownership(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened) {
+    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
         return 42
     }
-    if !debug.validate_phase112_syscall_boundary_thinness(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened) {
+    if !debug.validate_phase111_scheduler_and_lifecycle_ownership(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened) {
         return 43
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 112)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !debug.validate_phase112_syscall_boundary_thinness(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened) {
         return 44
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, LAST_INTERRUPT_KIND) {
         return 45
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 113)
+    if BOOT_MARKER_EMITTED != 1 {
         return 46
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 47
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 48
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 49
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 50
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 51
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 112 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 52
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 53
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 113 {
         return 54
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 55
     }
-    return PHASE112_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 56
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 57
+    }
+    return PHASE113_MARKER
 }

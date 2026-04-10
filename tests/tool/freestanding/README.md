@@ -24,6 +24,7 @@ Structure
   - `phase110_kernel_ownership_split_audit.cpp`: real-kernel ownership split audit.
   - `phase111_scheduler_lifecycle_ownership_clarification.cpp`: real-kernel scheduler and lifecycle ownership clarification audit.
   - `phase112_syscall_boundary_thinness_audit.cpp`: real-kernel syscall boundary thinness audit.
+  - `phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`: real-kernel interrupt-entry and generic-dispatch boundary audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

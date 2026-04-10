@@ -1,0 +1,158 @@
+Phase 113 -- Interrupt Entry And Generic Dispatch Boundary
+==========================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 112 syscall boundary thinness audit by
+making one bounded interrupt path explicit as architecture-local entry plus
+generic kernel dispatch instead of leaving timer-facing interrupt follow-
+through as ad hoc root-proof sequencing.
+
+This document is both the Phase 113 execution note and its closeout.
+It does not claim a broad interrupt framework, general trap handling,
+preemption, a public timer API, broader MMU work, or a compiler wave.
+It records one narrow hardware-boundary step inside the already admitted
+first running Canopus kernel slice.
+
+Repository status note
+----------------------
+- Phase 112 kept `kernel/src/syscall.mc` thin by routing IPC, capability,
+  address-space, and lifecycle semantics through their owner modules while
+  preserving the same running kernel slice.
+- That left the next hardware-facing question explicit: the current kernel
+  still had a timer-backed wake proof, but no owned interrupt-entry or
+  generic dispatch boundary over that wake path.
+- Without one bounded interrupt step now, later timer and hardware work would
+  keep growing as direct root-proof sequencing in `kernel/src/main.mc`
+  instead of through one visible interrupt owner.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-112 roadmap reserved Phase 113 for one bounded
+  interrupt entry and generic dispatch boundary before wider MMU or timer
+  hardening work.
+- The landed kernel already had explicit timer, lifecycle, scheduler, and
+  debug owners, but `kernel/src/interrupt.mc` was still only a controller
+  skeleton with no architecture-entry or generic dispatch surface.
+- That left the next kernel-boundary question unanswered: where does one real
+  interrupt arrive, and who owns the handoff from architecture-local entry to
+  generic kernel follow-through?
+
+Core rule
+---------
+- Preserve current kernel behavior exactly.
+- Make one architecture-local interrupt entry visible as an explicit
+  interrupt-owned record.
+- Route one bounded timer-backed wake path through one generic interrupt
+  dispatch helper instead of direct root-proof sequencing.
+- Do not expand the compiler or language surface unless this kernel step
+  proves a concrete owner gap. It does not.
+- Prove the boundary mechanically with one focused regression over the real
+  kernel artifact.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 113 note recording the interrupt-entry and generic
+   dispatch boundary plus the explicit decision not to reopen compiler work
+2. one update to `kernel/src/interrupt.mc` so the interrupt owner exposes one
+   architecture-local entry record, one generic dispatch result, and one
+   focused owner-local validator for the landed timer-backed wake path
+3. one update to `kernel/src/main.mc` so the real timer wake transition uses
+   the interrupt owner for architecture entry and dispatch instead of calling
+   timer helpers directly
+4. one update to `kernel/src/debug.mc` so the current running-slice audit can
+   record Phase 113 as a distinct interrupt-boundary hardening step
+5. one focused freestanding kernel regression that proves the current docs,
+   source call sites, emitted objects, and MIR all expose the new boundary
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current running slice is
+already honest and the next highest-value hardware-boundary move is making
+one interrupt handoff mechanically visible before wider MMU or timer work.
+
+What this phase proves
+----------------------
+- the current first running kernel slice can keep the same timer-backed wake
+  behavior while expressing one interrupt path as architecture-local entry
+  plus generic dispatch
+- the interrupt owner can stay small and explicit while routing one landed
+  wake path through the existing timer owner instead of turning into a broad
+  interrupt framework
+- the repository can record an intentional decision not to reopen compiler
+  work because this boundary closes entirely inside the landed kernel tree
+
+Deliverables
+------------
+- one canonical Phase 113 closeout note in `docs/plan/`
+- updated `kernel/src/interrupt.mc` with explicit entry and dispatch records
+  plus a focused owner-local validator
+- updated `kernel/src/main.mc` timer wake follow-through routed through the
+  interrupt owner
+- one new debug-owned Phase 113 audit
+- refreshed kernel-facing documentation, roadmap wording, decision records,
+  and one focused Phase 113 freestanding kernel regression
+
+Suggested execution order
+-------------------------
+1. Expand the interrupt owner from controller skeleton to explicit
+   architecture-entry and generic-dispatch helpers.
+2. Rewire the real timer wake transition to use that interrupt owner while
+   preserving the same wake observation and lifecycle follow-through.
+3. Add the Phase 113 debug audit and documentation updates.
+4. Advance the current kernel proof marker only after the new regression
+   proves the boundary mechanically.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 113 marker without
+  widening the admitted running slice
+- `kernel/src/interrupt.mc` no longer stops at a controller skeleton and now
+  exposes one architecture-local entry helper plus one generic dispatch
+  helper for the landed timer-backed wake path
+- the real timer wake transition routes through that interrupt owner instead
+  of directly sequencing timer advance and wake helpers in the root proof
+  path
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 113 boundary consistently
+
+Non-goals
+---------
+- a broad interrupt or trap framework
+- preemption, multicore, or broader scheduler work
+- public timer APIs or timer-policy redesign
+- MMU, barrier, or target-surface widening beyond this interrupt boundary
+- reopening sema, MIR, backend, ABI, or language design without a concrete
+  kernel-owned failure
+
+Implemented slice
+-----------------
+- expanded `kernel/src/interrupt.mc` so the interrupt owner now exposes one
+  architecture-local interrupt-entry record, one generic dispatch result, and
+  one focused owner-local validator over the landed timer-backed wake path
+- updated `kernel/src/main.mc` so the real child wake transition now enters
+  the interrupt owner through an explicit interrupt frame and generic
+  dispatch helper before continuing the existing lifecycle follow-through
+- added one debug-owned Phase 113 interrupt-boundary audit and one focused
+  freestanding regression covering docs, source imports, object emission, and
+  MIR visibility
+- refreshed the current kernel status docs, roadmap wording, decision log,
+  and backlog so the repository records both the landed interrupt boundary
+  and the decision not to widen compiler work here
+
+Closeout statement
+------------------
+Phase 113 is complete as an interrupt entry and generic dispatch boundary.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now expresses one real interrupt path more honestly:
+architecture-local entry is explicit, generic dispatch is visible, timer-
+backed wake follow-through no longer lives as direct root-proof sequencing,
+and the compiler remains intentionally closed for this step.

@@ -48,7 +48,7 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase111_lifecycle_ownership_run_output.txt",
                                                              "freestanding kernel phase111 lifecycle-ownership audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 112) {
+    if (!run_outcome.exited || run_outcome.exit_code != 113) {
         Fail("phase111 freestanding kernel lifecycle-ownership audit run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -71,7 +71,7 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 112 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 113 has moved the repository-owned kernel artifact beyond the landed",
                          "phase111 kernel README should record the lifecycle clarification as current status");
     ExpectOutputContains(kernel_readme,
                          "src/lifecycle.mc",
@@ -79,7 +79,7 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 112 syscall-boundary-thinness-audited kernel target",
+                         "currently a Phase 113 interrupt-entry-and-generic-dispatch-bounded kernel target",
                          "phase111 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "src/lifecycle.mc",
@@ -139,7 +139,7 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
 
     const std::string kernel_mir = ReadFile(dump_targets.mir);
     ExpectOutputContains(kernel_mir,
-                         "ConstGlobal names=[PHASE112_MARKER] type=i32",
+                         "ConstGlobal names=[PHASE113_MARKER] type=i32",
                          "phase111 merged MIR should expose the current kernel marker");
     ExpectOutputContains(kernel_mir,
                          "Function name=lifecycle.install_spawned_child",
