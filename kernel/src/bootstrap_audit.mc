@@ -160,6 +160,24 @@ struct RunningKernelSliceAuditInputs {
     boot_log_append_failed: u32
 }
 
+struct Phase117MultiServiceBringUpAuditInputs {
+    running_slice: debug.RunningKernelSliceAudit
+    init_endpoint_id: u32
+    transfer_endpoint_id: u32
+    log_service_program_capability: capability.CapabilitySlot
+    echo_service_program_capability: capability.CapabilitySlot
+    transfer_service_program_capability: capability.CapabilitySlot
+    log_service_spawn: syscall.SpawnObservation
+    echo_service_spawn: syscall.SpawnObservation
+    transfer_service_spawn: syscall.SpawnObservation
+    log_service_wait: syscall.WaitObservation
+    echo_service_wait: syscall.WaitObservation
+    transfer_service_wait: syscall.WaitObservation
+    log_service_handshake: log_service.LogHandshakeObservation
+    echo_service_exchange: echo_service.EchoExchangeObservation
+    transfer_service_transfer: transfer_service.TransferObservation
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1044,4 +1062,8 @@ func build_phase108_program_cap_contract(inputs: Phase108ProgramCapContractInput
 
 func build_phase109_running_kernel_slice_audit(inputs: RunningKernelSliceAuditInputs) debug.RunningKernelSliceAudit {
     return debug.RunningKernelSliceAudit{ kernel: inputs.kernel, init_pid: inputs.init_pid, init_tid: inputs.init_tid, init_asid: inputs.init_asid, child_tid: inputs.child_tid, child_exit_code: inputs.child_exit_code, transfer_endpoint_id: inputs.transfer_endpoint_id, log_service_request_byte: inputs.log_service_request_byte, echo_service_request_byte0: inputs.echo_service_request_byte0, echo_service_request_byte1: inputs.echo_service_request_byte1, log_service_exit_code: inputs.log_service_exit_code, echo_service_exit_code: inputs.echo_service_exit_code, transfer_service_exit_code: inputs.transfer_service_exit_code, init_bootstrap_handoff: inputs.init_bootstrap_handoff, receive_observation: inputs.receive_observation, attached_receive_observation: inputs.attached_receive_observation, transferred_handle_use_observation: inputs.transferred_handle_use_observation, pre_exit_wait_observation: inputs.pre_exit_wait_observation, exit_wait_observation: inputs.exit_wait_observation, sleep_observation: inputs.sleep_observation, timer_wake_observation: inputs.timer_wake_observation, log_service_handshake: inputs.log_service_handshake, log_service_wait_observation: inputs.log_service_wait_observation, echo_service_exchange: inputs.echo_service_exchange, echo_service_wait_observation: inputs.echo_service_wait_observation, transfer_service_transfer: inputs.transfer_service_transfer, transfer_service_wait_observation: inputs.transfer_service_wait_observation, phase104_contract_hardened: inputs.phase104_contract_hardened, phase108_contract_hardened: inputs.phase108_contract_hardened, init_process: inputs.init_process, init_task: inputs.init_task, init_user_frame: inputs.init_user_frame, boot_log_append_failed: inputs.boot_log_append_failed }
+}
+
+func build_phase117_multi_service_bring_up_audit(inputs: Phase117MultiServiceBringUpAuditInputs) debug.Phase117MultiServiceBringUpAudit {
+    return debug.Phase117MultiServiceBringUpAudit{ running_slice: inputs.running_slice, init_endpoint_id: inputs.init_endpoint_id, transfer_endpoint_id: inputs.transfer_endpoint_id, log_service_program_capability: inputs.log_service_program_capability, echo_service_program_capability: inputs.echo_service_program_capability, transfer_service_program_capability: inputs.transfer_service_program_capability, log_service_spawn: inputs.log_service_spawn, echo_service_spawn: inputs.echo_service_spawn, transfer_service_spawn: inputs.transfer_service_spawn, log_service_wait: inputs.log_service_wait, echo_service_wait: inputs.echo_service_wait, transfer_service_wait: inputs.transfer_service_wait, log_service_handshake: inputs.log_service_handshake, echo_service_exchange: inputs.echo_service_exchange, transfer_service_transfer: inputs.transfer_service_transfer }
 }

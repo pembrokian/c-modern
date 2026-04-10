@@ -40,7 +40,7 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const PHASE116_MARKER: i32 = 116
+const PHASE117_MARKER: i32 = 117
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -1196,6 +1196,10 @@ func build_phase109_running_kernel_slice_audit(phase104_contract_hardened: u32, 
     return bootstrap_audit.build_phase109_running_kernel_slice_audit(bootstrap_audit.RunningKernelSliceAuditInputs{ kernel: KERNEL, init_pid: INIT_PID, init_tid: INIT_TID, init_asid: INIT_ASID, child_tid: CHILD_TID, child_exit_code: CHILD_EXIT_CODE, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_request_byte: log_config.request_byte, echo_service_request_byte0: echo_config.request_byte0, echo_service_request_byte1: echo_config.request_byte1, log_service_exit_code: log_config.exit_code, echo_service_exit_code: echo_config.exit_code, transfer_service_exit_code: transfer_config.exit_code, init_bootstrap_handoff: INIT_BOOTSTRAP_HANDOFF, receive_observation: RECEIVE_OBSERVATION, attached_receive_observation: ATTACHED_RECEIVE_OBSERVATION, transferred_handle_use_observation: TRANSFERRED_HANDLE_USE_OBSERVATION, pre_exit_wait_observation: PRE_EXIT_WAIT_OBSERVATION, exit_wait_observation: EXIT_WAIT_OBSERVATION, sleep_observation: SLEEP_OBSERVATION, timer_wake_observation: TIMER_WAKE_OBSERVATION, log_service_handshake: LOG_SERVICE_HANDSHAKE, log_service_wait_observation: LOG_SERVICE_WAIT_OBSERVATION, echo_service_exchange: ECHO_SERVICE_EXCHANGE, echo_service_wait_observation: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER, transfer_service_wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, phase104_contract_hardened: phase104_contract_hardened, phase108_contract_hardened: phase108_contract_hardened, init_process: PROCESS_SLOTS[1], init_task: TASK_SLOTS[1], init_user_frame: USER_FRAME, boot_log_append_failed: BOOT_LOG_APPEND_FAILED })
 }
 
+func build_phase117_multi_service_bring_up_audit(running_slice_audit: debug.RunningKernelSliceAudit) debug.Phase117MultiServiceBringUpAudit {
+    return bootstrap_audit.build_phase117_multi_service_bring_up_audit(bootstrap_audit.Phase117MultiServiceBringUpAuditInputs{ running_slice: running_slice_audit, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, echo_service_program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, transfer_service_program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, log_service_spawn: LOG_SERVICE_SPAWN_OBSERVATION, echo_service_spawn: ECHO_SERVICE_SPAWN_OBSERVATION, transfer_service_spawn: TRANSFER_SERVICE_SPAWN_OBSERVATION, log_service_wait: LOG_SERVICE_WAIT_OBSERVATION, echo_service_wait: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_wait: TRANSFER_SERVICE_WAIT_OBSERVATION, log_service_handshake: LOG_SERVICE_HANDSHAKE, echo_service_exchange: ECHO_SERVICE_EXCHANGE, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER })
+}
+
 func execute_spawn_child_process() bool {
     WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
     CHILD_TRANSLATION_ROOT = mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
@@ -1483,43 +1487,46 @@ func bootstrap_main() i32 {
     if !debug.validate_phase116_mmu_activation_barrier_follow_through(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 51
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 116)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !debug.validate_phase117_init_orchestrated_multi_service_bring_up(build_phase117_multi_service_bring_up_audit(running_slice_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 52
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 117)
+    if BOOT_MARKER_EMITTED != 1 {
         return 53
     }
-    if BOOT_LOG.count != 5 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 54
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG.count != 5 {
         return 55
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 56
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 57
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 58
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 59
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 116 {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 60
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_detail_at(BOOT_LOG, 4) != 117 {
         return 61
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 62
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if TASK_SLOTS[1].tid != INIT_TID {
         return 63
     }
-    return PHASE116_MARKER
+    if USER_FRAME.task_id != INIT_TID {
+        return 64
+    }
+    return PHASE117_MARKER
 }

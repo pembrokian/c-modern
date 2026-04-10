@@ -1,0 +1,164 @@
+Phase 117 -- Init-Orchestrated Multi-Service Bring-Up
+=====================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 116 MMU activation barrier follow-through by
+making the next running-system claim explicit: init now orchestrates one
+bounded multi-service set over the landed service owners instead of the
+repository treating those service proofs only as separate phase-local slices.
+
+This document is both the Phase 117 execution note and its closeout.
+It does not claim general service discovery, dynamic loading, a broader
+runtime framework, namespace policy, or a new compiler wave.
+It records one narrow running-system follow-through inside the already
+admitted first running Canopus kernel slice.
+
+Repository status note
+----------------------
+- Phase 105 through Phase 107 already made three bounded service-shaped
+  follow-through paths real over the landed kernel slice: one log-service
+  handshake, one echo request-reply exchange, and one user-to-user capability
+  transfer relay.
+- Phase 108 through Phase 116 then hardened the same real kernel artifact
+  around program-cap provenance, running-slice support truth, ownership
+  boundaries, interrupt and timer boundaries, address-space and MMU ownership,
+  and one explicit MMU activation barrier hook.
+- That left the next running-system question narrower and clearer: the repo
+  had honest bounded service owners already, but it still lacked one explicit
+  init-owned aggregate proof that those service launches form one bounded
+  multi-service bring-up rather than only three separate proof islands.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-116 roadmap reserved Phase 117 for one bounded
+  init-orchestrated multi-service bring-up if the landed service owners and
+  running-kernel slice were already strong enough.
+- The real kernel artifact already launched and observed the bounded log,
+  echo, and transfer service flows through explicit program capabilities,
+  endpoint authority, wait handles, and user-space policy.
+- But the repository still published that slice as if no broader multi-service
+  bring-up had landed, which left the implementation stronger than the claim
+  and blurred the next honest boundary between a bounded running-system proof
+  and a speculative service framework.
+
+Core rule
+---------
+- Preserve the current kernel behavior exactly.
+- Keep service policy in `init` or user-space-facing orchestration rather than
+  moving it into a new kernel framework.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Do not widen into dynamic loading, service discovery, a namespace model, or
+  a general running-system framework.
+- Prove the boundary mechanically with one aggregate audit over the real
+  kernel artifact and one focused freestanding regression.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 117 note recording the aggregate init-owned
+   multi-service bring-up and the decision to keep compiler work closed
+2. one debug-owned Phase 117 audit that validates the current kernel slice as
+   one bounded init-orchestrated multi-service set rather than only as
+   separate service proofs
+3. one root-proof helper in `kernel/src/main.mc` and one audit builder in
+   `kernel/src/bootstrap_audit.mc` that package the already-landed service
+   observations into one aggregate running-system contract
+4. one advance of the real kernel proof marker from Phase 116 to Phase 117
+   only after the aggregate audit succeeds
+5. refreshed roadmap, position, kernel status, repository map, decision log,
+   backlog notes, and one focused Phase 117 freestanding regression
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the service owners, program-
+cap provenance, ownership boundaries, and MMU publication boundary are already
+landed. The next honest gain is not another new service shape or another
+compiler surface. It is publishing the existing slice accurately as one
+bounded init-owned multi-service bring-up.
+
+What this phase proves
+----------------------
+- init now launches and observes one bounded multi-service set over the landed
+  log, echo, and transfer service owners
+- that aggregate bring-up still uses explicit program-cap and endpoint
+  authority rather than ambient shortcuts or a hidden runtime framework
+- the repository can widen its running-system claim without widening the
+  compiler or changing the landed service or hardware-boundary owners
+
+Deliverables
+------------
+- one canonical Phase 117 closeout note in `docs/plan/`
+- one debug-owned aggregate multi-service audit plus the narrow audit builder
+  and root-proof helper needed to publish that boundary honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a Phase
+  117 marker only after the aggregate audit succeeds
+- refreshed roadmap, current-position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog entries
+- one focused Phase 117 freestanding kernel regression with a projected MIR
+  golden for the new audit surface
+
+Suggested execution order
+-------------------------
+1. Add the aggregate Phase 117 audit shape and builder over the existing
+   service observations.
+2. Rewire the root proof so the aggregate audit runs after the landed Phase
+   116 validation and advances the proof marker to 117.
+3. Add the focused Phase 117 freestanding regression.
+4. Refresh roadmap, position, kernel status, repository-map, decision-log,
+   and backlog publication.
+5. Advance the current kernel proof marker only after the new regression
+   proves the aggregate boundary mechanically.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 117 marker without
+  widening the admitted running slice beyond one bounded init-owned
+  multi-service bring-up
+- the debug-owned aggregate audit proves that the landed log, echo, and
+  transfer service proofs form one bounded init-orchestrated multi-service set
+- explicit program-cap and endpoint authority remain visible through the same
+  landed service owners, wait handles, and user-space policy boundaries
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 117 boundary consistently
+
+Non-goals
+---------
+- dynamic loading, service discovery, or namespace policy
+- a general running-system framework or public user-space runtime layer
+- new service mechanisms, broader IPC policy, or scheduler redesign
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase117MultiServiceBringUpAudit` and validator that
+  carry the already-landed service observations through one aggregate
+  init-owned running-system contract
+- added one narrow `bootstrap_audit` builder and one root-proof helper so the
+  real kernel artifact publishes the aggregate service set explicitly
+- advanced the real kernel proof marker to 117 only after the aggregate audit
+  succeeds, while keeping the service owners and kernel behavior unchanged
+- added one focused freestanding kernel regression plus a projected MIR golden
+  for the Phase 117 aggregate boundary
+- refreshed the roadmap, current-position note, kernel README, repository
+  map, freestanding test README, decision log, and backlog so the repository
+  records both the landed multi-service bring-up and the decision not to
+  expand compiler work in this phase
+
+Closeout statement
+------------------
+Phase 117 is complete as an init-orchestrated multi-service bring-up.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now publishes one more running-system truth honestly:
+init orchestrates one bounded multi-service set over the landed service
+owners, explicit program-cap and endpoint authority remain visible, and the
+compiler stays closed because this phase needed no new language or backend
+surface.

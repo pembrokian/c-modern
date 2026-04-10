@@ -1985,6 +1985,12 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
                          support::DiagnosticSink& diagnostics,
                          ExecutableFunctionState& state,
                          std::vector<std::string>& output_lines) {
+    if ((instruction.target_name == "hal.memory_barrier" || instruction.target_name == "memory_barrier") &&
+        instruction.operands.empty() && instruction.result.empty()) {
+        output_lines.push_back("fence seq_cst");
+        return true;
+    }
+
     const mir::Function* callee = FindFunction(*state.module, instruction.target_name);
     if (callee == nullptr) {
         ReportBackendError(source_path,

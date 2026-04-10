@@ -6,9 +6,8 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 116 has moved the repository-owned kernel artifact beyond the landed
-  Phase 115 timer ownership hardening into one bounded MMU activation barrier
-  follow-through step.
+- Phase 117 has moved the repository-owned kernel artifact beyond the landed
+  Phase 116 MMU activation barrier follow-through into one bounded init-orchestrated multi-service bring-up step.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -33,26 +32,25 @@ Current status
   clarification, one bounded syscall boundary thinness audit, one bounded
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
   MMU ownership split, one bounded timer ownership hardening step, one bounded
-  MMU activation barrier follow-through step, and no broader multi-service
-  bring-up yet.
+  MMU activation barrier follow-through step, and one bounded init-orchestrated multi-service bring-up step.
 
 Current files
 -------------
 
 - `build.toml`: freestanding kernel manifest for the current proof slice and
-  the explicit kernel image-input contract carried through the Phase 116 MMU
-  activation barrier follow-through step
+  the explicit kernel image-input contract carried through the Phase 117
+  init-orchestrated multi-service bring-up step
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core setup, bounded syscall-byte-IPC setup, bounded capability-
-  carrying transfer setup, thin service-proof orchestration, and thin root
-  orchestration across the owned scheduler, lifecycle, bootstrap helper, and
-  debug audit modules
+  carrying transfer setup, bounded init-owned multi-service orchestration,
+  and thin root orchestration across the owned scheduler, lifecycle,
+  bootstrap helper, and debug audit modules
 - `src/bootstrap_audit.mc`: extracted Phase 104 contract hardening helpers,
   bounded service validation helpers, and Phase 108-109 audit builders used by
   the root proof module
 - `src/bootstrap_services.mc`: extracted bounded log, echo, and transfer
   service execution flows plus explicit service config/state packaging used by
-  the root proof module
+  the root proof module and the aggregate Phase 117 bring-up audit
 - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn,
   wait, sleep, and wake follow-through
 - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for
@@ -61,7 +59,8 @@ Current files
   running-slice audit, Phase 110 ownership-split audit, Phase 111
   lifecycle-ownership audit, Phase 112 syscall-boundary audit, Phase 113
   interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115
-  timer-ownership audit, and Phase 116 MMU activation-barrier audit
+  timer-ownership audit, Phase 116 MMU activation-barrier audit, and Phase
+  117 init-orchestrated multi-service audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -106,11 +105,12 @@ Phase boundary
   ownership split audit, one bounded scheduler and lifecycle ownership
   clarification, one bounded syscall boundary thinness audit, one bounded
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
-  MMU ownership split, one bounded timer ownership hardening step, and one
-  bounded MMU activation barrier follow-through step.
+  MMU ownership split, one bounded timer ownership hardening step, one
+  bounded MMU activation barrier follow-through step, and one bounded init-
+  orchestrated multi-service bring-up step.
 - The repository can now honestly claim one first running Canopus kernel
-  slice with an explicit Phase 116 MMU activation barrier follow-through over
-  the landed Phase 115 timer ownership hardening: explicit
+  slice with an explicit Phase 117 init-orchestrated multi-service bring-up
+  over the landed Phase 116 MMU activation barrier follow-through: explicit
   boot
   entry,
   first user entry, endpoint-and-handle object core, syscall-owned byte-only
@@ -124,6 +124,8 @@ Phase boundary
   translation-root mechanics separated from generic address-space layout, and
   with timer-owned tick delivery separated from interrupt classification, and
   with translation-root activation published through one explicit `hal`
-  barrier hook.
-- It does not yet claim general loading, multi-service launch, namespace
-  policy, kill semantics, or a running init-owned service set.
+  barrier hook, and with init explicitly orchestrating one bounded multi-
+  service set over the landed service owners.
+- It does not yet claim general loading, dynamic service discovery,
+  namespace policy, kill semantics, or a general running init-owned service
+  framework.

@@ -1,4 +1,4 @@
-  ConstGlobal names=[PHASE116_MARKER] type=i32
+  ConstGlobal names=[PHASE117_MARKER] type=i32
   TypeDecl kind=struct name=timer.TimerInterruptDelivery
   Function name=timer.deliver_interrupt_tick returns=[timer.TimerInterruptDelivery]
   Function name=timer.validate_interrupt_delivery_boundary returns=[bool]

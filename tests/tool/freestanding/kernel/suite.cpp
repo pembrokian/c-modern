@@ -53,6 +53,9 @@ void RunFreestandingKernelPhase115TimerOwnershipHardening(const std::filesystem:
 void RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(const std::filesystem::path& source_root,
                                                                     const std::filesystem::path& binary_root,
                                                                     const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase117InitOrchestratedMultiServiceBringUp(const std::filesystem::path& source_root,
+                                                                      const std::filesystem::path& binary_root,
+                                                                      const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -73,6 +76,7 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase115TimerOwnershipHardening(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase117InitOrchestratedMultiServiceBringUp(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

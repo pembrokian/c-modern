@@ -1,4 +1,4 @@
-Phase 114 Through Phase 123 -- Speculative Post-Phase-113 Canopus Roadmap
+Phase 118 Through Phase 123 -- Speculative Post-Phase-117 Canopus Roadmap
 =========================================================================
 
 Status
@@ -7,13 +7,12 @@ SPECULATIVE
 
 Purpose
 -------
-Sketch one plausible continuation after the completed Phase 113 interrupt
-entry and generic dispatch boundary.
+Sketch one plausible continuation after the completed Phase 117 init-
+orchestrated multi-service bring-up.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
-It does not replace the concrete Phase 109, Phase 110, Phase 111, Phase 112,
-or Phase 113 closeout notes.
+It does not replace the concrete Phase 109 through Phase 117 closeout notes.
 It gives one plausible ordering for the next Canopus wave if the repository
 keeps following the same evidence-first rules used so far:
 
@@ -32,6 +31,10 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/phase111_scheduler_lifecycle_ownership_clarification.txt`
 - `docs/plan/phase112_syscall_boundary_thinness_audit.txt`
 - `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`
+- `docs/plan/phase114_address_space_and_mmu_ownership_split.txt`
+- `docs/plan/phase115_timer_ownership_hardening.txt`
+- `docs/plan/phase116_mmu_activation_barrier_follow_through.txt`
+- `docs/plan/phase117_init_orchestrated_multi_service_bring_up.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
 - `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
@@ -52,14 +55,17 @@ Repository numbering note
 - Phase 96 through Phase 113 are occupied by the concrete first real kernel
   bring-up wave through the first interrupt-entry and generic-dispatch
   boundary.
-- The next speculative continuation therefore starts at Phase 114.
+- The next speculative continuation therefore starts at Phase 118.
 
 Repository status note
 ----------------------
 - The repository can now honestly claim one bounded first running Canopus
   kernel slice with one landed ownership split, one landed lifecycle-owner
-  clarification, one landed syscall-boundary thinness audit, and one landed
-  interrupt-entry and generic-dispatch boundary over that same artifact.
+  clarification, one landed syscall-boundary thinness audit, one landed
+  interrupt-entry and generic-dispatch boundary, one landed address-space and
+  MMU ownership split, one landed timer ownership hardening step, one landed
+  MMU activation barrier follow-through, and one landed init-orchestrated
+  multi-service bring-up over that same artifact.
 - That slice remains intentionally small: fixed-size tables, explicit
   authority, bounded IPC and lifecycle paths, bounded service proofs, one
   image plus support audit over the real kernel artifact, one explicit
@@ -75,7 +81,8 @@ What this roadmap is trying to answer
 -------------------------------------
 - What likely comes after the first running-kernel statement, first ownership
   split, first lifecycle-owner clarification, first syscall-boundary
-  thinness audit, and first interrupt-boundary clarification if the
+  thinness audit, first interrupt-boundary clarification, first MMU barrier
+  follow-through, and first bounded multi-service bring-up if the
   repository keeps
   growing Canopus conservatively?
 - Which follow-on fronts belong first to kernel ownership hardening,
@@ -185,8 +192,11 @@ Historical bridge into this band:
 
 Band C - Grow From One Running Kernel To One Small Running System
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 117 through 120 should widen the user-space side carefully from the
-first bounded service proofs toward a slightly broader init-owned system.
+Phase 117 is now concrete as one init-orchestrated multi-service bring-up
+over the landed log, echo, and transfer service owners.
+
+Phases 118 through 120 should widen the user-space side carefully from that
+bounded aggregate bring-up toward a slightly broader init-owned system.
 
 Likely themes:
 - explicit init orchestration rather than ambient boot inheritance
@@ -196,15 +206,10 @@ Likely themes:
 
 Why this band is separate:
 - the first running kernel statement is already honest, but the next real
-  system question is whether init can orchestrate a slightly broader service
-  set while preserving the same explicit authority style.
+  system question is how to widen a now-landed init-orchestrated service set
+  while preserving the same explicit authority style.
 
 Possible phases in this band:
-
-Phase 117 -- Init-Orchestrated Multi-Service Bring-Up
-- Exit criterion: init launches and observes a bounded multi-service set with
-  explicit program-cap and endpoint authority, without implying general
-  service discovery, dynamic loading, or a broader runtime framework.
 
 Phase 118 -- Request-Reply And Delegation Follow-Through
 - Exit criterion: one bounded service interaction widens beyond the current
@@ -225,6 +230,15 @@ Phase 120 -- Running-System Support Statement
 - Exit criterion: if the prior phases land honestly, the repository can
   publish one updated support statement for a slightly broader running system
   while still naming all remaining deferrals explicitly.
+
+Historical bridge into this band:
+- Phase 117 is now concrete as `docs/plan/phase117_init_orchestrated_multi_service_bring_up.txt`.
+- That phase turned the already-landed log, echo, and transfer service proofs
+  into one explicit init-owned aggregate bring-up over the real kernel
+  artifact without widening compiler work, dynamic loading, or namespace
+  policy. It leaves the next open question centered on richer service
+  interaction and bounded delegation rather than on whether init owns any
+  honest multi-service bring-up at all.
 
 Band D - Harden Image, Target, And Support Truth For The Next Plateau
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

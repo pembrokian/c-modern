@@ -68,6 +68,24 @@ struct RunningKernelSliceAudit {
     boot_log_append_failed: u32
 }
 
+struct Phase117MultiServiceBringUpAudit {
+    running_slice: RunningKernelSliceAudit
+    init_endpoint_id: u32
+    transfer_endpoint_id: u32
+    log_service_program_capability: capability.CapabilitySlot
+    echo_service_program_capability: capability.CapabilitySlot
+    transfer_service_program_capability: capability.CapabilitySlot
+    log_service_spawn: syscall.SpawnObservation
+    echo_service_spawn: syscall.SpawnObservation
+    transfer_service_spawn: syscall.SpawnObservation
+    log_service_wait: syscall.WaitObservation
+    echo_service_wait: syscall.WaitObservation
+    transfer_service_wait: syscall.WaitObservation
+    log_service_handshake: log_service.LogHandshakeObservation
+    echo_service_exchange: echo_service.EchoExchangeObservation
+    transfer_service_transfer: transfer_service.TransferObservation
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -345,4 +363,32 @@ func validate_phase116_mmu_activation_barrier_follow_through(audit: RunningKerne
         return false
     }
     return validate_phase115_timer_ownership_hardening(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened)
+}
+
+func validate_phase117_init_orchestrated_multi_service_bring_up(audit: Phase117MultiServiceBringUpAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase116_mmu_activation_barrier_follow_through(audit.running_slice, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.log_service_handshake.client_pid != audit.running_slice.init_pid {
+        return false
+    }
+    if audit.echo_service_exchange.client_pid != audit.running_slice.init_pid {
+        return false
+    }
+    if audit.transfer_service_transfer.client_pid != audit.running_slice.init_pid {
+        return false
+    }
+    if audit.log_service_handshake.endpoint_id != audit.init_endpoint_id {
+        return false
+    }
+    if audit.echo_service_exchange.endpoint_id != audit.init_endpoint_id {
+        return false
+    }
+    if audit.transfer_service_transfer.control_endpoint_id != audit.init_endpoint_id {
+        return false
+    }
+    if audit.transfer_service_transfer.transferred_endpoint_id != audit.transfer_endpoint_id {
+        return false
+    }
+    return true
 }
