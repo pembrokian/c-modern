@@ -86,6 +86,15 @@ struct Phase117MultiServiceBringUpAudit {
     transfer_service_transfer: transfer_service.TransferObservation
 }
 
+struct Phase118DelegatedRequestReplyAudit {
+    phase117: Phase117MultiServiceBringUpAudit
+    transfer_service_transfer: transfer_service.TransferObservation
+    invalidated_source_send_status: syscall.SyscallStatus
+    invalidated_source_handle_slot: u32
+    retained_receive_handle_slot: u32
+    retained_receive_endpoint_id: u32
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -388,6 +397,49 @@ func validate_phase117_init_orchestrated_multi_service_bring_up(audit: Phase117M
         return false
     }
     if audit.transfer_service_transfer.transferred_endpoint_id != audit.transfer_endpoint_id {
+        return false
+    }
+    return true
+}
+
+func validate_phase118_request_reply_and_delegation_follow_through(audit: Phase118DelegatedRequestReplyAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase117_init_orchestrated_multi_service_bring_up(audit.phase117, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.transfer_service_transfer.grant_count != 1 {
+        return false
+    }
+    if audit.transfer_service_transfer.emit_count != 1 {
+        return false
+    }
+    if audit.transfer_service_transfer.grant_len != audit.transfer_service_transfer.emit_len {
+        return false
+    }
+    if audit.transfer_service_transfer.grant_byte0 != audit.transfer_service_transfer.emit_byte0 {
+        return false
+    }
+    if audit.transfer_service_transfer.grant_byte1 != audit.transfer_service_transfer.emit_byte1 {
+        return false
+    }
+    if audit.transfer_service_transfer.grant_byte2 != audit.transfer_service_transfer.emit_byte2 {
+        return false
+    }
+    if audit.transfer_service_transfer.grant_byte3 != audit.transfer_service_transfer.emit_byte3 {
+        return false
+    }
+    if syscall.status_score(audit.invalidated_source_send_status) != 8 {
+        return false
+    }
+    if audit.invalidated_source_handle_slot == 0 {
+        return false
+    }
+    if audit.retained_receive_handle_slot == 0 {
+        return false
+    }
+    if audit.invalidated_source_handle_slot == audit.retained_receive_handle_slot {
+        return false
+    }
+    if audit.retained_receive_endpoint_id != audit.phase117.transfer_endpoint_id {
         return false
     }
     return true

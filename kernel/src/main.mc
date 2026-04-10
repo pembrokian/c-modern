@@ -40,7 +40,7 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const PHASE117_MARKER: i32 = 117
+const PHASE118_MARKER: i32 = 118
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -104,6 +104,7 @@ var TRANSFER_SERVICE_GRANT_OBSERVATION: syscall.ReceiveObservation
 var TRANSFER_SERVICE_EMIT_OBSERVATION: syscall.ReceiveObservation
 var TRANSFER_SERVICE_TRANSFER: transfer_service.TransferObservation
 var TRANSFER_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
+var PHASE118_INVALIDATED_SOURCE_SEND_STATUS: syscall.SyscallStatus
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -168,6 +169,7 @@ func reset_kernel_state() {
     TRANSFER_SERVICE_EMIT_OBSERVATION = syscall.empty_receive_observation()
     TRANSFER_SERVICE_TRANSFER = transfer_service.TransferObservation{ service_pid: 0, client_pid: 0, control_endpoint_id: 0, transferred_endpoint_id: 0, transferred_rights: 0, tag: transfer_service.CapabilityTransferTag.None, grant_len: 0, grant_byte0: 0, grant_byte1: 0, grant_byte2: 0, grant_byte3: 0, emit_len: 0, emit_byte0: 0, emit_byte1: 0, emit_byte2: 0, emit_byte3: 0, grant_count: 0, emit_count: 0 }
     TRANSFER_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
+    PHASE118_INVALIDATED_SOURCE_SEND_STATUS = syscall.SyscallStatus.None
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -1200,6 +1202,24 @@ func build_phase117_multi_service_bring_up_audit(running_slice_audit: debug.Runn
     return bootstrap_audit.build_phase117_multi_service_bring_up_audit(bootstrap_audit.Phase117MultiServiceBringUpAuditInputs{ running_slice: running_slice_audit, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, echo_service_program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, transfer_service_program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, log_service_spawn: LOG_SERVICE_SPAWN_OBSERVATION, echo_service_spawn: ECHO_SERVICE_SPAWN_OBSERVATION, transfer_service_spawn: TRANSFER_SERVICE_SPAWN_OBSERVATION, log_service_wait: LOG_SERVICE_WAIT_OBSERVATION, echo_service_wait: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_wait: TRANSFER_SERVICE_WAIT_OBSERVATION, log_service_handshake: LOG_SERVICE_HANDSHAKE, echo_service_exchange: ECHO_SERVICE_EXCHANGE, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER })
 }
 
+func build_phase118_delegated_request_reply_audit(phase117_audit: debug.Phase117MultiServiceBringUpAudit) debug.Phase118DelegatedRequestReplyAudit {
+    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
+    retained_receive_endpoint_id: u32 = capability.find_endpoint_for_handle(HANDLE_TABLES[1], transfer_config.init_received_handle_slot)
+    return bootstrap_audit.build_phase118_delegated_request_reply_audit(bootstrap_audit.Phase118DelegatedRequestReplyAuditInputs{ phase117: phase117_audit, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER, invalidated_source_send_status: PHASE118_INVALIDATED_SOURCE_SEND_STATUS, invalidated_source_handle_slot: transfer_config.source_handle_slot, retained_receive_handle_slot: transfer_config.init_received_handle_slot, retained_receive_endpoint_id: retained_receive_endpoint_id })
+}
+
+func execute_phase118_invalidated_source_send_probe() bool {
+    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
+    probe_payload: [4]u8 = endpoint.zero_payload()
+    probe_payload[0] = transfer_config.grant_byte0
+    probe_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(transfer_config.source_handle_slot, 1, probe_payload))
+    SYSCALL_GATE = probe_result.gate
+    HANDLE_TABLES[1] = probe_result.handle_table
+    ENDPOINTS = probe_result.endpoints
+    PHASE118_INVALIDATED_SOURCE_SEND_STATUS = probe_result.status
+    return syscall.status_score(PHASE118_INVALIDATED_SOURCE_SEND_STATUS) == 8
+}
+
 func execute_spawn_child_process() bool {
     WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
     CHILD_TRANSLATION_ROOT = mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
@@ -1487,46 +1507,53 @@ func bootstrap_main() i32 {
     if !debug.validate_phase116_mmu_activation_barrier_follow_through(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 51
     }
-    if !debug.validate_phase117_init_orchestrated_multi_service_bring_up(build_phase117_multi_service_bring_up_audit(running_slice_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase117_audit: debug.Phase117MultiServiceBringUpAudit = build_phase117_multi_service_bring_up_audit(running_slice_audit)
+    if !debug.validate_phase117_init_orchestrated_multi_service_bring_up(phase117_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 52
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 117)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !execute_phase118_invalidated_source_send_probe() {
         return 53
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase118_request_reply_and_delegation_follow_through(build_phase118_delegated_request_reply_audit(phase117_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 54
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 118)
+    if BOOT_MARKER_EMITTED != 1 {
         return 55
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 56
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 57
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 58
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 59
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 60
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 117 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 61
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 62
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 118 {
         return 63
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 64
     }
-    return PHASE117_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 65
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 66
+    }
+    return PHASE118_MARKER
 }

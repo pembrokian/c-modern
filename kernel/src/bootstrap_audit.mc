@@ -178,6 +178,15 @@ struct Phase117MultiServiceBringUpAuditInputs {
     transfer_service_transfer: transfer_service.TransferObservation
 }
 
+struct Phase118DelegatedRequestReplyAuditInputs {
+    phase117: debug.Phase117MultiServiceBringUpAudit
+    transfer_service_transfer: transfer_service.TransferObservation
+    invalidated_source_send_status: syscall.SyscallStatus
+    invalidated_source_handle_slot: u32
+    retained_receive_handle_slot: u32
+    retained_receive_endpoint_id: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1066,4 +1075,8 @@ func build_phase109_running_kernel_slice_audit(inputs: RunningKernelSliceAuditIn
 
 func build_phase117_multi_service_bring_up_audit(inputs: Phase117MultiServiceBringUpAuditInputs) debug.Phase117MultiServiceBringUpAudit {
     return debug.Phase117MultiServiceBringUpAudit{ running_slice: inputs.running_slice, init_endpoint_id: inputs.init_endpoint_id, transfer_endpoint_id: inputs.transfer_endpoint_id, log_service_program_capability: inputs.log_service_program_capability, echo_service_program_capability: inputs.echo_service_program_capability, transfer_service_program_capability: inputs.transfer_service_program_capability, log_service_spawn: inputs.log_service_spawn, echo_service_spawn: inputs.echo_service_spawn, transfer_service_spawn: inputs.transfer_service_spawn, log_service_wait: inputs.log_service_wait, echo_service_wait: inputs.echo_service_wait, transfer_service_wait: inputs.transfer_service_wait, log_service_handshake: inputs.log_service_handshake, echo_service_exchange: inputs.echo_service_exchange, transfer_service_transfer: inputs.transfer_service_transfer }
+}
+
+func build_phase118_delegated_request_reply_audit(inputs: Phase118DelegatedRequestReplyAuditInputs) debug.Phase118DelegatedRequestReplyAudit {
+    return debug.Phase118DelegatedRequestReplyAudit{ phase117: inputs.phase117, transfer_service_transfer: inputs.transfer_service_transfer, invalidated_source_send_status: inputs.invalidated_source_send_status, invalidated_source_handle_slot: inputs.invalidated_source_handle_slot, retained_receive_handle_slot: inputs.retained_receive_handle_slot, retained_receive_endpoint_id: inputs.retained_receive_endpoint_id }
 }

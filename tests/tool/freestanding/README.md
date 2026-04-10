@@ -29,6 +29,7 @@ Structure
   - `phase115_timer_ownership_hardening.cpp`: real-kernel timer ownership hardening audit.
   - `phase116_mmu_activation_barrier_follow_through.cpp`: real-kernel MMU activation barrier follow-through audit.
   - `phase117_init_orchestrated_multi_service_bring_up.cpp`: real-kernel init-orchestrated multi-service bring-up audit.
+  - `phase118_request_reply_and_delegation_follow_through.cpp`: real-kernel delegated request-reply and source-invalidation audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

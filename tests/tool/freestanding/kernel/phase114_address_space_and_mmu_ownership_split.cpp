@@ -19,7 +19,7 @@ void ExpectPhase114BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase114_address_space_mmu_run_output.txt",
                                                              "freestanding kernel phase114 address-space/mmu run");
-    if (!run_outcome.exited || run_outcome.exit_code != 117) {
+    if (!run_outcome.exited || run_outcome.exit_code != 118) {
         Fail("phase114 freestanding kernel address-space/mmu run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -36,7 +36,7 @@ void ExpectPhase114MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE117_MARKER] type=i32",
+            "ConstGlobal names=[PHASE118_MARKER] type=i32",
             "TypeDecl kind=struct name=mmu.TranslationRoot",
             "Function name=mmu.bootstrap_translation_root returns=[mmu.TranslationRoot]",
             "Function name=mmu.validate_address_space_mmu_boundary returns=[bool]",

@@ -19,7 +19,7 @@ void ExpectPhase112BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase112_syscall_boundary_run_output.txt",
                                                              "freestanding kernel phase112 syscall-boundary audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 117) {
+    if (!run_outcome.exited || run_outcome.exit_code != 118) {
         Fail("phase112 freestanding kernel syscall-boundary audit run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -53,7 +53,7 @@ void ExpectPhase112PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 117 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 118 has moved the repository-owned kernel artifact beyond the landed",
                          "phase112 kernel README should record the syscall-boundary audit as current status");
     ExpectOutputContains(kernel_readme,
                          "thin observation state over capability,",
@@ -61,7 +61,7 @@ void ExpectPhase112PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 117 init-orchestrated-multi-service kernel target",
+                         "currently a Phase 118 delegated-request-reply kernel target",
                          "phase112 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase112_syscall_boundary_thinness_audit.cpp",
@@ -79,7 +79,7 @@ void ExpectPhase112MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE117_MARKER] type=i32",
+            "ConstGlobal names=[PHASE118_MARKER] type=i32",
             "Function name=address_space.build_child_bootstrap_context returns=[address_space.SpawnBootstrap]",
             "Function name=address_space.validate_syscall_address_space_boundary returns=[bool]",
             "Function name=capability.resolve_endpoint_handle returns=[capability.EndpointHandleResolution]",

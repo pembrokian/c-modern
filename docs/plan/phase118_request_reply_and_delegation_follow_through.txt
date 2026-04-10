@@ -1,0 +1,170 @@
+Phase 118 -- Request-Reply And Delegation Follow-Through
+========================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 117 init-orchestrated multi-service bring-up
+by making the next running-system claim explicit: the repository now publishes
+one bounded delegated request-reply path together with one explicit refused
+source action after delegation rather than leaving that combined boundary
+implicit inside the earlier transfer-service proof.
+
+This document is both the Phase 118 execution note and its closeout.
+It does not claim namespace policy, service discovery, multi-child service
+topologies, dynamic loading, or a new compiler wave.
+It records one narrow running-system follow-through inside the already
+admitted first running Canopus kernel slice.
+
+Repository status note
+----------------------
+- Phase 106 already made one bounded request-reply service path real over the
+  landed kernel slice.
+- Phase 107 already made one bounded delegated endpoint-transfer path real,
+  including one transferred reply-capable handle and one service-issued
+  follow-through send.
+- Phase 117 then published the log, echo, and transfer owners as one bounded
+  init-orchestrated multi-service bring-up.
+- That left the next running-system question narrower and clearer: the kernel
+  already had the mechanism for a delegated request-reply path, but the
+  repository still lacked one explicit phase-level proof that the delegated
+  reply remains request-derived, that one retained sibling handle still owns
+  reply reception, and that the invalidated source slot refuses later use
+  without turning failure policy into a broader kernel framework.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-117 roadmap reserved Phase 118 for one bounded
+  request-reply and delegation follow-through.
+- The real kernel artifact already had enough explicit authority to express
+  that step: init could retain one endpoint handle, delegate a sibling handle
+  to a bounded service owner, and observe a reply routed back through the
+  retained handle.
+- But the repository still published that delegated interaction only as a
+  capability-transfer proof, while the refused-action path on the invalidated
+  source slot was not yet part of the running-system publication boundary.
+
+Core rule
+---------
+- Preserve the current kernel owners and overall service topology.
+- Keep service policy in `init` and the landed service helpers rather than
+  moving it into a new kernel framework.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Do not widen into namespace policy, dynamic loading, multi-child service
+  orchestration, or a general service framework.
+- Prove the boundary mechanically with one delegated-request-reply audit over
+  the real kernel artifact and one focused freestanding regression.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 118 note recording the delegated request-reply
+   follow-through and the decision to keep compiler work closed
+2. one debug-owned Phase 118 audit that packages the landed delegated
+   transfer-service exchange together with one explicit invalidated-source
+   refusal after delegation
+3. one root-proof helper and one audit builder that publish the retained
+   receive handle, invalidated source handle, and delegated reply contract
+   explicitly
+4. one advance of the real kernel proof marker from Phase 117 to Phase 118
+   only after the new delegated audit succeeds
+5. refreshed roadmap, current-position note, kernel status, repository map,
+   freestanding test README, decision log, backlog notes, and one focused
+   Phase 118 freestanding regression
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the delegated reply mechanism
+is already real in the landed transfer-service slice. The next honest gain is
+not a broader namespace or another compiler surface. It is publishing that
+delegated reply route together with the refused invalidated-source action as
+one bounded running-system truth.
+
+What this phase proves
+----------------------
+- init can retain one local reply handle while delegating a sibling handle to
+  a bounded service owner
+- the delegated service path still returns a request-derived reply over the
+  delegated handle rather than through ambient authority shortcuts
+- the invalidated source slot refuses later send use explicitly with an
+  `InvalidHandle` status after delegation
+- the repository can widen its running-system claim without widening the
+  compiler or introducing a broader service-management framework
+
+Deliverables
+------------
+- one canonical Phase 118 closeout note in `docs/plan/`
+- one debug-owned delegated request-reply audit plus the narrow audit builder
+  and root-proof helper needed to publish that boundary honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 118 marker only after the delegated audit succeeds
+- refreshed roadmap, current-position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog entries
+- one focused Phase 118 freestanding kernel regression with a projected MIR
+  golden for the new audit surface
+
+Suggested execution order
+-------------------------
+1. Add the delegated-request-reply audit shape and builder over the landed
+   transfer-service observation.
+2. Add the invalidated-source send probe and validate that it refuses later
+   use after delegation.
+3. Rewire the root proof so the delegated audit runs after the landed Phase
+   117 validation and advances the proof marker to 118.
+4. Add the focused Phase 118 freestanding regression.
+5. Refresh roadmap, position, kernel status, repository-map, decision-log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 118 marker without
+  widening the admitted running slice beyond one bounded delegated
+  request-reply follow-through
+- the debug-owned audit proves that the delegated transfer-service exchange
+  preserves request-derived reply routing over explicit retained and delegated
+  handles
+- the invalidated source handle refuses later use explicitly after
+  delegation
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 118 boundary consistently
+
+Non-goals
+---------
+- namespace policy or service discovery
+- multi-child service orchestration or a broader scheduler wave
+- dynamic loading or a general running-system framework
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase118DelegatedRequestReplyAudit` and validator
+  that package the landed delegated transfer-service exchange together with an
+  explicit invalidated-source refusal
+- added one narrow root-proof helper and one `bootstrap_audit` builder so the
+  real kernel artifact publishes the retained-handle plus invalidated-source
+  contract explicitly
+- advanced the real kernel proof marker to 118 only after the delegated audit
+  succeeds, while keeping the compiler and service-owner surfaces unchanged
+- added one focused freestanding kernel regression plus a projected MIR golden
+  for the Phase 118 delegated-request-reply boundary
+- refreshed the roadmap, current-position note, kernel README, repository
+  map, freestanding test README, decision log, and backlog so the repository
+  records both the landed delegated reply boundary and the decision not to
+  expand compiler work in this phase
+
+Closeout statement
+------------------
+Phase 118 is complete as a delegated request-reply follow-through.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now publishes one more running-system truth honestly:
+init can retain one reply handle while delegating a sibling handle to a
+bounded service owner, the delegated reply remains request-derived, the old
+source slot refuses later use explicitly, and the compiler stays closed
+because this phase needed no new language or backend surface.
