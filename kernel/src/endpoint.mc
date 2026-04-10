@@ -36,6 +36,29 @@ struct EndpointTable {
     slots: [2]EndpointSlot
 }
 
+struct EndpointDispatch {
+    endpoint_id: u32
+    endpoint_index: usize
+    valid: u32
+}
+
+struct RuntimeSendResult {
+    endpoints: EndpointTable
+    endpoint_id: u32
+    queued: u32
+    queue_full: u32
+    endpoint_valid: u32
+}
+
+struct RuntimeReceiveResult {
+    endpoints: EndpointTable
+    endpoint_id: u32
+    message: KernelMessage
+    available: u32
+    queue_empty: u32
+    endpoint_valid: u32
+}
+
 func zero_payload() [4]u8 {
     payload: [4]u8
     payload[0] = 0
@@ -123,6 +146,76 @@ func find_endpoint_index(table: EndpointTable, endpoint_id: u32) usize {
         return 1
     }
     return ENDPOINT_NOT_FOUND
+}
+
+func resolve_runtime_endpoint(table: EndpointTable, endpoint_id: u32) EndpointDispatch {
+    endpoint_index: usize = find_endpoint_index(table, endpoint_id)
+    if !endpoint_index_valid(table, endpoint_index) {
+        return EndpointDispatch{ endpoint_id: endpoint_id, endpoint_index: 0, valid: 0 }
+    }
+    return EndpointDispatch{ endpoint_id: endpoint_id, endpoint_index: endpoint_index, valid: 1 }
+}
+
+func build_runtime_message(message_id: u32, source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8, attached_count: usize, attached_endpoint_id: u32, attached_rights: u32, attached_source_handle_slot: u32) KernelMessage {
+    if attached_count == 1 {
+        return attached_message(message_id, source_pid, endpoint_id, payload_len, payload, attached_endpoint_id, attached_rights, attached_source_handle_slot)
+    }
+    return byte_message(message_id, source_pid, endpoint_id, payload_len, payload)
+}
+
+func enqueue_runtime_message(table: EndpointTable, endpoint_id: u32, message: KernelMessage) RuntimeSendResult {
+    dispatch: EndpointDispatch = resolve_runtime_endpoint(table, endpoint_id)
+    if dispatch.valid == 0 {
+        return RuntimeSendResult{ endpoints: table, endpoint_id: endpoint_id, queued: 0, queue_full: 0, endpoint_valid: 0 }
+    }
+    updated_endpoints: EndpointTable = enqueue_message(table, dispatch.endpoint_index, message)
+    if !enqueue_succeeded(table, updated_endpoints, dispatch.endpoint_index) {
+        return RuntimeSendResult{ endpoints: table, endpoint_id: endpoint_id, queued: 0, queue_full: 1, endpoint_valid: 1 }
+    }
+    return RuntimeSendResult{ endpoints: updated_endpoints, endpoint_id: endpoint_id, queued: 1, queue_full: 0, endpoint_valid: 1 }
+}
+
+func receive_runtime_message(table: EndpointTable, endpoint_id: u32) RuntimeReceiveResult {
+    dispatch: EndpointDispatch = resolve_runtime_endpoint(table, endpoint_id)
+    if dispatch.valid == 0 {
+        return RuntimeReceiveResult{ endpoints: table, endpoint_id: endpoint_id, message: empty_message(), available: 0, queue_empty: 0, endpoint_valid: 0 }
+    }
+    message: KernelMessage = peek_head_message(table, dispatch.endpoint_index)
+    if message_state_score(message.state) == 1 {
+        return RuntimeReceiveResult{ endpoints: table, endpoint_id: endpoint_id, message: empty_message(), available: 0, queue_empty: 1, endpoint_valid: 1 }
+    }
+    updated_endpoints: EndpointTable = consume_head_message(table, dispatch.endpoint_index)
+    return RuntimeReceiveResult{ endpoints: updated_endpoints, endpoint_id: endpoint_id, message: message, available: 1, queue_empty: 0, endpoint_valid: 1 }
+}
+
+func validate_syscall_ipc_boundary() bool {
+    table: EndpointTable = empty_table()
+    table = install_endpoint(table, 2, 9)
+    payload: [4]u8 = zero_payload()
+    payload[0] = 83
+    payload[1] = 89
+    payload[2] = 83
+    payload[3] = 67
+    message: KernelMessage = build_runtime_message(5, 2, 9, 4, payload, 0, 0, 0, 0)
+    sent: RuntimeSendResult = enqueue_runtime_message(table, 9, message)
+    if sent.endpoint_valid == 0 || sent.queued == 0 {
+        return false
+    }
+    received: RuntimeReceiveResult = receive_runtime_message(sent.endpoints, 9)
+    if received.endpoint_valid == 0 || received.available == 0 {
+        return false
+    }
+    if received.message.source_pid != 2 {
+        return false
+    }
+    if received.message.payload[0] != 83 {
+        return false
+    }
+    empty_receive: RuntimeReceiveResult = receive_runtime_message(received.endpoints, 9)
+    if empty_receive.queue_empty == 0 {
+        return false
+    }
+    return true
 }
 
 func endpoint_index_valid(table: EndpointTable, endpoint_index: usize) bool {

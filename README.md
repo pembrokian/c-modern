@@ -41,14 +41,16 @@ Supported hosted slice:
 - supported workflow guarantee on the admitted richer proof: deterministic same-build-dir selected-target reuse without non-selected-target churn, now exposed directly on the shipped `issue_rollup` project through its default and report executable consumers over the admitted static-library boundary
 - unsupported today beyond this hosted support claim: the separate freestanding proof slice recorded below, general cross-compilation, shared libraries, external system-library links in project manifests, package management, and any public portability claim beyond Darwin arm64
 
-Supported freestanding proof slice:
+Supported freestanding v0.3 slice:
+
+This summary mirrors the first admitted freestanding `v0.3` slice statement in `docs/plan/freestanding_support_statement.txt`.
 
 - supported compiler host and produced proof-artifact target family: Darwin arm64 bootstrap target family only
 - admitted runtime environment: freestanding project `exe` targets with explicit `env = "freestanding"`
 - admitted project command path: `mc build --project <build.toml> --target <name> --build-dir <dir>`
 - admitted manifest boundary: freestanding `exe` targets with explicit `target`, explicit `[targets.<name>.runtime] startup`, and optional explicit `[targets.<name>.link] inputs = [...]`
 - admitted public stdlib boundary: narrow `hal` `mmio_ptr<T>`, `volatile_load<T>`, and `volatile_store<T>`
-- admitted proof set: Phase 81 boot-marker executable proof, Phase 82 explicit manifest-owned link-input proof, Phase 83 deterministic polling-console proof, Phase 85 kernel endpoint queue smoke proof, Phase 86 task lifecycle kernel proof, Phase 87 kernel static-data and artifact follow-through proof, Phase 88 kernel build integration audit, Phase 89 init-to-log-service handshake proof, Phase 90 capability-handle transfer proof, Phase 91 early user-space helper-boundary audit, Phase 92 user-space lifecycle follow-through proof, and Phase 93 timer wake proof
+- admitted proof set: Phase 81 boot-marker executable proof, Phase 82 explicit manifest-owned link-input proof, Phase 83 deterministic polling-console proof, Phase 85 kernel endpoint queue smoke proof, Phase 86 task lifecycle kernel proof, Phase 87 kernel static-data and artifact follow-through proof, Phase 88 kernel build integration audit, Phase 89 init-to-log-service handshake proof, Phase 90 capability-handle transfer proof, Phase 91 early user-space helper-boundary audit, Phase 92 user-space lifecycle follow-through proof, Phase 93 timer wake proof, and Phase 94 first-system demo integration proof
 - unsupported today: `mc run` or `mc test` freestanding workflow admission, general cross-compilation, non-bootstrap target families, linker scripts, arbitrary linker flags, shared libraries, kernel-image packaging, and broader `hal` taxonomy
 
 Supported host assumptions:

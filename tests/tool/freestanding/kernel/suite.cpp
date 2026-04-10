@@ -38,6 +38,9 @@ void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesyste
 void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const std::filesystem::path& source_root,
                                                                           const std::filesystem::path& binary_root,
                                                                           const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesystem::path& source_root,
+                                                              const std::filesystem::path& binary_root,
+                                                              const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -53,6 +56,7 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase109FirstRunningKernelSliceAudit(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase110KernelOwnershipSplitAudit(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

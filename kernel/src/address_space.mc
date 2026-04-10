@@ -39,6 +39,12 @@ struct UserEntryFrame {
     task_id: u32
 }
 
+struct SpawnBootstrap {
+    child_address_space: AddressSpace
+    child_frame: UserEntryFrame
+    valid: u32
+}
+
 func empty_mapping() Mapping {
     return Mapping{ base: 0, size: 0, kind: MappingKind.None, writable: 0, executable: 0 }
 }
@@ -135,6 +141,32 @@ func empty_frame() UserEntryFrame {
 
 func bootstrap_user_frame(space: AddressSpace, task_id: u32) UserEntryFrame {
     return UserEntryFrame{ entry_pc: space.entry_pc, stack_top: space.stack_top, address_space_id: space.asid, task_id: task_id }
+}
+
+func build_child_bootstrap_context(owner_pid: u32, child_tid: u32, child_asid: u32, root_page_table: usize, image_base: usize, image_size: usize, entry_pc: usize, stack_base: usize, stack_size: usize, stack_top: usize) SpawnBootstrap {
+    child_space: AddressSpace = bootstrap_space(child_asid, owner_pid, root_page_table, image_base, image_size, entry_pc, stack_base, stack_size, stack_top)
+    if state_score(child_space.state) != 2 {
+        return SpawnBootstrap{ child_address_space: empty_space(), child_frame: empty_frame(), valid: 0 }
+    }
+    child_frame: UserEntryFrame = bootstrap_user_frame(child_space, child_tid)
+    return SpawnBootstrap{ child_address_space: child_space, child_frame: child_frame, valid: 1 }
+}
+
+func validate_syscall_address_space_boundary() bool {
+    child: SpawnBootstrap = build_child_bootstrap_context(3, 4, 5, 32768, 65536, 8192, 66048, 131072, 8192, 139264)
+    if child.valid == 0 {
+        return false
+    }
+    if child.child_address_space.owner_pid != 3 {
+        return false
+    }
+    if child.child_frame.task_id != 4 {
+        return false
+    }
+    if child.child_frame.address_space_id != 5 {
+        return false
+    }
+    return true
 }
 
 func mapping_kind_at(space: AddressSpace, index: usize) MappingKind {

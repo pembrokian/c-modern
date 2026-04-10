@@ -158,6 +158,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase109_first_running_kernel_slice_audit.cpp
     tests/tool/freestanding/kernel/phase110_kernel_ownership_split_audit.cpp
     tests/tool/freestanding/kernel/phase111_scheduler_lifecycle_ownership_clarification.cpp
+    tests/tool/freestanding/kernel/phase112_syscall_boundary_thinness_audit.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -266,7 +267,14 @@ add_test(NAME mc_check_import_root_smoke
          -DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/stage5_import_root_smoke
          -DIMPORT_ROOT=${CMAKE_CURRENT_SOURCE_DIR}/tests/sema/import_roots
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_clean_mc_build_dir.cmake)
-add_test(NAME mc_check_dump_mir_smoke COMMAND mc check ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --dump-mir --build-dir ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME mc_check_dump_mir_smoke
+     COMMAND ${CMAKE_COMMAND}
+         -DMC=$<TARGET_FILE:mc>
+         -DMODE=check
+         -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc
+         -DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/stage5_check_dump_mir_smoke
+         -DEXTRA_ARGS=--dump-mir
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_clean_mc_build_dir.cmake)
 add_test(NAME mc_dump_paths_smoke COMMAND mc dump-paths ${CMAKE_CURRENT_SOURCE_DIR}/tests/cases/hello.mc --build-dir ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_first_use_smoke
      COMMAND ${CMAKE_COMMAND}

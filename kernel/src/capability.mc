@@ -63,6 +63,33 @@ struct WaitTable {
     slots: [2]WaitHandle
 }
 
+struct EndpointHandleResolution {
+    endpoint_id: u32
+    valid: u32
+}
+
+struct AttachedTransferResolution {
+    attached_endpoint_id: u32
+    attached_rights: u32
+    attached_source_handle_slot: u32
+    attached_count: usize
+    valid: u32
+}
+
+struct ReceivedHandleInstall {
+    handle_table: HandleTable
+    received_handle_slot: u32
+    received_handle_count: usize
+    valid: u32
+}
+
+struct SpawnWaitHandleAdmission {
+    wait_table: WaitTable
+    valid: u32
+    invalid_handle: u32
+    exhausted: u32
+}
+
 func empty_slot() CapabilitySlot {
     return CapabilitySlot{ slot_id: 0, owner_pid: 0, kind: CapabilityKind.Empty, rights: 0, object_id: 0 }
 }
@@ -334,6 +361,99 @@ func find_rights_for_handle(table: HandleTable, slot_id: u32) u32 {
         return 0
     }
     return table.slots[index].rights
+}
+
+func resolve_endpoint_handle(table: HandleTable, slot_id: u32) EndpointHandleResolution {
+    endpoint_id: u32 = find_endpoint_for_handle(table, slot_id)
+    if endpoint_id == 0 {
+        return EndpointHandleResolution{ endpoint_id: 0, valid: 0 }
+    }
+    return EndpointHandleResolution{ endpoint_id: endpoint_id, valid: 1 }
+}
+
+func resolve_attached_transfer_handle(table: HandleTable, attached_handle_slot: u32, attached_handle_count: usize) AttachedTransferResolution {
+    if attached_handle_count == 0 {
+        return AttachedTransferResolution{ attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: 0, attached_count: 0, valid: 1 }
+    }
+    if attached_handle_count != 1 {
+        return AttachedTransferResolution{ attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: 0, attached_count: attached_handle_count, valid: 0 }
+    }
+    attached_endpoint_id: u32 = find_endpoint_for_handle(table, attached_handle_slot)
+    attached_rights: u32 = find_transfer_rights_for_handle(table, attached_handle_slot)
+    if attached_endpoint_id == 0 || attached_rights == 0 {
+        return AttachedTransferResolution{ attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: attached_handle_slot, attached_count: attached_handle_count, valid: 0 }
+    }
+    return AttachedTransferResolution{ attached_endpoint_id: attached_endpoint_id, attached_rights: attached_rights, attached_source_handle_slot: attached_handle_slot, attached_count: attached_handle_count, valid: 1 }
+}
+
+func install_received_endpoint_handle(table: HandleTable, receive_handle_slot: u32, attached_count: usize, attached_endpoint_id: u32, attached_rights: u32) ReceivedHandleInstall {
+    if attached_count == 0 {
+        return ReceivedHandleInstall{ handle_table: table, received_handle_slot: 0, received_handle_count: 0, valid: 1 }
+    }
+    if receive_handle_slot == 0 {
+        return ReceivedHandleInstall{ handle_table: table, received_handle_slot: 0, received_handle_count: 0, valid: 0 }
+    }
+    updated_table: HandleTable = install_endpoint_handle(table, receive_handle_slot, attached_endpoint_id, attached_rights)
+    if !handle_install_succeeded(table, updated_table, receive_handle_slot) {
+        return ReceivedHandleInstall{ handle_table: table, received_handle_slot: 0, received_handle_count: 0, valid: 0 }
+    }
+    return ReceivedHandleInstall{ handle_table: updated_table, received_handle_slot: receive_handle_slot, received_handle_count: attached_count, valid: 1 }
+}
+
+func admit_spawn_wait_handle(table: WaitTable, wait_handle_slot: u32, child_pid: u32) SpawnWaitHandleAdmission {
+    if wait_handle_slot == 0 {
+        return SpawnWaitHandleAdmission{ wait_table: table, valid: 0, invalid_handle: 1, exhausted: 0 }
+    }
+    updated_wait_table: WaitTable = install_wait_handle(table, wait_handle_slot, child_pid)
+    if !wait_install_succeeded(table, updated_wait_table, wait_handle_slot) {
+        return SpawnWaitHandleAdmission{ wait_table: table, valid: 0, invalid_handle: 0, exhausted: 1 }
+    }
+    return SpawnWaitHandleAdmission{ wait_table: updated_wait_table, valid: 1, invalid_handle: 0, exhausted: 0 }
+}
+
+func validate_syscall_capability_boundary() bool {
+    table: HandleTable = handle_table_for_owner(7)
+    table = install_endpoint_handle(table, 1, 11, RIGHTS_ENDPOINT_ALL)
+    resolved: EndpointHandleResolution = resolve_endpoint_handle(table, 1)
+    if resolved.valid == 0 {
+        return false
+    }
+    if resolved.endpoint_id != 11 {
+        return false
+    }
+
+    attached: AttachedTransferResolution = resolve_attached_transfer_handle(table, 1, 1)
+    if attached.valid == 0 {
+        return false
+    }
+    if attached.attached_endpoint_id != 11 {
+        return false
+    }
+    if attached.attached_rights != RIGHTS_ENDPOINT_ALL {
+        return false
+    }
+
+    receiver: HandleTable = handle_table_for_owner(8)
+    installed: ReceivedHandleInstall = install_received_endpoint_handle(receiver, 3, 1, attached.attached_endpoint_id, attached.attached_rights)
+    if installed.valid == 0 {
+        return false
+    }
+    if installed.received_handle_slot != 3 {
+        return false
+    }
+    if find_endpoint_for_handle(installed.handle_table, 3) != 11 {
+        return false
+    }
+
+    waits: WaitTable = wait_table_for_owner(7)
+    admitted: SpawnWaitHandleAdmission = admit_spawn_wait_handle(waits, 1, 22)
+    if admitted.valid == 0 {
+        return false
+    }
+    if find_child_for_wait_handle(admitted.wait_table, 1) != 22 {
+        return false
+    }
+    return true
 }
 
 func handle_state_score(state: HandleState) i32 {

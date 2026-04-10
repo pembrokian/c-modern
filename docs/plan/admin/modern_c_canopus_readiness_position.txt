@@ -7,8 +7,8 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position after Phase 109 closed the first
-speculative Canopus kernel roadmap horizon.
+Record one maintained repository position after Phase 112 closed the first
+post-Phase-109 ownership-hardening wave over the running kernel slice.
 
 This note answers four questions that now matter:
 
@@ -19,8 +19,9 @@ This note answers four questions that now matter:
 
 This note is not a support statement, a full phase plan, or a claim that the
 full Canopus architecture is implemented.
-It does not replace the Phase 109 closeout, the Canopus architecture notes, or
-the narrower hosted and freestanding support statements.
+It does not replace the Phase 109 through Phase 112 closeouts, the Canopus
+architecture notes, or the narrower hosted and freestanding support
+statements.
 
 Relationship to companion notes
 -------------------------------
@@ -28,6 +29,9 @@ This position statement is meant to stay aligned with:
 
 - `docs/plan/admin/canopus_post_phase109_speculative_roadmap.txt`
 - `docs/plan/phase109_first_running_canopus_kernel_slice_audit.txt`
+- `docs/plan/phase110_kernel_ownership_split_audit.txt`
+- `docs/plan/phase111_scheduler_lifecycle_ownership_clarification.txt`
+- `docs/plan/phase112_syscall_boundary_thinness_audit.txt`
 - `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
 - `docs/plan/freestanding_support_statement.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
@@ -49,7 +53,9 @@ Current repository truth
   first user entry, endpoint and handle state, syscall-owned byte IPC,
   attached-handle transfer, program-cap spawn and wait, timer-backed wake,
   bootstrap-capability handoff, bounded service follow-through, kernel image
-  and program-cap audit, and an aggregate Phase 109 running-slice audit.
+  and program-cap audit, an aggregate Phase 109 running-slice audit, a landed
+  Phase 110 ownership split, a landed Phase 111 lifecycle-owner
+  clarification, and a landed Phase 112 syscall-boundary thinness audit.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   implementation slice rather than only for freestanding representation proofs.
@@ -74,9 +80,10 @@ It means:
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
-The speculative Phase 96 through Phase 109 roadmap is therefore complete as a
-roadmap horizon, but the implementation itself is still at an early kernel
-plateau rather than at architectural completion.
+The speculative Phase 96 through Phase 109 roadmap is complete as a roadmap
+horizon, and the first post-Phase-109 ownership-hardening wave through Phase
+112 is now also concrete, but the implementation itself is still at an early
+kernel plateau rather than at architectural completion.
 
 Kernel maturity and quality
 ---------------------------
@@ -140,11 +147,11 @@ What it still does not prove:
 
 Working engineering stance
 --------------------------
-The right stance after Phase 109 is still conservative.
+The right stance after Phase 112 is still conservative.
 
 - treat the current core language as sufficient until a real next kernel step
   proves otherwise
-- expect the next meaningful pressure to land first on kernel ownership split,
+- expect the next meaningful pressure to land first on interrupt, timer, MMU,
   target and build truth, ABI or backend edges, and narrow `hal` or hardware
   hooks rather than on new syntax
 - preserve the small-microkernel and user-space-policy bias while the current
@@ -187,9 +194,9 @@ first running slice.
 
 Recommended work themes:
 
-- kernel ownership hardening: begin extracting clearer `arch`, `init`, `sys`,
-  `ipc`, `cap`, `mm`, `sched`, and `debug` seams from the current flat kernel
-  tree only where real implementation pressure already exists
+- kernel ownership hardening: preserve the landed `sys`, `cap`, `ipc`, `mm`,
+  `sched`, `lifecycle`, and `debug` seams, and extract new owners only where
+  the next real kernel step proves one boundary is still too blurry
 - hardware-boundary truth: widen only the narrow architecture, trap, timer,
   MMU, barrier, and interrupt hooks required for the next real kernel step
 - running-system follow-through: grow from bounded service proofs toward a

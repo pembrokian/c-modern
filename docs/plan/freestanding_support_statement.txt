@@ -9,7 +9,7 @@ Purpose
 -------
 Record the current admitted freestanding proof slice separately from the hosted
 `v0.2` release-hardening note so the repository can state what the landed
-Phase 81 through Phase 93 work does and does not support.
+Phase 81 through Phase 94 work does and does not support.
 
 This note is intentionally narrower than the hosted release-hardening note.
 It does not claim general freestanding release readiness, broad non-hosted
@@ -55,6 +55,11 @@ Repository status note
   deterministic tick, wake one blocked worker, and publish one explicit wake
   observation without widening into a public timer API, interrupt framework,
   or scheduler runtime.
+- Phase 94 then proved one bounded first-system demo that composes kernel
+  boot, init, one log service, one echo service, one client, one timer wake,
+  one bounded request-reply exchange, and one explicit client-exit
+  observation without widening into a public service framework, scheduler
+  runtime, or broader support claim.
 - Before this note, those truths existed in phase closeouts and tool tests,
   but not yet as one explicit published support statement.
 
@@ -62,10 +67,12 @@ Core rule
 ---------
 - Keep this freestanding statement separate from the hosted `v0.2` support
   claim.
-- State only the Phase 81 through Phase 93 proof slice, not a larger
+- State only the Phase 81 through Phase 94 proof slice, not a larger
   freestanding ambition.
 - Keep target-owned support objects, startup choice, and `hal` scope explicit.
 - Reopen broader non-hosted claims only when a later proof lands them.
+
+admitted support-statement posture: first admitted freestanding `v0.3` slice statement only, not a broader release or portability guarantee.
 
 Frozen support matrix
 ---------------------
@@ -88,7 +95,7 @@ Frozen support matrix
   and Phase 89 init-to-log-service handshake proof, and Phase 90
   capability-handle transfer proof, and Phase 91 early user-space helper-
   boundary audit, and Phase 92 user-space lifecycle follow-through proof, and
-  Phase 93 timer wake proof
+  Phase 93 timer wake proof, and Phase 94 first-system demo integration proof
 - unsupported today: `mc run` or `mc test` freestanding workflow admission,
   general cross-compilation, non-bootstrap target families, linker scripts,
   arbitrary linker flags, shared libraries, kernel-image packaging, and
@@ -154,7 +161,16 @@ The current repository can honestly claim one repository-bounded freestanding
 executable proof slice on the bootstrap Darwin arm64 target family, with
 explicit freestanding manifest identity, explicit startup selection, optional
 manifest-owned extra link inputs, and the narrow public `hal` MMIO surface
-proved through the Phase 81 through Phase 93 tool regressions.
+proved through the Phase 81 through Phase 94 tool regressions.
+
+the repository still does not claim full Canopus Lite completion.
+
+The repository still does not claim broader
+freestanding workflow admission, namespace policy, scheduler policy, or
+service-discovery generality beyond that first-system demo proof.
+
+This remains the first admitted freestanding `v0.3` slice statement for the
+repository, not a broader non-hosted release commitment.
 
 Everything outside that slice should be treated as explicitly unsupported
 until a later phase note and proof layer admit it.

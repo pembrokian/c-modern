@@ -286,3 +286,16 @@ func validate_phase111_scheduler_and_lifecycle_ownership(audit: RunningKernelSli
     }
     return validate_phase110_kernel_ownership_split(audit, scheduler_contract_hardened)
 }
+
+func validate_phase112_syscall_boundary_thinness(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32) bool {
+    if capability_contract_hardened == 0 {
+        return false
+    }
+    if ipc_contract_hardened == 0 {
+        return false
+    }
+    if address_space_contract_hardened == 0 {
+        return false
+    }
+    return validate_phase111_scheduler_and_lifecycle_ownership(audit, scheduler_contract_hardened, lifecycle_contract_hardened)
+}

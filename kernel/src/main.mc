@@ -60,7 +60,7 @@ const TRANSFER_SERVICE_GRANT_BYTE1: u8 = 73
 const TRANSFER_SERVICE_GRANT_BYTE2: u8 = 86
 const TRANSFER_SERVICE_GRANT_BYTE3: u8 = 69
 const TRANSFER_SERVICE_EXIT_CODE: i32 = 54
-const PHASE111_MARKER: i32 = 111
+const PHASE112_MARKER: i32 = 112
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -2376,6 +2376,9 @@ func bootstrap_main() i32 {
     phase108_contract_hardened: u32 = 0
     scheduler_contract_hardened: u32 = 0
     lifecycle_contract_hardened: u32 = 0
+    capability_contract_hardened: u32 = 0
+    ipc_contract_hardened: u32 = 0
+    address_space_contract_hardened: u32 = 0
     if !architecture_entry() {
         return 10
     }
@@ -2436,79 +2439,94 @@ func bootstrap_main() i32 {
         return 28
     }
     lifecycle_contract_hardened = 1
-    if !validate_phase104_contract_hardening() {
+    if !capability.validate_syscall_capability_boundary() {
         return 29
+    }
+    capability_contract_hardened = 1
+    if !endpoint.validate_syscall_ipc_boundary() {
+        return 30
+    }
+    ipc_contract_hardened = 1
+    if !address_space.validate_syscall_address_space_boundary() {
+        return 31
+    }
+    address_space_contract_hardened = 1
+    if !validate_phase104_contract_hardening() {
+        return 32
     }
     phase104_contract_hardened = 1
     if !execute_phase105_log_service_handshake() {
-        return 30
-    }
-    if !validate_phase105_log_service_handshake() {
-        return 31
-    }
-    if !execute_phase106_echo_service_request_reply() {
-        return 32
-    }
-    if !validate_phase106_echo_service_request_reply() {
         return 33
     }
-    if !execute_phase107_user_to_user_capability_transfer() {
+    if !validate_phase105_log_service_handshake() {
         return 34
     }
-    if !validate_phase107_user_to_user_capability_transfer() {
+    if !execute_phase106_echo_service_request_reply() {
         return 35
     }
-    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+    if !validate_phase106_echo_service_request_reply() {
         return 36
+    }
+    if !execute_phase107_user_to_user_capability_transfer() {
+        return 37
+    }
+    if !validate_phase107_user_to_user_capability_transfer() {
+        return 38
+    }
+    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+        return 39
     }
     phase108_contract_hardened = 1
     running_slice_audit: debug.RunningKernelSliceAudit = build_phase109_running_kernel_slice_audit(phase104_contract_hardened, phase108_contract_hardened)
     if !debug.validate_phase109_first_running_kernel_slice(running_slice_audit) {
-        return 37
-    }
-    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
-        return 38
-    }
-    if !debug.validate_phase111_scheduler_and_lifecycle_ownership(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened) {
-        return 39
-    }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 111)
-    if BOOT_MARKER_EMITTED != 1 {
         return 40
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
         return 41
     }
-    if BOOT_LOG.count != 5 {
+    if !debug.validate_phase111_scheduler_and_lifecycle_ownership(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened) {
         return 42
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if !debug.validate_phase112_syscall_boundary_thinness(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened) {
         return 43
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 112)
+    if BOOT_MARKER_EMITTED != 1 {
         return 44
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 45
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if BOOT_LOG.count != 5 {
         return 46
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 47
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 111 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 48
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 49
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 50
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 51
     }
-    return PHASE111_MARKER
+    if state.log_detail_at(BOOT_LOG, 4) != 112 {
+        return 52
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 53
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 54
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 55
+    }
+    return PHASE112_MARKER
 }

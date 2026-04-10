@@ -6,9 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 111 has moved the repository-owned kernel artifact beyond the landed
-  Phase 110 ownership split into one bounded scheduler and lifecycle
-  ownership clarification.
+- Phase 112 has moved the repository-owned kernel artifact beyond the landed
+  Phase 111 scheduler and lifecycle ownership clarification into one bounded
+  syscall boundary thinness audit.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -30,14 +30,15 @@ Current status
   receiver-side installation, one bounded kernel image-input and program-cap
   audit, one bounded first running Canopus kernel slice audit, one bounded
   kernel ownership split audit, one bounded scheduler and lifecycle ownership
-  clarification, and no broader multi-service bring-up yet.
+  clarification, one bounded syscall boundary thinness audit, and no broader
+  multi-service bring-up yet.
 
 Current files
 -------------
 
 - `build.toml`: freestanding kernel manifest for the current proof slice and
-  the explicit kernel image-input contract carried through the Phase 111
-  lifecycle-ownership clarification
+  the explicit kernel image-input contract carried through the Phase 112
+  syscall-boundary thinness audit
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core setup, bounded syscall-byte-IPC setup, bounded capability-
   carrying transfer setup, bounded service proof sequencing, and thin root
@@ -47,8 +48,8 @@ Current files
 - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for
   spawn, block, ready, exit, and waited-child release follow-through
 - `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109
-  running-slice audit, Phase 110 ownership-split audit, and Phase 111
-  lifecycle-ownership audit
+  running-slice audit, Phase 110 ownership-split audit, Phase 111
+  lifecycle-ownership audit, and Phase 112 syscall-boundary audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -62,10 +63,12 @@ Current files
   handle-table state, explicit wait-handle state, and explicit handle-move
   helpers
 - `src/endpoint.mc`: bounded endpoint table, queued-message ring, and
-  attached-handle message state
+  attached-handle message state plus endpoint-owned runtime queue helpers for
+  the landed syscall slice
 - `src/interrupt.mc`: bounded interrupt controller skeleton
 - `src/syscall.mc`: bounded syscall gate, byte-plus-capability request,
-  spawn-and-wait request, and observation state
+  spawn-and-wait request, and thin observation state over capability,
+  endpoint, address-space, and lifecycle owners
 - `src/init.mc`: bounded boot-bundled init image descriptor plus explicit init
   bootstrap-capability handoff records
 
@@ -82,16 +85,17 @@ Phase boundary
   service reap, one bounded real user-to-user endpoint transfer with explicit
   service-side follow-through, one bounded kernel image-and-program-cap audit,
   one bounded first running Canopus kernel slice audit, one bounded kernel
-  ownership split audit, and one bounded scheduler and lifecycle ownership
-  clarification.
+  ownership split audit, one bounded scheduler and lifecycle ownership
+  clarification, and one bounded syscall boundary thinness audit.
 - The repository can now honestly claim one first running Canopus kernel
-  slice with an explicit Phase 111 lifecycle clarification: explicit boot
+  slice with an explicit Phase 112 syscall-boundary thinness audit: explicit
+  boot
   entry,
   first user entry, endpoint-and-handle object core, syscall-owned byte-only
   IPC, attached-handle transfer, program-cap spawn and wait, timer sleep and
   wake, init bootstrap-capability handoff, real log-service handshake, real
   echo-service request-reply, real user-to-user capability transfer, and
-  kernel image/program-cap audit, with scheduler-facing validation separated
-  from concrete lifecycle slot mutation.
+  kernel image/program-cap audit, with syscall decode and observation shaping
+  separated from capability, endpoint, address-space, and lifecycle semantics.
 - It does not yet claim general loading, multi-service launch, namespace
   policy, kill semantics, or a running init-owned service set.

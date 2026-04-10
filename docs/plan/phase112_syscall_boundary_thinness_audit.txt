@@ -1,0 +1,162 @@
+Phase 112 -- Syscall Boundary Thinness Audit
+===========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 111 scheduler and lifecycle ownership
+clarification by proving that the landed syscall edge stays thin instead of
+quietly reacquiring IPC, capability-transfer, and child address-space
+semantics inside one decoding file.
+
+This document is both the Phase 112 execution note and its closeout.
+It does not claim broader syscall families, a public syscall wrapper layer,
+broader scheduler completion, broader MMU policy, or a larger compiler wave.
+It records one bounded boundary-hardening step inside the already admitted
+first running Canopus kernel slice.
+
+Repository status note
+----------------------
+- Phase 111 made lifecycle slot mutation explicit through
+  `kernel/src/lifecycle.mc` while preserving the existing running slice.
+- That clarification answered who owns task and process transition mutation,
+  but the syscall edge still retained several owner-local helpers for handle
+  transfer, endpoint queue interaction, and child address-space construction.
+- Without one narrower audit now, later syscall work would keep growing local
+  semantics back into `kernel/src/syscall.mc` even though the repository
+  already has explicit owner modules for capability, endpoint, address-space,
+  and lifecycle truth.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-111 roadmap reserved Phase 112 for a syscall
+  boundary thinness audit before wider hardware-boundary work.
+- The landed kernel tree already had distinct owners for capability state,
+  endpoint state, child address-space construction, and lifecycle mutation,
+  but `kernel/src/syscall.mc` still carried local helpers that decided those
+  semantics directly.
+- That left the next ownership question unresolved: is the syscall module an
+  admission-and-observation edge, or is it quietly becoming the place where
+  subsystem meaning lives?
+
+Core rule
+---------
+- Preserve current kernel behavior exactly.
+- Keep syscall decode, gate status, and observation shaping thin.
+- Move endpoint queue behavior, capability-transfer handling, and child
+  address-space construction behind their existing owner modules.
+- Do not expand the compiler or language surface unless this kernel step
+  proves a concrete owner gap. It does not.
+- Prove the boundary mechanically with one focused regression over the real
+  kernel artifact.
+
+Chosen slice for this phase
+---------------------------
+Targeted audit shape:
+
+1. one canonical Phase 112 note recording the syscall thinness boundary and
+   the exact owner-local helpers now used by the landed syscall families
+2. one update to `kernel/src/capability.mc` so handle lookup, attached-handle
+   transfer resolution, received-handle installation, and wait-handle spawn
+   admission are explicit capability-owned helpers
+3. one update to `kernel/src/endpoint.mc` so runtime message construction plus
+   queue send-or-receive follow-through are explicit endpoint-owned helpers
+4. one update to `kernel/src/address_space.mc` so child bootstrap address-space
+   and user-entry-frame construction are explicit address-space-owned helpers
+5. one update to `kernel/src/syscall.mc` so send, receive, and spawn stay at
+   gate, decode, status, and observation wiring while calling those owners
+6. one new debug-owned Phase 112 audit and one focused freestanding kernel
+   regression that prove the boundary mechanically through source imports,
+   owner-local validators, and MIR-visible functions
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this boundary-hardening step now because the
+current running slice is already honest and the next highest-value step is
+preventing syscall decode from becoming the accidental owner of subsystem
+meaning.
+
+What this phase proves
+----------------------
+- the current first running kernel slice can stay behaviorally unchanged while
+  making the syscall edge more explicit about what it does and does not own
+- capability-transfer semantics, endpoint queue semantics, and child
+  address-space construction can remain in their subsystem owners while the
+  syscall layer keeps decode, gate, and observation duties
+- the repository can record an intentional decision not to reopen compiler
+  work here because this kernel step closes entirely inside the landed kernel
+  ownership tree
+
+Deliverables
+------------
+- one canonical Phase 112 closeout note in `docs/plan/`
+- updated `kernel/src/capability.mc`, `kernel/src/endpoint.mc`, and
+  `kernel/src/address_space.mc` owner-local helpers plus focused owner-local
+  validators for the landed syscall slice
+- updated `kernel/src/syscall.mc` call sites that route those semantics
+  through the owner modules
+- one debug-owned Phase 112 syscall-boundary audit
+- refreshed kernel-facing documentation and one focused Phase 112 freestanding
+  kernel regression
+
+Suggested execution order
+-------------------------
+1. Move capability-transfer and wait-handle admission helpers behind the
+   capability owner.
+2. Move runtime endpoint send-or-receive helpers behind the endpoint owner.
+3. Move child bootstrap address-space construction behind the address-space
+   owner.
+4. Rewire the real syscall path to call those owners and keep only gate,
+   status, and observation logic local.
+5. Advance the current kernel proof marker only after the new Phase 112 audit
+   and focused regression exist.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 112 marker without
+  widening the admitted running slice
+- `kernel/src/syscall.mc` no longer defines local helpers for endpoint queue
+  resolution and dequeue, attached-handle transfer resolution or receive-side
+  installation, or child bootstrap address-space construction
+- those behaviors instead live behind explicit capability, endpoint, and
+  address-space owner interfaces
+- the build keeps exposing those owner functions in MIR and the focused Phase
+  112 regression proves the current docs describe the boundary consistently
+
+Non-goals
+---------
+- broader syscall-family growth or public syscall wrappers
+- broader MMU, interrupt, timer, or hardware-boundary work
+- reopening sema, MIR, backend, ABI, or language design without a concrete
+  kernel-owned failure
+- broader init-owned multi-service or namespace policy work
+
+Implemented slice
+-----------------
+- added capability-owned syscall helpers for endpoint-handle lookup,
+  attached-handle transfer resolution, receive-side handle installation, and
+  wait-handle spawn admission
+- added endpoint-owned runtime message construction and queue send-or-receive
+  helpers so the syscall edge no longer decides queue semantics locally
+- added address-space-owned child bootstrap construction so spawn no longer
+  assembles child address-space and user-entry-frame state inside the syscall
+  owner
+- updated `kernel/src/syscall.mc` so send, receive, and spawn now route those
+  semantics through their owner modules while keeping gate, status, and
+  observation shaping local
+- added one debug-owned Phase 112 syscall-boundary thinness audit and one
+  focused freestanding regression covering source imports, owner-local
+  validators, docs, and MIR visibility
+
+Closeout statement
+------------------
+Phase 112 is complete as a syscall boundary thinness audit. The repository
+still claims only one bounded first running Canopus kernel slice, but that
+slice now keeps the syscall edge thinner and more honest: syscall decode,
+gate state, and observations remain local, while IPC, capability-transfer,
+address-space, and lifecycle semantics stay with their owning subsystems.

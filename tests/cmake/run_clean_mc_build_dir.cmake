@@ -19,6 +19,11 @@ if(DEFINED IMPORT_ROOT)
   list(APPEND command_args --import-root "${IMPORT_ROOT}")
 endif()
 
+if(DEFINED EXTRA_ARGS)
+  separate_arguments(extra_args NATIVE_COMMAND "${EXTRA_ARGS}")
+  list(APPEND command_args ${extra_args})
+endif()
+
 execute_process(
   COMMAND ${command_args}
   RESULT_VARIABLE mc_result

@@ -153,44 +153,11 @@ struct SleepSlotTransition {
     status: SyscallStatus
 }
 
-struct EndpointResolution {
-    endpoint_id: u32
-    endpoint_index: usize
-    status: SyscallStatus
-}
-
-struct AttachedHandleResolution {
-    attached_endpoint_id: u32
-    attached_rights: u32
-    status: SyscallStatus
-}
-
-struct ReceiveHandleInstall {
-    handle_table: capability.HandleTable
-    received_handle_slot: u32
-    received_handle_count: usize
-    status: SyscallStatus
-}
-
 struct SpawnAdmission {
     wait_table: capability.WaitTable
     process_slot: u32
     task_slot: u32
     status: SyscallStatus
-}
-
-struct SpawnCommit {
-    process_slots: [3]state.ProcessSlot
-    task_slots: [3]state.TaskSlot
-    child_address_space: address_space.AddressSpace
-    child_frame: address_space.UserEntryFrame
-    status: SyscallStatus
-}
-
-struct WaitRelease {
-    process_slots: [3]state.ProcessSlot
-    task_slots: [3]state.TaskSlot
-    exit_code: i32
 }
 
 func gate_closed() SyscallGate {
@@ -281,55 +248,6 @@ func update_gate(gate: SyscallGate, id: SyscallId, status: SyscallStatus, send_d
     return SyscallGate{ open: gate.open, last_id: id, last_status: status, send_count: gate.send_count + send_delta, receive_count: gate.receive_count + receive_delta }
 }
 
-func resolve_endpoint(handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, handle_slot: u32) EndpointResolution {
-    endpoint_id: u32 = capability.find_endpoint_for_handle(handle_table, handle_slot)
-    if endpoint_id == 0 {
-        return EndpointResolution{ endpoint_id: 0, endpoint_index: 0, status: SyscallStatus.InvalidHandle }
-    }
-    endpoint_index: usize = endpoint.find_endpoint_index(endpoints, endpoint_id)
-    if !endpoint.endpoint_index_valid(endpoints, endpoint_index) {
-        return EndpointResolution{ endpoint_id: endpoint_id, endpoint_index: 0, status: SyscallStatus.InvalidEndpoint }
-    }
-    return EndpointResolution{ endpoint_id: endpoint_id, endpoint_index: endpoint_index, status: SyscallStatus.Ok }
-}
-
-func resolve_attached_handle(handle_table: capability.HandleTable, request: SendRequest) AttachedHandleResolution {
-    if request.attached_handle_count == 0 {
-        return AttachedHandleResolution{ attached_endpoint_id: 0, attached_rights: 0, status: SyscallStatus.Ok }
-    }
-    if request.attached_handle_count != 1 {
-        return AttachedHandleResolution{ attached_endpoint_id: 0, attached_rights: 0, status: SyscallStatus.InvalidHandle }
-    }
-    attached_endpoint_id: u32 = capability.find_endpoint_for_handle(handle_table, request.attached_handle_slot)
-    attached_rights: u32 = capability.find_transfer_rights_for_handle(handle_table, request.attached_handle_slot)
-    if attached_endpoint_id == 0 || attached_rights == 0 {
-        return AttachedHandleResolution{ attached_endpoint_id: 0, attached_rights: 0, status: SyscallStatus.InvalidHandle }
-    }
-    return AttachedHandleResolution{ attached_endpoint_id: attached_endpoint_id, attached_rights: attached_rights, status: SyscallStatus.Ok }
-}
-
-func build_send_message(gate: SyscallGate, sender_pid: u32, endpoint_id: u32, request: SendRequest, attached: AttachedHandleResolution) endpoint.KernelMessage {
-    message_id: u32 = gate.send_count + FIRST_RUNTIME_MESSAGE_ID
-    if request.attached_handle_count == 1 {
-        return endpoint.attached_message(message_id, sender_pid, endpoint_id, request.payload_len, request.payload, attached.attached_endpoint_id, attached.attached_rights, request.attached_handle_slot)
-    }
-    return endpoint.byte_message(message_id, sender_pid, endpoint_id, request.payload_len, request.payload)
-}
-
-func install_received_handle(handle_table: capability.HandleTable, request: ReceiveRequest, message: endpoint.KernelMessage) ReceiveHandleInstall {
-    if message.attached_count == 0 {
-        return ReceiveHandleInstall{ handle_table: handle_table, received_handle_slot: 0, received_handle_count: 0, status: SyscallStatus.Ok }
-    }
-    if request.receive_handle_slot == 0 {
-        return ReceiveHandleInstall{ handle_table: handle_table, received_handle_slot: 0, received_handle_count: 0, status: SyscallStatus.InvalidHandle }
-    }
-    updated_handle_table: capability.HandleTable = capability.install_endpoint_handle(handle_table, request.receive_handle_slot, message.attached_endpoint_id, message.attached_rights)
-    if !capability.handle_install_succeeded(handle_table, updated_handle_table, request.receive_handle_slot) {
-        return ReceiveHandleInstall{ handle_table: handle_table, received_handle_slot: 0, received_handle_count: 0, status: SyscallStatus.InvalidHandle }
-    }
-    return ReceiveHandleInstall{ handle_table: updated_handle_table, received_handle_slot: request.receive_handle_slot, received_handle_count: message.attached_count, status: SyscallStatus.Ok }
-}
-
 func admit_spawn(program_capability: capability.CapabilitySlot, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, child_image: init.InitImage, request: SpawnRequest, child_pid: u32) SpawnAdmission {
     if !capability.is_program_capability(program_capability) {
         return SpawnAdmission{ wait_table: wait_table, process_slot: 0, task_slot: 0, status: SyscallStatus.InvalidCapability }
@@ -337,34 +255,19 @@ func admit_spawn(program_capability: capability.CapabilitySlot, process_slots: [
     if !init.bootstrap_image_valid(child_image) {
         return SpawnAdmission{ wait_table: wait_table, process_slot: 0, task_slot: 0, status: SyscallStatus.InvalidCapability }
     }
-    if request.wait_handle_slot == 0 {
-        return SpawnAdmission{ wait_table: wait_table, process_slot: 0, task_slot: 0, status: SyscallStatus.InvalidHandle }
-    }
     process_slot: u32 = state.find_empty_process_slot(process_slots)
     task_slot: u32 = state.find_empty_task_slot(task_slots)
     if process_slot >= 3 || task_slot >= 3 {
         return SpawnAdmission{ wait_table: wait_table, process_slot: 0, task_slot: 0, status: SyscallStatus.Exhausted }
     }
-    updated_wait_table: capability.WaitTable = capability.install_wait_handle(wait_table, request.wait_handle_slot, child_pid)
-    if !capability.wait_install_succeeded(wait_table, updated_wait_table, request.wait_handle_slot) {
+    wait_admission: capability.SpawnWaitHandleAdmission = capability.admit_spawn_wait_handle(wait_table, request.wait_handle_slot, child_pid)
+    if wait_admission.valid == 0 {
+        if wait_admission.invalid_handle != 0 {
+            return SpawnAdmission{ wait_table: wait_table, process_slot: 0, task_slot: 0, status: SyscallStatus.InvalidHandle }
+        }
         return SpawnAdmission{ wait_table: wait_table, process_slot: 0, task_slot: 0, status: SyscallStatus.Exhausted }
     }
-    return SpawnAdmission{ wait_table: updated_wait_table, process_slot: process_slot, task_slot: task_slot, status: SyscallStatus.Ok }
-}
-
-func commit_spawn(process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, child_image: init.InitImage, child_pid: u32, child_tid: u32, child_asid: u32, child_root_page_table: usize, process_slot: u32, task_slot: u32) SpawnCommit {
-    child_space: address_space.AddressSpace = address_space.bootstrap_space(child_asid, child_pid, child_root_page_table, child_image.image_base, child_image.image_size, child_image.entry_pc, child_image.stack_base, child_image.stack_size, child_image.stack_top)
-    if address_space.state_score(child_space.state) != 2 {
-        return SpawnCommit{ process_slots: process_slots, task_slots: task_slots, child_address_space: address_space.empty_space(), child_frame: address_space.empty_frame(), status: SyscallStatus.InvalidCapability }
-    }
-    child_frame: address_space.UserEntryFrame = address_space.bootstrap_user_frame(child_space, child_tid)
-    install: lifecycle.SpawnInstallResult = lifecycle.install_spawned_child(process_slots, task_slots, child_pid, child_tid, child_asid, process_slot, task_slot, child_image.entry_pc, child_image.stack_top)
-    return SpawnCommit{ process_slots: install.process_slots, task_slots: install.task_slots, child_address_space: child_space, child_frame: child_frame, status: SyscallStatus.Ok }
-}
-
-func release_waited_child(process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, wait_handle_slot: u32, child_pid: u32) WaitRelease {
-    released: lifecycle.ReleaseTransition = lifecycle.release_waited_child_slots(process_slots, task_slots, child_pid)
-    return WaitRelease{ process_slots: released.process_slots, task_slots: released.task_slots, exit_code: capability.find_exit_code_for_wait_handle(wait_table, wait_handle_slot) }
+    return SpawnAdmission{ wait_table: wait_admission.wait_table, process_slot: process_slot, task_slot: task_slot, status: SyscallStatus.Ok }
 }
 
 func perform_sleep_slot(task_slots: [3]state.TaskSlot, timer_state: timer.TimerState, task_slot: u32, duration_ticks: u64) SleepSlotTransition {
@@ -396,13 +299,13 @@ func perform_send(gate: SyscallGate, handle_table: capability.HandleTable, endpo
     if gate.open == 0 {
         return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Closed, 0, 0), handle_table, endpoints, SyscallStatus.Closed, BlockReason.None)
     }
-    resolved_endpoint: EndpointResolution = resolve_endpoint(handle_table, endpoints, request.handle_slot)
-    if status_score(resolved_endpoint.status) != 2 {
-        return send_result(update_gate(gate, SyscallId.Send, resolved_endpoint.status, 0, 0), handle_table, endpoints, resolved_endpoint.status, BlockReason.None)
+    resolved_handle: capability.EndpointHandleResolution = capability.resolve_endpoint_handle(handle_table, request.handle_slot)
+    if resolved_handle.valid == 0 {
+        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None)
     }
-    attached: AttachedHandleResolution = resolve_attached_handle(handle_table, request)
-    if status_score(attached.status) != 2 {
-        return send_result(update_gate(gate, SyscallId.Send, attached.status, 0, 0), handle_table, endpoints, attached.status, BlockReason.None)
+    attached: capability.AttachedTransferResolution = capability.resolve_attached_transfer_handle(handle_table, request.attached_handle_slot, request.attached_handle_count)
+    if attached.valid == 0 {
+        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None)
     }
     updated_handle_table: capability.HandleTable = handle_table
     if request.attached_handle_count == 1 {
@@ -411,36 +314,39 @@ func perform_send(gate: SyscallGate, handle_table: capability.HandleTable, endpo
             return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None)
         }
     }
-    message: endpoint.KernelMessage = build_send_message(gate, sender_pid, resolved_endpoint.endpoint_id, request, attached)
-    updated_endpoints: endpoint.EndpointTable = endpoint.enqueue_message(endpoints, resolved_endpoint.endpoint_index, message)
-    if !endpoint.enqueue_succeeded(endpoints, updated_endpoints, resolved_endpoint.endpoint_index) {
+    message_id: u32 = gate.send_count + FIRST_RUNTIME_MESSAGE_ID
+    message: endpoint.KernelMessage = endpoint.build_runtime_message(message_id, sender_pid, resolved_handle.endpoint_id, request.payload_len, request.payload, attached.attached_count, attached.attached_endpoint_id, attached.attached_rights, attached.attached_source_handle_slot)
+    sent: endpoint.RuntimeSendResult = endpoint.enqueue_runtime_message(endpoints, resolved_handle.endpoint_id, message)
+    if sent.endpoint_valid == 0 {
+        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidEndpoint, 0, 0), handle_table, endpoints, SyscallStatus.InvalidEndpoint, BlockReason.None)
+    }
+    if sent.queue_full != 0 {
         return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.WouldBlock, 0, 0), handle_table, endpoints, SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull)
     }
-    return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Ok, 1, 0), updated_handle_table, updated_endpoints, SyscallStatus.Ok, BlockReason.None)
+    return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Ok, 1, 0), updated_handle_table, sent.endpoints, SyscallStatus.Ok, BlockReason.None)
 }
 
 func perform_receive(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, request: ReceiveRequest) ReceiveResult {
     if gate.open == 0 {
         return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Closed, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.Closed, BlockReason.None, 0, 0, 0, 0, 0, endpoint.zero_payload()))
     }
-    resolved_endpoint: EndpointResolution = resolve_endpoint(handle_table, endpoints, request.handle_slot)
-    if status_score(resolved_endpoint.status) == 8 {
-        return receive_result(update_gate(gate, SyscallId.Receive, resolved_endpoint.status, 0, 0), handle_table, endpoints, receive_observation(resolved_endpoint.status, BlockReason.None, 0, 0, 0, 0, 0, endpoint.zero_payload()))
+    resolved_handle: capability.EndpointHandleResolution = capability.resolve_endpoint_handle(handle_table, request.handle_slot)
+    if resolved_handle.valid == 0 {
+        return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, 0, 0, 0, 0, endpoint.zero_payload()))
     }
-    if status_score(resolved_endpoint.status) == 16 {
-        return receive_result(update_gate(gate, SyscallId.Receive, resolved_endpoint.status, 0, 0), handle_table, endpoints, receive_observation(resolved_endpoint.status, BlockReason.None, resolved_endpoint.endpoint_id, 0, 0, 0, 0, endpoint.zero_payload()))
+    received: endpoint.RuntimeReceiveResult = endpoint.receive_runtime_message(endpoints, resolved_handle.endpoint_id)
+    if received.endpoint_valid == 0 {
+        return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidEndpoint, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.InvalidEndpoint, BlockReason.None, resolved_handle.endpoint_id, 0, 0, 0, 0, endpoint.zero_payload()))
     }
-    message: endpoint.KernelMessage = endpoint.peek_head_message(endpoints, resolved_endpoint.endpoint_index)
-    if endpoint.message_state_score(message.state) == 1 {
-        return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.WouldBlock, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.WouldBlock, BlockReason.EndpointQueueEmpty, resolved_endpoint.endpoint_id, 0, 0, 0, 0, endpoint.zero_payload()))
+    if received.queue_empty != 0 {
+        return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.WouldBlock, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.WouldBlock, BlockReason.EndpointQueueEmpty, resolved_handle.endpoint_id, 0, 0, 0, 0, endpoint.zero_payload()))
     }
-    install: ReceiveHandleInstall = install_received_handle(handle_table, request, message)
-    if status_score(install.status) != 2 {
-        return receive_result(update_gate(gate, SyscallId.Receive, install.status, 0, 0), handle_table, endpoints, receive_observation(install.status, BlockReason.None, resolved_endpoint.endpoint_id, 0, 0, 0, 0, endpoint.zero_payload()))
+    install: capability.ReceivedHandleInstall = capability.install_received_endpoint_handle(handle_table, request.receive_handle_slot, received.message.attached_count, received.message.attached_endpoint_id, received.message.attached_rights)
+    if install.valid == 0 {
+        return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.InvalidHandle, BlockReason.None, resolved_handle.endpoint_id, 0, 0, 0, 0, endpoint.zero_payload()))
     }
-    observation: ReceiveObservation = receive_observation(SyscallStatus.Ok, BlockReason.None, message.endpoint_id, message.source_pid, message.len, install.received_handle_slot, install.received_handle_count, message.payload)
-    updated_endpoints: endpoint.EndpointTable = endpoint.consume_head_message(endpoints, resolved_endpoint.endpoint_index)
-    return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Ok, 0, 1), install.handle_table, updated_endpoints, observation)
+    observation: ReceiveObservation = receive_observation(SyscallStatus.Ok, BlockReason.None, received.message.endpoint_id, received.message.source_pid, received.message.len, install.received_handle_slot, install.received_handle_count, received.message.payload)
+    return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Ok, 0, 1), install.handle_table, received.endpoints, observation)
 }
 
 func perform_spawn(gate: SyscallGate, program_capability: capability.CapabilitySlot, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, child_image: init.InitImage, request: SpawnRequest, child_pid: u32, child_tid: u32, child_asid: u32, child_root_page_table: usize) SpawnResult {
@@ -451,11 +357,12 @@ func perform_spawn(gate: SyscallGate, program_capability: capability.CapabilityS
     if status_score(admission.status) != 2 {
         return spawn_result(update_gate(gate, SyscallId.Spawn, admission.status, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: admission.status, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
     }
-    commit: SpawnCommit = commit_spawn(process_slots, task_slots, child_image, child_pid, child_tid, child_asid, child_root_page_table, admission.process_slot, admission.task_slot)
-    if status_score(commit.status) != 2 {
-        return spawn_result(update_gate(gate, SyscallId.Spawn, commit.status, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: commit.status, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
+    child_bootstrap: address_space.SpawnBootstrap = address_space.build_child_bootstrap_context(child_pid, child_tid, child_asid, child_root_page_table, child_image.image_base, child_image.image_size, child_image.entry_pc, child_image.stack_base, child_image.stack_size, child_image.stack_top)
+    if child_bootstrap.valid == 0 {
+        return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.InvalidCapability, 0, 0), program_capability, process_slots, task_slots, wait_table, address_space.empty_space(), address_space.empty_frame(), SpawnObservation{ status: SyscallStatus.InvalidCapability, child_pid: 0, child_tid: 0, child_asid: 0, wait_handle_slot: 0 })
     }
-    return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.Ok, 0, 0), capability.empty_slot(), commit.process_slots, commit.task_slots, admission.wait_table, commit.child_address_space, commit.child_frame, SpawnObservation{ status: SyscallStatus.Ok, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, wait_handle_slot: request.wait_handle_slot })
+    install: lifecycle.SpawnInstallResult = lifecycle.install_spawned_child(process_slots, task_slots, child_pid, child_tid, child_asid, admission.process_slot, admission.task_slot, child_image.entry_pc, child_image.stack_top)
+    return spawn_result(update_gate(gate, SyscallId.Spawn, SyscallStatus.Ok, 0, 0), capability.empty_slot(), install.process_slots, install.task_slots, admission.wait_table, child_bootstrap.child_address_space, child_bootstrap.child_frame, SpawnObservation{ status: SyscallStatus.Ok, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, wait_handle_slot: request.wait_handle_slot })
 }
 
 func perform_wait(gate: SyscallGate, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, request: WaitRequest) WaitResult {
@@ -470,8 +377,9 @@ func perform_wait(gate: SyscallGate, process_slots: [3]state.ProcessSlot, task_s
         return wait_result(update_gate(gate, SyscallId.Wait, SyscallStatus.WouldBlock, 0, 0), process_slots, task_slots, wait_table, wait_observation(SyscallStatus.WouldBlock, BlockReason.WaitPending, child_pid, 0, request.wait_handle_slot))
     }
     updated_wait_table: capability.WaitTable = capability.consume_wait_handle(wait_table, request.wait_handle_slot)
-    released: WaitRelease = release_waited_child(process_slots, task_slots, wait_table, request.wait_handle_slot, child_pid)
-    return wait_result(update_gate(gate, SyscallId.Wait, SyscallStatus.Ok, 0, 0), released.process_slots, released.task_slots, updated_wait_table, wait_observation(SyscallStatus.Ok, BlockReason.None, child_pid, released.exit_code, request.wait_handle_slot))
+    released: lifecycle.ReleaseTransition = lifecycle.release_waited_child_slots(process_slots, task_slots, child_pid)
+    exit_code: i32 = capability.find_exit_code_for_wait_handle(wait_table, request.wait_handle_slot)
+    return wait_result(update_gate(gate, SyscallId.Wait, SyscallStatus.Ok, 0, 0), released.process_slots, released.task_slots, updated_wait_table, wait_observation(SyscallStatus.Ok, BlockReason.None, child_pid, exit_code, request.wait_handle_slot))
 }
 
 func id_score(id: SyscallId) i32 {

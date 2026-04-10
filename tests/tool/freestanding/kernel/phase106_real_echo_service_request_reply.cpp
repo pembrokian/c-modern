@@ -41,7 +41,7 @@ void RunFreestandingKernelPhase106RealEchoServiceRequestReply(const std::filesys
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase106_echo_service_run_output.txt",
                                                              "freestanding kernel phase106 echo-service request-reply run");
-    if (!run_outcome.exited || run_outcome.exit_code != 111) {
+    if (!run_outcome.exited || run_outcome.exit_code != 112) {
         Fail("phase106 freestanding kernel echo-service request-reply run should exit with the current kernel proof marker while preserving the phase106 slice:\n" +
              run_output);
     }
