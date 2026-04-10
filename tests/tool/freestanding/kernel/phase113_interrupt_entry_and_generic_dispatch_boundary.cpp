@@ -12,44 +12,10 @@ using mc::test_support::Fail;
 using mc::test_support::ReadFile;
 using mc::test_support::RunCommandCapture;
 
-void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const std::filesystem::path& source_root,
-                                                                           const std::filesystem::path& binary_root,
-                                                                           const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src" / "main.mc";
-    const std::filesystem::path interrupt_source_path = source_root / "kernel" / "src" / "interrupt.mc";
-    const std::filesystem::path debug_source_path = source_root / "kernel" / "src" / "debug.mc";
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase113_interrupt_entry_and_generic_dispatch_boundary.txt";
-    const std::filesystem::path roadmap_path = source_root / "docs" / "plan" / "admin" /
-                                               "canopus_post_phase109_speculative_roadmap.txt";
-    const std::filesystem::path position_path = source_root / "docs" / "plan" / "admin" /
-                                                "modern_c_canopus_readiness_position.txt";
-    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
-    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
-    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
-    const std::filesystem::path decision_log_path = source_root / "docs" / "plan" / "decision_log.txt";
-    const std::filesystem::path backlog_path = source_root / "docs" / "plan" / "backlog.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase113_interrupt_boundary_build";
-    std::filesystem::remove_all(build_dir);
+namespace {
 
-    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                  "build",
-                                                                  "--project",
-                                                                  project_path.generic_string(),
-                                                                  "--target",
-                                                                  "kernel",
-                                                                  "--build-dir",
-                                                                  build_dir.generic_string(),
-                                                                  "--dump-mir"},
-                                                                 build_dir / "kernel_phase113_interrupt_boundary_build_output.txt",
-                                                                 "freestanding kernel phase113 interrupt boundary build");
-    if (!build_outcome.exited || build_outcome.exit_code != 0) {
-        Fail("phase113 freestanding kernel interrupt boundary build should succeed:\n" + build_output);
-    }
-
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+void ExpectPhase113BehaviorSlice(const std::filesystem::path& build_dir,
+                                 const mc::support::BuildArtifactTargets& build_targets) {
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase113_interrupt_boundary_run_output.txt",
                                                              "freestanding kernel phase113 interrupt boundary run");
@@ -62,7 +28,16 @@ void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_interrupt.mc.o")) {
         Fail("phase113 interrupt boundary audit should emit the interrupt module object");
     }
+}
 
+void ExpectPhase113PublicationSlice(const std::filesystem::path& phase_doc_path,
+                                    const std::filesystem::path& roadmap_path,
+                                    const std::filesystem::path& position_path,
+                                    const std::filesystem::path& kernel_readme_path,
+                                    const std::filesystem::path& repo_map_path,
+                                    const std::filesystem::path& freestanding_readme_path,
+                                    const std::filesystem::path& decision_log_path,
+                                    const std::filesystem::path& backlog_path) {
     const std::string phase_doc = ReadFile(phase_doc_path);
     ExpectOutputContains(phase_doc,
                          "Phase 113 -- Interrupt Entry And Generic Dispatch Boundary",
@@ -117,50 +92,79 @@ void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const
     ExpectOutputContains(backlog,
                          "keep the Phase 113 interrupt entry and generic dispatch boundary explicit",
                          "phase113 backlog should keep the new boundary visible for later phases");
-
-    const std::string main_source = ReadFile(main_source_path);
-    ExpectOutputContains(main_source,
-                         "const PHASE113_MARKER: i32 = 113",
-                         "phase113 main module should advance the current kernel marker");
-    ExpectOutputContains(main_source,
-                         "interrupt.arch_enter_interrupt",
-                         "phase113 main module should route timer wake through interrupt entry");
-    ExpectOutputContains(main_source,
-                         "interrupt.dispatch_interrupt",
-                         "phase113 main module should route timer wake through generic interrupt dispatch");
-    ExpectOutputContains(main_source,
-                         "interrupt.validate_interrupt_entry_and_dispatch_boundary",
-                         "phase113 main module should validate the interrupt-owned boundary");
-    ExpectOutputContains(main_source,
-                         "debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary",
-                         "phase113 main module should call the new debug-owned phase113 audit");
-
-    const std::string interrupt_source = ReadFile(interrupt_source_path);
-    ExpectOutputContains(interrupt_source,
-                         "func arch_enter_interrupt(controller: InterruptController, vector: u32, source_actor: u32) InterruptEntry",
-                         "phase113 interrupt module should own architecture-local entry");
-    ExpectOutputContains(interrupt_source,
-                         "func dispatch_interrupt(entry: InterruptEntry, timer_state: timer.TimerState, now_tick: u64) InterruptDispatchResult",
-                         "phase113 interrupt module should own generic dispatch");
-    ExpectOutputContains(interrupt_source,
-                         "func validate_interrupt_entry_and_dispatch_boundary() bool",
-                         "phase113 interrupt module should expose a focused owner-local validator");
-
-    const std::string debug_source = ReadFile(debug_source_path);
-    ExpectOutputContains(debug_source,
-                         "func validate_phase113_interrupt_entry_and_generic_dispatch_boundary(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, interrupt_dispatch_kind: interrupt.InterruptDispatchKind) bool",
-                         "phase113 debug module should own the new interrupt-boundary audit");
-
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "ConstGlobal names=[PHASE113_MARKER] type=i32",
-                         "phase113 merged MIR should expose the current kernel marker");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=interrupt.validate_interrupt_entry_and_dispatch_boundary returns=[bool]",
-                         "phase113 merged MIR should expose the interrupt-owned validator");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary returns=[bool]",
-                         "phase113 merged MIR should expose the new debug-owned phase113 audit");
 }
+
+void ExpectPhase113MirStructureSlice(const std::filesystem::path& mir_path,
+                                     const std::filesystem::path& expected_projection_path) {
+    const std::string kernel_mir = ReadFile(mir_path);
+    ExpectMirFirstMatchProjectionFile(
+        kernel_mir,
+        {
+            "ConstGlobal names=[PHASE113_MARKER] type=i32",
+            "Function name=interrupt.arch_enter_interrupt returns=[interrupt.InterruptEntry]",
+            "Function name=interrupt.dispatch_interrupt returns=[interrupt.InterruptDispatchResult]",
+            "Function name=interrupt.validate_interrupt_entry_and_dispatch_boundary returns=[bool]",
+            "Function name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary returns=[bool]",
+            "target=interrupt.arch_enter_interrupt target_kind=function target_name=interrupt.arch_enter_interrupt",
+            "target=interrupt.dispatch_interrupt target_kind=function target_name=interrupt.dispatch_interrupt",
+            "target=interrupt.validate_interrupt_entry_and_dispatch_boundary target_kind=function target_name=interrupt.validate_interrupt_entry_and_dispatch_boundary",
+            "target=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary target_kind=function target_name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary",
+        },
+        expected_projection_path,
+        "phase113 merged MIR should preserve the interrupt boundary projection");
+}
+
+}  // namespace
+
+void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const std::filesystem::path& source_root,
+                                                                           const std::filesystem::path& binary_root,
+                                                                           const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
+    const std::filesystem::path main_source_path = source_root / "kernel" / "src" / "main.mc";
+    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
+                                                 "phase113_interrupt_entry_and_generic_dispatch_boundary.txt";
+    const std::filesystem::path roadmap_path = source_root / "docs" / "plan" / "admin" /
+                                               "canopus_post_phase109_speculative_roadmap.txt";
+    const std::filesystem::path position_path = source_root / "docs" / "plan" / "admin" /
+                                                "modern_c_canopus_readiness_position.txt";
+    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
+    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
+    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
+    const std::filesystem::path decision_log_path = source_root / "docs" / "plan" / "decision_log.txt";
+    const std::filesystem::path backlog_path = source_root / "docs" / "plan" / "backlog.txt";
+    const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
+                                                      "phase113_interrupt_entry_and_generic_dispatch_boundary.mirproj.txt";
+    const std::filesystem::path build_dir = binary_root / "kernel_phase113_interrupt_boundary_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "kernel",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "kernel_phase113_interrupt_boundary_build_output.txt",
+                                                                 "freestanding kernel phase113 interrupt boundary build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase113 freestanding kernel interrupt boundary build should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    ExpectPhase113BehaviorSlice(build_dir, build_targets);
+    ExpectPhase113PublicationSlice(phase_doc_path,
+                                   roadmap_path,
+                                   position_path,
+                                   kernel_readme_path,
+                                   repo_map_path,
+                                   freestanding_readme_path,
+                                   decision_log_path,
+                                   backlog_path);
+    ExpectPhase113MirStructureSlice(dump_targets.mir, mir_projection_path);
+}
+
 
 }  // namespace mc::tool_tests

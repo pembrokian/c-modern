@@ -28,10 +28,27 @@ Structure
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 
+Late kernel audit pattern
+
+- For ownership-hardening kernel audits, keep one proof owner `.cpp` per phase.
+- Split those phase owners into three local slices when practical:
+  behavior, publication, and MIR structure.
+- Keep behavior assertions in C++ over the built artifact and emitted objects.
+- Keep publication assertions in C++ over the phase note, README, repo map,
+  and other intentionally published status files.
+- Keep MIR structure assertions as projected goldens in adjacent
+  `.mirproj.txt` files rather than embedding long expected MIR snippets in the
+  `.cpp` file.
+- Use `ExpectMirFirstMatchProjectionFile` from `tests/tool/tool_suite_common.*`
+  to compare those projected MIR goldens against the merged dump.
+
 Rule of thumb
 
 - Split by ownership boundary first.
 - Split to one proof per file when a proof has enough setup and assertions to
   stand on its own.
+- For late kernel audits, prefer projected MIR golden files over raw source
+  text scanning when the merged MIR already carries the ownership and routing
+  facts you need.
 - Keep shared project-writing and command helpers in `tests/tool/tool_suite_common.*`
   until a narrower freestanding-only helper layer is justified.

@@ -118,6 +118,8 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
     - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator
     - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase103_init_bootstrap_handoff.cpp`, `phase105_real_log_service_handshake.cpp`, `phase106_real_echo_service_request_reply.cpp`, `phase107_real_user_to_user_capability_transfer.cpp`, `phase108_kernel_image_program_cap_audit.cpp`, `phase109_first_running_kernel_slice_audit.cpp`, `phase110_kernel_ownership_split_audit.cpp`, `phase111_scheduler_lifecycle_ownership_clarification.cpp`, `phase112_syscall_boundary_thinness_audit.cpp`, `phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`: one kernel proof per file
+    - late ownership-hardening kernel audits now keep one `.cpp` proof owner plus one adjacent `.mirproj.txt` projected MIR golden; the `.cpp` owns behavior and publication checks while the `.mirproj.txt` owns the expected MIR projection
+    - `tests/tool/tool_suite_common.cpp`: `ExpectMirFirstMatchProjectionFile` is the shared helper for those projected MIR goldens
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
   - if freestanding or Canopus coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split

@@ -12,39 +12,10 @@ using mc::test_support::Fail;
 using mc::test_support::ReadFile;
 using mc::test_support::RunCommandCapture;
 
-void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const std::filesystem::path& source_root,
-                                                                           const std::filesystem::path& binary_root,
-                                                                           const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
-    const std::filesystem::path debug_source_path = source_root / "kernel" / "src/debug.mc";
-    const std::filesystem::path lifecycle_source_path = source_root / "kernel" / "src/lifecycle.mc";
-    const std::filesystem::path syscall_source_path = source_root / "kernel" / "src/syscall.mc";
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase111_scheduler_lifecycle_ownership_clarification.txt";
-    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
-    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
-    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase111_lifecycle_ownership_build";
-    std::filesystem::remove_all(build_dir);
+namespace {
 
-    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                  "build",
-                                                                  "--project",
-                                                                  project_path.generic_string(),
-                                                                  "--target",
-                                                                  "kernel",
-                                                                  "--build-dir",
-                                                                  build_dir.generic_string(),
-                                                                  "--dump-mir"},
-                                                                 build_dir / "kernel_phase111_lifecycle_ownership_build_output.txt",
-                                                                 "freestanding kernel phase111 lifecycle-ownership audit build");
-    if (!build_outcome.exited || build_outcome.exit_code != 0) {
-        Fail("phase111 freestanding kernel lifecycle-ownership audit build should succeed:\n" + build_output);
-    }
-
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+void ExpectPhase111BehaviorSlice(const std::filesystem::path& build_dir,
+                                 const mc::support::BuildArtifactTargets& build_targets) {
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase111_lifecycle_ownership_run_output.txt",
                                                              "freestanding kernel phase111 lifecycle-ownership audit run");
@@ -57,7 +28,12 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_lifecycle.mc.o")) {
         Fail("phase111 lifecycle clarification should emit a distinct lifecycle module object");
     }
+}
 
+void ExpectPhase111PublicationSlice(const std::filesystem::path& phase_doc_path,
+                                    const std::filesystem::path& kernel_readme_path,
+                                    const std::filesystem::path& repo_map_path,
+                                    const std::filesystem::path& freestanding_readme_path) {
     const std::string phase_doc = ReadFile(phase_doc_path);
     ExpectOutputContains(phase_doc,
                          "Phase 111 -- Scheduler And Lifecycle Ownership Clarification",
@@ -89,70 +65,67 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
     ExpectOutputContains(freestanding_readme,
                          "phase111_scheduler_lifecycle_ownership_clarification.cpp",
                          "phase111 freestanding README should list the new kernel proof owner");
+}
 
-    const std::string main_source = ReadFile(main_source_path);
-    ExpectOutputContains(main_source,
-                         "import lifecycle",
-                         "phase111 main module should import the lifecycle owner explicitly");
-    ExpectOutputContains(main_source,
-                         "lifecycle.validate_task_transition_contracts",
-                         "phase111 main module should validate the lifecycle-owned transition contract");
-    ExpectOutputContains(main_source,
-                         "lifecycle.ready_task",
-                         "phase111 main module should route wake-to-ready through the lifecycle owner");
-    ExpectOutputContains(main_source,
-                         "debug.validate_phase111_scheduler_and_lifecycle_ownership",
-                         "phase111 main module should call the debug-owned phase111 audit");
+void ExpectPhase111MirStructureSlice(const std::filesystem::path& mir_path,
+                                     const std::filesystem::path& expected_projection_path) {
+    const std::string kernel_mir = ReadFile(mir_path);
+    ExpectMirFirstMatchProjectionFile(
+        kernel_mir,
+        {
+            "ConstGlobal names=[PHASE113_MARKER] type=i32",
+            "Function name=lifecycle.install_spawned_child returns=[lifecycle.SpawnInstallResult]",
+            "Function name=lifecycle.block_task_on_timer returns=[lifecycle.TaskTransition]",
+            "Function name=lifecycle.ready_task returns=[lifecycle.TaskTransition]",
+            "Function name=lifecycle.validate_task_transition_contracts returns=[bool]",
+            "Function name=debug.validate_phase111_scheduler_and_lifecycle_ownership returns=[bool]",
+            "target=lifecycle.block_task_on_timer target_kind=function target_name=lifecycle.block_task_on_timer",
+            "target=lifecycle.ready_task target_kind=function target_name=lifecycle.ready_task",
+            "target=lifecycle.release_waited_child_slots target_kind=function target_name=lifecycle.release_waited_child_slots",
+            "target=lifecycle.install_spawned_child target_kind=function target_name=lifecycle.install_spawned_child",
+            "target=debug.validate_phase111_scheduler_and_lifecycle_ownership target_kind=function target_name=debug.validate_phase111_scheduler_and_lifecycle_ownership",
+        },
+        expected_projection_path,
+        "phase111 merged MIR should preserve the lifecycle ownership projection");
+}
 
-    const std::string syscall_source = ReadFile(syscall_source_path);
-    ExpectOutputContains(syscall_source,
-                         "import lifecycle",
-                         "phase111 syscall module should import the lifecycle owner explicitly");
-    ExpectOutputContains(syscall_source,
-                         "lifecycle.install_spawned_child",
-                         "phase111 syscall module should route spawn installation through the lifecycle owner");
-    ExpectOutputContains(syscall_source,
-                         "lifecycle.block_task_on_timer",
-                         "phase111 syscall module should route timer blocking through the lifecycle owner");
-    ExpectOutputContains(syscall_source,
-                         "lifecycle.release_waited_child_slots",
-                         "phase111 syscall module should route waited-child release through the lifecycle owner");
+}  // namespace
 
-    const std::string lifecycle_source = ReadFile(lifecycle_source_path);
-    ExpectOutputContains(lifecycle_source,
-                         "func install_spawned_child(",
-                         "phase111 lifecycle module should own spawned-child slot installation");
-    ExpectOutputContains(lifecycle_source,
-                         "func block_task_on_timer(",
-                         "phase111 lifecycle module should own timer-block transition");
-    ExpectOutputContains(lifecycle_source,
-                         "func ready_task(",
-                         "phase111 lifecycle module should own wake-to-ready transition");
-    ExpectOutputContains(lifecycle_source,
-                         "func validate_task_transition_contracts() bool",
-                         "phase111 lifecycle module should own a focused transition contract audit");
+void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const std::filesystem::path& source_root,
+                                                                           const std::filesystem::path& binary_root,
+                                                                           const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
+    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
+    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
+                                                 "phase111_scheduler_lifecycle_ownership_clarification.txt";
+    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
+    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
+    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
+    const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
+                                                      "phase111_scheduler_lifecycle_ownership_clarification.mirproj.txt";
+    const std::filesystem::path build_dir = binary_root / "kernel_phase111_lifecycle_ownership_build";
+    std::filesystem::remove_all(build_dir);
 
-    const std::string debug_source = ReadFile(debug_source_path);
-    ExpectOutputContains(debug_source,
-                         "func validate_phase111_scheduler_and_lifecycle_ownership(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32) bool",
-                         "phase111 debug module should own the new lifecycle clarification audit");
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "kernel",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "kernel_phase111_lifecycle_ownership_build_output.txt",
+                                                                 "freestanding kernel phase111 lifecycle-ownership audit build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase111 freestanding kernel lifecycle-ownership audit build should succeed:\n" + build_output);
+    }
 
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "ConstGlobal names=[PHASE113_MARKER] type=i32",
-                         "phase111 merged MIR should expose the current kernel marker");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=lifecycle.install_spawned_child",
-                         "phase111 merged MIR should expose the lifecycle-owned spawn transition");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=lifecycle.block_task_on_timer",
-                         "phase111 merged MIR should expose the lifecycle-owned block transition");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=lifecycle.ready_task",
-                         "phase111 merged MIR should expose the lifecycle-owned ready transition");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=debug.validate_phase111_scheduler_and_lifecycle_ownership returns=[bool]",
-                         "phase111 merged MIR should expose the new phase111 debug audit");
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    ExpectPhase111BehaviorSlice(build_dir, build_targets);
+    ExpectPhase111PublicationSlice(phase_doc_path, kernel_readme_path, repo_map_path, freestanding_readme_path);
+    ExpectPhase111MirStructureSlice(dump_targets.mir, mir_projection_path);
 }
 
 }  // namespace mc::tool_tests

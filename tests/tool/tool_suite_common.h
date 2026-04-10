@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 
@@ -75,6 +76,16 @@ std::string RunProjectTestTargetAndExpectSuccess(const std::filesystem::path& mc
                                                  std::string_view target_name,
                                                  std::string_view output_name,
                                                  const std::string& context);
+
+void ExpectMirFirstMatchProjection(std::string_view mir_text,
+                                   std::initializer_list<std::string_view> selectors,
+                                   std::string_view expected_projection,
+                                   const std::string& context);
+
+void ExpectMirFirstMatchProjectionFile(std::string_view mir_text,
+                                       std::initializer_list<std::string_view> selectors,
+                                       const std::filesystem::path& expected_projection_path,
+                                       const std::string& context);
 
 void RunWorkflowToolSuite(const std::filesystem::path& source_root,
                           const std::filesystem::path& binary_root,

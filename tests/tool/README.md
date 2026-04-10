@@ -6,7 +6,8 @@ tests for the `mc` toolchain entrypoints.
 Current structure
 
 - `tool_suite_common.h` and `tool_suite_common.cpp`: shared project-writing,
-  command-running, and assertion helpers used by the grouped tool suites.
+  command-running, assertion helpers, and projected-MIR golden helpers used by
+  the grouped tool suites.
 - `tool_workflow_tests.cpp` and `tool_workflow_suite.cpp`: CLI, project graph,
   and workflow validation.
 - `tool_build_state_tests.cpp` and `tool_build_state_suite.cpp`: interface
@@ -29,6 +30,8 @@ Current structure
     `kernel/phase109_first_running_kernel_slice_audit.cpp`,
       `kernel/phase110_kernel_ownership_split_audit.cpp`,
       `kernel/phase111_scheduler_lifecycle_ownership_clarification.cpp`: one kernel proof per file.
+  - late ownership-hardening kernel audits also keep adjacent `.mirproj.txt`
+    files for projected MIR golden expectations.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-
     system coverage.
 - `tool_suite_tests.cpp` and `phase7_tool_tests.cpp`: compatibility runners
@@ -38,6 +41,9 @@ Layout rule
 
 - Keep active suite implementation split by behavior family.
 - Prefer subtrees and focused suite files over growing one monolithic file.
+- When a freestanding kernel audit needs structural ownership checks, prefer an
+  adjacent projected MIR golden over raw source-text assertions if the merged
+  MIR already preserves the relevant routed call or owner-local symbol.
 - Keep Canopus-facing execution proofs in this directory for now rather than
   creating a separate `tests/tool/canopus/` subtree.
 

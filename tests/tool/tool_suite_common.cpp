@@ -1,5 +1,6 @@
 #include "tests/tool/tool_suite_common.h"
 
+#include <sstream>
 #include <vector>
 
 #include "tests/support/process_utils.h"
@@ -7,8 +8,31 @@
 namespace mc::tool_tests {
 
 using mc::test_support::Fail;
+using mc::test_support::ReadFile;
 using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
+
+namespace {
+
+std::string NormalizeProjectionText(std::string_view text) {
+    std::string normalized(text);
+    while (!normalized.empty() && (normalized.back() == '\n' || normalized.back() == '\r')) {
+        normalized.pop_back();
+    }
+    return normalized;
+}
+
+std::vector<std::string> SplitLines(std::string_view text) {
+    std::vector<std::string> lines;
+    std::istringstream stream{std::string(text)};
+    std::string line;
+    while (std::getline(stream, line)) {
+        lines.push_back(std::move(line));
+    }
+    return lines;
+}
+
+}  // namespace
 
 std::filesystem::path WriteBasicProject(const std::filesystem::path& root,
                                         std::string_view helper_source,
@@ -309,6 +333,50 @@ std::string RunProjectTestTargetAndExpectSuccess(const std::filesystem::path& mc
         Fail(context + " should pass:\n" + output);
     }
     return output;
+}
+
+void ExpectMirFirstMatchProjection(std::string_view mir_text,
+                                   std::initializer_list<std::string_view> selectors,
+                                   std::string_view expected_projection,
+                                   const std::string& context) {
+    const auto lines = SplitLines(mir_text);
+
+    std::string actual_projection;
+    bool first_line = true;
+    for (const auto selector : selectors) {
+        bool found = false;
+        for (const auto& line : lines) {
+            if (line.find(selector) == std::string::npos) {
+                continue;
+            }
+            if (!first_line) {
+                actual_projection += '\n';
+            }
+            actual_projection += line;
+            first_line = false;
+            found = true;
+            break;
+        }
+        if (!found) {
+            Fail(context + " missing MIR projection selector: " + std::string(selector));
+        }
+    }
+
+    const auto normalized_expected = NormalizeProjectionText(expected_projection);
+    const auto normalized_actual = NormalizeProjectionText(actual_projection);
+    if (normalized_actual != normalized_expected) {
+        Fail(context + " projection mismatch:\nexpected:\n" + normalized_expected + "\nactual:\n" + normalized_actual);
+    }
+}
+
+void ExpectMirFirstMatchProjectionFile(std::string_view mir_text,
+                                       std::initializer_list<std::string_view> selectors,
+                                       const std::filesystem::path& expected_projection_path,
+                                       const std::string& context) {
+    ExpectMirFirstMatchProjection(mir_text,
+                                  selectors,
+                                  ReadFile(expected_projection_path),
+                                  context + " golden=" + expected_projection_path.generic_string());
 }
 
 }  // namespace mc::tool_tests

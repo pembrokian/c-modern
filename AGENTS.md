@@ -82,6 +82,7 @@ Active grouped regression layout:
 - `tests/tool/freestanding/kernel/phase87_static_data.cpp`: kernel static-data proof
 - `tests/tool/freestanding/kernel/phase88_build_integration.cpp`: freestanding kernel build-integration proof
 - `tests/tool/freestanding/kernel/phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof
+- late freestanding kernel ownership-hardening audits keep one `.cpp` proof owner plus one adjacent `.mirproj.txt` projected MIR golden when the merged MIR already carries the relevant ownership and routed-call facts
 - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
 - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`: compatibility runners only, not the active implementation owners
 - `tests/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation
@@ -94,6 +95,7 @@ Diagnostic fixture convention:
 
 - `.errors.txt` stores one expected diagnostic substring per line
 - tests match substrings, not full formatted lines
+- freestanding late-kernel audit convention: `.mirproj.txt` stores the expected projected MIR lines consumed by `ExpectMirFirstMatchProjectionFile`
 
 ## Editing Guidance By Area
 

@@ -12,38 +12,10 @@ using mc::test_support::Fail;
 using mc::test_support::ReadFile;
 using mc::test_support::RunCommandCapture;
 
-void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesystem::path& source_root,
-                                                            const std::filesystem::path& binary_root,
-                                                            const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
-    const std::filesystem::path debug_source_path = source_root / "kernel" / "src/debug.mc";
-    const std::filesystem::path sched_source_path = source_root / "kernel" / "src/sched.mc";
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase110_kernel_ownership_split_audit.txt";
-    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
-    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
-    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase110_ownership_split_build";
-    std::filesystem::remove_all(build_dir);
+namespace {
 
-    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                  "build",
-                                                                  "--project",
-                                                                  project_path.generic_string(),
-                                                                  "--target",
-                                                                  "kernel",
-                                                                  "--build-dir",
-                                                                  build_dir.generic_string(),
-                                                                  "--dump-mir"},
-                                                                 build_dir / "kernel_phase110_ownership_split_build_output.txt",
-                                                                 "freestanding kernel phase110 ownership-split audit build");
-    if (!build_outcome.exited || build_outcome.exit_code != 0) {
-        Fail("phase110 freestanding kernel ownership-split audit build should succeed:\n" + build_output);
-    }
-
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+void ExpectPhase110BehaviorSlice(const std::filesystem::path& build_dir,
+                                 const mc::support::BuildArtifactTargets& build_targets) {
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase110_ownership_split_run_output.txt",
                                                              "freestanding kernel phase110 ownership-split audit run");
@@ -59,7 +31,12 @@ void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesyste
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_sched.mc.o")) {
         Fail("phase110 ownership split should emit a distinct sched module object");
     }
+}
 
+void ExpectPhase110PublicationSlice(const std::filesystem::path& phase_doc_path,
+                                    const std::filesystem::path& kernel_readme_path,
+                                    const std::filesystem::path& repo_map_path,
+                                    const std::filesystem::path& freestanding_readme_path) {
     const std::string phase_doc = ReadFile(phase_doc_path);
     ExpectOutputContains(phase_doc,
                          "Phase 110 -- Kernel Ownership Split Audit",
@@ -97,50 +74,63 @@ void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesyste
     ExpectOutputContains(freestanding_readme,
                          "phase110_kernel_ownership_split_audit.cpp",
                          "phase110 freestanding README should list the new kernel proof owner");
+}
 
-    const std::string main_source = ReadFile(main_source_path);
-    ExpectOutputContains(main_source,
-                         "import debug",
-                         "phase110 main module should import the debug owner explicitly");
-    ExpectOutputContains(main_source,
-                         "import sched",
-                         "phase110 main module should import the scheduler owner explicitly");
-    ExpectOutputContains(main_source,
-                         "sched.validate_program_cap_spawn_and_wait",
-                         "phase110 main module should call the scheduler-owned lifecycle validator");
-    ExpectOutputContains(main_source,
-                         "debug.validate_phase110_kernel_ownership_split",
-                         "phase110 main module should call the debug-owned ownership split audit");
+void ExpectPhase110MirStructureSlice(const std::filesystem::path& mir_path,
+                                     const std::filesystem::path& expected_projection_path) {
+    const std::string kernel_mir = ReadFile(mir_path);
+    ExpectMirFirstMatchProjectionFile(
+        kernel_mir,
+        {
+            "ConstGlobal names=[PHASE113_MARKER] type=i32",
+            "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
+            "Function name=debug.validate_phase109_first_running_kernel_slice returns=[bool]",
+            "Function name=debug.validate_phase110_kernel_ownership_split returns=[bool]",
+            "Function name=sched.validate_program_cap_spawn_and_wait returns=[bool]",
+            "target=debug.validate_phase110_kernel_ownership_split target_kind=function target_name=debug.validate_phase110_kernel_ownership_split",
+            "target=sched.validate_program_cap_spawn_and_wait target_kind=function target_name=sched.validate_program_cap_spawn_and_wait",
+        },
+        expected_projection_path,
+        "phase110 merged MIR should preserve the ownership split projection");
+}
 
-    const std::string debug_source = ReadFile(debug_source_path);
-    ExpectOutputContains(debug_source,
-                         "func validate_phase109_first_running_kernel_slice(audit: RunningKernelSliceAudit) bool",
-                         "phase110 debug module should retain the landed phase109 running-slice audit");
-    ExpectOutputContains(debug_source,
-                         "func validate_phase110_kernel_ownership_split(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32) bool",
-                         "phase110 debug module should own the new ownership split audit");
+}  // namespace
 
-    const std::string sched_source = ReadFile(sched_source_path);
-    ExpectOutputContains(sched_source,
-                         "func validate_program_cap_spawn_and_wait(audit: LifecycleAudit) bool",
-                         "phase110 sched module should own the lifecycle validation path");
+void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesystem::path& source_root,
+                                                            const std::filesystem::path& binary_root,
+                                                            const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
+    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
+    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
+                                                 "phase110_kernel_ownership_split_audit.txt";
+    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
+    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
+    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
+    const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
+                                                      "phase110_kernel_ownership_split_audit.mirproj.txt";
+    const std::filesystem::path build_dir = binary_root / "kernel_phase110_ownership_split_build";
+    std::filesystem::remove_all(build_dir);
 
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "ConstGlobal names=[PHASE113_MARKER] type=i32",
-                         "phase110 merged MIR should expose the current kernel marker");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=sched.validate_program_cap_spawn_and_wait returns=[bool]",
-                         "phase110 merged MIR should expose the scheduler-owned lifecycle validator");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
-                         "phase110 merged MIR should retain the landed phase108 debug audit path");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=debug.validate_phase109_first_running_kernel_slice returns=[bool]",
-                         "phase110 merged MIR should retain the landed phase109 running-slice audit");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=debug.validate_phase110_kernel_ownership_split returns=[bool]",
-                         "phase110 merged MIR should expose the new ownership split audit");
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "kernel",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "kernel_phase110_ownership_split_build_output.txt",
+                                                                 "freestanding kernel phase110 ownership-split audit build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase110 freestanding kernel ownership-split audit build should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    ExpectPhase110BehaviorSlice(build_dir, build_targets);
+    ExpectPhase110PublicationSlice(phase_doc_path, kernel_readme_path, repo_map_path, freestanding_readme_path);
+    ExpectPhase110MirStructureSlice(dump_targets.mir, mir_projection_path);
 }
 
 }  // namespace mc::tool_tests
