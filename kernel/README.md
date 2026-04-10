@@ -6,8 +6,8 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 105 has moved the repository-owned kernel artifact beyond the landed
-  critique-response hardening pass into one bounded real log-service handshake
+- Phase 106 has moved the repository-owned kernel artifact beyond the landed
+  real log-service handshake into one bounded real echo-service request-reply
   proof.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
@@ -36,10 +36,12 @@ Current files
   capability-carrying transfer validation, bounded spawn-and-wait
   validation, bounded timer sleep and wake validation, bounded init
   bootstrap-capability handoff validation, bounded Phase 104 contract-
-  hardening regressions, and one bounded Phase 105 real log-service
-  handshake proof
+  hardening regressions, one bounded Phase 105 real log-service handshake
+  proof, and one bounded Phase 106 real echo-service request-reply proof
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
+- `src/echo_service.mc`: bounded echo-service protocol state, request-derived
+  reply payload, and final exchange observation records
 - `src/state.mc`: kernel-owned descriptor, slot, queue, and boot-log records
 - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame
   records
@@ -61,8 +63,9 @@ Phase boundary
   handoff, one explicit endpoint-and-handle object-core follow-through, one
   explicit syscall-owned byte-only IPC round trip, one bounded attached-
   handle transfer, one bounded spawn-and-wait lifecycle path, one explicit
-  critique-response hardening pass over helper and proof contracts, and one
+  critique-response hardening pass over helper and proof contracts, one
   bounded real log-service request-and-acknowledgment flow with explicit
-  service reap.
+  service reap, and one bounded real echo-service request-reply flow with
+  explicit service reap.
 - It does not yet claim general loading, multi-service launch, namespace
   policy, kill semantics, or a running init-owned service set.

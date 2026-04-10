@@ -41,8 +41,8 @@ void RunFreestandingKernelPhase105RealLogServiceHandshake(const std::filesystem:
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase105_log_service_run_output.txt",
                                                              "freestanding kernel phase105 log-service handshake run");
-    if (!run_outcome.exited || run_outcome.exit_code != 105) {
-        Fail("phase105 freestanding kernel log-service handshake run should exit with the handshake proof marker:\n" +
+    if (!run_outcome.exited || run_outcome.exit_code != 106) {
+        Fail("phase105 freestanding kernel log-service handshake run should exit with the current kernel proof marker while preserving the phase105 slice:\n" +
              run_output);
     }
 

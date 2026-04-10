@@ -17,6 +17,7 @@ Structure
   - `phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof.
   - `phase98_endpoint_handle_core.cpp`: real-kernel endpoint-and-handle-core proof.
   - `phase105_real_log_service_handshake.cpp`: real-kernel log-service handshake proof.
+  - `phase106_real_echo_service_request_reply.cpp`: real-kernel echo-service request-reply proof.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

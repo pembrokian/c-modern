@@ -169,8 +169,10 @@ Phase 103 is concrete as init bootstrap capability handoff:
   that later child-control handles still appear only through explicit spawn
   rather than ambient boot inheritance.
 
-Phase 105 is now the next remaining Band C owner around real log-service
-handshake and first service-policy truth.
+Phase 105 and Phase 106 are now concrete as real log-service handshake and
+real echo-service request-reply proofs, and Phase 107 is now the next
+remaining Band C owner around first explicit user-to-user capability
+transfer.
 
 Likely themes:
 - one-to-one syscall mapping from `sys v0`
@@ -202,9 +204,9 @@ Phase 103 -- Init Bootstrap Capability Handoff
 
 Band C - Boot Real Init-Owned User Policy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 105 through 107 likely prove that the real kernel can now use that
-explicit bootstrap capability set to launch the same first service stories the
-proof ladder already modeled.
+Phases 105 and 106 are now concrete as the first real service-policy proofs,
+and Phase 107 remains the next bounded user-policy owner for the same landed
+kernel boundary.
 
 Likely themes:
 - explicit boot capability handoff
@@ -217,7 +219,7 @@ Why this band is separate:
   question is whether the actual kernel preserves those explicit boundaries
   once syscalls, boot handoff, and service launch are no longer simulated.
 
-Possible phases in this band:
+Concrete and remaining phases in this band:
 
 Phase 105 -- Real Log-Service Handshake
 - Exit criterion: init launches one real log service from one program
@@ -225,9 +227,10 @@ Phase 105 -- Real Log-Service Handshake
   the real kernel IPC path.
 
 Phase 106 -- Real Echo-Service Request Or Reply Proof
-- Exit criterion: init launches one second bounded service and one client so
-  the system completes one real request-reply exchange through the real kernel
-  IPC boundary.
+- Exit criterion: the owned kernel artifact launches one second bounded
+  service task from one explicit program capability and completes one real
+  request-reply exchange whose reply bytes are derived from the request over
+  the real kernel IPC boundary.
 
 Phase 107 -- Real User-To-User Capability Transfer
 - Exit criterion: one user-space component transfers one explicit endpoint or

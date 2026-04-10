@@ -22,7 +22,8 @@ Current structure
   - `kernel/phase85_endpoint_queue.cpp`, `kernel/phase86_task_lifecycle.cpp`,
     `kernel/phase87_static_data.cpp`, `kernel/phase88_build_integration.cpp`,
     `kernel/phase97_user_entry.cpp`, `kernel/phase98_endpoint_handle_core.cpp`,
-    `kernel/phase105_real_log_service_handshake.cpp`: one kernel proof per file.
+    `kernel/phase105_real_log_service_handshake.cpp`,
+    `kernel/phase106_real_echo_service_request_reply.cpp`: one kernel proof per file.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-
     system coverage.
 - `tool_suite_tests.cpp` and `phase7_tool_tests.cpp`: compatibility runners

@@ -1,0 +1,203 @@
+Phase 106 -- Real Echo-Service Request-Reply Proof
+==================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 105 real log-service handshake into the
+next remaining Band C owner: prove that the repository-owned kernel artifact
+can launch one second real bounded service task from one explicit program
+capability, drive one deterministic request-reply exchange whose reply bytes
+are derived from the client request over the landed real syscall IPC path,
+and stop before claiming multi-service startup policy, service registries,
+or a running general user-space system.
+
+This document is both the Phase 106 execution note and its closeout.
+It does not claim broader service orchestration, namespace discovery,
+user-to-user capability transfer beyond the landed Phase 100 slice, or a
+general init-owned runtime.
+
+Repository status note
+----------------------
+- Phase 96 made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 widened that owned target into one bounded address-space and first
+  user-entry handoff.
+- Phase 98 then made explicit endpoint tables, per-process handle tables, and
+  bounded queued-message lifetime concrete inside the same repository-owned
+  kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- Phase 100 then made one attached-handle transfer concrete across that same
+  syscall IPC boundary.
+- Phase 101 then made the first explicit program-capability spawn and wait
+  path concrete.
+- Phase 102 then made the first explicit timer-backed sleep, wake, and ready-
+  restoration path concrete.
+- Phase 103 then made one explicit bounded init bootstrap-capability handoff
+  concrete.
+- Phase 104 then hardened that same owned kernel lane around explicit helper
+  contracts, layout validation, and deterministic proof sequencing.
+- Phase 105 then proved that one real service task can launch and complete
+  one bounded request-and-acknowledgment flow over the landed syscall IPC
+  path.
+- The next strongest kernel question was therefore no longer whether one real
+  service could launch at all. It was whether a second bounded service could
+  preserve request-dependent reply behavior over that same landed kernel-owned
+  boundary without forcing a service framework or broader init policy.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names a real echo-service request-
+  reply proof as the next bounded service-policy owner after the landed real
+  log-service handshake.
+- The repository already had the necessary ingredients spread across the
+  owned kernel lane: one explicit init-visible endpoint handle, one real send
+  and receive syscall path, one consumed-on-success program-capability spawn
+  path, one explicit wait-handle reap path, and one demonstrated single-
+  service follow-through.
+- Without this step, later service phases could overclaim that the repository
+  already preserves request-dependent reply semantics across more than one
+  bounded service shape when the landed proof still stopped at one fixed
+  acknowledgment protocol.
+
+Core rule
+---------
+- Keep the phase to one second real bounded service task only.
+- Reuse the already-landed syscall, endpoint, handle, spawn, and wait owners.
+- Add only the smallest helper module needed to keep the echo-service
+  protocol state explicit and inspectable.
+- Keep the protocol to one init-issued request and one service-issued reply
+  whose bytes are copied from that request.
+- Stop before broader service startup policy, registries, restart semantics,
+  or a running multi-service user-space system claim.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one bounded `echo_service` helper module owning explicit request and reply
+   state, reply-payload construction, and final exchange observation
+2. one repository-owned kernel follow-through that seeds one dedicated
+   echo-service program capability, spawns one echo-service task, and
+   installs one explicit service-visible endpoint handle
+3. one deterministic init-issued two-byte request and one service-issued
+   two-byte reply over the landed real syscall IPC path, where the reply bytes
+   are copied from the request payload rather than hardcoded
+4. one explicit service-exit and wait-handle reap follow-through so the proof
+   cleans up the bounded child slot it reuses
+5. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported structs, enums, aggregate
+   initialization, fixed-array payload construction, and explicit helper
+   boundaries while preserving the landed Phase 105 log-service proof
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this second service boundary now because Phase 105
+already proved the first real service launch and reap path. The next honest
+owner is not a general service framework. It is one bounded real request-
+dependent reply proof through a second helper-owned service shape.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact now launches one second bounded service
+  task from one explicit program capability
+- init can issue one deterministic request to that service through the landed
+  real syscall IPC path and receive one bounded reply whose bytes are derived
+  from the request payload
+- the proof keeps the service protocol explicit inside one ordinary helper
+  module rather than inventing a special runtime or policy layer
+- the current language, freestanding build path, and kernel-owned proof lane
+  can carry the required request state, request-dependent reply payload, and
+  final exchange observation without new compiler work
+- the repository can stop honestly at one second bounded service proof without
+  implying a general multi-service startup model or a running general init
+  stack
+
+Deliverables
+------------
+- one canonical Phase 106 closeout note recording the implemented real echo-
+  service request-reply proof
+- one bounded `kernel/src/echo_service.mc` helper module owning the service-
+  local protocol state and final exchange observation records
+- one updated repository-owned kernel target that spawns an echo-service
+  task, runs the request-reply flow, and reaps the service cleanly after the
+  landed Phase 105 log-service proof
+- one focused freestanding kernel regression and MIR inspection validating the
+  new echo-service slice while preserving the landed Phase 105 service proof
+- refreshed planning and orientation surfaces so Phase 106 is concrete and
+  the next speculative owner shifts upward accordingly
+
+Suggested execution order
+-------------------------
+1. Add the smallest bounded echo-service helper module needed to keep
+   request, reply, and observation state explicit.
+2. Teach the repository-owned kernel target to seed one dedicated echo-
+   service program capability, spawn the service task, and install one
+   service-visible endpoint handle.
+3. Drive one init-issued request and one request-derived reply over the landed
+   syscall IPC boundary.
+4. Reap the bounded service task through the landed wait path.
+5. Inspect the merged MIR and refresh planning surfaces so Phase 106 is
+   concrete rather than still speculative.
+
+Exit criteria
+-------------
+- one repository-owned kernel target launches one bounded echo-service task
+  from one explicit program capability
+- init completes one deterministic request and one request-derived reply over
+  the landed real syscall IPC path
+- the proof exits with exactly one bounded Phase 106 marker only after the
+  Phase 105 log-service proof, the echo-service request-reply flow, and the
+  bounded echo-service reap succeed
+- the merged MIR preserves explicit `echo_service` helper-module records and
+  helper functions instead of collapsing the request-reply protocol into the
+  root proof body or a special runtime boundary
+- the planning surface records Phase 106 as concrete rather than speculative
+
+Non-goals
+---------
+- multi-service startup policy, registries, or namespace discovery
+- user-to-user capability transfer beyond the already-landed Phase 100 slice
+- service restart policy, loader generalization, or a running general user-
+  space system claim
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- added `kernel/src/echo_service.mc` so the owned kernel tree now supports
+  one bounded echo-service state record, one final exchange observation
+  record, one explicit request-to-reply state transition, and one reply-
+  payload helper that copies request bytes through ordinary imported structs,
+  enums, and fixed arrays
+- updated `kernel/src/main.mc` so the repository-owned kernel target now
+  seeds one dedicated echo-service program capability, spawns one bounded
+  echo-service task in the recycled child slot, installs one service-visible
+  endpoint handle, runs one init-issued request and one request-derived reply
+  over the landed real syscall IPC path, reaps that service through the
+  landed wait path, preserves the landed Phase 105 log-service validation,
+  and then emits the Phase 106 marker
+- added one focused Phase 106 freestanding kernel regression that builds and
+  runs the repository-owned kernel target, expects the Phase 106 marker, and
+  inspects merged MIR for preserved Phase 105 coverage plus explicit
+  `echo_service` helper-module records and functions
+- refreshed the speculative Canopus kernel roadmap, repository map, kernel
+  README, freestanding test notes, and decision log so the repository now
+  records Phase 106 as concrete and shifts the next speculative service owner
+  upward
+
+Closeout statement
+------------------
+Phase 106 is complete as a real echo-service request-reply proof. The
+repository still does not claim a general service framework, multi-service
+startup policy, or a running general user-space system, but it now has one
+honest real-kernel artifact that boots, reaches first user entry, owns
+explicit endpoint and handle state, drives real syscall IPC, preserves the
+landed hardening and Phase 105 service contracts, and launches plus reaps one
+second bounded service task around one deterministic request-dependent reply
+exchange.
