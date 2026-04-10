@@ -2,7 +2,8 @@
 
 #include "tests/tool/tool_suite_common.h"
 
-namespace mc::tool_tests {
+namespace mc {
+namespace tool_tests {
 
 void RunFreestandingKernelPhase85EndpointQueueSmoke(const std::filesystem::path& source_root,
                                                     const std::filesystem::path& binary_root,
@@ -16,9 +17,9 @@ void RunFreestandingKernelPhase87StaticDataProof(const std::filesystem::path& so
 void RunFreestandingKernelPhase88BuildIntegrationAudit(const std::filesystem::path& source_root,
                                                        const std::filesystem::path& binary_root,
                                                        const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase101SpawnWait(const std::filesystem::path& source_root,
-                                            const std::filesystem::path& binary_root,
-                                            const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase103InitBootstrapHandoff(const std::filesystem::path& source_root,
+                                                       const std::filesystem::path& binary_root,
+                                                       const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -27,7 +28,8 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase86TaskLifecycleProof(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase87StaticDataProof(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase88BuildIntegrationAudit(source_root, binary_root, mc_path);
-    RunFreestandingKernelPhase101SpawnWait(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase103InitBootstrapHandoff(source_root, binary_root, mc_path);
 }
 
-}  // namespace mc::tool_tests
+}  // namespace tool_tests
+}  // namespace mc

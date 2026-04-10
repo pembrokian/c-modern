@@ -1,0 +1,211 @@
+Phase 102 -- Timer Sleep And Scheduler Block-Wake Proof
+=======================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 101 program-cap spawn and wait proof into
+the next remaining Band B owner: prove that the repository-owned kernel
+artifact can arm one explicit sleep request for one child task, block that
+task against one bounded monotonic timer source, wake it exactly once at one
+deterministic deadline tick, and restore it to the ready path without yet
+claiming kill semantics, multi-child scheduling policy, or a broader service
+bring-up.
+
+This document is both the Phase 102 execution note and its closeout.
+It does not claim a public timer API, general interrupt handling, scheduler
+completion, kill semantics, or broader process-management policy.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 95 produced the bounded freestanding `v0.3` proof
+  ladder and froze that lane into the first admitted freestanding support
+  slice.
+- Phase 96 then made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 then widened that owned kernel target into one bounded address-
+  space and first-user-entry handoff.
+- Phase 98 then completed the remaining Band A object-core owner by making
+  explicit endpoint tables, per-process handle tables, and bounded queued-
+  message lifetime concrete inside the same repository-owned kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- Phase 100 then made one attached-handle transfer concrete across that same
+  syscall IPC boundary.
+- Phase 101 then made the first explicit program-capability spawn and wait
+  path concrete.
+- The strongest next kernel question was therefore no longer whether the
+  kernel could spawn and reap a child. It was whether that same real kernel
+  artifact could now block one child task on an explicit timer-owned sleep
+  path, wake it deterministically at one deadline, and return it to the ready
+  queue without widening immediately into broader scheduler or service work.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names timer-backed blocking as the
+  next remaining owner after the landed spawn-and-wait path.
+- The repository already had explicit process, task, wait-handle, endpoint,
+  and syscall state, plus a deterministic child exit path, but it still had no
+  active proof that one child task can be blocked by a timer-owned sleep
+  request and then woken by one monotonic tick source with explicit state
+  transition back to ready.
+- Without this step, later service or scheduler work could overclaim that the
+  kernel already supports timer-backed blocking truth when the repository
+  still only had spawn, wait, and IPC truth.
+
+Core rule
+---------
+- Keep the phase to one bounded sleep request, one monotonic timer source,
+  and one deterministic wake.
+- Make blocking explicit in the root proof module and keep timer bookkeeping
+  inside one ordinary helper module.
+- Make the syscall helper record the sleep request and returned would-block
+  observation.
+- Make the timer helper deliver one wake exactly once and restore the child
+  task to the ready path.
+- Stop before kill semantics, multi-child scheduling policy, timer API
+  admission, or broader service bring-up.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one widened timer helper module that owns one bounded monotonic tick
+   source, one bounded sleep-wait table, and one deterministic wake delivery
+   path
+2. one widened task-state model that admits one explicit blocked-on-timer
+   state alongside the existing boot, ready, and exited states
+3. one widened syscall helper layer that accepts one bounded sleep request and
+   records one explicit would-block sleep observation
+4. one repository-owned kernel follow-through that spawns one child, blocks
+   that child on one timer-backed sleep request, advances one monotonic tick,
+   wakes the child exactly once, then reaps it through the already landed wait
+   path
+5. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported types, aggregate initialization, enum
+   matching, and explicit global-state updates rather than hidden scheduler or
+   runtime helpers
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this timer-backed blocking boundary now because
+Phase 101 already proved that the kernel can consume one program capability,
+spawn one child, and reap that child deterministically. The next honest owner
+is not broader scheduler completion. It is one explicit timer-arm, block, and
+wake path.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact can now block one child task with one
+  explicit sleep request and one bounded monotonic timer source
+- the sleep request returns deterministic `WouldBlock` behavior while the
+  child is blocked
+- one deterministic tick wakes that child exactly once and restores it to the
+  ready path
+- the current language, freestanding build path, and runtime startup can carry
+  the necessary timer state, sleep observation, and wake-delivery records
+  without new compiler work
+- the repository can stop honestly at one bounded timer-backed block-wake
+  slice without implying kill semantics, multi-child policy, or a broader
+  running-kernel plateau
+
+Deliverables
+------------
+- one canonical Phase 102 closeout note recording the implemented timer
+  block-wake proof
+- one widened `kernel/src/timer.mc` helper module owning the bounded timer
+  state and deterministic wake delivery
+- one widened `kernel/src/state.mc` helper module owning explicit blocked task
+  classification
+- one widened `kernel/src/syscall.mc` helper module owning explicit sleep
+  request and observation state
+- one updated repository-owned kernel target that blocks one child on a sleep
+  request, wakes it at one deterministic tick, and then completes the landed
+  wait path
+- one focused freestanding kernel regression and MIR inspection validating the
+  new timer-backed block-wake slice
+- refreshed planning and orientation surfaces so Phase 102 is concrete and
+  Phase 103 becomes the next remaining owner
+
+Suggested execution order
+-------------------------
+1. Widen the owned state, timer, and syscall helper modules with the smallest
+   bounded sleep and wake support needed for one honest child block-wake
+   path.
+2. Teach the repository-owned kernel target to consume one explicit sleep
+   request, block the child task, and advance one monotonic tick.
+3. Wake the child exactly once, restore it to the ready path, then complete
+   the already landed wait and reap path.
+4. Inspect the merged MIR to confirm that the proof remains ordinary imported
+   type and global-state lowering.
+5. Refresh the planning surface so Phase 102 is concrete and Phase 103
+   remains the next remaining owner.
+
+Exit criteria
+-------------
+- one repository-owned kernel target blocks one child task on one explicit
+  sleep request
+- the sleep request returns deterministic `WouldBlock` while the child is
+  blocked
+- one monotonic tick wakes that child exactly once and restores it to the
+  ready path
+- the subsequent wait path still reaps that child exactly once
+- the runtime proof exits with exactly one bounded Phase 102 marker only after
+  validating sleep arm, timer wake, ready restoration, and child reap
+- the merged MIR preserves imported sleep-request and wake-observation types,
+  helper functions, and explicit global writes for the new timer state
+- the planning surface records Phase 102 as concrete rather than speculative
+
+Non-goals
+---------
+- kill semantics, multi-child orchestration, or broader process-management
+  policy
+- a public timer API, general interrupt framework, or richer scheduler model
+- periodic timers, heap-based timing wheels, or deadline queues beyond the
+  bounded first slice
+- init-owned service launch, namespace policy, or broader running-kernel
+  claims
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- widened `kernel/src/state.mc` so the owned kernel tree now supports one
+  bounded blocked-on-timer task state in addition to the existing boot,
+  ready, and exited task states
+- added `kernel/src/timer.mc` so the owned kernel tree now supports one
+  bounded monotonic tick source, one bounded sleep-wait table, and one
+  deterministic wake-delivery path using ordinary structs, enums, arrays, and
+  helper functions
+- widened `kernel/src/syscall.mc` so the landed syscall layer now includes one
+  bounded sleep request plus observation path that marks the child task
+  blocked and returns deterministic `WouldBlock`
+- updated `kernel/src/main.mc` so the repository-owned kernel target now
+  spawns one child, arms one sleep request for that child, advances one
+  monotonic tick, wakes the child exactly once, restores it to the ready path,
+  and then completes the landed wait-and-reap path before emitting the Phase
+  102 marker
+- added one focused Phase 102 freestanding kernel regression that builds and
+  runs the repository-owned kernel target, expects the Phase 102 marker, and
+  inspects merged MIR for imported sleep-request and wake-observation types
+  plus explicit global-state lowering for timer state
+- refreshed the kernel README, agent map, freestanding test notes, backlog,
+  decision log, and speculative Canopus kernel roadmap so the repository now
+  records Phase 102 as concrete and leaves Phase 103 as the next remaining
+  owner
+
+Closeout statement
+------------------
+Phase 102 is complete as a timer sleep and block-wake proof. The repository
+still does not claim kill semantics, a public timer API, broader scheduler
+policy, or init-owned service truth, but it now has one honest real-kernel
+artifact that boots, reaches first user entry, owns explicit endpoint and
+handle state, opens one explicit syscall gate, completes byte-only IPC,
+transfers one attached endpoint handle, consumes one launchable program
+capability to spawn one child, blocks that child on one explicit sleep
+request, wakes it exactly once on one deterministic timer tick, reaps it once
+through one explicit wait handle, and stops exactly at that boundary.

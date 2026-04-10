@@ -9,6 +9,7 @@ enum TaskState {
     Empty,
     Boot,
     Ready,
+    BlockedOnTimer,
     Exited,
 }
 
@@ -194,6 +195,10 @@ func exit_task_slot(slot: TaskSlot) TaskSlot {
     return TaskSlot{ tid: slot.tid, owner_pid: slot.owner_pid, address_space_id: slot.address_space_id, state: TaskState.Exited, entry_pc: slot.entry_pc, stack_top: slot.stack_top }
 }
 
+func blocked_task_slot(slot: TaskSlot) TaskSlot {
+    return TaskSlot{ tid: slot.tid, owner_pid: slot.owner_pid, address_space_id: slot.address_space_id, state: TaskState.BlockedOnTimer, entry_pc: slot.entry_pc, stack_top: slot.stack_top }
+}
+
 func log_actor_at(log: BootLog, index: usize) u32 {
     if index >= log.count {
         return 0
@@ -232,8 +237,10 @@ func task_state_score(state: TaskState) i32 {
         return 2
     case TaskState.Ready:
         return 4
-    case TaskState.Exited:
+    case TaskState.BlockedOnTimer:
         return 8
+    case TaskState.Exited:
+        return 16
     default:
         return 0
     }

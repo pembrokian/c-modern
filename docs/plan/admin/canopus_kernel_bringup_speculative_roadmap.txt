@@ -145,7 +145,7 @@ Phase 100 is now concrete as capability-carrying IPC transfer:
   received handle works for one bounded follow-through send plus receive
   without yet claiming spawn, wait, or timer-backed blocking.
 
-Phase 101 is now concrete as program-cap spawn and wait path:
+Phase 101 is concrete as program-cap spawn and wait path:
 
 - that same owned kernel artifact now consumes one explicit launchable program
   capability, seeds one bounded child process plus task plus address-space
@@ -154,8 +154,23 @@ Phase 101 is now concrete as program-cap spawn and wait path:
   exactly once without yet claiming timer-backed blocking, kill semantics, or
   init-owned service launch.
 
-Phase 102 is now the next remaining Band B owner around timer-backed blocking
-and scheduler block-wake truth.
+Phase 102 is concrete as timer sleep and scheduler block-wake truth:
+
+- that same owned kernel artifact now blocks one child task on one explicit
+  sleep request, advances one monotonic tick, wakes that child exactly once,
+  restores it to the ready path, and then reaps it through the landed wait
+  path without yet claiming kill semantics, a public timer API, or broader
+  scheduler policy.
+
+Phase 103 is concrete as init bootstrap capability handoff:
+
+- that same owned kernel artifact now installs one explicit bounded bootstrap
+  capability set into `init`, keeps root authority kernel-only, and proves
+  that later child-control handles still appear only through explicit spawn
+  rather than ambient boot inheritance.
+
+Phase 104 is now the next remaining Band C owner around real log-service
+handshake and first service-policy truth.
 
 Likely themes:
 - one-to-one syscall mapping from `sys v0`
@@ -167,7 +182,7 @@ Why this band comes next:
 - the kernel object core is only useful once the user boundary is honest, and
   the blueprints already name the minimal syscall families clearly.
 
-This band is now concrete through Phase 101.
+This band is now concrete through Phase 102.
 
 Possible phases in this band:
 
@@ -181,16 +196,15 @@ Phase 100 -- Capability-Carrying IPC Transfer
   with destructive-on-success send behavior, receiver-local reinstall on
   receive, and no partial-transfer distortion.
 
-Phase 102 -- Timer Sleep And Scheduler Block-Wake Proof
-- Exit criterion: one real kernel timer source and one simple ready queue can
-  block and wake tasks for receive, wait, and sleep without widening into a
-  public scheduler framework or multicore policy.
+Phase 103 -- Init Bootstrap Capability Handoff
+- Exit criterion: the kernel starts one isolated init process and gives it one
+  explicit bounded bootstrap capability set with no ambient global authority.
 
 Band C - Boot Real Init-Owned User Policy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 103 through 106 likely prove that the real kernel can hand off only an
-explicit bootstrap capability set to init and that init can then launch the
-same first service stories the proof ladder already modeled.
+Phases 104 through 106 likely prove that the real kernel can now use that
+explicit bootstrap capability set to launch the same first service stories the
+proof ladder already modeled.
 
 Likely themes:
 - explicit boot capability handoff
@@ -204,10 +218,6 @@ Why this band is separate:
   once syscalls, boot handoff, and service launch are no longer simulated.
 
 Possible phases in this band:
-
-Phase 103 -- Init Bootstrap Capability Handoff
-- Exit criterion: the kernel starts one isolated init process and gives it one
-  explicit bounded bootstrap capability set with no ambient global authority.
 
 Phase 104 -- Real Log-Service Handshake
 - Exit criterion: init launches one real log service from one program

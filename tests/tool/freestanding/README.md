@@ -16,7 +16,7 @@ Structure
   - `phase88_build_integration.cpp`: emitted-object and relink proof.
   - `phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof.
   - `phase98_endpoint_handle_core.cpp`: real-kernel endpoint-and-handle-core proof.
-  - `phase101_spawn_wait.cpp`: real-kernel program-cap spawn and wait proof.
+  - `phase103_init_bootstrap_handoff.cpp`: real-kernel init bootstrap-capability handoff proof.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

@@ -1,0 +1,200 @@
+Phase 103 -- Init Bootstrap Capability Handoff
+==============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 102 timer sleep and scheduler block-wake
+proof into the next remaining Band C owner: prove that the repository-owned
+kernel artifact can start one isolated `init` process, hand it one explicit
+bounded bootstrap capability set, and keep root authority kernel-only without
+yet claiming real service launch, namespace policy, or a broader running
+user-space stack.
+
+This document is both the Phase 103 execution note and its closeout.
+It does not claim a running log service, loader service, service registry,
+ambient authority discovery, or broader init-owned orchestration.
+
+Repository status note
+----------------------
+- Phase 81 through Phase 95 produced the bounded freestanding `v0.3` proof
+  ladder and froze that lane into the first admitted freestanding support
+  slice.
+- Phase 96 then made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 then widened that owned kernel target into one bounded address-
+  space and first-user-entry handoff.
+- Phase 98 then completed the remaining Band A object-core owner by making
+  explicit endpoint tables, per-process handle tables, and bounded queued-
+  message lifetime concrete inside the same repository-owned kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- Phase 100 then made one attached-handle transfer concrete across that same
+  syscall IPC boundary.
+- Phase 101 then made the first explicit program-capability spawn and wait
+  path concrete.
+- Phase 102 then made the first explicit timer-backed sleep, wake, and ready-
+  restoration path concrete.
+- The strongest next kernel question was therefore no longer whether the
+  kernel could boot, reach first user entry, and drive one bounded child
+  lifecycle. It was whether that same real kernel artifact could now show
+  exactly what authority `init` receives at boot and prove that root authority
+  stays kernel-only.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names init bootstrap capability
+  handoff as the next remaining owner after the landed timer block-wake path.
+- The repository already had one init-owned endpoint handle, one launchable
+  program capability later consumed by spawn, and one root capability kept in
+  kernel state, but it still had no explicit boot contract describing which of
+  those authorities actually become visible to `init`.
+- Without this step, later service-launch phases could overclaim that the
+  kernel already enforces explicit capability discipline at boot when the
+  repository still only had the individual ingredients spread across globals
+  and proof-local validation.
+
+Core rule
+---------
+- Keep the phase to one explicit bounded bootstrap capability set.
+- Reuse the already-landed init-visible endpoint handle and one launchable
+  program capability rather than inventing a broader authority taxonomy.
+- Make the handoff explicit in one ordinary helper module and keep the kernel-
+  owned act of installation visible in the root proof module.
+- Prove that wait handles are not ambient at boot and that the root capability
+  remains kernel-only.
+- Stop before service launch, registry policy, loader generalization, or
+  broader capability refinement.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one widened `init` helper module that owns one bounded bootstrap-
+   capability-set record and one deterministic handoff-observation record
+2. one repository-owned kernel follow-through that materializes the explicit
+   init bootstrap set from the landed init endpoint handle plus one launchable
+   program capability
+3. one validation path proving that the bootstrap set contains exactly those
+   explicit authorities, that no wait handle is ambient at boot, and that the
+   root capability remains kernel-only
+4. one continued child-spawn, timer-sleep, wake, and reap follow-through that
+   now runs on top of the explicit handoff contract rather than implicit boot-
+   global knowledge
+5. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported structs, aggregate initialization,
+   enum matching, and explicit global-state writes
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this boot-authority boundary now because Phase 102
+already proved that the kernel can hand off execution and drive one bounded
+child lifecycle. The next honest owner is not real service launch yet. It is
+one explicit statement of what authority `init` starts with.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact now installs one explicit bounded bootstrap
+  capability set for `init`
+- that set is intentionally small: one init-visible bootstrap endpoint handle
+  plus one launchable program capability already used by the landed spawn path
+- wait handles are not ambient at boot and still appear only after explicit
+  spawn
+- root authority remains kernel-owned and is not visible through the init
+  bootstrap set
+- the current language, freestanding build path, and runtime startup can carry
+  the necessary handoff records without new compiler work
+- the repository can stop honestly at one explicit init bootstrap handoff
+  without implying that real service launch or broader user-space policy is
+  already complete
+
+Deliverables
+------------
+- one canonical Phase 103 closeout note recording the implemented explicit
+  init bootstrap-capability handoff
+- one widened `kernel/src/init.mc` helper module owning the bounded bootstrap
+  capability-set and handoff-observation records
+- one updated repository-owned kernel target that materializes and validates
+  the init bootstrap set before the landed syscall and child-lifecycle proofs
+- one focused freestanding kernel regression and MIR inspection validating the
+  new bootstrap-handoff slice
+- refreshed planning and orientation surfaces so Phase 103 is concrete and
+  Phase 104 becomes the next remaining owner
+
+Suggested execution order
+-------------------------
+1. Add the smallest bounded init bootstrap-capability-set and handoff-
+   observation records needed to make boot authority explicit.
+2. Teach the repository-owned kernel target to materialize that set from the
+   already-landed init-visible endpoint handle and launchable program
+   capability.
+3. Validate that the handoff contains exactly those authorities, that wait
+   handles are still absent at boot, and that root authority remains kernel-
+   only.
+4. Keep the landed syscall, spawn, sleep, wake, and reap follow-through on top
+   of the explicit handoff contract.
+5. Inspect the merged MIR and refresh the planning surface so Phase 103 is
+   concrete and Phase 104 remains the next remaining owner.
+
+Exit criteria
+-------------
+- one repository-owned kernel target materializes one explicit bounded init
+  bootstrap capability set
+- that set contains the landed init-visible endpoint handle plus one
+  launchable program capability and no ambient wait handle
+- root authority remains kernel-owned and absent from the init bootstrap set
+- the runtime proof exits with exactly one bounded Phase 103 marker only after
+  validating the explicit bootstrap handoff and the landed child-lifecycle
+  follow-through
+- the merged MIR preserves imported bootstrap-handoff record types, helper
+  functions, and explicit global writes for the new init-owned capability-set
+  state
+- the planning surface records Phase 103 as concrete rather than speculative
+
+Non-goals
+---------
+- real log-service launch, request-reply policy, or service registry behavior
+- loader-service design, broader program-capability taxonomy, or capability
+  derivation rules
+- ambient namespace policy, filesystem lookup, or path-based spawn
+- kill semantics, multi-child orchestration, or broader scheduler policy
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- widened `kernel/src/init.mc` so the owned kernel tree now supports one
+  bounded bootstrap-capability-set record plus one deterministic handoff-
+  observation record using ordinary imported capability slots and scalar
+  counts
+- updated `kernel/src/main.mc` so the repository-owned kernel target now
+  materializes one explicit init bootstrap set from the landed init endpoint
+  handle plus the landed launchable program capability, records one explicit
+  handoff observation, validates that root authority remains kernel-only and
+  that wait handles are not ambient at boot, then continues through the landed
+  syscall, spawn, timer, wake, and reap path before emitting the Phase 103
+  marker
+- added one focused Phase 103 freestanding kernel regression that builds and
+  runs the repository-owned kernel target, expects the Phase 103 marker, and
+  inspects merged MIR for imported bootstrap-handoff types plus explicit
+  global-state lowering for the new init bootstrap-set globals
+- refreshed the kernel README, agent map, freestanding test notes, backlog,
+  decision log, and speculative Canopus kernel roadmap so the repository now
+  records Phase 103 as concrete and leaves Phase 104 as the next remaining
+  owner
+
+Closeout statement
+------------------
+Phase 103 is complete as an explicit init bootstrap capability handoff proof.
+The repository still does not claim real service launch, namespace policy, or
+full init-owned orchestration, but it now has one honest real-kernel artifact
+that boots, reaches first user entry, owns explicit endpoint and handle state,
+opens one explicit syscall gate, completes byte-only IPC, transfers one
+attached endpoint handle, consumes one launchable program capability to spawn
+one child, blocks and wakes that child once on one deterministic timer tick,
+reaps it through one explicit wait handle, and now makes the init bootstrap
+authority boundary itself explicit and bounded.

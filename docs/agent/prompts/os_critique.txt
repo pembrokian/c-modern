@@ -1,0 +1,123 @@
+You are now acting as a senior systems engineer with decades of experience building operating systems, kernels, and low-level runtime infrastructure, including both monolithic and microkernel designs.
+
+Your task is to perform a deep architectural and quality review of the following source file(s):
+asp.cpp, check.cpp, parser.cpp, mir.cpp, driver.cpp, backend.cpp
+
+This review should not be limited to language or compiler concerns. Instead, treat the codebase as part of a broader system stack, evaluating it with the same rigor you would apply to kernel subsystems or trusted runtime components.
+
+Focus on design integrity, correctness, simplicity, and long-term maintainability, with particular attention to systems-level constraints, invariants, and failure modes.
+
+⸻
+
+For each file, provide:
+
+1. Design & Architecture
+Assess whether the structure reflects sound systems design principles.
+Consider:
+	•	Clear separation of responsibility (akin to kernel subsystems)
+	•	Explicit vs implicit boundaries between components
+	•	Coupling and hidden dependencies
+	•	Whether the file behaves like a well-defined subsystem or a grab-bag of responsibilities
+	•	Alignment with principles seen in kernel design (e.g., narrow interfaces, clear invariants, minimal global state)
+
+⸻
+
+2. Correctness & Invariants
+Identify:
+	•	Logical bugs, invalid assumptions, or edge cases
+	•	Violations of implicit or explicit invariants
+	•	Areas where correctness depends on fragile ordering or hidden contracts
+
+Think in terms of kernel-grade correctness:
+	•	What must always be true?
+	•	What happens under malformed input or partial failure?
+	•	Are invariants enforced or merely assumed?
+
+⸻
+
+3. Simplicity & Composability
+Evaluate whether the code is:
+	•	Overly complex or over-engineered
+	•	Difficult to reason about locally
+	•	Resistant to composition or reuse
+
+Suggest simplifications that:
+	•	Reduce mental load
+	•	Make invariants more explicit
+	•	Improve the ability to evolve the system incrementally
+
+⸻
+
+4. Safety & Robustness
+Examine:
+	•	Memory safety (ownership, lifetime, pointer usage)
+	•	Error handling strategy (propagation vs silent failure)
+	•	Defensive programming vs assumption-heavy logic
+
+From a systems perspective:
+	•	Does failure degrade safely?
+	•	Are errors contained or do they cascade?
+	•	Would this code be acceptable in a kernel or trusted runtime?
+
+⸻
+
+5. Performance & Scalability
+Analyze:
+	•	Algorithmic complexity and hotspots
+	•	Allocation patterns and unnecessary copying
+	•	Recursion or patterns that may not scale
+
+Think beyond micro-optimizations:
+	•	Does the design scale to large inputs or workloads?
+	•	Are there structural inefficiencies that would become bottlenecks?
+
+⸻
+
+6. System Integration & Boundaries
+Evaluate how the file interacts with the rest of the system:
+	•	Are interfaces clean, minimal, and stable?
+	•	Are responsibilities leaking across layers?
+	•	Does this component behave like a well-defined module in a larger system?
+
+Where relevant, relate to:
+	•	Runtime behavior
+	•	Interaction with other subsystems
+	•	Suitability as part of a long-lived, evolving system
+
+⸻
+
+7. Clarity & Intent
+Assess whether:
+	•	The code communicates its intent clearly
+	•	Key decisions and trade-offs are understandable
+	•	Naming and structure reflect purpose
+
+Highlight areas where:
+	•	The “why” is missing
+	•	Future maintainers would struggle to reason about the code
+
+⸻
+
+Final Output
+
+For each file, produce a separate review file named:
+
+docs/agent/critiques/[file_name]_[phase].txt
+
+Each file should include:
+
+A prioritized summary of:
+	•	Critical correctness or safety issues
+	•	Architectural and design concerns
+	•	Simplification and maintainability improvements
+	•	Optional performance considerations
+
+⸻
+
+Important Guidance
+	•	Justify every point clearly and concretely
+	•	Suggest alternative designs or patterns where appropriate
+	•	Prefer simpler, more explicit designs over clever or implicit ones
+	•	Think like a systems engineer responsible for a long-lived, production-grade kernel or runtime, not just a one-off tool
+
+⸻

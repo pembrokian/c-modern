@@ -6,9 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 101 has moved the repository-owned kernel artifact beyond the landed
-  capability-carrying IPC boundary into one bounded program-cap spawn and
-  wait proof.
+- Phase 103 has moved the repository-owned kernel artifact beyond the landed
+  timer-backed child-lifecycle proof into one explicit init bootstrap-
+  capability handoff proof.
 - The current owned slice is still intentionally small: explicit boot entry,
   deterministic kernel state tables, one bounded init address space plus
   saved user-entry frame, one bounded init-owned endpoint and handle table,
@@ -16,7 +16,9 @@ Current status
   receive path with deterministic `WouldBlock` follow-through, one bounded
   attached-handle transfer with sender-side removal and receiver-local
   reinstall, one bounded program-capability spawn and explicit wait-handle
-  reap path, and no timer-backed blocking or service bring-up yet.
+  reap path, one bounded timer sleep path with explicit wake delivery, one
+  explicit init bootstrap-capability handoff, and no real service bring-up
+  yet.
 
 Current files
 -------------
@@ -24,8 +26,9 @@ Current files
 - `build.toml`: freestanding kernel manifest for the current proof slice
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core validation, bounded syscall-byte-IPC validation, bounded
-  capability-carrying transfer validation, and one bounded spawn-and-wait
-  validation
+  capability-carrying transfer validation, bounded spawn-and-wait
+  validation, bounded timer sleep and wake validation, and bounded init
+  bootstrap-capability handoff validation
 - `src/state.mc`: kernel-owned descriptor, slot, queue, and boot-log records
 - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame
   records
@@ -37,7 +40,8 @@ Current files
 - `src/interrupt.mc`: bounded interrupt controller skeleton
 - `src/syscall.mc`: bounded syscall gate, byte-plus-capability request,
   spawn-and-wait request, and observation state
-- `src/init.mc`: bounded boot-bundled init image descriptor skeleton
+- `src/init.mc`: bounded boot-bundled init image descriptor plus explicit init
+  bootstrap-capability handoff records
 
 Phase boundary
 --------------
@@ -46,5 +50,5 @@ Phase boundary
   handoff, one explicit endpoint-and-handle object-core follow-through, and
   one explicit syscall-owned byte-only IPC round trip plus one bounded
   attached-handle transfer plus one bounded spawn-and-wait lifecycle path.
-- It does not yet claim general loading, interrupt handling, timer-backed
-  scheduling, kill semantics, or a running init-owned service set.
+- It does not yet claim general loading, real service launch, namespace
+  policy, kill semantics, or a running init-owned service set.
