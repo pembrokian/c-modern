@@ -1,4 +1,4 @@
-Phase 111 Through Phase 123 -- Speculative Post-Phase-110 Canopus Roadmap
+Phase 112 Through Phase 123 -- Speculative Post-Phase-111 Canopus Roadmap
 =========================================================================
 
 Status
@@ -7,12 +7,13 @@ SPECULATIVE
 
 Purpose
 -------
-Sketch one plausible continuation after the completed Phase 110 kernel
-ownership split audit.
+Sketch one plausible continuation after the completed Phase 111 scheduler and
+lifecycle ownership clarification.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
-It does not replace the concrete Phase 109 or Phase 110 closeout notes.
+It does not replace the concrete Phase 109, Phase 110, or Phase 111 closeout
+notes.
 It gives one plausible ordering for the next Canopus wave if the repository
 keeps following the same evidence-first rules used so far:
 
@@ -28,6 +29,7 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/admin/modern_c_canopus_readiness_position.txt`
 - `docs/plan/phase109_first_running_canopus_kernel_slice_audit.txt`
 - `docs/plan/phase110_kernel_ownership_split_audit.txt`
+- `docs/plan/phase111_scheduler_lifecycle_ownership_clarification.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
 - `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
@@ -36,36 +38,40 @@ This roadmap is meant to stay aligned with:
 - `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
 
 If those notes define the current admitted slice, the landed ownership split,
-the longer-term ownership target, and the intended kernel boundary, this
-roadmap suggests one practical phase ordering for the next bounded
-implementation wave after the first running kernel and first ownership split
+the landed lifecycle-owner clarification, the longer-term ownership target,
+and the intended kernel boundary, this roadmap suggests one practical phase
+ordering for the next bounded implementation wave after those milestones
 became real.
 
 Repository numbering note
 -------------------------
 - Phase 81 through Phase 95 are occupied by the concrete freestanding bring-up
   and support-freeze wave.
-- Phase 96 through Phase 110 are occupied by the concrete first real kernel
-  bring-up wave through the first kernel ownership split audit.
-- The next speculative continuation therefore starts at Phase 111.
+- Phase 96 through Phase 111 are occupied by the concrete first real kernel
+  bring-up wave through the first lifecycle-owner clarification audit.
+- The next speculative continuation therefore starts at Phase 112.
 
 Repository status note
 ----------------------
 - The repository can now honestly claim one bounded first running Canopus
-  kernel slice with one landed ownership split over that same artifact.
+  kernel slice with one landed ownership split and one landed lifecycle-owner
+  clarification over that same artifact.
 - That slice remains intentionally small: fixed-size tables, explicit
   authority, bounded IPC and lifecycle paths, bounded service proofs, one
-  image plus support audit over the real kernel artifact, and one explicit
-  sched/debug ownership split out of the root proof lane.
+  image plus support audit over the real kernel artifact, one explicit
+  sched/debug ownership split, and one explicit lifecycle-owner split out of
+  the root proof lane.
 - The strongest next question is no longer whether the repository can produce
-  a real kernel artifact at all. It is how to widen that artifact without
-  blurring subsystem ownership, overselling platform maturity, or reopening
-  language work before a concrete owner gap exists.
+  a real kernel artifact at all. It is how to widen that artifact after the
+  first lifecycle-owner clarification without blurring subsystem ownership,
+  overselling platform maturity, or reopening language work before a concrete
+  owner gap exists.
 
 What this roadmap is trying to answer
 -------------------------------------
-- What likely comes after the first running-kernel statement and first owner
-  split if the repository keeps growing Canopus conservatively?
+- What likely comes after the first running-kernel statement, first ownership
+  split, and first lifecycle-owner clarification if the repository keeps
+  growing Canopus conservatively?
 - Which follow-on fronts belong first to kernel ownership hardening,
   hardware-boundary truth, running-system follow-through, or image and target
   hardening rather than to new language machinery?
@@ -105,36 +111,30 @@ Roadmap bands
 
 Band A - Harden Kernel Ownership Boundaries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 111 through 112 should continue turning the current kernel tree into
-clearer subsystem ownership without pretending the full end-state layout
-already exists.
+Phase 112 should continue turning the current kernel tree into clearer
+subsystem ownership without pretending the full end-state layout already
+exists.
 
 Likely themes:
-- split current flat kernel files along real ownership seams
+- keep `syscall` thin and prevent transition helpers from drifting back into
+  decode paths
+- answer the next remaining boundary question at the syscall edge rather than
+  reopening task-state ownership ambiguity
 - preserve current behavior while making future owners easier to name
-- keep `sys/` thin and avoid letting helper growth turn into hidden policy
 
 Why this band comes first:
-- after the landed Phase 110 split, the highest-value next step is answering
-  the next remaining ownership question without letting the root kernel lane
-  or subsystem seams blur again.
-
-Possible phases in this band:
+- after the landed Phase 111 clarification, the next highest-value step is
+  proving that syscall decode and marshalling stay thin while IPC,
+  capability, address-space, and lifecycle semantics remain in their owning
+  subsystems.
 
 Historical bridge into this band:
 - Phase 110 is now concrete as `docs/plan/phase110_kernel_ownership_split_audit.txt`.
-- That phase made `sched` and `debug` ownership explicit without widening the
-  admitted running slice, and it leaves the next open question centered on
-  task-state ownership rather than on whether the kernel tree can be split at
-  all.
-
-Phase 111 -- Scheduler And Lifecycle Ownership Clarification
-- Exit criterion: the current ready, block, wake, spawn, wait, and reap paths
-  are factored so scheduler policy, lifecycle bookkeeping, and wait-handle
-  mechanics have explicit owners rather than remaining interleaved in one
-  staged kernel lane, again without claiming broader preemption or kill
-  semantics. This phase must also answer one singular question explicitly:
-  who owns the state transition of a task?
+- Phase 111 is now concrete as `docs/plan/phase111_scheduler_lifecycle_ownership_clarification.txt`.
+- Those phases made `sched`, `debug`, and lifecycle slot-transition ownership
+  explicit without widening the admitted running slice, and they leave the
+  next open question centered on keeping syscall decode thin rather than on
+  whether task-state ownership is still ambiguous.
 
 Phase 112 -- Syscall Boundary Thinness Audit
 - Exit criterion: the kernel proves that syscall decode and marshalling stay
@@ -175,7 +175,7 @@ Phase 114 -- Address-Space And MMU Ownership Split
 Phase 115 -- Timer Ownership Hardening
 - Exit criterion: the timer-backed wake path is owned through a clearer
   interrupt or timer boundary that preserves single-delivery wake truth while
-  keeping device and scheduler policy separate, after the mapping and memory
+  keeping device and scheduler policy separate, after the mapping and memory-
   visibility assumptions it depends on are already explicit.
 
 Phase 116 -- Barrier Or Low-Level Hook Follow-Through
@@ -212,8 +212,8 @@ Phase 118 -- Request-Reply And Delegation Follow-Through
   single-hop proofs to show explicit delegation or reply routing across more
   than one user-space participant without ambient authority shortcuts,
   including at least one bounded failure, invalidation, or refused-action path
-  that crosses IPC and lifecycle boundaries without turning failure policy
-  into a new kernel-owned framework.
+  that crosses IPC and lifecycle boundaries without turning failure policy into
+  a new kernel-owned framework.
 
 Phase 119 -- Namespace-Pressure Audit
 - Exit criterion: the repository records the smallest explicit answer to the
@@ -257,7 +257,7 @@ Phase 122 -- Target-Surface Audit
   target truth with explicit build, runtime, and testing boundaries.
 
 Phase 123 -- Next Plateau Audit
-- Exit criterion: the repository can publish one honest post-Phase-110 plateau
+- Exit criterion: the repository can publish one honest post-Phase-111 plateau
   statement naming the admitted kernel, running-system, image, and target
   truths exactly, together with the still-deferred areas that remain outside
   that plateau.
@@ -266,7 +266,7 @@ Likely ordering bias
 --------------------
 If the repository keeps following the same pattern, the safest order is:
 
-1. clarify kernel ownership before widening kernel behavior
+1. keep kernel ownership explicit before widening kernel behavior
 2. widen only the narrow hardware-boundary truths the next kernel step really
    needs
 3. grow init-owned running-system behavior only after those boundaries are
@@ -274,8 +274,8 @@ If the repository keeps following the same pattern, the safest order is:
 4. freeze image, target, and support truth last
 
 That ordering keeps the repository from confusing a first running-kernel
-statement plus one landed ownership split with permission to claim a broader
-platform too early.
+statement plus landed ownership clarifications with permission to claim a
+broader platform too early.
 
 Non-goals
 ---------
@@ -291,8 +291,9 @@ Interpretation guide
 --------------------
 - Treat this as a rough map, not a contract.
 - The current position note remains the canonical statement of present truth.
-- The completed Phase 96 through Phase 110 notes now form the historical map
-  through the first running-kernel and first ownership-split wave.
+- The completed Phase 96 through Phase 111 notes now form the historical map
+  through the first running-kernel, first ownership-split, and first
+  lifecycle-owner-clarification wave.
 - If a smaller honest plateau appears earlier than Phase 123, that is success,
   not roadmap failure.
 - If a real next kernel step exposes a compiler or language distortion,

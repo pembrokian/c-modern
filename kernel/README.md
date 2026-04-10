@@ -6,9 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 110 has moved the repository-owned kernel artifact beyond the landed
-  first running kernel slice audit into one bounded kernel ownership split
-  audit.
+- Phase 111 has moved the repository-owned kernel artifact beyond the landed
+  Phase 110 ownership split into one bounded scheduler and lifecycle
+  ownership clarification.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -29,22 +29,26 @@ Current status
   user-to-user endpoint transfer with explicit sender-side removal and
   receiver-side installation, one bounded kernel image-input and program-cap
   audit, one bounded first running Canopus kernel slice audit, one bounded
-  kernel ownership split audit, and no broader multi-service bring-up yet.
+  kernel ownership split audit, one bounded scheduler and lifecycle ownership
+  clarification, and no broader multi-service bring-up yet.
 
 Current files
 -------------
 
 - `build.toml`: freestanding kernel manifest for the current proof slice and
-  the explicit kernel image-input contract carried through the Phase 110
-  ownership split audit
+  the explicit kernel image-input contract carried through the Phase 111
+  lifecycle-ownership clarification
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core setup, bounded syscall-byte-IPC setup, bounded capability-
   carrying transfer setup, bounded service proof sequencing, and thin root
-  orchestration across the owned scheduler and debug audit modules
+  orchestration across the owned scheduler, lifecycle, and debug audit modules
 - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn,
   wait, sleep, and wake follow-through
+- `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for
+  spawn, block, ready, exit, and waited-child release follow-through
 - `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109
-  running-slice audit, and Phase 110 ownership-split audit
+  running-slice audit, Phase 110 ownership-split audit, and Phase 111
+  lifecycle-ownership audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -77,14 +81,17 @@ Phase boundary
   service reap, one bounded real echo-service request-reply flow with explicit
   service reap, one bounded real user-to-user endpoint transfer with explicit
   service-side follow-through, one bounded kernel image-and-program-cap audit,
-  one bounded first running Canopus kernel slice audit, and one bounded kernel
-  ownership split audit.
+  one bounded first running Canopus kernel slice audit, one bounded kernel
+  ownership split audit, and one bounded scheduler and lifecycle ownership
+  clarification.
 - The repository can now honestly claim one first running Canopus kernel
-  slice with an explicit Phase 110 ownership split: explicit boot entry,
+  slice with an explicit Phase 111 lifecycle clarification: explicit boot
+  entry,
   first user entry, endpoint-and-handle object core, syscall-owned byte-only
   IPC, attached-handle transfer, program-cap spawn and wait, timer sleep and
   wake, init bootstrap-capability handoff, real log-service handshake, real
   echo-service request-reply, real user-to-user capability transfer, and
-  kernel image/program-cap audit.
+  kernel image/program-cap audit, with scheduler-facing validation separated
+  from concrete lifecycle slot mutation.
 - It does not yet claim general loading, multi-service launch, namespace
   policy, kill semantics, or a running init-owned service set.

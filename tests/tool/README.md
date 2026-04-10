@@ -27,7 +27,8 @@ Current structure
     `kernel/phase107_real_user_to_user_capability_transfer.cpp`,
     `kernel/phase108_kernel_image_program_cap_audit.cpp`,
     `kernel/phase109_first_running_kernel_slice_audit.cpp`,
-    `kernel/phase110_kernel_ownership_split_audit.cpp`: one kernel proof per file.
+      `kernel/phase110_kernel_ownership_split_audit.cpp`,
+      `kernel/phase111_scheduler_lifecycle_ownership_clarification.cpp`: one kernel proof per file.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-
     system coverage.
 - `tool_suite_tests.cpp` and `phase7_tool_tests.cpp`: compatibility runners

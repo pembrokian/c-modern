@@ -279,3 +279,10 @@ func validate_phase110_kernel_ownership_split(audit: RunningKernelSliceAudit, sc
     }
     return validate_phase109_first_running_kernel_slice(audit)
 }
+
+func validate_phase111_scheduler_and_lifecycle_ownership(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32) bool {
+    if lifecycle_contract_hardened == 0 {
+        return false
+    }
+    return validate_phase110_kernel_ownership_split(audit, scheduler_contract_hardened)
+}

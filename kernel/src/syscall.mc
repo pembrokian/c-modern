@@ -2,6 +2,7 @@ import address_space
 import capability
 import endpoint
 import init
+import lifecycle
 import state
 import timer
 
@@ -357,23 +358,13 @@ func commit_spawn(process_slots: [3]state.ProcessSlot, task_slots: [3]state.Task
         return SpawnCommit{ process_slots: process_slots, task_slots: task_slots, child_address_space: address_space.empty_space(), child_frame: address_space.empty_frame(), status: SyscallStatus.InvalidCapability }
     }
     child_frame: address_space.UserEntryFrame = address_space.bootstrap_user_frame(child_space, child_tid)
-    updated_process_slots: [3]state.ProcessSlot = state.with_updated_process_slot(process_slots, process_slot, state.init_process_slot(child_pid, task_slot, child_asid))
-    updated_task_slots: [3]state.TaskSlot = state.with_updated_task_slot(task_slots, task_slot, state.user_task_slot(child_tid, child_pid, child_asid, child_image.entry_pc, child_image.stack_top))
-    return SpawnCommit{ process_slots: updated_process_slots, task_slots: updated_task_slots, child_address_space: child_space, child_frame: child_frame, status: SyscallStatus.Ok }
+    install: lifecycle.SpawnInstallResult = lifecycle.install_spawned_child(process_slots, task_slots, child_pid, child_tid, child_asid, process_slot, task_slot, child_image.entry_pc, child_image.stack_top)
+    return SpawnCommit{ process_slots: install.process_slots, task_slots: install.task_slots, child_address_space: child_space, child_frame: child_frame, status: SyscallStatus.Ok }
 }
 
 func release_waited_child(process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, wait_handle_slot: u32, child_pid: u32) WaitRelease {
-    updated_process_slots: [3]state.ProcessSlot = process_slots
-    updated_task_slots: [3]state.TaskSlot = task_slots
-    process_slot: u32 = state.find_process_slot_by_pid(process_slots, child_pid)
-    task_slot: u32 = state.find_task_slot_by_owner_pid(task_slots, child_pid)
-    if process_slot < 3 {
-        updated_process_slots = state.with_updated_process_slot(updated_process_slots, process_slot, state.empty_process_slot())
-    }
-    if task_slot < 3 {
-        updated_task_slots = state.with_updated_task_slot(updated_task_slots, task_slot, state.empty_task_slot())
-    }
-    return WaitRelease{ process_slots: updated_process_slots, task_slots: updated_task_slots, exit_code: capability.find_exit_code_for_wait_handle(wait_table, wait_handle_slot) }
+    released: lifecycle.ReleaseTransition = lifecycle.release_waited_child_slots(process_slots, task_slots, child_pid)
+    return WaitRelease{ process_slots: released.process_slots, task_slots: released.task_slots, exit_code: capability.find_exit_code_for_wait_handle(wait_table, wait_handle_slot) }
 }
 
 func perform_sleep_slot(task_slots: [3]state.TaskSlot, timer_state: timer.TimerState, task_slot: u32, duration_ticks: u64) SleepSlotTransition {
@@ -386,8 +377,8 @@ func perform_sleep_slot(task_slots: [3]state.TaskSlot, timer_state: timer.TimerS
     if updated_timer_state.count == timer_state.count {
         return SleepSlotTransition{ task_slots: task_slots, timer_state: timer_state, observation: sleep_observation(SyscallStatus.Exhausted, BlockReason.None, 0, 0, 0), status: SyscallStatus.Exhausted }
     }
-    updated_task_slots: [3]state.TaskSlot = state.with_updated_task_slot(task_slots, task_slot, state.blocked_task_slot(selected_task))
-    return SleepSlotTransition{ task_slots: updated_task_slots, timer_state: updated_timer_state, observation: sleep_observation(SyscallStatus.WouldBlock, BlockReason.TimerPending, selected_task.tid, deadline_tick, 0), status: SyscallStatus.WouldBlock }
+    blocked: lifecycle.TaskTransition = lifecycle.block_task_on_timer(task_slots, task_slot)
+    return SleepSlotTransition{ task_slots: blocked.task_slots, timer_state: updated_timer_state, observation: sleep_observation(SyscallStatus.WouldBlock, BlockReason.TimerPending, selected_task.tid, deadline_tick, 0), status: SyscallStatus.WouldBlock }
 }
 
 func perform_sleep(gate: SyscallGate, task_slots: [3]state.TaskSlot, timer_state: timer.TimerState, request: SleepRequest) SleepResult {

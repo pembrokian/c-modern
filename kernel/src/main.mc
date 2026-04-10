@@ -5,6 +5,7 @@ import echo_service
 import endpoint
 import init
 import interrupt
+import lifecycle
 import log_service
 import sched
 import state
@@ -59,7 +60,7 @@ const TRANSFER_SERVICE_GRANT_BYTE1: u8 = 73
 const TRANSFER_SERVICE_GRANT_BYTE2: u8 = 86
 const TRANSFER_SERVICE_GRANT_BYTE3: u8 = 69
 const TRANSFER_SERVICE_EXIT_CODE: i32 = 54
-const PHASE110_MARKER: i32 = 110
+const PHASE111_MARKER: i32 = 111
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -1372,8 +1373,8 @@ func simulate_log_service_exit() {
     tasks: [3]state.TaskSlot = TASK_SLOTS
     wait_tables: [3]capability.WaitTable = WAIT_TABLES
 
-    processes[2] = state.exit_process_slot(processes[2])
-    tasks[2] = state.exit_task_slot(tasks[2])
+    processes = lifecycle.exit_process(processes, 2)
+    tasks = lifecycle.exit_task(tasks, 2)
     wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, LOG_SERVICE_EXIT_CODE)
 
     PROCESS_SLOTS = processes
@@ -1635,8 +1636,8 @@ func simulate_echo_service_exit() {
     tasks: [3]state.TaskSlot = TASK_SLOTS
     wait_tables: [3]capability.WaitTable = WAIT_TABLES
 
-    processes[2] = state.exit_process_slot(processes[2])
-    tasks[2] = state.exit_task_slot(tasks[2])
+    processes = lifecycle.exit_process(processes, 2)
+    tasks = lifecycle.exit_task(tasks, 2)
     wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, ECHO_SERVICE_EXIT_CODE)
 
     PROCESS_SLOTS = processes
@@ -1948,8 +1949,8 @@ func simulate_transfer_service_exit() {
     tasks: [3]state.TaskSlot = TASK_SLOTS
     wait_tables: [3]capability.WaitTable = WAIT_TABLES
 
-    processes[2] = state.exit_process_slot(processes[2])
-    tasks[2] = state.exit_task_slot(tasks[2])
+    processes = lifecycle.exit_process(processes, 2)
+    tasks = lifecycle.exit_task(tasks, 2)
     wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, TRANSFER_SERVICE_EXIT_CODE)
 
     PROCESS_SLOTS = processes
@@ -2287,7 +2288,8 @@ func execute_child_timer_wake_transition() bool {
     TIMER_STATE = wake_result.timer_state
     TIMER_WAKE_OBSERVATION = wake_result.observation
     TIMER_STATE = timer.consume_wake(TIMER_STATE, TIMER_WAKE_OBSERVATION.task_id)
-    TASK_SLOTS[2] = state.user_task_slot(TASK_SLOTS[2].tid, TASK_SLOTS[2].owner_pid, TASK_SLOTS[2].address_space_id, TASK_SLOTS[2].entry_pc, TASK_SLOTS[2].stack_top)
+    wake_transition: lifecycle.TaskTransition = lifecycle.ready_task(TASK_SLOTS, 2)
+    TASK_SLOTS = wake_transition.task_slots
     READY_QUEUE = state.user_ready_queue(CHILD_TID)
     WAKE_READY_QUEUE = READY_QUEUE
     if TIMER_WAKE_OBSERVATION.task_id != CHILD_TID {
@@ -2328,8 +2330,8 @@ func simulate_child_exit() {
     processes: [3]state.ProcessSlot = PROCESS_SLOTS
     tasks: [3]state.TaskSlot = TASK_SLOTS
     wait_tables: [3]capability.WaitTable = WAIT_TABLES
-    processes[2] = state.exit_process_slot(processes[2])
-    tasks[2] = state.exit_task_slot(tasks[2])
+    processes = lifecycle.exit_process(processes, 2)
+    tasks = lifecycle.exit_task(tasks, 2)
     wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, CHILD_EXIT_CODE)
     PROCESS_SLOTS = processes
     TASK_SLOTS = tasks
@@ -2373,6 +2375,7 @@ func bootstrap_main() i32 {
     phase104_contract_hardened: u32 = 0
     phase108_contract_hardened: u32 = 0
     scheduler_contract_hardened: u32 = 0
+    lifecycle_contract_hardened: u32 = 0
     if !architecture_entry() {
         return 10
     }
@@ -2429,76 +2432,83 @@ func bootstrap_main() i32 {
         return 27
     }
     scheduler_contract_hardened = 1
-    if !validate_phase104_contract_hardening() {
+    if !lifecycle.validate_task_transition_contracts() {
         return 28
+    }
+    lifecycle_contract_hardened = 1
+    if !validate_phase104_contract_hardening() {
+        return 29
     }
     phase104_contract_hardened = 1
     if !execute_phase105_log_service_handshake() {
-        return 29
-    }
-    if !validate_phase105_log_service_handshake() {
         return 30
     }
-    if !execute_phase106_echo_service_request_reply() {
+    if !validate_phase105_log_service_handshake() {
         return 31
     }
-    if !validate_phase106_echo_service_request_reply() {
+    if !execute_phase106_echo_service_request_reply() {
         return 32
     }
-    if !execute_phase107_user_to_user_capability_transfer() {
+    if !validate_phase106_echo_service_request_reply() {
         return 33
     }
-    if !validate_phase107_user_to_user_capability_transfer() {
+    if !execute_phase107_user_to_user_capability_transfer() {
         return 34
     }
-    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+    if !validate_phase107_user_to_user_capability_transfer() {
         return 35
+    }
+    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+        return 36
     }
     phase108_contract_hardened = 1
     running_slice_audit: debug.RunningKernelSliceAudit = build_phase109_running_kernel_slice_audit(phase104_contract_hardened, phase108_contract_hardened)
     if !debug.validate_phase109_first_running_kernel_slice(running_slice_audit) {
-        return 36
-    }
-    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
         return 37
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 110)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
         return 38
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase111_scheduler_and_lifecycle_ownership(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened) {
         return 39
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 111)
+    if BOOT_MARKER_EMITTED != 1 {
         return 40
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 41
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 42
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 43
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 44
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 45
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 110 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 46
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 47
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 111 {
         return 48
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 49
     }
-    return PHASE110_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 50
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 51
+    }
+    return PHASE111_MARKER
 }

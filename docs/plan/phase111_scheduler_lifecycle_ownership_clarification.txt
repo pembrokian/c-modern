@@ -1,0 +1,159 @@
+Phase 111 -- Scheduler And Lifecycle Ownership Clarification
+============================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 110 kernel ownership split audit by making
+task and process lifecycle transitions explicit owners instead of leaving them
+as side effects spread across syscall helpers and the root kernel proof lane.
+
+This document is both the Phase 111 execution note and its closeout.
+It does not claim broader scheduler policy, preemption, kill semantics,
+broader syscall families, a larger in-kernel runtime, or a wider running-
+system statement. It records one bounded clarification inside the already
+admitted first running kernel slice.
+
+Repository status note
+----------------------
+- Phase 110 closed one bounded kernel ownership split over the landed first
+  running Canopus kernel slice.
+- That split made scheduler-facing validation and aggregate debug audits
+  explicit, but the concrete task-state and process-state mutations still
+  remained distributed across `kernel/src/syscall.mc` and
+  `kernel/src/main.mc`.
+- Without one narrower clarification now, later lifecycle work would keep
+  mixing syscall marshalling, scheduler-facing validation, and lifecycle slot
+  mutation inside the same local code paths.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-110 roadmap reserved Phase 111 for scheduler and
+  lifecycle ownership clarification before wider syscall or hardware-boundary
+  work.
+- The repository already had a scheduler-owned audit module in
+  `kernel/src/sched.mc`, but the actual spawn installation, timer-blocked task
+  transition, timer wake resume, exit marking, and waited-child release paths
+  were not yet owned through one explicit lifecycle surface.
+- That left the key ownership question from the roadmap unanswered: who owns
+  the state transition of a task?
+
+Core rule
+---------
+- Preserve current kernel behavior exactly.
+- Keep syscall decode and observation shaping thin.
+- Make lifecycle slot mutation explicit through one owner-visible interface.
+- Keep `sched` responsible for scheduler-facing lifecycle validation, while a
+  narrower lifecycle owner carries direct task and process state transitions.
+- Prove the clarification with one focused regression over the real kernel
+  artifact.
+
+Chosen slice for this phase
+---------------------------
+Targeted clarification shape:
+
+1. one canonical Phase 111 note recording the clarified lifecycle owner and
+   the specific task and process transitions it now owns
+2. one new `kernel/src/lifecycle.mc` module owning spawned-child slot
+   installation, timer block and ready transitions, exit marking, and
+   waited-child release bookkeeping
+3. one update to `kernel/src/syscall.mc` so spawn, wait-release, and sleep
+   transitions call the lifecycle owner instead of mutating slots directly
+4. one update to `kernel/src/main.mc` so the real kernel proof uses the same
+   lifecycle owner for wake-to-ready and explicit child or service exits
+5. one focused freestanding regression that builds and runs the real kernel
+   target, proves the distinct lifecycle owner module exists, checks current
+   docs, and inspects MIR for the new lifecycle and debug audit owners
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this clarification now because the current running
+slice is already honest and the next highest-value step is turning task-state
+ownership from an implied convention into a mechanically visible boundary.
+
+What this phase proves
+----------------------
+- the current first running kernel slice can stay behaviorally unchanged while
+  becoming more explicit about who owns task and process lifecycle mutation
+- syscall code can stay focused on admission, status, and observation wiring
+  while lifecycle bookkeeping moves behind an owner-visible interface
+- `kernel/src/main.mc` can remain the thin root orchestrator without also
+  directly owning wake-resume and exit-transition mutation for the landed
+  runtime path
+- the repository can validate that clarification mechanically through a
+  distinct lifecycle module object, explicit imported call sites, and MIR-
+  visible owner functions
+
+Deliverables
+------------
+- one canonical Phase 111 closeout note in `docs/plan/`
+- one new `kernel/src/lifecycle.mc` module owning concrete lifecycle slot
+  transitions for spawn, block, ready, exit, and waited-child release
+- updated `kernel/src/syscall.mc` and `kernel/src/main.mc` call sites that now
+  route those mutations through the lifecycle owner
+- one new debug-owned Phase 111 audit that proves the lifecycle owner is part
+  of the current kernel boundary without widening the admitted running slice
+- refreshed kernel-facing documentation and one focused Phase 111 freestanding
+  kernel regression
+
+Suggested execution order
+-------------------------
+1. Add the lifecycle owner module and move direct slot-transition helpers
+   behind its explicit interface.
+2. Rewire the real syscall path so spawn, sleep, and wait-release use that
+   owner rather than mutating task and process slots directly.
+3. Rewire the real kernel proof path so wake-resume and explicit service or
+   child exit follow the same lifecycle owner.
+4. Advance the current kernel proof marker only after the new lifecycle owner
+   is wired through the real kernel artifact and the focused regression exists.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 111 marker without
+  widening the admitted running slice
+- task and process lifecycle transitions for spawn installation, timer block,
+  wake-to-ready, explicit exit, and waited-child release are no longer
+  directly owned by `kernel/src/main.mc` or `kernel/src/syscall.mc`
+- those lifecycle transitions instead live behind an explicit
+  `kernel/src/lifecycle.mc` interface
+- the build emits a distinct lifecycle module object and MIR exposes the new
+  lifecycle owner functions explicitly
+- the kernel README, repository map, and freestanding test notes all describe
+  Phase 111 as the current kernel boundary consistently
+
+Non-goals
+---------
+- broader preemption, kill, or scheduler-policy claims
+- new syscall families or broader syscall decode work
+- interrupt, MMU, or target-surface widening beyond the landed Phase 110
+  boundary
+- broader init-owned multi-service bring-up or namespace work
+
+Implemented slice
+-----------------
+- added `kernel/src/lifecycle.mc` so spawned-child slot installation,
+  timer-blocked task transition, wake-to-ready transition, explicit exit
+  marking, and waited-child release bookkeeping now live behind one lifecycle-
+  owned interface
+- updated `kernel/src/syscall.mc` so spawn commit, sleep transition, and
+  waited-child release now call the lifecycle owner instead of mutating slots
+  directly
+- updated `kernel/src/main.mc` so explicit child and service exits plus the
+  real timer wake resume path also use the lifecycle owner
+- added one focused Phase 111 freestanding regression that checks the current
+  documentation statement, distinct lifecycle module object, real source call
+  sites, and MIR visibility of the new lifecycle and Phase 111 debug audit
+  owners
+
+Closeout statement
+------------------
+Phase 111 is complete as a scheduler and lifecycle ownership clarification.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now makes task-state ownership explicit: scheduler-
+facing lifecycle validation remains in `sched`, while concrete task and
+process transition mutation now lives behind the distinct lifecycle owner.
