@@ -1,0 +1,177 @@
+KERNEL address_space.mc — Phase 103 Architectural Review
+=========================================================
+
+FILE: kernel/src/address_space.mc  (105 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. mapping_count: usize and the mappings: [2]Mapping array can diverge.
+     bootstrap_space() always sets mapping_count=2 and fills both slots,
+     so they are consistent today.  But nothing enforces this invariant:
+     a caller could construct an AddressSpace literal with mapping_count=1
+     and array of 2 valid mappings, or mapping_count=2 and only one valid
+     mapping slot.  mapping_kind_at() trusts mapping_count for bounds
+     checking without validating that the slot at that index is actually
+     populated.
+
+  2. bootstrap_space() accepts 9 parameters in a single function
+     signature.  There is no validation of the relationships between
+     them:
+       - entry_pc should be within [image_base, image_base+image_size).
+       - stack_top should be within [stack_base, stack_base+stack_size].
+       - image_base and stack_base should not overlap.
+     None of these constraints are checked.  An inverted or overlapping
+     layout would produce an AddressSpace that looks valid (state=
+     Constructed) but would crash on first user entry.
+
+  3. activate() is the only state transition from Constructed → Active.
+     There is no deactivate operation, no error path if activate() is
+     called on an Empty space, and no guards against activating an
+     already-Active space.  In main.mc, activate() is called once on
+     ADDRESS_SPACE.  If the same address space is activated twice, the
+     resulting state is still Active (idempotent), which is harmless
+     now but may not be the intended semantics for a future context
+     switch path.
+
+P2 — ARCHITECTURAL (design integrity)
+  4. UserEntryFrame duplicates fields from AddressSpace: entry_pc and
+     stack_top are stored in both.  bootstrap_user_frame() populates
+     the frame from the space.  If ADDRESS_SPACE.entry_pc changes after
+     the frame is created (e.g., due to a relocation), the frame will be
+     stale.  In the static boot proof this never happens, but the
+     duplication creates an obvious divergence risk.
+
+  5. MappingKind only distinguishes ImageText vs UserStack.  A real
+     kernel needs to map devices, MMIO regions, shared memory, etc.  The
+     two-kind limit is explicit bootstrap scope but will need to grow.
+     The [2]Mapping array will need to grow in tandem; currently both are
+     hardcoded as 2.
+
+  6. kind_score(MappingKind) and state_score(AddressSpaceState) are
+     local score functions with the same names as score functions in
+     other modules (capability.mc has kind_score for CapabilityKind).
+     Module qualification keeps these from colliding, but a reader
+     seeing kind_score(x) without module context cannot tell which kind
+     score is intended.  More descriptive names (mapping_kind_score,
+     address_space_state_score) would be unambiguous.
+
+P3 — SIMPLICITY / MAINTAINABILITY
+  7. bootstrap_space() produces a hardcoded result with the two mappings
+     always in fixed positions: mappings[0] = ImageText, mappings[1] =
+     UserStack.  This ordering is relied on by the validation in main.mc:
+         kind_score(mapping_kind_at(ADDRESS_SPACE, 0)) != 2  // ImageText
+         kind_score(mapping_kind_at(ADDRESS_SPACE, 1)) != 4  // UserStack
+     If mapping order ever changes, main.mc's validation fails silently
+     (because the checks pass on wrong mappings) or fails noisily (checks
+     fail on correct mappings out of order).  The validator should use
+     type-based lookup, not positional lookup.
+
+  8. The module is small (105 lines) and appropriately scoped.  No
+     significant complexity concerns beyond the above.
+
+────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+address_space.mc is a clean, narrow module.  It describes one address
+space as a value record and provides:
+  - Construction: empty_space(), bootstrap_space()
+  - Projection: bootstrap_user_frame() (creates a scheduler-usable view)
+  - Transition: activate()
+  - Query: mapping_kind_at(), state_score(), kind_score()
+
+The three-state machine (Empty → Constructed → Active) maps to a real
+kernel's address space lifecycle: allocated (empty), layout committed
+(constructed), and running (active).
+
+UserEntryFrame is a lightweight struct for passing entry information to a
+scheduler.  Its existence as a separate type is good: it separates "what
+the scheduler needs to start this task" from "what the kernel needs to
+manage this address space."
+
+────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & INVARIANTS
+────────────────────────────────────────────────────────────────────────
+AddressSpace invariants (not enforced in code):
+  - If state == Constructed or Active: root_page_table != 0
+  - If state == Constructed or Active: mapping_count == 2 and both
+    mapping slots are valid
+  - entry_pc is within the ImageText mapping range
+  - stack_top is within the UserStack mapping range
+  - ImageText mapping is not writable (writable == 0, executable == 1)
+  - UserStack mapping is not executable (executable == 0, writable == 1)
+
+All these invariants hold today because bootstrap_space() is the only
+constructor and it enforces them structurally.  The risk arises if a
+second constructor is added that doesn't respect them.
+
+UserEntryFrame invariants (not enforced):
+  - entry_pc and stack_top should match the owning AddressSpace
+  - address_space_id should match the space's asid
+  - task_id should be a valid task in the task table
+
+None enforced; all maintained by calling convention only.
+
+────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & COMPOSABILITY
+────────────────────────────────────────────────────────────────────────
+At 105 lines the module is minimal and readable.  The 9-parameter
+bootstrap_space() signature is the readability concern: when reading:
+    address_space.bootstrap_space(
+        INIT_ASID, INIT_PID, INIT_ROOT_PAGE_TABLE,
+        INIT_IMAGE.image_base, INIT_IMAGE.image_size, INIT_IMAGE.entry_pc,
+        INIT_IMAGE.stack_base, INIT_IMAGE.stack_size, INIT_IMAGE.stack_top)
+the argument order is non-obvious.  An AddressSpaceLayout helper struct
+passed as a single argument would reduce call site mistakes.
+
+────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────────────
+  - root_page_table: usize stores what would be a physical address in a
+    real kernel.  In the proof this is set to a constant (32768 =
+    INIT_ROOT_PAGE_TABLE).  There is no validation that this value is
+    page-aligned, non-zero, or within a valid physical range.  In a real
+    kernel, accepting an arbitrary usize as a page table root without
+    validation is a security vulnerability.
+  - The writable and executable fields on Mapping are individually
+    tracked u32 flags.  A real kernel MMU configuration that results in
+    a mapping that is both writable and executable (write+exec) would be
+    a W^X violation.  No check exists against this combination.  For
+    the current two-mapping proof (one exec-only, one write-only), this
+    is fine, but a future mapping function should validate W^X.
+
+────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────────────
+Not applicable at this scope.  The AddressSpace struct size is dominated
+by the [2]Mapping array.  Each Mapping is 5 fields (base, size, kind,
+writable, executable) = ~40 bytes.  The AddressSpace struct is ~80+
+bytes per copy.  For a context-switch path that reads entry_pc and
+stack_top from UserEntryFrame, the full AddressSpace copy is not needed.
+The UserEntryFrame projection correctly separates the hot-path fields.
+
+────────────────────────────────────────────────────────────────────────
+6. SYSTEM INTEGRATION & BOUNDARIES
+────────────────────────────────────────────────────────────────────────
+address_space.mc has no imports (leaf module).  It is imported by
+syscall.mc (for SpawnResult) and main.mc.
+
+The module correctly knows nothing about capabilities, endpoints, or
+process tables.  Its sole responsibility is address space layout and
+lifecycle tracking.
+
+────────────────────────────────────────────────────────────────────────
+7. CLARITY & INTENT
+────────────────────────────────────────────────────────────────────────
+The module communicates its intent clearly.  The three-state lifecycle
+is recognizable to anyone familiar with OS bring-up.
+
+The kind_score naming collision with capability.mc (noted in P2) is a
+clarity hazard when reading across modules.  Within the module alone,
+the meaning is unambiguous.
+
+The separation between AddressSpace (the full layout) and UserEntryFrame
+(the scheduling handoff) is a good design choice that should remain
+through future iterations.

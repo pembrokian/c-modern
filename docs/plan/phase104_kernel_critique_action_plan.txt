@@ -1,0 +1,351 @@
+Phase 104 -- Kernel Critique Action Plan
+========================================
+
+Status
+------
+IMPLEMENTED
+
+Source documents
+----------------
+  docs/agent/critiques/kernel/main_phase103.txt
+  docs/agent/critiques/kernel/state_phase103.txt
+  docs/agent/critiques/kernel/syscall_phase103.txt
+  docs/agent/critiques/kernel/capability_phase103.txt
+  docs/agent/critiques/kernel/endpoint_phase103.txt
+  docs/agent/critiques/kernel/address_space_phase103.txt
+  docs/agent/critiques/kernel/init_phase103.txt
+  docs/agent/critiques/kernel/interrupt_phase103.txt
+  docs/agent/critiques/kernel/timer_phase103.txt
+
+Purpose
+-------
+Turn the post-Phase-103 kernel critique set into one narrow, repository-
+honest hardening pass that fixes the actionable correctness and proof-
+contract weaknesses without pretending that the repository now owns a full
+production kernel architecture.
+
+This plan covers only issues that can be fixed with bounded changes inside
+the current bootstrap kernel lane: explicit helper contracts, tighter state
+validation, smaller proof reshaping, clearer sentinels, and deterministic
+regressions. It does not widen the repository into a real scheduler, a real
+loader, a real interrupt subsystem, or a fully generalized capability model.
+
+Scope
+-----
+This plan covers only actionable findings that require code changes or test
+changes now:
+
+- correctness gaps where current behavior is silently fragile
+- state-machine gaps where a helper accepts invalid transitions
+- proof-harness ordering contracts that can be made explicit and locally
+  enforceable
+- duplicated bounded logic that can be reduced without a large subsystem
+  rewrite
+- dead or ambiguous bootstrap scaffolding that now obscures intent
+
+Architecture-only findings are deferred when the fix would require a larger
+lane change than this repository phase should admit: global-kernel-object
+refactoring, real dynamic allocation, generalized PID-index lookup tables,
+real loader integration, richer interrupt modeling, or production-scale
+capacity management.
+
+Pre-work cross-check
+--------------------
+Before planning each item, the critique set was sorted into three buckets:
+
+1. fix now
+   - timer wake ordering and premature consume risk
+   - address-space and init-image validation gaps
+   - duplicated sleep-slot logic in syscall handling
+   - silent sentinel and capacity coupling in endpoint/capability helpers
+   - dead or misleading state and field definitions
+   - proof-only sequencing assumptions in kernel main that can be made more
+     explicit without redesigning the whole file
+
+2. document but defer
+   - replace score-based enum comparisons with direct enum equality
+   - replace module globals with one passed kernel-control-block record
+   - replace fixed-size tables with scalable allocation structures
+   - split kernel main into state, init, and proof modules
+   - replace hardcoded init-image layout with a real loader-derived image
+
+3. intentionally bootstrap-scoped
+   - bounded table sizes of 2, 3, 4, and 6
+   - one-child lifecycle proof only
+   - one explicit init bootstrap capability set only
+   - no real external interrupt routing yet
+
+Items reviewed but NOT planned in this pass
+-------------------------------------------
+- Score-comparison removal across the kernel lane.
+  Reason: this is a language-surface follow-through, not a kernel-only fix.
+  The current plan will reduce hidden score dependencies where possible, but
+  it will not try to replace the pattern globally while enum equality is not
+  yet admitted.
+
+- Global-state collapse in kernel/main.mc into one kernel descriptor object.
+  Reason: valid long-term direction, but too large for a critique-response
+  hardening phase.
+
+- Real loader / ELF / manifest-derived init-image placement.
+  Reason: the repository still intentionally uses a bounded proof image.
+
+- Real interrupt controller semantics and external interrupt routing.
+  Reason: Phase 103 only needs one timer-vector skeleton; broader IRQ truth is
+  a later owner.
+
+------------------------------------------------------------------------
+TIER 1 -- Correctness And Safety Fixes (must land together)
+------------------------------------------------------------------------
+
+Item K1: timer.mc -- make the wake protocol single-purpose and non-lossy
+  Severity : HIGH -- current wake flow depends on a fragile three-step caller
+             protocol and allows premature consume of an Armed sleep entry
+  Files    : kernel/src/timer.mc
+             kernel/src/syscall.mc
+             kernel/src/main.mc
+             tests/tool/freestanding/kernel/phase103_init_bootstrap_handoff
+             or successor grouped proof owner
+  Problems :
+             - consume_wake() accepts any non-Empty state, not specifically
+               Fired, so an Armed sleeper can be removed early
+             - wake_fired_sleepers() reports only one fired sleeper per call
+               and leaves the fired slot live without a stronger contract
+             - SleepState.Delivered exists but is never entered
+  Fix      :
+             - tighten consume_wake() so it only consumes Fired sleepers
+             - either remove SleepState.Delivered or fully implement and use
+               it as the one-step post-observation state
+             - add one explicit helper contract comment and regression proving
+               that a wake cannot be consumed before it fires
+             - if keeping one-wake-per-call semantics, make that contract
+               explicit and require the caller to loop until no fired sleeper
+               remains
+  Tests    :
+             - add a focused timer proof that advances time without firing,
+               attempts consume, and proves the sleeper remains Armed
+             - add a proof that two fired sleepers are either both drained by
+               the chosen helper path or that the second remains explicitly
+               discoverable for a later drain without duplicate observation
+
+Item K2: address_space.mc + init.mc -- validate bootstrap layout rather than
+accepting arbitrary scalars
+  Severity : HIGH -- current constructors can encode impossible entry or stack
+             layouts while still returning a seemingly valid AddressSpace
+  Files    : kernel/src/address_space.mc
+             kernel/src/init.mc
+             kernel/src/main.mc
+  Problems :
+             - bootstrap_space() accepts nine scalars with no relationship
+               checks between image base, size, entry PC, stack base, and top
+             - bootstrap_image() is pure stub data with no internal self-check
+             - activate() accepts any prior state without guarding intended
+               lifecycle
+  Fix      :
+             - add one small validation helper in address_space.mc that proves
+               the image range, stack range, non-overlap, and entry/stack-top
+               placement invariants
+             - add one init-image validation helper in init.mc so bootstrap
+               data is checked before main.mc consumes it
+             - make activate() either reject Empty spaces via a boolean result
+               helper or add an explicit separate predicate checked by main.mc
+  Tests    :
+             - extend the freestanding kernel proof to fail cleanly if an
+               invalid image layout is supplied
+             - keep the happy-path proof verifying that the current Phase 103
+               image still passes with no behavior change
+
+Item K3: syscall.mc -- remove the triplicated perform_sleep slot path
+  Severity : HIGH -- current logic is physically copied three times and will
+             drift the moment one path changes without the others
+  Files    : kernel/src/syscall.mc
+             kernel/src/state.mc
+             kernel/src/main.mc
+  Problem  : perform_sleep() repeats the same block for task slots 0, 1, and
+             2 with only index-specific substitutions
+  Fix      : extract one bounded helper that performs the per-slot sleep
+             transition for a supplied slot index and task snapshot, then let
+             perform_sleep() keep only the bounds check plus one dispatch path
+             into that helper
+  Notes    : this does not require general loops or dynamic indexing across
+             the kernel lane; one focused helper is enough to remove the drift
+             risk while preserving deterministic bounded behavior
+  Tests    :
+             - preserve the existing Phase 102/103 sleep-wake proof
+             - add one focused regression that exercises all three task-slot
+               paths through the same helper contract
+
+Item K4: endpoint.mc + capability.mc -- replace silent sentinel coupling with
+explicit helper contracts
+  Severity : HIGH -- several correctness checks depend on "unchanged table"
+             semantics or count comparisons that are only implicitly coupled
+  Files    : kernel/src/endpoint.mc
+             kernel/src/capability.mc
+             kernel/src/syscall.mc
+  Problems :
+             - enqueue_message() failure is inferred by queued-count equality
+             - install_endpoint_handle() failure is inferred by count equality
+             - find_endpoint_index(), find_handle_index(), and find_wait_index()
+               use capacity-sized sentinels known only by the caller
+  Fix      :
+             - add named not-found helpers or constants local to each module
+             - add small boolean predicates for success/failure detection where
+               current callers depend on unchanged-count heuristics
+             - keep the bounded arrays; only make the contracts explicit
+  Tests    :
+             - add focused proofs for full endpoint queue, duplicate handle
+               install rejection, and duplicate wait-handle rejection
+
+------------------------------------------------------------------------
+TIER 2 -- Boundary Cleanup And Dead-State Removal (land after Tier 1)
+------------------------------------------------------------------------
+
+Item K5: remove or fully justify dead bootstrap states and unused fields
+  Severity : MEDIUM -- misleading states and fields make the proof harder to
+             reason about and hide the real state machine
+  Files    : kernel/src/timer.mc
+             kernel/src/endpoint.mc
+             kernel/src/interrupt.mc
+  Problems :
+             - SleepState.Delivered is defined but unused
+             - KernelMessage.handle_slot is only meaningful for the bootstrap
+               init message and unused in the normal IPC path
+             - InterruptController.external_vector is structurally present but
+               has no activation path in the landed proof lane
+  Fix      :
+             - remove dead states/fields if they are not needed in the next
+               planned owner, or add short comments explaining why they remain
+               intentionally staged for the next phase
+             - prefer removal where the extra field or state creates a false
+               impression of implemented behavior
+  Tests    : refresh any MIR or proof assertions affected by the structural
+             cleanup
+
+Item K6: state.mc -- harden transition helpers around intended state changes
+  Severity : MEDIUM -- helpers like blocked_task_slot() rely entirely on the
+             caller to enforce legal transitions
+  Files    : kernel/src/state.mc
+             kernel/src/syscall.mc
+             kernel/src/main.mc
+  Problems :
+             - blocked_task_slot() will block any task regardless of prior
+               state
+             - append_record() silently drops overflowed boot-log entries
+             - queue and boot-log sentinel behavior is caller-known only
+  Fix      :
+             - add one bounded legality predicate for task block transition
+             - make append_record() return an explicit unchanged-or-appended
+               signal or add an overflow-visible marker path used by main.mc
+             - keep the bounded boot log but stop silently discarding proof-
+               critical records without a detectable contract
+  Tests    :
+             - add one proof that blocking a non-Ready task is rejected
+             - add one proof that boot-log overflow is observable rather than
+               silently lost
+
+Item K7: main.mc -- make proof-only ordering assumptions explicit
+  Severity : MEDIUM -- most current failures are honest but the call-order
+             contract still lives only in the reader's head
+  Files    : kernel/src/main.mc
+  Problems :
+             - validate_seeded_tables() assumes two prior boot-log records
+             - several proof phases overwrite shared globals in more than one
+               helper without explicitly stating ownership
+             - bootstrap_main() is both kernel entry and proof harness
+  Fix      :
+             - add short boundary comments marking proof-only sequencing points
+             - reduce duplicated reset/seed ownership where a field is reset in
+               both reset_kernel_state() and seed_kernel_owners()
+             - group closely related checks into smaller named validation
+               helpers so call-order assumptions are visible at the helper name
+               level rather than hidden in long boolean chains
+  Non-goal : this is not the large split of main.mc into multiple modules
+  Tests    : preserve the existing Phase 103 marker proof and add one focused
+             negative-path proof only if the repository already has a pattern
+             for expected-failure kernel runs
+
+------------------------------------------------------------------------
+TIER 3 -- Clarity And Proof-Surface Hardening (land only after Tier 1/2 are
+stable)
+------------------------------------------------------------------------
+
+Item K8: name and centralize bounded-capacity contracts where the language
+already allows it
+  Severity : LOW-MEDIUM -- current literals 2, 3, 4, and 6 are repeated across
+             arrays, wrap logic, and bounds checks
+  Files    : kernel/src/state.mc
+             kernel/src/capability.mc
+             kernel/src/endpoint.mc
+             kernel/src/timer.mc
+  Fix      :
+             - introduce module-local named constants where the language and
+               type surface already admit them
+             - at minimum centralize the non-type uses so wrap checks and
+               sentinel comparisons do not repeat raw literals
+  Notes    : if array type annotations cannot yet consume constants in the
+             current language lane, still centralize the runtime checks and
+             leave the type literals as an admitted temporary limitation
+
+Item K9: refresh planning and test-owner surfaces after the hardening lands
+  Severity : LOW -- necessary to keep the repository honest about what is now
+             explicit and what remains deferred
+  Files    : docs/agent/repo_map.md
+             kernel/README.md
+             tests/tool/README.md
+             docs/plan/backlog.txt
+             docs/plan/decision_log.txt
+  Fix      : record the landed hardening work narrowly and move any unresolved
+             larger architectural findings into the right deferred surface
+
+Suggested execution order
+-------------------------
+1. Land the timer wake-contract hardening first so the child lifecycle proof
+   stops depending on premature-consume behavior.
+2. Land address-space and init-image validation so bootstrap state creation is
+   guarded before any broader helper cleanup.
+3. Refactor syscall sleep handling into one bounded helper and make endpoint /
+   capability success contracts explicit.
+4. Remove or justify dead states and fields, then harden state transitions and
+   boot-log visibility.
+5. Tighten main.mc proof ownership comments and helper boundaries only after
+   the lower-level state helpers are stable.
+6. Refresh regression owners, MIR expectations where needed, and planning
+   surfaces last.
+
+Exit criteria
+-------------
+- the timer path no longer allows consume of an unfired sleep entry
+- the timer wake contract is explicit, deterministic, and covered by focused
+  freestanding regression
+- bootstrap image and address-space construction validate their layout
+  relationships before activation or user-entry handoff
+- syscall sleep handling no longer carries three copy-pasted per-slot code
+  paths
+- endpoint and capability helpers expose explicit bounded success/failure
+  contracts instead of relying on unchanged-count heuristics alone
+- dead or misleading state/field definitions are either removed or documented
+  as intentionally staged for the next owner
+- state helpers reject obviously illegal transitions or make overflow and
+  failure visible to the caller
+- main.mc remains a bounded proof harness but its sequencing assumptions are
+  materially clearer and less duplicated
+- focused kernel regressions cover the new contracts without widening into
+  broader Canopus claims
+
+Non-goals
+---------
+- replacing the score-function pattern across the whole kernel lane
+- introducing dynamic allocation, scalable process tables, or generalized PID
+  lookup infrastructure
+- splitting kernel/main.mc into a full multi-module kernel architecture
+- implementing a real loader, real external interrupts, or real scheduler
+  policy
+- widening beyond the bounded one-init, one-child, fixed-capacity proof lane
+
+Closeout target
+---------------
+This phase should close as a critique-response hardening pass, not as a new
+feature-claim phase. The honest outcome is that the repository still owns one
+bounded proof kernel, but that proof kernel now has sharper helper contracts,
+fewer silent failure paths, less duplicated bounded logic, and clearer state
+machine intent at the exact places the critique identified as fragile.

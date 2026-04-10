@@ -1,0 +1,137 @@
+KERNEL init.mc — Phase 103 Architectural Review
+================================================
+
+FILE: kernel/src/init.mc  (58 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. bootstrap_image() hardcodes physical addresses as decimal literals:
+         image_base: 65536    (0x10000)
+         image_size: 8192     (0x2000)
+         entry_pc:   66048    (0x10200)  // image_base + 0x200
+         stack_base: 131072   (0x20000)
+         stack_top:  139264   (0x22000)  // stack_base + stack_size
+         stack_size: 8192
+     These values are not derived from the actual init image.  Neither
+     the entry_pc offset (0x200 above image_base) nor the stack placement
+     are explained.  In a real kernel, these come from ELF headers or
+     a boot protocol structure.  A wrong image_base or entry_pc here
+     causes a silent boot fault with no useful diagnostic.
+
+  2. install_bootstrap_capability_set() checks:
+         capability.kind_score(program_capability.kind) == 4
+     to validate that the capability is an InitProgram capability.  The
+     literal 4 is the score value for CapabilityKind.InitProgram.  This
+     is a cross-module score constant leak (same issue as noted in
+     syscall.mc and capability.mc).  If the enum order changes,
+     kind_score(InitProgram) will no longer be 4 and this check silently
+     fails to validate, accepting any non-Empty capability as valid.
+
+P2 — ARCHITECTURAL (design integrity)
+  3. BootstrapCapabilitySet bundles three distinct capability types:
+     an endpoint handle, a program capability, and a wait handle count.
+     The authority_count in BootstrapHandoffObservation is a sum of all
+     three counts (endpoint_handle_count + program_capability_count +
+     wait_handle_count).  This treats an endpoint handle and a program
+     capability as equivalent units of authority, which they are not.
+     A program capability grants spawn authority (high privilege);
+     an endpoint handle grants IPC access (send/receive).  Summing them
+     obscures the security level of the handoff.
+
+  4. InitImage and BootstrapCapabilitySet are defined in the same module.
+     InitImage describes the init process's binary image layout.
+     BootstrapCapabilitySet describes the init process's initial
+     authority.  These are separate concerns: image layout is a loader
+     concern; capability authority is a security/policy concern.  They
+     share a module only because both relate to "init bootstrap."
+
+P3 — SIMPLICITY / MAINTAINABILITY
+  5. install_bootstrap_capability_set() has a default output for the
+     endpoint_handle_count:
+         endpoint_handle_count: usize = 0
+         if endpoint_handle_slot != 0 { endpoint_handle_count = 1 }
+     This treats slot_id 0 as the "no handle" sentinel.  This is an
+     implicit convention: slot_id 0 is reserved and means absent.  If
+     the calling convention changes to allow slot_id 0 as valid, this
+     silent check becomes wrong.  A separate bool present parameter
+     would be more explicit.
+
+  6. BootstrapHandoffObservation.ambient_root_visible: u32 is always 0 in
+     all constructors and observations.  The field exists presumably for
+     future use (whether the init process can observe the root capability),
+     but it is never set to 1 anywhere in the current codebase.  A field
+     that is always 0 in a security-relevant handoff struct should either
+     be documented as "permanently disabled" or removed until the feature
+     is implemented.
+
+────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+init.mc is the bootstrap custody module: it describes what the kernel
+loads into the init process and what authority it hands to it.  At 58
+lines it is intentionally minimal.
+
+The BootstrapCapabilitySet + BootstrapHandoffObservation pattern is
+well-designed: the kernel assembles a capability set (install step),
+then observes the handoff (observe step).  This separates "what was
+assembled" from "what was delivered in observable form," which is useful
+for cross-checking at test boundaries.
+
+────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & INVARIANTS
+────────────────────────────────────────────────────────────────────────
+BootstrapCapabilitySet invariants:
+  - endpoint_handle_count is 0 or 1 (only one endpoint handle is tracked).
+  - program_capability_count is 0 or 1.
+  - wait_handle_count is always 0 in current code.
+  - authority_count = endpoint_handle_count + program_capability_count +
+    wait_handle_count, derived on observe.
+
+These are correctly maintained by install_bootstrap_capability_set().
+
+The ownership check in install_bootstrap_capability_set():
+    program_capability.owner_pid == owner_pid
+verifies that the program capability belongs to the init process.  This
+is a necessary check for correctness.  However, the owner_pid comparison
+is done against a parameter, not against a trusted kernel constant, so
+if the caller passes the wrong owner_pid, the check passes a wrong
+capability.  In the current single-path boot proof this is safe; in a
+more complex boot handoff it would require independent verification.
+
+────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & COMPOSABILITY
+────────────────────────────────────────────────────────────────────────
+The module is small and readable.  The two-step install+observe pattern
+is simple enough that its intent is clear.
+
+The hardcoded image addresses in bootstrap_image() are the simplicity
+concern: they represent a fake/stub image layout for the proof, not a
+real loader.  This is acceptable as bootstrap scaffolding but should be
+marked as such to avoid being mistaken for real loader behavior.
+
+────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────────────
+The image layout values are accepted without validation against reality.
+In a real kernel a mismatch between bootstrap_image() and the actual
+binary layout causes a fault at first user-mode instruction.  The module
+should be regarded as entirely compile-time-stubbed until a real image
+loading path exists.
+
+────────────────────────────────────────────────────────────────────────
+5 & 6. PERFORMANCE & SYSTEM INTEGRATION
+────────────────────────────────────────────────────────────────────────
+Not applicable at this scope.  init.mc is a leaf module used only at
+boot; it has no hot paths.
+
+────────────────────────────────────────────────────────────────────────
+7. CLARITY & INTENT
+────────────────────────────────────────────────────────────────────────
+The module communicates its role (bootstrap handoff) clearly through
+naming.  The gap is the unexplained image address constants.  As a
+proof scaffold these are clearly synthetic; the constants should carry
+a comment explaining that they are stand-in values for the proof binary
+layout and will be replaced with a real loader interface.

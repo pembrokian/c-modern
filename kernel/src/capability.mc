@@ -1,3 +1,14 @@
+const HANDLE_TABLE_CAPACITY: usize = 4
+const HANDLE_NOT_FOUND: usize = 4
+const WAIT_TABLE_CAPACITY: usize = 2
+const WAIT_NOT_FOUND: usize = 2
+const RIGHTS_ENDPOINT_SEND: u32 = 1
+const RIGHTS_ENDPOINT_RECEIVE: u32 = 2
+const RIGHTS_ENDPOINT_TRANSFER: u32 = 4
+const RIGHTS_ENDPOINT_ALL: u32 = 7
+const RIGHTS_ALL: u32 = 255
+const RIGHTS_INIT_PROGRAM: u32 = 7
+
 enum CapabilityKind {
     Empty,
     Root,
@@ -113,11 +124,15 @@ func zero_wait_tables() [3]WaitTable {
 }
 
 func bootstrap_root_slot(owner_pid: u32) CapabilitySlot {
-    return CapabilitySlot{ slot_id: 1, owner_pid: owner_pid, kind: CapabilityKind.Root, rights: 255, object_id: 1 }
+    return CapabilitySlot{ slot_id: 1, owner_pid: owner_pid, kind: CapabilityKind.Root, rights: RIGHTS_ALL, object_id: 1 }
 }
 
 func bootstrap_init_program_slot(owner_pid: u32) CapabilitySlot {
-    return CapabilitySlot{ slot_id: 2, owner_pid: owner_pid, kind: CapabilityKind.InitProgram, rights: 7, object_id: 1 }
+    return CapabilitySlot{ slot_id: 2, owner_pid: owner_pid, kind: CapabilityKind.InitProgram, rights: RIGHTS_INIT_PROGRAM, object_id: 1 }
+}
+
+func is_program_capability(slot: CapabilitySlot) bool {
+    return kind_score(slot.kind) == 4
 }
 
 func find_handle_index(table: HandleTable, slot_id: u32) usize {
@@ -133,7 +148,7 @@ func find_handle_index(table: HandleTable, slot_id: u32) usize {
     if handle_state_score(table.slots[3].state) == 2 && table.slots[3].slot_id == slot_id {
         return 3
     }
-    return 4
+    return HANDLE_NOT_FOUND
 }
 
 func find_wait_index(table: WaitTable, slot_id: u32) usize {
@@ -143,14 +158,70 @@ func find_wait_index(table: WaitTable, slot_id: u32) usize {
     if wait_handle_state_score(table.slots[1].state) == 2 && table.slots[1].slot_id == slot_id {
         return 1
     }
-    return 2
+    return WAIT_NOT_FOUND
+}
+
+func handle_slot_installed(table: HandleTable, slot_id: u32) bool {
+    return find_handle_index(table, slot_id) < HANDLE_TABLE_CAPACITY
+}
+
+func wait_handle_installed(table: WaitTable, slot_id: u32) bool {
+    return find_wait_index(table, slot_id) < WAIT_TABLE_CAPACITY
+}
+
+func handle_install_succeeded(before: HandleTable, after: HandleTable, slot_id: u32) bool {
+    if after.count != before.count + 1 {
+        return false
+    }
+    return handle_slot_installed(after, slot_id)
+}
+
+func wait_install_succeeded(before: WaitTable, after: WaitTable, slot_id: u32) bool {
+    if after.count != before.count + 1 {
+        return false
+    }
+    return wait_handle_installed(after, slot_id)
+}
+
+func handle_remove_succeeded(before: HandleTable, after: HandleTable, slot_id: u32) bool {
+    if before.count == 0 {
+        return false
+    }
+    if after.count + 1 != before.count {
+        return false
+    }
+    return !handle_slot_installed(after, slot_id)
+}
+
+func endpoint_rights_valid(rights: u32) bool {
+    if rights == 0 {
+        return false
+    }
+    if rights > RIGHTS_ENDPOINT_ALL {
+        return false
+    }
+    return true
+}
+
+func attenuate_endpoint_rights(rights: u32) u32 {
+    if !endpoint_rights_valid(rights) {
+        return 0
+    }
+    return rights
+}
+
+func find_transfer_rights_for_handle(table: HandleTable, slot_id: u32) u32 {
+    return attenuate_endpoint_rights(find_rights_for_handle(table, slot_id))
 }
 
 func install_endpoint_handle(table: HandleTable, slot_id: u32, endpoint_id: u32, rights: u32) HandleTable {
-    if table.count >= 4 {
+    if table.count >= HANDLE_TABLE_CAPACITY {
         return table
     }
-    if find_handle_index(table, slot_id) < 4 {
+    if !endpoint_rights_valid(rights) {
+        return table
+    }
+    if handle_slot_installed(table, slot_id) {
         return table
     }
     slots: [4]HandleSlot = table.slots
@@ -175,7 +246,7 @@ func install_endpoint_handle(table: HandleTable, slot_id: u32, endpoint_id: u32,
 
 func remove_handle(table: HandleTable, slot_id: u32) HandleTable {
     index: usize = find_handle_index(table, slot_id)
-    if index >= 4 {
+    if index >= HANDLE_TABLE_CAPACITY || table.count == 0 {
         return table
     }
     slots: [4]HandleSlot = table.slots
@@ -184,10 +255,10 @@ func remove_handle(table: HandleTable, slot_id: u32) HandleTable {
 }
 
 func install_wait_handle(table: WaitTable, slot_id: u32, child_pid: u32) WaitTable {
-    if table.count >= 2 {
+    if table.count >= WAIT_TABLE_CAPACITY {
         return table
     }
-    if find_wait_index(table, slot_id) < 2 {
+    if wait_handle_installed(table, slot_id) {
         return table
     }
     slots: [2]WaitHandle = table.slots
@@ -241,7 +312,7 @@ func find_exit_code_for_wait_handle(table: WaitTable, slot_id: u32) i32 {
 
 func consume_wait_handle(table: WaitTable, slot_id: u32) WaitTable {
     index: usize = find_wait_index(table, slot_id)
-    if index >= 2 {
+    if index >= WAIT_TABLE_CAPACITY || table.count == 0 {
         return table
     }
     slots: [2]WaitHandle = table.slots
@@ -251,7 +322,7 @@ func consume_wait_handle(table: WaitTable, slot_id: u32) WaitTable {
 
 func find_endpoint_for_handle(table: HandleTable, slot_id: u32) u32 {
     index: usize = find_handle_index(table, slot_id)
-    if index >= 4 {
+    if index >= HANDLE_TABLE_CAPACITY {
         return 0
     }
     return table.slots[index].endpoint_id
@@ -259,7 +330,7 @@ func find_endpoint_for_handle(table: HandleTable, slot_id: u32) u32 {
 
 func find_rights_for_handle(table: HandleTable, slot_id: u32) u32 {
     index: usize = find_handle_index(table, slot_id)
-    if index >= 4 {
+    if index >= HANDLE_TABLE_CAPACITY {
         return 0
     }
     return table.slots[index].rights

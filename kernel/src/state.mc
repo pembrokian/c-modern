@@ -5,6 +5,11 @@ enum ProcessState {
     Exited,
 }
 
+const PROCESS_SLOT_COUNT: u32 = 3
+const PROCESS_SLOT_NOT_FOUND: u32 = 3
+const TASK_SLOT_COUNT: u32 = 3
+const TASK_SLOT_NOT_FOUND: u32 = 3
+
 enum TaskState {
     Empty,
     Boot,
@@ -63,6 +68,11 @@ struct BootLog {
     entries: [6]BootRecord
 }
 
+struct BootLogAppendResult {
+    log: BootLog
+    appended: u32
+}
+
 func empty_descriptor() KernelDescriptor {
     return KernelDescriptor{ magic: 0, current_pid: 0, current_tid: 0, active_asid: 0, booted: 0, user_entry_started: 0 }
 }
@@ -91,6 +101,56 @@ func init_process_slot(pid: u32, task_slot: u32, address_space_id: u32) ProcessS
     return ProcessSlot{ pid: pid, task_slot: task_slot, address_space_id: address_space_id, state: ProcessState.Ready }
 }
 
+func process_slot_at(process_slots: [3]ProcessSlot, slot_index: u32) ProcessSlot {
+    if slot_index == 0 {
+        return process_slots[0]
+    }
+    if slot_index == 1 {
+        return process_slots[1]
+    }
+    return process_slots[2]
+}
+
+func with_updated_process_slot(process_slots: [3]ProcessSlot, slot_index: u32, updated_slot: ProcessSlot) [3]ProcessSlot {
+    updated_process_slots: [3]ProcessSlot = process_slots
+    if slot_index == 0 {
+        updated_process_slots[0] = updated_slot
+        return updated_process_slots
+    }
+    if slot_index == 1 {
+        updated_process_slots[1] = updated_slot
+        return updated_process_slots
+    }
+    updated_process_slots[2] = updated_slot
+    return updated_process_slots
+}
+
+func find_empty_process_slot(process_slots: [3]ProcessSlot) u32 {
+    if process_state_score(process_slots[0].state) == 1 {
+        return 0
+    }
+    if process_state_score(process_slots[1].state) == 1 {
+        return 1
+    }
+    if process_state_score(process_slots[2].state) == 1 {
+        return 2
+    }
+    return PROCESS_SLOT_NOT_FOUND
+}
+
+func find_process_slot_by_pid(process_slots: [3]ProcessSlot, pid: u32) u32 {
+    if process_slots[0].pid == pid && process_state_score(process_slots[0].state) != 1 {
+        return 0
+    }
+    if process_slots[1].pid == pid && process_state_score(process_slots[1].state) != 1 {
+        return 1
+    }
+    if process_slots[2].pid == pid && process_state_score(process_slots[2].state) != 1 {
+        return 2
+    }
+    return PROCESS_SLOT_NOT_FOUND
+}
+
 func empty_task_slot() TaskSlot {
     return TaskSlot{ tid: 0, owner_pid: 0, address_space_id: 0, state: TaskState.Empty, entry_pc: 0, stack_top: 0 }
 }
@@ -101,6 +161,56 @@ func boot_task_slot(tid: u32, owner_pid: u32, entry_pc: usize, stack_top: usize)
 
 func user_task_slot(tid: u32, owner_pid: u32, address_space_id: u32, entry_pc: usize, stack_top: usize) TaskSlot {
     return TaskSlot{ tid: tid, owner_pid: owner_pid, address_space_id: address_space_id, state: TaskState.Ready, entry_pc: entry_pc, stack_top: stack_top }
+}
+
+func task_slot_at(task_slots: [3]TaskSlot, slot_index: u32) TaskSlot {
+    if slot_index == 0 {
+        return task_slots[0]
+    }
+    if slot_index == 1 {
+        return task_slots[1]
+    }
+    return task_slots[2]
+}
+
+func with_updated_task_slot(task_slots: [3]TaskSlot, slot_index: u32, updated_slot: TaskSlot) [3]TaskSlot {
+    updated_task_slots: [3]TaskSlot = task_slots
+    if slot_index == 0 {
+        updated_task_slots[0] = updated_slot
+        return updated_task_slots
+    }
+    if slot_index == 1 {
+        updated_task_slots[1] = updated_slot
+        return updated_task_slots
+    }
+    updated_task_slots[2] = updated_slot
+    return updated_task_slots
+}
+
+func find_empty_task_slot(task_slots: [3]TaskSlot) u32 {
+    if task_state_score(task_slots[0].state) == 1 {
+        return 0
+    }
+    if task_state_score(task_slots[1].state) == 1 {
+        return 1
+    }
+    if task_state_score(task_slots[2].state) == 1 {
+        return 2
+    }
+    return TASK_SLOT_NOT_FOUND
+}
+
+func find_task_slot_by_owner_pid(task_slots: [3]TaskSlot, owner_pid: u32) u32 {
+    if task_slots[0].owner_pid == owner_pid && task_state_score(task_slots[0].state) != 1 {
+        return 0
+    }
+    if task_slots[1].owner_pid == owner_pid && task_state_score(task_slots[1].state) != 1 {
+        return 1
+    }
+    if task_slots[2].owner_pid == owner_pid && task_state_score(task_slots[2].state) != 1 {
+        return 2
+    }
+    return TASK_SLOT_NOT_FOUND
 }
 
 func zero_ready_slots() [3]u32 {
@@ -164,13 +274,13 @@ func empty_log() BootLog {
     return BootLog{ count: 0, entries: zero_boot_records() }
 }
 
-func append_record(log: BootLog, stage: BootStage, actor: u32, detail: u32) BootLog {
+func append_record(log: BootLog, stage: BootStage, actor: u32, detail: u32) BootLogAppendResult {
     if log.count >= 6 {
-        return log
+        return BootLogAppendResult{ log: log, appended: 0 }
     }
     entries: [6]BootRecord = log.entries
     entries[log.count] = BootRecord{ stage: stage, actor: actor, detail: detail }
-    return BootLog{ count: log.count + 1, entries: entries }
+    return BootLogAppendResult{ log: BootLog{ count: log.count + 1, entries: entries }, appended: 1 }
 }
 
 func ready_slot_at(queue: ReadyQueue, index: usize) u32 {
@@ -195,7 +305,14 @@ func exit_task_slot(slot: TaskSlot) TaskSlot {
     return TaskSlot{ tid: slot.tid, owner_pid: slot.owner_pid, address_space_id: slot.address_space_id, state: TaskState.Exited, entry_pc: slot.entry_pc, stack_top: slot.stack_top }
 }
 
+func can_block_task(slot: TaskSlot) bool {
+    return task_state_score(slot.state) == 4
+}
+
 func blocked_task_slot(slot: TaskSlot) TaskSlot {
+    if !can_block_task(slot) {
+        return slot
+    }
     return TaskSlot{ tid: slot.tid, owner_pid: slot.owner_pid, address_space_id: slot.address_space_id, state: TaskState.BlockedOnTimer, entry_pc: slot.entry_pc, stack_top: slot.stack_top }
 }
 

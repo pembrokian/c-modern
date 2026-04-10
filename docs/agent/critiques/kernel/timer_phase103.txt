@@ -1,0 +1,194 @@
+KERNEL timer.mc — Phase 103 Architectural Review
+================================================
+
+FILE: kernel/src/timer.mc  (125 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. wake_fired_sleepers() processes at most ONE fired sleeper per call.
+     If both sleeper slots are in state Fired simultaneously, only slot 0
+     is processed; slot 1 remains Fired until the next call.  The
+     caller in main.mc calls wake_fired_sleepers() once after
+     advance_tick(), so simultaneous dual-fire is not observed in the
+     current proof.  But as a general interface, a single advance_tick()
+     that fires both sleepers is a valid scenario, and the caller has no
+     signal that a second fire was missed.  The function should return an
+     indication of whether more fired sleepers remain, or the caller
+     should loop until no more fires are pending.
+
+  2. The three-step wake protocol is not documented and creates a fragile
+     ordering contract:
+         (1) advance_tick(timer_state, now) → updated state
+         (2) wake_fired_sleepers(updated_state) → wake result
+         (3) consume_wake(timer_state, task_id) → final state
+     Between steps 2 and 3, the sleeper is in Fired state but has not
+     been removed from the sleeper list.  A second call to
+     advance_tick() before consume_wake() would not re-fire (because
+     the state is Fired, not Armed), but a second call to
+     wake_fired_sleepers() would produce a second wakeup observation for
+     the same sleeper.  The protocol requires strict ordering; nothing
+     enforces it.
+
+  3. wake_fired_sleepers() returns a TimerWakeResult with updated
+     wake_count but does NOT transition the Fired sleeper to Delivered
+     or remove it.  The SleepState.Delivered enum variant exists,
+     mark_delivered semantics exist conceptually, but no function sets
+     a sleeper to Delivered.  This means the Delivered state is an unused
+     variant.  The actual "delivery" is signaled only by removing the
+     sleeper via consume_wake().  The Delivered state is dead code and
+     creates confusion about the intended state machine.
+
+  4. consume_wake() matches a sleeper by task_id using:
+         sleep_state_score != 1 && sleepers[i].task_id == task_id
+     The condition "score != 1" means "not Empty".  This matches Armed,
+     Fired, or Delivered states.  If consume_wake() is called on a task
+     that is still Armed (not yet fired), it will consume the sleep entry
+     prematurely, silently aborting a scheduled wake.  The guard should
+     specifically require state == Fired to prevent early consumption.
+
+  5. TimerState.count tracks "armed + fired but not consumed" sleepers.
+     advance_tick() fires an Armed sleeper (sets Fired state) WITHOUT
+     decrementing count.  consume_wake() decrements count.  Therefore
+     count reflects "outstanding sleepers" not "currently armed sleepers."
+     The name "count" is ambiguous between these interpretations.  The
+     arm_sleep() function uses `timer_state.count >= 2` to prevent
+     over-booking, but since fired-but-unconsumed sleepers still count,
+     the effective booking headroom is reduced without a new sleep being
+     registered.  This is correct behavior (don't overwrite a fired
+     entry) but the count semantics should be named or commented.
+
+P2 — ARCHITECTURAL (design integrity)
+  6. TimerState is a flat record containing both the monotonic clock
+     (monotonic_tick) and the sleep wait list.  In a real kernel timer
+     subsystem these are separate concerns: the monotonic clock advances
+     on every tick regardless of sleepers; the sleep list is a secondary
+     data structure.  Coupled in one struct, every tick advance passes a
+     copy of the full sleeper list even when no sleepers are present.
+
+  7. TimerState.wake_count: u32 is a global count of total wake events.
+     This is a test observability field (used in validations in main.mc)
+     not required for timer functionality.  Embedding test instrumentation
+     in a production data structure is a design concern; a separate
+     TimerDiagnostics struct would separate functional state from
+     observability.
+
+P3 — SIMPLICITY / MAINTAINABILITY
+  8. arm_sleep() scans for an empty slot with two sequential if-branches
+     (slots 0 and 1).  find_sleep_index() similarly.  Same capacity-
+     coupling concern as in other modules.  Capacity changes require
+     touching all per-element branches.
+
+  9. zero_sleepers() initializes with per-element assignment.  Same
+     concern as state.mc.
+
+ 10. advance_tick() updates fired sleepers but does NOT update count.
+     This is correct by design (count = outstanding = armed + fired)
+     but the absence of a count decrement on fire is surprising and
+     requires careful explanation.
+
+────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+timer.mc implements a minimal deadline-based sleep service.  The design
+concept is sound:
+  - Tasks register a deadline via arm_sleep().
+  - At each tick, advance_tick() fires any expired deadlines.
+  - wake_fired_sleepers() picks the first fired sleeper and produces a
+    wake observation.
+  - consume_wake() removes the consumed sleeper from the list.
+
+The SleepState machine (Empty → Armed → Fired → [Delivered] → consumed)
+is a reasonable model.  The Delivered state is the gap: it exists in the
+enum but is never entered by any function.
+
+The split between "detecting that a sleeper fired" (wake_fired_sleepers)
+and "removing it" (consume_wake) is intentional: the detector produces
+an observation that the caller (main.mc) can use to unblock the task;
+the consumer clears the slot.  This pattern is correct but requires the
+caller to drive both steps.
+
+────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & INVARIANTS
+────────────────────────────────────────────────────────────────────────
+TimerState invariants:
+  - 0 <= count <= 2
+  - count == number of sleepers with state != Empty
+  - monotonic_tick is monotonically increasing (only advance_tick() and
+    the initial state set it; advance_tick() never decreases it — this
+    is correct but not enforced; something could construct a TimerState
+    with a higher tick)
+  - For each sleeper with state == Armed: deadline_tick >= any prior
+    deadline_tick (i.e., deadlines are at or in the future relative to
+    when arm_sleep was called — not enforced)
+
+The only enforced invariant is count <= 2 via the arm_sleep() guard.
+
+────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & COMPOSABILITY
+────────────────────────────────────────────────────────────────────────
+The module is 125 lines and manageable.  The biggest simplicity concern
+is the implicit three-step protocol (advance, wake, consume) described
+in P1.  A composed function advance_and_wake_all() that runs the full
+protocol for all fired sleepers would reduce the call site obligation:
+  func advance_and_wake_all(ts: TimerState, now: u64) TimerState {
+      // advance, then loop consuming all fired sleepers
+  }
+This is not possible with the current language bootstrap (no loops over
+arrays, no while loops over variable-length conditions), but should be
+noted as a desired future improvement.
+
+────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────────────
+  - deadline_tick: u64 and wake_tick: u64 prevent tick arithmetic overflow
+    at practical timescales.  Good choice.
+  - advance_tick() takes now_tick: u64 as an input.  Nothing prevents a
+    caller from advancing the timer backwards (now_tick < monotonic_tick).
+    The sleeper fire condition "now_tick >= deadline" would still work
+    correctly for already-fired deadlines, but the monotonic_tick would
+    be set to a past value.  An explicit guard (if now_tick <=
+    timer_state.monotonic_tick { return timer_state }) would enforce
+    monotonicity.
+  - TimerState.wake_count: u32 wraps at 4 billion wakes.  For a proof
+    harness with one wake this is irrelevant; for a long-running kernel
+    timer this would eventually wrap.
+
+────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────────────
+advance_tick() scans both sleeper slots unconditionally (no early exit
+after first fire).  For 2 sleepers this is trivially fast.  For a real
+kernel timer manager with many sleep registrations, a sorted heap or
+wheel-timer would replace the linear scan.  The current design is
+appropriate for the proof's bounded capacity.
+
+────────────────────────────────────────────────────────────────────────
+6. SYSTEM INTEGRATION & BOUNDARIES
+────────────────────────────────────────────────────────────────────────
+timer.mc has no imports (leaf module).  It is imported by syscall.mc
+(SleepResult contains timer.TimerState) and main.mc.
+
+The module correctly knows nothing about tasks, processes, or
+capabilities.  It operates on u32 task_ids, which are opaque to it.
+The caller (syscall.mc, main.mc) is responsible for mapping task_ids
+to actual TaskSlot structures.
+
+────────────────────────────────────────────────────────────────────────
+7. CLARITY & INTENT
+────────────────────────────────────────────────────────────────────────
+The module's names are clear (arm_sleep, advance_tick, wake_fired_sleepers,
+consume_wake).  The terminology maps well to timer subsystem vocabulary.
+
+The clarity gaps:
+  - The three-step protocol is not documented.
+  - SleepState.Delivered is a dead variant.
+  - The count semantics (counts fired-but-not-consumed as well as armed)
+    are not documented.
+  - advance_tick() silently allows backwards time by accepting any
+    now_tick value.
+
+These can be addressed with inline comments; they do not require
+structural changes for the current bootstrap proof.

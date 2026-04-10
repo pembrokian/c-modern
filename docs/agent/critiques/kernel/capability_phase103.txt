@@ -1,0 +1,186 @@
+KERNEL capability.mc — Phase 103 Architectural Review
+======================================================
+
+FILE: kernel/src/capability.mc  (305 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. WaitHandle has two safety-relevant state fields: state
+     (WaitHandleState.Installed) AND signaled (u32).  These can diverge:
+     a handle can be in Installed state with signaled=0 (normal) or
+     signaled=1 (child exited), but nothing prevents a handle with
+     state=Empty and signaled=1.  consume_wait_handle() sets the slot to
+     empty_wait_handle() which zeroes signaled, so the diverged state
+     resolves on consume — but mark_wait_handle_exited() checks
+     `state == Installed` before setting signaled, so the code is
+     currently safe.  However, the redundancy (two fields encoding one
+     conceptual state) is a correctness liability: a future function that
+     only checks signaled without checking state would be wrong.
+
+  2. remove_handle() decrements table.count unconditionally after finding
+     the slot.  find_handle_index() returns the sentinel (4) if not found,
+     in which case the function returns early.  But if a caller has
+     somehow miscounted and the slot is in Empty state yet was found by
+     find_handle_index() (which checks state == Installed), the count
+     decrement would be on an already-empty slot.  The guard on
+     find_handle_index's state check prevents this today, but the implicit
+     dependency between find_handle_index and remove_handle is fragile.
+
+  3. install_endpoint_handle() scans for the first empty slot with four
+     sequential if-branches.  This is physically safe (same as the unrolled
+     pattern noted in syscall.mc) but means that capacity changes require
+     manually adding or removing branches.  The bounds check at the top
+     (table.count >= 4) uses a hardcoded 4; if the [4]HandleSlot array
+     is resized, both the array type and the bounds constant must change.
+
+P2 — ARCHITECTURAL (design integrity)
+  4. kind_score(CapabilityKind.InitProgram) == 4 is the sentinel checked
+     in syscall.mc to validate spawn eligibility.  The numeric value 4
+     leaks across module boundaries as an implicit API.  A predicate
+     function (is_program_capability(slot: CapabilitySlot) bool) would
+     prevent this coupling.
+
+  5. rights: u32 has no defined semantics in this file.  Two values appear
+     in the codebase (7 from bootstrap_init_program_slot, 5 from
+     seed_transfer_endpoint_handle in main.mc).  There are no named
+     constants, no bitmask definitions, and no validation against a
+     maximum rights value.  From a capability security perspective, rights
+     amplification is prevented only by convention, not enforcement.
+
+  6. HandleTable and WaitTable both carry owner_pid.  But handle lookup
+     never checks owner_pid against the caller's pid — any process that
+     has access to the right HandleTable struct can access any handle in
+     it.  In the single-process proof this is fine; in a multi-process
+     kernel the table reference itself must be access-controlled.
+
+P3 — SIMPLICITY / MAINTAINABILITY
+  7. find_handle_index() and find_wait_index() use "return N" (where N ==
+     capacity) as the "not found" sentinel.  This is a valid convention
+     but requires every caller to know the capacity to interpret the
+     result.  Using a named constant (HANDLE_NOT_FOUND = 4,
+     WAIT_NOT_FOUND = 2) would make the intent clear.
+
+  8. bootstrap_root_slot() hardcodes rights: 255.  bootstrap_init_program_
+     slot() hardcodes rights: 7.  These values should be named constants
+     (RIGHTS_ALL = 255, RIGHTS_PROGRAM = 7) to survive any change in the
+     rights bit layout.
+
+  9. zero_handle_slots(), zero_wait_handles(), zero_handle_tables(),
+     zero_wait_tables() are initialization boilerplate with per-element
+     assignment.  Same concern as state.mc (item 2): capacity changes
+     require touching these manually.
+
+────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+capability.mc is well-structured as a leaf module: it defines capability
+and handle types and provides constructors, mutators, and query functions.
+It has no imports, which is correct — the capability layer should not
+need to know about addresses, endpoints, or timers.
+
+The four types (CapabilitySlot, HandleSlot, HandleTable, WaitTable) map
+to recognizable microkernel concepts.  The split between "capability slots"
+(live in the kernel, describe capabilities the kernel holds for processes)
+and "handle slots" (per-process table entries that name a capability) is
+a standard seL4-style layering.
+
+The WaitTable is a capability-adjacent type for child-wait tracking.  Its
+presence in capability.mc is reasonable but slightly impure: wait handles
+don't name a kernel capability object in the traditional sense; they track
+process lifecycle relationships.  A dedicated wait_table.mc would keep
+the module narrower.
+
+────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & INVARIANTS
+────────────────────────────────────────────────────────────────────────
+HandleTable invariants:
+  - count == number of slots with state == Installed.  Currently maintained
+    by install (+1) and remove (-1).  No additive or subtractive overflow
+    protection.
+  - Slot uniqueness: install_endpoint_handle() checks find_handle_index
+    before inserting, preventing duplicate slot_id values.  Correct.
+
+WaitTable invariants:
+  - count == number of slots with state == Installed.  Maintained by
+    install_wait_handle (+1) and consume_wait_handle (-1).
+  - find_wait_index() searches for state == Installed and slot_id match.
+    mark_wait_handle_exited() searches for state == Installed and
+    child_pid match.  These are two different key lookups on the same
+    table, which is fine but means the table can be looked up by either
+    key with no conflict detection (a slot_id=A, child_pid=B could be
+    searched by either A or B independently).
+
+CapabilitySlot invariants:
+  - A slot with kind == Empty has undefined object_id and rights.  The
+    empty_slot() constructor zeroes them, but nothing prevents creating a
+    CapabilitySlot with kind=Empty and non-zero rights.  In a real
+    capability system, Empty slots must not be usable; a kind check is
+    required before any dereference.  All current callers do check kind
+    before use, but the invariant is caller-enforced, not type-enforced.
+
+────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & COMPOSABILITY
+────────────────────────────────────────────────────────────────────────
+The module is relatively clean.  The most complex function is
+install_endpoint_handle() at ~20 lines, which is manageable.
+
+The pattern of "find first empty slot by scanning from index 0" produces
+allocation that is deterministic and stable (always fills from index 0
+upward), which is good for testing and observation.  A real kernel might
+use a faster scan (bitmask or linked free list), but for 4-slot tables
+this is irrelevant.
+
+The handle_state_score() and wait_handle_state_score() functions follow
+the same score-encoding pattern as state.mc.  Same concerns apply: opaque
+numeric values, stable only until variant order changes.
+
+────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────────────
+  - No direct memory access; purely value-typed structs.
+  - count fields are usize (unsigned).  count - 1 when count == 0 would
+    wrap.  All decrement paths (remove_handle, consume_wait_handle) are
+    guarded by a prior find that returns the sentinel if not found, so in
+    practice count does not wrap.  But explicit count > 0 guards would
+    make this robust.
+  - Rights value 255 (0xFF) is passed as u32.  In a real system, rights
+    are typically a small bitmask and values above the maximum valid
+    bitmask should be rejected.  No such validation exists.
+
+────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────────────
+All operations are O(N) over fixed-size arrays where N ≤ 4.  No concern.
+
+The full-struct-copy cost for HandleTable (1 owner + 1 count + 4 ×
+HandleSlot with 5 fields each = 22 values) on every insert/remove is
+acceptable for a 4-slot proof table.  At 64-slot production scale, the
+copy cost would matter.
+
+────────────────────────────────────────────────────────────────────────
+6. SYSTEM INTEGRATION & BOUNDARIES
+────────────────────────────────────────────────────────────────────────
+capability.mc is a leaf module (no imports) and is imported by syscall.mc,
+init.mc, and main.mc.  The module interface is stable and appropriate.
+
+The one integration problem is that kind_score(InitProgram) == 4 is used
+as a cross-module API constant (see issue 4 above).  Any caller that needs
+to express "this capability grants spawn authority" should call a named
+predicate, not compare raw score values.
+
+────────────────────────────────────────────────────────────────────────
+7. CLARITY & INTENT
+────────────────────────────────────────────────────────────────────────
+Function names are clear: install_endpoint_handle, remove_handle,
+find_endpoint_for_handle, find_rights_for_handle, etc.  The intent of
+each query function is evident from its name.
+
+The rights field's meaning is a gap.  In security-critical modules, the
+absence of defined rights semantics is a documentation defect.
+
+The WaitHandle.signaled field name is clear (it means "child has exited
+and this handle can now be reaped").  The dual-tracking with state is not.
+A comment explaining why both state and signaled exist would help.

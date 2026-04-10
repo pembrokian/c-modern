@@ -1,3 +1,7 @@
+const ENDPOINT_TABLE_CAPACITY: usize = 2
+const ENDPOINT_QUEUE_CAPACITY: usize = 2
+const ENDPOINT_NOT_FOUND: usize = 2
+
 enum MessageState {
     Empty,
     Queued,
@@ -8,11 +12,11 @@ struct KernelMessage {
     message_id: u32
     source_pid: u32
     endpoint_id: u32
-    handle_slot: u32
     len: usize
     attached_count: usize
     attached_endpoint_id: u32
     attached_rights: u32
+    attached_source_handle_slot: u32
     state: MessageState
     payload: [4]u8
 }
@@ -42,28 +46,28 @@ func zero_payload() [4]u8 {
 }
 
 func empty_message() KernelMessage {
-    return KernelMessage{ message_id: 0, source_pid: 0, endpoint_id: 0, handle_slot: 0, len: 0, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, state: MessageState.Empty, payload: zero_payload() }
+    return KernelMessage{ message_id: 0, source_pid: 0, endpoint_id: 0, len: 0, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: 0, state: MessageState.Empty, payload: zero_payload() }
 }
 
-func bootstrap_init_message(source_pid: u32, endpoint_id: u32, handle_slot: u32) KernelMessage {
+func bootstrap_init_message(source_pid: u32, endpoint_id: u32) KernelMessage {
     payload: [4]u8 = zero_payload()
     payload[0] = 73
     payload[1] = 78
     payload[2] = 73
     payload[3] = 84
-    return KernelMessage{ message_id: 1, source_pid: source_pid, endpoint_id: endpoint_id, handle_slot: handle_slot, len: 4, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, state: MessageState.Queued, payload: payload }
+    return KernelMessage{ message_id: 1, source_pid: source_pid, endpoint_id: endpoint_id, len: 4, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: 0, state: MessageState.Queued, payload: payload }
 }
 
 func mark_delivered(message: KernelMessage) KernelMessage {
-    return KernelMessage{ message_id: message.message_id, source_pid: message.source_pid, endpoint_id: message.endpoint_id, handle_slot: message.handle_slot, len: message.len, attached_count: message.attached_count, attached_endpoint_id: message.attached_endpoint_id, attached_rights: message.attached_rights, state: MessageState.Delivered, payload: message.payload }
+    return KernelMessage{ message_id: message.message_id, source_pid: message.source_pid, endpoint_id: message.endpoint_id, len: message.len, attached_count: message.attached_count, attached_endpoint_id: message.attached_endpoint_id, attached_rights: message.attached_rights, attached_source_handle_slot: message.attached_source_handle_slot, state: MessageState.Delivered, payload: message.payload }
 }
 
 func byte_message(message_id: u32, source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8) KernelMessage {
-    return KernelMessage{ message_id: message_id, source_pid: source_pid, endpoint_id: endpoint_id, handle_slot: 0, len: payload_len, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, state: MessageState.Queued, payload: payload }
+    return KernelMessage{ message_id: message_id, source_pid: source_pid, endpoint_id: endpoint_id, len: payload_len, attached_count: 0, attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: 0, state: MessageState.Queued, payload: payload }
 }
 
-func attached_message(message_id: u32, source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8, attached_endpoint_id: u32, attached_rights: u32) KernelMessage {
-    return KernelMessage{ message_id: message_id, source_pid: source_pid, endpoint_id: endpoint_id, handle_slot: 0, len: payload_len, attached_count: 1, attached_endpoint_id: attached_endpoint_id, attached_rights: attached_rights, state: MessageState.Queued, payload: payload }
+func attached_message(message_id: u32, source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8, attached_endpoint_id: u32, attached_rights: u32, attached_source_handle_slot: u32) KernelMessage {
+    return KernelMessage{ message_id: message_id, source_pid: source_pid, endpoint_id: endpoint_id, len: payload_len, attached_count: 1, attached_endpoint_id: attached_endpoint_id, attached_rights: attached_rights, attached_source_handle_slot: attached_source_handle_slot, state: MessageState.Queued, payload: payload }
 }
 
 func zero_messages() [2]KernelMessage {
@@ -90,14 +94,14 @@ func empty_table() EndpointTable {
 
 func advance_index(index: usize) usize {
     next: usize = index + 1
-    if next == 2 {
+    if next == ENDPOINT_QUEUE_CAPACITY {
         return 0
     }
     return next
 }
 
 func install_endpoint(table: EndpointTable, owner_pid: u32, endpoint_id: u32) EndpointTable {
-    if table.count >= 2 {
+    if table.count >= ENDPOINT_TABLE_CAPACITY {
         return table
     }
     slots: [2]EndpointSlot = table.slots
@@ -107,22 +111,29 @@ func install_endpoint(table: EndpointTable, owner_pid: u32, endpoint_id: u32) En
 
 func find_endpoint_index(table: EndpointTable, endpoint_id: u32) usize {
     if table.count == 0 {
-        return table.count
+        return ENDPOINT_NOT_FOUND
     }
     if table.slots[0].endpoint_id == endpoint_id && table.slots[0].active == 1 {
         return 0
     }
-    if table.count < 2 {
-        return table.count
+    if table.count < ENDPOINT_TABLE_CAPACITY {
+        return ENDPOINT_NOT_FOUND
     }
     if table.slots[1].endpoint_id == endpoint_id && table.slots[1].active == 1 {
         return 1
     }
-    return table.count
+    return ENDPOINT_NOT_FOUND
+}
+
+func endpoint_index_valid(table: EndpointTable, endpoint_index: usize) bool {
+    if endpoint_index >= ENDPOINT_TABLE_CAPACITY {
+        return false
+    }
+    return endpoint_index < table.count
 }
 
 func enqueue_message(table: EndpointTable, endpoint_index: usize, message: KernelMessage) EndpointTable {
-    if endpoint_index >= table.count {
+    if !endpoint_index_valid(table, endpoint_index) {
         return table
     }
     slots: [2]EndpointSlot = table.slots
@@ -130,7 +141,7 @@ func enqueue_message(table: EndpointTable, endpoint_index: usize, message: Kerne
     if current.active == 0 {
         return table
     }
-    if current.queued_messages >= 2 {
+    if current.queued_messages >= ENDPOINT_QUEUE_CAPACITY {
         return table
     }
     messages: [2]KernelMessage = current.messages
@@ -141,8 +152,15 @@ func enqueue_message(table: EndpointTable, endpoint_index: usize, message: Kerne
     return EndpointTable{ count: table.count, slots: slots }
 }
 
+func enqueue_succeeded(before: EndpointTable, after: EndpointTable, endpoint_index: usize) bool {
+    if !endpoint_index_valid(before, endpoint_index) {
+        return false
+    }
+    return after.slots[endpoint_index].queued_messages == before.slots[endpoint_index].queued_messages + 1
+}
+
 func peek_head_message(table: EndpointTable, endpoint_index: usize) KernelMessage {
-    if endpoint_index >= table.count {
+    if !endpoint_index_valid(table, endpoint_index) {
         return empty_message()
     }
     current: EndpointSlot = table.slots[endpoint_index]
@@ -153,7 +171,7 @@ func peek_head_message(table: EndpointTable, endpoint_index: usize) KernelMessag
 }
 
 func consume_head_message(table: EndpointTable, endpoint_index: usize) EndpointTable {
-    if endpoint_index >= table.count {
+    if !endpoint_index_valid(table, endpoint_index) {
         return table
     }
     slots: [2]EndpointSlot = table.slots

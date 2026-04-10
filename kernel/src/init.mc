@@ -1,3 +1,4 @@
+import address_space
 import capability
 
 struct InitImage {
@@ -11,7 +12,15 @@ struct InitImage {
 }
 
 func bootstrap_image() InitImage {
+    // These addresses are proof-owned bootstrap scaffolding until a real loader lands.
     return InitImage{ image_id: 1, image_base: 65536, image_size: 8192, entry_pc: 66048, stack_base: 131072, stack_top: 139264, stack_size: 8192 }
+}
+
+func bootstrap_image_valid(image: InitImage) bool {
+    if image.image_id == 0 {
+        return false
+    }
+    return address_space.bootstrap_layout_valid(image.image_base, image.image_size, image.entry_pc, image.stack_base, image.stack_size, image.stack_top)
 }
 
 struct BootstrapCapabilitySet {
@@ -45,7 +54,7 @@ func install_bootstrap_capability_set(owner_pid: u32, endpoint_handle_slot: u32,
     if endpoint_handle_slot != 0 {
         endpoint_handle_count = 1
     }
-    if capability.kind_score(program_capability.kind) == 4 && program_capability.owner_pid == owner_pid {
+    if capability.is_program_capability(program_capability) && program_capability.owner_pid == owner_pid {
         installed_program = program_capability
         program_capability_count = 1
     }

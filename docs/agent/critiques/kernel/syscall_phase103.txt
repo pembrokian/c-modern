@@ -1,0 +1,240 @@
+KERNEL syscall.mc — Phase 103 Architectural Review
+===================================================
+
+FILE: kernel/src/syscall.mc  (415 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. perform_sleep() is physically unrolled three times (one copy per
+     task_slot index 0, 1, 2).  This is the most structurally unsound
+     pattern in the kernel source.  The three copies must be kept
+     semantically identical manually; there is no mechanism to prevent
+     them from drifting.  As written, a bug fix or behavior change in
+     slot-0 handling must be applied in three places.
+
+  2. perform_spawn() hardcodes process_slots[2] as the child slot.  The
+     slot eligibility check is:
+         process_state_score(process_slots[2].state) != 1
+         task_state_score(task_slots[2].state) != 1
+     Only slot index 2 is ever tried.  If slot 2 is occupied, the result
+     is Exhausted even if slot 1 is also free.  The kernel cannot spawn
+     a second child if the first hasn't been reaped, even with capacity.
+
+  3. message_id in perform_send() is computed as gate.send_count + 2.
+     The +2 constant is undocumented.  Its purpose is to avoid colliding
+     with the bootstrap init message (message_id = 1).  If the boot path
+     changes its message ID convention, this constant becomes wrong
+     silently.
+
+  4. perform_receive() detects failed capability installation by checking:
+         updated_handle_table.count != handle_table.count + 1
+     This relies on install_endpoint_handle() returning the unchanged
+     table on failure — a cross-module implicit contract.  If
+     install_endpoint_handle() is changed to return an error code or a
+     different failure sentinel, this check silently starts passing or
+     failing incorrectly.
+
+  5. perform_wait() only searches process_slots[2] for the child pid.
+     If a child process was placed in slot 1, perform_wait() will never
+     find it and will clear slot 2 if it happens to have a different pid
+     match.  This search is the same hardcoded-index problem as issue 2.
+
+P2 — ARCHITECTURAL (design integrity)
+  6. SyscallGate.open is a u32 flag, not an enum.  The two meaningful
+     states (open/closed) should be a typed enum or a bool to prevent
+     ambiguous comparisons (gate.open == 0 vs gate.open != 1).
+
+  7. SyscallStatus.WouldBlock is used for two semantically different
+     cases:
+       a. Blocking IPC (no receiver, message queued)
+       b. Async sleep (task blocked, timer armed)
+     A real kernel would distinguish these: a blocked-on-IPC task and a
+     sleeping task have different scheduler implications.  Collapsing
+     both into WouldBlock obscures scheduling intent.
+
+  8. rights: u32 is passed through the capability transfer path with no
+     attenuation or validation.  The sender's rights are installed
+     verbatim on the receiver's handle.  In a real capability system,
+     rights can only be granted down to what the sender holds; they
+     cannot be amplified.  This enforcement is missing.
+
+  9. perform_spawn() consumes INIT_PROGRAM_CAPABILITY by returning
+     capability.empty_slot() as program_capability.  This correctly
+     makes spawn a one-shot operation, but the return struct discards
+     information: the caller cannot tell from the SpawnResult that the
+     capability was consumed; they must infer it from the subsequent
+     kind_score check.  A CapabilityConsumed status would make this
+     explicit.
+
+P3 — SIMPLICITY / MAINTAINABILITY
+ 10. Result structs (SendResult, ReceiveResult, SpawnResult, WaitResult,
+     SleepResult) bundle all outputs correctly.  However SpawnResult has
+     8 fields including child_address_space and child_frame which are
+     only relevant to spawn.  The result type is non-uniform with the
+     others and couples syscall.mc to address_space types.  A dedicated
+     SpawnOutcome wrapper would be cleaner.
+
+ 11. The 5 perform_X() functions all begin with the same gate.open check:
+         if gate.open == 0 { return X_result(update_gate(...Closed...), ...) }
+     This duplicated preamble could be a shared gate_check() that returns
+     an option or error.  In the current language bootstrap without
+     generics this is harder to express, but the duplication is worth
+     noting.
+
+ 12. Zero-initializers for observation structs (empty_receive_observation,
+     empty_spawn_observation, etc.) are called at each early-return error
+     path, creating many inline ReceiveObservation{...} literals in
+     perform_receive() and perform_spawn().  These could be defined once
+     as module-level constants.
+
+────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+syscall.mc is the integration layer: it imports every other kernel module
+and implements the actual syscall dispatch logic.  This is correct
+architecturally: the syscall layer knows about capabilities, endpoints,
+address spaces, timers, and process state because a real kernel syscall
+dispatcher does too.
+
+The pure functional design (take tables as input, return updated tables
+as output) is well-suited to deterministic testing and avoids global
+state within the functions themselves.  The result structs cleanly
+bundle all outputs.
+
+The biggest structural problem is the unrolled per-slot logic.  The
+language bootstrap's current limitation (fixed-size arrays, no loop over
+an array) forces physical repetition.  This is acceptable for 2-slot
+arrays (handle tables) but becomes untenable for 3-slot arrays like
+task_slots in perform_sleep().  If capacity ever increases to 4 or 8
+task slots, the implementation cost of this pattern grows linearly.
+
+The intent of the file is clear, but the perform_sleep() unrolling should
+be highlighted as a known language limitation deferral, not a design
+choice.
+
+────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & INVARIANTS
+────────────────────────────────────────────────────────────────────────
+Invariants that must hold after each syscall:
+
+perform_send:
+  - If status is Ok: endpoints.queued_messages for the target endpoint
+    increased by 1; handle table decreased by 1 if capability was
+    transferred.
+  - If status is not Ok: endpoints and handle_table are unchanged.
+  Currently correct.
+
+perform_receive:
+  - If status is Ok: endpoints.queued_messages for the source endpoint
+    decreased by 1; handle_table increased by 1 if a capability was
+    received.
+  - The check for capability receive (updated_handle_table.count != count+1)
+    fires an InvalidHandle if install failed.  But the message has not
+    been dequeued at this point, so the message is NOT lost.  This is
+    correct.  However: if capabilities.install fails because the slot ID
+    was already taken, the receive fails and the message stays in the
+    queue.  The sender already sent (and removed the handle from their
+    table); the message is stuck until explicitly consumed.  This is a
+    potential message leak in failure cases.
+
+perform_spawn:
+  - After spawn with Ok: INIT_PROGRAM_CAPABILITY is consumed (kind=Empty
+    returned), wait handle is installed, child slots 2 are populated.
+  - The dependency on slot 2 being free means only one outstanding child
+    is supported.  This is correct for the 3-slot kernel proof.
+  - Sending child_pid as CHILD_PID (a constant) rather than deriving it
+    from the slot contents means the spawn path requires the caller to
+    supply the correct child IDs.  The function doesn't allocate; the
+    caller provides allocation.  This is an intentional design choice
+    in the bootstrap proof but would need a real allocator in production.
+
+────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & COMPOSABILITY
+────────────────────────────────────────────────────────────────────────
+The five perform_X() functions are structurally parallel:
+  1. Check gate open
+  2. Resolve identifiers (handle → endpoint, wait handle → child pid)
+  3. Validate capability/state prerequisites
+  4. Execute operation on tables
+  5. Return updated tables + observation
+
+This consistent structure is good.  The functions could be documented
+with this invariant to help future readers.
+
+The unrolled perform_sleep() breaks this structure: the operation section
+(steps 3–5) is repeated three times instead of once.  A future reader
+of perform_send() expects a clean execute-once pattern; perform_sleep()
+violates that expectation.
+
+────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────────────
+  - Rights are u32 without a defined bit layout.  The only rights value
+    used is 7 (endpoint handle install) and 5 (transfer endpoint handle).
+    These bit patterns are not documented.  A rights validation against a
+    defined mask would prevent an accidentally-elevated rights value from
+    being installed.
+  - SyscallGate.send_count + send_delta: no overflow check.  For a short-
+    lived proof harness this is fine; for a long-running kernel this would
+    wrap at u32 max.
+  - perform_send() constructs message_id as gate.send_count + 2.  This is
+    correct for the first send, but if send_count wraps, message IDs will
+    repeat.  Duplicate message IDs across in-flight messages would be
+    incorrect in a real system.
+  - All error returns keep the gate updated with the failing status, which
+    is important for auditability.  This is good practice.
+
+────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────────────
+The full-struct-copy cost per syscall:
+
+  perform_send copies: SyscallGate (5 fields), HandleTable (owner+count+
+    [4]HandleSlot), EndpointTable (count + [2]EndpointSlot per slot with
+    [2]KernelMessage each).
+
+  EndpointTable is the largest: 2 slots × (7 scalar fields + [2]KernelMessage).
+  Each KernelMessage has 10 fields including [4]u8.  The full copy of an
+  EndpointTable on every syscall is significant for a production kernel
+  that expects thousands of IPC ops per second.
+
+  For the current bootstrap proof this is not a concern.  For production,
+  the IPC hot path would require a mutation-in-place strategy, which in
+  turn requires the language to support mutable references or pointers.
+
+────────────────────────────────────────────────────────────────────────
+6. SYSTEM INTEGRATION & BOUNDARIES
+────────────────────────────────────────────────────────────────────────
+syscall.mc imports: address_space, capability, endpoint, init, state,
+timer.  This is intentionally the most coupled module in the kernel.
+
+The import of init.mc is only for InitImage (used in perform_spawn as
+the child image descriptor).  This couples the syscall path to the boot
+image format.  In a real kernel, spawn would accept an arbitrary image
+descriptor, not a specific InitImage type.  The init module import in
+syscall.mc is a bootstrap artifact that should be replaced with a generic
+image descriptor when the kernel graduates from proof to real workload.
+
+────────────────────────────────────────────────────────────────────────
+7. CLARITY & INTENT
+────────────────────────────────────────────────────────────────────────
+The function names (perform_send, perform_receive, perform_spawn,
+perform_wait, perform_sleep) are clear and consistent.
+
+The result type names (SendResult, ReceiveResult, SpawnResult, WaitResult,
+SleepResult) map cleanly to their producing functions.
+
+What is NOT communicated:
+  - Why gate.send_count + 2 (see critical issue 3).
+  - Why perform_sleep is unrolled instead of using a loop.
+  - Why slot index 2 is always used for child processes.
+  - What the rights bits (5, 7) mean.
+  - Why WouldBlock is used for both async IPC and sleep blocking.
+
+The score-based comparisons in this file are particularly opaque because
+they cross module boundaries.  "syscall.status_score(x) != 2" is less
+readable than "x == SyscallStatus.Ok".  All score comparisons should be
+treated as temporary scaffolding until enum equality is available.

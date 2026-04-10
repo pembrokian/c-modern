@@ -1,0 +1,62 @@
+KERNEL interrupt.mc — Phase 103 Architectural Review
+=====================================================
+
+FILE: kernel/src/interrupt.mc  (29 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. unmask_timer() does not validate the vector number.  Vector 0 is
+     unconventionally mapped on most interrupt controllers (often
+     reserved for divide-by-zero or spurious interrupt).  Passing 0
+     would produce an InterruptController in Quiescent state with
+     timer_vector=0, which looks valid but would be wrong on any real
+     hardware.  A minimum valid range check (vector >= 1) would catch
+     this.
+
+  2. There is no re-mask operation.  Once the timer is unmasked (state
+     transitions to Quiescent), it cannot be re-masked.  The state
+     machine only has one forward transition.  In a real interrupt
+     controller, masking/unmasking interrupts during critical sections is
+     essential for correctness; the absence of a mask path makes this
+     module a stub, not a real interrupt interface.
+
+  3. The external_vector field has no setter other than reset_controller()
+     (which sets it to 0).  External interrupts are structurally present
+     in the design but have no activation path.  A field that can only
+     ever be 0 after initialization is either a placeholder or a design
+     artifact.
+
+P2 — ARCHITECTURAL
+  4. InterruptController conflates two concerns: timer interrupt routing
+     (timer_vector) and external interrupt routing (external_vector).
+     In a real system these might be managed by different hardware blocks
+     (e.g., a timer interrupt controller vs an I/O APIC).  At bootstrap
+     scale this is not a problem; at production scale they would need to
+     be separate.
+
+  5. The module has only two states (Masked and Quiescent).  A production
+     interrupt model would typically have: inactive, armed (vector
+     programmed), enabled (delivery unmasked), firing, and handler-active
+     states.  The current classification captures only the coarsest
+     distinction.
+
+P3 — SIMPLICITY
+  6. The file is 29 lines and appropriately minimal for a bootstrap
+     skeleton.  No complexity concerns.
+
+────────────────────────────────────────────────────────────────────────
+OVERALL ASSESSMENT
+────────────────────────────────────────────────────────────────────────
+interrupt.mc is explicitly a skeleton.  Its value in the current phase is
+to provide a typed placeholder that the proof harness can check
+(interrupt.state_score == 2 means the timer is unmasked) without
+implementing real interrupt delivery.
+
+The forward-only state machine and the absent external interrupt path
+should be documented as known limitations of the bootstrap proof, not
+treated as architectural intent for a production kernel.  When interrupt
+handling is needed (e.g., a timer IRQ from real hardware triggers a
+wake-from-sleep), this module will need significant expansion.

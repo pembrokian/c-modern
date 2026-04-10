@@ -1,0 +1,199 @@
+KERNEL state.mc — Phase 103 Architectural Review
+=================================================
+
+FILE: kernel/src/state.mc  (267 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. append_record() silently discards records when the boot log is full
+     (count >= 6).  This is a silent data loss path on a boot-critical
+     observability structure.  The caller has no way to detect the drop;
+     the returned log is identical to the input.  A real kernel should
+     treat boot log overflow as a fatal condition or wrap the index.
+  2. All zero_X() initialization functions use explicit per-element
+     assignment rather than loops.  If a capacity constant changes (e.g.
+     ReadyQueue.slots grows from [3] to [4]), every zero_X() function
+     that touches that array must be updated manually.  The compiler
+     will not catch the omission; the result is a partially-initialized
+     array that looks valid.
+
+P2 — ARCHITECTURAL (design integrity)
+  3. BootStage and BootRecord are dual-purpose: they track the kernel's
+     physical boot progress AND serve as the test harness's progress
+     ledger.  In a real kernel these would be separate concerns: kernel
+     boot stages would be a state machine with forward-only transitions;
+     test audit records would be a separate probe layer.
+  4. The score() functions encode enum identity as powers of 2 and are
+     the primary comparison mechanism.  This works for ordered linear
+     state machines, but:
+       a. The score values (1, 2, 4, 8, 16, 32) are not documented in
+          the file; they must be derived by reading the switch body.
+       b. The mapping is stable only until variants are reordered or
+          added.  Adding a new variant before an existing one breaks
+          every caller that uses score arithmetic.
+       c. Scores leak across module boundaries: callers in main.mc use
+          "process_state_score == 4" to mean "Ready," but 4 is not
+          defined anywhere as a named constant.
+
+P3 — SIMPLICITY / MAINTAINABILITY
+  5. Update functions (mark_booted, start_user_entry, exit_process_slot,
+     exit_task_slot, blocked_task_slot) each reconstruct the full struct
+     with all fields re-specified.  For a 6-field struct this means 5
+     fields are copied verbatim on every update.  If a new field is
+     added to KernelDescriptor, every update function silently
+     zero-initializes it unless manually updated.  This is a maintenance
+     liability.
+  6. boot_ready_queue and user_ready_queue are both identical wrappers
+     around single_ready_queue.  Their distinct names imply semantic
+     difference; their identical bodies suggest there is none.  Either
+     remove one or add a comment explaining why two names exist.
+  7. ProcessSlot.task_slot stores the task's position in TASK_SLOTS by
+     array index.  KernelDescriptor.current_tid stores the current
+     task's TID.  There is no enforced consistency between these two
+     fields: current_tid and task_slot[0].tid could diverge if update
+     functions are called incorrectly.
+
+P4 — OPTIONAL (security / future hardening)
+  8. exit_task_slot() preserves entry_pc and stack_top in the Exited
+     slot.  In a real kernel, clearing these fields on exit would
+     prevent a subsequent process that reuses the slot from reading the
+     previous process's layout.  Acceptable in a single-workload proof
+     but should be flagged for production hardening.
+
+────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+state.mc is the cleanest module in the kernel: it defines data records
+and factory/transition functions for the core kernel tables.  Each struct
+is plain data; each function is a named constructor or a named state
+transition.  The module has no imports and no side effects.
+
+The separation between "record definition" (struct) and "named
+construction" (factory functions) is good kernel practice.  It avoids
+naked struct literals scattered through call sites and makes legal
+initial states explicit.
+
+The one structural weakness is the BootLog.  It is sized at [6] entries
+and the overflow policy is silent drop.  For a boot-critical audit
+record, overflow should be a kernel abort or at minimum a named error
+state.  Compare: the boot log is the first indicator of what went wrong
+if the kernel fails to reach user entry.  Losing entries under overflow
+makes post-mortem analysis harder.
+
+────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & INVARIANTS
+────────────────────────────────────────────────────────────────────────
+TaskSlot invariants that are not enforced by this module:
+  - tid should be unique across all TaskSlot entries that are not Empty.
+  - owner_pid in a TaskSlot should correspond to an existing ProcessSlot
+    with the same pid.  No function validates this.
+  - task_slot in ProcessSlot should be a valid index in TASK_SLOTS.  This
+    is a PID-to-index map encoded as a scalar; no bounds check on it.
+
+ReadyQueue invariants:
+  - count can be at most 3 (the size of slots[]).  append is not
+    implemented; the queue is constructed whole.  This prevents
+    incremental addition errors but also means the queue cannot be
+    updated in place; the whole queue must be rebuilt on every change
+    (which main.mc does by calling boot_ready_queue / user_ready_queue / 
+    empty_queue to replace it entirely).
+  - ready_slot_at() returns 0 for out-of-range index.  TID 0 is never
+    a valid task (BOOT_TID = 1), so 0 acts as a "not present" sentinel.
+    This is correct but implicit; the convention is not documented.
+
+BootRecord.detail is a u32 used to store different things in different
+records (KERNEL_MAGIC in Reset record, BOOT_TID in TablesSeeded, etc.).
+This is a union-as-u32 pattern without type safety.  The interpretation
+of detail depends on stage, which the caller must know.
+
+────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & COMPOSABILITY
+────────────────────────────────────────────────────────────────────────
+The factory function pattern (empty_X, boot_X, init_X) is clear and
+consistent.  Callers can construct any legal state via a named function
+rather than manually filling structs.
+
+The explicit full-struct-copy update pattern (mark_booted returns a new
+KernelDescriptor with booted=1 and all other fields copied) is verbose
+but locally readable.  The verbosity cost:
+
+  func mark_booted(desc: KernelDescriptor) KernelDescriptor {
+      return KernelDescriptor{ magic: desc.magic, current_pid: desc.current_pid,
+          current_tid: desc.current_tid, active_asid: desc.active_asid,
+          booted: 1, user_entry_started: desc.user_entry_started }
+  }
+
+A "struct update" syntax (e.g. { ...desc, booted: 1 }) would eliminate
+five of six lines and make the intent (only booted changes) explicit.
+This is a language-level improvement request, not a code defect.
+
+────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────────────
+  - All arithmetic in this file is on unsigned types EXCEPT the score
+    functions which return i32.  There are no overflow conditions in
+    normal usage; the largest count (log.count, queue.count) is bounded
+    by small fixed-size arrays.
+  - There are no pointer dereferences; the module is purely value-typed.
+    Memory safety is not a concern at this level.
+  - The score functions have a trailing "return 0" after the switch
+    statement (after the default branch also returns 0).  This dead code
+    suggests the compiler requires a return after the switch even when
+    default is present.  The redundant return is harmless but indicates
+    the language's control flow analyzer is conservative.
+
+────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────────────
+All operations are O(1) over fixed-size arrays.  No concern at this
+scale.
+
+The capacity constants ([3] process slots, [3] task slots, [3] ready
+queue slots, [6] boot records) are embedded in struct field type
+annotations.  Changing capacity requires changing struct definitions,
+zero_X() initializers, and every access pattern in caller files.  In a
+production kernel, capacities would be compile-time constants derived
+from a central configuration header.
+
+────────────────────────────────────────────────────────────────────────
+6. SYSTEM INTEGRATION & BOUNDARIES
+────────────────────────────────────────────────────────────────────────
+state.mc has no imports.  It is a pure leaf module.  This is correct:
+kernel table records should not depend on capability, endpoint, or
+address space details.
+
+The separation of concern is good:
+  - state.mc: process/task/queue/log records and transitions
+  - capability.mc: capability and handle records
+  - address_space.mc: address space and mapping records
+  - endpoint.mc: message queue records
+
+The only integration concern is that main.mc indexes all of these tables
+by convention (HANDLE_TABLES[INIT_PID - 1]) that is not expressed in
+state.mc.  state.mc provides the ProcessSlot which notionally stores the
+address_space_id, but the handle table lookup for that process is done
+by array indexing in main.mc.  There is no "get handle table for pid"
+abstraction that would prevent the convention from drifting.
+
+────────────────────────────────────────────────────────────────────────
+7. CLARITY & INTENT
+────────────────────────────────────────────────────────────────────────
+The file is readable.  The naming is consistent and intent is clear.
+
+The score() functions are the primary clarity obstacle: every reader who
+encounters "if process_state_score(x) != 4" must map 4 → Ready
+mentally.  The values are not documented in an adjacent table or comment.
+
+process_state_score / task_state_score / boot_stage_score are workarounds
+for the current language bootstrap limitation of no enum equality
+comparison.  These should be flagged explicitly as bootstrap scaffolding
+to be removed when the language gains direct enum comparison.
+
+blocked_task_slot() is named as a transition function but does not check
+that the current state is Ready before transitioning to BlockedOnTimer.
+A task in Boot, Exited, or already BlockedOnTimer could be re-blocked
+without error.  The invariant "only Ready tasks can be blocked" is
+enforced by the caller, not by this function.

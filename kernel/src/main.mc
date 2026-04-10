@@ -31,13 +31,14 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const PHASE103_MARKER: i32 = 103
+const PHASE104_MARKER: i32 = 104
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
 var TASK_SLOTS: [3]state.TaskSlot
 var READY_QUEUE: state.ReadyQueue
 var BOOT_LOG: state.BootLog
+var BOOT_LOG_APPEND_FAILED: u32
 var BOOT_MARKER_EMITTED: u32
 var ROOT_CAPABILITY: capability.CapabilitySlot
 var INIT_PROGRAM_CAPABILITY: capability.CapabilitySlot
@@ -71,6 +72,7 @@ func reset_kernel_state() {
     TASK_SLOTS = state.zero_task_slots()
     READY_QUEUE = state.empty_queue()
     BOOT_LOG = state.empty_log()
+    BOOT_LOG_APPEND_FAILED = 0
     BOOT_MARKER_EMITTED = 0
     ROOT_CAPABILITY = capability.empty_slot()
     INIT_PROGRAM_CAPABILITY = capability.empty_slot()
@@ -100,7 +102,11 @@ func reset_kernel_state() {
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
-    BOOT_LOG = state.append_record(BOOT_LOG, stage_value, ARCH_ACTOR, detail)
+    append_result: state.BootLogAppendResult = state.append_record(BOOT_LOG, stage_value, ARCH_ACTOR, detail)
+    BOOT_LOG = append_result.log
+    if append_result.appended == 0 {
+        BOOT_LOG_APPEND_FAILED = 1
+    }
 }
 
 func seed_kernel_descriptor() {
@@ -131,15 +137,92 @@ func seed_kernel_owners() {
     ENDPOINTS = endpoint.empty_table()
     INTERRUPTS = interrupt.unmask_timer(INTERRUPTS, 32)
     SYSCALL_GATE = syscall.gate_closed()
-    INIT_IMAGE = init.bootstrap_image()
-    INIT_BOOTSTRAP_CAPS = init.empty_bootstrap_capability_set()
-    INIT_BOOTSTRAP_HANDOFF = init.BootstrapHandoffObservation{ owner_pid: 0, authority_count: 0, endpoint_handle_slot: 0, program_capability_slot: 0, program_object_id: 0, ambient_root_visible: 0 }
-    ADDRESS_SPACE = address_space.empty_space()
-    USER_FRAME = address_space.empty_frame()
-    CHILD_ADDRESS_SPACE = address_space.empty_space()
-    CHILD_USER_FRAME = address_space.empty_frame()
-    DELIVERED_MESSAGE = endpoint.empty_message()
-    RECEIVE_OBSERVATION = syscall.empty_receive_observation()
+}
+
+func validate_seeded_boot_log() bool {
+    if BOOT_LOG_APPEND_FAILED != 0 {
+        return false
+    }
+    if BOOT_LOG.count != 2 {
+        return false
+    }
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 0)) != 1 {
+        return false
+    }
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 1)) != 2 {
+        return false
+    }
+    return true
+}
+
+func validate_seeded_owner_state() bool {
+    if !init.bootstrap_image_valid(INIT_IMAGE) {
+        return false
+    }
+    if capability.kind_score(ROOT_CAPABILITY.kind) != 2 {
+        return false
+    }
+    if ROOT_CAPABILITY.owner_pid != BOOT_PID {
+        return false
+    }
+    if capability.kind_score(INIT_PROGRAM_CAPABILITY.kind) != 1 {
+        return false
+    }
+    if HANDLE_TABLES[0].count != 0 {
+        return false
+    }
+    if HANDLE_TABLES[1].count != 0 {
+        return false
+    }
+    if HANDLE_TABLES[2].count != 0 {
+        return false
+    }
+    if WAIT_TABLES[0].count != 0 {
+        return false
+    }
+    if WAIT_TABLES[1].count != 0 {
+        return false
+    }
+    if WAIT_TABLES[2].count != 0 {
+        return false
+    }
+    if ENDPOINTS.count != 0 {
+        return false
+    }
+    if interrupt.state_score(INTERRUPTS.state) != 2 {
+        return false
+    }
+    if INTERRUPTS.timer_vector != 32 {
+        return false
+    }
+    if syscall.id_score(SYSCALL_GATE.last_id) != 1 {
+        return false
+    }
+    if syscall.status_score(SYSCALL_GATE.last_status) != 1 {
+        return false
+    }
+    if SYSCALL_GATE.open != 0 {
+        return false
+    }
+    if SYSCALL_GATE.send_count != 0 {
+        return false
+    }
+    if SYSCALL_GATE.receive_count != 0 {
+        return false
+    }
+    if INIT_IMAGE.image_id != 1 {
+        return false
+    }
+    if address_space.state_score(ADDRESS_SPACE.state) != 1 {
+        return false
+    }
+    if USER_FRAME.task_id != 0 {
+        return false
+    }
+    if CHILD_USER_FRAME.task_id != 0 {
+        return false
+    }
+    return true
 }
 
 func validate_seeded_tables() bool {
@@ -209,89 +292,22 @@ func validate_seeded_tables() bool {
     if state.ready_slot_at(READY_QUEUE, 0) != BOOT_TID {
         return false
     }
-    if capability.kind_score(ROOT_CAPABILITY.kind) != 2 {
+    if !validate_seeded_owner_state() {
         return false
     }
-    if ROOT_CAPABILITY.owner_pid != BOOT_PID {
-        return false
-    }
-    if capability.kind_score(INIT_PROGRAM_CAPABILITY.kind) != 1 {
-        return false
-    }
-    if HANDLE_TABLES[0].count != 0 {
-        return false
-    }
-    if HANDLE_TABLES[1].count != 0 {
-        return false
-    }
-    if HANDLE_TABLES[2].count != 0 {
-        return false
-    }
-    if WAIT_TABLES[0].count != 0 {
-        return false
-    }
-    if WAIT_TABLES[1].count != 0 {
-        return false
-    }
-    if WAIT_TABLES[2].count != 0 {
-        return false
-    }
-    if ENDPOINTS.count != 0 {
-        return false
-    }
-    if interrupt.state_score(INTERRUPTS.state) != 2 {
-        return false
-    }
-    if INTERRUPTS.timer_vector != 32 {
-        return false
-    }
-    if syscall.id_score(SYSCALL_GATE.last_id) != 1 {
-        return false
-    }
-    if syscall.status_score(SYSCALL_GATE.last_status) != 1 {
-        return false
-    }
-    if SYSCALL_GATE.open != 0 {
-        return false
-    }
-    if SYSCALL_GATE.send_count != 0 {
-        return false
-    }
-    if SYSCALL_GATE.receive_count != 0 {
-        return false
-    }
-    if INIT_IMAGE.image_id != 1 {
-        return false
-    }
-    if address_space.state_score(ADDRESS_SPACE.state) != 1 {
-        return false
-    }
-    if USER_FRAME.task_id != 0 {
-        return false
-    }
-    if CHILD_USER_FRAME.task_id != 0 {
-        return false
-    }
-    if BOOT_LOG.count != 2 {
-        return false
-    }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 0)) != 1 {
-        return false
-    }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 1)) != 2 {
-        return false
-    }
-    return true
+    return validate_seeded_boot_log()
 }
 
 func architecture_entry() bool {
     reset_kernel_state()
+    // Proof-only sequencing: reset is recorded before seeded-table validation runs.
     record_boot_stage(state.BootStage.Reset, KERNEL_MAGIC)
     seed_kernel_descriptor()
     seed_process_table()
     seed_task_table()
     seed_ready_queue()
     seed_kernel_owners()
+    // Proof-only sequencing: the second boot-log record marks seeded tables.
     record_boot_stage(state.BootStage.TablesSeeded, BOOT_TID)
     if !validate_seeded_tables() {
         return false
@@ -300,10 +316,16 @@ func architecture_entry() bool {
     return true
 }
 
-func construct_first_user_address_space() {
+func construct_first_user_address_space() bool {
+    if !init.bootstrap_image_valid(INIT_IMAGE) {
+        return false
+    }
     slots: [3]state.ProcessSlot = PROCESS_SLOTS
     tasks: [3]state.TaskSlot = TASK_SLOTS
     ADDRESS_SPACE = address_space.bootstrap_space(INIT_ASID, INIT_PID, INIT_ROOT_PAGE_TABLE, INIT_IMAGE.image_base, INIT_IMAGE.image_size, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_base, INIT_IMAGE.stack_size, INIT_IMAGE.stack_top)
+    if address_space.state_score(ADDRESS_SPACE.state) != 2 {
+        return false
+    }
     INIT_PROGRAM_CAPABILITY = capability.bootstrap_init_program_slot(INIT_PID)
     slots[1] = state.init_process_slot(INIT_PID, INIT_TASK_SLOT, INIT_ASID)
     tasks[1] = state.user_task_slot(INIT_TID, INIT_PID, INIT_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
@@ -312,6 +334,7 @@ func construct_first_user_address_space() {
     READY_QUEUE = state.user_ready_queue(INIT_TID)
     USER_FRAME = address_space.bootstrap_user_frame(ADDRESS_SPACE, INIT_TID)
     record_boot_stage(state.BootStage.AddressSpaceReady, INIT_ASID)
+    return BOOT_LOG_APPEND_FAILED == 0
 }
 
 func validate_first_user_entry_ready() bool {
@@ -357,7 +380,7 @@ func validate_first_user_entry_ready() bool {
     if state.task_state_score(TASK_SLOTS[2].state) != 1 {
         return false
     }
-    if capability.kind_score(INIT_PROGRAM_CAPABILITY.kind) != 4 {
+    if !capability.is_program_capability(INIT_PROGRAM_CAPABILITY) {
         return false
     }
     if INIT_PROGRAM_CAPABILITY.owner_pid != INIT_PID {
@@ -378,34 +401,36 @@ func validate_first_user_entry_ready() bool {
     if ADDRESS_SPACE.mapping_count != 2 {
         return false
     }
-    if address_space.kind_score(address_space.mapping_kind_at(ADDRESS_SPACE, 0)) != 2 {
+    image_mapping_index: usize = address_space.find_mapping_index(ADDRESS_SPACE, address_space.MappingKind.ImageText)
+    if image_mapping_index >= ADDRESS_SPACE.mapping_count {
         return false
     }
-    if address_space.kind_score(address_space.mapping_kind_at(ADDRESS_SPACE, 1)) != 4 {
+    stack_mapping_index: usize = address_space.find_mapping_index(ADDRESS_SPACE, address_space.MappingKind.UserStack)
+    if stack_mapping_index >= ADDRESS_SPACE.mapping_count {
         return false
     }
-    if ADDRESS_SPACE.mappings[0].base != INIT_IMAGE.image_base {
+    if ADDRESS_SPACE.mappings[image_mapping_index].base != INIT_IMAGE.image_base {
         return false
     }
-    if ADDRESS_SPACE.mappings[0].size != INIT_IMAGE.image_size {
+    if ADDRESS_SPACE.mappings[image_mapping_index].size != INIT_IMAGE.image_size {
         return false
     }
-    if ADDRESS_SPACE.mappings[0].writable != 0 {
+    if ADDRESS_SPACE.mappings[image_mapping_index].writable != 0 {
         return false
     }
-    if ADDRESS_SPACE.mappings[0].executable != 1 {
+    if ADDRESS_SPACE.mappings[image_mapping_index].executable != 1 {
         return false
     }
-    if ADDRESS_SPACE.mappings[1].base != INIT_IMAGE.stack_base {
+    if ADDRESS_SPACE.mappings[stack_mapping_index].base != INIT_IMAGE.stack_base {
         return false
     }
-    if ADDRESS_SPACE.mappings[1].size != INIT_IMAGE.stack_size {
+    if ADDRESS_SPACE.mappings[stack_mapping_index].size != INIT_IMAGE.stack_size {
         return false
     }
-    if ADDRESS_SPACE.mappings[1].writable != 1 {
+    if ADDRESS_SPACE.mappings[stack_mapping_index].writable != 1 {
         return false
     }
-    if ADDRESS_SPACE.mappings[1].executable != 0 {
+    if ADDRESS_SPACE.mappings[stack_mapping_index].executable != 0 {
         return false
     }
     if USER_FRAME.entry_pc != INIT_IMAGE.entry_pc {
@@ -439,11 +464,19 @@ func validate_first_user_entry_ready() bool {
 }
 
 func transfer_to_first_user_entry() bool {
-    construct_first_user_address_space()
+    if !construct_first_user_address_space() {
+        return false
+    }
     if !validate_first_user_entry_ready() {
         return false
     }
+    if !address_space.can_activate(ADDRESS_SPACE) {
+        return false
+    }
     ADDRESS_SPACE = address_space.activate(ADDRESS_SPACE)
+    if address_space.state_score(ADDRESS_SPACE.state) != 4 {
+        return false
+    }
     KERNEL = state.start_user_entry(KERNEL, INIT_PID, INIT_TID, INIT_ASID)
     record_boot_stage(state.BootStage.UserEntryReady, INIT_TID)
     return true
@@ -456,7 +489,7 @@ func bootstrap_endpoint_handle_core() {
     endpoints = endpoint.install_endpoint(endpoints, INIT_PID, INIT_ENDPOINT_ID)
     handle_tables[1] = capability.handle_table_for_owner(INIT_PID)
     handle_tables[1] = capability.install_endpoint_handle(handle_tables[1], INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 7)
-    endpoints = endpoint.enqueue_message(endpoints, 0, endpoint.bootstrap_init_message(BOOT_PID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT))
+    endpoints = endpoint.enqueue_message(endpoints, 0, endpoint.bootstrap_init_message(BOOT_PID, INIT_ENDPOINT_ID))
     DELIVERED_MESSAGE = endpoint.mark_delivered(endpoint.peek_head_message(endpoints, 0))
     endpoints = endpoint.consume_head_message(endpoints, 0)
 
@@ -543,9 +576,6 @@ func validate_endpoint_handle_core() bool {
     if DELIVERED_MESSAGE.endpoint_id != INIT_ENDPOINT_ID {
         return false
     }
-    if DELIVERED_MESSAGE.handle_slot != INIT_ENDPOINT_HANDLE_SLOT {
-        return false
-    }
     if DELIVERED_MESSAGE.len != 4 {
         return false
     }
@@ -595,7 +625,7 @@ func validate_init_bootstrap_capability_handoff() bool {
     if INIT_BOOTSTRAP_CAPS.ambient_root_visible != 0 {
         return false
     }
-    if capability.kind_score(INIT_BOOTSTRAP_CAPS.program_capability.kind) != 4 {
+    if !capability.is_program_capability(INIT_BOOTSTRAP_CAPS.program_capability) {
         return false
     }
     if INIT_BOOTSTRAP_CAPS.program_capability.owner_pid != INIT_PID {
@@ -672,7 +702,10 @@ func execute_syscall_byte_ipc() bool {
     SYSCALL_GATE = would_block_result.gate
     HANDLE_TABLES[1] = would_block_result.handle_table
     ENDPOINTS = would_block_result.endpoints
-    return syscall.status_score(would_block_result.observation.status) == 4
+    if syscall.status_score(would_block_result.observation.status) != 4 {
+        return false
+    }
+    return syscall.block_reason_score(would_block_result.observation.block_reason) == 4
 }
 
 func validate_syscall_byte_ipc() bool {
@@ -719,6 +752,9 @@ func validate_syscall_byte_ipc() bool {
         return false
     }
     if syscall.status_score(RECEIVE_OBSERVATION.status) != 2 {
+        return false
+    }
+    if syscall.block_reason_score(RECEIVE_OBSERVATION.block_reason) != 1 {
         return false
     }
     return true
@@ -772,7 +808,7 @@ func execute_capability_carrying_ipc_transfer() bool {
     if syscall.status_score(transfer_send_result.status) != 2 {
         return false
     }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
         return false
     }
 
@@ -913,11 +949,274 @@ func validate_capability_carrying_ipc_transfer() bool {
     return true
 }
 
-func execute_program_cap_spawn_and_wait() bool {
+func validate_timer_hardening_contracts() bool {
+    premature_timer: timer.TimerState = timer.empty_timer_state()
+    premature_timer = timer.arm_sleep(premature_timer, 41, 5)
+    premature_consumed: timer.TimerState = timer.consume_wake(premature_timer, 41)
+    if premature_consumed.count != 1 {
+        return false
+    }
+    if timer.find_sleep_index(premature_consumed, 41) != 0 {
+        return false
+    }
+    if timer.sleep_state_score(premature_consumed.sleepers[0].state) != 2 {
+        return false
+    }
+
+    dual_timer: timer.TimerState = timer.empty_timer_state()
+    dual_timer = timer.arm_sleep(dual_timer, 51, 1)
+    dual_timer = timer.arm_sleep(dual_timer, 52, 1)
+    dual_timer = timer.advance_tick(dual_timer, 1)
+    if timer.has_fired_sleeper(dual_timer) == 0 {
+        return false
+    }
+    first_wake: timer.TimerWakeResult = timer.wake_fired_sleepers(dual_timer)
+    if first_wake.observation.task_id != 51 {
+        return false
+    }
+    dual_timer = timer.consume_wake(first_wake.timer_state, first_wake.observation.task_id)
+    if dual_timer.count != 1 {
+        return false
+    }
+    if timer.has_fired_sleeper(dual_timer) == 0 {
+        return false
+    }
+    second_wake: timer.TimerWakeResult = timer.wake_fired_sleepers(dual_timer)
+    if second_wake.observation.task_id != 52 {
+        return false
+    }
+    if second_wake.observation.wake_count != 2 {
+        return false
+    }
+    dual_timer = timer.consume_wake(second_wake.timer_state, second_wake.observation.task_id)
+    if dual_timer.count != 0 {
+        return false
+    }
+    return timer.has_fired_sleeper(dual_timer) == 0
+}
+
+func validate_bootstrap_layout_contracts() bool {
+    if !init.bootstrap_image_valid(INIT_IMAGE) {
+        return false
+    }
+    invalid_image: init.InitImage = init.InitImage{ image_id: 9, image_base: 65536, image_size: 4096, entry_pc: 70000, stack_base: 67584, stack_top: 71680, stack_size: 4096 }
+    if init.bootstrap_image_valid(invalid_image) {
+        return false
+    }
+    invalid_space: address_space.AddressSpace = address_space.bootstrap_space(3, 7, INIT_ROOT_PAGE_TABLE, invalid_image.image_base, invalid_image.image_size, invalid_image.entry_pc, invalid_image.stack_base, invalid_image.stack_size, invalid_image.stack_top)
+    if address_space.state_score(invalid_space.state) != 1 {
+        return false
+    }
+    if address_space.can_activate(address_space.empty_space()) {
+        return false
+    }
+    still_empty: address_space.AddressSpace = address_space.activate(address_space.empty_space())
+    return address_space.state_score(still_empty.state) == 1
+}
+
+func validate_endpoint_and_capability_contracts() bool {
+    payload: [4]u8 = endpoint.zero_payload()
+    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
+    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, INIT_ENDPOINT_ID)
+    enqueue_one: endpoint.EndpointTable = endpoint.enqueue_message(local_endpoints, 0, endpoint.byte_message(2, INIT_PID, INIT_ENDPOINT_ID, 0, payload))
+    if !endpoint.enqueue_succeeded(local_endpoints, enqueue_one, 0) {
+        return false
+    }
+    enqueue_two: endpoint.EndpointTable = endpoint.enqueue_message(enqueue_one, 0, endpoint.byte_message(3, INIT_PID, INIT_ENDPOINT_ID, 0, payload))
+    if !endpoint.enqueue_succeeded(enqueue_one, enqueue_two, 0) {
+        return false
+    }
+    enqueue_three: endpoint.EndpointTable = endpoint.enqueue_message(enqueue_two, 0, endpoint.byte_message(4, INIT_PID, INIT_ENDPOINT_ID, 0, payload))
+    if endpoint.enqueue_succeeded(enqueue_two, enqueue_three, 0) {
+        return false
+    }
+
+    local_handles: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
+    installed_handle: capability.HandleTable = capability.install_endpoint_handle(local_handles, 1, INIT_ENDPOINT_ID, 7)
+    if !capability.handle_install_succeeded(local_handles, installed_handle, 1) {
+        return false
+    }
+    duplicate_handle: capability.HandleTable = capability.install_endpoint_handle(installed_handle, 1, TRANSFER_ENDPOINT_ID, 7)
+    if capability.handle_install_succeeded(installed_handle, duplicate_handle, 1) {
+        return false
+    }
+    invalid_rights_handle: capability.HandleTable = capability.install_endpoint_handle(local_handles, 2, TRANSFER_ENDPOINT_ID, 8)
+    if capability.handle_install_succeeded(local_handles, invalid_rights_handle, 2) {
+        return false
+    }
+    if capability.attenuate_endpoint_rights(8) != 0 {
+        return false
+    }
+    if capability.find_transfer_rights_for_handle(installed_handle, 1) != 7 {
+        return false
+    }
+
+    local_waits: capability.WaitTable = capability.wait_table_for_owner(INIT_PID)
+    installed_wait: capability.WaitTable = capability.install_wait_handle(local_waits, CHILD_WAIT_HANDLE_SLOT, CHILD_PID)
+    if !capability.wait_install_succeeded(local_waits, installed_wait, CHILD_WAIT_HANDLE_SLOT) {
+        return false
+    }
+    duplicate_wait: capability.WaitTable = capability.install_wait_handle(installed_wait, CHILD_WAIT_HANDLE_SLOT, CHILD_PID)
+    return !capability.wait_install_succeeded(installed_wait, duplicate_wait, CHILD_WAIT_HANDLE_SLOT)
+}
+
+func validate_state_hardening_contracts() bool {
+    boot_task: state.TaskSlot = state.boot_task_slot(BOOT_TID, BOOT_PID, BOOT_ENTRY_PC, BOOT_STACK_TOP)
+    if state.can_block_task(boot_task) {
+        return false
+    }
+    if state.task_state_score(state.blocked_task_slot(boot_task).state) != 2 {
+        return false
+    }
+    ready_task: state.TaskSlot = state.user_task_slot(CHILD_TID, CHILD_PID, CHILD_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
+    if !state.can_block_task(ready_task) {
+        return false
+    }
+    if state.task_state_score(state.blocked_task_slot(ready_task).state) != 8 {
+        return false
+    }
+
+    local_log: state.BootLog = state.empty_log()
+    append0: state.BootLogAppendResult = state.append_record(local_log, state.BootStage.Reset, ARCH_ACTOR, 1)
+    append1: state.BootLogAppendResult = state.append_record(append0.log, state.BootStage.TablesSeeded, ARCH_ACTOR, 2)
+    append2: state.BootLogAppendResult = state.append_record(append1.log, state.BootStage.AddressSpaceReady, ARCH_ACTOR, 3)
+    append3: state.BootLogAppendResult = state.append_record(append2.log, state.BootStage.UserEntryReady, ARCH_ACTOR, 4)
+    append4: state.BootLogAppendResult = state.append_record(append3.log, state.BootStage.MarkerEmitted, ARCH_ACTOR, 5)
+    append5: state.BootLogAppendResult = state.append_record(append4.log, state.BootStage.Halted, ARCH_ACTOR, 6)
+    overflow: state.BootLogAppendResult = state.append_record(append5.log, state.BootStage.Halted, ARCH_ACTOR, 7)
+    if overflow.appended != 0 {
+        return false
+    }
+    return overflow.log.count == 6
+}
+
+func validate_syscall_contract_hardening() bool {
+    local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
+    payload: [4]u8 = endpoint.zero_payload()
+    payload[0] = 81
+    payload[1] = 85
+    payload[2] = 69
+    payload[3] = 85
+
+    local_handles: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
+    local_handles = capability.install_endpoint_handle(local_handles, INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
+    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, INIT_ENDPOINT_ID)
+
+    send_one: syscall.SendResult = syscall.perform_send(local_gate, local_handles, local_endpoints, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload))
+    send_two: syscall.SendResult = syscall.perform_send(send_one.gate, send_one.handle_table, send_one.endpoints, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload))
+    send_block: syscall.SendResult = syscall.perform_send(send_two.gate, send_two.handle_table, send_two.endpoints, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload))
+    if syscall.status_score(send_block.status) != 4 {
+        return false
+    }
+    if syscall.block_reason_score(send_block.block_reason) != 2 {
+        return false
+    }
+    if send_block.endpoints.slots[0].queued_messages != 2 {
+        return false
+    }
+
+    receive_one: syscall.ReceiveResult = syscall.perform_receive(send_block.gate, send_block.handle_table, send_block.endpoints, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
+    receive_two: syscall.ReceiveResult = syscall.perform_receive(receive_one.gate, receive_one.handle_table, receive_one.endpoints, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
+    receive_block: syscall.ReceiveResult = syscall.perform_receive(receive_two.gate, receive_two.handle_table, receive_two.endpoints, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
+    if syscall.status_score(receive_block.observation.status) != 4 {
+        return false
+    }
+    if syscall.block_reason_score(receive_block.observation.block_reason) != 4 {
+        return false
+    }
+
+    local_waits: capability.WaitTable = capability.wait_table_for_owner(INIT_PID)
+    local_waits = capability.install_wait_handle(local_waits, CHILD_WAIT_HANDLE_SLOT, CHILD_PID)
+    wait_block: syscall.WaitResult = syscall.perform_wait(local_gate, state.zero_process_slots(), state.zero_task_slots(), local_waits, syscall.build_wait_request(CHILD_WAIT_HANDLE_SLOT))
+    if syscall.status_score(wait_block.observation.status) != 4 {
+        return false
+    }
+    if syscall.block_reason_score(wait_block.observation.block_reason) != 8 {
+        return false
+    }
+
+    sleep_tasks: [3]state.TaskSlot = state.zero_task_slots()
+    sleep_tasks[1] = state.user_task_slot(CHILD_TID, CHILD_PID, CHILD_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
+    sleep_block: syscall.SleepResult = syscall.perform_sleep(local_gate, sleep_tasks, timer.empty_timer_state(), syscall.build_sleep_request(1, 2))
+    if syscall.status_score(sleep_block.observation.status) != 4 {
+        return false
+    }
+    if syscall.block_reason_score(sleep_block.observation.block_reason) != 16 {
+        return false
+    }
+
+    spawn_process_slots: [3]state.ProcessSlot = state.zero_process_slots()
+    spawn_process_slots[0] = state.boot_process_slot(BOOT_PID, BOOT_TASK_SLOT)
+    spawn_process_slots[2] = state.init_process_slot(9, 2, 9)
+    spawn_task_slots: [3]state.TaskSlot = state.zero_task_slots()
+    spawn_task_slots[0] = state.boot_task_slot(BOOT_TID, BOOT_PID, BOOT_ENTRY_PC, BOOT_STACK_TOP)
+    spawn_task_slots[2] = state.user_task_slot(9, 9, 9, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
+    spawn_waits: capability.WaitTable = capability.wait_table_for_owner(INIT_PID)
+    local_program_capability: capability.CapabilitySlot = capability.bootstrap_init_program_slot(INIT_PID)
+    local_spawn: syscall.SpawnResult = syscall.perform_spawn(local_gate, local_program_capability, spawn_process_slots, spawn_task_slots, spawn_waits, INIT_IMAGE, syscall.build_spawn_request(CHILD_WAIT_HANDLE_SLOT), CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
+    if syscall.status_score(local_spawn.observation.status) != 2 {
+        return false
+    }
+    if local_spawn.process_slots[1].pid != CHILD_PID {
+        return false
+    }
+    if local_spawn.process_slots[2].pid != 9 {
+        return false
+    }
+    if local_spawn.task_slots[1].tid != CHILD_TID {
+        return false
+    }
+    if local_spawn.task_slots[2].tid != 9 {
+        return false
+    }
+    if !capability.wait_handle_installed(local_spawn.wait_table, CHILD_WAIT_HANDLE_SLOT) {
+        return false
+    }
+
+    transfer_handles: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
+    transfer_handles = capability.install_endpoint_handle(transfer_handles, INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    transfer_handles = capability.install_endpoint_handle(transfer_handles, TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, 5)
+    transfer_endpoints: endpoint.EndpointTable = endpoint.empty_table()
+    transfer_endpoints = endpoint.install_endpoint(transfer_endpoints, INIT_PID, INIT_ENDPOINT_ID)
+    transfer_send: syscall.SendResult = syscall.perform_send(local_gate, transfer_handles, transfer_endpoints, INIT_PID, syscall.build_transfer_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload, TRANSFER_SOURCE_HANDLE_SLOT))
+    if capability.find_endpoint_for_handle(transfer_send.handle_table, TRANSFER_SOURCE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    blocked_receive: syscall.ReceiveResult = syscall.perform_receive(transfer_send.gate, transfer_send.handle_table, transfer_send.endpoints, syscall.build_transfer_receive_request(INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_HANDLE_SLOT))
+    if syscall.status_score(blocked_receive.observation.status) != 8 {
+        return false
+    }
+    if blocked_receive.endpoints.slots[0].queued_messages != 1 {
+        return false
+    }
+    return capability.find_endpoint_for_handle(blocked_receive.handle_table, TRANSFER_SOURCE_HANDLE_SLOT) == TRANSFER_ENDPOINT_ID
+}
+
+func validate_phase104_contract_hardening() bool {
+    if BOOT_LOG_APPEND_FAILED != 0 {
+        return false
+    }
+    if !validate_timer_hardening_contracts() {
+        return false
+    }
+    if !validate_bootstrap_layout_contracts() {
+        return false
+    }
+    if !validate_endpoint_and_capability_contracts() {
+        return false
+    }
+    if !validate_state_hardening_contracts() {
+        return false
+    }
+    return validate_syscall_contract_hardening()
+}
+
+func execute_spawn_child_process() bool {
     WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
 
     spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(CHILD_WAIT_HANDLE_SLOT)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, INIT_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_TASK_SLOT, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
+    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, INIT_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
     SYSCALL_GATE = spawn_result.gate
     INIT_PROGRAM_CAPABILITY = spawn_result.program_capability
     PROCESS_SLOTS = spawn_result.process_slots
@@ -927,10 +1226,10 @@ func execute_program_cap_spawn_and_wait() bool {
     CHILD_USER_FRAME = spawn_result.child_frame
     SPAWN_OBSERVATION = spawn_result.observation
     READY_QUEUE = state.user_ready_queue(CHILD_TID)
-    if syscall.status_score(SPAWN_OBSERVATION.status) != 2 {
-        return false
-    }
+    return syscall.status_score(SPAWN_OBSERVATION.status) == 2
+}
 
+func execute_child_sleep_transition() bool {
     sleep_result: syscall.SleepResult = syscall.perform_sleep(SYSCALL_GATE, TASK_SLOTS, TIMER_STATE, syscall.build_sleep_request(CHILD_TASK_SLOT, 1))
     SYSCALL_GATE = sleep_result.gate
     TASK_SLOTS = sleep_result.task_slots
@@ -952,10 +1251,10 @@ func execute_program_cap_spawn_and_wait() bool {
     if SLEEP_OBSERVATION.task_id != CHILD_TID {
         return false
     }
-    if SLEEP_OBSERVATION.deadline_tick != 1 {
-        return false
-    }
+    return SLEEP_OBSERVATION.deadline_tick == 1
+}
 
+func execute_child_timer_wake_transition() bool {
     TIMER_STATE = timer.advance_tick(TIMER_STATE, 1)
     wake_result: timer.TimerWakeResult = timer.wake_fired_sleepers(TIMER_STATE)
     TIMER_STATE = wake_result.timer_state
@@ -985,20 +1284,20 @@ func execute_program_cap_spawn_and_wait() bool {
     if TIMER_STATE.count != 0 {
         return false
     }
-    if state.task_state_score(TASK_SLOTS[2].state) != 4 {
-        return false
-    }
+    return state.task_state_score(TASK_SLOTS[2].state) == 4
+}
 
+func execute_child_pre_exit_wait() bool {
     pre_wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(CHILD_WAIT_HANDLE_SLOT))
     SYSCALL_GATE = pre_wait_result.gate
     PROCESS_SLOTS = pre_wait_result.process_slots
     TASK_SLOTS = pre_wait_result.task_slots
     WAIT_TABLES[1] = pre_wait_result.wait_table
     PRE_EXIT_WAIT_OBSERVATION = pre_wait_result.observation
-    if syscall.status_score(PRE_EXIT_WAIT_OBSERVATION.status) != 4 {
-        return false
-    }
+    return syscall.status_score(PRE_EXIT_WAIT_OBSERVATION.status) == 4
+}
 
+func simulate_child_exit() {
     processes: [3]state.ProcessSlot = PROCESS_SLOTS
     tasks: [3]state.TaskSlot = TASK_SLOTS
     wait_tables: [3]capability.WaitTable = WAIT_TABLES
@@ -1009,7 +1308,9 @@ func execute_program_cap_spawn_and_wait() bool {
     TASK_SLOTS = tasks
     WAIT_TABLES = wait_tables
     READY_QUEUE = state.empty_queue()
+}
 
+func execute_child_post_exit_wait() bool {
     wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(CHILD_WAIT_HANDLE_SLOT))
     SYSCALL_GATE = wait_result.gate
     PROCESS_SLOTS = wait_result.process_slots
@@ -1018,6 +1319,23 @@ func execute_program_cap_spawn_and_wait() bool {
     EXIT_WAIT_OBSERVATION = wait_result.observation
     READY_QUEUE = state.empty_queue()
     return syscall.status_score(EXIT_WAIT_OBSERVATION.status) == 2
+}
+
+func execute_program_cap_spawn_and_wait() bool {
+    if !execute_spawn_child_process() {
+        return false
+    }
+    if !execute_child_sleep_transition() {
+        return false
+    }
+    if !execute_child_timer_wake_transition() {
+        return false
+    }
+    if !execute_child_pre_exit_wait() {
+        return false
+    }
+    simulate_child_exit()
+    return execute_child_post_exit_wait()
 }
 
 func validate_program_cap_spawn_and_wait() bool {
@@ -1051,6 +1369,9 @@ func validate_program_cap_spawn_and_wait() bool {
     if syscall.status_score(PRE_EXIT_WAIT_OBSERVATION.status) != 4 {
         return false
     }
+    if syscall.block_reason_score(PRE_EXIT_WAIT_OBSERVATION.block_reason) != 8 {
+        return false
+    }
     if PRE_EXIT_WAIT_OBSERVATION.child_pid != CHILD_PID {
         return false
     }
@@ -1072,6 +1393,9 @@ func validate_program_cap_spawn_and_wait() bool {
     if EXIT_WAIT_OBSERVATION.wait_handle_slot != CHILD_WAIT_HANDLE_SLOT {
         return false
     }
+    if syscall.block_reason_score(EXIT_WAIT_OBSERVATION.block_reason) != 1 {
+        return false
+    }
     if syscall.status_score(SLEEP_OBSERVATION.status) != 4 {
         return false
     }
@@ -1079,6 +1403,9 @@ func validate_program_cap_spawn_and_wait() bool {
         return false
     }
     if SLEEP_OBSERVATION.deadline_tick != 1 {
+        return false
+    }
+    if syscall.block_reason_score(SLEEP_OBSERVATION.block_reason) != 16 {
         return false
     }
     if SLEEP_OBSERVATION.wake_tick != 0 {
@@ -1215,40 +1542,46 @@ func bootstrap_main() i32 {
     if !validate_program_cap_spawn_and_wait() {
         return 27
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 103)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !validate_phase104_contract_hardening() {
         return 28
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 104)
+    if BOOT_MARKER_EMITTED != 1 {
         return 29
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 30
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 31
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 32
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 33
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 34
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 103 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 35
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 36
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 104 {
         return 37
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 38
     }
-    return PHASE103_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 39
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 40
+    }
+    return PHASE104_MARKER
 }

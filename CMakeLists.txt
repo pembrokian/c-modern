@@ -151,7 +151,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase86_task_lifecycle.cpp
     tests/tool/freestanding/kernel/phase87_static_data.cpp
     tests/tool/freestanding/kernel/phase88_build_integration.cpp
-    tests/tool/freestanding/kernel/phase103_init_bootstrap_handoff.cpp
+    tests/tool/freestanding/kernel/phase104_kernel_critique_hardening.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp

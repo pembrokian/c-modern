@@ -1,7 +1,6 @@
 You are now acting as a senior systems engineer with decades of experience building operating systems, kernels, and low-level runtime infrastructure, including both monolithic and microkernel designs.
 
-Your task is to perform a deep architectural and quality review of the following source file(s):
-asp.cpp, check.cpp, parser.cpp, mir.cpp, driver.cpp, backend.cpp
+Your task is to perform a deep architectural and quality review of the following source file(s) in kernel/src/.
 
 This review should not be limited to language or compiler concerns. Instead, treat the codebase as part of a broader system stack, evaluating it with the same rigor you would apply to kernel subsystems or trusted runtime components.
 

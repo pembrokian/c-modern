@@ -1,0 +1,220 @@
+KERNEL main.mc — Phase 103 Architectural Review
+=================================================
+
+FILE: kernel/src/main.mc  (1253 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. Global state has no initialization order guarantee;
+     reset_kernel_state() is the single authoritative reset, but nothing
+     prevents a function from reading a global before reset is called.
+  2. seed_kernel_owners() re-initializes fields that reset_kernel_state()
+     already set (ADDRESS_SPACE, USER_FRAME, CHILD_ADDRESS_SPACE,
+     CHILD_USER_FRAME, DELIVERED_MESSAGE, RECEIVE_OBSERVATION, etc.).
+     Two functions own the same state; the second silently overwrites any
+     state set between the two calls.  Whoever calls these out of order
+     gets silent, wrong results.
+  3. validate_seeded_tables() hardcodes BOOT_LOG.count != 2.  The
+     predicate is only valid if record_boot_stage() was called exactly
+     twice before this function.  That ordering is enforced by
+     architecture_entry()'s call site, not by the function itself.  Any
+     reuse or reordering of the call will produce a silent validation
+     failure with a confusing error.
+  4. Partial initialization failure leaves all globals in an inconsistent
+     intermediate state.  bootstrap_main() returns an error code but
+     does not roll back any globals.  Callers seeing error code 12–38 are
+     looking at a partially-initialized kernel.
+
+P2 — ARCHITECTURAL (design integrity)
+  5. This file combines three distinct roles in one unit:
+       a. Kernel mutable global state store (25+ var declarations)
+       b. Kernel initialization sequence
+       c. Kernel self-test / validation harness
+     In any real system these would be separate modules.  The execute_X /
+     validate_X pairs, the fixed error codes 10–38, and bootstrap_main
+     returning PHASE103_MARKER (103) as a success signal are all test
+     harness idioms, not kernel idioms.
+  6. All persistent state is flat module-level globals.  There is no
+     kernel control block (KCB) struct that would let the state be passed
+     as a unit, serialized, or reset atomically.  Every function that
+     needs state reaches into globals directly.
+  7. HANDLE_TABLES[1] is used throughout as the init process's table.
+     Index 1 is the PID-1 convention but this is never stated, enforced,
+     or checked.  A process lookup that skips PID-1 to PID-2 alignment
+     would silently operate on the wrong table.
+
+P3 — SIMPLICITY / MAINTAINABILITY
+  8. Score comparisons (e.g. state.process_state_score(x) != 4) hide
+     semantic intent.  "!= 4" means "not Ready" but only if you know the
+     ReadyScore is 4.  The magic numbers are repeated hundreds of times
+     across main.mc alone.  This pattern is forced by the lack of enum
+     equality in the current language bootstrap, but if enum equality
+     ever becomes available this should be the first thing replaced.
+  9. Payload bytes are hardcoded as raw decimal integers (73, 78, 73, 84
+     for "INIT"; 83, 89, 83, 67 for "SYSC"; 67, 65, 80, 83 for "CAPS";
+     77, 79, 86, 69 for "MOVE").  Named constants would make these
+     legible, e.g. PAYLOAD_INIT_0: u8 = 73.
+ 10. Local variables shadow function names from the syscall module:
+       send_result: syscall.SendResult = syscall.perform_send(...)
+     The local name send_result and the constructor function send_result
+     from syscall.mc share a name.  This is currently benign but will
+     become a problem if the language adds overload resolution or method
+     syntax.
+ 11. execute_program_cap_spawn_and_wait() is 90+ lines and mixes spawn,
+     sleep, timer advance, timer wake, pre-exit wait, child exit, and
+     post-exit wait in a single function.  Splitting this into
+     execute_spawn(), execute_sleep_and_wake(), execute_child_exit(), and
+     execute_post_exit_wait() would allow each to be tested independently.
+
+P4 — OPTIONAL (performance)
+ 12. Every struct mutation reconstructs the full struct from scratch.
+     KernelDescriptor (6 fields), ProcessSlot (4 fields), TaskSlot (6
+     fields), etc. are fully re-specified on every update.  For the
+     bootstrap proof this is fine.  For a real kernel this would be a
+     source of silent bugs when a new field is added and an update
+     function is not updated.
+
+────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+The file plays the role of both a kernel init module and a kernel proof
+harness.  This dual purpose means neither role is done cleanly:
+
+  - As an init module: the sequenced calls to seed_X() and validate_X()
+    functions represent correct boot ordering, and the distinct error
+    codes allow root-cause identification.  But the return of a numeric
+    marker (PHASE103_MARKER = 103) as a success return code is a test
+    convention, not an OS convention.  A real kernel entry point either
+    never returns or panics.
+
+  - As a proof harness: the execute/validate split is a reasonable
+    pattern for a functional-style language.  execute_X() advances state;
+    validate_X() assertions can be checked independently.  But mixing
+    these with production state management makes it impossible to run one
+    without the other.
+
+Recommended architectural separation:
+  - kernel_state.mc: all var declarations, reset(), and accessors
+  - kernel_init.mc: seeding functions and architecture_entry()
+  - kernel_proof.mc: validate_X() functions and bootstrap_main()
+
+The current file is acceptable as a bootstrap proof artifact as long as
+it is not treated as a template for a real kernel init path.
+
+────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & INVARIANTS
+────────────────────────────────────────────────────────────────────────
+The implicit invocation order contract:
+  reset_kernel_state()
+  → architecture_entry() [calls seed_X, record twice, validate]
+  → transfer_to_first_user_entry()
+  → bootstrap_endpoint_handle_core()
+  → handoff_init_bootstrap_capability_set()
+  → execute_syscall_byte_ipc()
+  → seed_transfer_endpoint_handle()
+  → execute_capability_carrying_ipc_transfer()
+  → execute_program_cap_spawn_and_wait()
+
+This ordering is only enforced by bootstrap_main().  There is no type
+system, module system, or runtime enforcement.  Any function invoked
+outside this sequence will observe inconsistent global state and return
+misleading results.
+
+Specific bugs:
+
+  - validate_seeded_tables() checks addresses_space.state_score == 1
+    (Empty) but also checks USER_FRAME.task_id == 0 and
+    CHILD_USER_FRAME.task_id == 0.  These are post-reset invariants, not
+    post-seed invariants.  If validate_seeded_tables() is called after
+    construct_first_user_address_space(), these checks will correctly
+    fail, but the error code returned from architecture_entry() would not
+    distinguish "seed failed" from "validate called after address space
+    construction".
+
+  - execute_program_cap_spawn_and_wait() advances TIMER_STATE by ticking
+    to 1 and then directly reconstructs TASK_SLOTS[2] with
+    state.user_task_slot(...) without going through any syscall path.
+    This bypasses the task state machine and is only acceptable because
+    this is a proof, not a scheduler.  The comment should make this
+    explicit.
+
+────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & COMPOSABILITY
+────────────────────────────────────────────────────────────────────────
+The most significant simplicity problem is the volume of repeated
+validation predicates.  validate_program_cap_spawn_and_wait() alone is
+90 lines of sequential != checks.  These read like automated test
+assertions and are difficult to reason about locally: each check is
+individually correct but the collection does not expose a clear invariant.
+
+A named invariant would communicate intent better:
+  // After spawn-and-wait completes: child slot is Empty, wait handle is
+  // consumed, timer is quiescent, spawn observation carries child IDs.
+  if !post_spawn_wait_invariant() { return 27 }
+
+The execute/validate split also means that if execute_X() fails early,
+validate_X() may observe partial state and pass or fail for the wrong
+reasons.  Callers should only call validate_X() after execute_X() returns
+true; this is implicit.
+
+────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────────────
+  - Error code 10 is returned when architecture_entry() fails.  This
+    covers multiple internal failure modes (seed, validate, boot mark).
+    A caller cannot distinguish "descriptor was wrong" from "log count
+    was wrong" from "process slot had wrong state".
+  - No panic path.  On a real unikernel this would halt/abort; in a
+    hosted proof harness the test framework catches the return.
+  - BOOT_MARKER_EMITTED is a global u32 acting as a one-shot flag.  It
+    is checked immediately after being set with no intervening operation
+    that could corrupt it.  This is safe in a single-threaded proof but
+    would require a memory barrier on any real SMP target.
+
+────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────────────
+Not applicable for a 3-process proof harness.  The structural note is:
+the fixed capacity (3 process slots, 3 task slots, 2 endpoints, 4 handles
+per table, 2 wait handle slots) means this kernel cannot express a real
+workload.  Scaling these numbers would require touching every capacity
+literal in every file.  The value for the bootstrap proof is that the
+exact capacity invariants are testable, but the brittleness to capacity
+change is a cost that accrues over time.
+
+────────────────────────────────────────────────────────────────────────
+6. SYSTEM INTEGRATION & BOUNDARIES
+────────────────────────────────────────────────────────────────────────
+main.mc is the integration point for every other kernel module.  All
+imports converge here.  This is appropriate for a kernel main, but it
+means every module-level name that main.mc touches is a transitive
+dependency.  Changes to any field of any struct in any other module break
+main.mc's validation functions.
+
+The HANDLE_TABLES[pid-1] indexing convention means the table array is
+implicitly a process ID to handle table map.  This should be made
+explicit: either name the indices (BOOT_TABLE_INDEX = 0, INIT_TABLE_INDEX
+= 1, CHILD_TABLE_INDEX = 2) or replace the raw array with a lookup
+function (find_handle_table_for_pid).
+
+────────────────────────────────────────────────────────────────────────
+7. CLARITY & INTENT
+────────────────────────────────────────────────────────────────────────
+The file communicates bootstrap orchestration well.  The step-by-step
+sequence in bootstrap_main() with distinct error codes per step is
+readable and makes failure diagnosis tractable.
+
+What is NOT communicated:
+  - Why message IDs start at gate.send_count + 2 (to avoid collision with
+    the bootstrap message at ID 1).
+  - Why execute_program_cap_spawn_and_wait() manually advances timer state
+    rather than going through a syscall (because there is no timer IRQ
+    path in the proof).
+  - Why HANDLE_TABLES is indexed by PID-1.
+  - What PHASE103_MARKER means to the test harness calling bootstrap_main.
+
+These are not bugs, but they are knowledge gaps that would require reading
+all related files to reconstruct.

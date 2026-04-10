@@ -1,0 +1,218 @@
+KERNEL endpoint.mc — Phase 103 Architectural Review
+====================================================
+
+FILE: kernel/src/endpoint.mc  (189 lines)
+PHASE: 103 — init bootstrap-capability handoff
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — CRITICAL (correctness / invariant violations)
+  1. advance_index() is the ring buffer wrap function.  It hardcodes the
+     ring size as the literal 2:
+         if next == 2 { return 0 }
+     The ring size is also hardcoded in the EndpointSlot struct as
+     messages: [2]KernelMessage.  These two constants must match.  If the
+     message capacity grows to 4, advance_index() will corrupt the ring
+     (it wraps at 2 instead of 4), but the capacity check in
+     enqueue_message() uses the literal 2 separately:
+         if current.queued_messages >= 2 { return table }
+     All three sites (struct annotation, advance_index, enqueue guard)
+     must be updated together, with no compile-time enforcement.
+
+  2. find_endpoint_index() uses table.count as its "not found" sentinel:
+         return table.count
+     When the table has 0 entries, "not found" returns 0, and 0 is also a
+     valid in-bounds array index.  The caller in syscall.mc guards with
+     "endpoint_index >= endpoints.count", which handles the empty case
+     correctly because count == 0 means index 0 is not valid.  However:
+     if table.count is 1 and slot 0 is taken, a search miss returns 1.
+     The caller checks >= 1, so this is also correct.  But the
+     correctness proof is non-obvious and tightly couples find_endpoint_
+     index() to its callers' guard pattern.  A fixed sentinel (e.g. 2,
+     matching the table capacity constant) would make the coupling
+     explicit.
+
+  3. KernelMessage.handle_slot is set in bootstrap_init_message() but
+     never read or used in the IPC path.  byte_message() and
+     attached_message() both set it to 0.  The field is either vestigial
+     or reserved for future use, but its semantics (what handle it
+     refers to, which process it is relative to) are not documented.
+     A vestigial field in a security-relevant message struct is a
+     correctness and auditability hazard.
+
+P2 — ARCHITECTURAL (design integrity)
+  4. EndpointSlot.active: u32 is a binary flag that duplicates the
+     purpose of the slot's presence in the table.  An installed endpoint
+     slot in the table is active by definition; there is no path that
+     creates a slot with active=0 except the zero-initialization path
+     (empty_slot).  Since find_endpoint_index() already checks active==1,
+     the flag is a second guard on top of the slot contents.  This
+     redundancy is harmless but suggests the design once had (or
+     anticipated) a notion of inactive-but-present endpoints that
+     currently does not exist.
+
+  5. The ring buffer in EndpointSlot is a classic two-pointer ring (head,
+     tail, count).  But the ring capacity is 2, which means maximum
+     inflight-messages is 1 (full ring = one pending message; the second
+     slot is the "was empty" sentinel).  Actually with advance_index
+     wrapping at 2 and capacity check at >= 2, the effective queue depth
+     IS 2.  This is correct but the low depth means a sender that sends
+     two messages before the receiver acts will have the second message
+     rejected with WouldBlock.  The depth is intentional for the proof
+     but would be a serious bottleneck in production.
+
+  6. bootstrap_init_message() hardcodes the payload as individual byte
+     assignments:
+         payload[0] = 73   // 'I'
+         payload[1] = 78   // 'N'
+         payload[2] = 73   // 'I'
+         payload[3] = 84   // 'T'
+     The meaning ("INIT") is not documented in the code.  This payload
+     represents the boot capability handoff token and its opaque byte
+     encoding hides semantics that matter for security.
+
+P3 — SIMPLICITY / MAINTAINABILITY
+  7. zero_messages() uses per-element assignment.  Same concern as
+     zero_X() functions in other modules.  Capacity change requires
+     touching this manually.
+
+  8. The consume_head_message() function resets head and tail to 0 when
+     count reaches 0:
+         if count == 0 { head = 0; tail = 0 }
+     This is a normalization step to keep the queue in canonical form
+     after draining.  It is correct but interacts with the ring buffer
+     invariant: after normalization, empty_X() and a just-drained queue
+     have identical state.  This is good for deterministic testing.
+
+  9. mark_delivered returns a KernelMessage with state=Delivered.  But
+     no function in the module ever checks for the Delivered state, and
+     message_state_score(Delivered) = 4 is not tested in any current
+     receive or validation path.  The Delivered state and the mark_
+     delivered() function appear to be unused after the initial delivery
+     proof in main.mc.  If this state is needed for future auditability,
+     the protocol for transitioning to and from it should be defined.
+
+────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+────────────────────────────────────────────────────────────────────────
+endpoint.mc is a message queue subsystem module.  It defines:
+  - KernelMessage: the message unit with payload, source, destination,
+    and optional attached capability information.
+  - EndpointSlot: a per-endpoint bounded FIFO queue (ring buffer of 2).
+  - EndpointTable: a fixed-size collection of up to 2 endpoints.
+
+The module is correctly self-contained.  It has no imports, handles its
+own zero-initialization, and exposes a small, comprehensible interface:
+install_endpoint, find_endpoint_index, enqueue_message, peek_head_message,
+consume_head_message.
+
+The ring buffer implementation is correct for depth-2 queues.  The
+advance_index function correctly wraps the index modulo 2.
+
+The KernelMessage struct is heavyweight (10 fields) for a 4-byte payload.
+This reflects that capability-carrying messages need the attached_endpoint_id
+and attached_rights fields alongside the payload.  This is consistent
+with L4-family IPC semantics where messages carry both data and object
+references.
+
+────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & INVARIANTS
+────────────────────────────────────────────────────────────────────────
+Ring buffer invariants that must hold for EndpointSlot:
+  - 0 <= head < 2
+  - 0 <= tail < 2
+  - 0 <= queued_messages <= 2
+  - When queued_messages == 0: head == tail (normalized to 0 on drain)
+  - When queued_messages == 1: tail == advance_index(head)
+  - When queued_messages == 2: tail == head (full ring)
+
+These invariants are maintained by enqueue_message() and
+consume_head_message().  However, they are never asserted inside the
+module.  A future refactoring that touches head/tail arithmetic could
+violate them silently.
+
+The drain-normalization (reset head=0, tail=0 when count reaches 0)
+keeps the ring in canonical form, which is important for the
+deterministic test property.  Without this normalization, two queues
+that were drained at different wrap points would have different
+(head, tail) values despite being semantically empty.
+
+────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & COMPOSABILITY
+────────────────────────────────────────────────────────────────────────
+The module is well-scoped.  The 7 public functions form a coherent API
+for a queue manager:
+  - install_endpoint: add an endpoint to the table
+  - find_endpoint_index: look up an endpoint by id
+  - enqueue_message: add a message to an endpoint's queue
+  - peek_head_message: inspect the head message without consuming
+  - consume_head_message: remove the head message
+
+peak/consume split is a clean pattern: it allows the caller (syscall.mc)
+to inspect the message before deciding to consume it.  This is important
+for capability-carrying messages where the install step might fail.
+
+The three bootstrap constructors (bootstrap_init_message, byte_message,
+attached_message) cover all needed message types for the current proof.
+Their relationship (byte_message is a plain-data variant, attached_message
+adds capability transfer) is clear from naming.
+
+────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+────────────────────────────────────────────────────────────────────────
+  - enqueue_message() returns the unchanged table on overflow (count >= 2).
+    The caller in syscall.mc detects this by comparing queued_messages
+    before and after.  This is an implicit error contract.  A boolean
+    return or an explicit error status would be safer.
+  - consume_head_message() returns the unchanged table if the endpoint is
+    empty.  This is a safe no-op.
+  - payload: [4]u8 is a fixed-size buffer.  len: usize can be 0–4.
+    No receive path validates that len <= 4 before indexing into payload.
+    In the current proof all messages use len=4, but a future path with
+    len=0 would not access payload, and a len > 4 would be out of bounds.
+    The safe bound is not enforced.
+
+────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+────────────────────────────────────────────────────────────────────────
+The IPC hot path through enqueue_message() copies:
+  - EndpointTable: 1 count + 2 × EndpointSlot
+  - Each EndpointSlot: 6 scalars + [2]KernelMessage
+  - Each KernelMessage: 10 fields including [4]u8
+
+Total: 2 × (6 + 2 × 10 + 4) = 64 scalar values per enqueue.
+For the 2-endpoint, 2-slot proof this is acceptable.  For high-throughput
+production IPC this copy volume would need to be replaced with in-place
+mutation.
+
+────────────────────────────────────────────────────────────────────────
+6. SYSTEM INTEGRATION & BOUNDARIES
+────────────────────────────────────────────────────────────────────────
+endpoint.mc has no imports (leaf module).  It is imported by syscall.mc
+and main.mc.
+
+The module correctly knows nothing about processes, capabilities, or
+address spaces.  The attached_endpoint_id and attached_rights fields on
+KernelMessage represent opaque u32 values to the endpoint module; their
+interpretation is the caller's responsibility.  This is correct layering.
+
+────────────────────────────────────────────────────────────────────────
+7. CLARITY & INTENT
+────────────────────────────────────────────────────────────────────────
+The module is relatively clear.  The ring buffer logic in enqueue and
+consume is comprehensible.
+
+The opaque byte payloads (73, 78, 73, 84 for "INIT") are the main
+clarity gap.  In a kernel message that represents a security-critical
+boot capability handoff, the intent of the payload should be documented
+or encoded as named data.
+
+The advance_index() function is named well and its purpose (wrap modulo
+ring size) is clear.  Its tight coupling to the ring size constant 2 is
+the clarity concern flagged in P1.
+
+MessageState.Delivered exists in the enum and has a state transition
+function (mark_delivered) but is never checked in the receive path or
+validated in assertions.  Future readers will wonder whether Delivered
+is semantically meaningful or a vestigial variant.

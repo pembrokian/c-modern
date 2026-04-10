@@ -5,16 +5,15 @@ enum InterruptState {
 
 struct InterruptController {
     timer_vector: u32
-    external_vector: u32
     state: InterruptState
 }
 
 func reset_controller() InterruptController {
-    return InterruptController{ timer_vector: 0, external_vector: 0, state: InterruptState.Masked }
+    return InterruptController{ timer_vector: 0, state: InterruptState.Masked }
 }
 
 func unmask_timer(controller: InterruptController, vector: u32) InterruptController {
-    return InterruptController{ timer_vector: vector, external_vector: controller.external_vector, state: InterruptState.Quiescent }
+    return InterruptController{ timer_vector: vector, state: InterruptState.Quiescent }
 }
 
 func state_score(state: InterruptState) i32 {

@@ -1,3 +1,6 @@
+const MAPPING_SLOT_COUNT: usize = 2
+const MAPPING_NOT_FOUND: usize = 2
+
 enum AddressSpaceState {
     Empty,
     Constructed,
@@ -51,14 +54,78 @@ func empty_space() AddressSpace {
     return AddressSpace{ asid: 0, owner_pid: 0, state: AddressSpaceState.Empty, root_page_table: 0, entry_pc: 0, stack_top: 0, mapping_count: 0, mappings: zero_mappings() }
 }
 
+func mapping_end(base: usize, size: usize) usize {
+    return base + size
+}
+
+func ranges_overlap(first_base: usize, first_size: usize, second_base: usize, second_size: usize) bool {
+    first_end: usize = mapping_end(first_base, first_size)
+    second_end: usize = mapping_end(second_base, second_size)
+    if first_end <= second_base {
+        return false
+    }
+    if second_end <= first_base {
+        return false
+    }
+    return true
+}
+
+func bootstrap_layout_valid(image_base: usize, image_size: usize, entry_pc: usize, stack_base: usize, stack_size: usize, stack_top: usize) bool {
+    if image_size == 0 || stack_size == 0 {
+        return false
+    }
+    if entry_pc < image_base {
+        return false
+    }
+    if entry_pc >= mapping_end(image_base, image_size) {
+        return false
+    }
+    if stack_top < stack_base {
+        return false
+    }
+    if stack_top > mapping_end(stack_base, stack_size) {
+        return false
+    }
+    if ranges_overlap(image_base, image_size, stack_base, stack_size) {
+        return false
+    }
+    return true
+}
+
+func bootstrap_space_valid(root_page_table: usize, image_base: usize, image_size: usize, entry_pc: usize, stack_base: usize, stack_size: usize, stack_top: usize) bool {
+    if root_page_table == 0 {
+        return false
+    }
+    return bootstrap_layout_valid(image_base, image_size, entry_pc, stack_base, stack_size, stack_top)
+}
+
 func bootstrap_space(asid: u32, owner_pid: u32, root_page_table: usize, image_base: usize, image_size: usize, entry_pc: usize, stack_base: usize, stack_size: usize, stack_top: usize) AddressSpace {
+    if !bootstrap_space_valid(root_page_table, image_base, image_size, entry_pc, stack_base, stack_size, stack_top) {
+        return empty_space()
+    }
     mappings: [2]Mapping = zero_mappings()
     mappings[0] = Mapping{ base: image_base, size: image_size, kind: MappingKind.ImageText, writable: 0, executable: 1 }
     mappings[1] = Mapping{ base: stack_base, size: stack_size, kind: MappingKind.UserStack, writable: 1, executable: 0 }
     return AddressSpace{ asid: asid, owner_pid: owner_pid, state: AddressSpaceState.Constructed, root_page_table: root_page_table, entry_pc: entry_pc, stack_top: stack_top, mapping_count: 2, mappings: mappings }
 }
 
+func can_activate(space: AddressSpace) bool {
+    if state_score(space.state) != 2 {
+        return false
+    }
+    if space.root_page_table == 0 {
+        return false
+    }
+    if space.mapping_count != MAPPING_SLOT_COUNT {
+        return false
+    }
+    return true
+}
+
 func activate(space: AddressSpace) AddressSpace {
+    if !can_activate(space) {
+        return space
+    }
     return AddressSpace{ asid: space.asid, owner_pid: space.owner_pid, state: AddressSpaceState.Active, root_page_table: space.root_page_table, entry_pc: space.entry_pc, stack_top: space.stack_top, mapping_count: space.mapping_count, mappings: space.mappings }
 }
 
@@ -75,6 +142,22 @@ func mapping_kind_at(space: AddressSpace, index: usize) MappingKind {
         return MappingKind.None
     }
     return space.mappings[index].kind
+}
+
+func find_mapping_index(space: AddressSpace, kind: MappingKind) usize {
+    if space.mapping_count == 0 {
+        return MAPPING_NOT_FOUND
+    }
+    if kind_score(space.mappings[0].kind) == kind_score(kind) {
+        return 0
+    }
+    if space.mapping_count < MAPPING_SLOT_COUNT {
+        return MAPPING_NOT_FOUND
+    }
+    if kind_score(space.mappings[1].kind) == kind_score(kind) {
+        return 1
+    }
+    return MAPPING_NOT_FOUND
 }
 
 func state_score(state: AddressSpaceState) i32 {
