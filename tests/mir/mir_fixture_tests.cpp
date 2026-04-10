@@ -26,6 +26,7 @@ struct FixtureCase {
 };
 
 const std::vector<std::string> kForbiddenSemanticBoundaryCallTargets = {
+    "memory_barrier",
     "volatile_load",
     "volatile_store",
     "atomic_load",

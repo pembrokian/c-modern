@@ -27,6 +27,7 @@ Structure
   - `phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`: real-kernel interrupt-entry and generic-dispatch boundary audit.
   - `phase114_address_space_and_mmu_ownership_split.cpp`: real-kernel address-space and MMU ownership split audit.
   - `phase115_timer_ownership_hardening.cpp`: real-kernel timer ownership hardening audit.
+  - `phase116_mmu_activation_barrier_follow_through.cpp`: real-kernel MMU activation barrier follow-through audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

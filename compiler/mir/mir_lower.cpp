@@ -452,6 +452,7 @@ class FunctionLowerer {
             case SpecialCallKind::kBufferFree:
             case SpecialCallKind::kArenaNew:
             case SpecialCallKind::kSliceFromBuffer:
+            case SpecialCallKind::kMemoryBarrier:
             case SpecialCallKind::kAtomicCompareExchange:
             case SpecialCallKind::kNone:
             case SpecialCallKind::kMmioPtr:
@@ -507,6 +508,22 @@ class FunctionLowerer {
             if (wants_result && result != nullptr) {
                 *result = {value, result_type};
             }
+            return true;
+        }
+
+        if (kind == SpecialCallKind::kMemoryBarrier) {
+            if (!args.empty()) {
+                Report({}, "memory_barrier expects no arguments during MIR lowering");
+                return false;
+            }
+            Emit({
+                .kind = Instruction::Kind::kMemoryBarrier,
+                .type = result_type,
+                .target = target_metadata.target,
+                .target_kind = target_metadata.kind,
+                .target_name = target_metadata.name,
+                .target_display = target_metadata.display,
+            });
             return true;
         }
 
@@ -582,6 +599,9 @@ class FunctionLowerer {
                 break;
             case SpecialCallKind::kBufferFree:
                 instruction.kind = Instruction::Kind::kBufferFree;
+                break;
+            case SpecialCallKind::kMemoryBarrier:
+                instruction.kind = Instruction::Kind::kMemoryBarrier;
                 break;
             case SpecialCallKind::kVolatileLoad:
                 instruction.kind = Instruction::Kind::kVolatileLoad;

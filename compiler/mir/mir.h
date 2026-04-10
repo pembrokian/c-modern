@@ -101,6 +101,7 @@ struct Instruction {
         kBufferFree,
         kSliceFromBuffer,
         kCall,
+        kMemoryBarrier,
         kVolatileLoad,
         kVolatileStore,
         kAtomicLoad,

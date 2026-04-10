@@ -1,11 +1,6 @@
-  ConstGlobal names=[PHASE115_MARKER] type=i32
+  ConstGlobal names=[PHASE116_MARKER] type=i32
   Function name=lifecycle.install_spawned_child returns=[lifecycle.SpawnInstallResult]
   Function name=lifecycle.block_task_on_timer returns=[lifecycle.TaskTransition]
   Function name=lifecycle.ready_task returns=[lifecycle.TaskTransition]
   Function name=lifecycle.validate_task_transition_contracts returns=[bool]
   Function name=debug.validate_phase111_scheduler_and_lifecycle_ownership returns=[bool]
-      symbol_ref %v35:proc([3]state.TaskSlot, u32)->lifecycle.TaskTransition target=lifecycle.block_task_on_timer target_kind=function target_name=lifecycle.block_task_on_timer
-      symbol_ref %v74:proc([3]state.TaskSlot, u32)->lifecycle.TaskTransition target=lifecycle.ready_task target_kind=function target_name=lifecycle.ready_task
-      symbol_ref %v147:proc([3]state.ProcessSlot, [3]state.TaskSlot, u32)->lifecycle.ReleaseTransition target=lifecycle.release_waited_child_slots target_kind=function target_name=lifecycle.release_waited_child_slots
-      symbol_ref %v186:proc([3]state.ProcessSlot, [3]state.TaskSlot, u32, u32, u32, u32, u32, usize, usize)->lifecycle.SpawnInstallResult target=lifecycle.install_spawned_child target_kind=function target_name=lifecycle.install_spawned_child
-      symbol_ref %v18:proc(debug.RunningKernelSliceAudit, u32, u32)->bool target=debug.validate_phase111_scheduler_and_lifecycle_ownership target_kind=function target_name=debug.validate_phase111_scheduler_and_lifecycle_ownership

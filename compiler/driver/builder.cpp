@@ -432,6 +432,7 @@ bool InstructionUsesTypeTargetMetadata(mc::mir::Instruction::Kind kind) {
         case Kind::kBufferFree:
         case Kind::kSliceFromBuffer:
         case Kind::kCall:
+        case Kind::kMemoryBarrier:
         case Kind::kVolatileLoad:
         case Kind::kVolatileStore:
         case Kind::kAtomicLoad:

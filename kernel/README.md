@@ -6,9 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 115 has moved the repository-owned kernel artifact beyond the landed
-  Phase 114 address-space and MMU ownership split into one bounded timer
-  ownership hardening step.
+- Phase 116 has moved the repository-owned kernel artifact beyond the landed
+  Phase 115 timer ownership hardening into one bounded MMU activation barrier
+  follow-through step.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -32,15 +32,16 @@ Current status
   kernel ownership split audit, one bounded scheduler and lifecycle ownership
   clarification, one bounded syscall boundary thinness audit, one bounded
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
-  MMU ownership split, one bounded timer ownership hardening step, and no
-  broader multi-service bring-up yet.
+  MMU ownership split, one bounded timer ownership hardening step, one bounded
+  MMU activation barrier follow-through step, and no broader multi-service
+  bring-up yet.
 
 Current files
 -------------
 
 - `build.toml`: freestanding kernel manifest for the current proof slice and
-  the explicit kernel image-input contract carried through the Phase 115 timer
-  ownership hardening step
+  the explicit kernel image-input contract carried through the Phase 116 MMU
+  activation barrier follow-through step
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core setup, bounded syscall-byte-IPC setup, bounded capability-
   carrying transfer setup, thin service-proof orchestration, and thin root
@@ -59,8 +60,8 @@ Current files
 - `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109
   running-slice audit, Phase 110 ownership-split audit, Phase 111
   lifecycle-ownership audit, Phase 112 syscall-boundary audit, Phase 113
-  interrupt-boundary audit, Phase 114 address-space/MMU audit, and Phase 115
-  timer-ownership audit
+  interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115
+  timer-ownership audit, and Phase 116 MMU activation-barrier audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -70,8 +71,8 @@ Current files
 - `src/state.mc`: kernel-owned descriptor, slot, queue, and boot-log records
 - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame
   records
-- `src/mmu.mc`: bounded translation-root construction and activation helpers
-  for the landed first-user and spawn path
+- `src/mmu.mc`: bounded translation-root construction, activation, and
+  barrier-backed publish helpers for the landed first-user and spawn path
 - `src/timer.mc`: bounded timer state, sleep records, wake observations, and
   interrupt-tick delivery helpers for the landed timer-backed wake path
 - `src/capability.mc`: bounded bootstrap capability slots, per-process
@@ -105,10 +106,11 @@ Phase boundary
   ownership split audit, one bounded scheduler and lifecycle ownership
   clarification, one bounded syscall boundary thinness audit, one bounded
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
-  MMU ownership split, and one bounded timer ownership hardening step.
+  MMU ownership split, one bounded timer ownership hardening step, and one
+  bounded MMU activation barrier follow-through step.
 - The repository can now honestly claim one first running Canopus kernel
-  slice with an explicit Phase 115 timer ownership hardening over the landed
-  Phase 114 address-space and MMU ownership split: explicit
+  slice with an explicit Phase 116 MMU activation barrier follow-through over
+  the landed Phase 115 timer ownership hardening: explicit
   boot
   entry,
   first user entry, endpoint-and-handle object core, syscall-owned byte-only
@@ -120,6 +122,8 @@ Phase boundary
   semantics, with one bounded interrupt path expressed as explicit
   architecture entry plus generic dispatch classification, with
   translation-root mechanics separated from generic address-space layout, and
-  with timer-owned tick delivery separated from interrupt classification.
+  with timer-owned tick delivery separated from interrupt classification, and
+  with translation-root activation published through one explicit `hal`
+  barrier hook.
 - It does not yet claim general loading, multi-service launch, namespace
   policy, kill semantics, or a running init-owned service set.

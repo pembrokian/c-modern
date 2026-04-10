@@ -1078,6 +1078,18 @@ bool ValidateModule(const Module& module,
                         }
                         break;
                     }
+                    case Instruction::Kind::kMemoryBarrier: {
+                        if (ClassifySpecialCall(PrimaryTargetName(instruction)) != SpecialCallKind::kMemoryBarrier) {
+                            report("memory_barrier must use memory_barrier call metadata in function " + function.name);
+                        }
+                        if (!instruction.result.empty()) {
+                            report("memory_barrier must not produce a result in function " + function.name);
+                        }
+                        if (!instruction.operands.empty()) {
+                            report("memory_barrier must not use operands in function " + function.name);
+                        }
+                        break;
+                    }
                     case Instruction::Kind::kVolatileStore: {
                         if (ClassifySpecialCall(PrimaryTargetName(instruction)) != SpecialCallKind::kVolatileStore) {
                             report("volatile_store must use volatile_store call metadata in function " + function.name);

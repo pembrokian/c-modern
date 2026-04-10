@@ -1155,6 +1155,9 @@ void TestVolatileAndAtomicCallsLowerExplicitly() {
         "enum MemoryOrder { Relaxed, Acquire, Release }\n"
         "struct Atomic<T> {}\n"
         "\n"
+        "func memory_barrier() {\n"
+        "}\n"
+        "\n"
         "func volatile_load(ptr: *i32) i32 {\n"
         "    return 0\n"
         "}\n"
@@ -1184,6 +1187,7 @@ void TestVolatileAndAtomicCallsLowerExplicitly() {
         "func demo(ptr: *i32, atom: *Atomic<i32>, expected: *i32) bool {\n"
         "    value: i32 = volatile_load(ptr)\n"
         "    volatile_store(ptr, value)\n"
+        "    memory_barrier()\n"
         "    loaded: i32 = atomic_load(atom, MemoryOrder.Acquire)\n"
         "    atomic_store(atom, loaded, MemoryOrder.Release)\n"
         "    swapped: i32 = atomic_exchange(atom, loaded, MemoryOrder.Acquire)\n"
@@ -1197,16 +1201,18 @@ void TestVolatileAndAtomicCallsLowerExplicitly() {
     }
 
     const auto dump = mc::mir::DumpModule(*lowered.module);
-    if (dump.find("volatile_load %v") == std::string::npos || dump.find("volatile_store target=volatile_store") == std::string::npos) {
-        Fail("volatile operations should lower to dedicated MIR instructions");
+    if (dump.find("memory_barrier target=memory_barrier") == std::string::npos || dump.find("volatile_load %v") == std::string::npos ||
+        dump.find("volatile_store target=volatile_store") == std::string::npos) {
+        Fail("volatile and barrier operations should lower to dedicated MIR instructions");
     }
     if (dump.find("atomic_load %v") == std::string::npos || dump.find("atomic_store op=order=") == std::string::npos ||
         dump.find("atomic_exchange %v") == std::string::npos || dump.find("atomic_compare_exchange %v") == std::string::npos ||
         dump.find("atomic_fetch_add %v") == std::string::npos) {
         Fail("atomic operations should lower to dedicated MIR instructions");
     }
-    if (dump.find("call target=volatile_load") != std::string::npos || dump.find("call target=atomic_load") != std::string::npos) {
-        Fail("dedicated volatile and atomic operations must not lower as generic calls");
+    if (dump.find("call target=memory_barrier") != std::string::npos || dump.find("call target=volatile_load") != std::string::npos ||
+        dump.find("call target=atomic_load") != std::string::npos) {
+        Fail("dedicated barrier, volatile, and atomic operations must not lower as generic calls");
     }
 
     bool saw_atomic_load = false;
@@ -1243,6 +1249,9 @@ void TestDeferredBoundaryCallsLowerExplicitly() {
         "enum MemoryOrder { Relaxed, Acquire, Release }\n"
         "struct Atomic<T> {}\n"
         "\n"
+        "func memory_barrier() {\n"
+        "}\n"
+        "\n"
         "func volatile_store(ptr: *i32, value: i32) {\n"
         "}\n"
         "\n"
@@ -1250,6 +1259,7 @@ void TestDeferredBoundaryCallsLowerExplicitly() {
         "}\n"
         "\n"
         "func flush(ptr: *i32, atom: *Atomic<i32>) {\n"
+        "    defer memory_barrier()\n"
         "    defer volatile_store(ptr, 1)\n"
         "    defer atomic_store(atom, 2, MemoryOrder.Release)\n"
         "}\n",
@@ -1260,11 +1270,13 @@ void TestDeferredBoundaryCallsLowerExplicitly() {
     }
 
     const auto dump = mc::mir::DumpModule(*lowered.module);
-    if (dump.find("volatile_store target=volatile_store") == std::string::npos ||
+    if (dump.find("memory_barrier target=memory_barrier") == std::string::npos ||
+        dump.find("volatile_store target=volatile_store") == std::string::npos ||
         dump.find("atomic_store op=order=MemoryOrder.Release target=atomic_store") == std::string::npos) {
         Fail("deferred boundary calls should lower to dedicated MIR instructions");
     }
-    if (dump.find("call target=volatile_store") != std::string::npos || dump.find("call target=atomic_store") != std::string::npos) {
+    if (dump.find("call target=memory_barrier") != std::string::npos || dump.find("call target=volatile_store") != std::string::npos ||
+        dump.find("call target=atomic_store") != std::string::npos) {
         Fail("deferred boundary calls must not fall back to generic call instructions");
     }
 }

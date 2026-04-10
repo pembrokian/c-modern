@@ -6,6 +6,9 @@ enum MemoryOrder {
 
 struct Atomic<T> {}
 
+func memory_barrier() {
+}
+
 func volatile_load(ptr: *i32) i32 {
     return 0
 }
@@ -35,6 +38,7 @@ func atomic_fetch_add(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) i32 {
 func demo(ptr: *i32, atom: *Atomic<i32>, expected: *i32) bool {
     value: i32 = volatile_load(ptr)
     volatile_store(ptr, value)
+    memory_barrier()
     loaded: i32 = atomic_load(atom, MemoryOrder.Acquire)
     atomic_store(atom, loaded, MemoryOrder.Release)
     swapped: i32 = atomic_exchange(atom, loaded, MemoryOrder.Acquire)

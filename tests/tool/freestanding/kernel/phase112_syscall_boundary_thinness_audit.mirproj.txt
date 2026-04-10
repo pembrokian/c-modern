@@ -1,4 +1,4 @@
-  ConstGlobal names=[PHASE115_MARKER] type=i32
+  ConstGlobal names=[PHASE116_MARKER] type=i32
   Function name=address_space.build_child_bootstrap_context returns=[address_space.SpawnBootstrap]
   Function name=address_space.validate_syscall_address_space_boundary returns=[bool]
   Function name=capability.resolve_endpoint_handle returns=[capability.EndpointHandleResolution]
@@ -10,8 +10,3 @@
   Function name=endpoint.receive_runtime_message returns=[endpoint.RuntimeReceiveResult]
   Function name=endpoint.validate_syscall_ipc_boundary returns=[bool]
   Function name=debug.validate_phase112_syscall_boundary_thinness returns=[bool]
-      symbol_ref %v13:proc(u32, u32, u32, mmu.TranslationRoot, usize, usize, usize, usize, usize, usize)->address_space.SpawnBootstrap target=address_space.build_child_bootstrap_context target_kind=function target_name=address_space.build_child_bootstrap_context
-      symbol_ref %v11:proc(capability.HandleTable, u32)->capability.EndpointHandleResolution target=capability.resolve_endpoint_handle target_kind=function target_name=capability.resolve_endpoint_handle
-      symbol_ref %v34:proc(u32, u32, u32, usize, [4]u8, usize, u32, u32, u32)->endpoint.KernelMessage target=endpoint.build_runtime_message target_kind=function target_name=endpoint.build_runtime_message
-      symbol_ref %v39:proc(endpoint.EndpointTable, u32, endpoint.KernelMessage)->endpoint.RuntimeSendResult target=endpoint.enqueue_runtime_message target_kind=function target_name=endpoint.enqueue_runtime_message
-      symbol_ref %v57:proc(endpoint.EndpointTable, u32)->endpoint.RuntimeReceiveResult target=endpoint.receive_runtime_message target_kind=function target_name=endpoint.receive_runtime_message

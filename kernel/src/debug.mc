@@ -336,3 +336,13 @@ func validate_phase115_timer_ownership_hardening(audit: RunningKernelSliceAudit,
     }
     return validate_phase114_address_space_and_mmu_ownership_split(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened)
 }
+
+func validate_phase116_mmu_activation_barrier_follow_through(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if barrier_contract_hardened == 0 {
+        return false
+    }
+    if audit.kernel.active_asid != audit.init_asid {
+        return false
+    }
+    return validate_phase115_timer_ownership_hardening(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened)
+}

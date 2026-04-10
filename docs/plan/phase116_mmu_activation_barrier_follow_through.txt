@@ -1,0 +1,161 @@
+Phase 116 -- MMU Activation Barrier Follow-Through
+==================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 115 timer ownership hardening by making one
+barrier-facing hardware hook explicit at the MMU activation boundary instead
+of leaving translation-root activation look like a pure generic state change
+inside the kernel tree.
+
+This document is both the Phase 116 execution note and its closeout.
+It does not claim broad barrier taxonomy, SMP completion, target-entry
+redesign, broader `hal` growth, a device framework, or a compiler wave.
+It records one narrow low-level hook follow-through inside the already
+admitted first running Canopus kernel slice.
+
+Repository status note
+----------------------
+- Phase 114 separated generic address-space layout from MMU-owned
+  translation-root mechanics without widening the admitted running slice.
+- Phase 115 then moved timer-backed wake delivery fully into the timer owner,
+  which left the next hardware-facing question narrower and clearer: the
+  kernel now had an explicit MMU owner, but translation-root activation still
+  looked like a direct owner-local state flip with no explicit hardware-facing
+  publish hook.
+- Without one bounded follow-through now, later low-level or target work would
+  have to choose between hiding a barrier inside ad hoc kernel code or widening
+  the compiler and `hal` surfaces without a real owning proof.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-115 roadmap reserved Phase 116 for one narrow
+  barrier-facing or low-level hook only if the landed kernel slice actually
+  required it.
+- The landed kernel already had a real first-user and child-spawn activation
+  path through `kernel/src/mmu.mc`, but that owner still exposed activation as
+  a pure semantic transition with no explicit publish boundary.
+- That left the next ownership question unanswered: if translation-root
+  activation later requires a barrier, which owner names it honestly and how
+  does the repository avoid smearing that hook across kernel-local workaround
+  code?
+
+Core rule
+---------
+- Preserve current kernel behavior exactly.
+- Keep generic address-space layout and scheduler or lifecycle logic unchanged.
+- Keep the low-level hook at the `hal` boundary rather than in ad hoc
+  kernel-local workaround code.
+- Do not widen the compiler beyond one narrow `hal.memory_barrier()` hook
+  required by this proof.
+- Do not generalize into broader barrier taxonomy, interrupt redesign, target
+  entry redesign, or a device framework.
+- Prove the boundary mechanically with one focused regression over the real
+  kernel artifact.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 116 note recording the MMU activation barrier step plus
+   the explicit decision to keep compiler widening narrow
+2. one update to `stdlib/hal.mc` plus the owning MIR and LLVM lowering path so
+   the repository exposes exactly one `hal.memory_barrier()` hook
+3. one update to `kernel/src/mmu.mc` so the MMU owner publishes translation-
+   root activation through the `hal` hook and exposes one owner-local
+   validator for that boundary
+4. one carried-through activation path in `kernel/src/address_space.mc` and
+   `kernel/src/main.mc` that keeps the same running-slice behavior while using
+   the new MMU-owned barrier-backed activation helper
+5. one debug-owned Phase 116 audit plus one focused freestanding kernel
+   regression covering docs, source call sites, emitted objects, and MIR
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the running kernel slice
+already has explicit MMU ownership, and the next honest hardware-facing truth
+is showing where one activation barrier belongs before later target or system
+work widens that boundary by accident.
+
+What this phase proves
+----------------------
+- the current first running kernel slice can keep the same activation behavior
+  while expressing one barrier-facing hook explicitly through `hal`
+- the MMU owner can publish translation-root activation without hiding the
+  hook in kernel-local workaround code
+- the repository can keep compiler widening narrow and explicit rather than
+  treating this phase as permission for broader low-level surface growth
+
+Deliverables
+------------
+- one canonical Phase 116 closeout note in `docs/plan/`
+- one narrow `hal.memory_barrier()` hook with dedicated MIR and LLVM lowering
+- updated `kernel/src/mmu.mc` so activation publication routes through the
+  `hal` hook with one owner-local validator
+- updated `kernel/src/main.mc` and `kernel/src/debug.mc` so the real kernel
+  artifact advances to a Phase 116 marker with one explicit audit for the new
+  boundary
+- refreshed kernel-facing documentation, support wording, decision records,
+  backlog notes, and one focused Phase 116 freestanding kernel regression
+
+Suggested execution order
+-------------------------
+1. Add the narrow `hal.memory_barrier()` hook and dedicated lowering path.
+2. Rewire MMU activation so the owner publishes through that hook while
+   preserving the same running-slice behavior.
+3. Add the Phase 116 debug audit and focused kernel regression.
+4. Refresh roadmap, position, support, and repository-map documentation.
+5. Advance the current kernel proof marker only after the new regression
+   proves the barrier-facing boundary mechanically.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 116 marker without
+  widening the admitted running slice
+- `kernel/src/mmu.mc` no longer models translation-root activation as a pure
+  owner-local state flip and instead publishes it through one narrow `hal`
+  barrier hook
+- the compiler and `hal` surfaces widen only by the one dedicated
+  `memory_barrier()` hook required for this kernel proof
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 116 boundary consistently
+
+Non-goals
+---------
+- a broad barrier taxonomy or generic fence framework
+- target-entry redesign, interrupt redesign, or broader MMU policy
+- SMP claims, preemption, or device-framework work
+- reopening sema, ABI, backend, or target work beyond the one narrow
+  `hal.memory_barrier()` hook required here
+
+Implemented slice
+-----------------
+- added `hal.memory_barrier()` as one narrow hardware-facing hook with
+  dedicated MIR and LLVM lowering rather than a generic call fallback
+- updated `kernel/src/mmu.mc` so the MMU owner now exposes one activation
+  barrier observation, publishes translation-root activation through the `hal`
+  hook, and validates that boundary locally
+- carried the real activation path through the same MMU-owned helper while
+  preserving the running kernel slice and its timer-backed behavior
+- added one debug-owned Phase 116 MMU activation barrier audit and one focused
+  freestanding regression covering docs, source imports, emitted objects, and
+  MIR visibility
+- refreshed the roadmap, current position note, freestanding support wording,
+  repository map, decision log, and backlog so the repository records both the
+  landed barrier-facing hook and the decision not to widen compiler work any
+  further in this phase
+
+Closeout statement
+------------------
+Phase 116 is complete as an MMU activation barrier follow-through.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now expresses one more hardware-facing truth honestly:
+translation-root activation publishes through one explicit `hal` barrier hook,
+the MMU owner names that hook locally, and the compiler remains widened only
+by the one dedicated low-level primitive required for this proof.

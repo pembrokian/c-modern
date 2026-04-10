@@ -162,6 +162,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase113_interrupt_entry_and_generic_dispatch_boundary.cpp
     tests/tool/freestanding/kernel/phase114_address_space_and_mmu_ownership_split.cpp
     tests/tool/freestanding/kernel/phase115_timer_ownership_hardening.cpp
+    tests/tool/freestanding/kernel/phase116_mmu_activation_barrier_follow_through.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp

@@ -154,8 +154,8 @@ the landed first-user and spawn translation-root path.
 Phase 115 is now concrete as one timer ownership hardening step over the
 landed timer-backed wake path.
 
-Phase 116 should widen only the smallest remaining hardware-facing truth
-required by the next real kernel step.
+Phase 116 is now concrete as one MMU activation barrier follow-through over
+the landed translation-root activation path.
 
 Likely themes:
 - clearer trap or interrupt handoff shape
@@ -173,21 +173,15 @@ Historical bridge into this band:
 - Phase 113 is now concrete as `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`.
 - Phase 114 is now concrete as `docs/plan/phase114_address_space_and_mmu_ownership_split.txt`.
 - Phase 115 is now concrete as `docs/plan/phase115_timer_ownership_hardening.txt`.
+- Phase 116 is now concrete as `docs/plan/phase116_mmu_activation_barrier_follow_through.txt`.
 - Those phases turned one landed timer-backed wake path into an explicit
   architecture-entry plus generic-dispatch boundary, then separated generic
   address-space layout from translation-root mechanics, and then moved timer
   tick advancement plus single-delivery wake consumption fully into the timer
-  owner without widening the admitted running slice. They leave the next open
-  question centered on later barrier or low-level hook work rather than on
-  whether one honest interrupt, MMU, or timer boundary exists at all.
-
-Possible phases in this band:
-
-Phase 116 -- Barrier Or Low-Level Hook Follow-Through
-- Exit criterion: only if required by the prior phases, the repository admits
-  one narrow low-level hook such as barrier-facing or entry-convention truth,
-  and proves that the right owner is the target or language boundary rather
-  than ad hoc kernel-local workaround code.
+  owner, and then moved one translation-root activation barrier hook into the
+  explicit `hal` plus MMU boundary without widening the admitted running
+  slice. They leave the next open question centered on running-system growth
+  rather than on whether one honest barrier-facing hook exists at all.
 
 Band C - Grow From One Running Kernel To One Small Running System
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

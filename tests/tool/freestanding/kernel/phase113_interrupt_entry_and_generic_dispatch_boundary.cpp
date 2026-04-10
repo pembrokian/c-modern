@@ -19,7 +19,7 @@ void ExpectPhase113BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase113_interrupt_boundary_run_output.txt",
                                                              "freestanding kernel phase113 interrupt boundary run");
-    if (!run_outcome.exited || run_outcome.exit_code != 115) {
+    if (!run_outcome.exited || run_outcome.exit_code != 116) {
         Fail("phase113 freestanding kernel interrupt boundary run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -56,23 +56,23 @@ void ExpectPhase113PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string position = ReadFile(position_path);
     ExpectOutputContains(position,
-                         "after Phase 115 closed the timer ownership hardening",
+                         "after Phase 116 closed the MMU activation barrier follow-through",
                          "phase113 position note should advance the current repository position");
     ExpectOutputContains(position,
-                         "timer ownership hardening.",
+                         "MMU activation barrier follow-through.",
                          "phase113 position note should reference the new closeout");
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 115 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 116 has moved the repository-owned kernel artifact beyond the landed",
                          "phase113 kernel README should record the interrupt boundary as current status");
     ExpectOutputContains(kernel_readme,
-                         "timer ownership hardening",
+                         "MMU activation barrier follow-through",
                          "phase113 kernel README should describe the interrupt owner");
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 115 timer-ownership-hardened kernel target",
+                         "currently a Phase 116 MMU-activation-barrier-hardened kernel target",
                          "phase113 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase113_interrupt_entry_and_generic_dispatch_boundary.cpp",
@@ -83,7 +83,7 @@ void ExpectPhase113PublicationSlice(const std::filesystem::path& phase_doc_path,
                          "phase113_interrupt_entry_and_generic_dispatch_boundary.cpp",
                          "phase113 freestanding README should list the new kernel proof owner");
     ExpectOutputContains(freestanding_readme,
-                         "phase115_timer_ownership_hardening.cpp",
+                         "phase116_mmu_activation_barrier_follow_through.cpp",
                          "phase113 freestanding README should reflect the next landed kernel proof owner");
 
     const std::string decision_log = ReadFile(decision_log_path);
@@ -103,15 +103,11 @@ void ExpectPhase113MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE115_MARKER] type=i32",
+            "ConstGlobal names=[PHASE116_MARKER] type=i32",
             "Function name=interrupt.arch_enter_interrupt returns=[interrupt.InterruptEntry]",
             "Function name=interrupt.dispatch_interrupt returns=[interrupt.InterruptDispatchResult]",
             "Function name=interrupt.validate_interrupt_entry_and_dispatch_boundary returns=[bool]",
             "Function name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary returns=[bool]",
-            "target=interrupt.arch_enter_interrupt target_kind=function target_name=interrupt.arch_enter_interrupt",
-            "target=interrupt.dispatch_interrupt target_kind=function target_name=interrupt.dispatch_interrupt",
-            "target=interrupt.validate_interrupt_entry_and_dispatch_boundary target_kind=function target_name=interrupt.validate_interrupt_entry_and_dispatch_boundary",
-            "target=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary target_kind=function target_name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary",
         },
         expected_projection_path,
         "phase113 merged MIR should preserve the interrupt boundary projection");

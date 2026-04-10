@@ -149,6 +149,8 @@ inline std::string_view ToString(mir::Instruction::Kind kind) {
             return "slice_from_buffer";
         case mir::Instruction::Kind::kCall:
             return "call";
+        case mir::Instruction::Kind::kMemoryBarrier:
+            return "memory_barrier";
         case mir::Instruction::Kind::kVolatileLoad:
             return "volatile_load";
         case mir::Instruction::Kind::kVolatileStore:

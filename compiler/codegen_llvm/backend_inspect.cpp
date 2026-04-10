@@ -659,6 +659,18 @@ bool LowerInstruction(const mir::Instruction& instruction,
             return true;
         }
 
+        case mir::Instruction::Kind::kMemoryBarrier: {
+            if (!instruction.operands.empty()) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend expects memory_barrier without operands in function '" + function.name +
+                                       "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+            backend_block.instructions.push_back("memory_barrier");
+            return true;
+        }
+
         case mir::Instruction::Kind::kVolatileStore: {
             std::string ptr;
             BackendTypeInfo ptr_type;

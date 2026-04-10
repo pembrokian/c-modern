@@ -1,8 +1,5 @@
-  ConstGlobal names=[PHASE115_MARKER] type=i32
+  ConstGlobal names=[PHASE116_MARKER] type=i32
   TypeDecl kind=struct name=mmu.TranslationRoot
   Function name=mmu.bootstrap_translation_root returns=[mmu.TranslationRoot]
   Function name=mmu.validate_address_space_mmu_boundary returns=[bool]
   Function name=debug.validate_phase114_address_space_and_mmu_ownership_split returns=[bool]
-      symbol_ref %v2:proc(u32, usize)->mmu.TranslationRoot target=mmu.bootstrap_translation_root target_kind=function target_name=mmu.bootstrap_translation_root
-      symbol_ref %v116:proc()->bool target=mmu.validate_address_space_mmu_boundary target_kind=function target_name=mmu.validate_address_space_mmu_boundary
-      symbol_ref %v28:proc(debug.RunningKernelSliceAudit, u32, u32, u32, u32, u32, u32)->bool target=debug.validate_phase114_address_space_and_mmu_ownership_split target_kind=function target_name=debug.validate_phase114_address_space_and_mmu_ownership_split

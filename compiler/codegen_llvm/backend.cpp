@@ -3182,6 +3182,21 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             return true;
         }
 
+        case mir::Instruction::Kind::kMemoryBarrier: {
+            if (!RequireOperandCount(instruction,
+                                     0,
+                                     "LLVM bootstrap executable emission",
+                                     "memory_barrier",
+                                     state.function->name,
+                                     block,
+                                     source_path,
+                                     diagnostics)) {
+                return false;
+            }
+            output_lines.push_back("fence seq_cst");
+            return true;
+        }
+
         case mir::Instruction::Kind::kVolatileStore: {
             ExecutableValue ptr;
             ExecutableValue value;

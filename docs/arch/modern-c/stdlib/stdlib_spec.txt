@@ -101,7 +101,7 @@ Toolchain companion module:
 
 `hal`
 - hardware-facing or freestanding helpers
-- examples: `mmio_ptr`, `volatile_load`, `volatile_store`, target-specific escape hatches
+- examples: `mmio_ptr`, `memory_barrier`, `volatile_load`, `volatile_store`, target-specific escape hatches
 - rule: `hal` is where hardware reality lives, not `mem` or `sync`
 
 `startup`

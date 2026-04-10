@@ -20,6 +20,7 @@ constexpr SpecialCallEntry kSpecialCallTable[] = {
     {"buffer_free", "mem", SpecialCallKind::kBufferFree},
     {"arena_new", "mem", SpecialCallKind::kArenaNew},
     {"slice_from_buffer", "mem", SpecialCallKind::kSliceFromBuffer},
+    {"memory_barrier", "hal", SpecialCallKind::kMemoryBarrier},
     {"volatile_load", "hal", SpecialCallKind::kVolatileLoad},
     {"volatile_store", "hal", SpecialCallKind::kVolatileStore},
     {"atomic_load", "sync", SpecialCallKind::kAtomicLoad},

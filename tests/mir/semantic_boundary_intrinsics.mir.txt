@@ -5,6 +5,9 @@ Module
     Variant name=Release
   TypeDecl kind=struct name=Atomic
     typeParams=[T]
+  Function name=memory_barrier
+    Block label=entry0
+      terminator return
   Function name=volatile_load returns=[i32]
     Local name=ptr type=*i32 param readonly
     Block label=entry0
@@ -65,6 +68,7 @@ Module
       load_local %v2:*i32 target=ptr
       load_local %v3:i32 target=value
       volatile_store target=volatile_store target_kind=function target_name=volatile_store operands=[%v2, %v3]
+      memory_barrier target=memory_barrier target_kind=function target_name=memory_barrier
       load_local %v4:*Atomic<i32> target=atom
       symbol_ref %v5:MemoryOrder target=MemoryOrder.Acquire target_kind=other target_name=MemoryOrder.Acquire
       atomic_load %v6:i32 op=order=MemoryOrder.Acquire target=atomic_load target_kind=function target_name=atomic_load operands=[%v4, %v5]

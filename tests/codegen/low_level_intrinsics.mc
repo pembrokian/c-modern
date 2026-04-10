@@ -8,6 +8,9 @@ enum MemoryOrder {
 
 struct Atomic<T> {}
 
+func memory_barrier() {
+}
+
 func volatile_load(ptr: *i32) i32 {
     return 0
 }
@@ -32,6 +35,7 @@ func atomic_fetch_add(ptr: *Atomic<i32>, value: i32, order: MemoryOrder) i32 {
 
 func volatile_roundtrip(ptr: *i32, value: i32) i32 {
     volatile_store(ptr, value)
+    memory_barrier()
     return volatile_load(ptr)
 }
 

@@ -86,7 +86,7 @@ Frozen support matrix
   `target`, explicit `[targets.<name>.runtime] startup`, and optional explicit
   `[targets.<name>.link] inputs = [...]`
 - admitted public stdlib boundary: narrow `hal` `mmio_ptr<T>`,
-  `volatile_load<T>`, and `volatile_store<T>`
+  `memory_barrier()`, `volatile_load<T>`, and `volatile_store<T>`
 - admitted proof set: Phase 81 boot-marker executable proof, Phase 82
   explicit manifest-owned link-input proof, Phase 83 deterministic
   polling-console proof, Phase 85 kernel endpoint queue smoke proof, and
@@ -151,9 +151,9 @@ Known limitations
   admission
 - the repository still does not claim kernel-image assembly, init packaging,
   early-service packaging, general interrupt handling, broader timer
-  facilities, barriers, or richer hardware abstractions
+  facilities, broader barrier taxonomy, or richer hardware abstractions
 - the public `hal` boundary remains intentionally narrow: `mmio_ptr<T>`,
-  `volatile_load<T>`, and `volatile_store<T>` only
+  `memory_barrier()`, `volatile_load<T>`, and `volatile_store<T>` only
 
 Practical support statement
 ---------------------------

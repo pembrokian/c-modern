@@ -28,6 +28,7 @@ enum class SpecialCallKind {
     kBufferFree,
     kArenaNew,
     kSliceFromBuffer,
+    kMemoryBarrier,
     kVolatileLoad,
     kVolatileStore,
     kAtomicLoad,

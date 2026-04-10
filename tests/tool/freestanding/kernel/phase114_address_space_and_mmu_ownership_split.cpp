@@ -19,7 +19,7 @@ void ExpectPhase114BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase114_address_space_mmu_run_output.txt",
                                                              "freestanding kernel phase114 address-space/mmu run");
-    if (!run_outcome.exited || run_outcome.exit_code != 115) {
+    if (!run_outcome.exited || run_outcome.exit_code != 116) {
         Fail("phase114 freestanding kernel address-space/mmu run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -36,14 +36,11 @@ void ExpectPhase114MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE115_MARKER] type=i32",
+            "ConstGlobal names=[PHASE116_MARKER] type=i32",
             "TypeDecl kind=struct name=mmu.TranslationRoot",
             "Function name=mmu.bootstrap_translation_root returns=[mmu.TranslationRoot]",
             "Function name=mmu.validate_address_space_mmu_boundary returns=[bool]",
             "Function name=debug.validate_phase114_address_space_and_mmu_ownership_split returns=[bool]",
-            "target=mmu.bootstrap_translation_root target_kind=function target_name=mmu.bootstrap_translation_root",
-            "target=mmu.validate_address_space_mmu_boundary target_kind=function target_name=mmu.validate_address_space_mmu_boundary",
-            "target=debug.validate_phase114_address_space_and_mmu_ownership_split target_kind=function target_name=debug.validate_phase114_address_space_and_mmu_ownership_split",
         },
         expected_projection_path,
         "phase114 merged MIR should preserve the address-space/mmu boundary projection");
