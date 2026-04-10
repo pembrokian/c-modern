@@ -26,6 +26,12 @@ void RunFreestandingKernelPhase106RealEchoServiceRequestReply(const std::filesys
 void RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(const std::filesystem::path& source_root,
                                                                    const std::filesystem::path& binary_root,
                                                                    const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesystem::path& source_root,
+                                                             const std::filesystem::path& binary_root,
+                                                             const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase109FirstRunningKernelSliceAudit(const std::filesystem::path& source_root,
+                                                               const std::filesystem::path& binary_root,
+                                                               const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -37,6 +43,8 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase105RealLogServiceHandshake(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase106RealEchoServiceRequestReply(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase108KernelImageProgramCapAudit(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase109FirstRunningKernelSliceAudit(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

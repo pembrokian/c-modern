@@ -57,7 +57,7 @@ const TRANSFER_SERVICE_GRANT_BYTE1: u8 = 73
 const TRANSFER_SERVICE_GRANT_BYTE2: u8 = 86
 const TRANSFER_SERVICE_GRANT_BYTE3: u8 = 69
 const TRANSFER_SERVICE_EXIT_CODE: i32 = 54
-const PHASE107_MARKER: i32 = 107
+const PHASE109_MARKER: i32 = 109
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -2229,6 +2229,206 @@ func validate_phase107_user_to_user_capability_transfer() bool {
     return true
 }
 
+func validate_phase108_kernel_image_and_program_cap_contracts() bool {
+    if !capability.is_program_capability(INIT_BOOTSTRAP_CAPS.program_capability) {
+        return false
+    }
+    if INIT_BOOTSTRAP_CAPS.program_capability.owner_pid != INIT_PID {
+        return false
+    }
+    if INIT_BOOTSTRAP_CAPS.program_capability.slot_id != 2 {
+        return false
+    }
+    if INIT_BOOTSTRAP_CAPS.program_capability.rights != 7 {
+        return false
+    }
+    if INIT_BOOTSTRAP_CAPS.program_capability.object_id != 1 {
+        return false
+    }
+    if INIT_BOOTSTRAP_CAPS.program_capability.object_id == LOG_SERVICE_PROGRAM_OBJECT_ID {
+        return false
+    }
+    if INIT_BOOTSTRAP_CAPS.program_capability.object_id == ECHO_SERVICE_PROGRAM_OBJECT_ID {
+        return false
+    }
+    if INIT_BOOTSTRAP_CAPS.program_capability.object_id == TRANSFER_SERVICE_PROGRAM_OBJECT_ID {
+        return false
+    }
+    if capability.kind_score(LOG_SERVICE_PROGRAM_CAPABILITY.kind) != 1 {
+        return false
+    }
+    if capability.kind_score(ECHO_SERVICE_PROGRAM_CAPABILITY.kind) != 1 {
+        return false
+    }
+    if capability.kind_score(TRANSFER_SERVICE_PROGRAM_CAPABILITY.kind) != 1 {
+        return false
+    }
+    if LOG_SERVICE_SPAWN_OBSERVATION.wait_handle_slot != LOG_SERVICE_WAIT_HANDLE_SLOT {
+        return false
+    }
+    if ECHO_SERVICE_SPAWN_OBSERVATION.wait_handle_slot != ECHO_SERVICE_WAIT_HANDLE_SLOT {
+        return false
+    }
+    if TRANSFER_SERVICE_SPAWN_OBSERVATION.wait_handle_slot != TRANSFER_SERVICE_WAIT_HANDLE_SLOT {
+        return false
+    }
+    if LOG_SERVICE_WAIT_OBSERVATION.exit_code != LOG_SERVICE_EXIT_CODE {
+        return false
+    }
+    if ECHO_SERVICE_WAIT_OBSERVATION.exit_code != ECHO_SERVICE_EXIT_CODE {
+        return false
+    }
+    if TRANSFER_SERVICE_WAIT_OBSERVATION.exit_code != TRANSFER_SERVICE_EXIT_CODE {
+        return false
+    }
+    return true
+}
+
+func validate_phase109_first_running_kernel_slice() bool {
+    if KERNEL.booted != 1 {
+        return false
+    }
+    if KERNEL.current_pid != INIT_PID {
+        return false
+    }
+    if KERNEL.current_tid != INIT_TID {
+        return false
+    }
+    if KERNEL.active_asid != INIT_ASID {
+        return false
+    }
+    if KERNEL.user_entry_started != 1 {
+        return false
+    }
+    if INIT_BOOTSTRAP_HANDOFF.authority_count != 2 {
+        return false
+    }
+    if INIT_BOOTSTRAP_HANDOFF.ambient_root_visible != 0 {
+        return false
+    }
+    if syscall.status_score(RECEIVE_OBSERVATION.status) != 2 {
+        return false
+    }
+    if RECEIVE_OBSERVATION.payload_len != 4 {
+        return false
+    }
+    if RECEIVE_OBSERVATION.payload[0] != 83 {
+        return false
+    }
+    if RECEIVE_OBSERVATION.payload[1] != 89 {
+        return false
+    }
+    if RECEIVE_OBSERVATION.payload[2] != 83 {
+        return false
+    }
+    if RECEIVE_OBSERVATION.payload[3] != 67 {
+        return false
+    }
+    if syscall.status_score(ATTACHED_RECEIVE_OBSERVATION.status) != 2 {
+        return false
+    }
+    if ATTACHED_RECEIVE_OBSERVATION.received_handle_count != 1 {
+        return false
+    }
+    if syscall.status_score(TRANSFERRED_HANDLE_USE_OBSERVATION.status) != 2 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload_len != 4 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload[0] != 77 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload[1] != 79 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload[2] != 86 {
+        return false
+    }
+    if TRANSFERRED_HANDLE_USE_OBSERVATION.payload[3] != 69 {
+        return false
+    }
+    if syscall.status_score(PRE_EXIT_WAIT_OBSERVATION.status) != 4 {
+        return false
+    }
+    if syscall.status_score(EXIT_WAIT_OBSERVATION.status) != 2 {
+        return false
+    }
+    if EXIT_WAIT_OBSERVATION.exit_code != CHILD_EXIT_CODE {
+        return false
+    }
+    if syscall.status_score(SLEEP_OBSERVATION.status) != 4 {
+        return false
+    }
+    if syscall.block_reason_score(SLEEP_OBSERVATION.block_reason) != 16 {
+        return false
+    }
+    if TIMER_WAKE_OBSERVATION.task_id != CHILD_TID {
+        return false
+    }
+    if TIMER_WAKE_OBSERVATION.wake_tick != 1 {
+        return false
+    }
+    if !validate_phase104_contract_hardening() {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.request_count != 1 {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.ack_count != 1 {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.request_byte != LOG_SERVICE_REQUEST_BYTE {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.ack_byte != 33 {
+        return false
+    }
+    if LOG_SERVICE_WAIT_OBSERVATION.exit_code != LOG_SERVICE_EXIT_CODE {
+        return false
+    }
+    if ECHO_SERVICE_EXCHANGE.reply_count != 1 {
+        return false
+    }
+    if ECHO_SERVICE_EXCHANGE.reply_byte0 != ECHO_SERVICE_REQUEST_BYTE0 {
+        return false
+    }
+    if ECHO_SERVICE_EXCHANGE.reply_byte1 != ECHO_SERVICE_REQUEST_BYTE1 {
+        return false
+    }
+    if ECHO_SERVICE_WAIT_OBSERVATION.exit_code != ECHO_SERVICE_EXIT_CODE {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.transferred_endpoint_id != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.transferred_rights != 5 {
+        return false
+    }
+    if TRANSFER_SERVICE_TRANSFER.emit_count != 1 {
+        return false
+    }
+    if TRANSFER_SERVICE_WAIT_OBSERVATION.exit_code != TRANSFER_SERVICE_EXIT_CODE {
+        return false
+    }
+    if !validate_phase108_kernel_image_and_program_cap_contracts() {
+        return false
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return false
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return false
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return false
+    }
+    if BOOT_LOG_APPEND_FAILED != 0 {
+        return false
+    }
+    return true
+}
+
 func execute_spawn_child_process() bool {
     WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
 
@@ -2580,43 +2780,49 @@ func bootstrap_main() i32 {
     if !validate_phase107_user_to_user_capability_transfer() {
         return 34
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 107)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !validate_phase108_kernel_image_and_program_cap_contracts() {
         return 35
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !validate_phase109_first_running_kernel_slice() {
         return 36
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 109)
+    if BOOT_MARKER_EMITTED != 1 {
         return 37
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 38
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 39
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 40
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 41
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 42
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 107 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 43
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 44
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 109 {
         return 45
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 46
     }
-    return PHASE107_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 47
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 48
+    }
+    return PHASE109_MARKER
 }

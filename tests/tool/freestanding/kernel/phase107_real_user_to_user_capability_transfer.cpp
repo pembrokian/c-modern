@@ -41,7 +41,7 @@ void RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(const std::fi
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase107_user_transfer_run_output.txt",
                                                              "freestanding kernel phase107 user-to-user capability transfer run");
-    if (!run_outcome.exited || run_outcome.exit_code != 107) {
+    if (!run_outcome.exited || run_outcome.exit_code != 109) {
         Fail("phase107 freestanding kernel user-to-user capability transfer run should exit with the proof marker:\n" +
              run_output);
     }

@@ -19,6 +19,8 @@ Structure
   - `phase105_real_log_service_handshake.cpp`: real-kernel log-service handshake proof.
   - `phase106_real_echo_service_request_reply.cpp`: real-kernel echo-service request-reply proof.
   - `phase107_real_user_to_user_capability_transfer.cpp`: real-kernel user-to-user capability transfer proof.
+  - `phase108_kernel_image_program_cap_audit.cpp`: real-kernel image-input and program-cap audit.
+  - `phase109_first_running_kernel_slice_audit.cpp`: real-kernel first-running-kernel-slice support audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

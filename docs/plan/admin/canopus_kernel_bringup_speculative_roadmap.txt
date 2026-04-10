@@ -1,4 +1,4 @@
-Phase 96 Through Phase 108 -- Speculative Canopus Kernel Bring-Up Roadmap
+Phase 96 Through Phase 109 -- Speculative Canopus Kernel Bring-Up Roadmap
 =========================================================================
 
 Status
@@ -169,10 +169,10 @@ Phase 103 is concrete as init bootstrap capability handoff:
   that later child-control handles still appear only through explicit spawn
   rather than ambient boot inheritance.
 
-Phase 105 through Phase 107 are now concrete as real log-service handshake,
-real echo-service request-reply, and real user-to-user capability-transfer
-proofs, and Phase 108 is now the next remaining Band D owner around image and
-support truth.
+Phase 105 through Phase 109 are now concrete as real log-service handshake,
+real echo-service request-reply, real user-to-user capability-transfer,
+kernel image plus program-cap audit, and first-running-kernel support-truth
+proofs.
 
 Likely themes:
 - one-to-one syscall mapping from `sys v0`
@@ -204,9 +204,9 @@ Phase 103 -- Init Bootstrap Capability Handoff
 
 Band C - Boot Real Init-Owned User Policy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 105 through 107 are now concrete as the first real service-policy and
-user-to-user authority proofs, and Phase 108 remains the next bounded image
-and support owner for the same landed kernel boundary.
+Phases 105 through 109 are now concrete as the first real service-policy,
+user-to-user authority, image-contract, and running-kernel support proofs
+over the same landed kernel boundary.
 
 Likely themes:
 - explicit boot capability handoff
@@ -239,8 +239,8 @@ Phase 107 -- Real User-To-User Capability Transfer
 
 Band D - Freeze The First Running Kernel Slice
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 108 and 109 likely harden the first real kernel slice around image and
-build truth, documentation, and one first-running-system statement.
+Phases 108 and 109 harden the first real kernel slice around image and build
+truth, documentation, and one first-running-system statement.
 
 Likely themes:
 - explicit kernel image and relink contract
@@ -251,7 +251,7 @@ Why this band comes last:
 - image and support truth are only honest after boot, syscalls, init, and the
   first services already work on the real kernel implementation.
 
-Possible phases in this band:
+Concrete phases in this band:
 
 Phase 108 -- Kernel Image And Program-Cap Audit
 - Exit criterion: the kernel image build path, program-cap source contract,
@@ -259,9 +259,10 @@ Phase 108 -- Kernel Image And Program-Cap Audit
   widening into broad packaging or install claims.
 
 Phase 109 -- First Running Canopus Kernel Slice Audit
-- Exit criterion: the repository can state one first running Canopus kernel
-  slice honestly, name exactly which boot, syscall, IPC, spawn, timer, and
-  service paths are admitted, and keep broader OS and target claims deferred.
+- Exit criterion: complete. The repository now states one first running
+  Canopus kernel slice honestly, names the admitted boot, syscall, IPC,
+  spawn, timer, service, and image-contract paths exactly, and keeps broader
+  OS and target claims deferred.
 
 Likely ordering bias
 --------------------

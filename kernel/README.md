@@ -6,9 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 107 has moved the repository-owned kernel artifact beyond the landed
-  real echo-service request-reply proof into one bounded real user-to-user
-  capability transfer proof.
+- Phase 109 has moved the repository-owned kernel artifact beyond the landed
+  kernel image and program-cap audit into one bounded first running Canopus
+  kernel slice audit.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -27,20 +27,26 @@ Current status
   request-and-acknowledgment flow with explicit service reap, one bounded real
   echo-service request-reply flow with explicit service reap, one bounded real
   user-to-user endpoint transfer with explicit sender-side removal and
-  receiver-side installation, and no broader multi-service bring-up yet.
+  receiver-side installation, one bounded kernel image-input and program-cap
+  audit, one bounded first running Canopus kernel slice audit, and no broader
+  multi-service bring-up yet.
 
 Current files
 -------------
 
-- `build.toml`: freestanding kernel manifest for the current proof slice
+- `build.toml`: freestanding kernel manifest for the current proof slice and
+  the explicit kernel image-input contract carried into the Phase 109 running-
+  kernel support statement
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core validation, bounded syscall-byte-IPC validation, bounded
   capability-carrying transfer validation, bounded spawn-and-wait
   validation, bounded timer sleep and wake validation, bounded init
   bootstrap-capability handoff validation, bounded Phase 104 contract-
   hardening regressions, one bounded Phase 105 real log-service handshake
-  proof, one bounded Phase 106 real echo-service request-reply proof, and one
-  bounded Phase 107 real user-to-user capability transfer proof
+  proof, one bounded Phase 106 real echo-service request-reply proof, one
+  bounded Phase 107 real user-to-user capability transfer proof, one bounded
+  Phase 108 kernel image-and-program-cap audit, and one bounded Phase 109
+  first-running-kernel-slice audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -71,7 +77,14 @@ Phase boundary
   critique-response hardening pass over helper and proof contracts, one
   bounded real log-service request-and-acknowledgment flow with explicit
   service reap, one bounded real echo-service request-reply flow with explicit
-  service reap, and one bounded real user-to-user endpoint transfer with
-  explicit service-side follow-through.
+  service reap, one bounded real user-to-user endpoint transfer with explicit
+  service-side follow-through, one bounded kernel image-and-program-cap audit,
+  and one bounded first running Canopus kernel slice audit.
+- The repository can now honestly claim one first running Canopus kernel
+  slice: explicit boot entry, first user entry, endpoint-and-handle object
+  core, syscall-owned byte-only IPC, attached-handle transfer, program-cap
+  spawn and wait, timer sleep and wake, init bootstrap-capability handoff,
+  real log-service handshake, real echo-service request-reply, real user-to-
+  user capability transfer, and kernel image/program-cap audit.
 - It does not yet claim general loading, multi-service launch, namespace
   policy, kill semantics, or a running init-owned service set.

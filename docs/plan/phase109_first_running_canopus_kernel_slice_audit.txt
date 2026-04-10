@@ -1,0 +1,191 @@
+Phase 109 -- First Running Canopus Kernel Slice Audit
+=====================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 108 kernel image and program-cap audit
+into the final remaining owner named by the speculative kernel roadmap:
+publish and validate one honest first running Canopus kernel slice support
+statement for the repository-owned kernel artifact without widening into a
+broader kernel platform, packaging, or cross-target claim.
+
+This document is both the Phase 109 execution note and its closeout.
+It does not claim general loading, broader multi-service startup policy,
+namespace policy, kill semantics, generalized user-space runtime support, or
+support beyond the explicitly admitted bounded kernel slice.
+
+Repository status note
+----------------------
+- Phase 96 made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 widened that owned target into one bounded address-space and first
+  user-entry handoff.
+- Phase 98 then made explicit endpoint tables, per-process handle tables, and
+  bounded queued-message lifetime concrete inside the same repository-owned
+  kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- Phase 100 then made one attached-handle transfer concrete across that same
+  syscall IPC boundary.
+- Phase 101 then made the first explicit program-capability spawn and wait
+  path concrete.
+- Phase 102 then made the first explicit timer-backed sleep, wake, and ready-
+  restoration path concrete.
+- Phase 103 then made one explicit bounded init bootstrap-capability handoff
+  concrete.
+- Phase 104 then hardened that same owned kernel lane around explicit helper
+  contracts, layout validation, and deterministic proof sequencing.
+- Phase 105 then proved that one real service task can launch and complete
+  one bounded request-and-acknowledgment flow over the landed syscall IPC
+  path.
+- Phase 106 then proved that one second bounded service task can preserve a
+  request-derived reply over that same landed boundary.
+- Phase 107 then proved that one explicit endpoint capability can cross a
+  real user-to-user boundary with sender-side removal, receiver-local
+  installation, and bounded follow-through use.
+- Phase 108 then made the emitted kernel image-input artifacts and explicit
+  program-cap provenance contract reviewable and regression-owned.
+- The remaining question was therefore no longer whether the repository-owned
+  kernel artifact had one honest bounded boot, IPC, lifecycle, service, and
+  image contract. It was whether the repository could now publish one exact
+  support statement naming that admitted slice and keep that statement tied to
+  the running artifact rather than to roadmap implication.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap reserved Phase 109 for the first
+  running-kernel slice audit after Phase 108 closed image-input and program-
+  cap contract pressure.
+- The repository already had the bounded mechanisms and service proofs needed
+  for that statement, but there was still no single canonical support note
+  naming exactly what the repository-owned kernel now admits and what it still
+  defers.
+- Without this step, the repository could drift in two bad directions at the
+  same time: undersell the landed kernel by treating it as still merely
+  speculative, or oversell it by implying a general Canopus platform rather
+  than one bounded first running kernel slice.
+
+Core rule
+---------
+- Keep the phase to one support-statement owner only.
+- Reuse the landed kernel artifact and prior proof validators rather than
+  inventing a new mechanism path.
+- State the admitted running slice explicitly in documentation and validate it
+  against the same owned kernel artifact that Phase 108 already builds.
+- Keep all non-goals explicit so the first running-kernel statement does not
+  blur into platform, loader, or multi-service completion claims.
+
+Chosen slice for this phase
+---------------------------
+Targeted audit shape:
+
+1. one canonical Phase 109 note that names the first running Canopus kernel
+   slice exactly, including the admitted bounded boot, user-entry, IPC,
+   lifecycle, service, and image-contract paths
+2. one narrow root-module audit function that revalidates the already landed
+   proof obligations as a single support-statement contract and emits a new
+   Phase 109 marker only after that aggregate slice remains true
+3. one focused freestanding regression that builds and runs the real kernel
+   target, checks the published Phase 109 support wording in the canonical
+   planning and orientation surfaces, and inspects MIR for the new Phase 109
+   audit path and marker
+4. refreshed planning and orientation surfaces so the repository records Phase
+   109 as concrete rather than leaving the first running-kernel claim trapped
+   inside the roadmap's next-owner language
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this boundary now because the needed mechanism and
+artifact proof work is already landed. The next honest owner is publishing the
+support statement for that slice and attaching it to one regression-owned
+kernel artifact.
+
+What this phase proves
+----------------------
+- the repository can now honestly claim one first running Canopus kernel
+  slice: explicit boot entry, first user entry, endpoint-and-handle object
+  core, syscall-owned byte-only IPC, attached-handle transfer, program-cap
+  spawn and wait, timer sleep and wake, init bootstrap-capability handoff,
+  real log-service handshake, real echo-service request-reply, real user-to-
+  user capability transfer, and kernel image/program-cap audit
+- the landed running slice is still one bounded repository-owned kernel
+  artifact rather than a general loader, broader service framework, or
+  packaging claim
+- the repository's support note, kernel README, and agent-facing repository
+  map can all describe that same admitted slice consistently and can be
+  validated against the real kernel build plus MIR output
+
+Deliverables
+------------
+- one canonical Phase 109 closeout note recording the implemented first
+  running Canopus kernel slice audit
+- one narrow `kernel/src/main.mc` audit function validating the aggregate
+  Phase 109 support-statement contract over the landed kernel artifact
+- one focused Phase 109 freestanding kernel regression validating the current
+  running marker, the published support wording, and MIR visibility of the new
+  aggregate audit path
+- refreshed planning and orientation surfaces so Phase 109 is concrete and the
+  repository's current kernel boundary is stated explicitly
+
+Suggested execution order
+-------------------------
+1. Add the smallest aggregate root-module audit needed to turn the prior phase
+   validators into one support-statement contract.
+2. Advance the kernel proof marker and boot-log detail only after that new
+   aggregate audit succeeds.
+3. Add the narrow Phase 109 freestanding regression for build, run, MIR, and
+   documentation wording checks.
+4. Refresh planning and orientation surfaces so the current top-of-slice
+   statement matches the landed running artifact exactly.
+
+Exit criteria
+-------------
+- one repository-owned kernel regression builds and runs the real kernel
+  target to a Phase 109 marker
+- the root proof module emits that marker only after the landed Phase 108
+  image/program-cap audit and the aggregate Phase 109 support-statement audit
+  both succeed
+- the canonical Phase 109 note, kernel README, and repository map all publish
+  the same first running-kernel slice statement without widening into broader
+  platform claims
+- merged MIR retains the explicit Phase 108 image/program-cap audit path and
+  adds one explicit Phase 109 first-running-kernel audit path plus marker
+- planning surfaces record Phase 109 as concrete rather than speculative
+
+Non-goals
+---------
+- general boot-image packaging, install policy, or cross-target support claims
+- general loading, dynamic service discovery, or a broader user-space runtime
+- namespace policy, kill semantics, preemption policy, or a larger scheduler
+  completion claim
+- general multi-service system bring-up beyond the bounded proofs already
+  admitted in the current kernel artifact
+
+Implemented slice
+-----------------
+- updated `kernel/src/main.mc` so the owned kernel artifact now performs one
+  narrow Phase 109 aggregate support-statement audit that rechecks the landed
+  endpoint, IPC, lifecycle, service, and Phase 108 image/program-cap proof
+  paths before emitting the current running-kernel marker
+- added one focused Phase 109 freestanding kernel regression that builds and
+  runs the real `kernel/build.toml` target, checks the Phase 109 support note,
+  kernel README, and repository map for the published first running-kernel
+  slice wording, and inspects MIR for the new audit function plus marker
+- refreshed the speculative Canopus kernel roadmap, kernel README, test notes,
+  repository map, and decision log so the repository now records Phase 109 as
+  concrete rather than leaving it as the next deferred owner
+
+Closeout statement
+------------------
+Phase 109 is complete as a first running Canopus kernel slice audit. The
+repository still does not claim a general Canopus platform, broader target
+support, general loading or packaging policy, or a running multi-service
+system beyond the bounded proofs already landed, but it now has one honest and
+published first running kernel slice statement attached to the real repository-
+owned kernel artifact and validated at the regression boundary.

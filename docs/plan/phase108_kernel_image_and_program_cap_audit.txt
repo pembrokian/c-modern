@@ -1,0 +1,195 @@
+Phase 108 -- Kernel Image And Program-Cap Audit
+===============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 107 real user-to-user capability transfer
+proof into the next remaining Band D owner: freeze the first real kernel
+slice around the actual kernel image-input build path, explicit program-cap
+source contract, and emitted artifact ownership without widening into boot-
+image packaging, install policy, or a broader cross-target support claim.
+
+This document is both the Phase 108 execution note and its closeout.
+It does not claim automatic image packaging inside `mc`, generalized linker
+policy, a public loader surface, or the final first-running-system support
+statement reserved for the next phase.
+
+Repository status note
+----------------------
+- Phase 96 made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 widened that owned target into one bounded address-space and first
+  user-entry handoff.
+- Phase 98 then made explicit endpoint tables, per-process handle tables, and
+  bounded queued-message lifetime concrete inside the same repository-owned
+  kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- Phase 100 then made one attached-handle transfer concrete across that same
+  syscall IPC boundary.
+- Phase 101 then made the first explicit program-capability spawn and wait
+  path concrete.
+- Phase 102 then made the first explicit timer-backed sleep, wake, and ready-
+  restoration path concrete.
+- Phase 103 then made one explicit bounded init bootstrap-capability handoff
+  concrete.
+- Phase 104 then hardened that same owned kernel lane around explicit helper
+  contracts, layout validation, and deterministic proof sequencing.
+- Phase 105 then proved that one real service task can launch and complete
+  one bounded request-and-acknowledgment flow over the landed syscall IPC
+  path.
+- Phase 106 then proved that one second bounded service task can preserve a
+  request-derived reply over that same landed boundary.
+- Phase 107 then proved that one explicit endpoint capability can cross a
+  real user-to-user boundary with sender-side removal, receiver-local
+  installation, and bounded follow-through use.
+- The next strongest kernel question was therefore no longer whether the
+  owned kernel artifact could boot or preserve one bounded service and
+  authority path. It was whether the repository could now describe and
+  validate the actual emitted kernel image-input artifacts and program-cap
+  provenance honestly enough to stop hand-waving around build ownership.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names kernel image and program-cap
+  audit pressure as the next bounded owner after the landed user-to-user
+  transfer proof.
+- The repository already had most of the necessary truth, but it was spread
+  across different places: `kernel/build.toml` carried explicit target,
+  freestanding environment, package identity, and startup ownership; the
+  build path emitted a module object, runtime object, and linked executable;
+  and the kernel proof lane already seeded and consumed explicit program
+  capabilities for init, log service, echo service, and transfer service.
+- Without this step, later support notes could overclaim that the repository
+  already has an honest kernel-image contract when the real emitted artifact
+  ownership and program-cap provenance were still only implicit across build
+  outputs and proof code.
+
+Core rule
+---------
+- Keep the phase to one audit owner only.
+- Reuse the landed kernel artifact and service proofs rather than inventing a
+  new runtime path.
+- Validate the actual emitted image-input artifacts the current build already
+  produces.
+- Keep program-cap provenance explicit in the root proof module and bootstrap
+  handoff rather than implying a general loader or ambient authority source.
+- Stop before boot-image assembly, linker scripts, install trees, shared
+  libraries, or general target-family promises.
+
+Chosen slice for this phase
+---------------------------
+Targeted audit shape:
+
+1. one canonical Phase 108 note that records the concrete kernel image-input
+   and program-cap provenance contract for the landed owned kernel slice
+2. one focused freestanding regression that builds the real kernel project,
+   validates explicit manifest-owned target plus startup truth, confirms that
+   the emitted module object and generated freestanding runtime object exist,
+   and manually re-links those emitted artifacts through the host Clang tool
+   to prove target-owned image follow-through without hidden driver state
+3. one narrow root-module audit function that verifies the landed bootstrap
+   program capability remains explicit, that later service program
+   capabilities are consumed rather than ambient, and that each bounded
+   service proof still terminates through explicit wait-handle observation
+4. refreshed planning and orientation surfaces so the repository records
+   Phase 108 as concrete and moves the next speculative owner to the first
+   running-kernel support statement rather than leaving image truth implied
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this audit boundary now because the actual kernel
+mechanisms and bounded service-policy proofs are already landed. The next
+honest owner is not more mechanism. It is making the emitted image-input
+artifacts and program-cap source contract explicit and reviewable.
+
+What this phase proves
+----------------------
+- the real kernel manifest keeps target identity, freestanding environment,
+  root module, package identity, and startup ownership explicit
+- the real kernel build emits reusable image-input artifacts consisting of
+  the lowered module objects and generated freestanding runtime object, and a
+  target-owned relink step can reconstruct the running artifact from those
+  emitted pieces without hidden extra driver state
+- the program capability that bootstraps `init` remains explicit in the
+  bootstrap handoff, while later service program capabilities remain seeded
+  and consumed inside the owned proof lane rather than appearing ambiently
+- the repository can now stop honestly at one kernel-image and program-cap
+  audit without implying boot-image packaging, broad target support, or a
+  final running-system claim
+
+Deliverables
+------------
+- one canonical Phase 108 closeout note recording the implemented kernel
+  image and program-cap audit
+- one narrow `kernel/src/main.mc` audit function validating the bounded
+  program-cap provenance contract over the landed Phase 107 artifact
+- one focused Phase 108 freestanding kernel regression validating manifest
+  truth, emitted image-input artifacts, manual relink follow-through, and MIR
+  visibility of explicit program-cap ownership
+- refreshed planning and orientation surfaces so Phase 108 is concrete and
+  the next speculative owner shifts to the first running-kernel slice audit
+
+Suggested execution order
+-------------------------
+1. Add the smallest root-module audit function needed to make program-cap
+   provenance explicit over the landed kernel artifact.
+2. Build the real kernel target and validate the manifest-owned freestanding
+   contract plus emitted image-input artifacts.
+3. Manually relink the emitted module objects and runtime object through the
+   host toolchain to prove target-owned image follow-through.
+4. Inspect merged MIR for explicit program-cap globals and seed helpers.
+5. Refresh planning and orientation surfaces so Phase 108 is concrete rather
+   than still speculative.
+
+Exit criteria
+-------------
+- one repository-owned kernel regression validates the real kernel manifest's
+  explicit freestanding target, package, root-module, and startup contract
+- the same regression proves that the real kernel build emits reusable image-
+  input artifacts and that those artifacts can be manually re-linked into a
+  running kernel artifact
+- the root proof module keeps explicit bootstrap and service program-cap
+  ownership visible and validates that the bounded service program caps are
+  consumed rather than ambient
+- the proof exits with exactly one bounded Phase 108 marker only after the
+  landed Phase 107 slice and the new audit function succeed
+- the planning surface records Phase 108 as concrete rather than speculative
+
+Non-goals
+---------
+- boot-image packaging, linker-script support, or arbitrary linker flags
+- install policy, shared-library policy, or broad cross-target support claims
+- a public loader framework or general user-space program-cap taxonomy
+- the final first-running-system support statement reserved for Phase 109
+
+Implemented slice
+-----------------
+- updated `kernel/src/main.mc` so the owned kernel artifact now performs one
+  narrow Phase 108 audit of bootstrap program-cap provenance, consumed
+  service program-cap state, and explicit service wait-handle closeout before
+  emitting the current proof marker
+- added one focused Phase 108 freestanding kernel regression that builds the
+  real `kernel/build.toml` target, checks explicit manifest-owned target plus
+  startup truth, confirms emitted module objects and runtime image-input
+  artifacts, manually re-links those artifacts through the host Clang
+  toolchain, runs both linked artifacts to the current marker, and inspects
+  MIR for explicit program-cap globals and seed helpers
+- refreshed the speculative Canopus kernel roadmap, repository map, kernel
+  README, tool-test notes, and decision log so the repository now records
+  Phase 108 as concrete and shifts the next speculative owner upward
+
+Closeout statement
+------------------
+Phase 108 is complete as a kernel image and program-cap audit. The repository
+still does not claim boot-image packaging, general loader policy, install
+support, or a final first-running-system statement, but it now has one honest
+real-kernel artifact whose manifest-owned freestanding contract, emitted
+image-input artifacts, manual relink follow-through, and explicit program-cap
+provenance are all documented and validated at the repository boundary.

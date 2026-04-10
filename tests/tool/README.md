@@ -24,7 +24,9 @@ Current structure
     `kernel/phase97_user_entry.cpp`, `kernel/phase98_endpoint_handle_core.cpp`,
     `kernel/phase105_real_log_service_handshake.cpp`,
     `kernel/phase106_real_echo_service_request_reply.cpp`,
-    `kernel/phase107_real_user_to_user_capability_transfer.cpp`: one kernel proof per file.
+    `kernel/phase107_real_user_to_user_capability_transfer.cpp`,
+    `kernel/phase108_kernel_image_program_cap_audit.cpp`,
+    `kernel/phase109_first_running_kernel_slice_audit.cpp`: one kernel proof per file.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-
     system coverage.
 - `tool_suite_tests.cpp` and `phase7_tool_tests.cpp`: compatibility runners
