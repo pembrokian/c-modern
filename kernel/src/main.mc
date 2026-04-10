@@ -3,6 +3,7 @@ import capability
 import endpoint
 import init
 import interrupt
+import log_service
 import state
 import syscall
 import timer
@@ -31,7 +32,13 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const PHASE104_MARKER: i32 = 104
+const LOG_SERVICE_PROGRAM_SLOT: u32 = 3
+const LOG_SERVICE_PROGRAM_OBJECT_ID: u32 = 2
+const LOG_SERVICE_WAIT_HANDLE_SLOT: u32 = 2
+const LOG_SERVICE_ENDPOINT_HANDLE_SLOT: u32 = 1
+const LOG_SERVICE_REQUEST_BYTE: u8 = 76
+const LOG_SERVICE_EXIT_CODE: i32 = 52
+const PHASE105_MARKER: i32 = 105
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -42,6 +49,7 @@ var BOOT_LOG_APPEND_FAILED: u32
 var BOOT_MARKER_EMITTED: u32
 var ROOT_CAPABILITY: capability.CapabilitySlot
 var INIT_PROGRAM_CAPABILITY: capability.CapabilitySlot
+var LOG_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
 var HANDLE_TABLES: [3]capability.HandleTable
 var WAIT_TABLES: [3]capability.WaitTable
 var ENDPOINTS: endpoint.EndpointTable
@@ -54,6 +62,8 @@ var ADDRESS_SPACE: address_space.AddressSpace
 var USER_FRAME: address_space.UserEntryFrame
 var CHILD_ADDRESS_SPACE: address_space.AddressSpace
 var CHILD_USER_FRAME: address_space.UserEntryFrame
+var LOG_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
+var LOG_SERVICE_USER_FRAME: address_space.UserEntryFrame
 var TIMER_STATE: timer.TimerState
 var DELIVERED_MESSAGE: endpoint.KernelMessage
 var RECEIVE_OBSERVATION: syscall.ReceiveObservation
@@ -65,6 +75,12 @@ var TIMER_WAKE_OBSERVATION: timer.TimerWakeObservation
 var WAKE_READY_QUEUE: state.ReadyQueue
 var PRE_EXIT_WAIT_OBSERVATION: syscall.WaitObservation
 var EXIT_WAIT_OBSERVATION: syscall.WaitObservation
+var LOG_SERVICE_STATE: log_service.LogServiceState
+var LOG_SERVICE_SPAWN_OBSERVATION: syscall.SpawnObservation
+var LOG_SERVICE_RECEIVE_OBSERVATION: syscall.ReceiveObservation
+var LOG_SERVICE_ACK_OBSERVATION: syscall.ReceiveObservation
+var LOG_SERVICE_HANDSHAKE: log_service.LogHandshakeObservation
+var LOG_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -76,6 +92,7 @@ func reset_kernel_state() {
     BOOT_MARKER_EMITTED = 0
     ROOT_CAPABILITY = capability.empty_slot()
     INIT_PROGRAM_CAPABILITY = capability.empty_slot()
+    LOG_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
     HANDLE_TABLES = capability.zero_handle_tables()
     WAIT_TABLES = capability.zero_wait_tables()
     ENDPOINTS = endpoint.empty_table()
@@ -88,6 +105,8 @@ func reset_kernel_state() {
     USER_FRAME = address_space.empty_frame()
     CHILD_ADDRESS_SPACE = address_space.empty_space()
     CHILD_USER_FRAME = address_space.empty_frame()
+    LOG_SERVICE_ADDRESS_SPACE = address_space.empty_space()
+    LOG_SERVICE_USER_FRAME = address_space.empty_frame()
     TIMER_STATE = timer.empty_timer_state()
     DELIVERED_MESSAGE = endpoint.empty_message()
     RECEIVE_OBSERVATION = syscall.empty_receive_observation()
@@ -99,6 +118,12 @@ func reset_kernel_state() {
     WAKE_READY_QUEUE = state.empty_queue()
     PRE_EXIT_WAIT_OBSERVATION = syscall.empty_wait_observation()
     EXIT_WAIT_OBSERVATION = syscall.empty_wait_observation()
+    LOG_SERVICE_STATE = log_service.service_state(0, 0)
+    LOG_SERVICE_SPAWN_OBSERVATION = syscall.empty_spawn_observation()
+    LOG_SERVICE_RECEIVE_OBSERVATION = syscall.empty_receive_observation()
+    LOG_SERVICE_ACK_OBSERVATION = syscall.empty_receive_observation()
+    LOG_SERVICE_HANDSHAKE = log_service.LogHandshakeObservation{ service_pid: 0, client_pid: 0, endpoint_id: 0, tag: log_service.LogMessageTag.None, request_len: 0, request_byte: 0, ack_byte: 0, request_count: 0, ack_count: 0 }
+    LOG_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -1212,6 +1237,268 @@ func validate_phase104_contract_hardening() bool {
     return validate_syscall_contract_hardening()
 }
 
+func seed_log_service_program_capability() bool {
+    LOG_SERVICE_PROGRAM_CAPABILITY = capability.CapabilitySlot{ slot_id: LOG_SERVICE_PROGRAM_SLOT, owner_pid: INIT_PID, kind: capability.CapabilityKind.InitProgram, rights: 7, object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
+    return capability.is_program_capability(LOG_SERVICE_PROGRAM_CAPABILITY)
+}
+
+func spawn_log_service() bool {
+    WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
+    HANDLE_TABLES[2] = capability.handle_table_for_owner(CHILD_PID)
+
+    spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(LOG_SERVICE_WAIT_HANDLE_SLOT)
+    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, LOG_SERVICE_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
+    SYSCALL_GATE = spawn_result.gate
+    LOG_SERVICE_PROGRAM_CAPABILITY = spawn_result.program_capability
+    PROCESS_SLOTS = spawn_result.process_slots
+    TASK_SLOTS = spawn_result.task_slots
+    WAIT_TABLES[1] = spawn_result.wait_table
+    LOG_SERVICE_ADDRESS_SPACE = spawn_result.child_address_space
+    LOG_SERVICE_USER_FRAME = spawn_result.child_frame
+    LOG_SERVICE_SPAWN_OBSERVATION = spawn_result.observation
+    if syscall.status_score(LOG_SERVICE_SPAWN_OBSERVATION.status) != 2 {
+        return false
+    }
+
+    HANDLE_TABLES[2] = capability.install_endpoint_handle(HANDLE_TABLES[2], LOG_SERVICE_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
+    LOG_SERVICE_STATE = log_service.service_state(CHILD_PID, LOG_SERVICE_ENDPOINT_HANDLE_SLOT)
+    READY_QUEUE = state.user_ready_queue(CHILD_TID)
+    return capability.find_endpoint_for_handle(HANDLE_TABLES[2], LOG_SERVICE_ENDPOINT_HANDLE_SLOT) == INIT_ENDPOINT_ID
+}
+
+func execute_log_service_request_reply() bool {
+    request_payload: [4]u8 = endpoint.zero_payload()
+    request_payload[0] = LOG_SERVICE_REQUEST_BYTE
+
+    request_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 1, request_payload))
+    SYSCALL_GATE = request_send_result.gate
+    HANDLE_TABLES[1] = request_send_result.handle_table
+    ENDPOINTS = request_send_result.endpoints
+    if syscall.status_score(request_send_result.status) != 2 {
+        return false
+    }
+
+    service_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, syscall.build_receive_request(LOG_SERVICE_ENDPOINT_HANDLE_SLOT))
+    SYSCALL_GATE = service_receive_result.gate
+    HANDLE_TABLES[2] = service_receive_result.handle_table
+    ENDPOINTS = service_receive_result.endpoints
+    LOG_SERVICE_RECEIVE_OBSERVATION = service_receive_result.observation
+    if syscall.status_score(LOG_SERVICE_RECEIVE_OBSERVATION.status) != 2 {
+        return false
+    }
+    LOG_SERVICE_STATE = log_service.record_open_request(LOG_SERVICE_STATE, LOG_SERVICE_RECEIVE_OBSERVATION)
+
+    ack_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[2], ENDPOINTS, CHILD_PID, syscall.build_send_request(LOG_SERVICE_ENDPOINT_HANDLE_SLOT, 1, log_service.ack_payload()))
+    SYSCALL_GATE = ack_send_result.gate
+    HANDLE_TABLES[2] = ack_send_result.handle_table
+    ENDPOINTS = ack_send_result.endpoints
+    if syscall.status_score(ack_send_result.status) != 2 {
+        return false
+    }
+
+    init_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
+    SYSCALL_GATE = init_receive_result.gate
+    HANDLE_TABLES[1] = init_receive_result.handle_table
+    ENDPOINTS = init_receive_result.endpoints
+    LOG_SERVICE_ACK_OBSERVATION = init_receive_result.observation
+    if syscall.status_score(LOG_SERVICE_ACK_OBSERVATION.status) != 2 {
+        return false
+    }
+
+    LOG_SERVICE_STATE = log_service.record_ack(LOG_SERVICE_STATE, LOG_SERVICE_ACK_OBSERVATION.payload[0])
+    LOG_SERVICE_HANDSHAKE = log_service.observe_handshake(LOG_SERVICE_STATE)
+    return true
+}
+
+func simulate_log_service_exit() {
+    processes: [3]state.ProcessSlot = PROCESS_SLOTS
+    tasks: [3]state.TaskSlot = TASK_SLOTS
+    wait_tables: [3]capability.WaitTable = WAIT_TABLES
+
+    processes[2] = state.exit_process_slot(processes[2])
+    tasks[2] = state.exit_task_slot(tasks[2])
+    wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, LOG_SERVICE_EXIT_CODE)
+
+    PROCESS_SLOTS = processes
+    TASK_SLOTS = tasks
+    WAIT_TABLES = wait_tables
+    READY_QUEUE = state.empty_queue()
+}
+
+func execute_phase105_log_service_handshake() bool {
+    if !seed_log_service_program_capability() {
+        return false
+    }
+    if !spawn_log_service() {
+        return false
+    }
+    if !execute_log_service_request_reply() {
+        return false
+    }
+    simulate_log_service_exit()
+
+    wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(LOG_SERVICE_WAIT_HANDLE_SLOT))
+    SYSCALL_GATE = wait_result.gate
+    PROCESS_SLOTS = wait_result.process_slots
+    TASK_SLOTS = wait_result.task_slots
+    WAIT_TABLES[1] = wait_result.wait_table
+    LOG_SERVICE_WAIT_OBSERVATION = wait_result.observation
+    HANDLE_TABLES[2] = capability.empty_handle_table()
+    READY_QUEUE = state.empty_queue()
+    return syscall.status_score(LOG_SERVICE_WAIT_OBSERVATION.status) == 2
+}
+
+func validate_phase105_log_service_handshake() bool {
+    if capability.kind_score(LOG_SERVICE_PROGRAM_CAPABILITY.kind) != 1 {
+        return false
+    }
+    if syscall.id_score(SYSCALL_GATE.last_id) != 16 {
+        return false
+    }
+    if syscall.status_score(SYSCALL_GATE.last_status) != 2 {
+        return false
+    }
+    if SYSCALL_GATE.send_count != 5 {
+        return false
+    }
+    if SYSCALL_GATE.receive_count != 5 {
+        return false
+    }
+    if LOG_SERVICE_SPAWN_OBSERVATION.child_pid != CHILD_PID {
+        return false
+    }
+    if LOG_SERVICE_SPAWN_OBSERVATION.child_tid != CHILD_TID {
+        return false
+    }
+    if LOG_SERVICE_SPAWN_OBSERVATION.child_asid != CHILD_ASID {
+        return false
+    }
+    if LOG_SERVICE_SPAWN_OBSERVATION.wait_handle_slot != LOG_SERVICE_WAIT_HANDLE_SLOT {
+        return false
+    }
+    if syscall.status_score(LOG_SERVICE_SPAWN_OBSERVATION.status) != 2 {
+        return false
+    }
+    if LOG_SERVICE_RECEIVE_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
+        return false
+    }
+    if LOG_SERVICE_RECEIVE_OBSERVATION.source_pid != INIT_PID {
+        return false
+    }
+    if LOG_SERVICE_RECEIVE_OBSERVATION.payload_len != 1 {
+        return false
+    }
+    if LOG_SERVICE_RECEIVE_OBSERVATION.payload[0] != LOG_SERVICE_REQUEST_BYTE {
+        return false
+    }
+    if LOG_SERVICE_ACK_OBSERVATION.endpoint_id != INIT_ENDPOINT_ID {
+        return false
+    }
+    if LOG_SERVICE_ACK_OBSERVATION.source_pid != CHILD_PID {
+        return false
+    }
+    if LOG_SERVICE_ACK_OBSERVATION.payload_len != 1 {
+        return false
+    }
+    if LOG_SERVICE_ACK_OBSERVATION.payload[0] != 33 {
+        return false
+    }
+    if LOG_SERVICE_STATE.owner_pid != CHILD_PID {
+        return false
+    }
+    if LOG_SERVICE_STATE.endpoint_handle_slot != LOG_SERVICE_ENDPOINT_HANDLE_SLOT {
+        return false
+    }
+    if LOG_SERVICE_STATE.handled_request_count != 1 {
+        return false
+    }
+    if LOG_SERVICE_STATE.ack_count != 1 {
+        return false
+    }
+    if LOG_SERVICE_STATE.last_client_pid != INIT_PID {
+        return false
+    }
+    if LOG_SERVICE_STATE.last_endpoint_id != INIT_ENDPOINT_ID {
+        return false
+    }
+    if LOG_SERVICE_STATE.last_request_len != 1 {
+        return false
+    }
+    if LOG_SERVICE_STATE.last_request_byte != LOG_SERVICE_REQUEST_BYTE {
+        return false
+    }
+    if LOG_SERVICE_STATE.last_ack_byte != 33 {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.service_pid != CHILD_PID {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.client_pid != INIT_PID {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.endpoint_id != INIT_ENDPOINT_ID {
+        return false
+    }
+    if log_service.tag_score(LOG_SERVICE_HANDSHAKE.tag) != 4 {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.request_len != 1 {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.request_byte != LOG_SERVICE_REQUEST_BYTE {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.ack_byte != 33 {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.request_count != 1 {
+        return false
+    }
+    if LOG_SERVICE_HANDSHAKE.ack_count != 1 {
+        return false
+    }
+    if syscall.status_score(LOG_SERVICE_WAIT_OBSERVATION.status) != 2 {
+        return false
+    }
+    if LOG_SERVICE_WAIT_OBSERVATION.child_pid != CHILD_PID {
+        return false
+    }
+    if LOG_SERVICE_WAIT_OBSERVATION.exit_code != LOG_SERVICE_EXIT_CODE {
+        return false
+    }
+    if LOG_SERVICE_WAIT_OBSERVATION.wait_handle_slot != LOG_SERVICE_WAIT_HANDLE_SLOT {
+        return false
+    }
+    if WAIT_TABLES[1].count != 0 {
+        return false
+    }
+    if capability.find_child_for_wait_handle(WAIT_TABLES[1], LOG_SERVICE_WAIT_HANDLE_SLOT) != 0 {
+        return false
+    }
+    if HANDLE_TABLES[2].count != 0 {
+        return false
+    }
+    if READY_QUEUE.count != 0 {
+        return false
+    }
+    if state.process_state_score(PROCESS_SLOTS[2].state) != 1 {
+        return false
+    }
+    if state.task_state_score(TASK_SLOTS[2].state) != 1 {
+        return false
+    }
+    if address_space.state_score(LOG_SERVICE_ADDRESS_SPACE.state) != 2 {
+        return false
+    }
+    if LOG_SERVICE_ADDRESS_SPACE.owner_pid != CHILD_PID {
+        return false
+    }
+    if LOG_SERVICE_USER_FRAME.task_id != CHILD_TID {
+        return false
+    }
+    return true
+}
+
 func execute_spawn_child_process() bool {
     WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
 
@@ -1545,43 +1832,49 @@ func bootstrap_main() i32 {
     if !validate_phase104_contract_hardening() {
         return 28
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 104)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !execute_phase105_log_service_handshake() {
         return 29
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !validate_phase105_log_service_handshake() {
         return 30
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 105)
+    if BOOT_MARKER_EMITTED != 1 {
         return 31
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 32
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 33
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 34
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 35
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 36
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 104 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 37
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 38
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 105 {
         return 39
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 40
     }
-    return PHASE104_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 41
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 42
+    }
+    return PHASE105_MARKER
 }

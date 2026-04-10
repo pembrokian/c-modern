@@ -16,7 +16,7 @@ Structure
   - `phase88_build_integration.cpp`: emitted-object and relink proof.
   - `phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof.
   - `phase98_endpoint_handle_core.cpp`: real-kernel endpoint-and-handle-core proof.
-  - `phase104_kernel_critique_hardening.cpp`: real-kernel critique-response hardening proof.
+  - `phase105_real_log_service_handshake.cpp`: real-kernel log-service handshake proof.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

@@ -17,9 +17,9 @@ void RunFreestandingKernelPhase87StaticDataProof(const std::filesystem::path& so
 void RunFreestandingKernelPhase88BuildIntegrationAudit(const std::filesystem::path& source_root,
                                                        const std::filesystem::path& binary_root,
                                                        const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase104CritiqueHardening(const std::filesystem::path& source_root,
-                                                    const std::filesystem::path& binary_root,
-                                                    const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase105RealLogServiceHandshake(const std::filesystem::path& source_root,
+                                                          const std::filesystem::path& binary_root,
+                                                          const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -28,7 +28,7 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase86TaskLifecycleProof(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase87StaticDataProof(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase88BuildIntegrationAudit(source_root, binary_root, mc_path);
-    RunFreestandingKernelPhase104CritiqueHardening(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase105RealLogServiceHandshake(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

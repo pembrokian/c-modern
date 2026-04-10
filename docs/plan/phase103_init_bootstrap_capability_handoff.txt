@@ -124,7 +124,7 @@ Deliverables
 - one focused freestanding kernel regression and MIR inspection validating the
   new bootstrap-handoff slice
 - refreshed planning and orientation surfaces so Phase 103 is concrete and
-  Phase 104 becomes the next remaining owner
+  Phase 105 becomes the next remaining owner
 
 Suggested execution order
 -------------------------
@@ -139,7 +139,7 @@ Suggested execution order
 4. Keep the landed syscall, spawn, sleep, wake, and reap follow-through on top
    of the explicit handoff contract.
 5. Inspect the merged MIR and refresh the planning surface so Phase 103 is
-   concrete and Phase 104 remains the next remaining owner.
+  concrete and Phase 105 remains the next remaining owner.
 
 Exit criteria
 -------------
@@ -184,7 +184,7 @@ Implemented slice
   global-state lowering for the new init bootstrap-set globals
 - refreshed the kernel README, agent map, freestanding test notes, backlog,
   decision log, and speculative Canopus kernel roadmap so the repository now
-  records Phase 103 as concrete and leaves Phase 104 as the next remaining
+  records Phase 103 as concrete and leaves Phase 105 as the next remaining
   owner
 
 Closeout statement

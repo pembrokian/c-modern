@@ -1,0 +1,191 @@
+Phase 105 -- Real Log-Service Handshake
+=======================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 104 kernel critique-response hardening pass
+into the next remaining Band C owner: prove that the repository-owned kernel
+artifact can launch one real bounded log-service task from one explicit
+program capability, drive one deterministic request-and-acknowledgment flow
+over the landed real syscall IPC path, and stop before claiming broader
+service startup, namespace policy, or a running multi-service system.
+
+This document is both the Phase 105 execution note and its closeout.
+It does not claim an echo service, user-to-user capability transfer,
+namespace discovery, service registry policy, or a broader init-owned runtime.
+
+Repository status note
+----------------------
+- Phase 96 made one real kernel-owned boot entry and deterministic state
+  skeleton concrete.
+- Phase 97 widened that owned target into one bounded address-space and first
+  user-entry handoff.
+- Phase 98 then made explicit endpoint tables, per-process handle tables, and
+  bounded queued-message lifetime concrete inside the same repository-owned
+  kernel artifact.
+- Phase 99 then made the first real syscall-owned byte-only send and receive
+  boundary honest over that landed endpoint and handle object core.
+- Phase 100 then made one attached-handle transfer concrete across that same
+  syscall IPC boundary.
+- Phase 101 then made the first explicit program-capability spawn and wait
+  path concrete.
+- Phase 102 then made the first explicit timer-backed sleep, wake, and ready-
+  restoration path concrete.
+- Phase 103 then made one explicit bounded init bootstrap-capability handoff
+  concrete.
+- Phase 104 then hardened that same owned kernel lane around explicit helper
+  contracts, layout validation, and deterministic proof sequencing.
+- The next strongest kernel question was therefore no longer whether the
+  kernel could boot, hand off init, and drive bounded child lifecycle state.
+  It was whether that same real kernel artifact could now launch one real
+  service task and preserve one small user-space policy handshake across the
+  landed syscall boundary.
+
+Problem being solved
+--------------------
+- The speculative Canopus kernel roadmap names a real log-service handshake
+  as the next bounded service-policy owner after the landed bootstrap-
+  capability and critique-hardening work.
+- The repository already had the necessary ingredients spread across the
+  owned kernel lane: one explicit init-visible endpoint handle, one real send
+  and receive syscall path, one consumed-on-success program-capability spawn
+  path, and one explicit wait-handle reap path.
+- Without this step, later service phases could overclaim that the repository
+  already preserves init-owned service policy across real kernel IPC when the
+  landed proofs still stopped at mechanism plus hardening.
+
+Core rule
+---------
+- Keep the phase to one real bounded log-service task only.
+- Reuse the already-landed syscall, endpoint, handle, spawn, and wait owners.
+- Add only the smallest helper module needed to keep the log-service protocol
+  state explicit and inspectable.
+- Keep the service protocol to one init-issued request and one log-service
+  acknowledgment reply.
+- Stop before echo-service generalization, service registries, user-to-user
+  transfer, or broader init orchestration.
+
+Chosen slice for this phase
+---------------------------
+Targeted proof shape:
+
+1. one bounded `log_service` helper module owning explicit log-service state,
+   acknowledgment payload construction, and final handshake observation
+2. one repository-owned kernel follow-through that seeds one dedicated
+   log-service program capability into init-visible state, spawns one log-
+   service task, and installs one explicit service-visible endpoint handle
+3. one deterministic init-issued log-open request and one service-issued
+   acknowledgment reply over the landed real syscall IPC path
+4. one explicit service-exit and wait-handle reap follow-through so the proof
+   cleans up the bounded child slot it uses
+5. one focused freestanding regression and MIR inspection proving that the
+   slice stays inside ordinary imported structs, enums, aggregate
+   initialization, fixed-array payloads, and explicit helper boundaries
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should cross this service boundary now because Phase 104 left
+the owned kernel lane mechanism-complete enough for one small real service
+proof. The next honest owner is not a general service framework. It is one
+bounded real log-service request-and-acknowledgment flow.
+
+What this phase proves
+----------------------
+- one real Canopus kernel artifact now launches one bounded log-service task
+  from one explicit program capability
+- init can issue one deterministic request to that service through the landed
+  real syscall IPC path and receive one bounded acknowledgment reply
+- the proof keeps the service protocol explicit inside one ordinary helper
+  module rather than inventing a special runtime or policy layer
+- the current language, freestanding build path, and kernel-owned proof lane
+  can carry the required service state, request observation, and fixed-array
+  acknowledgment payload without new compiler work
+- the repository can stop honestly at one real log-service handshake without
+  implying a broader multi-service system or a running general init stack
+
+Deliverables
+------------
+- one canonical Phase 105 closeout note recording the implemented real log-
+  service handshake
+- one bounded `kernel/src/log_service.mc` helper module owning the service-
+  local protocol state and handshake observation records
+- one updated repository-owned kernel target that spawns a log-service task,
+  runs the request-and-acknowledgment flow, and reaps the service cleanly
+- one focused freestanding kernel regression and MIR inspection validating the
+  new service slice while preserving the landed Phase 104 hardening proof
+- refreshed planning and orientation surfaces so Phase 105 is concrete and
+  the next speculative owner shifts upward accordingly
+
+Suggested execution order
+-------------------------
+1. Add the smallest bounded log-service helper module needed to keep request,
+   acknowledgment, and observation state explicit.
+2. Teach the repository-owned kernel target to seed one dedicated log-service
+   program capability, spawn the service task, and install one service-visible
+   endpoint handle.
+3. Drive one init-issued request and one service-issued acknowledgment over
+   the landed syscall IPC boundary.
+4. Reap the bounded service task through the landed wait path.
+5. Inspect the merged MIR and refresh planning surfaces so Phase 105 is
+   concrete rather than still speculative.
+
+Exit criteria
+-------------
+- one repository-owned kernel target launches one bounded log-service task
+  from one explicit program capability
+- init completes one deterministic request and one acknowledgment reply over
+  the landed real syscall IPC path
+- the proof exits with exactly one bounded Phase 105 marker only after the
+  service handshake and bounded service reap succeed
+- the merged MIR preserves explicit `log_service` helper-module records and
+  helper functions instead of collapsing the service protocol into the root
+  proof body or a special runtime boundary
+- the planning surface records Phase 105 as concrete rather than speculative
+
+Non-goals
+---------
+- echo-service request-reply generalization or broader service startup policy
+- service registries, namespace design, or loader generalization
+- user-to-user capability transfer beyond the already-landed Phase 100 slice
+- multi-service orchestration, restart policy, or a running general user-
+  space system claim
+- claiming a complete Canopus kernel slice or broader target support
+
+Implemented slice
+-----------------
+- added `kernel/src/log_service.mc` so the owned kernel tree now supports one
+  bounded log-service state record, one final handshake observation record,
+  one explicit request-to-acknowledgment state transition, and one fixed-array
+  acknowledgment payload helper through ordinary imported structs and enums
+- updated `kernel/src/main.mc` so the repository-owned kernel target now seeds
+  one dedicated log-service program capability, spawns one bounded service
+  task in the recycled child slot, installs one service-visible endpoint
+  handle, runs one init-issued request and one service-issued acknowledgment
+  over the landed syscall IPC path, reaps that service through the landed wait
+  path, preserves the landed Phase 104 hardening validation, and then emits
+  the Phase 105 marker
+- added one focused Phase 105 freestanding kernel regression that builds and
+  runs the repository-owned kernel target, expects the Phase 105 marker, and
+  inspects merged MIR for preserved Phase 104 hardening plus explicit
+  `log_service` helper-module records and functions
+- refreshed the speculative Canopus kernel roadmap, repository map, kernel
+  README, freestanding test notes, backlog, and decision log so the
+  repository now records Phase 105 as concrete and shifts the next speculative
+  service owners upward
+
+Closeout statement
+------------------
+Phase 105 is complete as a real log-service handshake proof. The repository
+still does not claim a general service framework, user-to-user capability
+transfer beyond the landed Phase 100 slice, or a running multi-service
+system, but it now has one honest real-kernel artifact that boots, reaches
+first user entry, owns explicit endpoint and handle state, drives real
+syscall IPC, preserves the landed hardening contracts, and launches plus
+reaps one bounded log-service task around one deterministic request-and-
+acknowledgment flow.

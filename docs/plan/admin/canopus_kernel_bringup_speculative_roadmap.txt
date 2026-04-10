@@ -169,7 +169,7 @@ Phase 103 is concrete as init bootstrap capability handoff:
   that later child-control handles still appear only through explicit spawn
   rather than ambient boot inheritance.
 
-Phase 104 is now the next remaining Band C owner around real log-service
+Phase 105 is now the next remaining Band C owner around real log-service
 handshake and first service-policy truth.
 
 Likely themes:
@@ -202,7 +202,7 @@ Phase 103 -- Init Bootstrap Capability Handoff
 
 Band C - Boot Real Init-Owned User Policy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 104 through 106 likely prove that the real kernel can now use that
+Phases 105 through 107 likely prove that the real kernel can now use that
 explicit bootstrap capability set to launch the same first service stories the
 proof ladder already modeled.
 
@@ -219,24 +219,24 @@ Why this band is separate:
 
 Possible phases in this band:
 
-Phase 104 -- Real Log-Service Handshake
+Phase 105 -- Real Log-Service Handshake
 - Exit criterion: init launches one real log service from one program
   capability and completes one bounded request-and-acknowledgment flow over
   the real kernel IPC path.
 
-Phase 105 -- Real Echo-Service Request Or Reply Proof
+Phase 106 -- Real Echo-Service Request Or Reply Proof
 - Exit criterion: init launches one second bounded service and one client so
   the system completes one real request-reply exchange through the real kernel
   IPC boundary.
 
-Phase 106 -- Real User-To-User Capability Transfer
+Phase 107 -- Real User-To-User Capability Transfer
 - Exit criterion: one user-space component transfers one explicit endpoint or
   wait-style authority to another over real kernel IPC, and the receiver uses
   it for one bounded action without ambient shortcuts.
 
 Band D - Freeze The First Running Kernel Slice
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 107 and 108 likely harden the first real kernel slice around image and
+Phases 108 and 109 likely harden the first real kernel slice around image and
 build truth, documentation, and one first-running-system statement.
 
 Likely themes:
@@ -250,12 +250,12 @@ Why this band comes last:
 
 Possible phases in this band:
 
-Phase 107 -- Kernel Image And Program-Cap Audit
+Phase 108 -- Kernel Image And Program-Cap Audit
 - Exit criterion: the kernel image build path, program-cap source contract,
   and emitted artifact ownership are documented and validated honestly without
   widening into broad packaging or install claims.
 
-Phase 108 -- First Running Canopus Kernel Slice Audit
+Phase 109 -- First Running Canopus Kernel Slice Audit
 - Exit criterion: the repository can state one first running Canopus kernel
   slice honestly, name exactly which boot, syscall, IPC, spawn, timer, and
   service paths are admitted, and keep broader OS and target claims deferred.
@@ -291,4 +291,4 @@ Interpretation guide
 - If the real kernel path exposes an actual compiler or language distortion,
   reopen the narrowest owning layer only at that proof boundary.
 - If the repository reaches a smaller honest running-kernel plateau earlier
-  than Phase 108, that is a success, not a roadmap failure.
+  than Phase 109, that is a success, not a roadmap failure.
