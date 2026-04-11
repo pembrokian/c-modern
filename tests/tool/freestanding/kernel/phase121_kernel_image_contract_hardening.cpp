@@ -111,8 +111,8 @@ void RunFreestandingKernelPhase121KernelImageContractHardening(const std::filesy
                                                                const std::filesystem::path& binary_root,
                                                                const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase121_kernel_image_contract_hardening.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase121_kernel_image_contract_hardening.txt");
     const std::filesystem::path support_note_path = source_root / "docs" / "plan" /
                                                     "canopus_running_system_support_statement.txt";
     const std::filesystem::path position_path = source_root / "docs" / "plan" / "admin" /

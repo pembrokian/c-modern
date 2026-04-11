@@ -111,8 +111,8 @@ void RunFreestandingKernelPhase126AuthorityLifetimeClassification(const std::fil
                                                                  const std::filesystem::path& binary_root,
                                                                  const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase126_authority_lifetime_classification.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase126_authority_lifetime_classification.txt");
     const std::filesystem::path position_path = source_root / "docs" / "plan" / "admin" /
                                                 "modern_c_canopus_readiness_position.txt";
     const std::filesystem::path tool_readme_path = source_root / "tests" / "tool" / "README.md";

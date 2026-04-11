@@ -1,0 +1,188 @@
+Phase 130 -- Explicit Restart Or Replacement Probe
+=================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 129 partial failure propagation step by
+proving one bounded explicit restart or replacement story over the same
+already-landed Canopus kernel artifact.
+
+This document is both the Phase 130 execution note and its closeout.
+It does not claim kernel-side supervision, automatic restart policy,
+dynamic namespace repair, capability rebinding, a broader failure framework,
+or a compiler wave.
+It records one narrow explicit replacement step over the real kernel artifact
+that earlier phases already kept inspectable.
+
+Repository status note
+----------------------
+- Phase 129 already proved that one bounded service death remains a partial
+  failure because one second bounded service path still replies and exits
+  cleanly through the same fixed directory and shared control-endpoint model.
+- The same landed running-system slice already carried one explicit service-
+  death observation answer, one explicit fixed service-directory answer, and
+  one explicit init-owned multi-service orchestration answer over the same
+  admitted artifact.
+- The next honest gap is not a broader recovery framework or a compiler
+  reopening. It is publishing one explicit statement that init can choose one
+  bounded replacement path over one dead service through the retained program
+  capability and the same fixed control endpoint while the kernel still does
+  not become a supervisor.
+
+Problem being solved
+--------------------
+- The repository already had one explicit dead-service observation and one
+  explicit partial-failure statement, but it still lacked one published proof
+  that the current model can express one bounded restart or replacement story
+  without importing kernel-side recovery policy.
+- Without this step, later failure, IPC-composition, or device-boundary work
+  could blur whether the current model already keeps one bounded replacement
+  path explicit or whether it would need supervision semantics first.
+- The repository needed one small phase that reuses the landed log-service
+  helper, retained program capability, fixed directory key, shared control
+  endpoint, and init-owned orchestration model rather than inventing a new
+  service manager, rebinding layer, or compiler-owned mechanism.
+
+Core rule
+---------
+- Keep the current kernel owners, fixed directory, and shared control
+  endpoint intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed log-service execution helper and retained init-owned
+  program capability rather than inventing a broader restart framework.
+- Prove one bounded replacement path remains explicit because init chooses to
+  rerun the same bounded service through the same fixed service key after the
+  first run exits.
+- Do not widen into kernel-side supervision, automatic recovery, dynamic
+  namespace repair, capability rebinding, or another compiler wave.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 130 note recording the explicit restart or replacement
+   probe and the decision to keep compiler work closed
+2. one debug-owned Phase 130 audit that packages the landed Phase 129
+   partial-failure truth together with one explicit init-owned replacement
+   path for the log service
+3. one narrow root-proof helper that runs the bounded log-service path,
+   waits for exit, and then reruns the same bounded log-service path over the
+   retained program capability and same fixed control endpoint
+4. one advance of the real kernel proof marker from Phase 129 to Phase 130
+   only after that explicit replacement audit succeeds
+5. refreshed roadmap, position note, kernel README, repository map,
+   freestanding test READMEs, decision log, and backlog entries
+6. one focused Phase 130 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new explicit replacement
+   boundary
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current running-system
+artifact already has one explicit dead-service answer and one init-owned
+service-orchestration owner. The next narrow pressure is publishing that one
+explicit replacement path before later phases widen richer failure routing,
+IPC composition, or device pressure.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one bounded explicit restart or
+  replacement probe over the real kernel artifact
+- one dead service can be followed by one explicit init-owned rerun of that
+  same bounded service path through the retained program capability and same
+  fixed control endpoint
+- that replacement answer still stops well short of kernel-side supervision,
+  automatic recovery, dynamic namespace repair, capability rebinding, or a
+  broader failure framework
+- the current kernel model can answer one more failure-semantics question
+  through existing owners rather than by forcing new compiler or kernel
+  framework machinery
+
+Deliverables
+------------
+- one canonical Phase 130 closeout note in `docs/plan/`
+- one debug-owned Phase 130 explicit restart or replacement audit plus one
+  narrow root-proof helper that package the landed partial-failure boundary
+  together with one explicit rerun of the bounded log-service path
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 130 marker only after the new audit remains true
+- refreshed roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed replacement step and the decision not to expand
+  compiler work
+- one focused Phase 130 freestanding regression plus a projected MIR golden
+  for the new explicit replacement boundary
+
+Suggested execution order
+-------------------------
+1. Add the smallest root-proof helper needed to rerun the bounded log-service
+   path after the first explicit exit.
+2. Add the Phase 130 debug-owned audit and validator over that follow-through.
+3. Advance the kernel proof marker to 130 only after the new audit remains
+   true.
+4. Publish the canonical explicit restart or replacement note.
+5. Add the focused Phase 130 freestanding regression for build, run,
+   publication, and MIR checks.
+6. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 130 marker without
+  widening the admitted slice beyond the already-landed service, namespace,
+  and failure boundaries
+- one aggregate debug-owned audit proves that init can express one bounded
+  replacement path for one dead service through the retained program
+  capability and same fixed control endpoint while the kernel still does not
+  claim supervision or automatic recovery policy
+- the canonical Phase 130 note, roadmap, position note, and kernel README all
+  publish the same explicit replacement boundary
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 130 boundary consistently
+
+Non-goals
+---------
+- a broader recovery, restart, or supervision framework
+- dynamic namespace repair or capability rebinding after service death
+- richer IPC-composition stress, backpressure, or ordering work
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+- adding another service owner just to stage one explicit replacement
+  statement
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase130ExplicitRestartOrReplacementAudit` and
+  validator that package the landed Phase 129 truth together with one
+  explicit init-owned rerun of the bounded log-service path
+- added one narrow root-proof helper that runs the bounded log-service path,
+  waits for exit, and then reruns the same bounded path over the retained
+  program capability and shared control endpoint
+- advanced the real kernel proof marker to 130 only after that audit remains
+  true
+- published one canonical
+  `docs/plan/phase130_explicit_restart_or_replacement_probe.txt` note naming
+  the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR golden
+  for the Phase 130 explicit replacement boundary
+- refreshed the roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed restart-or-replacement step and the decision not to
+  expand compiler work
+
+Closeout statement
+------------------
+Phase 130 is complete as an explicit restart or replacement probe.
+The repository still claims only one bounded small Canopus running-system
+plateau, but that plateau now includes one explicit proof that init can rerun
+one dead service through the retained program capability and same fixed
+service key without turning the kernel into a supervisor, while the fixed
+directory stays static, the failure framework stays narrow, and the compiler
+stays closed because this phase needed owner-local failure evidence rather
+than new language or backend work.

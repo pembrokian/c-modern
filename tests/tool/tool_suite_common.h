@@ -24,6 +24,9 @@ struct FreestandingKernelCommonPaths {
 
 FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::filesystem::path& source_root);
 
+std::filesystem::path ResolvePlanDocPath(const std::filesystem::path& source_root,
+                                         std::string_view file_name);
+
 std::filesystem::path WriteBasicProject(const std::filesystem::path& root,
                                         std::string_view helper_source,
                                         std::string_view main_source);

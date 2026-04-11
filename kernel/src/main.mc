@@ -49,6 +49,8 @@ const PHASE128_MARKER: i32 = 128
 const PHASE128_MARKER_DETAIL: u32 = 128
 const PHASE129_MARKER: i32 = 129
 const PHASE129_MARKER_DETAIL: u32 = 129
+const PHASE130_MARKER: i32 = 130
+const PHASE130_MARKER_DETAIL: u32 = 130
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
@@ -145,6 +147,12 @@ var PHASE129_SURVIVING_REPLY_STATUS: syscall.SyscallStatus
 var PHASE129_SURVIVING_WAIT_STATUS: syscall.SyscallStatus
 var PHASE129_SURVIVING_REPLY_BYTE0: u8
 var PHASE129_SURVIVING_REPLY_BYTE1: u8
+var PHASE130_REPLACEMENT_SERVICE_PID: u32
+var PHASE130_REPLACEMENT_SPAWN_STATUS: syscall.SyscallStatus
+var PHASE130_REPLACEMENT_ACK_STATUS: syscall.SyscallStatus
+var PHASE130_REPLACEMENT_WAIT_STATUS: syscall.SyscallStatus
+var PHASE130_REPLACEMENT_ACK_BYTE: u8
+var PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID: u32
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -234,6 +242,12 @@ func reset_kernel_state() {
     PHASE129_SURVIVING_WAIT_STATUS = syscall.SyscallStatus.None
     PHASE129_SURVIVING_REPLY_BYTE0 = 0
     PHASE129_SURVIVING_REPLY_BYTE1 = 0
+    PHASE130_REPLACEMENT_SERVICE_PID = 0
+    PHASE130_REPLACEMENT_SPAWN_STATUS = syscall.SyscallStatus.None
+    PHASE130_REPLACEMENT_ACK_STATUS = syscall.SyscallStatus.None
+    PHASE130_REPLACEMENT_WAIT_STATUS = syscall.SyscallStatus.None
+    PHASE130_REPLACEMENT_ACK_BYTE = 0
+    PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID = 0
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -1318,6 +1332,11 @@ func build_phase129_partial_failure_propagation_audit(phase128_audit: debug.Phas
     return bootstrap_audit.build_phase129_partial_failure_propagation_audit(bootstrap_audit.Phase129PartialFailurePropagationAuditInputs{ phase128: phase128_audit, failed_service_pid: PHASE129_FAILED_SERVICE_PID, failed_service_key: LOG_SERVICE_DIRECTORY_KEY, failed_wait_handle_slot: log_config.wait_handle_slot, failed_wait_status: PHASE129_FAILED_WAIT_STATUS, surviving_service_pid: PHASE129_SURVIVING_SERVICE_PID, surviving_service_key: ECHO_SERVICE_DIRECTORY_KEY, surviving_wait_handle_slot: echo_config.wait_handle_slot, surviving_reply_status: PHASE129_SURVIVING_REPLY_STATUS, surviving_wait_status: PHASE129_SURVIVING_WAIT_STATUS, surviving_reply_byte0: PHASE129_SURVIVING_REPLY_BYTE0, surviving_reply_byte1: PHASE129_SURVIVING_REPLY_BYTE1, shared_control_endpoint_id: INIT_ENDPOINT_ID, directory_entry_count: 3, partial_failure_visible: 1, kernel_recovery_visible: 0, service_rebinding_visible: 0, broader_failure_framework_visible: 0, compiler_reopening_visible: 0 })
 }
 
+func build_phase130_explicit_restart_or_replacement_audit(phase129_audit: debug.Phase129PartialFailurePropagationAudit) debug.Phase130ExplicitRestartOrReplacementAudit {
+    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
+    return bootstrap_audit.build_phase130_explicit_restart_or_replacement_audit(bootstrap_audit.Phase130ExplicitRestartOrReplacementAuditInputs{ phase129: phase129_audit, replacement_policy_owner_pid: INIT_PID, replacement_service_pid: PHASE130_REPLACEMENT_SERVICE_PID, replacement_service_key: LOG_SERVICE_DIRECTORY_KEY, replacement_wait_handle_slot: log_config.wait_handle_slot, replacement_program_slot: log_config.program_slot, replacement_program_object_id: PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID, replacement_spawn_status: PHASE130_REPLACEMENT_SPAWN_STATUS, replacement_ack_status: PHASE130_REPLACEMENT_ACK_STATUS, replacement_wait_status: PHASE130_REPLACEMENT_WAIT_STATUS, replacement_ack_byte: PHASE130_REPLACEMENT_ACK_BYTE, shared_control_endpoint_id: INIT_ENDPOINT_ID, directory_entry_count: 3, explicit_restart_or_replacement_visible: 1, kernel_supervision_visible: 0, service_rebinding_visible: 0, broader_failure_framework_visible: 0, compiler_reopening_visible: 0 })
+}
+
 func execute_phase124_delegation_chain_probe() bool {
     transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
     local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
@@ -1652,6 +1671,42 @@ func execute_phase129_partial_failure_propagation_probe() bool {
         return false
     }
     return PHASE129_SURVIVING_REPLY_BYTE1 == echo_config.request_byte1
+}
+
+func execute_phase130_explicit_restart_or_replacement_probe() bool {
+    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
+    initial_result: bootstrap_services.LogServiceExecutionResult = bootstrap_services.execute_phase105_log_service_handshake(log_config, build_log_service_execution_state())
+    if initial_result.succeeded == 0 {
+        return false
+    }
+    if syscall.status_score(initial_result.state.wait_observation.status) != 2 {
+        return false
+    }
+
+    replacement_result: bootstrap_services.LogServiceExecutionResult = bootstrap_services.execute_phase105_log_service_handshake(log_config, initial_result.state)
+    if replacement_result.succeeded == 0 {
+        return false
+    }
+
+    PHASE130_REPLACEMENT_SERVICE_PID = replacement_result.state.wait_observation.child_pid
+    PHASE130_REPLACEMENT_SPAWN_STATUS = replacement_result.state.spawn_observation.status
+    PHASE130_REPLACEMENT_ACK_STATUS = replacement_result.state.ack_observation.status
+    PHASE130_REPLACEMENT_WAIT_STATUS = replacement_result.state.wait_observation.status
+    PHASE130_REPLACEMENT_ACK_BYTE = replacement_result.state.ack_observation.payload[0]
+    PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID = log_config.program_object_id
+    if PHASE130_REPLACEMENT_SERVICE_PID == 0 {
+        return false
+    }
+    if syscall.status_score(PHASE130_REPLACEMENT_SPAWN_STATUS) != 2 {
+        return false
+    }
+    if syscall.status_score(PHASE130_REPLACEMENT_ACK_STATUS) != 2 {
+        return false
+    }
+    if syscall.status_score(PHASE130_REPLACEMENT_WAIT_STATUS) != 2 {
+        return false
+    }
+    return PHASE130_REPLACEMENT_ACK_BYTE == log_service.ack_payload()[0]
 }
 
 func execute_phase118_invalidated_source_send_probe() bool {
@@ -2012,43 +2067,49 @@ func bootstrap_main() i32 {
     if !debug.validate_phase129_partial_failure_propagation(build_phase129_partial_failure_propagation_audit(build_phase128_service_death_observation_audit(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit)))))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 69
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, PHASE129_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !execute_phase130_explicit_restart_or_replacement_probe() {
         return 70
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase130_explicit_restart_or_replacement(build_phase130_explicit_restart_or_replacement_audit(build_phase129_partial_failure_propagation_audit(build_phase128_service_death_observation_audit(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit))))))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 71
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE130_MARKER_DETAIL)
+    if BOOT_MARKER_EMITTED != 1 {
         return 72
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 73
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 74
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 75
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 76
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 77
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE129_MARKER_DETAIL {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 78
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 79
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE130_MARKER_DETAIL {
         return 80
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 81
     }
-    return PHASE129_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 82
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 83
+    }
+    return PHASE130_MARKER
 }

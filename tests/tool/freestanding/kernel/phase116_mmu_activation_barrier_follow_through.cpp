@@ -116,8 +116,8 @@ void RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(const std::f
                                                                     const std::filesystem::path& binary_root,
                                                                     const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase116_mmu_activation_barrier_follow_through.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase116_mmu_activation_barrier_follow_through.txt");
     const std::filesystem::path freestanding_support_path = source_root / "docs" / "plan" /
                                                             "freestanding_support_statement.txt";
     const std::filesystem::path stdlib_readme_path = source_root / "stdlib" / "README.md";

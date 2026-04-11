@@ -108,8 +108,8 @@ void RunFreestandingKernelPhase117InitOrchestratedMultiServiceBringUp(const std:
                                                                       const std::filesystem::path& binary_root,
                                                                       const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase117_init_orchestrated_multi_service_bring_up.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase117_init_orchestrated_multi_service_bring_up.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase117_init_orchestrated_multi_service_bring_up.mirproj.txt";
     const std::filesystem::path build_dir = binary_root / "kernel_phase117_multi_service_build";

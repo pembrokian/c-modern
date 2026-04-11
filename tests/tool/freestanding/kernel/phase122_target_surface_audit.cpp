@@ -105,8 +105,8 @@ void RunFreestandingKernelPhase122TargetSurfaceAudit(const std::filesystem::path
                                                      const std::filesystem::path& binary_root,
                                                      const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase122_target_surface_audit.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase122_target_surface_audit.txt");
     const std::filesystem::path support_note_path = source_root / "docs" / "plan" /
                                                     "canopus_running_system_support_statement.txt";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /

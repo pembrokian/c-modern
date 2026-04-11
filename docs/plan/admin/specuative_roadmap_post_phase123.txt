@@ -172,7 +172,7 @@ Guardrail for this band:
 
 Band B - Make Failure Semantics Explicit
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 128 through 129 should make failure a first-class system fact before
+Phases 128 through 130 should make failure a first-class system fact before
 IPC composition is widened further.
 
 Likely themes:
@@ -221,8 +221,11 @@ Phase 129 -- Partial Failure Propagation
   of hidden scheduler or recovery semantics.
 
 Phase 130 -- Explicit Restart Or Replacement Probe
-- Exit criterion: one bounded restart or replacement story can be expressed as
-  service-owned policy without turning the kernel into a recovery framework.
+- Phase 130 is now concrete as one explicit restart or replacement probe over
+  the landed service-death and partial-failure path.
+- Exit criterion: one bounded explicit init-owned replacement path can rerun
+  one dead service through the retained program capability and same fixed
+  control endpoint without turning the kernel into a recovery framework.
 
 Band C - Stress IPC Composition Under The Clarified Model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -440,8 +443,10 @@ Interpretation guide
 - The current admitted boundary now includes the landed Phase 124
   delegation-chain stress step, the landed Phase 125 invalidation and
   rejection audit step, and the landed Phase 126 authority lifetime
-  classification step; later stress phases should only widen that boundary
-  when another concrete proof lands.
+  classification step, the landed Phase 128 service-death observation step,
+  the landed Phase 129 partial-failure propagation step, and the landed Phase
+  130 explicit restart or replacement probe; later stress phases should only
+  widen that boundary when another concrete proof lands.
 - If a smaller honest plateau appears earlier than Phase 137, that is success,
   not roadmap failure.
 - If a real stress phase exposes a compiler or language distortion, reopen the

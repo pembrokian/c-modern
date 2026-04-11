@@ -94,8 +94,8 @@ void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const
                                                                            const std::filesystem::path& binary_root,
                                                                            const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase113_interrupt_entry_and_generic_dispatch_boundary.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase113_interrupt_entry_and_generic_dispatch_boundary.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase113_interrupt_entry_and_generic_dispatch_boundary.mirproj.txt";
     const std::filesystem::path build_dir = binary_root / "kernel_phase113_interrupt_boundary_build";

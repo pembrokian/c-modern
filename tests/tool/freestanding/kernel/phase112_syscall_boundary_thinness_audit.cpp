@@ -95,8 +95,8 @@ void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesy
                                                                const std::filesystem::path& binary_root,
                                                                const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase112_syscall_boundary_thinness_audit.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase112_syscall_boundary_thinness_audit.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase112_syscall_boundary_thinness_audit.mirproj.txt";
     const std::filesystem::path build_dir = binary_root / "kernel_phase112_syscall_boundary_build";

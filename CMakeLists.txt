@@ -177,6 +177,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase126_authority_lifetime_classification.cpp
     tests/tool/freestanding/kernel/phase128_service_death_observation.cpp
     tests/tool/freestanding/kernel/phase129_partial_failure_propagation.cpp
+    tests/tool/freestanding/kernel/phase130_explicit_restart_or_replacement.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -282,6 +283,7 @@ set(MC_FREESTANDING_KERNEL_CASES
     phase126_authority_lifetime_classification
     phase128_service_death_observation
     phase129_partial_failure_propagation
+    phase130_explicit_restart_or_replacement
 )
 
 foreach(kernel_case IN LISTS MC_FREESTANDING_KERNEL_CASES)

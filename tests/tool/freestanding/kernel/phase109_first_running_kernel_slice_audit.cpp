@@ -16,8 +16,8 @@ void RunFreestandingKernelPhase109FirstRunningKernelSliceAudit(const std::filesy
                                                                const std::filesystem::path& binary_root,
                                                                const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase109_first_running_canopus_kernel_slice_audit.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase109_first_running_canopus_kernel_slice_audit.txt");
     const std::filesystem::path build_dir = binary_root / "kernel_phase109_running_slice_build";
     std::filesystem::remove_all(build_dir);
 

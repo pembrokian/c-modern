@@ -40,6 +40,7 @@ Structure
   - `phase126_authority_lifetime_classification.cpp`: real-kernel authority lifetime classification audit.
   - `phase128_service_death_observation.cpp`: real-kernel service-death observation audit.
   - `phase129_partial_failure_propagation.cpp`: real-kernel partial-failure propagation audit.
+  - `phase130_explicit_restart_or_replacement.cpp`: real-kernel explicit restart-or-replacement audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

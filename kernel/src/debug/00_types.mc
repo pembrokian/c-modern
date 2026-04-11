@@ -253,3 +253,24 @@ struct Phase129PartialFailurePropagationAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase130ExplicitRestartOrReplacementAudit {
+    phase129: Phase129PartialFailurePropagationAudit
+    replacement_policy_owner_pid: u32
+    replacement_service_pid: u32
+    replacement_service_key: u32
+    replacement_wait_handle_slot: u32
+    replacement_program_slot: u32
+    replacement_program_object_id: u32
+    replacement_spawn_status: syscall.SyscallStatus
+    replacement_ack_status: syscall.SyscallStatus
+    replacement_wait_status: syscall.SyscallStatus
+    replacement_ack_byte: u8
+    shared_control_endpoint_id: u32
+    directory_entry_count: usize
+    explicit_restart_or_replacement_visible: u32
+    kernel_supervision_visible: u32
+    service_rebinding_visible: u32
+    broader_failure_framework_visible: u32
+    compiler_reopening_visible: u32
+}
+

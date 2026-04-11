@@ -105,8 +105,8 @@ void RunFreestandingKernelPhase124DelegationChainStress(const std::filesystem::p
                                                         const std::filesystem::path& binary_root,
                                                         const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase124_delegation_chain_stress.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase124_delegation_chain_stress.txt");
     const std::filesystem::path position_path = source_root / "docs" / "plan" / "admin" /
                                                 "modern_c_canopus_readiness_position.txt";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /

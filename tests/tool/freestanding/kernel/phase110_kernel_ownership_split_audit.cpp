@@ -91,8 +91,8 @@ void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesyste
                                                             const std::filesystem::path& binary_root,
                                                             const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase110_kernel_ownership_split_audit.txt";
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase110_kernel_ownership_split_audit.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase110_kernel_ownership_split_audit.mirproj.txt";
     const std::filesystem::path build_dir = binary_root / "kernel_phase110_ownership_split_build";

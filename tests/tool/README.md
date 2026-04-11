@@ -46,7 +46,8 @@ Current structure
       `kernel/phase125_invalidation_and_rejection_audit.cpp`, and
       `kernel/phase126_authority_lifetime_classification.cpp`,
       `kernel/phase128_service_death_observation.cpp`, and
-      `kernel/phase129_partial_failure_propagation.cpp`: one kernel proof per file.
+      `kernel/phase129_partial_failure_propagation.cpp`, and
+      `kernel/phase130_explicit_restart_or_replacement.cpp`: one kernel proof per file.
   - late ownership-hardening kernel audits also keep adjacent `.mirproj.txt`
     files for projected MIR golden expectations.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-

@@ -47,6 +47,27 @@ FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::files
     };
 }
 
+std::filesystem::path ResolvePlanDocPath(const std::filesystem::path& source_root,
+                                         std::string_view file_name) {
+    const std::filesystem::path plan_root = source_root / "docs" / "plan";
+    const std::filesystem::path active_path = plan_root / "active" / std::string(file_name);
+    if (std::filesystem::exists(active_path)) {
+        return active_path;
+    }
+
+    const std::filesystem::path root_path = plan_root / std::string(file_name);
+    if (std::filesystem::exists(root_path)) {
+        return root_path;
+    }
+
+    const std::filesystem::path archive_path = plan_root / "archive" / std::string(file_name);
+    if (std::filesystem::exists(archive_path)) {
+        return archive_path;
+    }
+
+    return active_path;
+}
+
 std::filesystem::path WriteBasicProject(const std::filesystem::path& root,
                                         std::string_view helper_source,
                                         std::string_view main_source) {

@@ -6,6 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 130 has moved the repository-owned kernel artifact beyond the landed
+  Phase 129 partial failure propagation step into one bounded explicit
+  restart or replacement probe.
 - Phase 129 has moved the repository-owned kernel artifact beyond the landed
   Phase 128 service death observation step into one bounded partial failure
   propagation step.
@@ -55,7 +58,8 @@ Current status
   audit, one bounded next-plateau audit, one bounded delegation-chain stress
   step, one bounded invalidation and rejection audit step, and one bounded
   authority lifetime classification step, one bounded service death
-  observation step, and one bounded partial failure propagation step.
+  observation step, one bounded partial failure propagation step, and one
+  bounded explicit restart or replacement probe.
 
 Current files
 -------------
@@ -71,12 +75,14 @@ Current files
   step, one bounded delegation-chain stress step, one bounded invalidation
   and rejection audit step, one bounded authority lifetime classification
   step, one bounded service death observation step, one bounded partial
-  failure propagation step, and thin root orchestration across the owned
-  scheduler, lifecycle, bootstrap helper, and debug audit modules
+  failure propagation step, one bounded explicit restart or replacement
+  probe, and thin root orchestration across the owned scheduler, lifecycle,
+  bootstrap helper, and debug audit modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
   `module_sets.bootstrap_audit`, owning the extracted Phase 104 contract
-  hardening helpers, bounded service validation helpers, and Phase 108-129
-  audit builders used by the root proof module
+  hardening helpers, bounded service validation helpers, Phase 108-129 audit
+  builders, and the Phase 130 explicit restart-or-replacement audit builder
+  used by the root proof module
 - `src/bootstrap_services/`: one logical `bootstrap_services` module split
   through `module_sets.bootstrap_services`, owning extracted bounded log,
   echo, and transfer service execution flows plus explicit service config and
@@ -98,7 +104,8 @@ Current files
   target-surface audit, Phase 123 next-plateau audit, Phase 124
   delegation-chain stress audit, Phase 125 invalidation and rejection audit,
   Phase 126 authority lifetime classification audit, Phase 128 service death
-  observation audit, and Phase 129 partial failure propagation audit
+  observation audit, Phase 129 partial failure propagation audit, and Phase
+  130 explicit restart or replacement audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
