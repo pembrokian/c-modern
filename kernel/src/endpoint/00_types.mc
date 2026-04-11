@@ -1,6 +1,6 @@
-const ENDPOINT_TABLE_CAPACITY: usize = 2
+const ENDPOINT_TABLE_CAPACITY: usize = 4
 const ENDPOINT_QUEUE_CAPACITY: usize = 2
-const ENDPOINT_NOT_FOUND: usize = 2
+const ENDPOINT_NOT_FOUND: usize = 4
 
 enum MessageState {
     Empty,
@@ -33,7 +33,7 @@ struct EndpointSlot {
 
 struct EndpointTable {
     count: usize
-    slots: [2]EndpointSlot
+    slots: [4]EndpointSlot
 }
 
 struct EndpointDispatch {
@@ -104,10 +104,12 @@ func empty_slot() EndpointSlot {
     return EndpointSlot{ endpoint_id: 0, owner_pid: 0, head: 0, tail: 0, queued_messages: 0, active: 0, messages: zero_messages() }
 }
 
-func zero_slots() [2]EndpointSlot {
-    slots: [2]EndpointSlot
+func zero_slots() [4]EndpointSlot {
+    slots: [4]EndpointSlot
     slots[0] = empty_slot()
     slots[1] = empty_slot()
+    slots[2] = empty_slot()
+    slots[3] = empty_slot()
     return slots
 }
 
@@ -127,7 +129,7 @@ func install_endpoint(table: EndpointTable, owner_pid: u32, endpoint_id: u32) En
     if table.count >= ENDPOINT_TABLE_CAPACITY {
         return table
     }
-    slots: [2]EndpointSlot = table.slots
+    slots: [4]EndpointSlot = table.slots
     slots[table.count] = EndpointSlot{ endpoint_id: endpoint_id, owner_pid: owner_pid, head: 0, tail: 0, queued_messages: 0, active: 1, messages: zero_messages() }
     return EndpointTable{ count: table.count + 1, slots: slots }
 }
@@ -139,11 +141,14 @@ func find_endpoint_index(table: EndpointTable, endpoint_id: u32) usize {
     if table.slots[0].endpoint_id == endpoint_id && table.slots[0].active == 1 {
         return 0
     }
-    if table.count < ENDPOINT_TABLE_CAPACITY {
-        return ENDPOINT_NOT_FOUND
-    }
-    if table.slots[1].endpoint_id == endpoint_id && table.slots[1].active == 1 {
+    if table.count > 1 && table.slots[1].endpoint_id == endpoint_id && table.slots[1].active == 1 {
         return 1
+    }
+    if table.count > 2 && table.slots[2].endpoint_id == endpoint_id && table.slots[2].active == 1 {
+        return 2
+    }
+    if table.count > 3 && table.slots[3].endpoint_id == endpoint_id && table.slots[3].active == 1 {
+        return 3
     }
     return ENDPOINT_NOT_FOUND
 }

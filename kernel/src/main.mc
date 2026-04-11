@@ -51,9 +51,14 @@ const PHASE129_MARKER: i32 = 129
 const PHASE129_MARKER_DETAIL: u32 = 129
 const PHASE130_MARKER: i32 = 130
 const PHASE130_MARKER_DETAIL: u32 = 130
+const PHASE131_MARKER: i32 = 131
+const PHASE131_MARKER_DETAIL: u32 = 131
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
+const COMPOSITION_SERVICE_DIRECTORY_KEY: u32 = 4
+const COMPOSITION_ECHO_ENDPOINT_ID: u32 = 3
+const COMPOSITION_LOG_ENDPOINT_ID: u32 = 4
 const PHASE124_INTERMEDIARY_PID: u32 = 4
 const PHASE124_FINAL_HOLDER_PID: u32 = 5
 const PHASE124_CONTROL_HANDLE_SLOT: u32 = 1
@@ -153,6 +158,7 @@ var PHASE130_REPLACEMENT_ACK_STATUS: syscall.SyscallStatus
 var PHASE130_REPLACEMENT_WAIT_STATUS: syscall.SyscallStatus
 var PHASE130_REPLACEMENT_ACK_BYTE: u8
 var PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID: u32
+var PHASE131_COMPOSITION_STATE: bootstrap_services.CompositionServiceExecutionState
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -248,6 +254,7 @@ func reset_kernel_state() {
     PHASE130_REPLACEMENT_WAIT_STATUS = syscall.SyscallStatus.None
     PHASE130_REPLACEMENT_ACK_BYTE = 0
     PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID = 0
+    PHASE131_COMPOSITION_STATE = bootstrap_services.empty_composition_service_execution_state()
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -1337,6 +1344,31 @@ func build_phase130_explicit_restart_or_replacement_audit(phase129_audit: debug.
     return bootstrap_audit.build_phase130_explicit_restart_or_replacement_audit(bootstrap_audit.Phase130ExplicitRestartOrReplacementAuditInputs{ phase129: phase129_audit, replacement_policy_owner_pid: INIT_PID, replacement_service_pid: PHASE130_REPLACEMENT_SERVICE_PID, replacement_service_key: LOG_SERVICE_DIRECTORY_KEY, replacement_wait_handle_slot: log_config.wait_handle_slot, replacement_program_slot: log_config.program_slot, replacement_program_object_id: PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID, replacement_spawn_status: PHASE130_REPLACEMENT_SPAWN_STATUS, replacement_ack_status: PHASE130_REPLACEMENT_ACK_STATUS, replacement_wait_status: PHASE130_REPLACEMENT_WAIT_STATUS, replacement_ack_byte: PHASE130_REPLACEMENT_ACK_BYTE, shared_control_endpoint_id: INIT_ENDPOINT_ID, directory_entry_count: 3, explicit_restart_or_replacement_visible: 1, kernel_supervision_visible: 0, service_rebinding_visible: 0, broader_failure_framework_visible: 0, compiler_reopening_visible: 0 })
 }
 
+func build_composition_service_config() bootstrap_services.CompositionServiceConfig {
+    return bootstrap_services.composition_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
+}
+
+func build_composition_service_execution_state() bootstrap_services.CompositionServiceExecutionState {
+    return bootstrap_services.CompositionServiceExecutionState{ program_capability: PHASE131_COMPOSITION_STATE.program_capability, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: PHASE131_COMPOSITION_STATE.child_address_space, child_user_frame: PHASE131_COMPOSITION_STATE.child_user_frame, echo_peer_state: PHASE131_COMPOSITION_STATE.echo_peer_state, log_peer_state: PHASE131_COMPOSITION_STATE.log_peer_state, spawn_observation: PHASE131_COMPOSITION_STATE.spawn_observation, request_receive_observation: PHASE131_COMPOSITION_STATE.request_receive_observation, echo_fanout_observation: PHASE131_COMPOSITION_STATE.echo_fanout_observation, echo_peer_receive_observation: PHASE131_COMPOSITION_STATE.echo_peer_receive_observation, echo_reply_send_observation: PHASE131_COMPOSITION_STATE.echo_reply_send_observation, echo_reply_observation: PHASE131_COMPOSITION_STATE.echo_reply_observation, log_fanout_observation: PHASE131_COMPOSITION_STATE.log_fanout_observation, log_peer_receive_observation: PHASE131_COMPOSITION_STATE.log_peer_receive_observation, log_ack_send_observation: PHASE131_COMPOSITION_STATE.log_ack_send_observation, log_ack_observation: PHASE131_COMPOSITION_STATE.log_ack_observation, aggregate_reply_send_observation: PHASE131_COMPOSITION_STATE.aggregate_reply_send_observation, aggregate_reply_observation: PHASE131_COMPOSITION_STATE.aggregate_reply_observation, wait_observation: PHASE131_COMPOSITION_STATE.wait_observation, observation: PHASE131_COMPOSITION_STATE.observation, ready_queue: PHASE131_COMPOSITION_STATE.ready_queue }
+}
+
+func install_composition_service_execution_state(next_state: bootstrap_services.CompositionServiceExecutionState) {
+    PHASE131_COMPOSITION_STATE = next_state
+    SYSCALL_GATE = next_state.gate
+    PROCESS_SLOTS = next_state.process_slots
+    TASK_SLOTS = next_state.task_slots
+    HANDLE_TABLES[1] = next_state.init_handle_table
+    HANDLE_TABLES[2] = next_state.child_handle_table
+    WAIT_TABLES[1] = next_state.wait_table
+    ENDPOINTS = next_state.endpoints
+    READY_QUEUE = next_state.ready_queue
+}
+
+func build_phase131_fan_out_composition_audit(phase130_audit: debug.Phase130ExplicitRestartOrReplacementAudit) debug.Phase131FanOutCompositionAudit {
+    config: bootstrap_services.CompositionServiceConfig = build_composition_service_config()
+    return bootstrap_audit.build_phase131_fan_out_composition_audit(bootstrap_audit.Phase131FanOutCompositionAuditInputs{ phase130: phase130_audit, composition_policy_owner_pid: INIT_PID, composition_service_pid: PHASE131_COMPOSITION_STATE.wait_observation.child_pid, composition_service_key: COMPOSITION_SERVICE_DIRECTORY_KEY, composition_wait_handle_slot: config.wait_handle_slot, fixed_directory_entry_count: 4, control_endpoint_id: config.control_endpoint_id, echo_endpoint_id: config.echo_endpoint_id, log_endpoint_id: config.log_endpoint_id, request_receive_status: PHASE131_COMPOSITION_STATE.request_receive_observation.status, echo_fanout_status: PHASE131_COMPOSITION_STATE.echo_fanout_observation.status, echo_fanout_endpoint_id: PHASE131_COMPOSITION_STATE.echo_fanout_observation.endpoint_id, log_fanout_status: PHASE131_COMPOSITION_STATE.log_fanout_observation.status, log_fanout_endpoint_id: PHASE131_COMPOSITION_STATE.log_fanout_observation.endpoint_id, echo_reply_status: PHASE131_COMPOSITION_STATE.echo_reply_observation.status, log_ack_status: PHASE131_COMPOSITION_STATE.log_ack_observation.status, aggregate_reply_status: PHASE131_COMPOSITION_STATE.aggregate_reply_observation.status, composition_wait_status: PHASE131_COMPOSITION_STATE.wait_observation.status, aggregate_reply_byte0: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte0, aggregate_reply_byte1: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte1, aggregate_reply_byte2: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte2, aggregate_reply_byte3: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte3, explicit_composition_visible: 1, kernel_broker_visible: 0, dynamic_namespace_visible: 0, compiler_reopening_visible: 0 })
+}
+
 func execute_phase124_delegation_chain_probe() bool {
     transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
     local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
@@ -1709,6 +1741,21 @@ func execute_phase130_explicit_restart_or_replacement_probe() bool {
     return PHASE130_REPLACEMENT_ACK_BYTE == log_service.ack_payload()[0]
 }
 
+func execute_phase131_fan_out_composition_probe() bool {
+    result: bootstrap_services.CompositionServiceExecutionResult = bootstrap_services.execute_phase131_fan_out_composition(build_composition_service_config(), build_composition_service_execution_state())
+    install_composition_service_execution_state(result.state)
+    if result.succeeded == 0 {
+        return false
+    }
+    if PHASE131_COMPOSITION_STATE.observation.outbound_edge_count != 2 {
+        return false
+    }
+    if PHASE131_COMPOSITION_STATE.observation.aggregate_reply_count != 1 {
+        return false
+    }
+    return PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte3 == 2
+}
+
 func execute_phase118_invalidated_source_send_probe() bool {
     transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
     probe_payload: [4]u8 = endpoint.zero_payload()
@@ -2070,46 +2117,53 @@ func bootstrap_main() i32 {
     if !execute_phase130_explicit_restart_or_replacement_probe() {
         return 70
     }
-    if !debug.validate_phase130_explicit_restart_or_replacement(build_phase130_explicit_restart_or_replacement_audit(build_phase129_partial_failure_propagation_audit(build_phase128_service_death_observation_audit(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit))))))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase130_audit: debug.Phase130ExplicitRestartOrReplacementAudit = build_phase130_explicit_restart_or_replacement_audit(build_phase129_partial_failure_propagation_audit(build_phase128_service_death_observation_audit(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit)))))))
+    if !debug.validate_phase130_explicit_restart_or_replacement(phase130_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 71
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, PHASE130_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !execute_phase131_fan_out_composition_probe() {
         return 72
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase131_fan_out_composition(build_phase131_fan_out_composition_audit(phase130_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 73
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE131_MARKER_DETAIL)
+    if BOOT_MARKER_EMITTED != 1 {
         return 74
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 75
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 76
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 77
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 78
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 79
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE130_MARKER_DETAIL {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 80
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 81
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE131_MARKER_DETAIL {
         return 82
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 83
     }
-    return PHASE130_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 84
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 85
+    }
+    return PHASE131_MARKER
 }

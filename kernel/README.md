@@ -6,6 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 131 has moved the repository-owned kernel artifact beyond the landed
+  Phase 130 explicit restart or replacement step into one bounded fan-out
+  composition probe.
 - Phase 130 has moved the repository-owned kernel artifact beyond the landed
   Phase 129 partial failure propagation step into one bounded explicit
   restart or replacement probe.
@@ -59,7 +62,8 @@ Current status
   step, one bounded invalidation and rejection audit step, and one bounded
   authority lifetime classification step, one bounded service death
   observation step, one bounded partial failure propagation step, and one
-  bounded explicit restart or replacement probe.
+  bounded explicit restart or replacement probe, and one bounded fan-out
+  composition probe.
 
 Current files
 -------------
@@ -76,8 +80,9 @@ Current files
   and rejection audit step, one bounded authority lifetime classification
   step, one bounded service death observation step, one bounded partial
   failure propagation step, one bounded explicit restart or replacement
-  probe, and thin root orchestration across the owned scheduler, lifecycle,
-  bootstrap helper, and debug audit modules
+  probe, one bounded fan-out composition probe, and thin root orchestration
+  across the owned scheduler, lifecycle, bootstrap helper, and debug audit
+  modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
   `module_sets.bootstrap_audit`, owning the extracted Phase 104 contract
   hardening helpers, bounded service validation helpers, Phase 108-129 audit
@@ -85,9 +90,9 @@ Current files
   used by the root proof module
 - `src/bootstrap_services/`: one logical `bootstrap_services` module split
   through `module_sets.bootstrap_services`, owning extracted bounded log,
-  echo, and transfer service execution flows plus explicit service config and
-  state packaging used by the root proof module and the aggregate late-phase
-  running-system audits
+  echo, transfer, and composition service execution flows plus explicit
+  service config and state packaging used by the root proof module and the
+  aggregate late-phase running-system audits
 - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn,
   wait, sleep, and wake follow-through
 - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for
@@ -105,7 +110,8 @@ Current files
   delegation-chain stress audit, Phase 125 invalidation and rejection audit,
   Phase 126 authority lifetime classification audit, Phase 128 service death
   observation audit, Phase 129 partial failure propagation audit, and Phase
-  130 explicit restart or replacement audit
+  130 explicit restart or replacement audit, and Phase 131 fan-out
+  composition audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived

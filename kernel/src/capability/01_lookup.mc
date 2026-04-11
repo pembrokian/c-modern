@@ -11,6 +11,9 @@ func find_handle_index(table: HandleTable, slot_id: u32) usize {
     if handle_state_score(table.slots[3].state) == 2 && table.slots[3].slot_id == slot_id {
         return 3
     }
+    if handle_state_score(table.slots[4].state) == 2 && table.slots[4].slot_id == slot_id {
+        return 4
+    }
     return HANDLE_NOT_FOUND
 }
 
@@ -50,6 +53,9 @@ func handle_slot_invalidated(table: HandleTable, slot_id: u32) bool {
         return true
     }
     if table.slots[3].slot_id == slot_id && handle_state_score(table.slots[3].state) == 4 {
+        return true
+    }
+    if table.slots[4].slot_id == slot_id && handle_state_score(table.slots[4].state) == 4 {
         return true
     }
     return false

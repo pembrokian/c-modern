@@ -103,12 +103,15 @@ void RunFreestandingKernelPhase129PartialFailurePropagation(const std::filesyste
 void RunFreestandingKernelPhase130ExplicitRestartOrReplacement(const std::filesystem::path& source_root,
                                                                const std::filesystem::path& binary_root,
                                                                const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase131FanInOrFanOutComposition(const std::filesystem::path& source_root,
+                                                           const std::filesystem::path& binary_root,
+                                                           const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
 
-const std::array<KernelTestCase, 29> kKernelTestCases = {{
+const std::array<KernelTestCase, 30> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
@@ -138,6 +141,7 @@ const std::array<KernelTestCase, 29> kKernelTestCases = {{
     {"phase128_service_death_observation", 5, &RunFreestandingKernelPhase128ServiceDeathObservation},
     {"phase129_partial_failure_propagation", 5, &RunFreestandingKernelPhase129PartialFailurePropagation},
     {"phase130_explicit_restart_or_replacement", 5, &RunFreestandingKernelPhase130ExplicitRestartOrReplacement},
+    {"phase131_fan_in_or_fan_out_composition", 5, &RunFreestandingKernelPhase131FanInOrFanOutComposition},
 }};
 
 void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,

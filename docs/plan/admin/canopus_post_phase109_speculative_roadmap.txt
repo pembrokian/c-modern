@@ -85,6 +85,8 @@ Repository numbering note
   landed service-death and bounded echo-service reply paths.
 - Phase 130 is now concrete as one explicit restart or replacement probe over
   the landed service-death and partial-failure path.
+- Phase 131 is now concrete as one bounded fan-out composition probe over the
+  landed explicit replacement path plus one new composed echo-and-log owner.
 
 Repository status note
 ----------------------

@@ -64,7 +64,7 @@ func install_endpoint_handle(table: HandleTable, slot_id: u32, endpoint_id: u32,
     if handle_slot_installed(table, slot_id) {
         return table
     }
-    slots: [4]HandleSlot = table.slots
+    slots: [5]HandleSlot = table.slots
     if handle_slot_accepts_install(slots[0].state) {
         slots[0] = HandleSlot{ slot_id: slot_id, owner_pid: table.owner_pid, endpoint_id: endpoint_id, rights: rights, state: HandleState.Installed }
         return HandleTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
@@ -81,6 +81,10 @@ func install_endpoint_handle(table: HandleTable, slot_id: u32, endpoint_id: u32,
         slots[3] = HandleSlot{ slot_id: slot_id, owner_pid: table.owner_pid, endpoint_id: endpoint_id, rights: rights, state: HandleState.Installed }
         return HandleTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
     }
+    if handle_slot_accepts_install(slots[4].state) {
+        slots[4] = HandleSlot{ slot_id: slot_id, owner_pid: table.owner_pid, endpoint_id: endpoint_id, rights: rights, state: HandleState.Installed }
+        return HandleTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
+    }
     return table
 }
 
@@ -89,7 +93,7 @@ func remove_handle(table: HandleTable, slot_id: u32) HandleTable {
     if index >= HANDLE_TABLE_CAPACITY || table.count == 0 {
         return table
     }
-    slots: [4]HandleSlot = table.slots
+    slots: [5]HandleSlot = table.slots
     slots[index] = HandleSlot{ slot_id: slots[index].slot_id, owner_pid: slots[index].owner_pid, endpoint_id: slots[index].endpoint_id, rights: slots[index].rights, state: HandleState.Invalidated }
     return HandleTable{ owner_pid: table.owner_pid, count: table.count - 1, slots: slots }
 }

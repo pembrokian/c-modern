@@ -33,6 +33,18 @@ const TRANSFER_SERVICE_GRANT_BYTE1: u8 = 73
 const TRANSFER_SERVICE_GRANT_BYTE2: u8 = 86
 const TRANSFER_SERVICE_GRANT_BYTE3: u8 = 69
 const TRANSFER_SERVICE_EXIT_CODE: i32 = 54
+const COMPOSITION_SERVICE_PROGRAM_SLOT: u32 = 6
+const COMPOSITION_SERVICE_PROGRAM_OBJECT_ID: u32 = 5
+const COMPOSITION_SERVICE_WAIT_HANDLE_SLOT: u32 = 2
+const COMPOSITION_SERVICE_CONTROL_HANDLE_SLOT: u32 = 1
+const COMPOSITION_SERVICE_ECHO_HANDLE_SLOT: u32 = 2
+const COMPOSITION_SERVICE_LOG_HANDLE_SLOT: u32 = 3
+const COMPOSITION_SERVICE_INIT_ECHO_HANDLE_SLOT: u32 = 4
+const COMPOSITION_SERVICE_INIT_LOG_HANDLE_SLOT: u32 = 5
+const COMPOSITION_SERVICE_REQUEST_BYTE0: u8 = 69
+const COMPOSITION_SERVICE_REQUEST_BYTE1: u8 = 67
+const COMPOSITION_SERVICE_EXIT_CODE: i32 = 55
+const COMPOSITION_SERVICE_EDGE_COUNT: u8 = 2
 
 struct LogServiceConfig {
     init_pid: u32
@@ -167,6 +179,86 @@ struct TransferServiceExecutionResult {
     succeeded: u32
 }
 
+struct CompositionServiceConfig {
+    init_pid: u32
+    child_pid: u32
+    child_tid: u32
+    child_asid: u32
+    control_endpoint_id: u32
+    echo_endpoint_id: u32
+    log_endpoint_id: u32
+    init_control_handle_slot: u32
+    init_echo_handle_slot: u32
+    init_log_handle_slot: u32
+    child_control_handle_slot: u32
+    child_echo_handle_slot: u32
+    child_log_handle_slot: u32
+    child_translation_root: mmu.TranslationRoot
+    wait_handle_slot: u32
+    request_byte0: u8
+    request_byte1: u8
+    edge_count: u8
+    exit_code: i32
+    program_slot: u32
+    program_object_id: u32
+}
+
+struct CompositionFlowObservation {
+    service_pid: u32
+    client_pid: u32
+    control_endpoint_id: u32
+    echo_endpoint_id: u32
+    log_endpoint_id: u32
+    request_len: usize
+    request_byte0: u8
+    request_byte1: u8
+    echo_reply_byte0: u8
+    echo_reply_byte1: u8
+    log_ack_byte: u8
+    aggregate_reply_byte0: u8
+    aggregate_reply_byte1: u8
+    aggregate_reply_byte2: u8
+    aggregate_reply_byte3: u8
+    outbound_edge_count: usize
+    aggregate_reply_count: usize
+}
+
+struct CompositionServiceExecutionState {
+    program_capability: capability.CapabilitySlot
+    gate: syscall.SyscallGate
+    process_slots: [3]state.ProcessSlot
+    task_slots: [3]state.TaskSlot
+    init_handle_table: capability.HandleTable
+    child_handle_table: capability.HandleTable
+    wait_table: capability.WaitTable
+    endpoints: endpoint.EndpointTable
+    init_image: init.InitImage
+    child_address_space: address_space.AddressSpace
+    child_user_frame: address_space.UserEntryFrame
+    echo_peer_state: echo_service.EchoServiceState
+    log_peer_state: log_service.LogServiceState
+    spawn_observation: syscall.SpawnObservation
+    request_receive_observation: syscall.ReceiveObservation
+    echo_fanout_observation: syscall.SendObservation
+    echo_peer_receive_observation: syscall.ReceiveObservation
+    echo_reply_send_observation: syscall.SendObservation
+    echo_reply_observation: syscall.ReceiveObservation
+    log_fanout_observation: syscall.SendObservation
+    log_peer_receive_observation: syscall.ReceiveObservation
+    log_ack_send_observation: syscall.SendObservation
+    log_ack_observation: syscall.ReceiveObservation
+    aggregate_reply_send_observation: syscall.SendObservation
+    aggregate_reply_observation: syscall.ReceiveObservation
+    wait_observation: syscall.WaitObservation
+    observation: CompositionFlowObservation
+    ready_queue: state.ReadyQueue
+}
+
+struct CompositionServiceExecutionResult {
+    state: CompositionServiceExecutionState
+    succeeded: u32
+}
+
 func log_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_translation_root: mmu.TranslationRoot) LogServiceConfig {
     return LogServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: LOG_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: LOG_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte: LOG_SERVICE_REQUEST_BYTE, exit_code: LOG_SERVICE_EXIT_CODE, program_slot: LOG_SERVICE_PROGRAM_SLOT, program_object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
 }
@@ -189,4 +281,20 @@ func transfer_service_config(init_pid: u32, child_pid: u32, child_tid: u32, chil
 
 func transfer_service_result(state: TransferServiceExecutionState, succeeded: u32) TransferServiceExecutionResult {
     return TransferServiceExecutionResult{ state: state, succeeded: succeeded }
+}
+
+func composition_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, control_endpoint_id: u32, echo_endpoint_id: u32, log_endpoint_id: u32, init_control_handle_slot: u32, child_translation_root: mmu.TranslationRoot) CompositionServiceConfig {
+    return CompositionServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, control_endpoint_id: control_endpoint_id, echo_endpoint_id: echo_endpoint_id, log_endpoint_id: log_endpoint_id, init_control_handle_slot: init_control_handle_slot, init_echo_handle_slot: COMPOSITION_SERVICE_INIT_ECHO_HANDLE_SLOT, init_log_handle_slot: COMPOSITION_SERVICE_INIT_LOG_HANDLE_SLOT, child_control_handle_slot: COMPOSITION_SERVICE_CONTROL_HANDLE_SLOT, child_echo_handle_slot: COMPOSITION_SERVICE_ECHO_HANDLE_SLOT, child_log_handle_slot: COMPOSITION_SERVICE_LOG_HANDLE_SLOT, child_translation_root: child_translation_root, wait_handle_slot: COMPOSITION_SERVICE_WAIT_HANDLE_SLOT, request_byte0: COMPOSITION_SERVICE_REQUEST_BYTE0, request_byte1: COMPOSITION_SERVICE_REQUEST_BYTE1, edge_count: COMPOSITION_SERVICE_EDGE_COUNT, exit_code: COMPOSITION_SERVICE_EXIT_CODE, program_slot: COMPOSITION_SERVICE_PROGRAM_SLOT, program_object_id: COMPOSITION_SERVICE_PROGRAM_OBJECT_ID }
+}
+
+func empty_composition_flow_observation() CompositionFlowObservation {
+    return CompositionFlowObservation{ service_pid: 0, client_pid: 0, control_endpoint_id: 0, echo_endpoint_id: 0, log_endpoint_id: 0, request_len: 0, request_byte0: 0, request_byte1: 0, echo_reply_byte0: 0, echo_reply_byte1: 0, log_ack_byte: 0, aggregate_reply_byte0: 0, aggregate_reply_byte1: 0, aggregate_reply_byte2: 0, aggregate_reply_byte3: 0, outbound_edge_count: 0, aggregate_reply_count: 0 }
+}
+
+func empty_composition_service_execution_state() CompositionServiceExecutionState {
+    return CompositionServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: endpoint.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), echo_peer_state: echo_service.service_state(0, 0), log_peer_state: log_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), request_receive_observation: syscall.empty_receive_observation(), echo_fanout_observation: syscall.empty_send_observation(), echo_peer_receive_observation: syscall.empty_receive_observation(), echo_reply_send_observation: syscall.empty_send_observation(), echo_reply_observation: syscall.empty_receive_observation(), log_fanout_observation: syscall.empty_send_observation(), log_peer_receive_observation: syscall.empty_receive_observation(), log_ack_send_observation: syscall.empty_send_observation(), log_ack_observation: syscall.empty_receive_observation(), aggregate_reply_send_observation: syscall.empty_send_observation(), aggregate_reply_observation: syscall.empty_receive_observation(), wait_observation: syscall.empty_wait_observation(), observation: empty_composition_flow_observation(), ready_queue: state.empty_queue() }
+}
+
+func composition_service_result(state: CompositionServiceExecutionState, succeeded: u32) CompositionServiceExecutionResult {
+    return CompositionServiceExecutionResult{ state: state, succeeded: succeeded }
 }

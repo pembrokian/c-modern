@@ -9,7 +9,7 @@ func enqueue_message(table: EndpointTable, endpoint_index: usize, message: Kerne
     if !endpoint_index_valid(table, endpoint_index) {
         return table
     }
-    slots: [2]EndpointSlot = table.slots
+    slots: [4]EndpointSlot = table.slots
     current: EndpointSlot = slots[endpoint_index]
     if current.active == 0 {
         return table
@@ -47,7 +47,7 @@ func consume_head_message(table: EndpointTable, endpoint_index: usize) EndpointT
     if !endpoint_index_valid(table, endpoint_index) {
         return table
     }
-    slots: [2]EndpointSlot = table.slots
+    slots: [4]EndpointSlot = table.slots
     current: EndpointSlot = slots[endpoint_index]
     if current.queued_messages == 0 {
         return table

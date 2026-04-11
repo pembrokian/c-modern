@@ -106,12 +106,22 @@ struct SleepObservation {
     wake_tick: u64
 }
 
+struct SendObservation {
+    status: SyscallStatus
+    block_reason: BlockReason
+    endpoint_id: u32
+    sender_pid: u32
+    payload_len: usize
+    attached_handle_count: usize
+}
+
 struct SendResult {
     gate: SyscallGate
     handle_table: capability.HandleTable
     endpoints: endpoint.EndpointTable
     status: SyscallStatus
     block_reason: BlockReason
+    observation: SendObservation
 }
 
 struct ReceiveResult {
@@ -213,8 +223,16 @@ func empty_sleep_observation() SleepObservation {
     return SleepObservation{ status: SyscallStatus.None, block_reason: BlockReason.None, task_id: 0, deadline_tick: 0, wake_tick: 0 }
 }
 
-func send_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, status: SyscallStatus, block_reason: BlockReason) SendResult {
-    return SendResult{ gate: gate, handle_table: handle_table, endpoints: endpoints, status: status, block_reason: block_reason }
+func empty_send_observation() SendObservation {
+    return SendObservation{ status: SyscallStatus.None, block_reason: BlockReason.None, endpoint_id: 0, sender_pid: 0, payload_len: 0, attached_handle_count: 0 }
+}
+
+func send_observation(status: SyscallStatus, block_reason: BlockReason, endpoint_id: u32, sender_pid: u32, payload_len: usize, attached_handle_count: usize) SendObservation {
+    return SendObservation{ status: status, block_reason: block_reason, endpoint_id: endpoint_id, sender_pid: sender_pid, payload_len: payload_len, attached_handle_count: attached_handle_count }
+}
+
+func send_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, status: SyscallStatus, block_reason: BlockReason, observation: SendObservation) SendResult {
+    return SendResult{ gate: gate, handle_table: handle_table, endpoints: endpoints, status: status, block_reason: block_reason, observation: observation }
 }
 
 func receive_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, observation: ReceiveObservation) ReceiveResult {
@@ -298,33 +316,33 @@ func perform_sleep(gate: SyscallGate, task_slots: [3]state.TaskSlot, timer_state
 
 func perform_send(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, sender_pid: u32, request: SendRequest) SendResult {
     if gate.open == 0 {
-        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Closed, 0, 0), handle_table, endpoints, SyscallStatus.Closed, BlockReason.None)
+        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Closed, 0, 0), handle_table, endpoints, SyscallStatus.Closed, BlockReason.None, send_observation(SyscallStatus.Closed, BlockReason.None, 0, sender_pid, request.payload_len, request.attached_handle_count))
     }
     resolved_handle: capability.EndpointHandleResolution = capability.resolve_send_endpoint_handle(handle_table, request.handle_slot)
     if resolved_handle.valid == 0 {
-        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None)
+        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None, send_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, sender_pid, request.payload_len, request.attached_handle_count))
     }
     attached: capability.AttachedTransferResolution = capability.resolve_attached_transfer_handle(handle_table, request.attached_handle_slot, request.attached_handle_count)
     if attached.valid == 0 {
-        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None)
+        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None, send_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, sender_pid, request.payload_len, request.attached_handle_count))
     }
     updated_handle_table: capability.HandleTable = handle_table
     if request.attached_handle_count == 1 {
         updated_handle_table = capability.remove_handle(handle_table, request.attached_handle_slot)
         if !capability.handle_remove_succeeded(handle_table, updated_handle_table, request.attached_handle_slot) {
-            return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None)
+            return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None, send_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, sender_pid, request.payload_len, request.attached_handle_count))
         }
     }
     message_id: u32 = gate.send_count + FIRST_RUNTIME_MESSAGE_ID
     message: endpoint.KernelMessage = endpoint.build_runtime_message(message_id, sender_pid, resolved_handle.endpoint_id, request.payload_len, request.payload, attached.attached_count, attached.attached_endpoint_id, attached.attached_rights, attached.attached_source_handle_slot)
     sent: endpoint.RuntimeSendResult = endpoint.enqueue_runtime_message(endpoints, resolved_handle.endpoint_id, message)
     if sent.endpoint_valid == 0 {
-        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidEndpoint, 0, 0), handle_table, endpoints, SyscallStatus.InvalidEndpoint, BlockReason.None)
+        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidEndpoint, 0, 0), handle_table, endpoints, SyscallStatus.InvalidEndpoint, BlockReason.None, send_observation(SyscallStatus.InvalidEndpoint, BlockReason.None, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count))
     }
     if sent.queue_full != 0 {
-        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.WouldBlock, 0, 0), handle_table, endpoints, SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull)
+        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.WouldBlock, 0, 0), handle_table, endpoints, SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull, send_observation(SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count))
     }
-    return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Ok, 1, 0), updated_handle_table, sent.endpoints, SyscallStatus.Ok, BlockReason.None)
+    return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Ok, 1, 0), updated_handle_table, sent.endpoints, SyscallStatus.Ok, BlockReason.None, send_observation(SyscallStatus.Ok, BlockReason.None, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count))
 }
 
 func perform_receive(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: endpoint.EndpointTable, request: ReceiveRequest) ReceiveResult {

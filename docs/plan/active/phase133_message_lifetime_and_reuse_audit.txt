@@ -1,0 +1,210 @@
+Phase 133 -- Message Lifetime And Reuse Audit
+=============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 132 backpressure step by making message-slot,
+payload, and attached-handle lifetime explicit enough that bounded queue reuse
+remains mechanically auditable under deeper IPC composition.
+
+This document is an execution plan for Phase 133.
+It defines one bounded message-lifetime phase that must land as explicit
+endpoint and capability behavior before it is admitted as a debug audit or
+regression.
+It does not claim a general memory manager, garbage collection, zero-copy
+messaging, or a broader capability rewrite.
+
+Repository status note
+----------------------
+- The current endpoint model already has `Empty`, `Queued`, and `Delivered`
+  message states, and queue consumption clears the head slot back to an empty
+  record.
+- The current capability model already invalidates transferred handles in
+  bounded cases, but the running-system slice does not yet publish one broader
+  statement about message-slot retirement and safe reuse under deeper
+  composition pressure.
+- If the repository stops at Phase 131 or Phase 132, deeper IPC composition
+  could still rely on accidental slot clearing or stale attached-handle state
+  rather than on explicit lifetime rules.
+
+Problem being solved
+--------------------
+- Deeper IPC composition increases pressure on queue-slot reuse, attached
+  handle retirement, and repeat delivery over the same endpoint paths.
+- Without an explicit lifetime story, later phases could accidentally depend
+  on stale payload bytes, stale handle metadata, or ambiguous delivered versus
+  retired message states.
+- The repository therefore needs one bounded implementation wave that makes
+  message retirement and reuse an owner-local invariant rather than a test-side
+  assumption.
+
+Core rule
+---------
+- Message lifetime belongs to endpoint and capability owners.
+- The kernel may describe when a message is queued, delivered, retired,
+  scrubbed, and safe to reuse. It must not invent a general heap, hidden
+  retention policy, or automatic recovery layer.
+- Phase completion requires real runtime state and transition changes in the
+  kernel artifact.
+- Debug audits, MIR projections, and tool regressions are acceptance artifacts
+  only.
+- Keep compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 133 change:
+
+- describing whether a message or attached handle is still live: admissible
+- deciding whether software should retain, replay, or resurrect it: wrong
+  layer
+
+Do not answer lifetime pressure by widening into refcounting or general memory
+management. Keep the phase bounded to deterministic queue-slot retirement,
+payload scrubbing, and attached-handle lifetime truth.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 133 execution note that defines message lifetime and
+   reuse as owner-local runtime truth
+2. one additive message-state refinement under the `endpoint` owner so queued,
+   delivered, retired, and reusable states are explicit enough for later
+   stress work
+3. one additive capability-retirement slice that makes attached-handle source
+   invalidation and receiver installation explicit across message completion
+4. one real repeated-message path over the running-system artifact that reuses
+   a queue slot only after the prior message is fully retired
+5. one debug-owned Phase 133 audit and focused regression over the landed
+   lifetime and reuse invariants
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because deeper IPC composition is only
+honest if the system can explain when a message stops being live and why a
+queue slot becomes safe to reuse.
+
+What this phase should try to prove
+-----------------------------------
+- one message queue slot is reused only after the previous message is fully
+  retired
+- payload bytes and attached metadata are scrubbed or reset deterministically
+  before reuse
+- attached-handle transfer truth remains explicit across delivery and consume
+  boundaries
+- repeated messaging over one endpoint path does not depend on stale message
+  state or ambient aliasing
+- the running-system claim expands because message lifetime is now described
+  by code-owned invariants rather than by fixture assumptions
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/endpoint/00_types.mc`
+   - refine the message-state model so retirement and reusability are explicit
+   - preferred shape: an additive state or equivalent additive metadata rather
+     than a broad queue rewrite
+
+2. `kernel/src/endpoint/01_queue.mc`
+   - implement deterministic slot retirement, payload clearing, and safe reuse
+     rules
+   - keep the queue fixed-size and mechanical
+
+3. `kernel/src/endpoint/02_runtime.mc`
+   - publish the runtime transition surface for repeated send and receive over
+   - the same endpoint path
+   - ensure the runtime result can distinguish invalid, blocked, delivered,
+     and safely reusable states as needed
+
+4. `kernel/src/endpoint/03_validation.mc`
+   - validate message retirement and reuse invariants directly
+   - keep validation local to endpoint lifetime truth
+
+5. `kernel/src/capability/02_ops.mc` and `kernel/src/capability/03_validation.mc`
+   - make attached-handle invalidation, installation, and post-delivery reuse
+     rules explicit where this phase needs them
+   - do not widen into a general capability GC or rebinding model
+
+6. `kernel/src/syscall.mc`
+   - publish any additive observations needed to inspect repeated delivery and
+     attached-handle lifetime cleanly
+   - keep syscalls descriptive rather than policy-owning
+
+7. one real service path under `kernel/src/bootstrap_services/`
+   - preferred shape: extend the Phase 131 composition owner or one existing
+     bounded service so it performs repeated sends through the same endpoint
+     path
+   - the repeated path must be real running code, not a unit-only queue test
+
+8. `kernel/src/debug/`
+   - preferred shape: add `07_phase133.mc` if needed
+   - validate lifetime and reuse invariants over the real artifact
+
+9. `kernel/src/main.mc`
+   - drive one repeated-message execution path and advance the proof marker to
+     133 only after the audit succeeds
+
+Deliverables
+------------
+- one canonical Phase 133 execution plan in `docs/plan/active/`
+- one additive endpoint lifetime and slot-reuse implementation slice
+- one additive capability lifetime slice for attached-handle retirement
+- one real repeated-message path over the running-system artifact
+- one debug-owned Phase 133 audit over the landed implementation
+- one focused freestanding regression plus projected MIR golden for the Phase
+  133 boundary
+- refreshed supporting docs only after the code shape is settled
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 133 boundary in docs: explicit retirement and reuse, no
+   general memory-management expansion.
+2. Refine endpoint message-state truth and queue-slot retirement rules.
+3. Add the minimal capability-lifetime changes needed for attached handles.
+4. Drive one repeated-message path through a real bounded service owner.
+5. Publish the additive syscall observations needed to inspect that path.
+6. Add the Phase 133 debug audit and validator over the landed behavior.
+7. Advance the kernel proof marker to 133 only after repeated delivery and
+   slot reuse are mechanically validated.
+8. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One endpoint queue slot carries two sequential messages with explicit
+   retirement between them.
+2. One payload-clearing proof shows that stale bytes are not observed after
+   reuse.
+3. One attached-handle transfer proof shows the source handle is no longer
+   live after transfer and the receiver-side installation remains explicit.
+4. One projected MIR proof shows the runtime artifact carries the new message
+   lifetime logic and audit.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 133 marker
+- endpoint message retirement and queue-slot reuse exist as explicit runtime
+  behavior rather than as fixture assumptions
+- attached-handle lifetime truth is explicit across the bounded repeated
+  message path
+- the Phase 133 debug audit validates lifetime and reuse invariants over the
+  real kernel artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 133 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- a general heap, memory manager, or garbage collector
+- zero-copy or performance-oriented messaging work
+- hidden retention, replay, or resurrection policy
+- a broad capability redesign beyond attached-handle lifetime truth
+- reopening sema, MIR, backend, ABI, target, or `hal`
+- claiming message-lifetime support from tests alone without landed runtime
+  state changes

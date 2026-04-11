@@ -366,6 +366,35 @@ struct Phase130ExplicitRestartOrReplacementAuditInputs {
     compiler_reopening_visible: u32
 }
 
+struct Phase131FanOutCompositionAuditInputs {
+    phase130: debug.Phase130ExplicitRestartOrReplacementAudit
+    composition_policy_owner_pid: u32
+    composition_service_pid: u32
+    composition_service_key: u32
+    composition_wait_handle_slot: u32
+    fixed_directory_entry_count: usize
+    control_endpoint_id: u32
+    echo_endpoint_id: u32
+    log_endpoint_id: u32
+    request_receive_status: syscall.SyscallStatus
+    echo_fanout_status: syscall.SyscallStatus
+    echo_fanout_endpoint_id: u32
+    log_fanout_status: syscall.SyscallStatus
+    log_fanout_endpoint_id: u32
+    echo_reply_status: syscall.SyscallStatus
+    log_ack_status: syscall.SyscallStatus
+    aggregate_reply_status: syscall.SyscallStatus
+    composition_wait_status: syscall.SyscallStatus
+    aggregate_reply_byte0: u8
+    aggregate_reply_byte1: u8
+    aggregate_reply_byte2: u8
+    aggregate_reply_byte3: u8
+    explicit_composition_visible: u32
+    kernel_broker_visible: u32
+    dynamic_namespace_visible: u32
+    compiler_reopening_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize

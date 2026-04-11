@@ -1,0 +1,143 @@
+Phase 131 -- Fan-In Or Fan-Out Composition Probe
+================================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 130 explicit restart or replacement step by
+making IPC composition concrete as running code rather than as another narrow
+republication of already-landed one-hop service proofs.
+
+This document is both the Phase 131 execution note and its closeout.
+It records one bounded fan-out composition step over the real kernel artifact.
+It does not claim a general broker framework, multicast kernel policy,
+dynamic namespace growth, a broader IPC rewrite, or a compiler wave.
+
+Repository status note
+----------------------
+- Phase 128 through Phase 130 made failure explicit enough to move forward:
+  one bounded service death is visible, one bounded partial failure stays
+  partial, and one bounded replacement path remains init-owned rather than
+  kernel-owned.
+- The current running-system slice still centers on explicitly owned service
+  flows: log, echo, transfer, and now one bounded composition relay.
+- The landed slice adds one owner-local composition service under
+  `kernel/src/bootstrap_services/`, one additive endpoint-capacity increase,
+  one additive handle-table-capacity increase, and one additive send-side
+  syscall observation path so the composed topology is mechanically real and
+  inspectable.
+
+Problem being solved
+--------------------
+- The repository did not yet have one honest end-to-end proof that multiple
+  IPC edges can participate in one bounded topology over the real kernel
+  artifact.
+- Without a real composition step, later backpressure and message-lifetime
+  phases would be forced to stress synthetic fixtures instead of stressing the
+  running system the repository actually claims.
+- The repository therefore needed one bounded composition owner that runs over
+  the real kernel artifact and one small set of owner-local kernel additions
+  that support that composition honestly.
+
+Core rule
+---------
+- Topology belongs to service and init owners, not to the kernel.
+- The kernel may report endpoint truth, handle truth, blocking truth, and
+  failure truth, but it must not become a broker, router policy engine, or
+  service graph manager.
+- Debug audits, projected MIR goldens, and freestanding regressions are
+  acceptance artifacts only. They do not count as the implementation.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository took this phase because the next honest pressure was no longer
+service death or replacement. It was proving that the same explicit model can
+carry one bounded service owner through more than one IPC edge at a time.
+
+What this phase proves
+----------------------
+- one bounded fan-out topology runs over the real kernel artifact rather than
+  only in a fixture harness
+- composition still lives in a bounded service owner instead of migrating into
+  the kernel
+- endpoint ownership, handle ownership, and fixed-directory truth remain
+  explicit while the topology becomes deeper
+- failure from one edge remains a visible fact rather than hidden retry or
+  fallback policy
+- the running-system claim expands because new code landed, not because a
+  proof was reworded
+
+Implemented slice
+-----------------
+- added one bounded `bootstrap_services` composition owner in
+  `kernel/src/bootstrap_services/04_composition.mc`
+- added explicit composition config, execution-state, and summary-observation
+  records in `kernel/src/bootstrap_services/00_types.mc`
+- widened `endpoint` table capacity and `capability` handle-table capacity
+  only enough to support one control edge plus two peer edges for the landed
+  topology
+- added `syscall.SendObservation` so the Phase 131 audit can prove distinct
+  fan-out edges without inferring them from raw queue internals
+- split the debug owner with one new `kernel/src/debug/05_phase131.mc`
+  validator plus one new bootstrap-audit builder path
+- wired `kernel/src/main.mc` through one real init-owned request to one
+  bounded composition child, one bounded fan-out to init-owned echo and log
+  peer lanes, one aggregated reply, and one explicit service reap before the
+  kernel marker advances to 131
+- added one focused freestanding regression plus one projected MIR golden for
+  the landed Phase 131 boundary
+
+Deliverables
+------------
+- one canonical Phase 131 closeout note in `docs/plan/active/`
+- one real bounded composition service under `kernel/src/bootstrap_services/`
+- one additive kernel mechanism slice across endpoint, capability, and syscall
+  owners that supports the composed path honestly
+- one init and root-orchestration update that executes the topology over the
+  real kernel artifact
+- one debug-owned Phase 131 audit over the landed implementation
+- one focused freestanding regression plus projected MIR golden for the Phase
+  131 boundary
+- refreshed roadmap, position, kernel README, repository map, decision log,
+  and backlog wording that keep the implementation and the no-compiler-growth
+  decision aligned
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 131 marker
+- one new bounded composition owner exists as real code under
+  `kernel/src/bootstrap_services/`
+- one additive kernel mechanism slice now exists under `endpoint`,
+  `capability`, and `syscall` because the composed topology required it
+- the Phase 131 debug audit validates the landed topology and its owner
+  boundaries over the real kernel artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 131 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- a general broker, router, or service-graph subsystem
+- dynamic namespace growth or service discovery
+- fairness, load balancing, or throughput work
+- a kernel-owned retry, fallback, or recovery policy
+- reopening sema, MIR, backend, ABI, target, or `hal`
+- claiming deeper IPC composition from tests alone without landing new owners
+
+Closeout statement
+------------------
+Phase 131 is complete as one bounded fan-out composition probe.
+The repository now carries one honest composed IPC topology over the real
+kernel artifact: one bounded composition owner receives one request on the
+shared control edge, drives one bounded echo lane and one bounded log lane,
+returns one bounded aggregate reply, and keeps routing policy with init and
+service owners rather than migrating it into the kernel. The fixed directory
+stays small, the kernel still does not claim broker or namespace policy, and
+the compiler stays closed because this phase needed owner-local IPC evidence,
+not another language or backend wave.

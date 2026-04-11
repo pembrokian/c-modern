@@ -1,5 +1,5 @@
-const HANDLE_TABLE_CAPACITY: usize = 4
-const HANDLE_NOT_FOUND: usize = 4
+const HANDLE_TABLE_CAPACITY: usize = 5
+const HANDLE_NOT_FOUND: usize = 5
 const WAIT_TABLE_CAPACITY: usize = 2
 const WAIT_NOT_FOUND: usize = 2
 const RIGHTS_ENDPOINT_SEND: u32 = 1
@@ -46,7 +46,7 @@ struct HandleSlot {
 struct HandleTable {
     owner_pid: u32
     count: usize
-    slots: [4]HandleSlot
+    slots: [5]HandleSlot
 }
 
 struct WaitHandle {
@@ -103,12 +103,13 @@ func empty_wait_handle() WaitHandle {
     return WaitHandle{ slot_id: 0, owner_pid: 0, child_pid: 0, exit_code: 0, signaled: 0, state: WaitHandleState.Empty }
 }
 
-func zero_handle_slots() [4]HandleSlot {
-    slots: [4]HandleSlot
+func zero_handle_slots() [5]HandleSlot {
+    slots: [5]HandleSlot
     slots[0] = empty_handle_slot()
     slots[1] = empty_handle_slot()
     slots[2] = empty_handle_slot()
     slots[3] = empty_handle_slot()
+    slots[4] = empty_handle_slot()
     return slots
 }
 

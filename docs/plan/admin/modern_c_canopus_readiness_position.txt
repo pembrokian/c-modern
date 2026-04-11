@@ -7,7 +7,7 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position after Phase 130 published one explicit restart or replacement probe over the landed running kernel slice.
+Record one maintained repository position after Phase 131 published one bounded fan-out composition probe over the landed running kernel slice.
 
 This note answers four questions that now matter:
 
@@ -18,7 +18,7 @@ This note answers four questions that now matter:
 
 This note is not a support statement, a full phase plan, or a claim that the
 full Canopus architecture is implemented.
-It does not replace the Phase 109 through Phase 130 closeouts, the Canopus
+It does not replace the Phase 109 through Phase 131 closeouts, the Canopus
 architecture notes, or the narrower hosted and freestanding support
 statements.
 
@@ -38,6 +38,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/phase117_init_orchestrated_multi_service_bring_up.txt`
 - `docs/plan/phase118_request_reply_and_delegation_follow_through.txt`
 - `docs/plan/phase119_namespace_pressure_audit.txt`
+- `docs/plan/active/phase131_fan_in_or_fan_out_composition_probe.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
 - `docs/plan/phase121_kernel_image_contract_hardening.txt`
 - `docs/plan/phase122_target_surface_audit.txt`
@@ -80,11 +81,15 @@ Current repository truth
   Phase 124 delegation-chain stress step, one landed Phase 125 invalidation
   and rejection audit step, one landed Phase 126 authority lifetime
   classification step, one landed Phase 128 service death observation step,
-  one landed Phase 129 partial failure propagation step, and one landed Phase
-  130 explicit restart or replacement probe over that same admitted slice.
+  one landed Phase 129 partial failure propagation step, one landed Phase 130
+  explicit restart or replacement probe, and one landed Phase 131 fan-out
+  composition probe over that same admitted slice.
 - The landed Phase 124 delegation-chain stress step, the landed Phase 125 invalidation and rejection audit step, the landed Phase 126 authority lifetime classification step, the landed Phase 128 service death observation step, and the landed Phase 129 partial failure propagation step all belong to that same admitted slice rather than to a broader authority or failure framework.
 - The landed Phase 130 explicit restart or replacement probe also belongs to
   that same admitted slice rather than to a broader supervision or recovery
+  framework.
+- The landed Phase 131 fan-out composition probe also belongs to that same
+  admitted slice rather than to a broader broker, routing, or namespace
   framework.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
@@ -113,15 +118,20 @@ It means:
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
-Phase 96 through Phase 130 are now concrete as one first real kernel wave,
+Phase 96 through Phase 131 are now concrete as one first real kernel wave,
 one ownership and hardware-boundary clarification wave, one first bounded
 running-system and plateau freeze wave, and two first post-plateau
 authority-lifecycle stress steps plus one explicit lifetime-classification
 step and one explicit service-death observation step plus one explicit
 partial-failure propagation step plus one explicit restart-or-replacement
-probe.
+probe plus one explicit fan-out composition probe.
 That is meaningful implementation progress, but it is still an early system
 plateau rather than architectural completion.
+
+The repository now includes a landed Phase 131 fan-out composition probe that
+keeps routing policy with init and service owners, adds no compiler-facing
+surface, and expands the running-system slice by one honest composed IPC path
+rather than by another proof-only restatement of one-hop service behavior.
 
 Kernel maturity and quality
 ---------------------------

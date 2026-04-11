@@ -1,0 +1,208 @@
+Phase 132 -- Backpressure And Blocking Audit
+============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 131 composition step by making queue pressure,
+blocking, and wakeup behavior real kernel-owned mechanism rather than a thin
+audit over return codes that never mutate scheduler-visible state.
+
+This document is an execution plan for Phase 132.
+It defines one bounded backpressure phase that must land as concrete endpoint,
+state, lifecycle, scheduler, and syscall behavior before it is admitted as a
+debug audit or regression.
+It does not claim fairness guarantees, dynamic queue sizing, throughput work,
+or a broader scheduler rewrite.
+
+Repository status note
+----------------------
+- The current endpoint runtime already reports queue-full and queue-empty
+  conditions, but today that answer is mostly observational.
+- The current task-state model in `kernel/src/state.mc` has `BlockedOnTimer`
+  but no explicit endpoint-send or endpoint-receive blocking state.
+- The current scheduler and lifecycle slices therefore do not yet own one
+  honest block-to-wake follow-through for IPC pressure.
+- If the repository tries to stage Phase 132 through fixtures alone, it will
+  only prove that helper functions can return `WouldBlock`, not that the real
+  kernel artifact carries bounded backpressure honestly.
+
+Problem being solved
+--------------------
+- One honest IPC composition slice is not enough if queue pressure still has
+  no scheduler-visible consequence.
+- Without explicit block and wake behavior, later message-lifetime work would
+  stress an unreal model where senders and receivers appear to make progress
+  without owned state transitions.
+- The repository therefore needs one bounded implementation wave that makes
+  queue pressure a real state transition across existing owners.
+
+Core rule
+---------
+- Backpressure is kernel mechanism, not service policy.
+- The kernel may report that a sender blocks, a receiver blocks, or a blocked
+  task wakes because queue state changed. It must not decide retry policy,
+  fallback policy, or admission policy for services.
+- Phase completion requires state mutation in the running kernel artifact, not
+  just a new validation helper or new expected output file.
+- Debug audits, MIR projections, and tool regressions are acceptance artifacts
+  only.
+- Keep compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 132 change:
+
+- describing why a task is blocked and what event wakes it: admissible
+- deciding when software should retry or reorder work: wrong layer
+
+Do not answer backpressure by adding hidden buffering or queue growth. Make
+the bounded queue pressure explicit and route its consequences through the
+already-owned state, lifecycle, scheduler, and syscall paths.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 132 execution note that defines backpressure as real
+   kernel mechanism rather than as proof-only return-code coverage
+2. one additive endpoint waiter model that can record one bounded blocked send
+   path and one bounded blocked receive path
+3. one additive task-state and lifecycle model that can mark a task blocked on
+   endpoint send or receive and later return it to ready
+4. one scheduler-visible wake path driven by explicit endpoint state change or
+   peer disappearance
+5. one syscall surface that exposes the resulting observation cleanly without
+   owning policy
+6. one debug-owned Phase 132 audit and focused regression over the landed
+   block-to-wake follow-through
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because one honest composed topology is
+not yet enough. The next real pressure is whether the same model remains
+correct when bounded queues fill or empty and tasks must block visibly.
+
+What this phase should try to prove
+-----------------------------------
+- one bounded sender can block on queue pressure through an explicit task-state
+  transition
+- one bounded receiver can block on queue emptiness through an explicit
+  task-state transition
+- one explicit queue or peer-state transition wakes the blocked task and
+  returns it to ready without hidden scheduler policy
+- syscall observations, endpoint state, and scheduler-visible state all agree
+  on what happened
+- the running-system claim expands because the kernel now carries real IPC
+  pressure semantics rather than only reporting `WouldBlock`
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/state.mc`
+   - extend task-state truth so endpoint blocking is explicit
+   - preferred shape: add bounded endpoint-send and endpoint-receive blocked
+     states rather than reusing timer blocking as a generic bucket
+   - add any additive ready or wake helpers needed for the new transitions
+
+2. `kernel/src/endpoint/00_types.mc`
+   - add bounded waiter or pending-operation state owned by endpoint runtime
+   - keep the state fixed-size and explicit
+   - do not add dynamic queues or unbounded pending lists
+
+3. `kernel/src/endpoint/01_queue.mc` and `kernel/src/endpoint/02_runtime.mc`
+   - implement queue-pressure transitions, waiter registration, and wake
+     emission on the smallest honest slice
+   - ensure endpoint close or peer death can wake blocked paths explicitly
+
+4. `kernel/src/endpoint/03_validation.mc`
+   - validate the new endpoint block and wake invariants directly
+   - keep validation local to endpoint truth, not service policy
+
+5. `kernel/src/lifecycle.mc` and `kernel/src/sched.mc`
+   - own the task-state mutation and wake-to-ready follow-through for blocked
+     IPC tasks
+   - keep timer-owned behavior intact and additive rather than overloaded
+
+6. `kernel/src/syscall.mc`
+   - publish additive observations and block reasons for send and receive
+   - keep syscall behavior thin and descriptive
+
+7. `kernel/src/capability/03_validation.mc`
+   - validate any handle invalidation or close path that now wakes blocked IPC
+     operations
+   - do not widen capability ownership beyond what backpressure requires
+
+8. `kernel/src/debug/`
+   - preferred shape: add `06_phase132.mc` rather than forcing all later work
+     into the existing Phase 128 through Phase 130 debug file
+   - audit the real block-to-wake behavior over the landed kernel artifact
+
+9. `kernel/src/main.mc`
+   - drive one real bounded backpressure path using the running-system slice
+   - advance the kernel proof marker to 132 only after the audit succeeds
+
+Deliverables
+------------
+- one canonical Phase 132 execution plan in `docs/plan/active/`
+- one additive endpoint waiter and wake mechanism in the kernel source tree
+- one additive task-state and lifecycle transition slice for IPC blocking
+- one syscall observation update that exposes block and wake truth cleanly
+- one debug-owned Phase 132 audit over the real artifact
+- one focused freestanding regression plus projected MIR golden for the Phase
+  132 boundary
+- refreshed supporting docs only after the code shape is settled
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 132 boundary in docs: explicit backpressure mechanism, no
+   retry policy, no dynamic queue growth.
+2. Extend task-state truth in `state.mc` so IPC blocking is explicit.
+3. Add endpoint-owned waiter state and queue-pressure transitions.
+4. Wire lifecycle and scheduler wake transitions through the new endpoint
+   events.
+5. Publish the additive syscall observations and block reasons.
+6. Drive one real bounded backpressure path from `main.mc`.
+7. Add the Phase 132 debug audit and validator over the landed behavior.
+8. Advance the kernel proof marker to 132 only after the block-to-wake path is
+   real.
+9. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One sender blocks because the bounded endpoint queue is full.
+2. One receiver blocks because the bounded endpoint queue is empty.
+3. One later queue-state change wakes each blocked path explicitly.
+4. One peer-close or peer-death path wakes a blocked task with explicit
+   failure truth rather than a silent stall.
+5. One projected MIR proof that the new block and wake logic is present in the
+   emitted artifact.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 132 marker
+- endpoint blocking exists as real owner-local runtime state rather than only
+  as helper return codes
+- task-state, lifecycle, scheduler, and syscall observations all expose the
+  same block-to-wake truth for one bounded send path and one bounded receive
+  path
+- the Phase 132 debug audit validates the landed backpressure slice over the
+  real kernel artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 132 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- fairness guarantees or throughput tuning
+- dynamic queue sizing or hidden buffering
+- kernel-owned retry, fallback, or admission policy
+- a scheduler rewrite outside the new explicit IPC states
+- reopening sema, MIR, backend, ABI, target, or `hal`
+- claiming IPC pressure support from tests alone without landed state changes
