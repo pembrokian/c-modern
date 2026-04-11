@@ -390,7 +390,7 @@ func validate_phase109_first_running_kernel_slice(audit: RunningKernelSliceAudit
     if audit.transfer_service_transfer.transferred_endpoint_id != audit.transfer_endpoint_id {
         return false
     }
-    if audit.transfer_service_transfer.transferred_rights != 5 {
+    if audit.transfer_service_transfer.transferred_rights != 7 {
         return false
     }
     if audit.transfer_service_transfer.emit_count != 1 {

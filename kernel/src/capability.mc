@@ -19,6 +19,7 @@ enum CapabilityKind {
 enum HandleState {
     Empty,
     Installed,
+    Invalidated,
 }
 
 enum WaitHandleState {
@@ -203,6 +204,22 @@ func handle_install_succeeded(before: HandleTable, after: HandleTable, slot_id: 
     return handle_slot_installed(after, slot_id)
 }
 
+func handle_slot_invalidated(table: HandleTable, slot_id: u32) bool {
+    if table.slots[0].slot_id == slot_id && handle_state_score(table.slots[0].state) == 4 {
+        return true
+    }
+    if table.slots[1].slot_id == slot_id && handle_state_score(table.slots[1].state) == 4 {
+        return true
+    }
+    if table.slots[2].slot_id == slot_id && handle_state_score(table.slots[2].state) == 4 {
+        return true
+    }
+    if table.slots[3].slot_id == slot_id && handle_state_score(table.slots[3].state) == 4 {
+        return true
+    }
+    return false
+}
+
 func wait_install_succeeded(before: WaitTable, after: WaitTable, slot_id: u32) bool {
     if after.count != before.count + 1 {
         return false
@@ -230,6 +247,41 @@ func endpoint_rights_valid(rights: u32) bool {
     return true
 }
 
+func endpoint_rights_include(rights: u32, required_rights: u32) bool {
+    if !endpoint_rights_valid(rights) {
+        return false
+    }
+    if required_rights == 0 {
+        return true
+    }
+    if required_rights == RIGHTS_ENDPOINT_SEND {
+        return rights == 1 || rights == 3 || rights == 5 || rights == 7
+    }
+    if required_rights == RIGHTS_ENDPOINT_RECEIVE {
+        return rights == 2 || rights == 3 || rights == 6 || rights == 7
+    }
+    if required_rights == RIGHTS_ENDPOINT_TRANSFER {
+        return rights == 4 || rights == 5 || rights == 6 || rights == 7
+    }
+    if required_rights == 3 {
+        return rights == 3 || rights == 7
+    }
+    if required_rights == 5 {
+        return rights == 5 || rights == 7
+    }
+    if required_rights == 6 {
+        return rights == 6 || rights == 7
+    }
+    if required_rights == RIGHTS_ENDPOINT_ALL {
+        return rights == RIGHTS_ENDPOINT_ALL
+    }
+    return false
+}
+
+func handle_slot_accepts_install(state: HandleState) bool {
+    return handle_state_score(state) != 2
+}
+
 func attenuate_endpoint_rights(rights: u32) u32 {
     if !endpoint_rights_valid(rights) {
         return 0
@@ -252,19 +304,19 @@ func install_endpoint_handle(table: HandleTable, slot_id: u32, endpoint_id: u32,
         return table
     }
     slots: [4]HandleSlot = table.slots
-    if handle_state_score(slots[0].state) == 1 {
+    if handle_slot_accepts_install(slots[0].state) {
         slots[0] = HandleSlot{ slot_id: slot_id, owner_pid: table.owner_pid, endpoint_id: endpoint_id, rights: rights, state: HandleState.Installed }
         return HandleTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
     }
-    if handle_state_score(slots[1].state) == 1 {
+    if handle_slot_accepts_install(slots[1].state) {
         slots[1] = HandleSlot{ slot_id: slot_id, owner_pid: table.owner_pid, endpoint_id: endpoint_id, rights: rights, state: HandleState.Installed }
         return HandleTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
     }
-    if handle_state_score(slots[2].state) == 1 {
+    if handle_slot_accepts_install(slots[2].state) {
         slots[2] = HandleSlot{ slot_id: slot_id, owner_pid: table.owner_pid, endpoint_id: endpoint_id, rights: rights, state: HandleState.Installed }
         return HandleTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
     }
-    if handle_state_score(slots[3].state) == 1 {
+    if handle_slot_accepts_install(slots[3].state) {
         slots[3] = HandleSlot{ slot_id: slot_id, owner_pid: table.owner_pid, endpoint_id: endpoint_id, rights: rights, state: HandleState.Installed }
         return HandleTable{ owner_pid: table.owner_pid, count: table.count + 1, slots: slots }
     }
@@ -277,7 +329,7 @@ func remove_handle(table: HandleTable, slot_id: u32) HandleTable {
         return table
     }
     slots: [4]HandleSlot = table.slots
-    slots[index] = empty_handle_slot()
+    slots[index] = HandleSlot{ slot_id: slots[index].slot_id, owner_pid: slots[index].owner_pid, endpoint_id: slots[index].endpoint_id, rights: slots[index].rights, state: HandleState.Invalidated }
     return HandleTable{ owner_pid: table.owner_pid, count: table.count - 1, slots: slots }
 }
 
@@ -364,8 +416,24 @@ func find_rights_for_handle(table: HandleTable, slot_id: u32) u32 {
 }
 
 func resolve_endpoint_handle(table: HandleTable, slot_id: u32) EndpointHandleResolution {
+    return resolve_endpoint_handle_for_rights(table, slot_id, 0)
+}
+
+func resolve_send_endpoint_handle(table: HandleTable, slot_id: u32) EndpointHandleResolution {
+    return resolve_endpoint_handle_for_rights(table, slot_id, RIGHTS_ENDPOINT_SEND)
+}
+
+func resolve_receive_endpoint_handle(table: HandleTable, slot_id: u32) EndpointHandleResolution {
+    return resolve_endpoint_handle_for_rights(table, slot_id, RIGHTS_ENDPOINT_RECEIVE)
+}
+
+func resolve_endpoint_handle_for_rights(table: HandleTable, slot_id: u32, required_rights: u32) EndpointHandleResolution {
     endpoint_id: u32 = find_endpoint_for_handle(table, slot_id)
+    rights: u32 = find_rights_for_handle(table, slot_id)
     if endpoint_id == 0 {
+        return EndpointHandleResolution{ endpoint_id: 0, valid: 0 }
+    }
+    if !endpoint_rights_include(rights, required_rights) {
         return EndpointHandleResolution{ endpoint_id: 0, valid: 0 }
     }
     return EndpointHandleResolution{ endpoint_id: endpoint_id, valid: 1 }
@@ -378,12 +446,12 @@ func resolve_attached_transfer_handle(table: HandleTable, attached_handle_slot: 
     if attached_handle_count != 1 {
         return AttachedTransferResolution{ attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: 0, attached_count: attached_handle_count, valid: 0 }
     }
-    attached_endpoint_id: u32 = find_endpoint_for_handle(table, attached_handle_slot)
+    resolved: EndpointHandleResolution = resolve_endpoint_handle_for_rights(table, attached_handle_slot, RIGHTS_ENDPOINT_TRANSFER)
     attached_rights: u32 = find_transfer_rights_for_handle(table, attached_handle_slot)
-    if attached_endpoint_id == 0 || attached_rights == 0 {
+    if resolved.valid == 0 || attached_rights == 0 {
         return AttachedTransferResolution{ attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: attached_handle_slot, attached_count: attached_handle_count, valid: 0 }
     }
-    return AttachedTransferResolution{ attached_endpoint_id: attached_endpoint_id, attached_rights: attached_rights, attached_source_handle_slot: attached_handle_slot, attached_count: attached_handle_count, valid: 1 }
+    return AttachedTransferResolution{ attached_endpoint_id: resolved.endpoint_id, attached_rights: attached_rights, attached_source_handle_slot: attached_handle_slot, attached_count: attached_handle_count, valid: 1 }
 }
 
 func install_received_endpoint_handle(table: HandleTable, receive_handle_slot: u32, attached_count: usize, attached_endpoint_id: u32, attached_rights: u32) ReceivedHandleInstall {
@@ -414,7 +482,7 @@ func admit_spawn_wait_handle(table: WaitTable, wait_handle_slot: u32, child_pid:
 func validate_syscall_capability_boundary() bool {
     table: HandleTable = handle_table_for_owner(7)
     table = install_endpoint_handle(table, 1, 11, RIGHTS_ENDPOINT_ALL)
-    resolved: EndpointHandleResolution = resolve_endpoint_handle(table, 1)
+    resolved: EndpointHandleResolution = resolve_endpoint_handle_for_rights(table, 1, RIGHTS_ENDPOINT_SEND)
     if resolved.valid == 0 {
         return false
     }
@@ -430,6 +498,24 @@ func validate_syscall_capability_boundary() bool {
         return false
     }
     if attached.attached_rights != RIGHTS_ENDPOINT_ALL {
+        return false
+    }
+
+    invalidated: HandleTable = remove_handle(table, 1)
+    if !handle_slot_invalidated(invalidated, 1) {
+        return false
+    }
+    invalidated_lookup: EndpointHandleResolution = resolve_endpoint_handle_for_rights(invalidated, 1, RIGHTS_ENDPOINT_SEND)
+    if invalidated_lookup.valid != 0 {
+        return false
+    }
+
+    send_only: HandleTable = handle_table_for_owner(9)
+    send_only = install_endpoint_handle(send_only, 2, 17, RIGHTS_ENDPOINT_SEND)
+    if resolve_endpoint_handle_for_rights(send_only, 2, RIGHTS_ENDPOINT_SEND).valid == 0 {
+        return false
+    }
+    if resolve_endpoint_handle_for_rights(send_only, 2, RIGHTS_ENDPOINT_RECEIVE).valid != 0 {
         return false
     }
 
@@ -462,6 +548,8 @@ func handle_state_score(state: HandleState) i32 {
         return 1
     case HandleState.Installed:
         return 2
+    case HandleState.Invalidated:
+        return 4
     default:
         return 0
     }

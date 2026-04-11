@@ -510,7 +510,7 @@ func validate_syscall_contract_hardening(audit: SyscallHardeningAudit) bool {
     payload[3] = 85
 
     local_handles: capability.HandleTable = capability.handle_table_for_owner(audit.init_pid)
-    local_handles = capability.install_endpoint_handle(local_handles, audit.init_endpoint_handle_slot, audit.init_endpoint_id, 5)
+    local_handles = capability.install_endpoint_handle(local_handles, audit.init_endpoint_handle_slot, audit.init_endpoint_id, 3)
     local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
     local_endpoints = endpoint.install_endpoint(local_endpoints, audit.init_pid, audit.init_endpoint_id)
 
@@ -586,7 +586,7 @@ func validate_syscall_contract_hardening(audit: SyscallHardeningAudit) bool {
     }
 
     transfer_handles: capability.HandleTable = capability.handle_table_for_owner(audit.init_pid)
-    transfer_handles = capability.install_endpoint_handle(transfer_handles, audit.init_endpoint_handle_slot, audit.init_endpoint_id, 5)
+    transfer_handles = capability.install_endpoint_handle(transfer_handles, audit.init_endpoint_handle_slot, audit.init_endpoint_id, 3)
     transfer_handles = capability.install_endpoint_handle(transfer_handles, audit.transfer_source_handle_slot, 2, 5)
     transfer_endpoints: endpoint.EndpointTable = endpoint.empty_table()
     transfer_endpoints = endpoint.install_endpoint(transfer_endpoints, audit.init_pid, audit.init_endpoint_id)
@@ -980,7 +980,7 @@ func validate_phase107_user_to_user_capability_transfer(audit: TransferServicePh
     if capability.find_endpoint_for_handle(audit.init_handle_table, audit.init_received_handle_slot) != audit.transfer_endpoint_id {
         return false
     }
-    if capability.find_rights_for_handle(audit.init_handle_table, audit.init_received_handle_slot) != 5 {
+    if capability.find_rights_for_handle(audit.init_handle_table, audit.init_received_handle_slot) != 7 {
         return false
     }
     if audit.grant_observation.endpoint_id != audit.init_endpoint_id {
@@ -1061,7 +1061,7 @@ func validate_phase107_user_to_user_capability_transfer(audit: TransferServicePh
     if audit.service_state.last_transferred_endpoint_id != audit.transfer_endpoint_id {
         return false
     }
-    if audit.service_state.last_transferred_rights != 5 {
+    if audit.service_state.last_transferred_rights != 7 {
         return false
     }
     if audit.service_state.last_grant_len != 4 {
@@ -1106,7 +1106,7 @@ func validate_phase107_user_to_user_capability_transfer(audit: TransferServicePh
     if audit.transfer.transferred_endpoint_id != audit.transfer_endpoint_id {
         return false
     }
-    if audit.transfer.transferred_rights != 5 {
+    if audit.transfer.transferred_rights != 7 {
         return false
     }
     if transfer_service.tag_score(audit.transfer.tag) != 4 {

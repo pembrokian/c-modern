@@ -893,7 +893,7 @@ func seed_transfer_endpoint_handle() bool {
     endpoints: endpoint.EndpointTable = ENDPOINTS
 
     endpoints = endpoint.install_endpoint(endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
-    handle_tables[1] = capability.install_endpoint_handle(handle_tables[1], TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, 5)
+    handle_tables[1] = capability.install_endpoint_handle(handle_tables[1], TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, 7)
 
     HANDLE_TABLES = handle_tables
     ENDPOINTS = endpoints
@@ -916,7 +916,7 @@ func seed_transfer_endpoint_handle() bool {
     if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
         return false
     }
-    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 5 {
+    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 7 {
         return false
     }
     return true
@@ -1011,7 +1011,7 @@ func validate_capability_carrying_ipc_transfer() bool {
     if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
         return false
     }
-    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != 5 {
+    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != 7 {
         return false
     }
     if syscall.status_score(ATTACHED_RECEIVE_OBSERVATION.status) != 2 {
@@ -1290,14 +1290,14 @@ func execute_phase124_delegation_chain_probe() bool {
     local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
 
     init_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
     init_table = capability.install_endpoint_handle(init_table, transfer_config.init_received_handle_slot, TRANSFER_ENDPOINT_ID, 5)
 
     intermediary_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_INTERMEDIARY_PID)
-    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
 
     final_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_FINAL_HOLDER_PID)
-    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
 
     grant_payload: [4]u8 = endpoint.zero_payload()
     grant_payload[0] = 67
@@ -1377,14 +1377,14 @@ func execute_phase125_invalidation_probe() bool {
     local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
 
     init_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
     init_table = capability.install_endpoint_handle(init_table, transfer_config.init_received_handle_slot, TRANSFER_ENDPOINT_ID, 5)
 
     intermediary_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_INTERMEDIARY_PID)
-    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
 
     final_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_FINAL_HOLDER_PID)
-    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
 
     grant_payload: [4]u8 = endpoint.zero_payload()
     grant_payload[0] = 67
@@ -1465,14 +1465,14 @@ func execute_phase126_authority_lifetime_probe() bool {
     local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
 
     init_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
     init_table = capability.install_endpoint_handle(init_table, transfer_config.init_received_handle_slot, TRANSFER_ENDPOINT_ID, 5)
 
     intermediary_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_INTERMEDIARY_PID)
-    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
 
     final_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_FINAL_HOLDER_PID)
-    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
 
     grant_payload: [4]u8 = endpoint.zero_payload()
     grant_payload[0] = 67

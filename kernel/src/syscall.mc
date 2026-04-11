@@ -300,7 +300,7 @@ func perform_send(gate: SyscallGate, handle_table: capability.HandleTable, endpo
     if gate.open == 0 {
         return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Closed, 0, 0), handle_table, endpoints, SyscallStatus.Closed, BlockReason.None)
     }
-    resolved_handle: capability.EndpointHandleResolution = capability.resolve_endpoint_handle(handle_table, request.handle_slot)
+    resolved_handle: capability.EndpointHandleResolution = capability.resolve_send_endpoint_handle(handle_table, request.handle_slot)
     if resolved_handle.valid == 0 {
         return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, SyscallStatus.InvalidHandle, BlockReason.None)
     }
@@ -331,7 +331,7 @@ func perform_receive(gate: SyscallGate, handle_table: capability.HandleTable, en
     if gate.open == 0 {
         return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Closed, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.Closed, BlockReason.None, 0, 0, 0, 0, 0, endpoint.zero_payload()))
     }
-    resolved_handle: capability.EndpointHandleResolution = capability.resolve_endpoint_handle(handle_table, request.handle_slot)
+    resolved_handle: capability.EndpointHandleResolution = capability.resolve_receive_endpoint_handle(handle_table, request.handle_slot)
     if resolved_handle.valid == 0 {
         return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, 0, 0, 0, 0, endpoint.zero_payload()))
     }

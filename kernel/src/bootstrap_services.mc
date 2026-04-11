@@ -362,12 +362,12 @@ func seed_transfer_service_program_capability(config: TransferServiceConfig, exe
 }
 
 func seed_transfer_service_sender_handle(config: TransferServiceConfig, execution: TransferServiceExecutionState) TransferServiceExecutionResult {
-    init_handle_table: capability.HandleTable = capability.install_endpoint_handle(execution.init_handle_table, config.source_handle_slot, 2, 5)
+    init_handle_table: capability.HandleTable = capability.install_endpoint_handle(execution.init_handle_table, config.source_handle_slot, 2, 7)
     next_state: TransferServiceExecutionState = TransferServiceExecutionState{ program_capability: execution.program_capability, gate: execution.gate, process_slots: execution.process_slots, task_slots: execution.task_slots, init_handle_table: init_handle_table, child_handle_table: execution.child_handle_table, wait_table: execution.wait_table, endpoints: execution.endpoints, init_image: execution.init_image, child_address_space: execution.child_address_space, child_user_frame: execution.child_user_frame, service_state: execution.service_state, spawn_observation: execution.spawn_observation, grant_observation: execution.grant_observation, emit_observation: execution.emit_observation, transfer: execution.transfer, wait_observation: execution.wait_observation, ready_queue: execution.ready_queue }
     if capability.find_endpoint_for_handle(next_state.init_handle_table, config.init_received_handle_slot) != 2 {
         return transfer_service_result(next_state, 0)
     }
-    if capability.find_rights_for_handle(next_state.init_handle_table, config.init_received_handle_slot) != 5 {
+    if capability.find_rights_for_handle(next_state.init_handle_table, config.init_received_handle_slot) != 7 {
         return transfer_service_result(next_state, 0)
     }
     if capability.find_endpoint_for_handle(next_state.init_handle_table, config.source_handle_slot) != 2 {
