@@ -55,8 +55,8 @@ Current status
   clarification, one bounded syscall boundary thinness audit, one bounded
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
   MMU ownership split, one bounded timer ownership hardening step, one bounded
-  MMU activation barrier follow-through step, one bounded init-orchestrated multi-service
-  bring-up step, one bounded delegated request-reply follow-through step, one
+  MMU activation barrier follow-through step, one bounded init-orchestrated multi-service bring-up
+  step, one bounded delegated request-reply follow-through step, one
   bounded init-owned fixed service-directory step, one bounded target-surface
   audit, one bounded next-plateau audit, one bounded delegation-chain stress
   step, one bounded invalidation and rejection audit step, and one bounded

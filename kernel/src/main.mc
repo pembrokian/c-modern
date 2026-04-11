@@ -1,5 +1,6 @@
 import address_space
 import bootstrap_audit
+import bootstrap_proofs
 import bootstrap_services
 import capability
 import debug
@@ -127,38 +128,6 @@ var TRANSFER_SERVICE_GRANT_OBSERVATION: syscall.ReceiveObservation
 var TRANSFER_SERVICE_EMIT_OBSERVATION: syscall.ReceiveObservation
 var TRANSFER_SERVICE_TRANSFER: transfer_service.TransferObservation
 var TRANSFER_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
-var PHASE118_INVALIDATED_SOURCE_SEND_STATUS: syscall.SyscallStatus
-var PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS: syscall.SyscallStatus
-var PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS: syscall.SyscallStatus
-var PHASE124_FINAL_SEND_STATUS: syscall.SyscallStatus
-var PHASE124_FINAL_SEND_SOURCE_PID: u32
-var PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH: usize
-var PHASE125_REJECTED_SEND_STATUS: syscall.SyscallStatus
-var PHASE125_REJECTED_RECEIVE_STATUS: syscall.SyscallStatus
-var PHASE125_SURVIVING_CONTROL_SEND_STATUS: syscall.SyscallStatus
-var PHASE125_SURVIVING_CONTROL_SOURCE_PID: u32
-var PHASE125_SURVIVING_CONTROL_QUEUE_DEPTH: usize
-var PHASE126_REPEAT_LONG_LIVED_SEND_STATUS: syscall.SyscallStatus
-var PHASE126_REPEAT_LONG_LIVED_SOURCE_PID: u32
-var PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH: usize
-var PHASE128_OBSERVED_SERVICE_PID: u32
-var PHASE128_OBSERVED_SERVICE_KEY: u32
-var PHASE128_OBSERVED_WAIT_HANDLE_SLOT: u32
-var PHASE128_OBSERVED_EXIT_CODE: i32
-var PHASE129_FAILED_SERVICE_PID: u32
-var PHASE129_FAILED_WAIT_STATUS: syscall.SyscallStatus
-var PHASE129_SURVIVING_SERVICE_PID: u32
-var PHASE129_SURVIVING_REPLY_STATUS: syscall.SyscallStatus
-var PHASE129_SURVIVING_WAIT_STATUS: syscall.SyscallStatus
-var PHASE129_SURVIVING_REPLY_BYTE0: u8
-var PHASE129_SURVIVING_REPLY_BYTE1: u8
-var PHASE130_REPLACEMENT_SERVICE_PID: u32
-var PHASE130_REPLACEMENT_SPAWN_STATUS: syscall.SyscallStatus
-var PHASE130_REPLACEMENT_ACK_STATUS: syscall.SyscallStatus
-var PHASE130_REPLACEMENT_WAIT_STATUS: syscall.SyscallStatus
-var PHASE130_REPLACEMENT_ACK_BYTE: u8
-var PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID: u32
-var PHASE131_COMPOSITION_STATE: bootstrap_services.CompositionServiceExecutionState
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -223,38 +192,7 @@ func reset_kernel_state() {
     TRANSFER_SERVICE_EMIT_OBSERVATION = syscall.empty_receive_observation()
     TRANSFER_SERVICE_TRANSFER = transfer_service.TransferObservation{ service_pid: 0, client_pid: 0, control_endpoint_id: 0, transferred_endpoint_id: 0, transferred_rights: 0, tag: transfer_service.CapabilityTransferTag.None, grant_len: 0, grant_byte0: 0, grant_byte1: 0, grant_byte2: 0, grant_byte3: 0, emit_len: 0, emit_byte0: 0, emit_byte1: 0, emit_byte2: 0, emit_byte3: 0, grant_count: 0, emit_count: 0 }
     TRANSFER_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
-    PHASE118_INVALIDATED_SOURCE_SEND_STATUS = syscall.SyscallStatus.None
-    PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS = syscall.SyscallStatus.None
-    PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS = syscall.SyscallStatus.None
-    PHASE124_FINAL_SEND_STATUS = syscall.SyscallStatus.None
-    PHASE124_FINAL_SEND_SOURCE_PID = 0
-    PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH = 0
-    PHASE125_REJECTED_SEND_STATUS = syscall.SyscallStatus.None
-    PHASE125_REJECTED_RECEIVE_STATUS = syscall.SyscallStatus.None
-    PHASE125_SURVIVING_CONTROL_SEND_STATUS = syscall.SyscallStatus.None
-    PHASE125_SURVIVING_CONTROL_SOURCE_PID = 0
-    PHASE125_SURVIVING_CONTROL_QUEUE_DEPTH = 0
-    PHASE126_REPEAT_LONG_LIVED_SEND_STATUS = syscall.SyscallStatus.None
-    PHASE126_REPEAT_LONG_LIVED_SOURCE_PID = 0
-    PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH = 0
-    PHASE128_OBSERVED_SERVICE_PID = 0
-    PHASE128_OBSERVED_SERVICE_KEY = 0
-    PHASE128_OBSERVED_WAIT_HANDLE_SLOT = 0
-    PHASE128_OBSERVED_EXIT_CODE = 0
-    PHASE129_FAILED_SERVICE_PID = 0
-    PHASE129_FAILED_WAIT_STATUS = syscall.SyscallStatus.None
-    PHASE129_SURVIVING_SERVICE_PID = 0
-    PHASE129_SURVIVING_REPLY_STATUS = syscall.SyscallStatus.None
-    PHASE129_SURVIVING_WAIT_STATUS = syscall.SyscallStatus.None
-    PHASE129_SURVIVING_REPLY_BYTE0 = 0
-    PHASE129_SURVIVING_REPLY_BYTE1 = 0
-    PHASE130_REPLACEMENT_SERVICE_PID = 0
-    PHASE130_REPLACEMENT_SPAWN_STATUS = syscall.SyscallStatus.None
-    PHASE130_REPLACEMENT_ACK_STATUS = syscall.SyscallStatus.None
-    PHASE130_REPLACEMENT_WAIT_STATUS = syscall.SyscallStatus.None
-    PHASE130_REPLACEMENT_ACK_BYTE = 0
-    PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID = 0
-    PHASE131_COMPOSITION_STATE = bootstrap_services.empty_composition_service_execution_state()
+    bootstrap_proofs.reset_late_phase_proofs()
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -1269,91 +1207,16 @@ func validate_phase107_user_to_user_capability_transfer() bool {
     return bootstrap_audit.validate_phase107_user_to_user_capability_transfer(bootstrap_audit.TransferServicePhaseAudit{ program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, spawn_observation: TRANSFER_SERVICE_SPAWN_OBSERVATION, grant_observation: TRANSFER_SERVICE_GRANT_OBSERVATION, emit_observation: TRANSFER_SERVICE_EMIT_OBSERVATION, service_state: TRANSFER_SERVICE_STATE, transfer: TRANSFER_SERVICE_TRANSFER, wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, init_handle_table: HANDLE_TABLES[1], wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: TRANSFER_SERVICE_ADDRESS_SPACE, child_user_frame: TRANSFER_SERVICE_USER_FRAME, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, source_handle_slot: config.source_handle_slot, control_handle_slot: config.control_handle_slot, init_received_handle_slot: config.init_received_handle_slot, service_received_handle_slot: config.service_received_handle_slot, grant_byte0: config.grant_byte0, grant_byte1: config.grant_byte1, grant_byte2: config.grant_byte2, grant_byte3: config.grant_byte3, exit_code: config.exit_code })
 }
 
-func build_phase108_program_cap_contract() debug.Phase108ProgramCapContract {
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    return bootstrap_audit.build_phase108_program_cap_contract(bootstrap_audit.Phase108ProgramCapContractInputs{ init_pid: INIT_PID, log_service_program_object_id: log_config.program_object_id, echo_service_program_object_id: echo_config.program_object_id, transfer_service_program_object_id: transfer_config.program_object_id, log_service_wait_handle_slot: log_config.wait_handle_slot, echo_service_wait_handle_slot: echo_config.wait_handle_slot, transfer_service_wait_handle_slot: transfer_config.wait_handle_slot, log_service_exit_code: log_config.exit_code, echo_service_exit_code: echo_config.exit_code, transfer_service_exit_code: transfer_config.exit_code, bootstrap_program_capability: INIT_BOOTSTRAP_CAPS.program_capability, log_service_program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, echo_service_program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, transfer_service_program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, log_service_spawn: LOG_SERVICE_SPAWN_OBSERVATION, echo_service_spawn: ECHO_SERVICE_SPAWN_OBSERVATION, transfer_service_spawn: TRANSFER_SERVICE_SPAWN_OBSERVATION, log_service_wait: LOG_SERVICE_WAIT_OBSERVATION, echo_service_wait: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_wait: TRANSFER_SERVICE_WAIT_OBSERVATION })
-}
-
-func build_phase109_running_kernel_slice_audit(phase104_contract_hardened: u32, phase108_contract_hardened: u32) debug.RunningKernelSliceAudit {
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    return bootstrap_audit.build_phase109_running_kernel_slice_audit(bootstrap_audit.RunningKernelSliceAuditInputs{ kernel: KERNEL, init_pid: INIT_PID, init_tid: INIT_TID, init_asid: INIT_ASID, child_tid: CHILD_TID, child_exit_code: CHILD_EXIT_CODE, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_request_byte: log_config.request_byte, echo_service_request_byte0: echo_config.request_byte0, echo_service_request_byte1: echo_config.request_byte1, log_service_exit_code: log_config.exit_code, echo_service_exit_code: echo_config.exit_code, transfer_service_exit_code: transfer_config.exit_code, init_bootstrap_handoff: INIT_BOOTSTRAP_HANDOFF, receive_observation: RECEIVE_OBSERVATION, attached_receive_observation: ATTACHED_RECEIVE_OBSERVATION, transferred_handle_use_observation: TRANSFERRED_HANDLE_USE_OBSERVATION, pre_exit_wait_observation: PRE_EXIT_WAIT_OBSERVATION, exit_wait_observation: EXIT_WAIT_OBSERVATION, sleep_observation: SLEEP_OBSERVATION, timer_wake_observation: TIMER_WAKE_OBSERVATION, log_service_handshake: LOG_SERVICE_HANDSHAKE, log_service_wait_observation: LOG_SERVICE_WAIT_OBSERVATION, echo_service_exchange: ECHO_SERVICE_EXCHANGE, echo_service_wait_observation: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER, transfer_service_wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, phase104_contract_hardened: phase104_contract_hardened, phase108_contract_hardened: phase108_contract_hardened, init_process: PROCESS_SLOTS[1], init_task: TASK_SLOTS[1], init_user_frame: USER_FRAME, boot_log_append_failed: BOOT_LOG_APPEND_FAILED })
-}
-
-func build_phase117_multi_service_bring_up_audit(running_slice_audit: debug.RunningKernelSliceAudit) debug.Phase117MultiServiceBringUpAudit {
-    return bootstrap_audit.build_phase117_multi_service_bring_up_audit(bootstrap_audit.Phase117MultiServiceBringUpAuditInputs{ running_slice: running_slice_audit, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, echo_service_program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, transfer_service_program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, log_service_spawn: LOG_SERVICE_SPAWN_OBSERVATION, echo_service_spawn: ECHO_SERVICE_SPAWN_OBSERVATION, transfer_service_spawn: TRANSFER_SERVICE_SPAWN_OBSERVATION, log_service_wait: LOG_SERVICE_WAIT_OBSERVATION, echo_service_wait: ECHO_SERVICE_WAIT_OBSERVATION, transfer_service_wait: TRANSFER_SERVICE_WAIT_OBSERVATION, log_service_handshake: LOG_SERVICE_HANDSHAKE, echo_service_exchange: ECHO_SERVICE_EXCHANGE, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER })
-}
-
-func build_phase118_delegated_request_reply_audit(phase117_audit: debug.Phase117MultiServiceBringUpAudit) debug.Phase118DelegatedRequestReplyAudit {
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    retained_receive_endpoint_id: u32 = capability.find_endpoint_for_handle(HANDLE_TABLES[1], transfer_config.init_received_handle_slot)
-    return bootstrap_audit.build_phase118_delegated_request_reply_audit(bootstrap_audit.Phase118DelegatedRequestReplyAuditInputs{ phase117: phase117_audit, transfer_service_transfer: TRANSFER_SERVICE_TRANSFER, invalidated_source_send_status: PHASE118_INVALIDATED_SOURCE_SEND_STATUS, invalidated_source_handle_slot: transfer_config.source_handle_slot, retained_receive_handle_slot: transfer_config.init_received_handle_slot, retained_receive_endpoint_id: retained_receive_endpoint_id })
-}
-
-func build_phase119_namespace_pressure_audit(phase118_audit: debug.Phase118DelegatedRequestReplyAudit) debug.Phase119NamespacePressureAudit {
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    return bootstrap_audit.build_phase119_namespace_pressure_audit(bootstrap_audit.Phase119NamespacePressureAuditInputs{ phase118: phase118_audit, directory_owner_pid: INIT_PID, directory_entry_count: 3, log_service_key: LOG_SERVICE_DIRECTORY_KEY, echo_service_key: ECHO_SERVICE_DIRECTORY_KEY, transfer_service_key: TRANSFER_SERVICE_DIRECTORY_KEY, shared_directory_endpoint_id: INIT_ENDPOINT_ID, log_service_program_slot: log_config.program_slot, echo_service_program_slot: echo_config.program_slot, transfer_service_program_slot: transfer_config.program_slot, log_service_program_object_id: log_config.program_object_id, echo_service_program_object_id: echo_config.program_object_id, transfer_service_program_object_id: transfer_config.program_object_id, log_service_wait_handle_slot: LOG_SERVICE_SPAWN_OBSERVATION.wait_handle_slot, echo_service_wait_handle_slot: ECHO_SERVICE_SPAWN_OBSERVATION.wait_handle_slot, transfer_service_wait_handle_slot: TRANSFER_SERVICE_SPAWN_OBSERVATION.wait_handle_slot, dynamic_namespace_visible: 0 })
-}
-
-func build_phase120_running_system_support_audit(phase119_audit: debug.Phase119NamespacePressureAudit) debug.Phase120RunningSystemSupportAudit {
-    return bootstrap_audit.build_phase120_running_system_support_audit(bootstrap_audit.Phase120RunningSystemSupportAuditInputs{ phase119: phase119_audit, service_policy_owner_pid: INIT_PID, running_service_count: 3, fixed_directory_count: 1, shared_control_endpoint_id: INIT_ENDPOINT_ID, retained_reply_endpoint_id: phase119_audit.phase118.retained_receive_endpoint_id, program_capability_count: 3, wait_handle_count: 3, dynamic_loading_visible: 0, service_manager_visible: 0, dynamic_namespace_visible: 0 })
-}
-
-func build_phase121_kernel_image_contract_audit(phase120_audit: debug.Phase120RunningSystemSupportAudit) debug.Phase121KernelImageContractAudit {
-    return bootstrap_audit.build_phase121_kernel_image_contract_audit(bootstrap_audit.Phase121KernelImageContractAuditInputs{ phase120: phase120_audit, kernel_manifest_visible: 1, kernel_target_visible: 1, kernel_runtime_startup_visible: 1, bootstrap_target_family_visible: 1, emitted_image_input_visible: 1, linked_kernel_executable_visible: 1, dynamic_loading_visible: 0, service_manager_visible: 0, dynamic_namespace_visible: 0 })
-}
-
-func build_phase122_target_surface_audit(phase121_audit: debug.Phase121KernelImageContractAudit) debug.Phase122TargetSurfaceAudit {
-    return bootstrap_audit.build_phase122_target_surface_audit(bootstrap_audit.Phase122TargetSurfaceAuditInputs{ phase121: phase121_audit, kernel_target_visible: 1, kernel_runtime_startup_visible: 1, bootstrap_target_family_visible: 1, bootstrap_target_family_only_visible: 1, broader_target_family_visible: 0, dynamic_loading_visible: 0, service_manager_visible: 0, dynamic_namespace_visible: 0 })
-}
-
-func build_phase123_next_plateau_audit(phase122_audit: debug.Phase122TargetSurfaceAudit) debug.Phase123NextPlateauAudit {
-    return bootstrap_audit.build_phase123_next_plateau_audit(bootstrap_audit.Phase123NextPlateauAuditInputs{ phase122: phase122_audit, running_kernel_truth_visible: 1, running_system_truth_visible: 1, kernel_image_truth_visible: 1, target_surface_truth_visible: 1, broader_platform_visible: 0, broad_target_support_visible: 0, general_loading_visible: 0, compiler_reopening_visible: 0 })
-}
-
-func build_phase124_delegation_chain_audit(phase123_audit: debug.Phase123NextPlateauAudit) debug.Phase124DelegationChainAudit {
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    return bootstrap_audit.build_phase124_delegation_chain_audit(bootstrap_audit.Phase124DelegationChainAuditInputs{ phase123: phase123_audit, delegator_pid: INIT_PID, intermediary_pid: PHASE124_INTERMEDIARY_PID, final_holder_pid: PHASE124_FINAL_HOLDER_PID, control_endpoint_id: INIT_ENDPOINT_ID, delegated_endpoint_id: TRANSFER_ENDPOINT_ID, delegator_source_handle_slot: transfer_config.init_received_handle_slot, intermediary_receive_handle_slot: PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT, final_receive_handle_slot: PHASE124_FINAL_RECEIVE_HANDLE_SLOT, first_invalidated_send_status: PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS, second_invalidated_send_status: PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS, final_send_status: PHASE124_FINAL_SEND_STATUS, final_send_source_pid: PHASE124_FINAL_SEND_SOURCE_PID, final_endpoint_queue_depth: PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH, ambient_authority_visible: 0, compiler_reopening_visible: 0 })
-}
-
-func build_phase125_invalidation_audit(phase124_audit: debug.Phase124DelegationChainAudit) debug.Phase125InvalidationAudit {
-    return bootstrap_audit.build_phase125_invalidation_audit(bootstrap_audit.Phase125InvalidationAuditInputs{ phase124: phase124_audit, invalidated_holder_pid: PHASE124_FINAL_HOLDER_PID, control_endpoint_id: INIT_ENDPOINT_ID, invalidated_endpoint_id: TRANSFER_ENDPOINT_ID, invalidated_handle_slot: PHASE124_FINAL_RECEIVE_HANDLE_SLOT, rejected_send_status: PHASE125_REJECTED_SEND_STATUS, rejected_receive_status: PHASE125_REJECTED_RECEIVE_STATUS, surviving_control_send_status: PHASE125_SURVIVING_CONTROL_SEND_STATUS, surviving_control_source_pid: PHASE125_SURVIVING_CONTROL_SOURCE_PID, surviving_control_queue_depth: PHASE125_SURVIVING_CONTROL_QUEUE_DEPTH, authority_loss_visible: 1, broader_revocation_visible: 0, compiler_reopening_visible: 0 })
-}
-
-func build_phase126_authority_lifetime_audit(phase125_audit: debug.Phase125InvalidationAudit) debug.Phase126AuthorityLifetimeAudit {
-    return bootstrap_audit.build_phase126_authority_lifetime_audit(bootstrap_audit.Phase126AuthorityLifetimeAuditInputs{ phase125: phase125_audit, classified_holder_pid: PHASE124_FINAL_HOLDER_PID, long_lived_endpoint_id: INIT_ENDPOINT_ID, short_lived_endpoint_id: TRANSFER_ENDPOINT_ID, long_lived_handle_slot: PHASE124_CONTROL_HANDLE_SLOT, short_lived_handle_slot: PHASE124_FINAL_RECEIVE_HANDLE_SLOT, repeat_long_lived_send_status: PHASE126_REPEAT_LONG_LIVED_SEND_STATUS, repeat_long_lived_source_pid: PHASE126_REPEAT_LONG_LIVED_SOURCE_PID, repeat_long_lived_queue_depth: PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH, long_lived_class_visible: 1, short_lived_class_visible: 1, broader_lifetime_framework_visible: 0, compiler_reopening_visible: 0 })
-}
-
-func build_phase128_service_death_observation_audit(phase126_audit: debug.Phase126AuthorityLifetimeAudit) debug.Phase128ServiceDeathObservationAudit {
-    return bootstrap_audit.build_phase128_service_death_observation_audit(bootstrap_audit.Phase128ServiceDeathObservationAuditInputs{ phase126: phase126_audit, observed_service_pid: PHASE128_OBSERVED_SERVICE_PID, observed_service_key: PHASE128_OBSERVED_SERVICE_KEY, observed_wait_handle_slot: PHASE128_OBSERVED_WAIT_HANDLE_SLOT, observed_exit_code: PHASE128_OBSERVED_EXIT_CODE, fixed_directory_entry_count: 3, service_death_visible: 1, kernel_supervision_visible: 0, service_restart_visible: 0, broader_failure_framework_visible: 0, compiler_reopening_visible: 0 })
-}
-
-func build_phase129_partial_failure_propagation_audit(phase128_audit: debug.Phase128ServiceDeathObservationAudit) debug.Phase129PartialFailurePropagationAudit {
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
-    return bootstrap_audit.build_phase129_partial_failure_propagation_audit(bootstrap_audit.Phase129PartialFailurePropagationAuditInputs{ phase128: phase128_audit, failed_service_pid: PHASE129_FAILED_SERVICE_PID, failed_service_key: LOG_SERVICE_DIRECTORY_KEY, failed_wait_handle_slot: log_config.wait_handle_slot, failed_wait_status: PHASE129_FAILED_WAIT_STATUS, surviving_service_pid: PHASE129_SURVIVING_SERVICE_PID, surviving_service_key: ECHO_SERVICE_DIRECTORY_KEY, surviving_wait_handle_slot: echo_config.wait_handle_slot, surviving_reply_status: PHASE129_SURVIVING_REPLY_STATUS, surviving_wait_status: PHASE129_SURVIVING_WAIT_STATUS, surviving_reply_byte0: PHASE129_SURVIVING_REPLY_BYTE0, surviving_reply_byte1: PHASE129_SURVIVING_REPLY_BYTE1, shared_control_endpoint_id: INIT_ENDPOINT_ID, directory_entry_count: 3, partial_failure_visible: 1, kernel_recovery_visible: 0, service_rebinding_visible: 0, broader_failure_framework_visible: 0, compiler_reopening_visible: 0 })
-}
-
-func build_phase130_explicit_restart_or_replacement_audit(phase129_audit: debug.Phase129PartialFailurePropagationAudit) debug.Phase130ExplicitRestartOrReplacementAudit {
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    return bootstrap_audit.build_phase130_explicit_restart_or_replacement_audit(bootstrap_audit.Phase130ExplicitRestartOrReplacementAuditInputs{ phase129: phase129_audit, replacement_policy_owner_pid: INIT_PID, replacement_service_pid: PHASE130_REPLACEMENT_SERVICE_PID, replacement_service_key: LOG_SERVICE_DIRECTORY_KEY, replacement_wait_handle_slot: log_config.wait_handle_slot, replacement_program_slot: log_config.program_slot, replacement_program_object_id: PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID, replacement_spawn_status: PHASE130_REPLACEMENT_SPAWN_STATUS, replacement_ack_status: PHASE130_REPLACEMENT_ACK_STATUS, replacement_wait_status: PHASE130_REPLACEMENT_WAIT_STATUS, replacement_ack_byte: PHASE130_REPLACEMENT_ACK_BYTE, shared_control_endpoint_id: INIT_ENDPOINT_ID, directory_entry_count: 3, explicit_restart_or_replacement_visible: 1, kernel_supervision_visible: 0, service_rebinding_visible: 0, broader_failure_framework_visible: 0, compiler_reopening_visible: 0 })
-}
-
 func build_composition_service_config() bootstrap_services.CompositionServiceConfig {
     return bootstrap_services.composition_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
 }
 
-func build_composition_service_execution_state() bootstrap_services.CompositionServiceExecutionState {
-    return bootstrap_services.CompositionServiceExecutionState{ program_capability: PHASE131_COMPOSITION_STATE.program_capability, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: PHASE131_COMPOSITION_STATE.child_address_space, child_user_frame: PHASE131_COMPOSITION_STATE.child_user_frame, echo_peer_state: PHASE131_COMPOSITION_STATE.echo_peer_state, log_peer_state: PHASE131_COMPOSITION_STATE.log_peer_state, spawn_observation: PHASE131_COMPOSITION_STATE.spawn_observation, request_receive_observation: PHASE131_COMPOSITION_STATE.request_receive_observation, echo_fanout_observation: PHASE131_COMPOSITION_STATE.echo_fanout_observation, echo_peer_receive_observation: PHASE131_COMPOSITION_STATE.echo_peer_receive_observation, echo_reply_send_observation: PHASE131_COMPOSITION_STATE.echo_reply_send_observation, echo_reply_observation: PHASE131_COMPOSITION_STATE.echo_reply_observation, log_fanout_observation: PHASE131_COMPOSITION_STATE.log_fanout_observation, log_peer_receive_observation: PHASE131_COMPOSITION_STATE.log_peer_receive_observation, log_ack_send_observation: PHASE131_COMPOSITION_STATE.log_ack_send_observation, log_ack_observation: PHASE131_COMPOSITION_STATE.log_ack_observation, aggregate_reply_send_observation: PHASE131_COMPOSITION_STATE.aggregate_reply_send_observation, aggregate_reply_observation: PHASE131_COMPOSITION_STATE.aggregate_reply_observation, wait_observation: PHASE131_COMPOSITION_STATE.wait_observation, observation: PHASE131_COMPOSITION_STATE.observation, ready_queue: PHASE131_COMPOSITION_STATE.ready_queue }
+func build_late_phase_proof_context() bootstrap_proofs.LatePhaseProofContext {
+    return bootstrap_proofs.LatePhaseProofContext{ init_pid: INIT_PID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_directory_key: LOG_SERVICE_DIRECTORY_KEY, echo_service_directory_key: ECHO_SERVICE_DIRECTORY_KEY, composition_service_directory_key: COMPOSITION_SERVICE_DIRECTORY_KEY, phase124_intermediary_pid: PHASE124_INTERMEDIARY_PID, phase124_final_holder_pid: PHASE124_FINAL_HOLDER_PID, phase124_control_handle_slot: PHASE124_CONTROL_HANDLE_SLOT, phase124_intermediary_receive_handle_slot: PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT, phase124_final_receive_handle_slot: PHASE124_FINAL_RECEIVE_HANDLE_SLOT }
 }
 
-func install_composition_service_execution_state(next_state: bootstrap_services.CompositionServiceExecutionState) {
-    PHASE131_COMPOSITION_STATE = next_state
+func install_composition_service_runtime_state(next_state: bootstrap_services.CompositionServiceExecutionState) {
+    bootstrap_proofs.install_composition_service_execution_state(next_state)
     SYSCALL_GATE = next_state.gate
     PROCESS_SLOTS = next_state.process_slots
     TASK_SLOTS = next_state.task_slots
@@ -1364,398 +1227,6 @@ func install_composition_service_execution_state(next_state: bootstrap_services.
     READY_QUEUE = next_state.ready_queue
 }
 
-func build_phase131_fan_out_composition_audit(phase130_audit: debug.Phase130ExplicitRestartOrReplacementAudit) debug.Phase131FanOutCompositionAudit {
-    config: bootstrap_services.CompositionServiceConfig = build_composition_service_config()
-    return bootstrap_audit.build_phase131_fan_out_composition_audit(bootstrap_audit.Phase131FanOutCompositionAuditInputs{ phase130: phase130_audit, composition_policy_owner_pid: INIT_PID, composition_service_pid: PHASE131_COMPOSITION_STATE.wait_observation.child_pid, composition_service_key: COMPOSITION_SERVICE_DIRECTORY_KEY, composition_wait_handle_slot: config.wait_handle_slot, fixed_directory_entry_count: 4, control_endpoint_id: config.control_endpoint_id, echo_endpoint_id: config.echo_endpoint_id, log_endpoint_id: config.log_endpoint_id, request_receive_status: PHASE131_COMPOSITION_STATE.request_receive_observation.status, echo_fanout_status: PHASE131_COMPOSITION_STATE.echo_fanout_observation.status, echo_fanout_endpoint_id: PHASE131_COMPOSITION_STATE.echo_fanout_observation.endpoint_id, log_fanout_status: PHASE131_COMPOSITION_STATE.log_fanout_observation.status, log_fanout_endpoint_id: PHASE131_COMPOSITION_STATE.log_fanout_observation.endpoint_id, echo_reply_status: PHASE131_COMPOSITION_STATE.echo_reply_observation.status, log_ack_status: PHASE131_COMPOSITION_STATE.log_ack_observation.status, aggregate_reply_status: PHASE131_COMPOSITION_STATE.aggregate_reply_observation.status, composition_wait_status: PHASE131_COMPOSITION_STATE.wait_observation.status, aggregate_reply_byte0: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte0, aggregate_reply_byte1: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte1, aggregate_reply_byte2: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte2, aggregate_reply_byte3: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte3, explicit_composition_visible: 1, kernel_broker_visible: 0, dynamic_namespace_visible: 0, compiler_reopening_visible: 0 })
-}
-
-func execute_phase124_delegation_chain_probe() bool {
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, INIT_ENDPOINT_ID)
-    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
-
-    init_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-    init_table = capability.install_endpoint_handle(init_table, transfer_config.init_received_handle_slot, TRANSFER_ENDPOINT_ID, 5)
-
-    intermediary_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_INTERMEDIARY_PID)
-    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-
-    final_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_FINAL_HOLDER_PID)
-    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-
-    grant_payload: [4]u8 = endpoint.zero_payload()
-    grant_payload[0] = 67
-    grant_payload[1] = 72
-    grant_payload[2] = 65
-    grant_payload[3] = 73
-    first_send: syscall.SendResult = syscall.perform_send(local_gate, init_table, local_endpoints, INIT_PID, syscall.build_transfer_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, grant_payload, transfer_config.init_received_handle_slot))
-    init_table = first_send.handle_table
-    local_endpoints = first_send.endpoints
-    local_gate = first_send.gate
-    if syscall.status_score(first_send.status) != 2 {
-        return false
-    }
-
-    first_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, intermediary_table, local_endpoints, syscall.build_transfer_receive_request(PHASE124_CONTROL_HANDLE_SLOT, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT))
-    intermediary_table = first_receive.handle_table
-    local_endpoints = first_receive.endpoints
-    local_gate = first_receive.gate
-    if syscall.status_score(first_receive.observation.status) != 2 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(intermediary_table, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-
-    init_invalidated_send: syscall.SendResult = syscall.perform_send(local_gate, init_table, local_endpoints, INIT_PID, syscall.build_send_request(transfer_config.init_received_handle_slot, 4, grant_payload))
-    PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS = init_invalidated_send.status
-    if syscall.status_score(PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS) != 8 {
-        return false
-    }
-
-    second_send: syscall.SendResult = syscall.perform_send(local_gate, intermediary_table, local_endpoints, PHASE124_INTERMEDIARY_PID, syscall.build_transfer_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, grant_payload, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT))
-    intermediary_table = second_send.handle_table
-    local_endpoints = second_send.endpoints
-    local_gate = second_send.gate
-    if syscall.status_score(second_send.status) != 2 {
-        return false
-    }
-
-    second_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, final_table, local_endpoints, syscall.build_transfer_receive_request(PHASE124_CONTROL_HANDLE_SLOT, PHASE124_FINAL_RECEIVE_HANDLE_SLOT))
-    final_table = second_receive.handle_table
-    local_endpoints = second_receive.endpoints
-    local_gate = second_receive.gate
-    if syscall.status_score(second_receive.observation.status) != 2 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(final_table, PHASE124_FINAL_RECEIVE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-
-    intermediary_invalidated_send: syscall.SendResult = syscall.perform_send(local_gate, intermediary_table, local_endpoints, PHASE124_INTERMEDIARY_PID, syscall.build_send_request(PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT, 4, grant_payload))
-    PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS = intermediary_invalidated_send.status
-    if syscall.status_score(PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS) != 8 {
-        return false
-    }
-
-    final_payload: [4]u8 = endpoint.zero_payload()
-    final_payload[0] = 72
-    final_payload[1] = 79
-    final_payload[2] = 80
-    final_payload[3] = 50
-    final_send: syscall.SendResult = syscall.perform_send(local_gate, final_table, local_endpoints, PHASE124_FINAL_HOLDER_PID, syscall.build_send_request(PHASE124_FINAL_RECEIVE_HANDLE_SLOT, 4, final_payload))
-    PHASE124_FINAL_SEND_STATUS = final_send.status
-    PHASE124_FINAL_SEND_SOURCE_PID = final_send.endpoints.slots[1].messages[0].source_pid
-    PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH = final_send.endpoints.slots[1].queued_messages
-    if syscall.status_score(PHASE124_FINAL_SEND_STATUS) != 2 {
-        return false
-    }
-    return PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH == 1
-}
-
-func execute_phase125_invalidation_probe() bool {
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, INIT_ENDPOINT_ID)
-    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
-
-    init_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-    init_table = capability.install_endpoint_handle(init_table, transfer_config.init_received_handle_slot, TRANSFER_ENDPOINT_ID, 5)
-
-    intermediary_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_INTERMEDIARY_PID)
-    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-
-    final_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_FINAL_HOLDER_PID)
-    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-
-    grant_payload: [4]u8 = endpoint.zero_payload()
-    grant_payload[0] = 67
-    grant_payload[1] = 72
-    grant_payload[2] = 65
-    grant_payload[3] = 73
-
-    first_send: syscall.SendResult = syscall.perform_send(local_gate, init_table, local_endpoints, INIT_PID, syscall.build_transfer_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, grant_payload, transfer_config.init_received_handle_slot))
-    init_table = first_send.handle_table
-    local_endpoints = first_send.endpoints
-    local_gate = first_send.gate
-    if syscall.status_score(first_send.status) != 2 {
-        return false
-    }
-
-    first_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, intermediary_table, local_endpoints, syscall.build_transfer_receive_request(PHASE124_CONTROL_HANDLE_SLOT, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT))
-    intermediary_table = first_receive.handle_table
-    local_endpoints = first_receive.endpoints
-    local_gate = first_receive.gate
-    if syscall.status_score(first_receive.observation.status) != 2 {
-        return false
-    }
-
-    second_send: syscall.SendResult = syscall.perform_send(local_gate, intermediary_table, local_endpoints, PHASE124_INTERMEDIARY_PID, syscall.build_transfer_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, grant_payload, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT))
-    intermediary_table = second_send.handle_table
-    local_endpoints = second_send.endpoints
-    local_gate = second_send.gate
-    if syscall.status_score(second_send.status) != 2 {
-        return false
-    }
-
-    second_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, final_table, local_endpoints, syscall.build_transfer_receive_request(PHASE124_CONTROL_HANDLE_SLOT, PHASE124_FINAL_RECEIVE_HANDLE_SLOT))
-    final_table = second_receive.handle_table
-    local_endpoints = second_receive.endpoints
-    local_gate = second_receive.gate
-    if syscall.status_score(second_receive.observation.status) != 2 {
-        return false
-    }
-
-    invalidated_final_table: capability.HandleTable = capability.remove_handle(final_table, PHASE124_FINAL_RECEIVE_HANDLE_SLOT)
-    if !capability.handle_remove_succeeded(final_table, invalidated_final_table, PHASE124_FINAL_RECEIVE_HANDLE_SLOT) {
-        return false
-    }
-    final_table = invalidated_final_table
-
-    rejected_send: syscall.SendResult = syscall.perform_send(local_gate, final_table, local_endpoints, PHASE124_FINAL_HOLDER_PID, syscall.build_send_request(PHASE124_FINAL_RECEIVE_HANDLE_SLOT, 4, grant_payload))
-    PHASE125_REJECTED_SEND_STATUS = rejected_send.status
-    if syscall.status_score(PHASE125_REJECTED_SEND_STATUS) != 8 {
-        return false
-    }
-
-    rejected_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, final_table, local_endpoints, syscall.build_receive_request(PHASE124_FINAL_RECEIVE_HANDLE_SLOT))
-    PHASE125_REJECTED_RECEIVE_STATUS = rejected_receive.observation.status
-    if syscall.status_score(PHASE125_REJECTED_RECEIVE_STATUS) != 8 {
-        return false
-    }
-
-    control_payload: [4]u8 = endpoint.zero_payload()
-    control_payload[0] = 76
-    control_payload[1] = 79
-    control_payload[2] = 83
-    control_payload[3] = 84
-    surviving_control_send: syscall.SendResult = syscall.perform_send(local_gate, final_table, local_endpoints, PHASE124_FINAL_HOLDER_PID, syscall.build_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, control_payload))
-    PHASE125_SURVIVING_CONTROL_SEND_STATUS = surviving_control_send.status
-    PHASE125_SURVIVING_CONTROL_SOURCE_PID = surviving_control_send.endpoints.slots[0].messages[0].source_pid
-    PHASE125_SURVIVING_CONTROL_QUEUE_DEPTH = surviving_control_send.endpoints.slots[0].queued_messages
-    if syscall.status_score(PHASE125_SURVIVING_CONTROL_SEND_STATUS) != 2 {
-        return false
-    }
-    return PHASE125_SURVIVING_CONTROL_QUEUE_DEPTH == 1
-}
-
-func execute_phase126_authority_lifetime_probe() bool {
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, INIT_ENDPOINT_ID)
-    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
-
-    init_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-    init_table = capability.install_endpoint_handle(init_table, transfer_config.init_received_handle_slot, TRANSFER_ENDPOINT_ID, 5)
-
-    intermediary_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_INTERMEDIARY_PID)
-    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-
-    final_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_FINAL_HOLDER_PID)
-    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 3)
-
-    grant_payload: [4]u8 = endpoint.zero_payload()
-    grant_payload[0] = 67
-    grant_payload[1] = 72
-    grant_payload[2] = 65
-    grant_payload[3] = 73
-
-    first_send: syscall.SendResult = syscall.perform_send(local_gate, init_table, local_endpoints, INIT_PID, syscall.build_transfer_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, grant_payload, transfer_config.init_received_handle_slot))
-    init_table = first_send.handle_table
-    local_endpoints = first_send.endpoints
-    local_gate = first_send.gate
-    if syscall.status_score(first_send.status) != 2 {
-        return false
-    }
-
-    first_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, intermediary_table, local_endpoints, syscall.build_transfer_receive_request(PHASE124_CONTROL_HANDLE_SLOT, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT))
-    intermediary_table = first_receive.handle_table
-    local_endpoints = first_receive.endpoints
-    local_gate = first_receive.gate
-    if syscall.status_score(first_receive.observation.status) != 2 {
-        return false
-    }
-
-    second_send: syscall.SendResult = syscall.perform_send(local_gate, intermediary_table, local_endpoints, PHASE124_INTERMEDIARY_PID, syscall.build_transfer_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, grant_payload, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT))
-    intermediary_table = second_send.handle_table
-    local_endpoints = second_send.endpoints
-    local_gate = second_send.gate
-    if syscall.status_score(second_send.status) != 2 {
-        return false
-    }
-
-    second_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, final_table, local_endpoints, syscall.build_transfer_receive_request(PHASE124_CONTROL_HANDLE_SLOT, PHASE124_FINAL_RECEIVE_HANDLE_SLOT))
-    final_table = second_receive.handle_table
-    local_endpoints = second_receive.endpoints
-    local_gate = second_receive.gate
-    if syscall.status_score(second_receive.observation.status) != 2 {
-        return false
-    }
-
-    invalidated_final_table: capability.HandleTable = capability.remove_handle(final_table, PHASE124_FINAL_RECEIVE_HANDLE_SLOT)
-    if !capability.handle_remove_succeeded(final_table, invalidated_final_table, PHASE124_FINAL_RECEIVE_HANDLE_SLOT) {
-        return false
-    }
-    final_table = invalidated_final_table
-
-    rejected_send: syscall.SendResult = syscall.perform_send(local_gate, final_table, local_endpoints, PHASE124_FINAL_HOLDER_PID, syscall.build_send_request(PHASE124_FINAL_RECEIVE_HANDLE_SLOT, 4, grant_payload))
-    PHASE125_REJECTED_SEND_STATUS = rejected_send.status
-    if syscall.status_score(PHASE125_REJECTED_SEND_STATUS) != 8 {
-        return false
-    }
-
-    rejected_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, final_table, local_endpoints, syscall.build_receive_request(PHASE124_FINAL_RECEIVE_HANDLE_SLOT))
-    PHASE125_REJECTED_RECEIVE_STATUS = rejected_receive.observation.status
-    if syscall.status_score(PHASE125_REJECTED_RECEIVE_STATUS) != 8 {
-        return false
-    }
-
-    control_payload: [4]u8 = endpoint.zero_payload()
-    control_payload[0] = 76
-    control_payload[1] = 79
-    control_payload[2] = 83
-    control_payload[3] = 84
-    surviving_control_send: syscall.SendResult = syscall.perform_send(local_gate, final_table, local_endpoints, PHASE124_FINAL_HOLDER_PID, syscall.build_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, control_payload))
-    PHASE125_SURVIVING_CONTROL_SEND_STATUS = surviving_control_send.status
-    PHASE125_SURVIVING_CONTROL_SOURCE_PID = surviving_control_send.endpoints.slots[0].messages[0].source_pid
-    PHASE125_SURVIVING_CONTROL_QUEUE_DEPTH = surviving_control_send.endpoints.slots[0].queued_messages
-    final_table = surviving_control_send.handle_table
-    local_endpoints = surviving_control_send.endpoints
-    local_gate = surviving_control_send.gate
-    if syscall.status_score(PHASE125_SURVIVING_CONTROL_SEND_STATUS) != 2 {
-        return false
-    }
-    if PHASE125_SURVIVING_CONTROL_QUEUE_DEPTH != 1 {
-        return false
-    }
-
-    repeat_control_send: syscall.SendResult = syscall.perform_send(local_gate, final_table, local_endpoints, PHASE124_FINAL_HOLDER_PID, syscall.build_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, control_payload))
-    PHASE126_REPEAT_LONG_LIVED_SEND_STATUS = repeat_control_send.status
-    PHASE126_REPEAT_LONG_LIVED_SOURCE_PID = repeat_control_send.endpoints.slots[0].messages[1].source_pid
-    PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH = repeat_control_send.endpoints.slots[0].queued_messages
-    if syscall.status_score(PHASE126_REPEAT_LONG_LIVED_SEND_STATUS) != 2 {
-        return false
-    }
-    return PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH == 2
-}
-
-func execute_phase128_service_death_observation_probe() bool {
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    if syscall.status_score(LOG_SERVICE_WAIT_OBSERVATION.status) != 2 {
-        return false
-    }
-    PHASE128_OBSERVED_SERVICE_PID = LOG_SERVICE_WAIT_OBSERVATION.child_pid
-    PHASE128_OBSERVED_SERVICE_KEY = LOG_SERVICE_DIRECTORY_KEY
-    PHASE128_OBSERVED_WAIT_HANDLE_SLOT = LOG_SERVICE_WAIT_OBSERVATION.wait_handle_slot
-    PHASE128_OBSERVED_EXIT_CODE = LOG_SERVICE_WAIT_OBSERVATION.exit_code
-    if PHASE128_OBSERVED_SERVICE_PID != LOG_SERVICE_SPAWN_OBSERVATION.child_pid {
-        return false
-    }
-    if PHASE128_OBSERVED_WAIT_HANDLE_SLOT != log_config.wait_handle_slot {
-        return false
-    }
-    return PHASE128_OBSERVED_EXIT_CODE == log_config.exit_code
-}
-
-func execute_phase129_partial_failure_propagation_probe() bool {
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    log_result: bootstrap_services.LogServiceExecutionResult = bootstrap_services.execute_phase105_log_service_handshake(log_config, build_log_service_execution_state())
-    if log_result.succeeded == 0 {
-        return false
-    }
-    PHASE129_FAILED_SERVICE_PID = log_result.state.wait_observation.child_pid
-    PHASE129_FAILED_WAIT_STATUS = log_result.state.wait_observation.status
-    if PHASE129_FAILED_SERVICE_PID == 0 {
-        return false
-    }
-    if syscall.status_score(PHASE129_FAILED_WAIT_STATUS) != 2 {
-        return false
-    }
-
-    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
-    echo_execution: bootstrap_services.EchoServiceExecutionState = bootstrap_services.EchoServiceExecutionState{ program_capability: capability.empty_slot(), gate: log_result.state.gate, process_slots: log_result.state.process_slots, task_slots: log_result.state.task_slots, init_handle_table: log_result.state.init_handle_table, child_handle_table: log_result.state.child_handle_table, wait_table: log_result.state.wait_table, endpoints: log_result.state.endpoints, init_image: log_result.state.init_image, child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: echo_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), reply_observation: syscall.empty_receive_observation(), exchange: echo_service.EchoExchangeObservation{ service_pid: 0, client_pid: 0, endpoint_id: 0, tag: echo_service.EchoMessageTag.None, request_len: 0, request_byte0: 0, request_byte1: 0, reply_len: 0, reply_byte0: 0, reply_byte1: 0, request_count: 0, reply_count: 0 }, wait_observation: syscall.empty_wait_observation(), ready_queue: log_result.state.ready_queue }
-    echo_result: bootstrap_services.EchoServiceExecutionResult = bootstrap_services.execute_phase106_echo_service_request_reply(echo_config, echo_execution)
-    if echo_result.succeeded == 0 {
-        return false
-    }
-    PHASE129_SURVIVING_SERVICE_PID = echo_result.state.wait_observation.child_pid
-    PHASE129_SURVIVING_REPLY_STATUS = echo_result.state.reply_observation.status
-    PHASE129_SURVIVING_WAIT_STATUS = echo_result.state.wait_observation.status
-    PHASE129_SURVIVING_REPLY_BYTE0 = echo_result.state.reply_observation.payload[0]
-    PHASE129_SURVIVING_REPLY_BYTE1 = echo_result.state.reply_observation.payload[1]
-    if PHASE129_SURVIVING_SERVICE_PID == 0 {
-        return false
-    }
-    if syscall.status_score(PHASE129_SURVIVING_REPLY_STATUS) != 2 {
-        return false
-    }
-    if syscall.status_score(PHASE129_SURVIVING_WAIT_STATUS) != 2 {
-        return false
-    }
-    if PHASE129_SURVIVING_REPLY_BYTE0 != echo_config.request_byte0 {
-        return false
-    }
-    return PHASE129_SURVIVING_REPLY_BYTE1 == echo_config.request_byte1
-}
-
-func execute_phase130_explicit_restart_or_replacement_probe() bool {
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    initial_result: bootstrap_services.LogServiceExecutionResult = bootstrap_services.execute_phase105_log_service_handshake(log_config, build_log_service_execution_state())
-    if initial_result.succeeded == 0 {
-        return false
-    }
-    if syscall.status_score(initial_result.state.wait_observation.status) != 2 {
-        return false
-    }
-
-    replacement_result: bootstrap_services.LogServiceExecutionResult = bootstrap_services.execute_phase105_log_service_handshake(log_config, initial_result.state)
-    if replacement_result.succeeded == 0 {
-        return false
-    }
-
-    PHASE130_REPLACEMENT_SERVICE_PID = replacement_result.state.wait_observation.child_pid
-    PHASE130_REPLACEMENT_SPAWN_STATUS = replacement_result.state.spawn_observation.status
-    PHASE130_REPLACEMENT_ACK_STATUS = replacement_result.state.ack_observation.status
-    PHASE130_REPLACEMENT_WAIT_STATUS = replacement_result.state.wait_observation.status
-    PHASE130_REPLACEMENT_ACK_BYTE = replacement_result.state.ack_observation.payload[0]
-    PHASE130_REPLACEMENT_PROGRAM_OBJECT_ID = log_config.program_object_id
-    if PHASE130_REPLACEMENT_SERVICE_PID == 0 {
-        return false
-    }
-    if syscall.status_score(PHASE130_REPLACEMENT_SPAWN_STATUS) != 2 {
-        return false
-    }
-    if syscall.status_score(PHASE130_REPLACEMENT_ACK_STATUS) != 2 {
-        return false
-    }
-    if syscall.status_score(PHASE130_REPLACEMENT_WAIT_STATUS) != 2 {
-        return false
-    }
-    return PHASE130_REPLACEMENT_ACK_BYTE == log_service.ack_payload()[0]
-}
-
-func execute_phase131_fan_out_composition_probe() bool {
-    result: bootstrap_services.CompositionServiceExecutionResult = bootstrap_services.execute_phase131_fan_out_composition(build_composition_service_config(), build_composition_service_execution_state())
-    install_composition_service_execution_state(result.state)
-    if result.succeeded == 0 {
-        return false
-    }
-    if PHASE131_COMPOSITION_STATE.observation.outbound_edge_count != 2 {
-        return false
-    }
-    if PHASE131_COMPOSITION_STATE.observation.aggregate_reply_count != 1 {
-        return false
-    }
-    return PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte3 == 2
-}
-
 func execute_phase118_invalidated_source_send_probe() bool {
     transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
     probe_payload: [4]u8 = endpoint.zero_payload()
@@ -1764,8 +1235,12 @@ func execute_phase118_invalidated_source_send_probe() bool {
     SYSCALL_GATE = probe_result.gate
     HANDLE_TABLES[1] = probe_result.handle_table
     ENDPOINTS = probe_result.endpoints
-    PHASE118_INVALIDATED_SOURCE_SEND_STATUS = probe_result.status
-    return syscall.status_score(PHASE118_INVALIDATED_SOURCE_SEND_STATUS) == 8
+    bootstrap_proofs.record_phase118_invalidated_source_send_status(probe_result.status)
+    return syscall.status_score(bootstrap_proofs.phase118_invalidated_source_send_status()) == 8
+}
+
+func build_phase108_program_cap_contract(init_pid: u32, log_config: bootstrap_services.LogServiceConfig, echo_config: bootstrap_services.EchoServiceConfig, transfer_config: bootstrap_services.TransferServiceConfig, bootstrap_program_capability: capability.CapabilitySlot, log_service_program_capability: capability.CapabilitySlot, echo_service_program_capability: capability.CapabilitySlot, transfer_service_program_capability: capability.CapabilitySlot, log_service_spawn: syscall.SpawnObservation, echo_service_spawn: syscall.SpawnObservation, transfer_service_spawn: syscall.SpawnObservation, log_service_wait: syscall.WaitObservation, echo_service_wait: syscall.WaitObservation, transfer_service_wait: syscall.WaitObservation) debug.Phase108ProgramCapContract {
+    return bootstrap_proofs.build_phase108_program_cap_contract(init_pid, log_config, echo_config, transfer_config, bootstrap_program_capability, log_service_program_capability, echo_service_program_capability, transfer_service_program_capability, log_service_spawn, echo_service_spawn, transfer_service_spawn, log_service_wait, echo_service_wait, transfer_service_wait)
 }
 
 func execute_spawn_child_process() bool {
@@ -2026,11 +1501,14 @@ func bootstrap_main() i32 {
     if !validate_phase107_user_to_user_capability_transfer() {
         return 42
     }
-    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract()) {
+    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
+    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
+    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
+    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract(INIT_PID, log_config, echo_config, transfer_config, INIT_BOOTSTRAP_CAPS.program_capability, LOG_SERVICE_PROGRAM_CAPABILITY, ECHO_SERVICE_PROGRAM_CAPABILITY, TRANSFER_SERVICE_PROGRAM_CAPABILITY, LOG_SERVICE_SPAWN_OBSERVATION, ECHO_SERVICE_SPAWN_OBSERVATION, TRANSFER_SERVICE_SPAWN_OBSERVATION, LOG_SERVICE_WAIT_OBSERVATION, ECHO_SERVICE_WAIT_OBSERVATION, TRANSFER_SERVICE_WAIT_OBSERVATION)) {
         return 43
     }
     phase108_contract_hardened = 1
-    running_slice_audit: debug.RunningKernelSliceAudit = build_phase109_running_kernel_slice_audit(phase104_contract_hardened, phase108_contract_hardened)
+    running_slice_audit: debug.RunningKernelSliceAudit = bootstrap_proofs.build_phase109_running_kernel_slice_audit(log_config, echo_config, transfer_config, KERNEL, INIT_PID, INIT_TID, INIT_ASID, CHILD_TID, CHILD_EXIT_CODE, TRANSFER_ENDPOINT_ID, INIT_BOOTSTRAP_HANDOFF, RECEIVE_OBSERVATION, ATTACHED_RECEIVE_OBSERVATION, TRANSFERRED_HANDLE_USE_OBSERVATION, PRE_EXIT_WAIT_OBSERVATION, EXIT_WAIT_OBSERVATION, SLEEP_OBSERVATION, TIMER_WAKE_OBSERVATION, LOG_SERVICE_HANDSHAKE, LOG_SERVICE_WAIT_OBSERVATION, ECHO_SERVICE_EXCHANGE, ECHO_SERVICE_WAIT_OBSERVATION, TRANSFER_SERVICE_TRANSFER, TRANSFER_SERVICE_WAIT_OBSERVATION, phase104_contract_hardened, phase108_contract_hardened, PROCESS_SLOTS[1], TASK_SLOTS[1], USER_FRAME, BOOT_LOG_APPEND_FAILED)
     if !debug.validate_phase109_first_running_kernel_slice(running_slice_audit) {
         return 44
     }
@@ -2055,76 +1533,90 @@ func bootstrap_main() i32 {
     if !debug.validate_phase116_mmu_activation_barrier_follow_through(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 51
     }
-    phase117_audit: debug.Phase117MultiServiceBringUpAudit = build_phase117_multi_service_bring_up_audit(running_slice_audit)
+    phase117_audit: debug.Phase117MultiServiceBringUpAudit = bootstrap_proofs.build_phase117_multi_service_bring_up_audit(running_slice_audit, INIT_ENDPOINT_ID, TRANSFER_ENDPOINT_ID, LOG_SERVICE_PROGRAM_CAPABILITY, ECHO_SERVICE_PROGRAM_CAPABILITY, TRANSFER_SERVICE_PROGRAM_CAPABILITY, LOG_SERVICE_SPAWN_OBSERVATION, ECHO_SERVICE_SPAWN_OBSERVATION, TRANSFER_SERVICE_SPAWN_OBSERVATION, LOG_SERVICE_WAIT_OBSERVATION, ECHO_SERVICE_WAIT_OBSERVATION, TRANSFER_SERVICE_WAIT_OBSERVATION, LOG_SERVICE_HANDSHAKE, ECHO_SERVICE_EXCHANGE, TRANSFER_SERVICE_TRANSFER)
     if !debug.validate_phase117_init_orchestrated_multi_service_bring_up(phase117_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 52
     }
     if !execute_phase118_invalidated_source_send_probe() {
         return 53
     }
-    phase118_audit: debug.Phase118DelegatedRequestReplyAudit = build_phase118_delegated_request_reply_audit(phase117_audit)
+    phase118_audit: debug.Phase118DelegatedRequestReplyAudit = bootstrap_proofs.build_phase118_delegated_request_reply_audit(phase117_audit, transfer_config, HANDLE_TABLES[1], TRANSFER_SERVICE_TRANSFER)
     if !debug.validate_phase118_request_reply_and_delegation_follow_through(phase118_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 54
     }
-    phase119_audit: debug.Phase119NamespacePressureAudit = build_phase119_namespace_pressure_audit(phase118_audit)
+    phase119_audit: debug.Phase119NamespacePressureAudit = bootstrap_proofs.build_phase119_namespace_pressure_audit(phase118_audit, INIT_PID, INIT_ENDPOINT_ID, LOG_SERVICE_DIRECTORY_KEY, ECHO_SERVICE_DIRECTORY_KEY, TRANSFER_SERVICE_DIRECTORY_KEY, log_config, echo_config, transfer_config, LOG_SERVICE_SPAWN_OBSERVATION, ECHO_SERVICE_SPAWN_OBSERVATION, TRANSFER_SERVICE_SPAWN_OBSERVATION)
     if !debug.validate_phase119_namespace_pressure_audit(phase119_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 55
     }
-    phase120_audit: debug.Phase120RunningSystemSupportAudit = build_phase120_running_system_support_audit(phase119_audit)
+    phase120_audit: debug.Phase120RunningSystemSupportAudit = bootstrap_proofs.build_phase120_running_system_support_audit(phase119_audit, INIT_PID, INIT_ENDPOINT_ID)
     if !debug.validate_phase120_running_system_support_statement(phase120_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 56
     }
-    if !debug.validate_phase121_kernel_image_contract_hardening(build_phase121_kernel_image_contract_audit(phase120_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase121_audit: debug.Phase121KernelImageContractAudit = bootstrap_proofs.build_phase121_kernel_image_contract_audit(phase120_audit)
+    if !debug.validate_phase121_kernel_image_contract_hardening(phase121_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 57
     }
-    phase122_audit: debug.Phase122TargetSurfaceAudit = build_phase122_target_surface_audit(build_phase121_kernel_image_contract_audit(phase120_audit))
+    phase122_audit: debug.Phase122TargetSurfaceAudit = bootstrap_proofs.build_phase122_target_surface_audit(phase121_audit)
     if !debug.validate_phase122_target_surface_audit(phase122_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 58
     }
-    if !debug.validate_phase123_next_plateau_audit(build_phase123_next_plateau_audit(phase122_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase123_audit: debug.Phase123NextPlateauAudit = bootstrap_proofs.build_phase123_next_plateau_audit(phase122_audit)
+    if !debug.validate_phase123_next_plateau_audit(phase123_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 59
     }
-    if !execute_phase124_delegation_chain_probe() {
+    late_phase_context: bootstrap_proofs.LatePhaseProofContext = build_late_phase_proof_context()
+    if !bootstrap_proofs.execute_phase124_delegation_chain_probe(late_phase_context, transfer_config) {
         return 60
     }
-    if !debug.validate_phase124_delegation_chain_stress(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit)), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase124_audit: debug.Phase124DelegationChainAudit = bootstrap_proofs.build_phase124_delegation_chain_audit(late_phase_context, transfer_config, phase123_audit)
+    if !debug.validate_phase124_delegation_chain_stress(phase124_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 61
     }
-    if !execute_phase125_invalidation_probe() {
+    if !bootstrap_proofs.execute_phase125_invalidation_probe(late_phase_context, transfer_config) {
         return 62
     }
-    if !debug.validate_phase125_invalidation_and_rejection_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase125_audit: debug.Phase125InvalidationAudit = bootstrap_proofs.build_phase125_invalidation_audit(late_phase_context, phase124_audit)
+    if !debug.validate_phase125_invalidation_and_rejection_audit(phase125_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 63
     }
-    if !execute_phase126_authority_lifetime_probe() {
+    if !bootstrap_proofs.execute_phase126_authority_lifetime_probe(late_phase_context, transfer_config) {
         return 64
     }
-    if !debug.validate_phase126_authority_lifetime_classification(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit)))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase126_audit: debug.Phase126AuthorityLifetimeAudit = bootstrap_proofs.build_phase126_authority_lifetime_audit(late_phase_context, phase125_audit)
+    if !debug.validate_phase126_authority_lifetime_classification(phase126_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 65
     }
-    if !execute_phase128_service_death_observation_probe() {
+    if !bootstrap_proofs.execute_phase128_service_death_observation_probe(late_phase_context, log_config, LOG_SERVICE_SPAWN_OBSERVATION, LOG_SERVICE_WAIT_OBSERVATION) {
         return 66
     }
-    if !debug.validate_phase128_service_death_observation(build_phase128_service_death_observation_audit(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit))))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase128_audit: debug.Phase128ServiceDeathObservationAudit = bootstrap_proofs.build_phase128_service_death_observation_audit(phase126_audit)
+    if !debug.validate_phase128_service_death_observation(phase128_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 67
     }
-    if !execute_phase129_partial_failure_propagation_probe() {
+    if !bootstrap_proofs.execute_phase129_partial_failure_propagation_probe(log_config, build_log_service_execution_state(), echo_config) {
         return 68
     }
-    if !debug.validate_phase129_partial_failure_propagation(build_phase129_partial_failure_propagation_audit(build_phase128_service_death_observation_audit(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit)))))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase129_audit: debug.Phase129PartialFailurePropagationAudit = bootstrap_proofs.build_phase129_partial_failure_propagation_audit(late_phase_context, log_config, echo_config, phase128_audit)
+    if !debug.validate_phase129_partial_failure_propagation(phase129_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 69
     }
-    if !execute_phase130_explicit_restart_or_replacement_probe() {
+    if !bootstrap_proofs.execute_phase130_explicit_restart_or_replacement_probe(log_config, build_log_service_execution_state()) {
         return 70
     }
-    phase130_audit: debug.Phase130ExplicitRestartOrReplacementAudit = build_phase130_explicit_restart_or_replacement_audit(build_phase129_partial_failure_propagation_audit(build_phase128_service_death_observation_audit(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit)))))))
+    phase130_audit: debug.Phase130ExplicitRestartOrReplacementAudit = bootstrap_proofs.build_phase130_explicit_restart_or_replacement_audit(late_phase_context, log_config, phase129_audit)
     if !debug.validate_phase130_explicit_restart_or_replacement(phase130_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 71
     }
-    if !execute_phase131_fan_out_composition_probe() {
+    composition_config: bootstrap_services.CompositionServiceConfig = build_composition_service_config()
+    composition_result: bootstrap_services.CompositionServiceExecutionResult = bootstrap_services.execute_phase131_fan_out_composition(composition_config, bootstrap_proofs.build_composition_service_execution_state(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, HANDLE_TABLES[1], HANDLE_TABLES[2], WAIT_TABLES[1], ENDPOINTS, INIT_IMAGE))
+    install_composition_service_runtime_state(composition_result.state)
+    if composition_result.succeeded == 0 {
         return 72
     }
-    if !debug.validate_phase131_fan_out_composition(build_phase131_fan_out_composition_audit(phase130_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    if !bootstrap_proofs.phase131_composition_probe_succeeded() {
+        return 72
+    }
+    if !debug.validate_phase131_fan_out_composition(bootstrap_proofs.build_phase131_fan_out_composition_audit(late_phase_context, composition_config, phase130_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 73
     }
     BOOT_MARKER_EMITTED = 1
