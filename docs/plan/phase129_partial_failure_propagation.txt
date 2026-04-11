@@ -1,0 +1,178 @@
+Phase 129 -- Partial Failure Propagation
+========================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 128 service death observation step by
+proving one bounded partial-failure path over the same already-landed
+Canopus kernel artifact.
+
+This document is both the Phase 129 execution note and its closeout.
+It does not claim restart policy, service replacement, capability rebinding,
+dynamic namespace repair, a broader supervision framework, or a compiler wave.
+It records one narrow failure-propagation step over the real kernel artifact
+that earlier phases already kept explicit.
+
+Repository status note
+----------------------
+- Phase 128 already proved that one bounded service disappearance is visible
+  through the landed log-service wait path without importing restart or
+  supervision policy.
+- The same landed running-system slice already carried one bounded echo-service
+  request-reply proof over the shared init-owned control endpoint and one
+  bounded authority-lifetime classification chain over the same admitted
+  artifact.
+- The next honest gap is not restart machinery or a compiler reopening. It is
+  publishing one explicit statement that one bounded service death remains a
+  partial failure while another bounded request-reply path still succeeds over
+  the same fixed directory and control-endpoint model.
+
+Problem being solved
+--------------------
+- The repository already had one explicit service-death observation answer,
+  but it still lacked one published proof that the same bounded model carries
+  that failure as a partial failure rather than as a whole-system collapse or
+  a hidden recovery story.
+- Without this step, later failure, IPC-composition, or restart work could
+  blur whether the current model already keeps one dead-service path explicit
+  while another bounded service path still survives.
+- The repository needed one small phase that classifies one dead log-service
+  path together with one fresh echo-service reply path through the existing
+  bootstrap-service, fixed-directory, shared-control-endpoint, wait-handle,
+  and debug owners rather than through a new recovery or rebinding layer.
+
+Core rule
+---------
+- Keep the current kernel owners and fixed service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed log-service death boundary and the landed echo-service
+  request-reply owner rather than inventing a broader failure framework.
+- Prove one bounded service death remains partial because a second bounded
+  service path still replies and exits cleanly through the same current model.
+- Do not widen into restart logic, service replacement, kernel supervision,
+  dynamic namespace repair, capability rebinding, or another compiler wave.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 129 note recording the partial-failure propagation step
+   and the decision to keep compiler work closed
+2. one debug-owned Phase 129 audit that packages the landed Phase 128 truth
+   together with one local dead-log-service wait result and one fresh bounded
+   echo-service reply and wait result
+3. one narrow root-proof helper that replays the landed log-service death
+   path and then proves one bounded echo-service reply still succeeds through
+   the same fixed directory and shared control-endpoint model
+4. one advance of the real kernel proof marker from Phase 128 to Phase 129
+   only after that partial-failure audit succeeds
+5. refreshed roadmap, position note, kernel README, repository map,
+   freestanding test READMEs, decision log, and backlog entries
+6. one focused Phase 129 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new failure-propagation path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current running-system
+artifact already has one explicit service-death answer and one bounded second
+service reply proof. The next narrow pressure is publishing that those truths
+compose as a partial-failure answer before later phases widen restart,
+replacement, or richer IPC-composition work.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one bounded partial-failure
+  propagation step over the real kernel artifact
+- one bounded service death remains explicit while another bounded service
+  path still replies and exits cleanly through the same current service model
+- that failure answer still stops well short of kernel-side restart,
+  supervision, rebinding, or dynamic namespace repair policy
+- the current kernel model can answer one more failure-semantics question
+  through existing owners rather than by forcing new compiler or kernel
+  framework machinery
+
+Deliverables
+------------
+- one canonical Phase 129 closeout note in `docs/plan/`
+- one debug-owned Phase 129 partial-failure audit plus one narrow root-proof
+  helper that package the landed service-death boundary together with one
+  fresh surviving echo-service reply path
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 129 marker only after the new audit remains true
+- refreshed roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed failure step and the decision not to expand
+  compiler work
+- one focused Phase 129 freestanding kernel regression plus a projected MIR
+  golden for the new partial-failure boundary
+
+Suggested execution order
+-------------------------
+1. Add the smallest root-proof helper needed to replay the landed log-service
+   death path and then one fresh echo-service reply path.
+2. Add the Phase 129 debug-owned audit and validator over that follow-through.
+3. Advance the kernel proof marker to 129 only after the new audit remains
+   true.
+4. Publish the canonical partial-failure propagation note.
+5. Add the focused Phase 129 freestanding regression for build, run,
+   publication, and MIR checks.
+6. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 129 marker without
+  widening the admitted slice beyond the already-landed service, namespace,
+  and authority boundaries
+- one aggregate debug-owned audit proves that one explicit service death stays
+  partial because one second bounded service path still replies and exits
+  cleanly while the kernel still does not claim recovery or restart policy
+- the canonical Phase 129 note, roadmap, position note, and kernel README all
+  publish the same partial-failure boundary
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 129 boundary consistently
+
+Non-goals
+---------
+- a broader failure, restart, or supervision framework
+- capability rebinding or dynamic namespace repair after service death
+- richer IPC-composition stress, backpressure, or ordering work
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+- adding another service owner just to stage one partial-failure statement
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase129PartialFailurePropagationAudit` and validator
+  that package the landed Phase 128 truth together with one local dead
+  log-service wait result and one fresh bounded echo-service reply result
+- added one narrow root-proof helper that replays the landed log-service
+  death path and then proves one bounded echo-service reply and wait result
+  still succeed over the same current service model
+- advanced the real kernel proof marker to 129 only after that audit remains
+  true
+- published one canonical `docs/plan/phase129_partial_failure_propagation.txt`
+  note naming the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR golden
+  for the Phase 129 partial-failure boundary
+- refreshed the roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed failure step and the decision not to expand
+  compiler work
+
+Closeout statement
+------------------
+Phase 129 is complete as a partial failure propagation step.
+The repository still claims only one bounded small Canopus running-system
+plateau, but that plateau now includes one explicit proof that one bounded
+service death remains a partial failure because one second bounded service
+path still replies and exits cleanly through the landed fixed-directory and
+shared-control-endpoint model, while the kernel stays free of restart and
+supervision policy, and the compiler stays closed because this phase needed
+failure evidence rather than new language or backend work.

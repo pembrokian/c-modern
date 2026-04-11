@@ -6,6 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 129 has moved the repository-owned kernel artifact beyond the landed
+  Phase 128 service death observation step into one bounded partial failure
+  propagation step.
 - Phase 128 has moved the repository-owned kernel artifact beyond the landed
   Phase 126 authority lifetime classification step into one bounded service
   death observation step.
@@ -51,8 +54,8 @@ Current status
   bounded init-owned fixed service-directory step, one bounded target-surface
   audit, one bounded next-plateau audit, one bounded delegation-chain stress
   step, one bounded invalidation and rejection audit step, and one bounded
-  authority lifetime classification step, and one bounded service death
-  observation step.
+  authority lifetime classification step, one bounded service death
+  observation step, and one bounded partial failure propagation step.
 
 Current files
 -------------
@@ -67,12 +70,12 @@ Current files
   service-directory publication step, one bounded next-plateau publication
   step, one bounded delegation-chain stress step, one bounded invalidation
   and rejection audit step, one bounded authority lifetime classification
-  step, one bounded service death observation step, and thin root
-  orchestration across the owned scheduler, lifecycle, bootstrap helper, and
-  debug audit modules
+  step, one bounded service death observation step, one bounded partial
+  failure propagation step, and thin root orchestration across the owned
+  scheduler, lifecycle, bootstrap helper, and debug audit modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
   `module_sets.bootstrap_audit`, owning the extracted Phase 104 contract
-  hardening helpers, bounded service validation helpers, and Phase 108-126
+  hardening helpers, bounded service validation helpers, and Phase 108-129
   audit builders used by the root proof module
 - `src/bootstrap_services/`: one logical `bootstrap_services` module split
   through `module_sets.bootstrap_services`, owning extracted bounded log,
@@ -94,8 +97,8 @@ Current files
   kernel image-contract hardening audit, Phase 122
   target-surface audit, Phase 123 next-plateau audit, Phase 124
   delegation-chain stress audit, Phase 125 invalidation and rejection audit,
-  Phase 126 authority lifetime classification audit, and Phase 128 service
-  death observation audit
+  Phase 126 authority lifetime classification audit, Phase 128 service death
+  observation audit, and Phase 129 partial failure propagation audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -149,7 +152,8 @@ Phase boundary
   directory step, one bounded target-surface audit, one bounded next-plateau
   audit, one bounded delegation-chain stress step, one bounded invalidation
   and rejection audit step, and one bounded authority lifetime classification
-  step, and one bounded service death observation step.
+  step, one bounded service death observation step, and one bounded partial
+  failure propagation step.
 - The repository can now honestly claim one first running Canopus kernel
   slice with an explicit Phase 120 running-system support statement over the
   landed Phase 118 delegated request-reply follow-through, landed Phase 121
@@ -157,8 +161,8 @@ Phase boundary
   audit, a landed Phase 123 next-plateau audit, a landed Phase 124
   delegation-chain stress step, a landed Phase 125 invalidation and
   rejection audit step, a landed Phase 126 authority lifetime
-  classification step, and a landed Phase 128 service death observation
-  step:
+  classification step, a landed Phase 128 service death observation step,
+  and a landed Phase 129 partial failure propagation step:
   explicit
   boot
   entry,
@@ -183,8 +187,9 @@ Phase boundary
   plus one bounded next-plateau audit plus one bounded delegation-chain
   stress step plus one bounded invalidation and rejection audit step plus one
   bounded authority lifetime classification step plus one bounded service
-  death observation step publishing that same admitted slice without widening
-  into a broader service framework or supervision policy.
+  death observation step plus one bounded partial failure propagation step
+  publishing that same admitted slice without widening into a broader service
+  framework or supervision policy.
 - It does not yet claim general loading, dynamic service discovery,
   namespace policy, kill semantics, or a general running init-owned service
   framework.

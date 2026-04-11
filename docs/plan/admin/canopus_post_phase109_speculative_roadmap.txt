@@ -12,7 +12,7 @@ plateau audit.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
-It does not replace the concrete Phase 109 through Phase 128 closeout notes.
+It does not replace the concrete Phase 109 through Phase 129 closeout notes.
 It gives one plausible ordering for the next Canopus wave if the repository
 keeps following the same evidence-first rules used so far:
 
@@ -43,6 +43,7 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/phase125_invalidation_and_rejection_audit.txt`
 - `docs/plan/phase126_authority_lifetime_classification.txt`
 - `docs/plan/phase128_service_death_observation.txt`
+- `docs/plan/phase129_partial_failure_propagation.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
@@ -70,11 +71,15 @@ Repository numbering note
   lifecycle stress wave.
 - Phase 128 is occupied by the concrete bounded service-death observation
   step.
+- Phase 129 is occupied by the concrete bounded partial-failure propagation
+  step.
 - Proposed compiler planning now reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
-- The next speculative Canopus continuation therefore starts at Phase 128.
+- The next speculative Canopus continuation therefore starts at Phase 130.
 - Phase 128 is now concrete as one service death observation step over the
   landed log-service wait observation path.
+- Phase 129 is now concrete as one partial failure propagation step over the
+  landed service-death and bounded echo-service reply paths.
 
 Repository status note
 ----------------------

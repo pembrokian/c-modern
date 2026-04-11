@@ -214,6 +214,8 @@ Phase 128 -- Service Death Observation
   kernel-side supervision policy.
 
 Phase 129 -- Partial Failure Propagation
+- Phase 129 is now concrete as one partial failure propagation step over the
+  landed service-death and bounded echo-service reply paths.
 - Exit criterion: one partial-failure path can cross the current request,
   reply, and authority boundaries while remaining explicit, bounded, and free
   of hidden scheduler or recovery semantics.

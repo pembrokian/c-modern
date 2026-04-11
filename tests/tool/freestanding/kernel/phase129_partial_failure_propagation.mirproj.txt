@@ -1,0 +1,3 @@
+  TypeDecl kind=struct name=debug.Phase129PartialFailurePropagationAudit
+  Function name=bootstrap_audit.build_phase129_partial_failure_propagation_audit returns=[debug.Phase129PartialFailurePropagationAudit]
+  Function name=debug.validate_phase129_partial_failure_propagation returns=[bool]

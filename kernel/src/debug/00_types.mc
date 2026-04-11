@@ -231,3 +231,25 @@ struct Phase128ServiceDeathObservationAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase129PartialFailurePropagationAudit {
+    phase128: Phase128ServiceDeathObservationAudit
+    failed_service_pid: u32
+    failed_service_key: u32
+    failed_wait_handle_slot: u32
+    failed_wait_status: syscall.SyscallStatus
+    surviving_service_pid: u32
+    surviving_service_key: u32
+    surviving_wait_handle_slot: u32
+    surviving_reply_status: syscall.SyscallStatus
+    surviving_wait_status: syscall.SyscallStatus
+    surviving_reply_byte0: u8
+    surviving_reply_byte1: u8
+    shared_control_endpoint_id: u32
+    directory_entry_count: usize
+    partial_failure_visible: u32
+    kernel_recovery_visible: u32
+    service_rebinding_visible: u32
+    broader_failure_framework_visible: u32
+    compiler_reopening_visible: u32
+}
+

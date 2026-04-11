@@ -39,6 +39,7 @@ Structure
   - `phase125_invalidation_and_rejection_audit.cpp`: real-kernel invalidation and rejection audit.
   - `phase126_authority_lifetime_classification.cpp`: real-kernel authority lifetime classification audit.
   - `phase128_service_death_observation.cpp`: real-kernel service-death observation audit.
+  - `phase129_partial_failure_propagation.cpp`: real-kernel partial-failure propagation audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

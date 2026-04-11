@@ -97,12 +97,15 @@ void RunFreestandingKernelPhase126AuthorityLifetimeClassification(const std::fil
 void RunFreestandingKernelPhase128ServiceDeathObservation(const std::filesystem::path& source_root,
                                                           const std::filesystem::path& binary_root,
                                                           const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase129PartialFailurePropagation(const std::filesystem::path& source_root,
+                                                            const std::filesystem::path& binary_root,
+                                                            const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
 
-const std::array<KernelTestCase, 27> kKernelTestCases = {{
+const std::array<KernelTestCase, 28> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
@@ -130,6 +133,7 @@ const std::array<KernelTestCase, 27> kKernelTestCases = {{
     {"phase125_invalidation_and_rejection_audit", 5, &RunFreestandingKernelPhase125InvalidationAndRejectionAudit},
     {"phase126_authority_lifetime_classification", 5, &RunFreestandingKernelPhase126AuthorityLifetimeClassification},
     {"phase128_service_death_observation", 5, &RunFreestandingKernelPhase128ServiceDeathObservation},
+    {"phase129_partial_failure_propagation", 5, &RunFreestandingKernelPhase129PartialFailurePropagation},
 }};
 
 void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,
