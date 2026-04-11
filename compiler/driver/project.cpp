@@ -58,6 +58,102 @@ struct SourceLine {
     std::string text;
 };
 
+std::string Trim(std::string_view text);
+
+std::string StripComment(std::string_view line);
+
+void ReportProjectError(const std::filesystem::path& path,
+                        std::size_t line,
+                        std::string message,
+                        support::DiagnosticSink& diagnostics);
+
+int CountBracketDelta(std::string_view text) {
+    int delta = 0;
+    bool in_string = false;
+    bool escape = false;
+    for (const char ch : text) {
+        if (escape) {
+            escape = false;
+            continue;
+        }
+
+        if (ch == '\\') {
+            escape = true;
+            continue;
+        }
+
+        if (ch == '"') {
+            in_string = !in_string;
+            continue;
+        }
+
+        if (in_string) {
+            continue;
+        }
+
+        if (ch == '[') {
+            ++delta;
+            continue;
+        }
+
+        if (ch == ']') {
+            --delta;
+        }
+    }
+
+    return delta;
+}
+
+std::vector<SourceLine> ReadLogicalProjectLines(std::istream& input,
+                                                const std::filesystem::path& project_path,
+                                                support::DiagnosticSink& diagnostics) {
+    std::vector<SourceLine> lines;
+
+    std::string raw_line;
+    std::size_t line_number = 0;
+    std::optional<SourceLine> pending;
+    int pending_bracket_depth = 0;
+    while (std::getline(input, raw_line)) {
+        ++line_number;
+        const std::string without_comment = StripComment(raw_line);
+        const std::string line = Trim(without_comment);
+        if (line.empty()) {
+            continue;
+        }
+
+        if (!pending.has_value()) {
+            const std::size_t equals = line.find('=');
+            if (equals != std::string::npos) {
+                const std::string value_text = Trim(std::string_view(line).substr(equals + 1));
+                const int bracket_depth = CountBracketDelta(value_text);
+                if (!value_text.empty() && value_text.front() == '[' && bracket_depth > 0) {
+                    pending = SourceLine{.number = line_number, .text = line};
+                    pending_bracket_depth = bracket_depth;
+                    continue;
+                }
+            }
+
+            lines.push_back(SourceLine{.number = line_number, .text = line});
+            continue;
+        }
+
+        pending->text += ' ';
+        pending->text += line;
+        pending_bracket_depth += CountBracketDelta(line);
+        if (pending_bracket_depth <= 0) {
+            lines.push_back(*pending);
+            pending.reset();
+            pending_bracket_depth = 0;
+        }
+    }
+
+    if (pending.has_value()) {
+        ReportProjectError(project_path, pending->number, "unterminated array value", diagnostics);
+    }
+
+    return lines;
+}
+
 std::string Trim(std::string_view text) {
     std::size_t begin = 0;
     while (begin < text.size() && std::isspace(static_cast<unsigned char>(text[begin])) != 0) {
@@ -420,6 +516,15 @@ ProjectTarget* LookupTarget(ProjectFile& project,
     return &it->second;
 }
 
+ProjectModuleSet* LookupTargetModuleSet(ProjectTarget& target,
+                                        std::string_view module_name) {
+    auto [it, inserted] = target.module_sets.emplace(std::string(module_name), ProjectModuleSet {});
+    if (inserted) {
+        it->second.module_name = it->first;
+    }
+    return &it->second;
+}
+
 bool IsSupportedMode(std::string_view mode) {
     return mode == "debug" || mode == "release" || mode == "checked";
 }
@@ -443,13 +548,12 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
     project.path = std::filesystem::absolute(path).lexically_normal();
     project.root_dir = project.path.parent_path();
 
+    const std::vector<SourceLine> lines = ReadLogicalProjectLines(input, project.path, diagnostics);
+
     std::vector<std::string> section;
-    std::string raw_line;
-    std::size_t line_number = 0;
-    while (std::getline(input, raw_line)) {
-        ++line_number;
-        const std::string without_comment = StripComment(raw_line);
-        const std::string line = Trim(without_comment);
+    for (const auto& source_line : lines) {
+        const std::size_t line_number = source_line.number;
+        const std::string& line = source_line.text;
         if (line.empty()) {
             continue;
         }
@@ -608,6 +712,22 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             package_roots.clear();
             for (const auto& entry : parsed_value->string_array_value) {
                 package_roots.push_back(entry);
+            }
+            continue;
+        }
+
+        if (section.size() == 4 && section[2] == "module_sets") {
+            if (key != "files") {
+                ReportProjectError(project.path, line_number, "unknown module_sets key: " + key, diagnostics);
+                continue;
+            }
+            if (!ExpectValueKind(*parsed_value, ParsedValue::Kind::kStringArray, project.path, line_number, key, diagnostics)) {
+                continue;
+            }
+            auto* module_set = LookupTargetModuleSet(*target, section[3]);
+            module_set->files.clear();
+            for (const auto& entry : parsed_value->string_array_value) {
+                module_set->files.push_back(entry);
             }
             continue;
         }
@@ -814,6 +934,46 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                                        "module search path",
                                        target.module_search_paths,
                                        diagnostics);
+        for (auto& [module_name, module_set] : target.module_sets) {
+            if (module_name == "internal") {
+                diagnostics.Report({
+                    .file_path = project.path,
+                    .span = mc::support::kDefaultSourceSpan,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "target '" + name + "' may not declare multi-file module set 'internal'; multi-file internal modules remain deferred",
+                });
+            }
+            if (module_set.files.empty()) {
+                diagnostics.Report({
+                    .file_path = project.path,
+                    .span = mc::support::kDefaultSourceSpan,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "target '" + name + "' declares module set '" + module_name + "' with no files",
+                });
+                continue;
+            }
+            for (auto& file : module_set.files) {
+                file = std::filesystem::absolute(project.root_dir / file).lexically_normal();
+                if (file.filename() == "internal.mc") {
+                    diagnostics.Report({
+                        .file_path = project.path,
+                        .span = mc::support::kDefaultSourceSpan,
+                        .severity = DiagnosticSeverity::kError,
+                        .message = "target '" + name + "' module set '" + module_name +
+                                   "' includes internal module source '" + file.generic_string() +
+                                   "'; multi-file internal modules remain deferred",
+                    });
+                }
+            }
+            std::sort(module_set.files.begin(), module_set.files.end(), [](const auto& lhs, const auto& rhs) {
+                return lhs.generic_string() < rhs.generic_string();
+            });
+            ReportDuplicateConfiguredPaths(project.path,
+                                           name,
+                                           "module set '" + module_name + "' file",
+                                           module_set.files,
+                                           diagnostics);
+        }
         ReportDuplicateConfiguredPaths(project.path,
                                        name,
                                        "test root",
@@ -834,6 +994,52 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                     });
                 }
             }
+        }
+        std::unordered_map<std::string, std::string> owned_module_set_files;
+        for (const auto& [module_name, module_set] : target.module_sets) {
+            for (const auto& file : module_set.files) {
+                const std::string normalized_file = file.lexically_normal().generic_string();
+                const auto [it, inserted] = owned_module_set_files.emplace(normalized_file, module_name);
+                if (!inserted && it->second != module_name) {
+                    diagnostics.Report({
+                        .file_path = project.path,
+                        .span = mc::support::kDefaultSourceSpan,
+                        .severity = DiagnosticSeverity::kError,
+                        .message = "target '" + name + "' assigns source file '" + normalized_file +
+                                   "' to multiple module sets: '" + it->second + "' and '" + module_name + "'",
+                    });
+                }
+            }
+        }
+        const std::string entry_module_name = target.root.stem().string();
+        const auto entry_module_it = target.module_sets.find(entry_module_name);
+        if (entry_module_it != target.module_sets.end()) {
+            const std::string root_key = target.root.lexically_normal().generic_string();
+            const bool root_owned_by_entry_module = std::any_of(entry_module_it->second.files.begin(),
+                                                                entry_module_it->second.files.end(),
+                                                                [&](const auto& file) {
+                                                                    return file.lexically_normal().generic_string() == root_key;
+                                                                });
+            if (!root_owned_by_entry_module) {
+                diagnostics.Report({
+                    .file_path = project.path,
+                    .span = mc::support::kDefaultSourceSpan,
+                    .severity = DiagnosticSeverity::kError,
+                    .message = "target '" + name + "' declares entry module set '" + entry_module_name +
+                               "' but does not include root source '" + root_key + "'",
+                });
+            }
+        }
+        const auto root_owner = owned_module_set_files.find(target.root.lexically_normal().generic_string());
+        if (root_owner != owned_module_set_files.end() && root_owner->second != entry_module_name) {
+            diagnostics.Report({
+                .file_path = project.path,
+                .span = mc::support::kDefaultSourceSpan,
+                .severity = DiagnosticSeverity::kError,
+                .message = "target '" + name + "' root source '" + target.root.generic_string() +
+                           "' belongs to module set '" + root_owner->second +
+                           "'; the root source may only participate in entry module set '" + entry_module_name + "'",
+            });
         }
         if (!IsSupportedMode(target.tests.mode)) {
             diagnostics.Report({
@@ -943,6 +1149,29 @@ std::vector<std::filesystem::path> ComputeProjectImportRoots(const ProjectFile& 
 
     (void)project;
     return roots;
+}
+
+const ProjectModuleSet* LookupProjectModuleSet(const ProjectTarget& target,
+                                               std::string_view module_name) {
+    const auto found = target.module_sets.find(std::string(module_name));
+    if (found == target.module_sets.end()) {
+        return nullptr;
+    }
+    return &found->second;
+}
+
+const ProjectModuleSet* FindProjectModuleSetForSource(const ProjectTarget& target,
+                                                      const std::filesystem::path& source_path) {
+    const std::string normalized = std::filesystem::absolute(source_path).lexically_normal().generic_string();
+    for (const auto& [module_name, module_set] : target.module_sets) {
+        (void)module_name;
+        for (const auto& file : module_set.files) {
+            if (file.lexically_normal().generic_string() == normalized) {
+                return &module_set;
+            }
+        }
+    }
+    return nullptr;
 }
 
 std::optional<std::string> ResolveTargetPackageIdentity(const ProjectTarget& target,

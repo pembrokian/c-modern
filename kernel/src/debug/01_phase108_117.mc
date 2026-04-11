@@ -1,0 +1,307 @@
+func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
+    if !capability.is_program_capability(contract.bootstrap_program_capability) {
+        return false
+    }
+    if contract.bootstrap_program_capability.owner_pid != contract.init_pid {
+        return false
+    }
+    if contract.bootstrap_program_capability.slot_id != 2 {
+        return false
+    }
+    if contract.bootstrap_program_capability.rights != 7 {
+        return false
+    }
+    if contract.bootstrap_program_capability.object_id != 1 {
+        return false
+    }
+    if contract.bootstrap_program_capability.object_id == contract.log_service_program_object_id {
+        return false
+    }
+    if contract.bootstrap_program_capability.object_id == contract.echo_service_program_object_id {
+        return false
+    }
+    if contract.bootstrap_program_capability.object_id == contract.transfer_service_program_object_id {
+        return false
+    }
+    if capability.kind_score(contract.log_service_program_capability.kind) != 1 {
+        return false
+    }
+    if capability.kind_score(contract.echo_service_program_capability.kind) != 1 {
+        return false
+    }
+    if capability.kind_score(contract.transfer_service_program_capability.kind) != 1 {
+        return false
+    }
+    if contract.log_service_spawn.wait_handle_slot != contract.log_service_wait_handle_slot {
+        return false
+    }
+    if contract.echo_service_spawn.wait_handle_slot != contract.echo_service_wait_handle_slot {
+        return false
+    }
+    if contract.transfer_service_spawn.wait_handle_slot != contract.transfer_service_wait_handle_slot {
+        return false
+    }
+    if contract.log_service_wait.exit_code != contract.log_service_exit_code {
+        return false
+    }
+    if contract.echo_service_wait.exit_code != contract.echo_service_exit_code {
+        return false
+    }
+    if contract.transfer_service_wait.exit_code != contract.transfer_service_exit_code {
+        return false
+    }
+    return true
+}
+
+func validate_phase109_first_running_kernel_slice(audit: RunningKernelSliceAudit) bool {
+    if audit.kernel.booted != 1 {
+        return false
+    }
+    if audit.kernel.current_pid != audit.init_pid {
+        return false
+    }
+    if audit.kernel.current_tid != audit.init_tid {
+        return false
+    }
+    if audit.kernel.active_asid != audit.init_asid {
+        return false
+    }
+    if audit.kernel.user_entry_started != 1 {
+        return false
+    }
+    if audit.init_bootstrap_handoff.authority_count != 2 {
+        return false
+    }
+    if audit.init_bootstrap_handoff.ambient_root_visible != 0 {
+        return false
+    }
+    if syscall.status_score(audit.receive_observation.status) != 2 {
+        return false
+    }
+    if audit.receive_observation.payload_len != 4 {
+        return false
+    }
+    if audit.receive_observation.payload[0] != 83 {
+        return false
+    }
+    if audit.receive_observation.payload[1] != 89 {
+        return false
+    }
+    if audit.receive_observation.payload[2] != 83 {
+        return false
+    }
+    if audit.receive_observation.payload[3] != 67 {
+        return false
+    }
+    if syscall.status_score(audit.attached_receive_observation.status) != 2 {
+        return false
+    }
+    if audit.attached_receive_observation.received_handle_count != 1 {
+        return false
+    }
+    if syscall.status_score(audit.transferred_handle_use_observation.status) != 2 {
+        return false
+    }
+    if audit.transferred_handle_use_observation.payload_len != 4 {
+        return false
+    }
+    if audit.transferred_handle_use_observation.payload[0] != 77 {
+        return false
+    }
+    if audit.transferred_handle_use_observation.payload[1] != 79 {
+        return false
+    }
+    if audit.transferred_handle_use_observation.payload[2] != 86 {
+        return false
+    }
+    if audit.transferred_handle_use_observation.payload[3] != 69 {
+        return false
+    }
+    if syscall.status_score(audit.pre_exit_wait_observation.status) != 4 {
+        return false
+    }
+    if syscall.status_score(audit.exit_wait_observation.status) != 2 {
+        return false
+    }
+    if audit.exit_wait_observation.exit_code != audit.child_exit_code {
+        return false
+    }
+    if syscall.status_score(audit.sleep_observation.status) != 4 {
+        return false
+    }
+    if syscall.block_reason_score(audit.sleep_observation.block_reason) != 16 {
+        return false
+    }
+    if audit.timer_wake_observation.task_id != audit.child_tid {
+        return false
+    }
+    if audit.timer_wake_observation.wake_tick != 1 {
+        return false
+    }
+    if audit.phase104_contract_hardened == 0 {
+        return false
+    }
+    if audit.log_service_handshake.request_count != 1 {
+        return false
+    }
+    if audit.log_service_handshake.ack_count != 1 {
+        return false
+    }
+    if audit.log_service_handshake.request_byte != audit.log_service_request_byte {
+        return false
+    }
+    if audit.log_service_handshake.ack_byte != 33 {
+        return false
+    }
+    if audit.log_service_wait_observation.exit_code != audit.log_service_exit_code {
+        return false
+    }
+    if audit.echo_service_exchange.reply_count != 1 {
+        return false
+    }
+    if audit.echo_service_exchange.reply_byte0 != audit.echo_service_request_byte0 {
+        return false
+    }
+    if audit.echo_service_exchange.reply_byte1 != audit.echo_service_request_byte1 {
+        return false
+    }
+    if audit.echo_service_wait_observation.exit_code != audit.echo_service_exit_code {
+        return false
+    }
+    if audit.transfer_service_transfer.transferred_endpoint_id != audit.transfer_endpoint_id {
+        return false
+    }
+    if audit.transfer_service_transfer.transferred_rights != 7 {
+        return false
+    }
+    if audit.transfer_service_transfer.emit_count != 1 {
+        return false
+    }
+    if audit.transfer_service_wait_observation.exit_code != audit.transfer_service_exit_code {
+        return false
+    }
+    if audit.phase108_contract_hardened == 0 {
+        return false
+    }
+    if audit.init_process.pid != audit.init_pid {
+        return false
+    }
+    if audit.init_task.tid != audit.init_tid {
+        return false
+    }
+    if audit.init_user_frame.task_id != audit.init_tid {
+        return false
+    }
+    if audit.boot_log_append_failed != 0 {
+        return false
+    }
+    return true
+}
+
+func validate_phase110_kernel_ownership_split(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32) bool {
+    if scheduler_contract_hardened == 0 {
+        return false
+    }
+    if audit.phase104_contract_hardened == 0 {
+        return false
+    }
+    if audit.phase108_contract_hardened == 0 {
+        return false
+    }
+    return validate_phase109_first_running_kernel_slice(audit)
+}
+
+func validate_phase111_scheduler_and_lifecycle_ownership(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32) bool {
+    if lifecycle_contract_hardened == 0 {
+        return false
+    }
+    return validate_phase110_kernel_ownership_split(audit, scheduler_contract_hardened)
+}
+
+func validate_phase112_syscall_boundary_thinness(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32) bool {
+    if capability_contract_hardened == 0 {
+        return false
+    }
+    if ipc_contract_hardened == 0 {
+        return false
+    }
+    if address_space_contract_hardened == 0 {
+        return false
+    }
+    return validate_phase111_scheduler_and_lifecycle_ownership(audit, scheduler_contract_hardened, lifecycle_contract_hardened)
+}
+
+func validate_phase113_interrupt_entry_and_generic_dispatch_boundary(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, interrupt_dispatch_kind: interrupt.InterruptDispatchKind) bool {
+    if interrupt_contract_hardened == 0 {
+        return false
+    }
+    if interrupt.dispatch_kind_score(interrupt_dispatch_kind) != 2 {
+        return false
+    }
+    return validate_phase112_syscall_boundary_thinness(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened)
+}
+
+func validate_phase114_address_space_and_mmu_ownership_split(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32) bool {
+    if interrupt_contract_hardened == 0 {
+        return false
+    }
+    if audit.kernel.active_asid != audit.init_asid {
+        return false
+    }
+    if audit.init_user_frame.address_space_id != audit.init_asid {
+        return false
+    }
+    return validate_phase113_interrupt_entry_and_generic_dispatch_boundary(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, interrupt.InterruptDispatchKind.TimerWake)
+}
+
+func validate_phase115_timer_ownership_hardening(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32) bool {
+    if timer_contract_hardened == 0 {
+        return false
+    }
+    if audit.timer_wake_observation.task_id != audit.child_tid {
+        return false
+    }
+    if audit.timer_wake_observation.wake_count != 1 {
+        return false
+    }
+    return validate_phase114_address_space_and_mmu_ownership_split(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened)
+}
+
+func validate_phase116_mmu_activation_barrier_follow_through(audit: RunningKernelSliceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if barrier_contract_hardened == 0 {
+        return false
+    }
+    if audit.kernel.active_asid != audit.init_asid {
+        return false
+    }
+    return validate_phase115_timer_ownership_hardening(audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened)
+}
+
+func validate_phase117_init_orchestrated_multi_service_bring_up(audit: Phase117MultiServiceBringUpAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase116_mmu_activation_barrier_follow_through(audit.running_slice, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.log_service_handshake.client_pid != audit.running_slice.init_pid {
+        return false
+    }
+    if audit.echo_service_exchange.client_pid != audit.running_slice.init_pid {
+        return false
+    }
+    if audit.transfer_service_transfer.client_pid != audit.running_slice.init_pid {
+        return false
+    }
+    if audit.log_service_handshake.endpoint_id != audit.init_endpoint_id {
+        return false
+    }
+    if audit.echo_service_exchange.endpoint_id != audit.init_endpoint_id {
+        return false
+    }
+    if audit.transfer_service_transfer.control_endpoint_id != audit.init_endpoint_id {
+        return false
+    }
+    if audit.transfer_service_transfer.transferred_endpoint_id != audit.transfer_endpoint_id {
+        return false
+    }
+    return true
+}
+

@@ -44,6 +44,8 @@ enum class InvocationKind {
 };
 
 struct BuildUnit {
+    std::string module_name;
+    std::string artifact_key;
     std::filesystem::path source_path;
     mc::parse::ParseResult parse_result;
     mc::sema::CheckResult sema_result;
@@ -72,15 +74,19 @@ struct ModuleBuildState {
 
 struct CompileImport {
     std::string module_name;
+    std::string artifact_key;
     std::string package_identity;
     std::filesystem::path source_path;
+    std::vector<std::filesystem::path> source_paths;
     ast::SourceFile::ModuleKind module_kind = ast::SourceFile::ModuleKind::kOrdinary;
 };
 
 struct CompileNode {
     std::string module_name;
+    std::string artifact_key;
     std::string package_identity;
     std::filesystem::path source_path;
+    std::vector<std::filesystem::path> source_paths;
     mc::parse::ParseResult parse_result;
     std::vector<CompileImport> imports;
 };
@@ -150,10 +156,16 @@ std::string HexU64(std::uint64_t value);
 std::string HashText(std::string_view text);
 std::filesystem::path ComputeModuleStatePath(const std::filesystem::path& source_path,
                                              const std::filesystem::path& build_dir);
+std::filesystem::path ComputeLogicalModuleStatePath(std::string_view artifact_key,
+                                                    const std::filesystem::path& build_dir);
 std::filesystem::path ComputeRuntimeObjectPath(const std::filesystem::path& entry_source_path,
                                                const std::filesystem::path& build_dir,
                                                std::string_view env,
                                                std::string_view startup);
+std::filesystem::path ComputeLogicalRuntimeObjectPath(std::string_view artifact_key,
+                                                      const std::filesystem::path& build_dir,
+                                                      std::string_view env,
+                                                      std::string_view startup);
 
 std::string FormatCommandForDisplay(const std::vector<std::string>& args);
 WaitForChildResult WaitForChildProcess(pid_t pid,
@@ -185,6 +197,8 @@ bool SupportsBootstrapTarget(const ProjectTarget& target,
 
 std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& entry_source_path,
                                                 const std::vector<std::filesystem::path>& import_roots,
+                                                const std::function<std::optional<std::string>(const std::filesystem::path&)>& package_identity_for_source,
+                                                const std::function<std::vector<CompileImport>(std::string_view)>& known_module_sources,
                                                 const std::unordered_set<std::string>& external_module_paths,
                                                 const std::filesystem::path& build_dir,
                                                 const mc::codegen_llvm::TargetConfig& target_config,

@@ -128,6 +128,8 @@ Current module-model contract:
 - ordinary modules are public by default
 - `@private` is the only declaration-level hiding mechanism
 - a file named `internal.mc` is package-internal and may be imported only by modules in the same explicit target `package`
+- direct-source workflows remain one file per module
+- project mode may assemble one ordinary logical module from an explicit `build.toml` `module_sets.<module>.files = [...]` file list while preserving the same import name and one `.mci` or object or build-state record per logical module
 - project manifests should set `package = "..."` on each target instead of relying on implicit package identity
 
 Artifact expectations:

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -18,6 +19,11 @@ struct ProjectTargetTests {
     std::optional<int> timeout_ms;
 };
 
+struct ProjectModuleSet {
+    std::string module_name;
+    std::vector<std::filesystem::path> files;
+};
+
 struct ProjectTarget {
     std::string name;
     std::string kind = "exe";
@@ -30,6 +36,7 @@ struct ProjectTarget {
     std::vector<std::filesystem::path> link_inputs;
     std::vector<std::filesystem::path> module_search_paths;
     std::unordered_map<std::string, std::vector<std::filesystem::path>> package_roots;
+    std::unordered_map<std::string, ProjectModuleSet> module_sets;
     std::string runtime_startup = "default";
     ProjectTargetTests tests;
 };
@@ -53,6 +60,12 @@ const ProjectTarget* SelectProjectTarget(const ProjectFile& project,
 std::vector<std::filesystem::path> ComputeProjectImportRoots(const ProjectFile& project,
                                                              const ProjectTarget& target,
                                                              const std::vector<std::filesystem::path>& cli_import_roots);
+
+const ProjectModuleSet* LookupProjectModuleSet(const ProjectTarget& target,
+                                               std::string_view module_name);
+
+const ProjectModuleSet* FindProjectModuleSetForSource(const ProjectTarget& target,
+                                                      const std::filesystem::path& source_path);
 
 std::optional<std::string> ResolveTargetPackageIdentity(const ProjectTarget& target,
                                                         const std::filesystem::path& source_path);

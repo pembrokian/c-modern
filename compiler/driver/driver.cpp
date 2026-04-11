@@ -1102,7 +1102,7 @@ int RunCheck(const CommandOptions& options) {
     }
 
     const BuildUnit& entry_unit = units->back();
-    const auto dump_targets = support::ComputeDumpTargets(entry_unit.source_path, graph->compile_graph.build_dir);
+    const auto dump_targets = support::ComputeLogicalDumpTargets(entry_unit.artifact_key, graph->compile_graph.build_dir);
 
     if (options.dump_ast &&
         !WriteTextArtifact(dump_targets.ast,
@@ -1237,8 +1237,8 @@ int RunBuild(const CommandOptions& options) {
         return 1;
     }
 
-    const auto dump_targets = support::ComputeDumpTargets(entry_unit.source_path, graph->compile_graph.build_dir);
-    const auto build_targets = support::ComputeBuildArtifactTargets(entry_unit.source_path, graph->compile_graph.build_dir);
+    const auto dump_targets = support::ComputeLogicalDumpTargets(entry_unit.artifact_key, graph->compile_graph.build_dir);
+    const auto build_targets = support::ComputeLogicalBuildArtifactTargets(entry_unit.artifact_key, graph->compile_graph.build_dir);
 
     if (options.dump_ast &&
         !WriteTextArtifact(dump_targets.ast,

@@ -1,0 +1,280 @@
+Modern C - Modules, Visibility, and Package Model
+
+Purpose
+
+This document freezes the v0.2 module and visibility model after the module
+contract reset.
+It keeps source organization, import resolution, package-internal sharing, and
+interface artifacts explicit without introducing a second language-level
+namespace system.
+
+Authority and scope:
+- `language_spec.txt` remains the semantic authority for the language.
+- `grammar_spec.txt` remains the concrete syntax authority for imports and
+	top-level attributes.
+- `stdlib_spec.txt` remains the canonical standard-library packaging note.
+- `build_spec.txt` remains the canonical build, package-identity, and
+	source-root authority.
+- this document freezes the module boundary, visibility rules, import
+	resolution, package-internal module rules, and interface-artifact
+	expectations for v0.2.
+- this document does not define package management, vendoring policy, or
+	remote dependency fetching.
+
+1. Core Terms
+
+Module:
+- a module is one logical compilation unit in v0.2
+- direct-source workflows keep one source file per module
+- project mode may map one ordinary logical module to multiple explicit source
+	files through `build.toml` `module_sets.<module>.files = [...]`
+- a module is the unit of import, separate compilation, and interface-artifact
+	emission
+- a module name is the public identity used by import statements and
+	module-qualified names
+
+Package identity:
+- a package identity is an explicit build-owned string that groups modules for
+	package-internal visibility decisions
+- package identity is not inferred from raw directory adjacency or filename
+	conventions alone
+- package identity affects only whether `internal.mc` may be imported; it does
+	not create a second name-resolution model
+
+Package:
+- a package is the build-time grouping of modules that share one explicit
+	package identity
+- a package is not source syntax in v0.2
+- packages do not create hidden imports, alternate qualification, or implicit
+	reexports
+
+Project:
+- a project is a build configuration root that names targets, source roots,
+	package identities, and output locations
+- the build system may organize one or more packages inside a project, but the
+	source language does not gain package syntax from that fact
+
+Rules:
+- direct-source workflows use one source file per module in v0.2
+- project mode may assemble one ordinary logical module from multiple explicit
+	source files owned by the selected target's build description
+- the language must not require a hidden prelude or ambient module set
+- packages help the build tool define `internal.mc` legality, but they do not
+	become a second module system
+
+2. Module Identity And Naming
+
+Module name rules:
+- module names are explicit and are compared by exact spelling
+- module names in v0.2 are single identifiers, not hierarchical package paths
+- module identity is not inferred from directory structure alone
+- a build tool may map file paths to module names, but that mapping must remain
+	explicit and stable within the project model
+- when project mode uses `module_sets.<module>.files`, the table key is the
+	canonical module name used by `import`
+- a source file literally named `internal.mc` still has the module name
+	`internal`; the special meaning is visibility and import legality, not an
+	alternate naming scheme
+
+Qualified access:
+- `module.name` refers to a non-private member of module `module` that is legal
+	for the current importer to access
+- `module.Type` refers to a non-private type from module `module`
+- dotted member access does not imply nested modules or package inheritance
+
+Rules:
+- `mem.Allocator` means visible member `Allocator` of module `mem`
+- `helper_types.Pair` means visible member `Pair` of module `helper_types`
+- dotted names are member qualification, not package paths
+
+3. Imports
+
+Import model:
+- imports are explicit
+- imports are acyclic
+- imports are resolved before later semantic and MIR stages consume the program
+- importing a module does not automatically import its imports
+- imported names are only the non-private declarations made visible by the
+	imported module and the importer's package identity
+
+Resolution rules:
+- each import must resolve to exactly one visible source module
+- missing matches are errors
+- duplicate visible matches are errors
+- the build system should search only the explicit module roots configured for
+	the target or project
+
+Canonical resolution algorithm for v0.2:
+- for direct-source checking, the compiler first considers the importing file's
+	directory and then each explicit import root in configured order
+- for project-driven builds, the ordinary explicit roots are the configured
+	`search_paths.modules` entries for the target; any repository-local stdlib
+	discovery remains a tool-mode convenience rather than a language rule
+- for project-driven builds, explicit target-owned `module_sets` are consulted
+	before the legacy single-file `<root>/<module>.mc` probe so the logical
+	module identity remains stable even when its implementation spans several
+	files
+- each candidate module path is formed mechanically as `<root>/<module-name>.mc`
+- each candidate is classified as either an ordinary module or an
+	`internal.mc` module based on the source filename
+- ordinary modules are visible to any importer that can resolve them
+- `internal.mc` candidates are visible only when the importer and the imported
+	module carry the same explicit package identity
+- visibility filtering happens before duplicate suppression and ambiguity
+	detection
+- candidate paths are normalized before duplicate suppression so the same file
+	found through two equivalent roots is still one match
+- if exactly one distinct visible candidate exists, the import resolves to that
+	module
+- if zero distinct visible candidates exist, the import is unresolved
+- if more than one distinct visible candidate exists, the import is ambiguous
+	and must be rejected; there is no first-match-wins rule
+
+Direct-source rule:
+- direct-source workflows do not define package identity
+- because `internal.mc` legality depends on explicit package identity,
+	direct-source workflows must reject using an `internal.mc` file as the root
+	input and must reject imports that would resolve to `internal.mc`
+- project-driven workflows are the standardized path for package-internal
+	modules in v0.2
+
+Non-goals:
+- wildcard imports
+- implicit transitive imports
+- import aliases that rewrite the canonical module identity
+- hidden vendor search rules
+
+4. Visibility And Internal Modules
+
+Declaration visibility:
+- ordinary top-level declarations are public to legal importers by default
+- `@private` is the only declaration-level hiding mechanism in v0.2
+- a `@private` declaration is visible only inside its defining module
+- import statements do not create reexports
+
+Module-kind visibility:
+- a source file named `internal.mc` is a package-internal module
+- an `internal.mc` module may be imported only by modules in the same explicit
+	package identity
+- `internal.mc` is the only package-sharing mechanism in v0.2
+- there is no declaration-scoped package-private or friend-style visibility
+	tier
+
+Visibility lattice for v0.2:
+- the declaration-level split is binary: non-private or `@private`
+- ordinary modules expose all non-private declarations to any legal importer
+- `internal.mc` modules expose all non-private declarations only to legal
+	same-package importers
+- when an ordinary module is defined by multiple explicit project-mode source
+	files, `@private` remains private to the logical module rather than to one
+	physical file part
+- packages, directories, build targets, and source roots do not create any
+	further visibility classes
+
+Interface expectations:
+- non-private declarations appear in interface artifacts
+- `@private` declarations do not
+- `internal.mc` does not use importer-specific interface projections; legality
+	is validated from package identity metadata instead
+- downstream compilation should depend on the non-private semantic surface, not
+	on reparsing upstream implementation details
+
+5. Standard Library And Toolchain Modules
+
+Standard library modules:
+- `mem`, `utf8`, `strings`, `io`, `fs`, `net`, `sync`, and `time` are ordinary
+	modules from the language point of view
+- `os` and `hal` remain explicit platform-facing modules
+- `testing` is a toolchain companion module for tests
+- `startup` is a special non-import layer and is not an ordinary application
+	module
+
+Rules:
+- standard-library modules obey the same module and visibility rules as user
+	code
+- the standard library does not get hidden import privileges
+- the build tool may discover standard-library roots automatically, but that
+	discovery is a build concern, not a language feature
+
+Package direction:
+- the standard library is packaged as a repository-local module set, not as a
+	registry-backed ecosystem
+- the build tool may distinguish portable, platform-facing, and toolchain
+	companion modules
+- that distinction must not change source syntax or module identity rules
+
+6. Interface Artifacts
+
+Canonical artifact:
+- each compiled module should emit one interface artifact with the canonical
+	extension `.mci`
+- `.mci` is for compiler consumption, not hand authoring
+- `.mci` must be deterministic so incremental rebuilds and tests can rely on
+	stable output
+
+Minimum contents:
+- module name
+- module kind: ordinary or `internal`
+- package identity for project-driven compilation
+- target identity for the build configuration that produced the artifact
+- source identity or path information needed for diagnostics
+- imported module list
+- non-private declarations that legal importers may consume
+- resolved non-private function signatures, including extern ABI strings and
+	any accepted per-parameter semantic flags such as `@noalias`
+- resolved non-private types, including declared kind, type parameters, alias
+	base type when applicable, and layout-relevant facts already admitted by
+	sema
+- layout-relevant facts for non-private aggregates
+- non-private globals and constant payloads needed by importers
+- deterministic artifact hash or equivalent change-detection material
+
+Rules:
+- interface artifacts are serialized module contracts
+- interface artifacts must not become a second source language
+- if a non-private semantic fact changes, dependent modules should rebuild
+- if only implementation details or `@private` semantic facts change,
+	dependents should not need to rebuild
+- package identity and module kind metadata must be sufficient to validate
+	`internal.mc` legality without generating importer-specific artifacts
+- when a project-mode multi-file module set is used, one logical module still
+	emits one deterministic `.mci`, one deterministic object, and one
+	deterministic build-state record
+
+7. Build-Tool Responsibilities
+
+The build tool may:
+- choose source roots explicitly
+- map source files to module names
+- map one ordinary module name to multiple explicit source files in project
+	mode through target-owned `module_sets`
+- assign explicit package identities to configured roots
+- resolve imports through ordered roots plus package-identity filtering
+- emit object files and interface artifacts
+- track module-level dependency ordering
+- treat generated source roots and generated interface roots as ordinary roots
+	only when they are configured explicitly or are part of a separately
+	documented tool workflow
+
+The build tool must not:
+- invent package aliases
+- rewrite module identities implicitly
+- infer package identity from raw path adjacency alone
+- inject hidden prelude imports
+- add repository-global namespace rules that source code cannot see
+
+8. Bottom Line
+
+Modern C v0.2 should have:
+- direct-source one-source-file-per-module workflows
+- project-mode explicit multi-file ordinary modules through target-owned
+	`module_sets`
+- explicit, acyclic imports
+- default-public top-level declarations
+- `@private` as the only declaration-level hiding tool
+- `internal.mc` as the only package-internal module kind
+- deterministic interface artifacts
+- build-time package identity only, not language-level packages
+
+If a future feature wants richer package behavior, it must be introduced as a
+build or distribution concern without changing the core module model.

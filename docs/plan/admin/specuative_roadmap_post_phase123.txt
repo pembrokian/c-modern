@@ -50,7 +50,9 @@ Repository numbering note
 - Phase 96 through Phase 126 are occupied by the concrete first-kernel,
   ownership-hardening, hardware-boundary, running-system, plateau-freeze, and
   authority-lifecycle stress waves.
-- The next speculative continuation therefore starts at Phase 127.
+- Proposed compiler planning now reserves Phase 127 for
+  `docs/plan/phase127_project_mode_multi_file_modules.txt`.
+- The next speculative Canopus continuation therefore starts at Phase 128.
 
 Repository status note
 ----------------------
@@ -182,7 +184,7 @@ Why this band comes next:
   orchestration; making it explicit now is safer than normalizing hidden
   coupling through broader composition patterns first.
 
-Phase 127 through Phase 129 -- Failure Semantics
+Phase 128 through Phase 130 -- Failure Semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Goal:
 - make failure a first-class part of the model without importing kernel-side
@@ -202,17 +204,17 @@ Exit criteria:
 Non-goal:
 - turning the kernel into a recovery or supervision framework
 
-Phase 127 -- Service Death Observation
+Phase 128 -- Service Death Observation
 - Exit criterion: one bounded service-disappearance path becomes observable and
   explicit without corrupting kernel ownership boundaries or introducing a
   kernel-side supervision policy.
 
-Phase 128 -- Partial Failure Propagation
+Phase 129 -- Partial Failure Propagation
 - Exit criterion: one partial-failure path can cross the current request,
   reply, and authority boundaries while remaining explicit, bounded, and free
   of hidden scheduler or recovery semantics.
 
-Phase 129 -- Explicit Restart Or Replacement Probe
+Phase 130 -- Explicit Restart Or Replacement Probe
 - Exit criterion: one bounded restart or replacement story can be expressed as
   service-owned policy without turning the kernel into a recovery framework.
 
@@ -231,7 +233,7 @@ Why this band comes after failure:
 - IPC composition should be stressed after the repository already knows what
   explicit failure and invalidation look like inside the same system model.
 
-Phase 130 through Phase 132 -- IPC Composition Stress
+Phase 131 through Phase 133 -- IPC Composition Stress
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Goal:
 - prove that IPC remains correct when composed more deeply, after authority and
@@ -251,24 +253,24 @@ Exit criteria:
 Non-goal:
 - optimizing IPC for performance before correctness is stressed
 
-Phase 130 -- Fan-In Or Fan-Out Composition Probe
+Phase 131 -- Fan-In Or Fan-Out Composition Probe
 - Exit criterion: one bounded fan-in or fan-out topology preserves explicit
   ownership and does not leak scheduler policy into IPC semantics.
 
-Phase 131 -- Backpressure And Blocking Audit
+Phase 132 -- Backpressure And Blocking Audit
 - Exit criterion: one bounded backpressure case preserves clean block or wake
   ownership without requiring hidden ordering assumptions for correctness.
 
-Phase 132 -- Message Lifetime And Reuse Audit
+Phase 133 -- Message Lifetime And Reuse Audit
 - Exit criterion: one bounded message lifetime and reuse path proves that copy,
   ownership, and retirement rules remain explicit under deeper composition.
 
 Band D - Attempt One Narrow Device-Service Experiment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 133 through 136 should test one real interrupt-facing service path only
+Phases 134 through 137 should test one real interrupt-facing service path only
 after authority, failure, and IPC composition already hold under stress.
 
-Phase 133 through Phase 136 -- Device boundary experiment
+Phase 134 through Phase 137 -- Device boundary experiment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Goal:
 - prove that real devices can be attached without letting driver policy move
@@ -288,21 +290,21 @@ Exit criteria:
 Non-goal:
 - a general in-kernel device stack
 
-Phase 133 -- Minimal Device-Service Handoff
+Phase 134 -- Minimal Device-Service Handoff
 - Exit criterion: one real device-facing event path can cross from interrupt or
   kernel mediation into one user-space service without turning the kernel into
   a driver framework.
 
-Phase 134 -- Buffer Ownership Boundary Audit
+Phase 135 -- Buffer Ownership Boundary Audit
 - Exit criterion: one bounded device buffer path keeps ownership explicit end
   to end without adding an in-kernel policy layer.
 
-Phase 135 -- Device Failure Containment Probe
+Phase 136 -- Device Failure Containment Probe
 - Exit criterion: one bounded device-failure path remains explicit and does not
   trigger broad kernel policy growth.
 
-Phase 136 -- Optional DMA-Or-Equivalent Follow-Through
-- Exit criterion: only if Phase 133 through Phase 135 prove it is the narrowest
+Phase 137 -- Optional DMA-Or-Equivalent Follow-Through
+- Exit criterion: only if Phase 134 through Phase 136 prove it is the narrowest
   next owner, one bounded DMA or equivalent transfer-boundary truth can be
   admitted without widening into a general in-kernel driver stack.
 
@@ -312,10 +314,10 @@ Guardrail for this band:
 
 Band E - Rebuild Only If Earlier Stress Exposes A Distorted Owner
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phase 137 should remain conditional.
+Phase 138 should remain conditional.
 It is not an automatic culmination of the roadmap.
 
-Phase 137 -- Optional subsystem rebuild
+Phase 138 -- Optional subsystem rebuild
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Goal:
 - re-implement one already-landed subsystem using the newer structure and

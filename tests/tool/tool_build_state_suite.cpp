@@ -944,6 +944,122 @@ void TestPrivateAndInternalIncrementalBehavior(const std::filesystem::path& bina
     }
 }
 
+void TestMultiFileModuleIncrementalBehavior(const std::filesystem::path& binary_root,
+                                           const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "multifile_incremental_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase127-multifile-incremental\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "package = \"app\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.module_sets.main]\n"
+              "files = [\"src/main.mc\", \"src/main_logic.mc\"]\n"
+              "\n"
+              "[targets.app.module_sets.helper]\n"
+              "files = [\"src/helper_public.mc\", \"src/helper_private.mc\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(project_root / "src/main.mc",
+              "import helper\n"
+              "\n"
+              "func main() i32 {\n"
+              "    return helper.answer() + main_bonus()\n"
+              "}\n");
+    WriteFile(project_root / "src/main_logic.mc",
+              "func main_bonus() i32 {\n"
+              "    return 1\n"
+              "}\n");
+    WriteFile(project_root / "src/helper_private.mc",
+              "@private\n"
+              "func hidden_value() i32 {\n"
+              "    return 7\n"
+              "}\n");
+    WriteFile(project_root / "src/helper_public.mc",
+              "func answer() i32 {\n"
+              "    return hidden_value()\n"
+              "}\n");
+
+    const std::filesystem::path build_dir = binary_root / "multifile_incremental_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto run_build = [&](const std::string& context) {
+        const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                          "build",
+                                                          "--project",
+                                                          (project_root / "build.toml").generic_string(),
+                                                          "--build-dir",
+                                                          build_dir.generic_string()},
+                                                         build_dir / (context + ".txt"),
+                                                         context);
+        if (!outcome.exited || outcome.exit_code != 0) {
+            Fail(context + " should succeed:\n" + output);
+        }
+    };
+
+    run_build("multifile_incremental_initial");
+
+    const auto helper_targets = mc::support::ComputeLogicalBuildArtifactTargets("app::helper", build_dir);
+    const auto main_targets = mc::support::ComputeLogicalBuildArtifactTargets("app::main", build_dir);
+    const auto helper_dump_targets = mc::support::ComputeLogicalDumpTargets("app::helper", build_dir);
+
+    const auto helper_object_time_1 = RequireWriteTime(helper_targets.object);
+    const auto main_object_time_1 = RequireWriteTime(main_targets.object);
+    const auto helper_mci_time_1 = RequireWriteTime(helper_dump_targets.mci);
+    const std::string helper_mci_text_1 = ReadFile(helper_dump_targets.mci);
+    const auto executable_time_1 = RequireWriteTime(main_targets.executable);
+
+    SleepForTimestampTick();
+    WriteFile(project_root / "src/helper_private.mc",
+              "@private\n"
+              "func hidden_value() i32 {\n"
+              "    return 9\n"
+              "}\n");
+    run_build("multifile_incremental_private_change");
+
+    if (!(RequireWriteTime(helper_targets.object) > helper_object_time_1)) {
+        Fail("private multi-file module edit should rebuild the logical helper object");
+    }
+    if (RequireWriteTime(main_targets.object) != main_object_time_1) {
+        Fail("private multi-file module edit should not rebuild the dependent main object");
+    }
+    if (ReadFile(helper_dump_targets.mci) != helper_mci_text_1) {
+        Fail("private multi-file module edit should preserve the helper interface artifact contents");
+    }
+    if (!(RequireWriteTime(main_targets.executable) > executable_time_1)) {
+        Fail("private multi-file module edit should still relink the executable");
+    }
+
+    SleepForTimestampTick();
+    WriteFile(project_root / "src/helper_public.mc",
+              "func answer() i32 {\n"
+              "    return hidden_value()\n"
+              "}\n"
+              "\n"
+              "func extra() i32 {\n"
+              "    return 1\n"
+              "}\n");
+    run_build("multifile_incremental_interface_change");
+
+    if (!(RequireWriteTime(helper_dump_targets.mci) > helper_mci_time_1)) {
+        Fail("public multi-file module edit should rewrite the helper interface artifact");
+    }
+    if (!(RequireWriteTime(main_targets.object) > main_object_time_1)) {
+        Fail("public multi-file module edit should rebuild the dependent main object");
+    }
+}
+
 }  // namespace
 
 namespace mc::tool_tests {
@@ -966,6 +1082,7 @@ void RunBuildStateToolSuite(const std::filesystem::path& binary_root,
     TestInvalidStateFileForcesRebuild(suite_root, mc_path);
     TestIncrementalRebuildBehavior(suite_root, mc_path);
     TestPrivateAndInternalIncrementalBehavior(suite_root, mc_path);
+    TestMultiFileModuleIncrementalBehavior(suite_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

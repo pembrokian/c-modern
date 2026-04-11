@@ -1,0 +1,219 @@
+import address_space
+import capability
+import echo_service
+import init
+import interrupt
+import log_service
+import state
+import syscall
+import timer
+import transfer_service
+
+struct Phase108ProgramCapContract {
+    init_pid: u32
+    log_service_program_object_id: u32
+    echo_service_program_object_id: u32
+    transfer_service_program_object_id: u32
+    log_service_wait_handle_slot: u32
+    echo_service_wait_handle_slot: u32
+    transfer_service_wait_handle_slot: u32
+    log_service_exit_code: i32
+    echo_service_exit_code: i32
+    transfer_service_exit_code: i32
+    bootstrap_program_capability: capability.CapabilitySlot
+    log_service_program_capability: capability.CapabilitySlot
+    echo_service_program_capability: capability.CapabilitySlot
+    transfer_service_program_capability: capability.CapabilitySlot
+    log_service_spawn: syscall.SpawnObservation
+    echo_service_spawn: syscall.SpawnObservation
+    transfer_service_spawn: syscall.SpawnObservation
+    log_service_wait: syscall.WaitObservation
+    echo_service_wait: syscall.WaitObservation
+    transfer_service_wait: syscall.WaitObservation
+}
+
+struct RunningKernelSliceAudit {
+    kernel: state.KernelDescriptor
+    init_pid: u32
+    init_tid: u32
+    init_asid: u32
+    child_tid: u32
+    child_exit_code: i32
+    transfer_endpoint_id: u32
+    log_service_request_byte: u8
+    echo_service_request_byte0: u8
+    echo_service_request_byte1: u8
+    log_service_exit_code: i32
+    echo_service_exit_code: i32
+    transfer_service_exit_code: i32
+    init_bootstrap_handoff: init.BootstrapHandoffObservation
+    receive_observation: syscall.ReceiveObservation
+    attached_receive_observation: syscall.ReceiveObservation
+    transferred_handle_use_observation: syscall.ReceiveObservation
+    pre_exit_wait_observation: syscall.WaitObservation
+    exit_wait_observation: syscall.WaitObservation
+    sleep_observation: syscall.SleepObservation
+    timer_wake_observation: timer.TimerWakeObservation
+    log_service_handshake: log_service.LogHandshakeObservation
+    log_service_wait_observation: syscall.WaitObservation
+    echo_service_exchange: echo_service.EchoExchangeObservation
+    echo_service_wait_observation: syscall.WaitObservation
+    transfer_service_transfer: transfer_service.TransferObservation
+    transfer_service_wait_observation: syscall.WaitObservation
+    phase104_contract_hardened: u32
+    phase108_contract_hardened: u32
+    init_process: state.ProcessSlot
+    init_task: state.TaskSlot
+    init_user_frame: address_space.UserEntryFrame
+    boot_log_append_failed: u32
+}
+
+struct Phase117MultiServiceBringUpAudit {
+    running_slice: RunningKernelSliceAudit
+    init_endpoint_id: u32
+    transfer_endpoint_id: u32
+    log_service_program_capability: capability.CapabilitySlot
+    echo_service_program_capability: capability.CapabilitySlot
+    transfer_service_program_capability: capability.CapabilitySlot
+    log_service_spawn: syscall.SpawnObservation
+    echo_service_spawn: syscall.SpawnObservation
+    transfer_service_spawn: syscall.SpawnObservation
+    log_service_wait: syscall.WaitObservation
+    echo_service_wait: syscall.WaitObservation
+    transfer_service_wait: syscall.WaitObservation
+    log_service_handshake: log_service.LogHandshakeObservation
+    echo_service_exchange: echo_service.EchoExchangeObservation
+    transfer_service_transfer: transfer_service.TransferObservation
+}
+
+struct Phase118DelegatedRequestReplyAudit {
+    phase117: Phase117MultiServiceBringUpAudit
+    transfer_service_transfer: transfer_service.TransferObservation
+    invalidated_source_send_status: syscall.SyscallStatus
+    invalidated_source_handle_slot: u32
+    retained_receive_handle_slot: u32
+    retained_receive_endpoint_id: u32
+}
+
+struct Phase119NamespacePressureAudit {
+    phase118: Phase118DelegatedRequestReplyAudit
+    directory_owner_pid: u32
+    directory_entry_count: usize
+    log_service_key: u32
+    echo_service_key: u32
+    transfer_service_key: u32
+    shared_directory_endpoint_id: u32
+    log_service_program_slot: u32
+    echo_service_program_slot: u32
+    transfer_service_program_slot: u32
+    log_service_program_object_id: u32
+    echo_service_program_object_id: u32
+    transfer_service_program_object_id: u32
+    log_service_wait_handle_slot: u32
+    echo_service_wait_handle_slot: u32
+    transfer_service_wait_handle_slot: u32
+    dynamic_namespace_visible: u32
+}
+
+struct Phase120RunningSystemSupportAudit {
+    phase119: Phase119NamespacePressureAudit
+    service_policy_owner_pid: u32
+    running_service_count: usize
+    fixed_directory_count: usize
+    shared_control_endpoint_id: u32
+    retained_reply_endpoint_id: u32
+    program_capability_count: usize
+    wait_handle_count: usize
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
+struct Phase121KernelImageContractAudit {
+    phase120: Phase120RunningSystemSupportAudit
+    kernel_manifest_visible: u32
+    kernel_target_visible: u32
+    kernel_runtime_startup_visible: u32
+    bootstrap_target_family_visible: u32
+    emitted_image_input_visible: u32
+    linked_kernel_executable_visible: u32
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
+struct Phase122TargetSurfaceAudit {
+    phase121: Phase121KernelImageContractAudit
+    kernel_target_visible: u32
+    kernel_runtime_startup_visible: u32
+    bootstrap_target_family_visible: u32
+    bootstrap_target_family_only_visible: u32
+    broader_target_family_visible: u32
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
+struct Phase123NextPlateauAudit {
+    phase122: Phase122TargetSurfaceAudit
+    running_kernel_truth_visible: u32
+    running_system_truth_visible: u32
+    kernel_image_truth_visible: u32
+    target_surface_truth_visible: u32
+    broader_platform_visible: u32
+    broad_target_support_visible: u32
+    general_loading_visible: u32
+    compiler_reopening_visible: u32
+}
+
+struct Phase124DelegationChainAudit {
+    phase123: Phase123NextPlateauAudit
+    delegator_pid: u32
+    intermediary_pid: u32
+    final_holder_pid: u32
+    control_endpoint_id: u32
+    delegated_endpoint_id: u32
+    delegator_source_handle_slot: u32
+    intermediary_receive_handle_slot: u32
+    final_receive_handle_slot: u32
+    first_invalidated_send_status: syscall.SyscallStatus
+    second_invalidated_send_status: syscall.SyscallStatus
+    final_send_status: syscall.SyscallStatus
+    final_send_source_pid: u32
+    final_endpoint_queue_depth: usize
+    ambient_authority_visible: u32
+    compiler_reopening_visible: u32
+}
+
+struct Phase125InvalidationAudit {
+    phase124: Phase124DelegationChainAudit
+    invalidated_holder_pid: u32
+    control_endpoint_id: u32
+    invalidated_endpoint_id: u32
+    invalidated_handle_slot: u32
+    rejected_send_status: syscall.SyscallStatus
+    rejected_receive_status: syscall.SyscallStatus
+    surviving_control_send_status: syscall.SyscallStatus
+    surviving_control_source_pid: u32
+    surviving_control_queue_depth: usize
+    authority_loss_visible: u32
+    broader_revocation_visible: u32
+    compiler_reopening_visible: u32
+}
+
+struct Phase126AuthorityLifetimeAudit {
+    phase125: Phase125InvalidationAudit
+    classified_holder_pid: u32
+    long_lived_endpoint_id: u32
+    short_lived_endpoint_id: u32
+    long_lived_handle_slot: u32
+    short_lived_handle_slot: u32
+    repeat_long_lived_send_status: syscall.SyscallStatus
+    repeat_long_lived_source_pid: u32
+    repeat_long_lived_queue_depth: usize
+    long_lived_class_visible: u32
+    short_lived_class_visible: u32
+    broader_lifetime_framework_visible: u32
+    compiler_reopening_visible: u32
+}
+

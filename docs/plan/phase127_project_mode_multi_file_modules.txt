@@ -1,0 +1,308 @@
+Phase 127 -- Project-Mode Multi-File Modules
+============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Turn the current single-file module contract into one bounded compiler and
+build-model phase that allows one logical ordinary module to be composed from
+multiple source files in project mode.
+
+This document is both the Phase 127 execution note and its closeout.
+It records the landed project-mode multi-file ordinary-module slice.
+It does not claim hierarchical packages, source-language partial-module
+declarations, implicit directory ownership, direct-source multi-file
+workflows, or a broader module-system rewrite.
+
+Repository status note
+----------------------
+- Direct-source workflows remain explicitly single-file in Phase 127.
+- Project mode now admits explicit `[targets.<name>.module_sets.<module>]`
+  file lists for ordinary modules, and one logical module still emits one
+  `.mci`, one object, and one build-state record.
+- Import resolution in project mode now checks explicit logical module source
+  sets before falling back to the legacy `<root>/<module>.mc` single-file
+  lookup.
+- The kernel tree already demonstrates real pressure for larger logical
+  module-local ownership surfaces, but today it must answer that pressure by
+  either growing one file or splitting behavior into extra import-visible
+  sibling modules.
+- The landed answer remains build-owned and explicit rather than a second
+  package system, hierarchical module naming scheme, or implicit directory
+  rule.
+
+Problem being solved
+--------------------
+- The current module model forces a false choice between oversized module
+  files and extra import-visible boundaries that exist only to satisfy file
+  layout pressure.
+- That pressure is now real in kernel-shaped code where one logical owner may
+  need a directory or subgroup of files without wanting a second public module
+  boundary.
+- The present implementation ties module identity to file stem and source path
+  across `compiler/driver/`, `compiler/sema/`, `compiler/mci/`, and artifact
+  naming, so the repository needs one explicit phase that untangles logical
+  module identity from physical file count.
+
+Core rule
+---------
+- Keep module identity explicit and build-owned.
+- Keep import syntax unchanged: `import debug` should still name one logical
+  module called `debug`, regardless of how many files define it.
+- Make the first implementation project-mode only.
+- Keep direct-source workflows single-file in this phase.
+- Keep package identity explicit and build-owned; do not infer package meaning
+  from directory adjacency.
+- Keep the initial admitted slice to ordinary modules only; defer multi-file
+  `internal` modules until a later phase proves that pressure honestly.
+- Emit one semantic surface, one `.mci`, one object, and one build-state
+  record per logical module.
+- Prefer explicit source-set declarations over implicit directory scanning in
+  the first cut.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 127 note that defines project-mode multi-file ordinary
+   modules as the bounded next compiler wave
+2. one additive `build.toml` extension for explicit module source sets owned
+   by a target
+3. one driver-internal module-source-set abstraction that becomes the unit of
+   import resolution, dependency discovery, interface emission, and object
+   reuse
+4. one sema path that checks a logical module built from multiple parsed
+   source files and exposes one merged import-visible surface
+5. one artifact and incremental-build re-keying from source-path identity to
+   logical module identity
+6. one focused workflow and regression wave proving success, duplicate-symbol
+   failure, visibility behavior, and rebuild correctness for the new model
+7. refreshed roadmap, backlog, and decision-log wording so Phase 127 is no
+   longer claimed by two incompatible futures
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because the pressure is now concrete and
+the smallest honest answer is a bounded project-owned module-source-set model.
+That answer keeps the phase anchored in driver, sema, interface-artifact, and
+incremental-build truth rather than widening immediately into source-language
+module declarations or package redesign.
+
+Implemented result
+------------------
+- `build.toml` schema v1 now admits explicit target-owned
+  `module_sets.<module>.files = [...]` tables.
+- Logical module discovery, `.mci` loading, object emission, and build-state
+  reuse now operate on one logical module node when a module set is declared.
+- Legacy single-file project modules keep their existing artifact names and
+  workflow behavior unchanged.
+- Focused tool regressions now cover successful split root and imported
+  modules, duplicate file ownership failure, duplicate top-level declaration
+  failure across parts, and logical-module incremental rebuild behavior.
+- Multi-file `internal` modules, implicit directory discovery, and
+  direct-source multi-file workflows remain explicitly deferred.
+
+What this phase should try to prove
+-----------------------------------
+- one logical ordinary module can be built from multiple source files in
+  project mode without changing import syntax
+- duplicate top-level declarations across module parts are diagnosed
+  deterministically at the logical-module boundary
+- module-private visibility remains module-scoped rather than becoming an
+  accidental file-scoped rule
+- one logical module still emits one deterministic interface artifact and one
+  deterministic object artifact
+- dependent rebuild behavior follows logical interface change rather than raw
+  file-count changes
+- kernel-like directory pressure can be answered without inventing
+  hierarchical package names, hidden directory rules, or source-language
+  partial-module declarations
+
+Proposed manifest shape
+-----------------------
+Preferred additive shape for this phase:
+
+    [targets.kernel]
+    kind = "exe"
+    package = "kernel"
+    root = "src/main.mc"
+
+    [targets.kernel.module_sets.main]
+    files = ["src/main.mc", "src/main_boot.mc", "src/main_debug.mc"]
+
+    [targets.kernel.module_sets.debug]
+    files = ["src/debug.mc", "src/debug/audit.mc", "src/debug/format.mc"]
+
+Rules for the first cut:
+- the table key under `module_sets` is the canonical module name used by
+  `import`
+- `files` is a non-empty explicit list of source files
+- every listed file belongs to exactly one module source set
+- the target `root` file must belong to the entry module's source set if that
+  source set is declared
+- modules without a `module_sets.<name>` table continue to use the legacy
+  single-file `<name>.mc` rule during the transition
+- listed files are normalized and deduplicated before graph construction
+- file-list order carries no semantic meaning; the compiler should process the
+  normalized paths deterministically
+
+Semantic rules for the first cut
+--------------------------------
+- all files in one declared source set belong to the same logical module
+- declarations in one part are visible to other parts of the same module under
+  the same rules that already apply within one file today
+- `@private` remains private to the logical module, not to one file part
+- duplicate top-level value or type names across parts are errors
+- imports from all parts are merged and deduplicated at the logical-module
+  boundary
+- import cycles are detected between logical modules, not between individual
+  files inside one logical module
+- the module kind for the first cut is ordinary only; multi-file `internal`
+  modules remain deferred
+
+Implementation areas
+--------------------
+The owning implementation surfaces for this phase are:
+
+1. `compiler/driver/project.h` and `compiler/driver/project.cpp`
+   - parse and validate `module_sets`
+   - enforce that files are unique across source sets
+   - keep legacy single-file targets working unchanged
+
+2. `compiler/driver/internal.h` and `compiler/driver/builder.cpp`
+   - introduce a logical module-source-set abstraction
+   - discover dependency graphs by logical module identity instead of by raw
+     source path alone
+   - resolve imports first to module identity, then to the owning file set
+
+3. `compiler/sema/check.h`, `compiler/sema/check.cpp`, and
+   `compiler/sema/module_resolver.cpp`
+   - check one logical module assembled from several parsed `SourceFile`
+     values
+   - collect top-level declarations across all parts deterministically
+   - compute one import-visible module surface over the merged module scope
+
+4. `compiler/mci/mci.cpp`
+   - detach interface metadata from the assumption that one source file owns
+     one module name
+   - keep one `.mci` per logical module
+
+5. `compiler/support/dump_paths.h`, `compiler/support/dump_paths.cpp`, and
+   `compiler/driver/builder.cpp`
+   - re-key dump, object, and state paths by logical module identity instead
+     of raw source path when multi-file modules are used
+
+6. `compiler/driver/driver.cpp`
+   - keep direct-source workflows explicitly single-file
+   - audit ordinary test discovery and generated runner assumptions that still
+     key test modules by file stem
+
+Deliverables
+------------
+- one canonical Phase 127 execution plan in `docs/plan/`
+- one build-spec and module-semantics update documenting explicit project-mode
+  multi-file ordinary modules and explicit deferrals
+- one additive project parser and validator for `module_sets`
+- one internal logical-module abstraction used by graph discovery, interface
+  loading, and incremental reuse
+- one sema path for merged logical modules across multiple source files
+- one `.mci` and artifact naming update so logical module identity remains
+  deterministic
+- one focused workflow and tool-suite regression set covering:
+  - successful root-module split across multiple files
+  - successful imported-module split across multiple files
+  - duplicate top-level declaration failure across parts
+  - duplicate file ownership failure across source sets
+  - logical-module rebuild correctness when public surface changes
+  - no dependent rebuild on private-only implementation-part changes if the
+    interface remains unchanged
+- one kernel-style or kernel-shaped fixture showing a directory-backed module
+  source set without claiming implicit directory-module discovery as a feature
+
+Suggested execution order
+-------------------------
+1. Freeze the language, module-semantics, and build-spec wording for explicit
+   project-mode multi-file ordinary modules and their deferrals.
+2. Add `module_sets` parsing and validation while keeping all current targets
+   valid.
+3. Introduce the internal logical-module abstraction and artifact-key helpers
+   without changing module semantics yet.
+4. Rework graph discovery so imports resolve to logical modules rather than
+   only to raw source files.
+5. Add the merged sema path over multiple parsed source files and keep
+   duplicate-symbol and visibility diagnostics deterministic.
+6. Re-key `.mci`, object, and build-state generation to logical module
+   identity and wire dependent rebuild checks through that identity.
+7. Add focused workflow tests and one kernel-style proof fixture.
+8. Re-audit whether any remaining pressure belongs to direct-source support,
+   multi-file `internal` modules, test-runner widening, or later directory
+   sugar.
+
+Preferred proof points
+----------------------
+1. One root executable module split across at least two files.
+2. One imported helper module split across at least two files.
+3. One deterministic duplicate-symbol failure across parts of the same module.
+4. One deterministic duplicate-file-ownership failure across module sets.
+5. One incremental-build proof where a private-only part change does not force
+   dependent rebuild while a public-surface part change does.
+6. One kernel-shaped layout proof that uses a subdirectory or grouped file set
+   under one module identity without claiming implicit directory ownership.
+
+Exit criteria
+-------------
+- the build spec and module semantics explicitly document project-mode
+  multi-file ordinary modules and their explicit deferrals
+- one project target can compile and link a root logical module assembled from
+  multiple files
+- one imported logical module assembled from multiple files can be consumed by
+  another module through the unchanged import syntax
+- duplicate top-level names across module parts are diagnosed deterministically
+- one logical module emits one deterministic `.mci`, one deterministic object,
+  and one deterministic build-state record
+- dependent rebuild behavior follows logical interface change rather than raw
+  file-count change
+- direct-source workflows remain explicitly single-file in this phase
+- multi-file `internal` modules, implicit directory discovery, and
+  source-language partial-module declarations remain explicitly deferred
+
+Closeout
+--------
+Phase 127 is complete for the bounded admitted slice above.
+The repository now supports explicit project-mode multi-file ordinary modules
+without changing import syntax, while keeping the first cut narrow enough to
+avoid a broader package or source-language module redesign.
+
+Non-goals
+---------
+- hierarchical module names or language-level package paths
+- implicit directory-to-module mapping in the first cut
+- source-language `module`, `partial`, or `part of` declarations
+- multi-file `internal` modules in this phase
+- direct-source multi-file workflows in this phase
+- wildcard imports, reexports, or new visibility tiers
+- broad `mc test` runner redesign unless the focused Phase 127 fixtures prove
+  it is immediately required
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 127 stands alone as one bounded compiler and build-model wave rather
+  than as a vague module-system rewrite.
+- The plan names the exact owning layers that must move: driver, sema,
+  interface artifacts, incremental state, and tests.
+- The plan keeps the first admitted slice explicit: project-mode, ordinary
+  modules, explicit file lists, unchanged import syntax, and deferred
+  directory magic.
+
+Closeout target
+---------------
+Phase 127 should end with one bounded but important new truth: in project
+mode, Modern C can build one logical ordinary module from multiple explicit
+source files while preserving deterministic checking, interface artifacts, and
+incremental rebuild behavior, without claiming a broader package redesign or a
+new source-language module syntax.

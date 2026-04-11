@@ -103,54 +103,269 @@ std::string JoinPaths(const std::vector<std::filesystem::path>& paths) {
     return stream.str();
 }
 
-struct ResolvedImportPath {
-    std::filesystem::path path;
+constexpr std::size_t kMergedModulePartLineStride = 1000000;
+
+void OffsetSpan(support::SourceSpan& span, std::size_t line_offset) {
+    if (line_offset == 0) {
+        return;
+    }
+    span.begin.line += line_offset;
+    span.end.line += line_offset;
+}
+
+void OffsetTypeExprSpans(ast::TypeExpr* type_expr, std::size_t line_offset);
+void OffsetExprSpans(ast::Expr* expr, std::size_t line_offset);
+void OffsetStmtSpans(ast::Stmt* stmt, std::size_t line_offset);
+
+void OffsetNamePatternSpans(ast::NamePattern& pattern, std::size_t line_offset) {
+    OffsetSpan(pattern.span, line_offset);
+}
+
+void OffsetAttributeArgSpans(ast::AttributeArg& arg, std::size_t line_offset) {
+    OffsetSpan(arg.span, line_offset);
+}
+
+void OffsetAttributeSpans(ast::Attribute& attribute, std::size_t line_offset) {
+    OffsetSpan(attribute.span, line_offset);
+    for (auto& arg : attribute.args) {
+        OffsetAttributeArgSpans(arg, line_offset);
+    }
+}
+
+void OffsetFieldDeclSpans(ast::FieldDecl& field_decl, std::size_t line_offset) {
+    OffsetSpan(field_decl.span, line_offset);
+    OffsetTypeExprSpans(field_decl.type.get(), line_offset);
+}
+
+void OffsetEnumVariantDeclSpans(ast::EnumVariantDecl& variant_decl, std::size_t line_offset) {
+    OffsetSpan(variant_decl.span, line_offset);
+    for (auto& payload_field : variant_decl.payload_fields) {
+        OffsetFieldDeclSpans(payload_field, line_offset);
+    }
+}
+
+void OffsetParamDeclSpans(ast::ParamDecl& param_decl, std::size_t line_offset) {
+    OffsetSpan(param_decl.span, line_offset);
+    for (auto& attribute : param_decl.attributes) {
+        OffsetAttributeSpans(attribute, line_offset);
+    }
+    OffsetTypeExprSpans(param_decl.type.get(), line_offset);
+}
+
+void OffsetFieldInitSpans(ast::FieldInit& field_init, std::size_t line_offset) {
+    OffsetSpan(field_init.span, line_offset);
+    OffsetExprSpans(field_init.value.get(), line_offset);
+}
+
+void OffsetCasePatternSpans(ast::CasePattern& pattern, std::size_t line_offset) {
+    OffsetSpan(pattern.span, line_offset);
+    OffsetExprSpans(pattern.expr.get(), line_offset);
+}
+
+void OffsetSwitchCaseSpans(ast::SwitchCase& switch_case, std::size_t line_offset) {
+    OffsetCasePatternSpans(switch_case.pattern, line_offset);
+    for (auto& stmt : switch_case.statements) {
+        OffsetStmtSpans(stmt.get(), line_offset);
+    }
+}
+
+void OffsetDefaultCaseSpans(ast::DefaultCase& default_case, std::size_t line_offset) {
+    OffsetSpan(default_case.span, line_offset);
+    for (auto& stmt : default_case.statements) {
+        OffsetStmtSpans(stmt.get(), line_offset);
+    }
+}
+
+void OffsetTypeExprSpans(ast::TypeExpr* type_expr, std::size_t line_offset) {
+    if (type_expr == nullptr) {
+        return;
+    }
+    OffsetSpan(type_expr->span, line_offset);
+    for (auto& type_arg : type_expr->type_args) {
+        OffsetTypeExprSpans(type_arg.get(), line_offset);
+    }
+    OffsetTypeExprSpans(type_expr->inner.get(), line_offset);
+    OffsetExprSpans(type_expr->length_expr.get(), line_offset);
+    for (auto& param : type_expr->params) {
+        OffsetTypeExprSpans(param.get(), line_offset);
+    }
+    for (auto& ret : type_expr->returns) {
+        OffsetTypeExprSpans(ret.get(), line_offset);
+    }
+}
+
+void OffsetExprSpans(ast::Expr* expr, std::size_t line_offset) {
+    if (expr == nullptr) {
+        return;
+    }
+    OffsetSpan(expr->span, line_offset);
+    for (auto& type_arg : expr->type_args) {
+        OffsetTypeExprSpans(type_arg.get(), line_offset);
+    }
+    OffsetTypeExprSpans(expr->type_target.get(), line_offset);
+    for (auto& arg : expr->args) {
+        OffsetExprSpans(arg.get(), line_offset);
+    }
+    for (auto& field_init : expr->field_inits) {
+        OffsetFieldInitSpans(field_init, line_offset);
+    }
+    OffsetExprSpans(expr->left.get(), line_offset);
+    OffsetExprSpans(expr->right.get(), line_offset);
+    OffsetExprSpans(expr->extra.get(), line_offset);
+}
+
+void OffsetStmtSpans(ast::Stmt* stmt, std::size_t line_offset) {
+    if (stmt == nullptr) {
+        return;
+    }
+    OffsetSpan(stmt->span, line_offset);
+    for (auto& nested_stmt : stmt->statements) {
+        OffsetStmtSpans(nested_stmt.get(), line_offset);
+    }
+    OffsetNamePatternSpans(stmt->pattern, line_offset);
+    OffsetTypeExprSpans(stmt->type_ann.get(), line_offset);
+    for (auto& expr : stmt->exprs) {
+        OffsetExprSpans(expr.get(), line_offset);
+    }
+    for (auto& target : stmt->assign_targets) {
+        OffsetExprSpans(target.get(), line_offset);
+    }
+    for (auto& value : stmt->assign_values) {
+        OffsetExprSpans(value.get(), line_offset);
+    }
+    for (auto& switch_case : stmt->switch_cases) {
+        OffsetSwitchCaseSpans(switch_case, line_offset);
+    }
+    if (stmt->has_default_case) {
+        OffsetDefaultCaseSpans(stmt->default_case, line_offset);
+    }
+    OffsetStmtSpans(stmt->then_branch.get(), line_offset);
+    OffsetStmtSpans(stmt->else_branch.get(), line_offset);
+}
+
+void OffsetDeclSpans(ast::Decl& decl, std::size_t line_offset) {
+    OffsetSpan(decl.span, line_offset);
+    for (auto& attribute : decl.attributes) {
+        OffsetAttributeSpans(attribute, line_offset);
+    }
+    for (auto& param : decl.params) {
+        OffsetParamDeclSpans(param, line_offset);
+    }
+    for (auto& return_type : decl.return_types) {
+        OffsetTypeExprSpans(return_type.get(), line_offset);
+    }
+    OffsetStmtSpans(decl.body.get(), line_offset);
+    for (auto& field : decl.fields) {
+        OffsetFieldDeclSpans(field, line_offset);
+    }
+    for (auto& variant : decl.variants) {
+        OffsetEnumVariantDeclSpans(variant, line_offset);
+    }
+    OffsetNamePatternSpans(decl.pattern, line_offset);
+    OffsetTypeExprSpans(decl.type_ann.get(), line_offset);
+    for (auto& value : decl.values) {
+        OffsetExprSpans(value.get(), line_offset);
+    }
+    OffsetTypeExprSpans(decl.aliased_type.get(), line_offset);
+}
+
+void OffsetSourceFileSpans(ast::SourceFile& source_file, std::size_t line_offset) {
+    OffsetSpan(source_file.span, line_offset);
+    for (auto& import_decl : source_file.imports) {
+        OffsetSpan(import_decl.span, line_offset);
+    }
+    for (auto& decl : source_file.decls) {
+        OffsetDeclSpans(decl, line_offset);
+    }
+}
+
+std::string MakeModuleArtifactKey(std::string_view package_identity,
+                                  std::string_view module_name) {
+    if (package_identity.empty()) {
+        return std::string(module_name);
+    }
+    return std::string(package_identity) + "::" + std::string(module_name);
+}
+
+struct ResolvedModuleSource {
+    std::string module_name;
+    std::string artifact_key;
+    std::filesystem::path primary_source_path;
+    std::vector<std::filesystem::path> source_paths;
     std::optional<std::string> package_identity;
+    ast::SourceFile::ModuleKind module_kind = ast::SourceFile::ModuleKind::kOrdinary;
 };
 
-std::optional<ResolvedImportPath> ResolveImportPathWithPackageRules(
+std::optional<ResolvedModuleSource> ResolveImportPathWithPackageRules(
     const std::filesystem::path& importer_path,
     std::string_view module_name,
     const std::vector<std::filesystem::path>& search_roots,
     const std::optional<std::string>& importer_package_identity,
     const std::function<std::optional<std::string>(const std::filesystem::path&)>& package_identity_for_source,
+    const std::function<std::vector<CompileImport>(std::string_view)>& known_module_sources,
     support::DiagnosticSink& diagnostics,
     const support::SourceSpan& span) {
-    std::vector<ResolvedImportPath> matches;
+    std::vector<ResolvedModuleSource> matches;
     std::unordered_set<std::string> seen_matches;
     std::optional<std::string> rejected_internal_reason;
+
+    const auto append_match = [&](ResolvedModuleSource match) {
+        const std::string key = match.primary_source_path.generic_string();
+        if (!seen_matches.insert(key).second) {
+            return;
+        }
+
+        if (match.module_kind == ast::SourceFile::ModuleKind::kInternal) {
+            if (!importer_package_identity.has_value()) {
+                rejected_internal_reason =
+                    "direct source mode does not support importing internal module: " + std::string(module_name);
+                return;
+            }
+
+            if (!match.package_identity.has_value()) {
+                rejected_internal_reason =
+                    "unable to determine package identity for internal module: " + match.primary_source_path.generic_string();
+                return;
+            }
+            if (*match.package_identity != *importer_package_identity) {
+                rejected_internal_reason = "module " + std::string(module_name) + " is internal to package '" +
+                    *match.package_identity + "' and cannot be imported from package '" + *importer_package_identity + "'";
+                return;
+            }
+        }
+
+        matches.push_back(std::move(match));
+    };
+
+    if (known_module_sources) {
+        for (auto& known_match : known_module_sources(module_name)) {
+            append_match({
+                .module_name = known_match.module_name,
+                .artifact_key = known_match.artifact_key,
+                .primary_source_path = known_match.source_path,
+                .source_paths = known_match.source_paths,
+                .package_identity = known_match.package_identity.empty() ? std::optional<std::string> {}
+                                                                        : std::optional<std::string> {known_match.package_identity},
+                .module_kind = known_match.module_kind,
+            });
+        }
+    }
 
     for (const auto& root : search_roots) {
         const std::filesystem::path candidate = std::filesystem::absolute(root / (std::string(module_name) + ".mc")).lexically_normal();
         if (!std::filesystem::exists(candidate)) {
             continue;
         }
-        if (!seen_matches.insert(candidate.generic_string()).second) {
-            continue;
-        }
 
         const auto candidate_package_identity = package_identity_for_source ? package_identity_for_source(candidate) : std::nullopt;
-        if (IsInternalModulePath(candidate)) {
-            if (!importer_package_identity.has_value()) {
-                rejected_internal_reason =
-                    "direct source mode does not support importing internal module: " + std::string(module_name);
-                continue;
-            }
-
-            if (!candidate_package_identity.has_value()) {
-                rejected_internal_reason = "unable to determine package identity for internal module: " + candidate.generic_string();
-                continue;
-            }
-            if (*candidate_package_identity != *importer_package_identity) {
-                rejected_internal_reason = "module " + std::string(module_name) + " is internal to package '" +
-                    *candidate_package_identity + "' and cannot be imported from package '" + *importer_package_identity + "'";
-                continue;
-            }
-        }
-
-        matches.push_back({
-            .path = candidate,
+        append_match({
+            .module_name = std::string(module_name),
+            .artifact_key = candidate.generic_string(),
+            .primary_source_path = candidate,
+            .source_paths = {candidate},
             .package_identity = candidate_package_identity,
+            .module_kind = IsInternalModulePath(candidate) ? ast::SourceFile::ModuleKind::kInternal
+                                                           : ast::SourceFile::ModuleKind::kOrdinary,
         });
     }
 
@@ -177,12 +392,107 @@ std::optional<ResolvedImportPath> ResolveImportPathWithPackageRules(
             std::vector<std::filesystem::path> match_paths;
             match_paths.reserve(matches.size());
             for (const auto& match : matches) {
-                match_paths.push_back(match.path);
+                match_paths.push_back(match.primary_source_path);
             }
             return "ambiguous import module '" + std::string(module_name) + "' matched multiple roots: " + JoinPaths(match_paths);
         }(),
     });
     return std::nullopt;
+}
+
+std::vector<std::filesystem::path> CanonicalizeModuleSourcePaths(const std::vector<std::filesystem::path>& source_paths) {
+    std::vector<std::filesystem::path> normalized;
+    normalized.reserve(source_paths.size());
+    std::unordered_set<std::string> seen;
+    for (const auto& source_path : source_paths) {
+        const auto path = std::filesystem::absolute(source_path).lexically_normal();
+        if (seen.insert(path.generic_string()).second) {
+            normalized.push_back(path);
+        }
+    }
+    return normalized;
+}
+
+mc::parse::ParseResult MergeParsedModuleSources(std::vector<mc::parse::ParseResult> parsed_parts) {
+    mc::parse::ParseResult merged;
+    merged.ok = true;
+    merged.source_file = std::make_unique<mc::ast::SourceFile>();
+
+    std::unordered_set<std::string> seen_imports;
+    bool module_kind_initialized = false;
+    for (auto& part : parsed_parts) {
+        if (part.source_file == nullptr) {
+            merged.ok = false;
+            return merged;
+        }
+        if (!module_kind_initialized) {
+            merged.source_file->module_kind = part.source_file->module_kind;
+            merged.source_file->span = part.source_file->span;
+            module_kind_initialized = true;
+        }
+        for (const auto& import_decl : part.source_file->imports) {
+            if (!seen_imports.insert(import_decl.module_name).second) {
+                continue;
+            }
+            merged.source_file->imports.push_back(import_decl);
+        }
+        for (auto& decl : part.source_file->decls) {
+            merged.source_file->decls.push_back(std::move(decl));
+        }
+    }
+    std::sort(merged.source_file->imports.begin(), merged.source_file->imports.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.module_name < rhs.module_name;
+    });
+    return merged;
+}
+
+std::optional<mc::parse::ParseResult> ParseLogicalModuleSources(const std::vector<std::filesystem::path>& source_paths,
+                                                                support::DiagnosticSink& diagnostics) {
+    std::vector<mc::parse::ParseResult> parsed_parts;
+    parsed_parts.reserve(source_paths.size());
+    ast::SourceFile::ModuleKind expected_module_kind = ast::SourceFile::ModuleKind::kOrdinary;
+    bool module_kind_initialized = false;
+    std::size_t part_index = 0;
+
+    for (const auto& source_path : CanonicalizeModuleSourcePaths(source_paths)) {
+        auto parsed = ParseSourcePath(source_path, diagnostics);
+        if (!parsed.has_value()) {
+            return std::nullopt;
+        }
+        if (!module_kind_initialized) {
+            expected_module_kind = parsed->source_file->module_kind;
+            module_kind_initialized = true;
+        } else if (parsed->source_file->module_kind != expected_module_kind) {
+            diagnostics.Report({
+                .file_path = source_path,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "logical module source set mixes ordinary and internal module files",
+            });
+            return std::nullopt;
+        }
+        OffsetSourceFileSpans(*parsed->source_file, part_index * kMergedModulePartLineStride);
+        parsed_parts.push_back(std::move(*parsed));
+        ++part_index;
+    }
+
+    return MergeParsedModuleSources(std::move(parsed_parts));
+}
+
+std::optional<std::string> ReadLogicalModuleSourceText(const std::vector<std::filesystem::path>& source_paths,
+                                                       support::DiagnosticSink& diagnostics) {
+    std::string text;
+    for (const auto& source_path : CanonicalizeModuleSourcePaths(source_paths)) {
+        const auto source_text = ReadSourceText(source_path, diagnostics);
+        if (!source_text.has_value()) {
+            return std::nullopt;
+        }
+        text += source_path.generic_string();
+        text.push_back('\n');
+        text += *source_text;
+        text.push_back('\0');
+    }
+    return text;
 }
 
 std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesystem::path& start_path) {
@@ -257,25 +567,87 @@ void CollectOwnedSourcePathsForLink(const TargetBuildGraph& graph,
     }
 }
 
+ResolvedModuleSource BuildResolvedModuleSource(std::string_view module_name,
+                                               std::optional<std::string> package_identity,
+                                               std::vector<std::filesystem::path> source_paths,
+                                               ast::SourceFile::ModuleKind module_kind,
+                                               std::optional<std::filesystem::path> preferred_primary_source = std::nullopt) {
+    ResolvedModuleSource resolved;
+    resolved.module_name = std::string(module_name);
+    resolved.package_identity = std::move(package_identity);
+    resolved.source_paths = CanonicalizeModuleSourcePaths(source_paths);
+    resolved.module_kind = module_kind;
+    resolved.artifact_key = MakeModuleArtifactKey(resolved.package_identity.value_or(std::string {}), module_name);
+    resolved.primary_source_path = preferred_primary_source.has_value()
+        ? std::filesystem::absolute(*preferred_primary_source).lexically_normal()
+        : resolved.source_paths.front();
+    return resolved;
+}
+
+std::vector<CompileImport> LookupKnownProjectModuleSources(const ProjectTarget& target,
+                                                           const std::vector<TargetBuildGraph>& linked_targets,
+                                                           std::string_view module_name) {
+    std::vector<CompileImport> matches;
+    if (const auto* module_set = LookupProjectModuleSet(target, module_name); module_set != nullptr) {
+        const auto primary_source = std::find(module_set->files.begin(), module_set->files.end(), target.root) != module_set->files.end()
+            ? std::optional<std::filesystem::path>(target.root)
+            : std::optional<std::filesystem::path>(module_set->files.front());
+        const auto resolved = BuildResolvedModuleSource(module_set->module_name,
+                                                        ResolveTargetPackageIdentity(target, *primary_source),
+                                                        module_set->files,
+                                                        ast::SourceFile::ModuleKind::kOrdinary,
+                                                        primary_source);
+        matches.push_back({
+            .module_name = resolved.module_name,
+            .artifact_key = resolved.artifact_key,
+            .package_identity = resolved.package_identity.value_or(std::string {}),
+            .source_path = resolved.primary_source_path,
+            .source_paths = resolved.source_paths,
+            .module_kind = resolved.module_kind,
+        });
+    }
+
+    for (const auto& linked_graph : linked_targets) {
+        for (const auto& node : linked_graph.compile_graph.nodes) {
+            if (node.module_name != module_name) {
+                continue;
+            }
+            matches.push_back({
+                .module_name = node.module_name,
+                .artifact_key = node.artifact_key,
+                .package_identity = node.package_identity,
+                .source_path = node.source_path,
+                .source_paths = node.source_paths,
+                .module_kind = node.parse_result.source_file != nullptr ? node.parse_result.source_file->module_kind
+                                                                        : ast::SourceFile::ModuleKind::kOrdinary,
+            });
+        }
+        auto nested = LookupKnownProjectModuleSources(linked_graph.target, linked_graph.linked_targets, module_name);
+        matches.insert(matches.end(), nested.begin(), nested.end());
+    }
+    return matches;
+}
+
 mc::mci::InterfaceArtifact MakeModuleInterfaceArtifact(const std::filesystem::path& source_path,
+                                                       std::string_view module_name,
                                                        const ast::SourceFile& source_file,
                                                        const sema::Module& checked_module,
                                                        std::string target_identity) {
     return {
         .target_identity = std::move(target_identity),
         .package_identity = checked_module.package_identity,
-        .module_name = source_path.stem().string(),
+        .module_name = std::string(module_name),
         .module_kind = source_file.module_kind,
         .source_path = source_path,
         .module = sema::BuildImportVisibleModuleSurface(checked_module, source_file),
     };
 }
 
-bool WriteModuleInterface(const std::filesystem::path& source_path,
+bool WriteModuleInterface(std::string_view artifact_key,
                           const mc::mci::InterfaceArtifact& artifact,
                           const std::filesystem::path& build_dir,
                           support::DiagnosticSink& diagnostics) {
-    const auto dump_targets = support::ComputeDumpTargets(source_path, build_dir);
+    const auto dump_targets = support::ComputeLogicalDumpTargets(artifact_key, build_dir);
     return mc::mci::WriteInterfaceArtifact(dump_targets.mci, artifact, diagnostics);
 }
 
@@ -288,7 +660,7 @@ std::optional<ImportedInterfaceData> LoadImportedInterfaces(
     for (const auto& import : node.imports) {
         const auto& import_name = import.module_name;
         const auto& import_path = import.source_path;
-        const auto dump_targets = support::ComputeDumpTargets(import_path, build_dir);
+        const auto dump_targets = support::ComputeLogicalDumpTargets(import.artifact_key, build_dir);
         const auto artifact = mc::mci::LoadInterfaceArtifact(dump_targets.mci, diagnostics);
         if (!artifact.has_value()) {
             return std::nullopt;
@@ -297,7 +669,7 @@ std::optional<ImportedInterfaceData> LoadImportedInterfaces(
                                                         dump_targets.mci,
                                                         target_identity,
                                                         import.package_identity,
-                                                        import_path.stem().string(),
+                                                        import.module_name,
                                                         import.module_kind,
                                                         import_path,
                                                         diagnostics)) {
@@ -944,11 +1316,26 @@ std::filesystem::path ComputeModuleStatePath(const std::filesystem::path& source
     return build_dir / "state" / (support::SanitizeArtifactStem(source_path) + ".state.txt");
 }
 
+std::filesystem::path ComputeLogicalModuleStatePath(std::string_view artifact_key,
+                                                    const std::filesystem::path& build_dir) {
+    return build_dir / "state" / (support::SanitizeArtifactStem(std::filesystem::path(std::string(artifact_key))) + ".state.txt");
+}
+
 std::filesystem::path ComputeRuntimeObjectPath(const std::filesystem::path& entry_source_path,
                                                const std::filesystem::path& build_dir,
                                                std::string_view env,
                                                std::string_view startup) {
     const auto build_targets = support::ComputeBuildArtifactTargets(entry_source_path, build_dir);
+    const std::string runtime_object_name =
+        build_targets.object.stem().generic_string() + "." + std::string(env) + "." + std::string(startup) + ".runtime.o";
+    return build_targets.object.parent_path() / runtime_object_name;
+}
+
+std::filesystem::path ComputeLogicalRuntimeObjectPath(std::string_view artifact_key,
+                                                      const std::filesystem::path& build_dir,
+                                                      std::string_view env,
+                                                      std::string_view startup) {
+    const auto build_targets = support::ComputeLogicalBuildArtifactTargets(artifact_key, build_dir);
     const std::string runtime_object_name =
         build_targets.object.stem().generic_string() + "." + std::string(env) + "." + std::string(startup) + ".runtime.o";
     return build_targets.object.parent_path() / runtime_object_name;
@@ -1144,17 +1531,17 @@ bool SupportsBootstrapTarget(const ProjectTarget& target,
     return false;
 }
 
-bool DiscoverModuleGraphRecursive(const std::string& module_name,
-                                  const std::filesystem::path& source_path,
+bool DiscoverModuleGraphRecursive(const ResolvedModuleSource& module_source,
                                   const std::vector<std::filesystem::path>& import_roots,
                                   const std::function<std::optional<std::string>(const std::filesystem::path&)>& package_identity_for_source,
+                                  const std::function<std::vector<CompileImport>(std::string_view)>& known_module_sources,
                                   const std::unordered_set<std::string>& external_module_paths,
                                   support::DiagnosticSink& diagnostics,
                                   std::unordered_set<std::string>& visiting,
                                   std::unordered_set<std::string>& visited,
                                   std::vector<CompileNode>& nodes) {
-    const std::filesystem::path normalized_path = std::filesystem::absolute(source_path).lexically_normal();
-    const std::string path_key = normalized_path.generic_string();
+    const std::filesystem::path normalized_path = std::filesystem::absolute(module_source.primary_source_path).lexically_normal();
+    const std::string path_key = module_source.artifact_key;
     if (visited.contains(path_key)) {
         return true;
     }
@@ -1163,19 +1550,21 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
             .file_path = normalized_path,
             .span = support::kDefaultSourceSpan,
             .severity = support::DiagnosticSeverity::kError,
-            .message = "import cycle detected involving module: " + module_name,
+            .message = "import cycle detected involving module: " + module_source.module_name,
         });
         return false;
     }
 
-    auto parse_result = ParseSourcePath(normalized_path, diagnostics);
+    auto parse_result = ParseLogicalModuleSources(module_source.source_paths, diagnostics);
     if (!parse_result.has_value()) {
         visiting.erase(path_key);
         return false;
     }
 
-    const auto current_package_identity = package_identity_for_source ? package_identity_for_source(normalized_path) : std::nullopt;
-    if (IsInternalModulePath(normalized_path) && !current_package_identity.has_value()) {
+    const auto current_package_identity = module_source.package_identity.has_value()
+        ? module_source.package_identity
+        : (package_identity_for_source ? package_identity_for_source(normalized_path) : std::nullopt);
+    if (module_source.module_kind == ast::SourceFile::ModuleKind::kInternal && !current_package_identity.has_value()) {
         diagnostics.Report({
             .file_path = normalized_path,
             .span = support::kDefaultSourceSpan,
@@ -1187,9 +1576,11 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
     }
 
     CompileNode node {
-        .module_name = module_name,
+        .module_name = module_source.module_name,
+        .artifact_key = module_source.artifact_key,
         .package_identity = current_package_identity.value_or(std::string {}),
         .source_path = normalized_path,
+        .source_paths = module_source.source_paths,
         .parse_result = std::move(*parse_result),
     };
 
@@ -1199,6 +1590,7 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
                                                                    import_roots,
                                                                    current_package_identity,
                                                                    package_identity_for_source,
+                                                                   known_module_sources,
                                                                    diagnostics,
                                                                    import_decl.span);
         if (!import_path.has_value()) {
@@ -1207,19 +1599,20 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
         }
         node.imports.push_back({
             .module_name = import_decl.module_name,
+            .artifact_key = import_path->artifact_key,
             .package_identity = import_path->package_identity.value_or(std::string {}),
-            .source_path = import_path->path,
-            .module_kind = IsInternalModulePath(import_path->path) ? ast::SourceFile::ModuleKind::kInternal
-                                                                   : ast::SourceFile::ModuleKind::kOrdinary,
+            .source_path = import_path->primary_source_path,
+            .source_paths = import_path->source_paths,
+            .module_kind = import_path->module_kind,
         });
-        const std::string import_key = std::filesystem::absolute(import_path->path).lexically_normal().generic_string();
+        const std::string import_key = std::filesystem::absolute(import_path->primary_source_path).lexically_normal().generic_string();
         if (external_module_paths.contains(import_key)) {
             continue;
         }
-        if (!DiscoverModuleGraphRecursive(import_decl.module_name,
-                                          import_path->path,
+        if (!DiscoverModuleGraphRecursive(*import_path,
                                           import_roots,
                                           package_identity_for_source,
+                                          known_module_sources,
                                           external_module_paths,
                                           diagnostics,
                                           visiting,
@@ -1239,6 +1632,7 @@ bool DiscoverModuleGraphRecursive(const std::string& module_name,
 std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& entry_source_path,
                                                 const std::vector<std::filesystem::path>& import_roots,
                                                 const std::function<std::optional<std::string>(const std::filesystem::path&)>& package_identity_for_source,
+                                                const std::function<std::vector<CompileImport>(std::string_view)>& known_module_sources,
                                                 const std::unordered_set<std::string>& external_module_paths,
                                                 const std::filesystem::path& build_dir,
                                                 const mc::codegen_llvm::TargetConfig& target_config,
@@ -1249,8 +1643,37 @@ std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& ent
                                                 support::DiagnosticSink& diagnostics) {
     const std::filesystem::path normalized_entry =
         std::filesystem::absolute(entry_source_path).lexically_normal();
+    ResolvedModuleSource entry_module {
+        .module_name = normalized_entry.stem().string(),
+        .artifact_key = normalized_entry.generic_string(),
+        .primary_source_path = normalized_entry,
+        .source_paths = {normalized_entry},
+        .package_identity = package_identity_for_source ? package_identity_for_source(normalized_entry) : std::nullopt,
+        .module_kind = IsInternalModulePath(normalized_entry) ? ast::SourceFile::ModuleKind::kInternal
+                                                              : ast::SourceFile::ModuleKind::kOrdinary,
+    };
+    if (known_module_sources) {
+        const auto known_entry_matches = known_module_sources(normalized_entry.stem().string());
+        for (const auto& known_entry : known_entry_matches) {
+            const bool owns_entry = std::any_of(known_entry.source_paths.begin(), known_entry.source_paths.end(), [&](const auto& path) {
+                return std::filesystem::absolute(path).lexically_normal() == normalized_entry;
+            });
+            if (owns_entry) {
+                entry_module = {
+                    .module_name = known_entry.module_name,
+                    .artifact_key = known_entry.artifact_key,
+                    .primary_source_path = known_entry.source_path,
+                    .source_paths = known_entry.source_paths,
+                    .package_identity = known_entry.package_identity.empty() ? std::optional<std::string> {}
+                                                                            : std::optional<std::string> {known_entry.package_identity},
+                    .module_kind = known_entry.module_kind,
+                };
+                break;
+            }
+        }
+    }
     CompileGraph graph {
-        .entry_source_path = normalized_entry,
+        .entry_source_path = entry_module.primary_source_path,
         .import_roots = import_roots,
         .build_dir = build_dir,
         .mode = std::move(mode),
@@ -1261,10 +1684,10 @@ std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& ent
     };
     std::unordered_set<std::string> visiting;
     std::unordered_set<std::string> visited;
-    if (!DiscoverModuleGraphRecursive(normalized_entry.stem().string(),
-                                      normalized_entry,
+    if (!DiscoverModuleGraphRecursive(entry_module,
                                       import_roots,
                                       package_identity_for_source,
+                                      known_module_sources,
                                       external_module_paths,
                                       diagnostics,
                                       visiting,
@@ -1282,12 +1705,12 @@ void AssertCompileGraphTopologicalOrder(const CompileGraph& graph) {
     std::unordered_map<std::string, std::size_t> node_indices;
     node_indices.reserve(graph.nodes.size());
     for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
-        node_indices.emplace(graph.nodes[index].source_path.generic_string(), index);
+        node_indices.emplace(graph.nodes[index].artifact_key, index);
     }
 
     for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
         for (const auto& import : graph.nodes[index].imports) {
-            const std::string import_key = std::filesystem::absolute(import.source_path).lexically_normal().generic_string();
+            const std::string import_key = import.artifact_key;
             const auto found = node_indices.find(import_key);
             if (found == node_indices.end()) {
                 continue;
@@ -1383,6 +1806,9 @@ std::optional<TargetBuildGraph> BuildResolvedTargetGraph(const ProjectFile& proj
                                                  }
                                                  return ResolveExternalSourcePackageIdentity(path, import_roots);
                                              },
+                                             [&](std::string_view module_name) {
+                                                 return LookupKnownProjectModuleSources(target, linked_targets, module_name);
+                                             },
                                              external_module_paths,
                                              project.build_dir,
                                              ResolveProjectTargetConfig(project, target, diagnostics),
@@ -1474,7 +1900,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
             sema_options.current_package_identity = node.package_identity;
         }
 
-        const auto source_text = ReadSourceText(node.source_path, diagnostics);
+        const auto source_text = ReadLogicalModuleSourceText(node.source_paths, diagnostics);
         if (!source_text.has_value()) {
             return std::nullopt;
         }
@@ -1488,13 +1914,14 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         }
 
         mc::mci::InterfaceArtifact interface_artifact = MakeModuleInterfaceArtifact(node.source_path,
+                                                node.module_name,
                                                                                     *node.parse_result.source_file,
                                                                                     *sema_result.module,
                                                                                     graph.target_config.triple);
         const std::string interface_hash = mc::mci::ComputeInterfaceHash(interface_artifact);
-        const auto dump_targets = support::ComputeDumpTargets(node.source_path, graph.build_dir);
-        const auto build_targets = support::ComputeBuildArtifactTargets(node.source_path, graph.build_dir);
-        const auto state_path = ComputeModuleStatePath(node.source_path, graph.build_dir);
+        const auto dump_targets = support::ComputeLogicalDumpTargets(node.artifact_key, graph.build_dir);
+        const auto build_targets = support::ComputeLogicalBuildArtifactTargets(node.artifact_key, graph.build_dir);
+        const auto state_path = ComputeLogicalModuleStatePath(node.artifact_key, graph.build_dir);
 
         ModuleBuildState current_state {
             .target_identity = graph.target_config.triple,
@@ -1523,7 +1950,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
                                                             dump_targets.mci,
                                                             graph.target_config.triple,
                                                             node.package_identity,
-                                                            node.source_path.stem().string(),
+                                                            node.module_name,
                                                             node.parse_result.source_file->module_kind,
                                                             node.source_path,
                                                             diagnostics)) {
@@ -1532,7 +1959,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         }
         const bool interface_changed = !previous_interface.has_value() || previous_interface->interface_hash != interface_hash;
         if (interface_changed) {
-            if (!WriteModuleInterface(node.source_path, interface_artifact, graph.build_dir, diagnostics)) {
+            if (!WriteModuleInterface(node.artifact_key, interface_artifact, graph.build_dir, diagnostics)) {
                 return std::nullopt;
             }
             interface_written = true;
@@ -1547,7 +1974,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         }
         if (mir_result.ok &&
             (node.source_path != graph.entry_source_path || graph.namespace_entry_module)) {
-            NamespaceImportedBuildUnit(*mir_result.module, node.source_path.stem().string());
+            NamespaceImportedBuildUnit(*mir_result.module, node.module_name);
         }
         if (!mir_result.ok || !mc::mir::ValidateModule(*mir_result.module, node.source_path, diagnostics)) {
             return std::nullopt;
@@ -1577,18 +2004,20 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
             } else {
                 reused_object = true;
                 if (!interface_written && !std::filesystem::exists(dump_targets.mci)) {
-                    if (!WriteModuleInterface(node.source_path, interface_artifact, graph.build_dir, diagnostics)) {
+                    if (!WriteModuleInterface(node.artifact_key, interface_artifact, graph.build_dir, diagnostics)) {
                         return std::nullopt;
                     }
                 }
             }
         } else if (!interface_changed && !std::filesystem::exists(dump_targets.mci)) {
-            if (!WriteModuleInterface(node.source_path, interface_artifact, graph.build_dir, diagnostics)) {
+            if (!WriteModuleInterface(node.artifact_key, interface_artifact, graph.build_dir, diagnostics)) {
                 return std::nullopt;
             }
         }
 
         BuildUnit unit {
+            .module_name = node.module_name,
+            .artifact_key = node.artifact_key,
             .source_path = node.source_path,
             .parse_result = std::move(node.parse_result),
             .sema_result = std::move(sema_result),
@@ -1630,6 +2059,7 @@ std::optional<BuildUnit> CompileToMir(const CommandOptions& options,
             return ResolveDirectSourcePackageIdentity(path, import_roots);
         },
         {},
+        {},
         options.build_dir,
         bootstrap_config,
         "debug",
@@ -1656,6 +2086,8 @@ std::optional<BuildUnit> CompileToMir(const CommandOptions& options,
     }
 
     return BuildUnit {
+        .module_name = entry_unit.module_name,
+        .artifact_key = entry_unit.artifact_key,
         .source_path = entry_unit.source_path,
         .parse_result = std::move(entry_unit.parse_result),
         .sema_result = std::move(entry_unit.sema_result),
@@ -1701,7 +2133,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
     }
 
     const BuildUnit& entry_unit = units->back();
-    const auto build_targets = support::ComputeBuildArtifactTargets(entry_unit.source_path, graph.compile_graph.build_dir);
+    const auto build_targets = support::ComputeLogicalBuildArtifactTargets(entry_unit.artifact_key, graph.compile_graph.build_dir);
 
     if (IsStaticLibraryTargetKind(graph.target.kind)) {
         if (ShouldArchiveProjectStaticLibrary(build_targets.static_library, *units)) {
@@ -1732,10 +2164,10 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
         };
     }
 
-    const auto runtime_object_path = ComputeRuntimeObjectPath(entry_unit.source_path,
-                                                              graph.compile_graph.build_dir,
-                                                              graph.target.env,
-                                                              graph.target.runtime_startup);
+    const auto runtime_object_path = ComputeLogicalRuntimeObjectPath(entry_unit.artifact_key,
+                                                                     graph.compile_graph.build_dir,
+                                                                     graph.target.env,
+                                                                     graph.target.runtime_startup);
     const auto runtime_source_path = DiscoverRuntimeSupportSource(graph.target.env,
                                                                   graph.target.runtime_startup,
                                                                   entry_unit.source_path);

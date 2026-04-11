@@ -25,10 +25,10 @@ void ExpectPhase112BehaviorSlice(const std::filesystem::path& build_dir,
                           "phase112 freestanding kernel syscall-boundary audit run should preserve the landed phase112 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
-    if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_capability.mc.o")) {
+    if (!std::filesystem::exists(object_dir / "kernel__capability.o")) {
         Fail("phase112 syscall boundary audit should emit the capability module object");
     }
-    if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_endpoint.mc.o")) {
+    if (!std::filesystem::exists(object_dir / "kernel__endpoint.o")) {
         Fail("phase112 syscall boundary audit should emit the endpoint module object");
     }
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_address_space.mc.o")) {

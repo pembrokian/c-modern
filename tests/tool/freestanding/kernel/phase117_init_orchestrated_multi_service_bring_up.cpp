@@ -25,7 +25,7 @@ void ExpectPhase117BehaviorSlice(const std::filesystem::path& build_dir,
                           "phase117 freestanding kernel multi-service run should preserve the landed phase117 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
-    if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_bootstrap_services.mc.o")) {
+    if (!std::filesystem::exists(object_dir / "kernel__bootstrap_services.o")) {
         Fail("phase117 multi-service audit should emit the bootstrap_services module object");
     }
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_log_service.mc.o")) {

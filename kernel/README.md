@@ -70,24 +70,28 @@ Current files
   and rejection audit step, one bounded authority lifetime classification
   step, and thin root orchestration across the owned scheduler, lifecycle,
   bootstrap helper, and debug audit modules
-- `src/bootstrap_audit.mc`: extracted Phase 104 contract hardening helpers,
-  bounded service validation helpers, and Phase 108-126 audit builders used by
-  the root proof module
-- `src/bootstrap_services.mc`: extracted bounded log, echo, and transfer
-  service execution flows plus explicit service config and state packaging used
-  by the root proof module and the aggregate late-phase running-system audits
+- `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
+  `module_sets.bootstrap_audit`, owning the extracted Phase 104 contract
+  hardening helpers, bounded service validation helpers, and Phase 108-126
+  audit builders used by the root proof module
+- `src/bootstrap_services/`: one logical `bootstrap_services` module split
+  through `module_sets.bootstrap_services`, owning extracted bounded log,
+  echo, and transfer service execution flows plus explicit service config and
+  state packaging used by the root proof module and the aggregate late-phase
+  running-system audits
 - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn,
   wait, sleep, and wake follow-through
 - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for
   spawn, block, ready, exit, and waited-child release follow-through
-- `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109
-  running-slice audit, Phase 110 ownership-split audit, Phase 111
-  lifecycle-ownership audit, Phase 112 syscall-boundary audit, Phase 113
-  interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115
-  timer-ownership audit, Phase 116 MMU activation-barrier audit, Phase 117
-  init-orchestrated multi-service audit, Phase 118 delegated request-reply
-  audit, Phase 119 namespace-pressure audit, Phase 120 running-system
-  support audit, Phase 121 kernel image-contract hardening audit, Phase 122
+- `src/debug/`: one logical `debug` module split through `module_sets.debug`,
+  owning Phase 108 image/program-cap audit, Phase 109 running-slice audit,
+  Phase 110 ownership-split audit, Phase 111 lifecycle-ownership audit,
+  Phase 112 syscall-boundary audit, Phase 113 interrupt-boundary audit,
+  Phase 114 address-space/MMU audit, Phase 115 timer-ownership audit,
+  Phase 116 MMU activation-barrier audit, Phase 117 init-orchestrated
+  multi-service audit, Phase 118 delegated request-reply audit, Phase 119
+  namespace-pressure audit, Phase 120 running-system support audit, Phase 121
+  kernel image-contract hardening audit, Phase 122
   target-surface audit, Phase 123 next-plateau audit, Phase 124
   delegation-chain stress audit, Phase 125 invalidation and rejection audit,
   and Phase 126 authority lifetime classification audit
@@ -104,10 +108,12 @@ Current files
   barrier-backed publish helpers for the landed first-user and spawn path
 - `src/timer.mc`: bounded timer state, sleep records, wake observations, and
   interrupt-tick delivery helpers for the landed timer-backed wake path
-- `src/capability.mc`: bounded bootstrap capability slots, per-process
-  handle-table state, explicit wait-handle state, and explicit handle-move
-  helpers
-- `src/endpoint.mc`: bounded endpoint table, queued-message ring, and
+- `src/capability/`: one logical `capability` module split through
+  `module_sets.capability`, owning bounded bootstrap capability slots,
+  per-process handle-table state, explicit wait-handle state, and explicit
+  handle-move helpers
+- `src/endpoint/`: one logical `endpoint` module split through
+  `module_sets.endpoint`, owning bounded endpoint table, queued-message ring,
   attached-handle message state plus endpoint-owned runtime queue helpers for
   the landed syscall slice
 - `src/interrupt.mc`: bounded interrupt controller, architecture-entry

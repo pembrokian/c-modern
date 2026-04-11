@@ -13,5 +13,45 @@ target = "arm64-apple-darwin25.4.0"
 [targets.kernel.search_paths]
 modules = ["src", "../stdlib"]
 
+[targets.kernel.module_sets.capability]
+files = [
+	"src/capability/00_types.mc",
+	"src/capability/01_lookup.mc",
+	"src/capability/02_ops.mc",
+	"src/capability/03_validation.mc",
+]
+
+[targets.kernel.module_sets.endpoint]
+files = [
+	"src/endpoint/00_types.mc",
+	"src/endpoint/01_queue.mc",
+	"src/endpoint/02_runtime.mc",
+	"src/endpoint/03_validation.mc",
+]
+
+[targets.kernel.module_sets.debug]
+files = [
+	"src/debug/00_types.mc",
+	"src/debug/01_phase108_117.mc",
+	"src/debug/02_phase118_123.mc",
+	"src/debug/03_phase124_126.mc",
+]
+
+[targets.kernel.module_sets.bootstrap_audit]
+files = [
+	"src/bootstrap_audit/00_types.mc",
+	"src/bootstrap_audit/01_phase104_105.mc",
+	"src/bootstrap_audit/02_phase106_107.mc",
+	"src/bootstrap_audit/03_builders.mc",
+]
+
+[targets.kernel.module_sets.bootstrap_services]
+files = [
+	"src/bootstrap_services/00_types.mc",
+	"src/bootstrap_services/01_log.mc",
+	"src/bootstrap_services/02_echo.mc",
+	"src/bootstrap_services/03_transfer.mc",
+]
+
 [targets.kernel.runtime]
 startup = "bootstrap_main"

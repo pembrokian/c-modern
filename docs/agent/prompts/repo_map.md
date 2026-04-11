@@ -33,7 +33,7 @@ This file is a fast orientation map for agents working in this repository.
   - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed first-user-entry, endpoint core, syscall IPC, interrupt classification, timer-owned tick delivery, MMU-owned translation-root construction, bounded init-owned multi-service orchestration, one bounded delegated request-reply follow-through, one bounded fixed service-directory publication step, one bounded image-contract hardening step, one bounded target-surface audit, one bounded next-plateau audit, one bounded delegation-chain stress step, one bounded invalidation and rejection audit step, and thin root orchestration across the owned scheduler, lifecycle, bootstrap helper, and debug audit modules
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
   - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for spawn, timer block, wake-to-ready, exit, and waited-child release follow-through
-  - `src/debug.mc`: debug-owned Phase 108 image/program-cap audit, Phase 109 first-running-kernel-slice audit, Phase 110 ownership-split audit, Phase 111 lifecycle-ownership audit, Phase 112 syscall-boundary audit, Phase 113 interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115 timer-ownership audit, Phase 116 MMU activation-barrier audit, Phase 117 init-orchestrated multi-service audit, Phase 118 delegated request-reply audit, Phase 119 namespace-pressure audit, Phase 120 running-system support audit, Phase 121 kernel image-contract hardening audit, Phase 122 target-surface audit, Phase 123 next-plateau audit, Phase 124 delegation-chain stress audit, and Phase 125 invalidation and rejection audit
+  - `src/debug/`: one logical `debug` module split through `module_sets.debug`, owning Phase 108 image/program-cap audit, Phase 109 first-running-kernel-slice audit, Phase 110 ownership-split audit, Phase 111 lifecycle-ownership audit, Phase 112 syscall-boundary audit, Phase 113 interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115 timer-ownership audit, Phase 116 MMU activation-barrier audit, Phase 117 init-orchestrated multi-service audit, Phase 118 delegated request-reply audit, Phase 119 namespace-pressure audit, Phase 120 running-system support audit, Phase 121 kernel image-contract hardening audit, Phase 122 target-surface audit, Phase 123 next-plateau audit, Phase 124 delegation-chain stress audit, and Phase 125 invalidation and rejection audit
   - `src/log_service.mc`: bounded log-service protocol state, acknowledgment payload, and handshake observation records
   - `src/echo_service.mc`: bounded echo-service protocol state, request-derived reply payload, and exchange observation records
   - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
@@ -41,8 +41,8 @@ This file is a fast orientation map for agents working in this repository.
   - `src/address_space.mc`: bounded address-space, mapping, user-entry-frame, and child-bootstrap construction records with translation-root ownership delegated to `mmu`
   - `src/mmu.mc`: bounded translation-root construction, activation, and barrier-backed publish records for the landed first-user and spawn path
   - `src/timer.mc`: bounded timer state, sleep records, wake observations, and interrupt-tick delivery helpers for the landed timer-backed wake path
-  - `src/capability.mc`: bounded bootstrap capability slots, per-process handle-table records, explicit wait-handle records, and handle-move helpers
-  - `src/endpoint.mc`: bounded endpoint-table, queued-message, attached-handle message, and runtime queue helper records
+  - `src/capability/`: one logical `capability` module split through `module_sets.capability`, owning bounded bootstrap capability slots, per-process handle-table records, explicit wait-handle records, and handle-move helpers
+  - `src/endpoint/`: one logical `endpoint` module split through `module_sets.endpoint`, owning bounded endpoint-table, queued-message, attached-handle message, and runtime queue helper records
   - `src/syscall.mc`: bounded syscall gate, byte-plus-capability send-and-receive request, bounded spawn-and-wait request, and thin observation records over the landed owner modules
   - `src/interrupt.mc`: bounded interrupt controller, architecture-entry records, and generic dispatch classification for the landed timer-backed wake path
   - `src/init.mc`: bounded boot-bundled init image descriptor plus explicit init bootstrap-capability handoff records
@@ -50,6 +50,7 @@ This file is a fast orientation map for agents working in this repository.
 - `compiler/driver`
   - CLI entrypoint and pipeline orchestration
   - `driver.cpp` is where `mc check` options are parsed and parse -> sema -> MIR -> optional backend dump wiring lives
+  - project mode now admits explicit `module_sets.<module>.files = [...]` source sets for ordinary modules; the driver and builder own logical-module graph discovery, artifact naming, and incremental reuse for that slice
 
 - `compiler/ast`
   - AST node definitions and AST dump support
@@ -140,6 +141,7 @@ This file is a fast orientation map for agents working in this repository.
 - The repo is beyond parser-only bring-up.
 - Bootstrap sema is real and runs before MIR.
 - MIR lowering consumes the semantic module instead of rebuilding semantic facts ad hoc.
+- Direct-source workflows remain single-file, but project mode now supports explicit multi-file ordinary modules through target-owned `module_sets`.
 - Configured import roots are supported through the sema API and `mc check --import-root`.
 - Struct layout dumps now include deterministic size, alignment, and field offsets.
 - Full Phase 3 from `docs/plan/plan.txt` is still not complete.

@@ -1,0 +1,553 @@
+Modern C - Build System Notes
+
+Purpose
+
+This document freezes the initial v0.2 build model for Modern C.
+It is intentionally narrow: the goal is to define the canonical build surface for first implementation, not to solve every future workspace or package-management problem.
+Its purpose is to define a build model that matches the language philosophy:
+- simple
+- explicit
+- inspectable
+- fast in ordinary use
+- separate from hidden runtime or package-management machinery
+
+Core position
+
+Modern C should have a canonical build tool, but that tool should remain narrow.
+It should solve:
+- compilation
+- dependency ordering
+- linking
+- build modes
+- target selection
+- standard-library and runtime selection
+
+It should not try to solve everything at once.
+In particular, v0.2 should avoid turning the build tool into:
+- a package registry client
+- a hidden code generator framework
+- a second module system
+- a general-purpose scripting language
+- a giant IDE platform encoded in the command line
+
+1. Design Bias
+
+The build system should feel closer to `go build` or a sharp `make` replacement than to a programmable meta-build framework.
+
+If forced to choose, prefer:
+- convention over large amounts of configuration
+- explicit dependency edges over clever discovery
+- ordinary object files and libraries over opaque caches only the tool understands
+- a small build file over an embedded programming language
+- build speed and clarity over maximal flexibility
+
+2. Basic Model
+
+The language already assumes:
+- direct-source workflows use one source file per module in v0.2
+- project mode may assemble one ordinary logical module from an explicit
+	`module_sets.<name>.files = [...]` source list
+- imports are explicit and acyclic
+- top-level initialization is static and requires no hidden initialization hooks
+- there are no hidden init hooks
+
+The build tool should lean on those facts.
+
+Basic model:
+- a build target is a named artifact such as an executable, static library, shared library, or test binary
+- each target has an explicit root module or explicit set of source roots
+- a target may additionally declare explicit logical ordinary-module source
+	sets through `module_sets.<module>.files = [...]`
+- imports determine compilation order inside a target
+- the build tool tracks logical-module dependencies and rebuilds only what changed
+- linking is an ordinary final phase, not a hidden side effect of compilation
+
+3. Canonical Command Shape
+
+The canonical tool exposes a small command surface.
+
+Canonical shape:
+
+```text
+mc build
+mc run
+mc test
+mc check
+mc fmt
+mc clean
+```
+
+Meaning:
+- `mc build`: compile and link the requested target
+- `mc run`: build and execute an executable target
+- `mc test`: build and run tests
+- `mc check`: parse, resolve, and type-check without full code generation when possible
+- `mc fmt`: optional formatting tool entry if formatting becomes standardized
+- `mc clean`: remove build outputs and caches
+
+This is enough for ordinary use.
+More specialized behavior can remain flags or separate subcommands.
+
+4. Build File Philosophy
+
+The build file should be declarative and small.
+
+Recommendation:
+- use one project file at the repository root for ordinary projects
+- keep the syntax data-oriented rather than imperative
+- avoid embedding a general scripting language in the build file
+
+Canonical choice for v0.2:
+- use `build.toml` at the repository root
+
+Why TOML is a reasonable fit:
+- readable without executing code
+- familiar enough without dragging in a programming language
+- good at small nested configuration
+- easy to parse in multiple implementation languages
+
+Rule:
+- the build description should be readable without executing arbitrary user code
+
+Build schema decision for v0.2:
+- the canonical project file is `build.toml`
+- the first standardized schema is `build.toml` schema version 1
+- schema version 1 freezes the top-level field names and table nesting used below unless a later spec revision changes them explicitly
+
+5. What The Build File Should Describe
+
+The first version only needs to describe a small set of things.
+
+Per project:
+- project name
+- default target
+- optional target directory or output directory
+
+Per target:
+- target kind: `exe`, `staticlib`, `sharedlib`, `test`
+- root module or source file list
+- optional logical-module source sets for ordinary modules in project mode
+- import roots if more than one source root is allowed
+- explicit package identity for the target-owned source roots
+- optional additional package identities and the roots assigned to them
+- build mode: `debug`, `release`, `checked`
+- target triple or platform profile
+- hosted or freestanding mode
+- extra libraries to link
+- startup selection if the default hosted shim is replaced
+
+Optional but useful:
+- defines or feature toggles if the language later grows any narrow conditional-compilation surface
+- include paths for generated bindings if C interop tooling emits source files
+
+Concrete first-pass `build.toml` shape:
+
+```toml
+schema = 1
+project = "grep-lite"
+default = "grep"
+build_dir = "build"
+
+[targets.grep]
+kind = "exe"
+package = "grep"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+target = "x86_64-macos"
+links = ["c"]
+
+[targets.grep.search_paths]
+modules = ["src", "vendor"]
+
+[targets.grep.module_sets.main]
+files = ["src/main.mc", "src/main_logic.mc"]
+
+[targets.grep.module_sets.argparse]
+files = ["vendor/argparse/api.mc", "vendor/argparse/parse.mc"]
+
+[targets.grep.packages.vendor_argparse]
+roots = ["vendor/argparse"]
+
+[targets.grep.runtime]
+startup = "default"
+
+[targets.grep.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000
+```
+
+Suggested meanings:
+- `schema`: build-file schema version
+- `project`: project display or artifact namespace
+- `default`: target selected when the user runs `mc build` with no explicit target
+- `build_dir`: visible output directory
+- `kind`: one of `exe`, `staticlib`, `sharedlib`, `test`
+- `package`: explicit package identity for the root module and for any
+	configured source root not claimed by another package entry
+- `root`: root module for the target
+- `mode`: default build mode for that target
+- `env`: `hosted` or `freestanding`
+- `target`: target triple or canonical target name
+- `links`: in-project static-library target dependencies
+- `link.inputs`: explicit extra prebuilt object or archive inputs for
+	executable targets
+- `search_paths.modules`: explicit source or vendored module roots
+- `module_sets.<module>.files`: explicit file list for one logical ordinary
+	module in project mode; the table key is the canonical import name
+- `packages.<name>.roots`: explicit source roots that belong to package
+	identity `<name>` instead of the target's default `package`
+- `runtime.startup`: `default` or a named replacement shim
+- `tests.enabled`: whether the build tool should discover and build test targets associated with this target
+- `tests.roots`: directories searched for test files
+- `tests.mode`: build mode used for the generated test executable
+- `tests.timeout_ms`: per-test-executable timeout unless overridden by the command line
+
+Syntax rule:
+- the build file should stay declarative even if the exact field names change later
+
+Schema version 1 rule:
+- these field names and nesting rules are the canonical v0.2 starting point, not just illustrative pseudocode
+
+Schema version 1 additive Phase 127 rule:
+- `module_sets.<module>.files` is admitted only in project mode
+- each listed file belongs to exactly one module source set
+- file-list order carries no semantic meaning; paths are normalized and
+	processed deterministically
+- if the entry module's source set is declared, it must contain the target
+	`root` file
+- explicit module sets in Phase 127 are ordinary-module only; multi-file
+	`internal` modules remain deferred
+
+Package identity rules for schema version 1:
+- every target must declare one explicit default `package` identity
+- each configured source root belongs to exactly one package identity after
+	applying the target default plus any `packages.<name>.roots` overrides
+- one package identity may own more than one root
+- package identities are compared by exact spelling and are owned by the build
+	description rather than by raw directory adjacency
+- `internal.mc` import legality is defined from this package mapping, not from
+	textual path proximity alone
+
+6. What The Build File Should Not Describe Yet
+
+Avoid early complexity.
+
+v0.2 should avoid putting these into the core build spec:
+- arbitrary scripting hooks
+- custom per-file command pipelines
+- a full dependency solver
+- workspace-wide package version negotiation
+- remote fetch semantics
+- deeply programmable rule generation
+
+If those ever exist, they should be layered outside the core build model.
+
+7. Imports and Separate Compilation
+
+Because the module system is explicit and acyclic, the build tool can stay simple.
+
+Canonical behavior:
+- each logical module compiles independently to an object file plus a small
+	interface artifact
+- the interface artifact records the non-private import-visible surface and
+	enough type information for downstream checking
+- importing a module should not require reparsing the entire upstream source tree every time
+- if an interface changes, dependent modules rebuild
+- if only implementation details or `@private` declarations change,
+	unaffected dependents do not
+
+This gives a simple and fast separate-compilation story without requiring a giant build graph language.
+
+8. Interface Artifacts
+
+The compiler should likely emit a small machine-readable interface file per compiled module.
+
+Canonical artifact model:
+- each compiled logical module emits one object file and one interface artifact
+- the interface artifact is for compiler consumption, not for hand authoring
+- the canonical extension is `.mci` for "Modern C Interface"
+- v0.2 uses a deterministic text encoding for `.mci`
+
+Suggested contents:
+- compiler format version
+- target triple or target ABI profile
+- package identity
+- source module name
+- module kind: ordinary or `internal`
+- source file path or stable module identity
+- when a project-mode multi-file module set is used, one canonical source file
+	path plus the stable logical module identity
+- import-visible non-private declarations
+- fully resolved type signatures for import-visible non-private declarations
+- distinct-type identities needed by legal importers
+- layout-relevant facts for import-visible structs, enums, and ABI-visible
+	types
+- calling convention or ABI information for import-visible procedures
+- imported module list
+- content hash or interface hash
+- optional diagnostic map or source span references if needed for better downstream errors
+
+These artifacts should be:
+- deterministic
+- cheap to read
+- versioned by compiler format
+- internal enough that the compiler can evolve them without turning them into a user programming surface
+
+Encoding decision:
+- v0.2 `.mci` files should use a canonical text encoding rather than a binary format
+- field order should be deterministic
+- import-visible declarations should be serialized in a stable normalized form
+- future toolchains may add a cached binary sidecar internally, but the canonical interchange artifact remains text unless the spec changes
+
+Important rebuild rule:
+- dependents should rebuild when the interface hash changes, not merely when the source timestamp changes
+
+Important non-goal:
+- the interface artifact should not become a second source language or a user-maintained header format
+
+This is one area where a Plan 9 style influence still makes sense: keep compilation units explicit and keep dependency checking cheap.
+
+Illustrative `.mci` shape:
+
+```text
+format = 2
+target = x86_64-macos
+package = std_strings
+module = strings
+module_kind = ordinary
+source = std/strings/main.mc
+imports = [utf8]
+interface_hash = 8f1c...
+
+decl func split_once(input: str, sep: str) (str, str, bool)
+decl func trim_space(input: str) str
+decl type Builder = opaque
+```
+
+The actual binary or text encoding can be decided later.
+The important point is the compiler contract first and the stable text encoding second.
+
+9. Output Structure
+
+The build tool should emit ordinary outputs into a visible build directory.
+
+Canonical shape:
+
+```text
+build/
+	debug/
+	release/
+	checked/
+```
+
+Within each mode:
+- object files
+- interface artifacts
+- final binaries or libraries
+- optional LLVM IR or MIR dumps when explicitly requested
+
+The build cache should not be magical.
+Users should be able to inspect or delete it without damaging the project.
+
+10. Build Modes
+
+The build system should standardize a small number of modes.
+
+Recommended initial modes:
+- `debug`
+	- fast compile
+	- minimal optimization
+	- full debug info
+
+- `release`
+	- optimized build for deployment
+	- reduced debug overhead as configured
+
+- `checked`
+	- like debug, but with extra runtime checks and validation where the language and compiler support them
+
+These mode names should mean something stable across projects.
+They should not be a free-for-all pile of ad hoc flag bundles.
+
+11. Hosted and Freestanding Builds
+
+The build system should make the runtime boundary explicit.
+
+Hosted builds:
+- use the normal startup shim by default
+- link the standard hosted support layers
+- expose ordinary executable targets easily
+- assume the canonical hosted entry convention unless the target overrides startup behavior
+
+Freestanding builds:
+- do not assume process startup, OS services, file I/O, or a default allocator
+- allow selecting or replacing entry code explicitly
+- should require explicit target identity in the manifest
+- allow omitting hosted runtime pieces entirely
+
+This split should be a first-class build setting, not a bag of undocumented flags.
+
+12. Standard Library and Runtime Selection
+
+The build tool should know how to assemble the standard layers without hiding them conceptually.
+
+Recommendation:
+- standard-library selection should be mostly conventional
+- runtime startup selection should be explicit when deviating from the default
+- target-owned extra object or archive inputs should be linked through explicit
+	manifest settings
+- broader linker scripts or arbitrary linker flags should stay deferred until a
+	real target proof requires them
+
+The user should be able to say, in effect:
+- build a hosted executable with the standard runtime shim
+- build a freestanding binary with no hosted startup
+- build a library with no entrypoint expectations
+
+Hosted executable convention:
+- the default hosted executable target expects `func main(args: Slice<cstr>) i32`
+- `args` is a borrowed slice of read-only null-terminated argument strings established by the startup shim
+- the startup shim must form this slice without changing the argument bytes and without requiring heap allocation
+- environment access is not part of `main` and should instead come from the standard library or platform library
+
+13. Linking Model
+
+Linking should remain ordinary.
+
+Recommendations:
+- emit normal object files and libraries
+- allow using the system linker where practical
+- avoid creating a sealed proprietary artifact pipeline
+- make external C libraries and system libraries explicit in the build description
+
+This keeps the toolchain compatible with the surrounding systems environment.
+
+14. Tests
+
+Testing should fit naturally into the same model.
+
+Accepted v0.2 direction:
+- `mc test` discovers test files under the configured `tests.roots`
+- test source files end in `_test.mc`
+- runnable test functions are named `test_*` and use the signature `func() Error`
+- `mc test` generates one test runner executable per enabled build target
+- the generated runner executes tests serially in deterministic lexical order
+- `mc test` uses `checked` mode by default unless the target or command line overrides it
+- unit tests and integration tests remain ordinary Modern C code, not a separate DSL
+
+Runner rules:
+- returning `nil` means pass
+- returning non-`nil` `Error` means fail
+- trap, crash, or timeout means fail
+- one crashing test executable fails that target's test run
+
+Discovery should stay small and explicit rather than turning into a framework policy engine.
+
+15. Relationship To Make
+
+Modern C should not require `make`, but it should interoperate with it cleanly.
+
+Good rule:
+- the canonical build tool should be enough for ordinary projects
+- projects that want `make`, Ninja, Bazel, or another external build system should still be able to drive the compiler and linker with normal artifacts
+
+That means the compiler and build tool should not trap users inside a closed world.
+
+16. Dependencies and Vendoring
+
+The canonical build tool should support local dependencies, but v0.2 should stop short of remote dependency fetching.
+
+Recommended scope for v0.2:
+- support explicit local source roots
+- support vendored dependencies inside the repository
+- support linking prebuilt system or third-party libraries explicitly
+- do not require or standardize a registry client
+- do not require network access to build a project
+
+Suggested default convention:
+- vendored source dependencies live under `vendor/`
+- the build file names the module search roots explicitly
+- external binary libraries remain explicit link inputs rather than magical package references
+
+Why this is the right cut:
+- it keeps builds reproducible and inspectable
+- it avoids entangling the language with registry politics early
+- it matches the "no hidden behavior" bias
+- it still gives projects a practical way to carry dependencies
+
+Non-goal for v0.2:
+- `mc build` should not fetch code from the network
+
+Possible future layering:
+- a separate tool may later manage fetching, pinning, and vendoring dependencies
+- that tool can write into `vendor/` or update `build.toml`
+- the core build tool can remain focused on building what is already present locally
+
+17. What A Good Project Might Look Like
+
+Possible repository shape:
+
+```text
+project/
+	build.toml
+	src/
+		main.mc
+		util.mc
+		parse.mc
+	tests/
+		parse_test.mc
+	vendor/
+		argparse/
+			main.mc
+	build/
+```
+
+Possible build description shape:
+
+```toml
+schema = 1
+project = "grep-lite"
+default = "grep"
+build_dir = "build"
+
+[targets.grep]
+kind = "exe"
+package = "grep"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+target = "x86_64-macos"
+links = ["c"]
+
+[targets.grep.search_paths]
+modules = ["src", "vendor"]
+
+[targets.grep.packages.vendor_argparse]
+roots = ["vendor/argparse"]
+
+[targets.grep.runtime]
+startup = "default"
+```
+
+The exact syntax is not important yet.
+The important part is the level of complexity: small, declarative, and obvious.
+
+18. Bottom-Line Recommendation
+
+The build or make system for Modern C should be:
+- canonical, but narrow
+- declarative, not programmable-by-default
+- explicit about targets, runtime mode, and linking
+- compatible with separate compilation and interface artifacts
+- local-first about dependencies and vendoring
+- inspectable through ordinary object files and build directories
+- usable without becoming a package manager or meta-build language
+
+In short:
+- closer to a sharp, modernized `make` for this language ecosystem
+- farther from a general build-programming environment
+
+That is the build story most consistent with the rest of the design.

@@ -25,7 +25,7 @@ void ExpectPhase110BehaviorSlice(const std::filesystem::path& build_dir,
                           "phase110 freestanding kernel ownership-split audit run should preserve the landed phase110 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
-    if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_debug.mc.o")) {
+    if (!std::filesystem::exists(object_dir / "kernel__debug.o")) {
         Fail("phase110 ownership split should emit a distinct debug module object");
     }
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_sched.mc.o")) {
@@ -53,12 +53,12 @@ void ExpectPhase110PublicationSlice(const std::filesystem::path& phase_doc_path,
                          "src/sched.mc",
                          "phase110 kernel README should list the scheduler-owned module");
     ExpectOutputContains(kernel_readme,
-                         "src/debug.mc",
+                         "src/debug/",
                          "phase110 kernel README should list the debug-owned module");
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "src/debug.mc",
+                         "src/debug/",
                          "phase110 repository map should list the debug owner");
     ExpectOutputContains(repo_map,
                          "src/sched.mc",

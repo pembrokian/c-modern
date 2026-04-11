@@ -379,13 +379,13 @@ Register By Concern
 4. Module, Package, Build, And Test Model
 -----------------------------------------
 
-- Slice: one source file equals one module
+- Slice: direct-source single-file modules plus project-mode explicit multi-file ordinary modules
   design: settled
-  plan phase: 3 and 7 boundary
+  plan phase: 3, 7, and 127 boundary
   repo status: landed
-  repo wave: Phase 3 and Phase 7
+  repo wave: Phase 3, Phase 7, and Phase 127
   docs: docs/arch/language/language_spec.txt, docs/arch/language/semantics/modules_spec.txt
-  end state: single-file module unit for import, export, compilation, and .mci emission in v0.2.
+  end state: direct source stays one file per module; project mode may map one ordinary logical module to an explicit file set while preserving one import identity, one .mci, one object, and one build-state record per logical module.
 
 - Slice: package model as build-time grouping only
   design: settled
