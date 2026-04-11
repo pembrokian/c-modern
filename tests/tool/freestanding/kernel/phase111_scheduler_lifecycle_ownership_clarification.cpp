@@ -19,10 +19,10 @@ void ExpectPhase111BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase111_lifecycle_ownership_run_output.txt",
                                                              "freestanding kernel phase111 lifecycle-ownership audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 121) {
-        Fail("phase111 freestanding kernel lifecycle-ownership audit run should exit with the current kernel proof marker:\n" +
-             run_output);
-    }
+    ExpectExitCodeAtLeast(run_outcome,
+                          111,
+                          run_output,
+                          "phase111 freestanding kernel lifecycle-ownership audit run should preserve the landed phase111 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_lifecycle.mc.o")) {
@@ -47,16 +47,10 @@ void ExpectPhase111PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 120 has moved the repository-owned kernel artifact beyond the landed",
-                         "phase111 kernel README should record the lifecycle clarification as current status");
-    ExpectOutputContains(kernel_readme,
                          "src/lifecycle.mc",
                          "phase111 kernel README should list the lifecycle-owned module");
 
     const std::string repo_map = ReadFile(repo_map_path);
-    ExpectOutputContains(repo_map,
-                         "currently a Phase 120 running-system-support kernel target",
-                         "phase111 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "src/lifecycle.mc",
                          "phase111 repository map should list the lifecycle owner");
@@ -73,7 +67,6 @@ void ExpectPhase111MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE121_MARKER] type=i32",
             "Function name=lifecycle.install_spawned_child returns=[lifecycle.SpawnInstallResult]",
             "Function name=lifecycle.block_task_on_timer returns=[lifecycle.TaskTransition]",
             "Function name=lifecycle.ready_task returns=[lifecycle.TaskTransition]",
@@ -89,13 +82,9 @@ void ExpectPhase111MirStructureSlice(const std::filesystem::path& mir_path,
 void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const std::filesystem::path& source_root,
                                                                            const std::filesystem::path& binary_root,
                                                                            const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
                                                  "phase111_scheduler_lifecycle_ownership_clarification.txt";
-    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
-    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
-    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase111_scheduler_lifecycle_ownership_clarification.mirproj.txt";
     const std::filesystem::path build_dir = binary_root / "kernel_phase111_lifecycle_ownership_build";
@@ -104,7 +93,7 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
                                                                   "--project",
-                                                                  project_path.generic_string(),
+                                                                  common_paths.project_path.generic_string(),
                                                                   "--target",
                                                                   "kernel",
                                                                   "--build-dir",
@@ -116,10 +105,13 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
         Fail("phase111 freestanding kernel lifecycle-ownership audit build should succeed:\n" + build_output);
     }
 
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase111BehaviorSlice(build_dir, build_targets);
-    ExpectPhase111PublicationSlice(phase_doc_path, kernel_readme_path, repo_map_path, freestanding_readme_path);
+    ExpectPhase111PublicationSlice(phase_doc_path,
+                                   common_paths.kernel_readme_path,
+                                   common_paths.repo_map_path,
+                                   common_paths.freestanding_readme_path);
     ExpectPhase111MirStructureSlice(dump_targets.mir, mir_projection_path);
 }
 

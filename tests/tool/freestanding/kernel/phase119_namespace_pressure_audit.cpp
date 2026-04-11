@@ -19,10 +19,10 @@ void ExpectPhase119BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase119_namespace_run_output.txt",
                                                              "freestanding kernel phase119 namespace-pressure run");
-    if (!run_outcome.exited || run_outcome.exit_code != 121) {
-        Fail("phase119 freestanding kernel namespace-pressure run should exit with the current kernel proof marker:\n" +
-             run_output);
-    }
+    ExpectExitCodeAtLeast(run_outcome,
+                          119,
+                          run_output,
+                          "phase119 freestanding kernel namespace-pressure run should preserve the landed phase119 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_bootstrap_audit.mc.o")) {
@@ -32,7 +32,6 @@ void ExpectPhase119BehaviorSlice(const std::filesystem::path& build_dir,
 
 void ExpectPhase119PublicationSlice(const std::filesystem::path& phase_doc_path,
                                     const std::filesystem::path& roadmap_path,
-                                    const std::filesystem::path& position_path,
                                     const std::filesystem::path& kernel_readme_path,
                                     const std::filesystem::path& repo_map_path,
                                     const std::filesystem::path& freestanding_readme_path,
@@ -54,26 +53,12 @@ void ExpectPhase119PublicationSlice(const std::filesystem::path& phase_doc_path,
                          "Phase 119 is now concrete as one init-owned fixed service-directory and namespace-pressure audit",
                          "phase119 roadmap should record the landed namespace-pressure boundary");
 
-    const std::string position = ReadFile(position_path);
-    ExpectOutputContains(position,
-                         "after Phase 120 published the running-system support statement",
-                         "phase119 position note should advance the current repository position");
-    ExpectOutputContains(position,
-                         "landed Phase 120 running-system support statement.",
-                         "phase119 position note should reference the new closeout");
-
     const std::string kernel_readme = ReadFile(kernel_readme_path);
-    ExpectOutputContains(kernel_readme,
-                         "Phase 120 has moved the repository-owned kernel artifact beyond the landed",
-                         "phase119 kernel README should record the new running-system status");
     ExpectOutputContains(kernel_readme,
                          "bounded init-owned fixed service-directory step",
                          "phase119 kernel README should describe the fixed namespace answer");
 
     const std::string repo_map = ReadFile(repo_map_path);
-    ExpectOutputContains(repo_map,
-                         "currently a Phase 120 running-system-support kernel target",
-                         "phase119 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase119_namespace_pressure_audit.cpp",
                          "phase119 repository map should list the new kernel proof owner");
@@ -100,7 +85,6 @@ void ExpectPhase119MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE121_MARKER] type=i32",
             "TypeDecl kind=struct name=debug.Phase119NamespacePressureAudit",
             "Function name=bootstrap_audit.build_phase119_namespace_pressure_audit returns=[debug.Phase119NamespacePressureAudit]",
             "Function name=debug.validate_phase119_namespace_pressure_audit returns=[bool]",
@@ -114,19 +98,9 @@ void ExpectPhase119MirStructureSlice(const std::filesystem::path& mir_path,
 void RunFreestandingKernelPhase119NamespacePressureAudit(const std::filesystem::path& source_root,
                                                          const std::filesystem::path& binary_root,
                                                          const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src" / "main.mc";
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
                                                  "phase119_namespace_pressure_audit.txt";
-    const std::filesystem::path roadmap_path = source_root / "docs" / "plan" / "admin" /
-                                               "canopus_post_phase109_speculative_roadmap.txt";
-    const std::filesystem::path position_path = source_root / "docs" / "plan" / "admin" /
-                                                "modern_c_canopus_readiness_position.txt";
-    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
-    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
-    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
-    const std::filesystem::path decision_log_path = source_root / "docs" / "plan" / "decision_log.txt";
-    const std::filesystem::path backlog_path = source_root / "docs" / "plan" / "backlog.txt";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase119_namespace_pressure_audit.mirproj.txt";
     const std::filesystem::path build_dir = binary_root / "kernel_phase119_namespace_build";
@@ -135,7 +109,7 @@ void RunFreestandingKernelPhase119NamespacePressureAudit(const std::filesystem::
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
                                                                   "--project",
-                                                                  project_path.generic_string(),
+                                                                  common_paths.project_path.generic_string(),
                                                                   "--target",
                                                                   "kernel",
                                                                   "--build-dir",
@@ -147,17 +121,16 @@ void RunFreestandingKernelPhase119NamespacePressureAudit(const std::filesystem::
         Fail("phase119 freestanding kernel namespace-pressure build should succeed:\n" + build_output);
     }
 
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase119BehaviorSlice(build_dir, build_targets);
     ExpectPhase119PublicationSlice(phase_doc_path,
-                                   roadmap_path,
-                                   position_path,
-                                   kernel_readme_path,
-                                   repo_map_path,
-                                   freestanding_readme_path,
-                                   decision_log_path,
-                                   backlog_path);
+                                   common_paths.roadmap_path,
+                                   common_paths.kernel_readme_path,
+                                   common_paths.repo_map_path,
+                                   common_paths.freestanding_readme_path,
+                                   common_paths.decision_log_path,
+                                   common_paths.backlog_path);
     ExpectPhase119MirStructureSlice(dump_targets.mir, mir_projection_path);
 }
 

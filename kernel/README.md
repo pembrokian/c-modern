@@ -6,6 +6,8 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 122 has moved the repository-owned kernel artifact beyond the landed
+  Phase 121 kernel image-contract hardening step into one bounded target-surface audit.
 - Phase 121 has moved the repository-owned kernel artifact beyond the landed
   Phase 120 running-system support statement into one bounded kernel image-contract hardening step.
 - Phase 120 has moved the repository-owned kernel artifact beyond the landed
@@ -36,7 +38,7 @@ Current status
   MMU ownership split, one bounded timer ownership hardening step, one bounded
   MMU activation barrier follow-through step, one bounded init-orchestrated multi-service
   bring-up step, one bounded delegated request-reply follow-through step, and
-  one bounded init-owned fixed service-directory step.
+  one bounded init-owned fixed service-directory step, and one bounded target-surface audit.
 
 The landed slice still includes one bounded init-orchestrated multi-service bring-up step.
 
@@ -53,7 +55,7 @@ Current files
   service-directory publication step, and thin root orchestration across the
   owned scheduler, lifecycle, bootstrap helper, and debug audit modules
 - `src/bootstrap_audit.mc`: extracted Phase 104 contract hardening helpers,
-  bounded service validation helpers, and Phase 108-119 audit builders used by
+  bounded service validation helpers, and Phase 108-122 audit builders used by
   the root proof module
 - `src/bootstrap_services.mc`: extracted bounded log, echo, and transfer
   service execution flows plus explicit service config and state packaging used
@@ -69,7 +71,8 @@ Current files
   timer-ownership audit, Phase 116 MMU activation-barrier audit, Phase 117
   init-orchestrated multi-service audit, Phase 118 delegated request-reply
   audit, Phase 119 namespace-pressure audit, Phase 120 running-system
-  support audit, and Phase 121 kernel image-contract hardening audit
+  support audit, Phase 121 kernel image-contract hardening audit, and Phase
+  122 target-surface audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -117,11 +120,13 @@ Phase boundary
   MMU ownership split, one bounded timer ownership hardening step, one
   bounded MMU activation barrier follow-through step, one bounded init-orchestrated
   multi-service bring-up step, one bounded delegated request-reply follow-through step,
-  and one bounded init-owned fixed service-directory step.
+  and one bounded init-owned fixed service-directory step, and one bounded
+  target-surface audit.
 - The repository can now honestly claim one first running Canopus kernel
   slice with an explicit Phase 120 running-system support statement over the
-  landed Phase 118 delegated request-reply follow-through and a landed
-  Phase 121 kernel image-contract hardening step:
+  landed Phase 118 delegated request-reply follow-through, landed Phase 121
+  kernel image-contract hardening step, and a landed Phase 122 target-surface
+  audit:
   explicit
   boot
   entry,
@@ -142,8 +147,9 @@ Phase boundary
   landed transfer-service owner, and with one fixed init-owned three-entry
   service directory published explicitly as the current namespace-pressure
   answer, and with one bounded running-system support statement plus one
-  bounded image-contract hardening step publishing that same admitted slice
-  without widening into a broader service framework.
+  bounded image-contract hardening step plus one bounded target-surface audit
+  publishing that same admitted slice without widening into a broader service
+  framework.
 - It does not yet claim general loading, dynamic service discovery,
   namespace policy, kill semantics, or a general running init-owned service
   framework.

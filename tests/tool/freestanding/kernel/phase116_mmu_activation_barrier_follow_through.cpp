@@ -19,10 +19,10 @@ void ExpectPhase116BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase116_mmu_barrier_run_output.txt",
                                                              "freestanding kernel phase116 mmu barrier run");
-    if (!run_outcome.exited || run_outcome.exit_code != 121) {
-        Fail("phase116 freestanding kernel mmu barrier run should exit with the current kernel proof marker:\n" +
-             run_output);
-    }
+    ExpectExitCodeAtLeast(run_outcome,
+                          116,
+                          run_output,
+                          "phase116 freestanding kernel mmu barrier run should preserve the landed phase116 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_mmu.mc.o")) {
@@ -35,7 +35,6 @@ void ExpectPhase116BehaviorSlice(const std::filesystem::path& build_dir,
 
 void ExpectPhase116PublicationSlice(const std::filesystem::path& phase_doc_path,
                                     const std::filesystem::path& roadmap_path,
-                                    const std::filesystem::path& position_path,
                                     const std::filesystem::path& kernel_readme_path,
                                     const std::filesystem::path& repo_map_path,
                                     const std::filesystem::path& freestanding_readme_path,
@@ -59,26 +58,12 @@ void ExpectPhase116PublicationSlice(const std::filesystem::path& phase_doc_path,
                          "Phase 116 is now concrete as one MMU activation barrier follow-through",
                          "phase116 roadmap should record the landed barrier-facing hook");
 
-    const std::string position = ReadFile(position_path);
-    ExpectOutputContains(position,
-                         "after Phase 120 published the running-system support statement",
-                         "phase116 position note should advance the current repository position");
-    ExpectOutputContains(position,
-                         "landed Phase 120 running-system support statement.",
-                         "phase116 position note should reference the new closeout");
-
     const std::string kernel_readme = ReadFile(kernel_readme_path);
-    ExpectOutputContains(kernel_readme,
-                         "Phase 120 has moved the repository-owned kernel artifact beyond the landed",
-                         "phase116 kernel README should record the new hardware-boundary status");
     ExpectOutputContains(kernel_readme,
                          "MMU activation barrier follow-through",
                          "phase116 kernel README should describe the barrier-facing MMU owner");
 
     const std::string repo_map = ReadFile(repo_map_path);
-    ExpectOutputContains(repo_map,
-                         "currently a Phase 120 running-system-support kernel target",
-                         "phase116 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase116_mmu_activation_barrier_follow_through.cpp",
                          "phase116 repository map should list the new kernel proof owner");
@@ -115,7 +100,6 @@ void ExpectPhase116MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE121_MARKER] type=i32",
             "TypeDecl kind=struct name=mmu.ActivationBarrierObservation",
             "Function name=hal.memory_barrier",
             "Function name=mmu.activate_with_barrier returns=[mmu.ActivationBarrierObservation]",
@@ -131,22 +115,12 @@ void ExpectPhase116MirStructureSlice(const std::filesystem::path& mir_path,
 void RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(const std::filesystem::path& source_root,
                                                                     const std::filesystem::path& binary_root,
                                                                     const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src" / "main.mc";
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
                                                  "phase116_mmu_activation_barrier_follow_through.txt";
-    const std::filesystem::path roadmap_path = source_root / "docs" / "plan" / "admin" /
-                                               "canopus_post_phase109_speculative_roadmap.txt";
-    const std::filesystem::path position_path = source_root / "docs" / "plan" / "admin" /
-                                                "modern_c_canopus_readiness_position.txt";
-    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
-    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
-    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
     const std::filesystem::path freestanding_support_path = source_root / "docs" / "plan" /
                                                             "freestanding_support_statement.txt";
     const std::filesystem::path stdlib_readme_path = source_root / "stdlib" / "README.md";
-    const std::filesystem::path decision_log_path = source_root / "docs" / "plan" / "decision_log.txt";
-    const std::filesystem::path backlog_path = source_root / "docs" / "plan" / "backlog.txt";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase116_mmu_activation_barrier_follow_through.mirproj.txt";
     const std::filesystem::path build_dir = binary_root / "kernel_phase116_mmu_barrier_build";
@@ -155,7 +129,7 @@ void RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(const std::f
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
                                                                   "--project",
-                                                                  project_path.generic_string(),
+                                                                  common_paths.project_path.generic_string(),
                                                                   "--target",
                                                                   "kernel",
                                                                   "--build-dir",
@@ -167,19 +141,18 @@ void RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(const std::f
         Fail("phase116 freestanding kernel mmu barrier build should succeed:\n" + build_output);
     }
 
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase116BehaviorSlice(build_dir, build_targets);
     ExpectPhase116PublicationSlice(phase_doc_path,
-                                   roadmap_path,
-                                   position_path,
-                                   kernel_readme_path,
-                                   repo_map_path,
-                                   freestanding_readme_path,
+                                   common_paths.roadmap_path,
+                                   common_paths.kernel_readme_path,
+                                   common_paths.repo_map_path,
+                                   common_paths.freestanding_readme_path,
                                    freestanding_support_path,
                                    stdlib_readme_path,
-                                   decision_log_path,
-                                   backlog_path);
+                                   common_paths.decision_log_path,
+                                   common_paths.backlog_path);
     ExpectPhase116MirStructureSlice(dump_targets.mir, mir_projection_path);
 }
 

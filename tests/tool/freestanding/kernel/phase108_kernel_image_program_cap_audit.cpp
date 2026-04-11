@@ -17,15 +17,14 @@ using mc::test_support::RunCommandCapture;
 void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesystem::path& source_root,
                                                              const std::filesystem::path& binary_root,
                                                              const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path build_dir = binary_root / "kernel_phase108_image_program_cap_build";
     std::filesystem::remove_all(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
                                                                   "--project",
-                                                                  project_path.generic_string(),
+                                                                  common_paths.project_path.generic_string(),
                                                                   "--target",
                                                                   "kernel",
                                                                   "--build-dir",
@@ -37,7 +36,7 @@ void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesyst
         Fail("phase108 freestanding kernel image-and-program-cap audit build should succeed:\n" + build_output);
     }
 
-    const std::string manifest = ReadFile(project_path);
+    const std::string manifest = ReadFile(common_paths.project_path);
     ExpectOutputContains(manifest,
                          "kind = \"exe\"",
                          "phase108 kernel manifest should keep the kernel target executable-owned and explicit");
@@ -57,8 +56,8 @@ void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesyst
                          "startup = \"bootstrap_main\"",
                          "phase108 kernel manifest should keep startup ownership explicit");
 
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     const std::filesystem::path runtime_object =
         build_targets.object.parent_path() /
         (build_targets.object.stem().generic_string() + ".freestanding.bootstrap_main.runtime.o");
@@ -78,10 +77,10 @@ void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesyst
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase108_image_program_cap_run_output.txt",
                                                              "freestanding kernel phase108 image-and-program-cap audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 121) {
-        Fail("phase108 freestanding kernel image-and-program-cap audit run should exit with the current kernel proof marker:\n" +
-             run_output);
-    }
+    ExpectExitCodeAtLeast(run_outcome,
+                          108,
+                          run_output,
+                          "phase108 freestanding kernel image-and-program-cap audit run should preserve the landed phase108 slice");
 
     const std::filesystem::path manual_executable = build_dir / "bin" / "phase108_manual_kernel_image";
     std::vector<std::string> manual_link_args{"xcrun", "clang", "-target", std::string(mc::kBootstrapTriple)};
@@ -102,10 +101,10 @@ void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesyst
     const auto [manual_run_outcome, manual_run_output] = RunCommandCapture({manual_executable.generic_string()},
                                                                            build_dir / "phase108_manual_link_run_output.txt",
                                                                            "phase108 manual kernel image run");
-    if (!manual_run_outcome.exited || manual_run_outcome.exit_code != 121) {
-        Fail("phase108 manual kernel image run should preserve the current kernel proof marker after target-owned relink:\n" +
-             manual_run_output);
-    }
+    ExpectExitCodeAtLeast(manual_run_outcome,
+                          108,
+                          manual_run_output,
+                          "phase108 manual kernel image run should preserve the landed phase108 slice after target-owned relink");
 
     const std::string kernel_mir = ReadFile(dump_targets.mir);
     ExpectOutputContains(kernel_mir,

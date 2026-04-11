@@ -14,23 +14,23 @@ using mc::test_support::RunCommandCapture;
 
 namespace {
 
-void ExpectPhase120BehaviorSlice(const std::filesystem::path& build_dir,
+void ExpectPhase122BehaviorSlice(const std::filesystem::path& build_dir,
                                  const mc::support::BuildArtifactTargets& build_targets) {
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
-                                                             build_dir / "kernel_phase120_support_run_output.txt",
-                                                             "freestanding kernel phase120 running-system support run");
+                                                             build_dir / "kernel_phase122_target_surface_run_output.txt",
+                                                             "freestanding kernel phase122 target-surface audit run");
     ExpectExitCodeAtLeast(run_outcome,
-                          120,
+                          122,
                           run_output,
-                          "phase120 freestanding kernel running-system support run should preserve the landed phase120 slice");
+                          "phase122 freestanding kernel target-surface run should preserve the landed phase122 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_bootstrap_audit.mc.o")) {
-        Fail("phase120 running-system support audit should emit the bootstrap_audit module object");
+        Fail("phase122 target-surface audit should emit the bootstrap_audit module object");
     }
 }
 
-void ExpectPhase120PublicationSlice(const std::filesystem::path& phase_doc_path,
+void ExpectPhase122PublicationSlice(const std::filesystem::path& phase_doc_path,
                                     const std::filesystem::path& support_note_path,
                                     const std::filesystem::path& roadmap_path,
                                     const std::filesystem::path& kernel_readme_path,
@@ -40,81 +40,78 @@ void ExpectPhase120PublicationSlice(const std::filesystem::path& phase_doc_path,
                                     const std::filesystem::path& backlog_path) {
     const std::string phase_doc = ReadFile(phase_doc_path);
     ExpectOutputContains(phase_doc,
-                         "Phase 120 -- Running-System Support Statement",
-                         "phase120 plan note should exist in canonical phase-doc style");
+                         "Phase 122 -- Target-Surface Audit",
+                         "phase122 plan note should exist in canonical phase-doc style");
     ExpectOutputContains(phase_doc,
                          "Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.",
-                         "phase120 plan note should record the decision not to widen compiler work");
+                         "phase122 plan note should record the decision not to widen compiler work");
     ExpectOutputContains(phase_doc,
-                         "Phase 120 is complete as a running-system support statement.",
-                         "phase120 plan note should close out the running-system support boundary explicitly");
+                         "Phase 122 is complete as a target-surface audit.",
+                         "phase122 plan note should close out the target-surface boundary explicitly");
 
     const std::string support_note = ReadFile(support_note_path);
     ExpectOutputContains(support_note,
-                         "Canopus Running-System Support Statement",
-                         "phase120 support note should exist in canonical support-note style");
-    ExpectOutputContains(support_note,
-                         "The current repository can honestly claim one bounded running-system support statement",
-                         "phase120 support note should publish the admitted running-system slice explicitly");
+                         "arm64 bootstrap target family only",
+                         "phase122 support note should keep the admitted target family unchanged");
 
     const std::string roadmap = ReadFile(roadmap_path);
     ExpectOutputContains(roadmap,
-                         "Phase 120 is now concrete as one running-system support statement",
-                         "phase120 roadmap should record the landed running-system support boundary");
+                         "Phase 122 is now concrete as one target-surface audit",
+                         "phase122 roadmap should record the landed target boundary");
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "bounded running-system support statement",
-                         "phase120 kernel README should describe the new support boundary");
+                         "bounded target-surface audit",
+                         "phase122 kernel README should describe the new target boundary");
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "phase120_running_system_support_statement.cpp",
-                         "phase120 repository map should list the new kernel proof owner");
+                         "phase122_target_surface_audit.cpp",
+                         "phase122 repository map should list the new kernel proof owner");
 
     const std::string freestanding_readme = ReadFile(freestanding_readme_path);
     ExpectOutputContains(freestanding_readme,
-                         "phase120_running_system_support_statement.cpp",
-                         "phase120 freestanding README should list the new kernel proof owner");
+                         "phase122_target_surface_audit.cpp",
+                         "phase122 freestanding README should list the new kernel proof owner");
 
     const std::string decision_log = ReadFile(decision_log_path);
     ExpectOutputContains(decision_log,
-                         "Phase 120 running-system support statement",
-                         "phase120 decision log should record the limited-scope running-system publication decision");
+                         "Phase 122 target-surface audit",
+                         "phase122 decision log should record the limited-scope target publication decision");
 
     const std::string backlog = ReadFile(backlog_path);
     ExpectOutputContains(backlog,
-                         "keep the Phase 120 running-system support statement explicit",
-                         "phase120 backlog should keep the new support boundary visible for later phases");
+                         "keep the Phase 122 target-surface audit explicit",
+                         "phase122 backlog should keep the new target boundary visible for later phases");
 }
 
-void ExpectPhase120MirStructureSlice(const std::filesystem::path& mir_path,
+void ExpectPhase122MirStructureSlice(const std::filesystem::path& mir_path,
                                      const std::filesystem::path& expected_projection_path) {
     const std::string kernel_mir = ReadFile(mir_path);
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "TypeDecl kind=struct name=debug.Phase120RunningSystemSupportAudit",
-            "Function name=bootstrap_audit.build_phase120_running_system_support_audit returns=[debug.Phase120RunningSystemSupportAudit]",
-            "Function name=debug.validate_phase120_running_system_support_statement returns=[bool]",
+            "TypeDecl kind=struct name=debug.Phase122TargetSurfaceAudit",
+            "Function name=bootstrap_audit.build_phase122_target_surface_audit returns=[debug.Phase122TargetSurfaceAudit]",
+            "Function name=debug.validate_phase122_target_surface_audit returns=[bool]",
         },
         expected_projection_path,
-        "phase120 merged MIR should preserve the running-system support projection");
+        "phase122 merged MIR should preserve the target-surface projection");
 }
 
 }  // namespace
 
-void RunFreestandingKernelPhase120RunningSystemSupportStatement(const std::filesystem::path& source_root,
-                                                                const std::filesystem::path& binary_root,
-                                                                const std::filesystem::path& mc_path) {
+void RunFreestandingKernelPhase122TargetSurfaceAudit(const std::filesystem::path& source_root,
+                                                     const std::filesystem::path& binary_root,
+                                                     const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
-                                                 "phase120_running_system_support_statement.txt";
+                                                 "phase122_target_surface_audit.txt";
     const std::filesystem::path support_note_path = source_root / "docs" / "plan" /
                                                     "canopus_running_system_support_statement.txt";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
-                                                      "phase120_running_system_support_statement.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase120_support_build";
+                                                      "phase122_target_surface_audit.mirproj.txt";
+    const std::filesystem::path build_dir = binary_root / "kernel_phase122_target_surface_build";
     std::filesystem::remove_all(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
@@ -126,16 +123,16 @@ void RunFreestandingKernelPhase120RunningSystemSupportStatement(const std::files
                                                                   "--build-dir",
                                                                   build_dir.generic_string(),
                                                                   "--dump-mir"},
-                                                                 build_dir / "kernel_phase120_support_build_output.txt",
-                                                                 "freestanding kernel phase120 running-system support build");
+                                                                 build_dir / "kernel_phase122_target_surface_build_output.txt",
+                                                                 "freestanding kernel phase122 target-surface audit build");
     if (!build_outcome.exited || build_outcome.exit_code != 0) {
-        Fail("phase120 freestanding kernel running-system support build should succeed:\n" + build_output);
+        Fail("phase122 freestanding kernel target-surface audit build should succeed:\n" + build_output);
     }
 
     const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
     const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
-    ExpectPhase120BehaviorSlice(build_dir, build_targets);
-    ExpectPhase120PublicationSlice(phase_doc_path,
+    ExpectPhase122BehaviorSlice(build_dir, build_targets);
+    ExpectPhase122PublicationSlice(phase_doc_path,
                                    support_note_path,
                                    common_paths.roadmap_path,
                                    common_paths.kernel_readme_path,
@@ -143,7 +140,7 @@ void RunFreestandingKernelPhase120RunningSystemSupportStatement(const std::files
                                    common_paths.freestanding_readme_path,
                                    common_paths.decision_log_path,
                                    common_paths.backlog_path);
-    ExpectPhase120MirStructureSlice(dump_targets.mir, mir_projection_path);
+    ExpectPhase122MirStructureSlice(dump_targets.mir, mir_projection_path);
 }
 
 }  // namespace mc::tool_tests

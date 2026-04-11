@@ -16,15 +16,14 @@ using mc::test_support::RunCommandCapture;
 void RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(const std::filesystem::path& source_root,
                                                                    const std::filesystem::path& binary_root,
                                                                    const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path build_dir = binary_root / "kernel_phase107_user_transfer_build";
     std::filesystem::remove_all(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
                                                                   "--project",
-                                                                  project_path.generic_string(),
+                                                                  common_paths.project_path.generic_string(),
                                                                   "--target",
                                                                   "kernel",
                                                                   "--build-dir",
@@ -36,15 +35,15 @@ void RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(const std::fi
         Fail("phase107 freestanding kernel user-to-user capability transfer build should succeed:\n" + build_output);
     }
 
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase107_user_transfer_run_output.txt",
                                                              "freestanding kernel phase107 user-to-user capability transfer run");
-    if (!run_outcome.exited || run_outcome.exit_code != 121) {
-        Fail("phase107 freestanding kernel user-to-user capability transfer run should exit with the proof marker:\n" +
-             run_output);
-    }
+    ExpectExitCodeAtLeast(run_outcome,
+                          107,
+                          run_output,
+                          "phase107 freestanding kernel user-to-user capability transfer run should preserve the landed phase107 slice");
 
     const std::string kernel_mir = ReadFile(dump_targets.mir);
     ExpectOutputContains(kernel_mir,

@@ -33,6 +33,7 @@ Structure
   - `phase119_namespace_pressure_audit.cpp`: real-kernel fixed service-directory and namespace-pressure audit.
   - `phase120_running_system_support_statement.cpp`: real-kernel running-system support-statement audit.
   - `phase121_kernel_image_contract_hardening.cpp`: real-kernel image-contract hardening audit.
+  - `phase122_target_surface_audit.cpp`: real-kernel target-surface audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

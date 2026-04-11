@@ -1,4 +1,3 @@
-  ConstGlobal names=[PHASE121_MARKER] type=i32
   TypeDecl kind=struct name=debug.Phase117MultiServiceBringUpAudit
   Function name=bootstrap_audit.build_phase117_multi_service_bring_up_audit returns=[debug.Phase117MultiServiceBringUpAudit]
   Function name=debug.validate_phase117_init_orchestrated_multi_service_bring_up returns=[bool]

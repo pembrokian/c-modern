@@ -1,4 +1,3 @@
-  ConstGlobal names=[PHASE121_MARKER] type=i32
   Function name=interrupt.arch_enter_interrupt returns=[interrupt.InterruptEntry]
   Function name=interrupt.dispatch_interrupt returns=[interrupt.InterruptDispatchResult]
   Function name=interrupt.validate_interrupt_entry_and_dispatch_boundary returns=[bool]

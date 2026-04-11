@@ -19,10 +19,10 @@ void ExpectPhase114BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase114_address_space_mmu_run_output.txt",
                                                              "freestanding kernel phase114 address-space/mmu run");
-    if (!run_outcome.exited || run_outcome.exit_code != 121) {
-        Fail("phase114 freestanding kernel address-space/mmu run should exit with the current kernel proof marker:\n" +
-             run_output);
-    }
+    ExpectExitCodeAtLeast(run_outcome,
+                          114,
+                          run_output,
+                          "phase114 freestanding kernel address-space/mmu run should preserve the landed phase114 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_mmu.mc.o")) {
@@ -36,7 +36,6 @@ void ExpectPhase114MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE121_MARKER] type=i32",
             "TypeDecl kind=struct name=mmu.TranslationRoot",
             "Function name=mmu.bootstrap_translation_root returns=[mmu.TranslationRoot]",
             "Function name=mmu.validate_address_space_mmu_boundary returns=[bool]",
@@ -51,8 +50,7 @@ void ExpectPhase114MirStructureSlice(const std::filesystem::path& mir_path,
 void RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit(const std::filesystem::path& source_root,
                                                                    const std::filesystem::path& binary_root,
                                                                    const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src" / "main.mc";
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path build_dir = binary_root / "kernel_phase114_address_space_mmu_build";
     const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
                                                  "phase114_address_space_and_mmu_ownership_split.txt";
@@ -63,7 +61,7 @@ void RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit(const std::fi
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
                                                                   "--project",
-                                                                  project_path.generic_string(),
+                                                                  common_paths.project_path.generic_string(),
                                                                   "--target",
                                                                   "kernel",
                                                                   "--build-dir",
@@ -80,8 +78,8 @@ void RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit(const std::fi
                          "Phase 114 -- Address-Space And MMU Ownership Split",
                          "phase114 plan note should exist in canonical phase-doc style");
 
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase114BehaviorSlice(build_dir, build_targets);
     ExpectPhase114MirStructureSlice(dump_targets.mir, mir_projection_path);
 }

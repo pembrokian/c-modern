@@ -1,4 +1,3 @@
-  ConstGlobal names=[PHASE121_MARKER] type=i32
   TypeDecl kind=struct name=debug.Phase119NamespacePressureAudit
   Function name=bootstrap_audit.build_phase119_namespace_pressure_audit returns=[debug.Phase119NamespacePressureAudit]
   Function name=debug.validate_phase119_namespace_pressure_audit returns=[bool]

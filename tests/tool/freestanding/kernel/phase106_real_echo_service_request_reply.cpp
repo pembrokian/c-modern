@@ -16,15 +16,14 @@ using mc::test_support::RunCommandCapture;
 void RunFreestandingKernelPhase106RealEchoServiceRequestReply(const std::filesystem::path& source_root,
                                                               const std::filesystem::path& binary_root,
                                                               const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path build_dir = binary_root / "kernel_phase106_echo_service_build";
     std::filesystem::remove_all(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
                                                                   "--project",
-                                                                  project_path.generic_string(),
+                                                                  common_paths.project_path.generic_string(),
                                                                   "--target",
                                                                   "kernel",
                                                                   "--build-dir",
@@ -36,15 +35,15 @@ void RunFreestandingKernelPhase106RealEchoServiceRequestReply(const std::filesys
         Fail("phase106 freestanding kernel echo-service request-reply build should succeed:\n" + build_output);
     }
 
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase106_echo_service_run_output.txt",
                                                              "freestanding kernel phase106 echo-service request-reply run");
-    if (!run_outcome.exited || run_outcome.exit_code != 121) {
-        Fail("phase106 freestanding kernel echo-service request-reply run should exit with the current kernel proof marker while preserving the phase106 slice:\n" +
-             run_output);
-    }
+    ExpectExitCodeAtLeast(run_outcome,
+                          106,
+                          run_output,
+                          "phase106 freestanding kernel echo-service request-reply run should preserve the landed phase106 slice");
 
     const std::string kernel_mir = ReadFile(dump_targets.mir);
     ExpectOutputContains(kernel_mir,

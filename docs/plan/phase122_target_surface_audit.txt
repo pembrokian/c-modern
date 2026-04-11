@@ -1,0 +1,163 @@
+Phase 122 -- Target-Surface Audit
+=================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 121 kernel image-contract hardening step by
+publishing one explicit target-surface audit over the same already-landed
+Canopus kernel artifact.
+
+This document is both the Phase 122 execution note and its closeout.
+It does not claim a broader target-family admission, dynamic loading, a
+service manager, a general namespace model, or a compiler wave.
+It records one narrow target-surface audit over the real kernel artifact that
+Phase 121 already made explicit.
+
+Repository status note
+----------------------
+- Phase 120 already published one bounded running-system support statement
+  over the landed log, echo, and transfer slice.
+- Phase 121 then hardened the image contract for that same admitted slice so
+  the manifest, target identity, runtime startup, emitted image-input
+  contract, and linked executable shape stayed explicit.
+- The next honest gap is not another runtime mechanism. It is keeping the
+  admitted target surface explicit so the supported bootstrap target family
+  stays reviewable without widening into broader target-family admission.
+
+Problem being solved
+--------------------
+- The repository already had a real first-running-kernel and running-system
+  support statement, plus one explicit image-contract hardening step, but the
+  current target-surface contract still lived mostly in the manifest,
+  support wording, and position notes instead of in one explicit proof-owned
+  audit step.
+- Without this step, later work could blur the admitted bootstrap target
+  family into broader target-family admission, dynamic loading, or compiler
+  reopening.
+- The repository needed one small phase that made the target surface honest
+  without reopening sema, MIR, backend, ABI, or `hal` work.
+
+Core rule
+---------
+- Keep the current kernel owners and service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed Phase 120 through Phase 121 artifact truth rather than
+  inventing a new runtime mechanism.
+- Publish the admitted target surface explicitly and keep all remaining
+  non-goals explicit.
+- Do not widen into dynamic loading, a service manager, a broader target-
+  family claim, or a broader freestanding workflow statement.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 122 note recording the target-surface audit and the
+   decision to keep compiler work closed
+2. one debug-owned Phase 122 audit that packages the landed Phase 121 image
+   contract together with explicit bootstrap target-family markers
+3. one narrow audit builder and one root-proof helper that publish the target
+   surface, supported target family, runtime startup, and non-broadened
+   target claims explicitly
+4. one advance of the real kernel proof marker from Phase 121 to Phase 122
+   only after the target-surface audit succeeds
+5. refreshed roadmap, current-position note, kernel README, repository map,
+   freestanding test README, decision log, and backlog entries
+6. one focused Phase 122 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new target-surface path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the admitted bootstrap
+target family is already real, but the target-surface contract still needs
+one explicit proof-owned audit pass before later work widens anything else.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one explicit target-surface audit
+  over the real kernel artifact
+- the admitted target surface keeps the manifest, bootstrap target family,
+  runtime startup, and emitted image-input contract explicit
+- the current target claim still stops well short of dynamic loading,
+  broader target-family admission, or compiler reopening
+- the repository can advance its published Canopus position without
+  widening compiler or low-level ownership surfaces
+
+Deliverables
+------------
+- one canonical Phase 122 closeout note in `docs/plan/`
+- one debug-owned Phase 122 target-surface audit plus the narrow audit
+  builder and root-proof helper needed to publish the explicit target
+  contract honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 122 marker only after the target-surface audit succeeds
+- refreshed roadmap, current-position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog so the repository
+  records both the landed target surface and the decision not to expand
+  compiler work in this phase
+- one focused Phase 122 freestanding kernel regression with a projected MIR
+  golden for the new audit surface
+
+Suggested execution order
+-------------------------
+1. Add the smallest audit shape needed to revalidate the landed Phase 121
+   image contract together with the explicit bootstrap target-family
+   surface.
+2. Advance the kernel proof marker to 122 only after that audit succeeds.
+3. Publish the canonical target-surface note.
+4. Add the focused Phase 122 freestanding regression for build, run,
+   publication, and MIR checks.
+5. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 122 marker without
+  widening the admitted running-system slice beyond the already-landed
+  Phase 117 through Phase 121 truth
+- one aggregate debug-owned audit proves that the target surface stays
+  explicit through the manifest, bootstrap target family, runtime startup,
+  emitted image-input contract, and linked executable shape
+- the canonical Phase 122 note, current-position note, kernel README, and
+  repository map all publish the same admitted slice
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 122 boundary consistently
+
+Non-goals
+---------
+- dynamic service discovery or a general namespace model
+- dynamic loading or a broader init-owned service framework
+- public freestanding `mc run` or `mc test` workflow admission
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase122TargetSurfaceAudit` and validator that
+  package the landed Phase 121 image contract together with explicit target
+  surface markers
+- added one narrow `bootstrap_audit` builder plus one root-proof helper so
+  the real kernel artifact publishes that target surface mechanically and
+  advances the proof marker to 122 only after it remains true
+- published one canonical `docs/plan/phase122_target_surface_audit.txt`
+  note naming the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR
+  golden for the Phase 122 target-surface boundary
+- refreshed the roadmap, current-position note, kernel README, repository
+  map, freestanding test README, decision log, and backlog so the repository
+  records both the landed target surface and the decision not to expand
+  compiler work in this phase
+
+Closeout statement
+------------------
+Phase 122 is complete as a target-surface audit.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now has one explicit published target surface over the
+landed Phase 121 image contract, and the compiler stays closed because this
+phase needed publication and audit rather than new language or backend work.

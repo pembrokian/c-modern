@@ -1,4 +1,3 @@
-  ConstGlobal names=[PHASE121_MARKER] type=i32
   Function name=lifecycle.install_spawned_child returns=[lifecycle.SpawnInstallResult]
   Function name=lifecycle.block_task_on_timer returns=[lifecycle.TaskTransition]
   Function name=lifecycle.ready_task returns=[lifecycle.TaskTransition]

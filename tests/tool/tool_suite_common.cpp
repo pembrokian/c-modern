@@ -34,6 +34,19 @@ std::vector<std::string> SplitLines(std::string_view text) {
 
 }  // namespace
 
+FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::filesystem::path& source_root) {
+    return {
+        .project_path = source_root / "kernel" / "build.toml",
+        .main_source_path = source_root / "kernel" / "src" / "main.mc",
+        .roadmap_path = source_root / "docs" / "plan" / "admin" / "canopus_post_phase109_speculative_roadmap.txt",
+        .kernel_readme_path = source_root / "kernel" / "README.md",
+        .repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md",
+        .freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md",
+        .decision_log_path = source_root / "docs" / "plan" / "decision_log.txt",
+        .backlog_path = source_root / "docs" / "plan" / "backlog.txt",
+    };
+}
+
 std::filesystem::path WriteBasicProject(const std::filesystem::path& root,
                                         std::string_view helper_source,
                                         std::string_view main_source) {
@@ -219,6 +232,29 @@ std::string CheckProjectTargetAndExpectFailure(const std::filesystem::path& mc_p
     }
     return output;
 }
+
+    void ExpectExitCodeAtLeast(const mc::test_support::CommandOutcome& outcome,
+                              int minimum_exit_code,
+                              std::string_view output,
+                              const std::string& context) {
+        if (!outcome.exited) {
+            std::string message = context + ": process did not exit";
+            if (!output.empty()) {
+                message += "\n";
+                message += output;
+            }
+            Fail(message);
+        }
+        if (outcome.exit_code < minimum_exit_code) {
+            std::string message = context + ": expected exit code >= " + std::to_string(minimum_exit_code) +
+                                  ", got " + std::to_string(outcome.exit_code);
+            if (!output.empty()) {
+                message += "\n";
+                message += output;
+            }
+            Fail(message);
+        }
+    }
 
 std::string CheckProjectTargetAndExpectSuccess(const std::filesystem::path& mc_path,
                                                const std::filesystem::path& project_path,

@@ -234,6 +234,18 @@ struct Phase121KernelImageContractAuditInputs {
     dynamic_namespace_visible: u32
 }
 
+struct Phase122TargetSurfaceAuditInputs {
+    phase121: debug.Phase121KernelImageContractAudit
+    kernel_target_visible: u32
+    kernel_runtime_startup_visible: u32
+    bootstrap_target_family_visible: u32
+    bootstrap_target_family_only_visible: u32
+    broader_target_family_visible: u32
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1138,4 +1150,8 @@ func build_phase120_running_system_support_audit(inputs: Phase120RunningSystemSu
 
 func build_phase121_kernel_image_contract_audit(inputs: Phase121KernelImageContractAuditInputs) debug.Phase121KernelImageContractAudit {
     return debug.Phase121KernelImageContractAudit{ phase120: inputs.phase120, kernel_manifest_visible: inputs.kernel_manifest_visible, kernel_target_visible: inputs.kernel_target_visible, kernel_runtime_startup_visible: inputs.kernel_runtime_startup_visible, bootstrap_target_family_visible: inputs.bootstrap_target_family_visible, emitted_image_input_visible: inputs.emitted_image_input_visible, linked_kernel_executable_visible: inputs.linked_kernel_executable_visible, dynamic_loading_visible: inputs.dynamic_loading_visible, service_manager_visible: inputs.service_manager_visible, dynamic_namespace_visible: inputs.dynamic_namespace_visible }
+}
+
+func build_phase122_target_surface_audit(inputs: Phase122TargetSurfaceAuditInputs) debug.Phase122TargetSurfaceAudit {
+    return debug.Phase122TargetSurfaceAudit{ phase121: inputs.phase121, kernel_target_visible: inputs.kernel_target_visible, kernel_runtime_startup_visible: inputs.kernel_runtime_startup_visible, bootstrap_target_family_visible: inputs.bootstrap_target_family_visible, bootstrap_target_family_only_visible: inputs.bootstrap_target_family_only_visible, broader_target_family_visible: inputs.broader_target_family_visible, dynamic_loading_visible: inputs.dynamic_loading_visible, service_manager_visible: inputs.service_manager_visible, dynamic_namespace_visible: inputs.dynamic_namespace_visible }
 }

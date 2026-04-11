@@ -142,6 +142,18 @@ struct Phase121KernelImageContractAudit {
     dynamic_namespace_visible: u32
 }
 
+struct Phase122TargetSurfaceAudit {
+    phase121: Phase121KernelImageContractAudit
+    kernel_target_visible: u32
+    kernel_runtime_startup_visible: u32
+    bootstrap_target_family_visible: u32
+    bootstrap_target_family_only_visible: u32
+    broader_target_family_visible: u32
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -643,6 +655,34 @@ func validate_phase121_kernel_image_contract_hardening(audit: Phase121KernelImag
         return false
     }
     if audit.linked_kernel_executable_visible != 1 {
+        return false
+    }
+    if audit.dynamic_loading_visible != 0 {
+        return false
+    }
+    if audit.service_manager_visible != 0 {
+        return false
+    }
+    return audit.dynamic_namespace_visible == 0
+}
+
+func validate_phase122_target_surface_audit(audit: Phase122TargetSurfaceAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase121_kernel_image_contract_hardening(audit.phase121, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.kernel_target_visible != 1 {
+        return false
+    }
+    if audit.kernel_runtime_startup_visible != 1 {
+        return false
+    }
+    if audit.bootstrap_target_family_visible != 1 {
+        return false
+    }
+    if audit.bootstrap_target_family_only_visible != 1 {
+        return false
+    }
+    if audit.broader_target_family_visible != 0 {
         return false
     }
     if audit.dynamic_loading_visible != 0 {

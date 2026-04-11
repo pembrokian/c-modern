@@ -32,17 +32,12 @@ Repository status note
 - Phase 121 then hardens the image contract for that same admitted slice so
   the manifest, target identity, runtime startup, emitted image-input
   contract, and linked executable shape stay explicit.
-- Phase 120 now publishes those running-system truths together as one
-  explicit support statement tied to the same regression-owned kernel
-  artifact.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
 - State only the admitted Phase 117 through Phase 121 running-system slice,
-  not a larger platform ambition.
-- State only the admitted Phase 117 through Phase 120 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands

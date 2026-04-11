@@ -65,6 +65,12 @@ void RunFreestandingKernelPhase119NamespacePressureAudit(const std::filesystem::
 void RunFreestandingKernelPhase120RunningSystemSupportStatement(const std::filesystem::path& source_root,
                                                                 const std::filesystem::path& binary_root,
                                                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase121KernelImageContractHardening(const std::filesystem::path& source_root,
+                                                               const std::filesystem::path& binary_root,
+                                                               const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase122TargetSurfaceAudit(const std::filesystem::path& source_root,
+                                                     const std::filesystem::path& binary_root,
+                                                     const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -89,6 +95,8 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase118RequestReplyAndDelegationFollowThrough(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase119NamespacePressureAudit(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase120RunningSystemSupportStatement(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase121KernelImageContractHardening(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase122TargetSurfaceAudit(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

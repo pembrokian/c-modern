@@ -1,4 +1,3 @@
-  ConstGlobal names=[PHASE121_MARKER] type=i32
   TypeDecl kind=struct name=debug.Phase118DelegatedRequestReplyAudit
   Function name=bootstrap_audit.build_phase118_delegated_request_reply_audit returns=[debug.Phase118DelegatedRequestReplyAudit]
   Function name=debug.validate_phase118_request_reply_and_delegation_follow_through returns=[bool]

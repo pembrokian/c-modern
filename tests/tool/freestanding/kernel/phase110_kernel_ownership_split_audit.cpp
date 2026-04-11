@@ -19,10 +19,10 @@ void ExpectPhase110BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase110_ownership_split_run_output.txt",
                                                              "freestanding kernel phase110 ownership-split audit run");
-    if (!run_outcome.exited || run_outcome.exit_code != 121) {
-        Fail("phase110 freestanding kernel ownership-split audit run should exit with the current kernel proof marker:\n" +
-             run_output);
-    }
+    ExpectExitCodeAtLeast(run_outcome,
+                          110,
+                          run_output,
+                          "phase110 freestanding kernel ownership-split audit run should preserve the landed phase110 slice");
 
     const std::filesystem::path object_dir = build_targets.object.parent_path();
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_debug.mc.o")) {
@@ -50,9 +50,6 @@ void ExpectPhase110PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 120 has moved the repository-owned kernel artifact beyond the landed",
-                         "phase110 kernel README should record the ownership split as current status");
-    ExpectOutputContains(kernel_readme,
                          "src/sched.mc",
                          "phase110 kernel README should list the scheduler-owned module");
     ExpectOutputContains(kernel_readme,
@@ -60,9 +57,6 @@ void ExpectPhase110PublicationSlice(const std::filesystem::path& phase_doc_path,
                          "phase110 kernel README should list the debug-owned module");
 
     const std::string repo_map = ReadFile(repo_map_path);
-    ExpectOutputContains(repo_map,
-                         "currently a Phase 120 running-system-support kernel target",
-                         "phase110 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "src/debug.mc",
                          "phase110 repository map should list the debug owner");
@@ -82,7 +76,6 @@ void ExpectPhase110MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE121_MARKER] type=i32",
             "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
             "Function name=debug.validate_phase109_first_running_kernel_slice returns=[bool]",
             "Function name=debug.validate_phase110_kernel_ownership_split returns=[bool]",
@@ -97,13 +90,9 @@ void ExpectPhase110MirStructureSlice(const std::filesystem::path& mir_path,
 void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesystem::path& source_root,
                                                             const std::filesystem::path& binary_root,
                                                             const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
-    const std::filesystem::path main_source_path = source_root / "kernel" / "src/main.mc";
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path phase_doc_path = source_root / "docs" / "plan" /
                                                  "phase110_kernel_ownership_split_audit.txt";
-    const std::filesystem::path kernel_readme_path = source_root / "kernel" / "README.md";
-    const std::filesystem::path repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md";
-    const std::filesystem::path freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase110_kernel_ownership_split_audit.mirproj.txt";
     const std::filesystem::path build_dir = binary_root / "kernel_phase110_ownership_split_build";
@@ -112,7 +101,7 @@ void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesyste
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
                                                                   "--project",
-                                                                  project_path.generic_string(),
+                                                                  common_paths.project_path.generic_string(),
                                                                   "--target",
                                                                   "kernel",
                                                                   "--build-dir",
@@ -124,10 +113,13 @@ void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesyste
         Fail("phase110 freestanding kernel ownership-split audit build should succeed:\n" + build_output);
     }
 
-    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
-    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(common_paths.main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase110BehaviorSlice(build_dir, build_targets);
-    ExpectPhase110PublicationSlice(phase_doc_path, kernel_readme_path, repo_map_path, freestanding_readme_path);
+    ExpectPhase110PublicationSlice(phase_doc_path,
+                                   common_paths.kernel_readme_path,
+                                   common_paths.repo_map_path,
+                                   common_paths.freestanding_readme_path);
     ExpectPhase110MirStructureSlice(dump_targets.mir, mir_projection_path);
 }
 

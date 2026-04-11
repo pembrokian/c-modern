@@ -5,7 +5,24 @@
 #include <string>
 #include <string_view>
 
+namespace mc::test_support {
+struct CommandOutcome;
+}
+
 namespace mc::tool_tests {
+
+struct FreestandingKernelCommonPaths {
+    std::filesystem::path project_path;
+    std::filesystem::path main_source_path;
+    std::filesystem::path roadmap_path;
+    std::filesystem::path kernel_readme_path;
+    std::filesystem::path repo_map_path;
+    std::filesystem::path freestanding_readme_path;
+    std::filesystem::path decision_log_path;
+    std::filesystem::path backlog_path;
+};
+
+FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::filesystem::path& source_root);
 
 std::filesystem::path WriteBasicProject(const std::filesystem::path& root,
                                         std::string_view helper_source,
@@ -76,6 +93,11 @@ std::string RunProjectTestTargetAndExpectSuccess(const std::filesystem::path& mc
                                                  std::string_view target_name,
                                                  std::string_view output_name,
                                                  const std::string& context);
+
+void ExpectExitCodeAtLeast(const mc::test_support::CommandOutcome& outcome,
+                          int minimum_exit_code,
+                          std::string_view output,
+                          const std::string& context);
 
 void ExpectMirFirstMatchProjection(std::string_view mir_text,
                                    std::initializer_list<std::string_view> selectors,

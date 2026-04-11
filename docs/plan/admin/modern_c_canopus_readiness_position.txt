@@ -7,8 +7,7 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position after Phase 121 hardened the kernel image contract over the landed running kernel slice.
-Record one maintained repository position after Phase 120 published the running-system support statement over the landed running kernel slice.
+Record one maintained repository position after Phase 122 kept the target surface explicit over the landed running kernel slice.
 
 This note answers four questions that now matter:
 
@@ -19,10 +18,7 @@ This note answers four questions that now matter:
 
 This note is not a support statement, a full phase plan, or a claim that the
 full Canopus architecture is implemented.
-It does not replace the Phase 109 through Phase 121 closeouts, the Canopus
-architecture notes, or the narrower hosted and freestanding support
-statements.
-It does not replace the Phase 109 through Phase 120 closeouts, the Canopus
+It does not replace the Phase 109 through Phase 122 closeouts, the Canopus
 architecture notes, or the narrower hosted and freestanding support
 statements.
 
@@ -44,7 +40,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/phase119_namespace_pressure_audit.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
 - `docs/plan/phase121_kernel_image_contract_hardening.txt`
-- `docs/plan/phase120_running_system_support_statement.txt`
+- `docs/plan/phase122_target_surface_audit.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
 - `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
 - `docs/plan/freestanding_support_statement.txt`
@@ -76,7 +72,8 @@ Current repository truth
   landed Phase 117 init-orchestrated multi-service bring-up, a landed
   Phase 118 delegated request-reply follow-through, a landed Phase 119
   namespace-pressure audit, a landed Phase 120 running-system support
-  statement, and a landed Phase 121 kernel image-contract hardening step.
+  statement, a landed Phase 121 kernel image-contract hardening step, and a
+  landed Phase 122 target-surface audit.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   implementation slice rather than only for freestanding representation proofs.
@@ -108,12 +105,13 @@ The first bounded running-system follow-through at Phase 117, the next
 bounded delegated request-reply follow-through at Phase 118, the next
 fixed-directory namespace-pressure answer at Phase 119, and the next running-
 system support statement at Phase 120 and the kernel image contract at
-Phase 121 are now also concrete,
+Phase 121 and Phase 122 are now also concrete,
 but the implementation itself is still at an early kernel plateau rather than
 at architectural completion.
 
 This position also records the landed Phase 120 running-system support statement.
 This position also records the landed Phase 121 kernel image-contract hardening step.
+This position also records the landed Phase 122 target-surface audit.
 
 Kernel maturity and quality
 ---------------------------
@@ -273,7 +271,8 @@ The repository now has one honest first running Canopus kernel slice with one
 bounded init-orchestrated multi-service bring-up, one bounded delegated
 request-reply follow-through, one bounded fixed service-directory answer, and
   one published running-system support statement over that same landed slice,
-  one explicit image-contract hardening step over that same artifact, and the
+  one explicit image-contract hardening step over that same artifact, one
+  explicit target-surface audit over that same artifact, and the
   current Modern C implementation is strong enough to grow that slice further
   without assuming a new language wave first.
 
@@ -284,8 +283,9 @@ language machinery.
 Bottom line
 -----------
 Canopus should currently be described as a bounded first running kernel with a
-landed Phase 120 running-system support statement and Phase 121 image
-contract hardening step over the earlier Phase 119 namespace-pressure audit,
+landed Phase 120 running-system support statement, Phase 121 image contract
+hardening step, and Phase 122 target-surface audit over the earlier Phase 119
+namespace-pressure audit,
 Phase 118 delegated request-reply follow-through, Phase 117 init-orchestrated
 multi-service bring-up, timer-owned wake path, and MMU publication boundary,
 and Modern C should currently be described as capable of carrying that

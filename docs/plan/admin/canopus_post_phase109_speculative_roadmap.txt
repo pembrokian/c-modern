@@ -272,6 +272,7 @@ Phase 121 -- Kernel Image Contract Hardening
   changes in lifecycle, VM, capability, or syscall owners.
 
 Phase 122 -- Target-Surface Audit
+- Phase 122 is now concrete as one target-surface audit over the landed image-contract and target surface.
 - Exit criterion: the repository either keeps the bootstrap target-family
   claim unchanged with refreshed justification, or admits one narrowly wider
   target truth with explicit build, runtime, and testing boundaries.
