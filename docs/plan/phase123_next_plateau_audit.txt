@@ -1,0 +1,171 @@
+Phase 123 -- Next Plateau Audit
+================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 122 target-surface audit by publishing one
+explicit next-plateau audit over the same already-landed Canopus kernel
+artifact.
+
+This document is both the Phase 123 execution note and its closeout.
+It does not claim a broader Canopus platform, broader target-family
+admission, general loading or packaging, multicore truth, a service manager,
+or a compiler wave.
+It records one narrow plateau audit over the real kernel artifact that
+Phase 122 already kept explicit.
+
+Repository status note
+----------------------
+- Phase 120 already published one bounded running-system support statement
+  over the landed log, echo, and transfer slice.
+- Phase 121 then hardened the image contract for that same admitted slice so
+  the manifest, target identity, runtime startup, emitted image-input
+  contract, and linked executable shape stayed explicit.
+- Phase 122 then kept the admitted target surface explicit so the bootstrap
+  target-family claim remained narrow and reviewable.
+- The next honest gap is not another runtime mechanism. It is publishing one
+  explicit plateau statement that names the admitted kernel, running-system,
+  image, and target truths together with their still-deferred boundaries.
+
+Problem being solved
+--------------------
+- The repository already had a real first-running-kernel slice, one explicit
+  running-system support statement, one explicit image-contract hardening
+  step, and one explicit target-surface audit, but the current plateau still
+  lived across several notes rather than in one explicit proof-owned audit
+  step.
+- Without this step, later work could blur the admitted kernel, running-
+  system, image, and target truths into broader platform, loading,
+  portability, or compiler-surface claims.
+- The repository needed one small phase that made the current plateau honest
+  without reopening sema, MIR, backend, ABI, or `hal` work.
+
+Core rule
+---------
+- Keep the current kernel owners and service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed Phase 109 through Phase 122 truth rather than inventing a
+  new runtime mechanism.
+- Publish the admitted plateau explicitly and keep all remaining non-goals
+  explicit.
+- Do not widen into broader target-family admission, general loading,
+  packaging, multicore claims, or a broader freestanding workflow statement.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 123 note recording the next-plateau audit and the
+   decision to keep compiler work closed
+2. one debug-owned Phase 123 audit that packages the landed Phase 122 target
+   surface together with explicit running-kernel, running-system, image, and
+   target truths
+3. one narrow audit builder and one root-proof helper that publish that
+   plateau mechanically and keep broader platform, loading, target, and
+   compiler claims explicitly out of scope
+4. one advance of the real kernel proof marker from Phase 122 to Phase 123
+   only after the plateau audit succeeds
+5. refreshed roadmap, current-position note, kernel README, repository map,
+   freestanding test README, decision log, and backlog entries
+6. one focused Phase 123 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new plateau path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the admitted kernel,
+running-system, image, and target truths are already real, but the current
+plateau still needs one explicit proof-owned audit before later work widens
+anything else.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one explicit next-plateau audit
+  over the real kernel artifact
+- the admitted plateau keeps the running-kernel, running-system, image, and
+  target truths named together and mechanically tied to the same regression-
+  owned artifact
+- the current plateau still stops well short of a broader Canopus platform,
+  broader target support, general loading or packaging, multicore truth, or
+  compiler reopening
+- the repository can advance its published Canopus position without widening
+  compiler or low-level ownership surfaces
+
+Deliverables
+------------
+- one canonical Phase 123 closeout note in `docs/plan/`
+- one debug-owned Phase 123 plateau audit plus the narrow audit builder and
+  root-proof helper needed to publish the explicit plateau honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 123 marker only after the plateau audit succeeds
+- refreshed roadmap, current-position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog so the repository
+  records both the landed plateau and the decision not to expand compiler
+  work in this phase
+- one focused Phase 123 freestanding kernel regression with a projected MIR
+  golden for the new plateau surface
+
+Suggested execution order
+-------------------------
+1. Add the smallest audit shape needed to revalidate the landed Phase 122
+   target surface together with the explicit plateau truth.
+2. Advance the kernel proof marker to 123 only after that audit succeeds.
+3. Publish the canonical next-plateau note.
+4. Add the focused Phase 123 freestanding regression for build, run,
+   publication, and MIR checks.
+5. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 123 marker without
+  widening the admitted slice beyond the already-landed Phase 109 through
+  Phase 122 truth
+- one aggregate debug-owned audit proves that the current plateau stays
+  explicit through the running-kernel, running-system, image, and target
+  statements while broader platform, target, loading, and compiler claims
+  remain out of scope
+- the canonical Phase 123 note, current-position note, kernel README, and
+  repository map all publish the same admitted slice
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 123 boundary consistently
+
+Non-goals
+---------
+- broader target-family admission or general portability claims
+- general loading, packaging, or install policy
+- dynamic service discovery or a broader namespace model
+- public freestanding `mc run` or `mc test` workflow admission
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase123NextPlateauAudit` and validator that package
+  the landed Phase 122 target surface together with explicit running-kernel,
+  running-system, image, and target truths
+- added one narrow `bootstrap_audit` builder plus one root-proof helper so
+  the real kernel artifact publishes that plateau mechanically and advances
+  the proof marker to 123 only after it remains true
+- published one canonical `docs/plan/phase123_next_plateau_audit.txt` note
+  naming the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR
+  golden for the Phase 123 plateau boundary
+- refreshed the roadmap, current-position note, kernel README, repository
+  map, freestanding test README, decision log, and backlog so the repository
+  records both the landed plateau and the decision not to expand compiler
+  work in this phase
+
+Closeout statement
+------------------
+Phase 123 is complete as a next-plateau audit.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now has one explicit published plateau tying together
+the landed running-kernel, running-system, image, and target truths, and the
+compiler stays closed because this phase needed publication and audit rather
+than new language or backend work.

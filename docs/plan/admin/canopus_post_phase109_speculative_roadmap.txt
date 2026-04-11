@@ -1,5 +1,5 @@
-Phase 122 Through Phase 123 -- Speculative Post-Phase-121 Canopus Roadmap
-=========================================================================
+Phase 124 And Beyond -- Speculative Post-Phase-123 Canopus Roadmap
+=================================================================
 
 Status
 ------
@@ -7,8 +7,8 @@ SPECULATIVE
 
 Purpose
 -------
-Sketch one plausible continuation after the completed Phase 120 running-
-system support statement.
+Sketch one plausible continuation after the completed Phase 123 next-
+plateau audit.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
@@ -38,6 +38,7 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/phase118_request_reply_and_delegation_follow_through.txt`
 - `docs/plan/phase119_namespace_pressure_audit.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
+- `docs/plan/phase123_next_plateau_audit.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
@@ -59,7 +60,9 @@ Repository numbering note
 - Phase 96 through Phase 113 are occupied by the concrete first real kernel
   bring-up wave through the first interrupt-entry and generic-dispatch
   boundary.
-- The next speculative continuation therefore starts at Phase 122.
+- Phase 121 through Phase 123 are occupied by the concrete image, target, and
+  plateau freeze wave.
+- The next speculative continuation therefore starts at Phase 124.
 
 Repository status note
 ----------------------
@@ -71,8 +74,9 @@ Repository status note
   MMU activation barrier follow-through, one landed init-orchestrated
   multi-service bring-up, one landed delegated request-reply plus
   invalidated-source follow-through, one landed fixed service-directory
-  namespace-pressure audit, and one landed running-system support statement
-  over that same artifact.
+  namespace-pressure audit, one landed running-system support statement, one
+  landed image-contract hardening step, one landed target-surface audit, and
+  one landed next-plateau audit over that same artifact.
 - That slice remains intentionally small: fixed-size tables, explicit
   authority, bounded IPC and lifecycle paths, bounded service proofs, one
   image plus support audit over the real kernel artifact, one explicit
@@ -86,15 +90,13 @@ Repository status note
 
 What this roadmap is trying to answer
 -------------------------------------
-- What likely comes after the first running-kernel statement, first ownership
-  split, first lifecycle-owner clarification, first syscall-boundary
-  thinness audit, first interrupt-boundary clarification, first MMU barrier
-  follow-through, first bounded multi-service bring-up, first delegated
-  request-reply follow-through, first namespace-pressure audit, and first
-  running-system support statement if the
-  
-  repository keeps
-  growing Canopus conservatively?
+- What likely comes after the now-landed plateau statement over the first
+  running-kernel statement, ownership split, lifecycle-owner clarification,
+  syscall-boundary thinness audit, interrupt-boundary clarification, MMU
+  barrier follow-through, bounded multi-service bring-up, delegated request-
+  reply follow-through, namespace-pressure audit, running-system support
+  statement, image-contract hardening step, and target-surface audit if the
+  repository keeps growing Canopus conservatively?
 - Which follow-on fronts belong first to kernel ownership hardening,
   hardware-boundary truth, running-system follow-through, or image and target
   hardening rather than to new language machinery?
@@ -249,9 +251,9 @@ Historical bridge into this band:
 
 Band D - Harden Image, Target, And Support Truth For The Next Plateau
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 121 through 123 should freeze the next slice around build, image,
-target, and documentation truth after the broader running-system support
-statement is real.
+Phases 121 through 123 are now concrete and freeze the current slice around
+build, image, target, and documentation truth after the broader running-
+system support statement became real.
 
 Likely themes:
 - emitted artifact ownership stays explicit
@@ -278,6 +280,8 @@ Phase 122 -- Target-Surface Audit
   target truth with explicit build, runtime, and testing boundaries.
 
 Phase 123 -- Next Plateau Audit
+- Phase 123 is now concrete as one next-plateau audit over the landed
+  kernel, running-system, image, and target truths.
 - Exit criterion: the repository can publish one honest post-Phase-111 plateau
   statement naming the admitted kernel, running-system, image, and target
   truths exactly, together with the still-deferred areas that remain outside
@@ -316,7 +320,7 @@ Interpretation guide
   through the first running-kernel, first ownership-split, first lifecycle-
   owner clarification, first syscall-boundary clarification, first interrupt-
   boundary clarification, and first address-space/MMU split wave.
-- If a smaller honest plateau appears earlier than Phase 123, that is success,
-  not roadmap failure.
+- Phase 123 now supplies the first small honest plateau for this kernel lane;
+  the next question is which pressure deserves the next bounded widening.
 - If a real next kernel step exposes a compiler or language distortion,
   reopen the narrowest owning layer only at that proof boundary.

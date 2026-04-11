@@ -154,6 +154,18 @@ struct Phase122TargetSurfaceAudit {
     dynamic_namespace_visible: u32
 }
 
+struct Phase123NextPlateauAudit {
+    phase122: Phase122TargetSurfaceAudit
+    running_kernel_truth_visible: u32
+    running_system_truth_visible: u32
+    kernel_image_truth_visible: u32
+    target_surface_truth_visible: u32
+    broader_platform_visible: u32
+    broad_target_support_visible: u32
+    general_loading_visible: u32
+    compiler_reopening_visible: u32
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -692,4 +704,32 @@ func validate_phase122_target_surface_audit(audit: Phase122TargetSurfaceAudit, s
         return false
     }
     return audit.dynamic_namespace_visible == 0
+}
+
+func validate_phase123_next_plateau_audit(audit: Phase123NextPlateauAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase122_target_surface_audit(audit.phase122, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.running_kernel_truth_visible != 1 {
+        return false
+    }
+    if audit.running_system_truth_visible != 1 {
+        return false
+    }
+    if audit.kernel_image_truth_visible != 1 {
+        return false
+    }
+    if audit.target_surface_truth_visible != 1 {
+        return false
+    }
+    if audit.broader_platform_visible != 0 {
+        return false
+    }
+    if audit.broad_target_support_visible != 0 {
+        return false
+    }
+    if audit.general_loading_visible != 0 {
+        return false
+    }
+    return audit.compiler_reopening_visible == 0
 }

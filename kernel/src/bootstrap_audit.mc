@@ -246,6 +246,18 @@ struct Phase122TargetSurfaceAuditInputs {
     dynamic_namespace_visible: u32
 }
 
+struct Phase123NextPlateauAuditInputs {
+    phase122: debug.Phase122TargetSurfaceAudit
+    running_kernel_truth_visible: u32
+    running_system_truth_visible: u32
+    kernel_image_truth_visible: u32
+    target_surface_truth_visible: u32
+    broader_platform_visible: u32
+    broad_target_support_visible: u32
+    general_loading_visible: u32
+    compiler_reopening_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1154,4 +1166,8 @@ func build_phase121_kernel_image_contract_audit(inputs: Phase121KernelImageContr
 
 func build_phase122_target_surface_audit(inputs: Phase122TargetSurfaceAuditInputs) debug.Phase122TargetSurfaceAudit {
     return debug.Phase122TargetSurfaceAudit{ phase121: inputs.phase121, kernel_target_visible: inputs.kernel_target_visible, kernel_runtime_startup_visible: inputs.kernel_runtime_startup_visible, bootstrap_target_family_visible: inputs.bootstrap_target_family_visible, bootstrap_target_family_only_visible: inputs.bootstrap_target_family_only_visible, broader_target_family_visible: inputs.broader_target_family_visible, dynamic_loading_visible: inputs.dynamic_loading_visible, service_manager_visible: inputs.service_manager_visible, dynamic_namespace_visible: inputs.dynamic_namespace_visible }
+}
+
+func build_phase123_next_plateau_audit(inputs: Phase123NextPlateauAuditInputs) debug.Phase123NextPlateauAudit {
+    return debug.Phase123NextPlateauAudit{ phase122: inputs.phase122, running_kernel_truth_visible: inputs.running_kernel_truth_visible, running_system_truth_visible: inputs.running_system_truth_visible, kernel_image_truth_visible: inputs.kernel_image_truth_visible, target_surface_truth_visible: inputs.target_surface_truth_visible, broader_platform_visible: inputs.broader_platform_visible, broad_target_support_visible: inputs.broad_target_support_visible, general_loading_visible: inputs.general_loading_visible, compiler_reopening_visible: inputs.compiler_reopening_visible }
 }
