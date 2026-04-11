@@ -65,8 +65,9 @@ Layout rule
 Validation rule
 
 - During focused iteration, run the narrowest owning tool test target.
-- For freestanding or Canopus-facing changes, prefer the narrowest owning freestanding slice first: `mc_tool_freestanding_bootstrap_unit`, the relevant `mc_tool_freestanding_kernel_shardN_unit`, or `mc_tool_freestanding_system_unit`.
+- For freestanding or Canopus-facing changes, prefer the narrowest owning freestanding slice first: `mc_tool_freestanding_bootstrap_unit`, the owning per-case kernel proof `mc_tool_freestanding_kernel_case_<name>_unit`, or `mc_tool_freestanding_system_unit`.
 - For targeted kernel timing or one-proof debugging, run the freestanding test binary directly with a case selector such as `build/debug/bin/mc_tool_freestanding_tests /Users/ro/dev/c_modern /Users/ro/dev/c_modern/build/debug 'kernel-case:phase85_endpoint_queue'`.
+  The equivalent CTest entrypoint is `mc_tool_freestanding_kernel_case_phase85_endpoint_queue_unit`.
   first.
 - For cross-cutting driver or build changes, rerun the broader tool suite set
   before closing the change.

@@ -54,7 +54,7 @@ ctest --test-dir build/debug -R mc_mir_fixture_unit --output-on-failure
 ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure
 ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure
 ctest --test-dir build/debug -R mc_tool_real_project_unit --output-on-failure
-ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_shard[1-5]|system)_unit' -j7 --output-on-failure
+ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_case_.*|system)_unit' -j8 --output-on-failure
 ```
 
 ## Testing Conventions

@@ -99,7 +99,7 @@ build/debug/bin/mc build --project kernel/build.toml --target kernel --build-dir
 Repo-owned audit entrypoint for this support statement:
 
 ```sh
-ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_shard[1-5]|system)_unit' -j7 --output-on-failure
+ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_case_.*|system)_unit' -j8 --output-on-failure
 ```
 
 Artifact expectations

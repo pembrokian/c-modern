@@ -249,6 +249,41 @@ add_test(NAME mc_tool_freestanding_kernel_shard2_unit COMMAND mc_tool_freestandi
 add_test(NAME mc_tool_freestanding_kernel_shard3_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-3)
 add_test(NAME mc_tool_freestanding_kernel_shard4_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-4)
 add_test(NAME mc_tool_freestanding_kernel_shard5_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-5)
+
+set(MC_FREESTANDING_KERNEL_CASES
+    phase85_endpoint_queue
+    phase86_task_lifecycle
+    phase87_static_data
+    phase88_build_integration
+    phase105_real_log_service_handshake
+    phase106_real_echo_service_request_reply
+    phase107_real_user_to_user_capability_transfer
+    phase108_kernel_image_program_cap_audit
+    phase109_first_running_kernel_slice_audit
+    phase110_kernel_ownership_split_audit
+    phase111_scheduler_lifecycle_ownership_clarification
+    phase112_syscall_boundary_thinness_audit
+    phase113_interrupt_entry_and_generic_dispatch_boundary
+    phase114_address_space_and_mmu_ownership_split
+    phase115_timer_ownership_hardening
+    phase116_mmu_activation_barrier_follow_through
+    phase117_init_orchestrated_multi_service_bring_up
+    phase118_request_reply_and_delegation_follow_through
+    phase119_namespace_pressure_audit
+    phase120_running_system_support_statement
+    phase121_kernel_image_contract_hardening
+    phase122_target_surface_audit
+    phase123_next_plateau_audit
+    phase124_delegation_chain_stress
+    phase125_invalidation_and_rejection_audit
+    phase126_authority_lifetime_classification
+)
+
+foreach(kernel_case IN LISTS MC_FREESTANDING_KERNEL_CASES)
+    add_test(NAME mc_tool_freestanding_kernel_case_${kernel_case}_unit
+             COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-case:${kernel_case})
+endforeach()
+
 add_test(NAME mc_tool_freestanding_system_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} system)
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_codegen_executable_core_unit COMMAND mc_codegen_executable_core_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})

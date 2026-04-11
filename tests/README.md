@@ -77,11 +77,7 @@ The active grouped tool CTest targets use semantic names:
 - `mc_tool_build_state_unit`
 - `mc_tool_real_project_unit`
 - `mc_tool_freestanding_bootstrap_unit`
-- `mc_tool_freestanding_kernel_shard1_unit`
-- `mc_tool_freestanding_kernel_shard2_unit`
-- `mc_tool_freestanding_kernel_shard3_unit`
-- `mc_tool_freestanding_kernel_shard4_unit`
-- `mc_tool_freestanding_kernel_shard5_unit`
+- `mc_tool_freestanding_kernel_case_<name>_unit`
 - `mc_tool_freestanding_system_unit`
 
 When those grouped tool suites generate disposable outputs, they now root them
