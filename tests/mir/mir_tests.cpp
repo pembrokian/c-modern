@@ -1771,6 +1771,52 @@ void TestValidatorRejectsBadSymbolRefType() {
     }
 }
 
+void TestValidatorRejectsGenericFunctionSymbolRefTypeMismatch() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+
+    mc::mir::Function generic_callee;
+    generic_callee.name = "id";
+    generic_callee.is_extern = true;
+    generic_callee.type_params = {"T"};
+    generic_callee.locals.push_back({
+        .name = "value",
+        .type = mc::sema::NamedType("T"),
+        .is_parameter = true,
+        .is_mutable = false,
+    });
+    generic_callee.return_types.push_back(mc::sema::NamedType("T"));
+    module.functions.push_back(std::move(generic_callee));
+
+    mc::mir::Function broken;
+    broken.name = "broken_generic_symbol";
+    broken.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kSymbolRef,
+                .result = "%v1",
+                .type = mc::sema::ProcedureType({mc::sema::NamedType("i32")}, {mc::sema::BoolType()}),
+                .target = "id",
+                .target_kind = mc::mir::Instruction::TargetKind::kFunction,
+                .target_name = "id",
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(broken));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject generic function symbol references with incompatible procedure types");
+    }
+    if (diagnostics.Render().find("symbol_ref function type mismatch") == std::string::npos) {
+        Fail("validator should explain bad generic function symbol reference types");
+    }
+}
+
 void TestValidatorRejectsStoreTargetFieldMismatch() {
     mc::support::DiagnosticSink diagnostics;
     mc::mir::Module module;
@@ -3174,6 +3220,7 @@ int main() {
     TestValidatorRejectsAggregateDuplicateNamedField();
     TestValidatorRejectsVariantExtractPayloadMismatch();
     TestValidatorRejectsBadSymbolRefType();
+    TestValidatorRejectsGenericFunctionSymbolRefTypeMismatch();
     TestValidatorRejectsStoreTargetFieldMismatch();
     TestValidatorRejectsBadAddressOfResultType();
     TestValidatorRejectsBadDerefOperandType();

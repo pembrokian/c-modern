@@ -2,6 +2,7 @@
 
 #include "compiler/mir/mir_internal.h"
 
+#include <cassert>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -191,9 +192,15 @@ const Function* FindMirFunction(const Module& module, std::string_view name) {
 
 sema::Type FunctionProcedureType(const Function& function) {
     std::vector<sema::Type> param_types;
+    bool saw_non_parameter = false;
     for (const auto& local : function.locals) {
         if (local.is_parameter) {
+            // MIR construction keeps parameters as a contiguous prefix in
+            // function.locals so procedure signatures stay deterministic.
+            assert(!saw_non_parameter && "FunctionProcedureType expects parameter locals to appear before non-parameters");
             param_types.push_back(local.type);
+        } else {
+            saw_non_parameter = true;
         }
     }
     return sema::ProcedureType(param_types, function.return_types);

@@ -1,0 +1,205 @@
+Phase 127 -- MIR Critique Treatment
+==================================
+
+Source document
+---------------
+- docs/agent/critiques/compiler/phase127/mir_phase127.txt
+
+Purpose
+-------
+This note records how to treat each Phase 127 MIR critique item against the
+current tree: accept and fix, accept but defer, already closed or outdated, or
+reject as proposed.
+
+The point is to respond to the critique honestly, not mechanically. Several
+claims in the critique no longer match the implementation in `compiler/mir/mir.cpp`,
+and a few others are directionally useful but aimed at the wrong boundary.
+
+Cross-check summary
+-------------------
+The current tree was checked before triage.
+
+- `MatchGenericTypePattern` already ends with `return canonical_pattern == canonical_actual;`.
+  The broad final OR-chain cited in the critique is no longer present.
+- `MatchGenericTypePattern` already has a short function-level comment stating
+  that matching is one-directional and accumulates bindings.
+- `MatchesTargetDisplay` is not dump-only. It is used by MIR validation to
+  confirm conversion target metadata matches the instruction result type.
+- `AtomicMetadataText` currently feeds MIR dump rendering only.
+- MIR validation already rejects partially populated compare-exchange order
+  metadata via `HasCompareExchangeOrderMetadata` before dump rendering matters.
+- Function lowering currently appends parameter locals first and only appends
+  non-parameter locals later, so `FunctionProcedureType` is relying on a real
+  existing construction invariant rather than wishful ordering.
+- Imported module names are parsed as identifiers, and qualified names are
+  constructed with `.` as the repository-wide separator. The variant split on
+  the last dot is aligned with current naming rules.
+
+Bucket 1 -- Already Closed Or Critique Is Outdated
+--------------------------------------------------
+
+1. C1: `MatchGenericTypePattern` final return condition is too broad.
+   Treatment: already closed.
+   Reason: the critique is describing an older version of the function. The
+   current code already requires full canonical equality after subtype
+   recursion. No implementation work should be queued from this item.
+
+2. C2: default-case fallthrough in `MatchGenericTypePattern` creates an
+   unreachable or confusing path.
+   Treatment: already closed.
+   Reason: the current switch no longer contains the described
+   `return canonical_pattern == canonical_actual;` fallback in the default
+   branch. The residual subtype-size check after the switch is now ordinary,
+   not evidence of stale control flow.
+
+3. BUG RISK: generic procedure-type matching can over-accept.
+   Treatment: already closed in code; keep a regression test in mind.
+   Reason: the underlying concern was the same stale C1 issue. The logic is no
+   longer over-broad. A focused test would still be worthwhile the next time
+   generic MIR matching is touched, because this path controls generic symbol
+   reference validation.
+
+4. Documentation claim: `MatchGenericTypePattern` lacks a function-level
+   comment.
+   Treatment: outdated.
+   Reason: a short comment already exists. It can be expanded later, but the
+   claim of no comment is no longer true.
+
+Bucket 2 -- Accept, But Do Not Overreact
+----------------------------------------
+
+5. C3: MIR lookup helpers duplicate linear scans found in the LLVM backend.
+   Treatment: accept in spirit, but defer.
+   Reason: `FindMirTypeDecl`, `FindMirFunction`, and `FindMirGlobalDecl` do
+   overlap with backend-local scans for functions and globals. That said, the
+   backend also has `FindMirLocal`, which is backend-local by nature, and the
+   repository is still intentionally operating at bootstrap scale. This is real
+   duplication, but not urgent enough to justify an API reshuffle now.
+
+6. `FunctionProcedureType` depends on parameter locals appearing first.
+   Treatment: accept as an invariant-documentation cleanup.
+   Reason: the concern is valid, but the implementation is presently safe
+   because function lowering and extern-function import both append parameters
+   before non-parameters. The right response is a short comment or assert when
+   that area is next touched, not a broader redesign.
+
+7. Documentation claim: `AtomicMetadataText` should document its sentinel
+   behavior.
+   Treatment: accept as low-priority documentation cleanup.
+   Reason: the current empty-string sentinel is not ideal to reason about in
+   isolation, even though validation currently keeps partial compare-exchange
+   metadata from becoming a meaningful live state.
+
+Bucket 3 -- Accept, But At The Right Boundary
+---------------------------------------------
+
+8. C4: change `AtomicMetadataText` to `std::optional<std::string>`.
+   Treatment: reject as immediate work; keep as possible later API cleanup.
+   Reason: the critique is right that `""` conflates "no metadata" and
+   "partially invalid metadata" at the helper boundary. But in the current
+   pipeline this helper only formats dump text, and MIR validation already
+   rejects missing compare-exchange order pairs. There is no current consumer
+   that needs a tri-state API to stay correct. If this helper starts feeding
+   validation or backend logic, revisit the signature then.
+
+9. `MatchesTargetDisplay` suffix matching could be dangerous if reused for
+   semantic matching.
+   Treatment: accept the boundary warning, reject the factual framing.
+   Reason: the example in the critique is wrong. The implementation compares
+   either the full formatted type or the exact final qualified-name component;
+   `FooError` does not match `Error`. The more important point is that this
+   helper is already used by MIR validation for target metadata checks, so it is
+   not merely a dump/display helper. Keep the current exact-final-component
+   behavior, but do not broaden its use casually.
+
+10. `FindMirVariantDecl` should document the last-dot qualified-name split.
+    Treatment: accept as tiny documentation cleanup only.
+    Reason: the current split matches repository naming rules. Import module
+    names are parsed as identifiers, and qualified names intentionally use `.`
+    as a separator. There is no bug to fix here.
+
+11. System-level claim: special-call/backend handling should be tied together
+    more explicitly.
+    Treatment: accept in principle, but not as written.
+    Reason: the critique overstates the direct dependency. The backend mainly
+    emits dedicated MIR instruction kinds, not `SpecialCallKind` entries
+    directly. The tighter contract is between special-call classification and
+    MIR lowering/validation. If the special-call surface grows, a narrow audit
+    of lowering plus validation coverage is more valuable than forcing a new
+    `static_assert` shape prematurely.
+
+12. System-level claim: generic function-type matching deserves dedicated test
+    coverage.
+    Treatment: accept.
+    Reason: even though the concrete C1 bug is already gone, the generic type
+    matching path is central enough that one focused regression test would be a
+    good future hardening step.
+
+Bucket 4 -- Real But Deferred
+-----------------------------
+
+13. Simplicity suggestion: extract a structural-compatibility helper from
+    `MatchGenericTypePattern`.
+    Treatment: defer.
+    Reason: this is a readability preference, not a live correctness problem.
+    The function is now short enough and materially clearer than the version the
+    critique appears to have reviewed.
+
+14. Performance: keep linear `Find*` scans for now, but plan lookup maps if MIR
+    module sizes grow.
+    Treatment: defer.
+    Reason: this is consistent with the existing bootstrap comments already in
+    the file. The critique is directionally right but not pressing at current
+    scale.
+
+15. Performance: `BuiltinAggregateFields` allocation in `FindMirFieldType`
+    could be cached.
+    Treatment: defer.
+    Reason: this is not a MIR-only concern. The same helper is called from MIR,
+    sema, and codegen paths. If allocation pressure appears in profiling, solve
+    it at the shared `sema::BuiltinAggregateFields` boundary rather than with a
+    one-off MIR cache.
+
+Bucket 5 -- Do Not Take As Proposed
+-----------------------------------
+
+16. Performance: replace the small `unordered_map` structures in generic type
+    matching with a flat map or small-vector structure now.
+    Treatment: reject as immediate work.
+    Reason: this is a micro-optimization without evidence of pressure. The
+    current code is simple and correct, and generic matching is not a known hot
+    path bottleneck.
+
+17. Treat `MatchesTargetDisplay` as a dump-only helper and audit all call sites
+    under that assumption.
+    Treatment: reject.
+    Reason: that assumption is already false today. The right conclusion from
+    the call-site audit is the opposite: this helper participates in MIR
+    validation, so its contract should stay narrow and exact.
+
+18. Treat the current `FindMirVariantDecl` split as a latent correctness bug.
+    Treatment: reject.
+    Reason: under current grammar and naming rules, the last-dot split is the
+    intended representation of qualified type plus variant leaf. This should not
+    be promoted into a live bug just because a more permissive future naming
+    scheme might someday exist.
+
+Recommended Follow-Through Order
+--------------------------------
+If this critique is converted into code work later, the narrow honest order is:
+
+1. Add one focused regression test for generic procedure-type matching in MIR.
+2. Add a short invariant comment or assert for parameter-local ordering near
+   `FunctionProcedureType` or the function-lowering construction path.
+3. If MIR declaration lookup pressure becomes measurable, unify exact duplicate
+   scans and then add lookup maps instead of doing one without the other.
+4. Leave `AtomicMetadataText` as a formatting helper unless a real tri-state
+   consumer appears.
+
+Bottom line
+-----------
+The Phase 127 MIR critique contains useful instincts, but not all of its
+specific recommendations should be taken literally. The most severe generic
+matching issue is already fixed. The remaining worthwhile items are mostly
+small documentation or test hardening steps plus deferred scale work, not a
+justification for widening the MIR utility layer right now.
