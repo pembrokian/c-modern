@@ -1,4 +1,5 @@
 SourceFile
+  ModuleKind=ordinary
   DistinctDecl name=Counter
     Attribute name=private
     aliasedType:

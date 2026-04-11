@@ -1,4 +1,5 @@
 SourceFile
+  ModuleKind=ordinary
   EnumDecl name=Option
     typeParams=[T]
     variants:

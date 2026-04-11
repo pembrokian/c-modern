@@ -1,4 +1,5 @@
 SourceFile
+  ModuleKind=ordinary
   FuncDecl name=demo
     body:
       BlockStmt

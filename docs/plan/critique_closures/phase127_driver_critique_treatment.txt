@@ -15,9 +15,10 @@ The driver critique mixes one real correctness defect, a few worthwhile local
 cleanups, and several broad architecture suggestions. The right response is to
 separate those rather than treat all of them as one refactor queue.
 
-Cross-check summary
--------------------
-The current tree was checked before triage.
+Initial cross-check summary
+---------------------------
+The current tree was checked before triage. The later landed status is
+recorded separately below.
 
 - `BuildOrdinaryRunnerSource()` no longer emits one `if failures == N` branch
   per count. It now emits a single `if failures == 0 { return 0 }` followed by
@@ -42,6 +43,27 @@ The current tree was checked before triage.
 - No default timeout is applied when ordinary tests or run-output regressions
   omit a timeout.
 - The driver still includes POSIX process headers directly.
+
+Implementation status
+---------------------
+The narrow driver hardening slice selected here has now landed.
+
+- Bucket 1 item 1 is closed in both shared merge owners: `MergeBuildUnits()` in
+  `compiler/driver/driver.cpp` and `compiler/driver/builder.cpp` now diagnose
+  duplicate non-extern definitions during module merge instead of silently
+  keeping the first encountered body.
+- Bucket 1 item 2 is closed: direct-source `RunRun()` now consumes
+  `BuildDirectSource()` and `DirectSourceBuildResult` instead of recomputing the
+  executable artifact path after build.
+- Bucket 1 item 3 is closed: `EvaluateRunOutputCase()` now merges build and
+  expectation-loading diagnostics through `MergeRenderedDiagnostics()` when both
+  matter.
+- `mc_tool_workflow_unit` currently passes with these driver hardening changes
+  in place.
+- The remaining driver critique work is therefore documentation and later
+  boundary cleanup: clearer ordinary-test diagnostics, explicit regression-sort
+  rationale, repository-root failure surfacing, process abstraction, and test
+  infrastructure factoring.
 
 Bucket 1 -- Fix In A Narrow Driver Hardening Pass
 -------------------------------------------------
@@ -216,3 +238,7 @@ artifact-path API cleanup, one reporting defect, and several valid but clearly
 deferred architecture suggestions. The most severe performance complaint in the
 critique is already fixed. The right response is narrow driver hardening first,
 not a wholesale test-runner extraction pass.
+
+That narrow driver hardening slice is now complete. The remaining Phase 127
+driver follow-through is documentation or later support-boundary work, not an
+active correctness queue.

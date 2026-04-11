@@ -1,4 +1,5 @@
 SourceFile
+  ModuleKind=ordinary
   FuncDecl name=test
     ParamDecl name=a
       NamedType name=i32

@@ -20,6 +20,7 @@
 
 #include "compiler/lex/lexer.h"
 #include "compiler/parse/parser.h"
+#include "compiler/support/module_paths.h"
 
 namespace mc::sema {
 
@@ -64,7 +65,7 @@ std::string JoinPaths(const std::vector<std::filesystem::path>& paths) {
 }
 
 bool IsInternalModulePath(const std::filesystem::path& path) {
-    return path.filename() == "internal.mc";
+    return mc::support::IsInternalModulePath(path);
 }
 
 bool HasPrivateAttribute(const std::vector<ast::Attribute>& attributes) {

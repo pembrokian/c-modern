@@ -1,4 +1,5 @@
 SourceFile
+  ModuleKind=ordinary
   FuncDecl name=classify
     ParamDecl name=x
       NamedType name=i32

@@ -19,6 +19,7 @@
 #include "compiler/mci/mci.h"
 #include "compiler/support/assert.h"
 #include "compiler/support/dump_paths.h"
+#include "compiler/support/module_paths.h"
 #include "compiler/support/source_manager.h"
 
 namespace mc::driver {
@@ -28,7 +29,7 @@ constexpr std::string_view kHostedRuntimeSupportRelativePath = "runtime/hosted/m
 constexpr std::string_view kFreestandingRuntimeDirectoryRelativePath = "runtime/freestanding";
 
 bool IsInternalModulePath(const std::filesystem::path& path) {
-    return path.filename() == "internal.mc";
+    return mc::support::IsInternalModulePath(path);
 }
 
 bool IsPathWithinRoot(const std::filesystem::path& path,

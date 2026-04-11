@@ -293,6 +293,8 @@ void TestParserBuildsDeterministicAstDump() {
 
     const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
     Expect(dump.find("SourceFile") != std::string::npos, "dump should start with SourceFile");
+    Expect(dump.find("ModuleKind=ordinary") != std::string::npos,
+           "dump should record the default ordinary module kind explicitly");
     Expect(dump.find("ImportDecl moduleName=io") != std::string::npos, "dump should include imports");
     Expect(dump.find("FuncDecl name=main") != std::string::npos, "dump should include function declaration");
     Expect(dump.find("AggregateInitExpr") != std::string::npos, "dump should include aggregate initializer expression");

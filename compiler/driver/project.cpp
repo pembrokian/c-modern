@@ -8,6 +8,8 @@
 #include <string_view>
 #include <unordered_set>
 
+#include "compiler/support/module_paths.h"
+
 namespace mc::driver {
 namespace {
 
@@ -954,7 +956,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             }
             for (auto& file : module_set.files) {
                 file = std::filesystem::absolute(project.root_dir / file).lexically_normal();
-                if (file.filename() == "internal.mc") {
+                if (mc::support::IsInternalModulePath(file)) {
                     diagnostics.Report({
                         .file_path = project.path,
                         .span = mc::support::kDefaultSourceSpan,

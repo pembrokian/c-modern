@@ -3,7 +3,7 @@ Phase 127 -- Compiler Critique Response Plan
 
 Source documents
 ----------------
-- docs/agent/critiques/compiler/phase127/asp_phase127.txt
+- docs/agent/critiques/compiler/phase127/ast_phase127.txt
 - docs/agent/critiques/compiler/phase127/backend_phase127.txt
 - docs/agent/critiques/compiler/phase127/check_phase127.txt
 - docs/agent/critiques/compiler/phase127/driver_phase127.txt
@@ -12,230 +12,93 @@ Source documents
 
 Purpose
 -------
-This note consolidates the still-relevant Phase 127 compiler critique items
-into one repository-facing response plan. It records what was fixed in the
-backend hardening pass landed alongside this note, what should be fixed next,
-what is real but deferred, what is already closed or partly outdated, and what
-should not be taken as proposed.
+This note now serves as the current repository-facing summary of the Phase 127
+compiler critique wave after the per-file treatment notes were written and the
+first parser/backend follow-through slices landed.
 
-Backend status
+Use the per-file treatment notes under `docs/plan/critique_closures/` as the
+authoritative detailed record. This note exists to answer one narrower question:
+what from the Phase 127 compiler critique wave is already closed, what is still
+worth doing next, and what remains intentionally deferred.
+
+Current status
 --------------
-Backend-specific treatment is recorded in:
-- docs/plan/archive/phase127_backend_critique_treatment.txt
+Closed or already landed in code:
+- the backend hardening slice recorded in
+  `docs/plan/critique_closures/phase127_backend_critique_treatment.txt`
+- the parser hygiene slice recorded in
+  `docs/plan/critique_closures/phase127_parser_critique_treatment.txt`
+- the AST dump-depth concern that originally motivated the Phase 127 AST note
+- the older driver ordinary-runner O(1) summary concern
+- the older MIR generic-type-matching OR-chain concern
+- the older sema `kDerefField` / `ValidateGlobals` framing used by the initial
+  consolidated draft of this note
 
-The current pass already landed the narrow backend hardening slice that was
-selected there:
-- payload-bearing enum equality now compares the active payload fields instead
-  of raw payload bytes
-- `buffer_new` now computes the Buffer header size mechanically in LLVM IR
-  rather than hardcoding `32`
-- host toolchain invocations now capture stdout/stderr instead of using
-  `std::system`
-- object, runtime-object, executable, and archive outputs are invalidated
-  before host-tool writes so failed builds do not silently leave stale success
-  artifacts behind
-- focused codegen executable tests now assert the enum-equality and buffer-
-  header LLVM IR shapes
+Still live and worth follow-through:
+- sema duplicate-name bind-vs-assign fact recording inside one pattern
+- sema float-to-int constant-conversion boundary hardening
+- driver duplicate non-extern definition diagnostics in shared merge paths
+- driver direct-source build-result plumbing so `RunRun()` stops recomputing
+  artifact paths
+- driver dual-diagnostic-sink reporting in `EvaluateRunOutputCase()`
 
-Cross-check notes
------------------
-Before consolidating the remaining critique items, the current tree was checked
-against the critiques.
+Real but intentionally deferred:
+- checker lookup-map and import-resolver boundary work
+- parser lexer/result-contract cleanup around `ok_`
+- AST and MIR documentation/test polish that does not currently block behavior
+- larger driver factoring such as process abstraction, timeout policy, and
+  test-runner extraction
 
-- `compiler/parse/parser.cpp` already has `assert(index_ > 0)` in `Previous()`.
-  The older parser crash concern from earlier critique waves is already closed.
-- `compiler/parse/parser_statements.cpp` already recovers with
-  `SynchronizeStatement()` at statement-level call sites, so the parser
-  separator concern is a maintainability issue, not a currently failing slice.
-- `compiler/ast/ast.cpp` still does not propagate dump depth through
-  `DumpFieldInit` and `DumpCasePattern`; that critique item is live.
-- `compiler/sema/check.cpp` still handles `kField` and `kDerefField` through
-  the same field-selection path without stripping pointer indirection first;
-  that correctness gap is live.
-- `compiler/sema/check.cpp` still builds exported module lookup maps only at
-  the end of checking; the internal O(n) lookup concern remains real but is a
-  performance issue, not a blocker.
-- `compiler/driver/driver.cpp` still emits the O(n) failure summary chain in
-  `BuildOrdinaryRunnerSource`, and `RunRun` still re-derives the direct-source
-  executable path after calling `RunBuild`.
-- `compiler/mir/mir.cpp` still contains the broad final OR-chain in
-  `MatchGenericTypePattern`; the critical generic-type-matching concern is live.
-- The requested `asp.cpp` critique is actually an `ast.cpp` critique; the note
-  itself says so. Treat it as AST-only and discard the filename typo.
+Cross-check summary
+-------------------
+The current tree and treatment notes agree on the following points:
 
-Bucket 1 -- Fix Next In Narrow Follow-Through
----------------------------------------------
+- Parser critique work is no longer an active correctness queue. The shared
+  `internal.mc` convention, parser infrastructure comment, parser lifetime
+  note, separator-plus-sync helper, and top-level recovery tightening are all
+  landed; only broader lexer/parser result-contract cleanup remains deferred.
+- AST depth propagation is already closed. Remaining AST critique work is small
+  dump-contract documentation and future-proofing, not a correctness repair.
+- The sema critique's live items are the duplicate-name bind-vs-assign fact
+  recording issue and the float-to-int boundary case. The earlier consolidated
+  `kDerefField` and `ValidateGlobals` items are already outdated.
+- The driver critique's live items are shared merge diagnostics, structured
+  direct-source build results, and merged reporting from multiple diagnostic
+  sinks. The generated ordinary-runner summary-growth concern is already closed.
+- The MIR critique no longer identifies a live generic matching bug. Remaining
+  MIR work is documentation/test hardening and later scale work.
 
-1. `check.cpp`: fix `kDerefField` type analysis.
-   Reason: this is a real semantic correctness gap. `ptr->bad_field` should be
-   rejected in sema instead of silently collapsing to `UnknownType` and relying
-   on later phases to stumble over it.
+Recommended next order
+----------------------
+If Phase 127 compiler-critique follow-through continues before a wider Canopus
+restart, the narrow honest order is:
 
-2. `mir.cpp`: tighten the final return condition in `MatchGenericTypePattern`.
-   Reason: this is the only clearly critical non-backend item in the remaining
-   critique set, and it is mechanically small. After structural checks and
-   recursive subtype matching, the function should not over-accept on the final
-   OR-chain.
+1. `check.cpp`: fix duplicate-name bind-vs-assign fact recording in one
+   binding-or-assign pattern.
+2. `check.cpp`: tighten float-to-int constant-conversion bounds and add a
+   focused regression test.
+3. Shared driver/builder merge path: diagnose duplicate non-extern definitions
+   instead of silently keeping the first encountered body.
+4. `driver.cpp`: return structured direct-source build results so `RunRun()`
+   consumes the authoritative executable path instead of recomputing it.
+5. `driver.cpp`: merge or concatenate diagnostics in `EvaluateRunOutputCase()`.
 
-3. `driver.cpp`: collapse the generated ordinary-test runner summary to O(1)
-   size.
-   Reason: this is a local, low-risk fix with clear payoff and no architecture
-   widening. The current generated `if failures == N` ladder is unnecessary.
-
-4. `ast.cpp`: propagate dump depth through `DumpFieldInit` and `DumpCasePattern`.
-   Reason: small, local, and directly aligned with the critique. This is not a
-   performance or architecture rewrite; it is a precise hardening fix for the
-   dump-depth invariant.
-
-5. `check.cpp`: add `assert(scopes_.empty())` at the start of `ValidateGlobals`.
-   Reason: cheap invariant documentation that protects a real ordering
-   assumption already described in code comments.
-
-Bucket 2 -- Accept, But Fix At The Right Boundary
--------------------------------------------------
-
-6. `driver.cpp`: duplicate non-extern function definitions should not be
-   silently discarded during merged-module construction.
-   Treatment: accept the issue, but fix it in the shared merge path, not only
-   in `driver.cpp`.
-   Reason: the same merge logic also exists in `compiler/driver/builder.cpp`.
-   The repository should not fix one copy and leave the other semantically
-   divergent.
-
-7. `driver.cpp`: `RunRun` should not recompute the direct-source executable
-   path after calling `RunBuild`.
-   Treatment: accept, but defer until the direct-source build path returns a
-   structured build result rather than only an exit code.
-   Reason: the critique is correct, but the right fix is an API cleanup,
-   not another local recomputation wrapper.
-
-8. `driver.cpp`: repository-root / stdlib discovery failure should be reported
-   explicitly rather than surfacing later as a missing-import side effect.
-   Treatment: accept the issue, but address it in the shared repository-root /
-   runtime discovery utilities used by both `driver.cpp` and `builder.cpp`.
-
-9. `parser.cpp`: the `internal.mc` magic string should move to one shared
-   constant.
-   Treatment: accept, but fix it as a shared parser/sema convention instead of
-   only changing one filename check.
-
-Bucket 3 -- Real, But Deferred
-------------------------------
-
-10. `check.cpp`: build internal checker lookup maps earlier.
-    Reason: real O(n^2) pressure, but performance only at current scales.
-
-11. `check.cpp`: split the monolithic `Checker` class into layout / const-eval /
-    expression / statement subsystems.
-    Reason: directionally right, too large for a critique-response pass.
-
-12. `check.cpp`: introduce an import-resolver interface instead of directly
-    walking the filesystem from the checker.
-    Reason: valid testability boundary, but this is architecture work, not a
-    narrow bug fix.
-
-13. `driver.cpp`: extract test infrastructure ownership into a dedicated
-    test-runner module.
-    Reason: valid long-term factoring, too broad for a response pass.
-
-14. `driver.cpp`: abstract subprocess execution into a support-layer process
-    interface.
-    Reason: still worth doing. The backend pass tightened its own subprocess
-    path, but the driver remains POSIX-bound. This is now a broader support
-    refactor, not the next smallest compiler fix.
-
-15. `driver.cpp`: add a default test timeout when neither CLI nor manifest
-    specifies one.
-    Reason: good CI hygiene, but this is a policy decision and should be taken
-    together with test-runner cleanup rather than slipped in alone.
-
-16. `parser.cpp`: remove the `ok_` boolean and derive parser success solely
-    from diagnostics.
-    Reason: good cleanup, but not urgent. The dual channel is live yet stable,
-    and companion files still set `ok_` directly.
-
-17. `parser.cpp`: combine separator checking and statement synchronization into
-    one helper.
-    Reason: maintainability win, but current statement-level recovery call sites
-    already do the necessary synchronization.
-
-18. `ast.cpp`: share `WriteIndent` / `WriteLine` with sema dump code.
-    Reason: low-value utility deduplication.
-
-19. `ast.cpp`: move toward a visitor-style dump protocol.
-    Reason: valid architectural direction, far too large for a critique pass.
-
-20. `mir.cpp`: unify linear scan helpers across MIR and backend.
-    Reason: real duplication, but not the next valuable change while module
-    sizes are still bootstrap-scale.
-
-Bucket 4 -- Already Closed, Mostly Closed, Or Lower Priority Than The Critique Implies
----------------------------------------------------------------------------------------
-
-21. `parser.cpp`: the file is already split correctly across infrastructure and
-    grammar-specific companions.
-    Reason: the critique correctly acknowledges this; no action needed.
-
-22. `parser.cpp`: `Previous()` already has the debug assertion the critique
-    calls for.
-    Reason: keep it; do not reopen the older parser underflow issue.
-
-23. `driver.cpp`: the repository-root heuristic is not the only path used for
-    project-mode runtime resolution anymore.
-    Reason: the heuristic is still real, but the critique overstates how much
-    current behavior depends on one undisguised direct-source probe.
-
-24. `ast.cpp`: `MC_UNREACHABLE` already protects the `ToString()` switches.
-    Reason: missing dump-branch exhaustiveness is still a maintainability
-    concern, but the basic kind-to-string fail-fast path is already present.
-
-25. `parser.cpp`: `Peek(offset)` overflow risk is theoretical only.
-    Reason: all current lookahead users are tightly bounded. No change needed.
-
-Bucket 5 -- Do Not Take As Proposed
------------------------------------
-
-26. `check.cpp`: treat the float-to-int boundary concern as a must-fix blocker.
-    Treatment: reject that priority level.
-    Reason: the critique identifies a real edge around exact double bounds, but
-    this is not currently an observed user-facing failure in the admitted slice.
-    It belongs behind the live sema correctness items, not ahead of them.
-
-27. `mir.cpp`: change `AtomicMetadataText` to `std::optional<std::string>` now.
-    Treatment: reject as immediate work.
-    Reason: the silent-sentinel concern is intellectually valid, but callers do
-    not currently need a tri-state API to remain correct. A comment or later API
-    cleanup is enough unless a real ambiguity bug appears.
-
-28. `ast.cpp`: add visitor infrastructure only to make dump updates more
-    auditable.
-    Treatment: reject as disproportionate.
-    Reason: the dump file is small, deterministic, and already isolated. A full
-    visitor protocol would cost far more than the current maintenance burden.
-
-Recommended Response Order
---------------------------
-If the remaining Phase 127 compiler critique items are turned into code work,
-the narrowest honest order is:
-
-1. `check.cpp`: fix `kDerefField` analysis and add the `ValidateGlobals`
-   scope invariant assert.
-2. `mir.cpp`: tighten `MatchGenericTypePattern` and add one dedicated test for
-   generic procedure-type matching.
-3. `driver.cpp`: shrink `BuildOrdinaryRunnerSource` and decide whether the
-   duplicate-definition diagnostic should be landed together with the shared
-   merge helper in both driver and builder.
-4. `ast.cpp`: propagate dump depth through helper calls.
-5. Leave parser state cleanup, test-runner extraction, import-resolver
-   abstraction, and shared process abstraction for later dedicated phases.
-
-Definition Of Done For This Critique Wave
+Definition of done for this critique wave
 -----------------------------------------
-This Phase 127 response should be considered complete when:
+For current planning purposes, this critique wave should be treated as closed
+enough to stop blocking adjacent work when:
 
-- the backend hardening fixes already landed here remain green
-- the next small correctness items (`kDerefField`, generic MIR type matching,
-  ordinary runner summary growth, AST dump depth propagation) are either landed
-  or explicitly deferred in a later phase note
-- broad architecture items remain tracked as architecture work, not disguised
-  as unfinished "small fixes"
+- the landed backend and parser follow-through remains green
+- the remaining live sema/driver items are either landed or explicitly parked
+  in later phase notes/backlog entries
+- no stale consolidated note continues to contradict the authoritative per-file
+  treatment documents
+
+Bottom line
+-----------
+Phase 127 critique work is no longer one broad compiler response queue. The
+backend and parser slices are landed, the AST and MIR critiques are mostly in
+documentation-or-scale territory, and the only clearly live implementation work
+left from this wave sits in sema and driver. That is a small enough remainder
+that Canopus development does not need to stay blocked on a vague "finish the
+compiler critique wave first" requirement.

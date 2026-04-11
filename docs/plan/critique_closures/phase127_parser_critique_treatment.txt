@@ -15,9 +15,10 @@ This critique is largely about parser infrastructure hygiene rather than a live
 front-end correctness failure. The important distinction is between useful API
 cleanup and changes that would add churn without solving an observed problem.
 
-Cross-check summary
--------------------
-The current tree was checked before triage.
+Initial cross-check summary
+---------------------------
+The current tree was checked before triage. The later landed status is recorded
+separately below.
 
 - The parser still stores `ok_` and seeds it from `lexed_module.ok`, while the
   final parse result still returns `ok = ok_ && !diagnostics_.HasErrors()`.
@@ -35,6 +36,28 @@ The current tree was checked before triage.
   modules.
 - There is still no top-level file comment describing the infrastructure split
   between this file and the grammar companion files.
+
+Implementation status
+---------------------
+The narrow parser follow-through selected here has now landed.
+
+- Bucket 1 item 1 is closed through one shared internal-module path helper in
+   `compiler/support/module_paths.h`, with parser, sema, and driver call sites
+   now using the shared helper instead of repeating the filename literal.
+- Bucket 1 items 2 and 3 are closed: `parser.cpp` now has a short file-level
+   comment describing the infrastructure split, and `Parser` now documents the
+   borrowed-token and caller-owned diagnostic-sink lifetime contract.
+- Bucket 2 item 5 is now closed as an API-hardening cleanup: statement parsing
+   uses `RequireStatementSeparatorOrSync()` so separator errors and local
+   resynchronization stay coupled by contract.
+- Bucket 2 item 6 is now closed as a resilience improvement:
+   `SynchronizeTopLevel()` keeps scanning past stray newlines until it reaches a
+   real top-level starter or EOF.
+- Bucket 2 item 7 is now closed: `ParseIdentifier()` documents the
+   capture-before-advance contract explicitly.
+- Bucket 2 item 4 remains intentionally deferred. `ok_` is still present, but
+   the current lexer-plus-parser success-state contract is now documented rather
+   than being removed piecemeal.
 
 Bucket 1 -- Accept, But Do The Minimal Honest Cleanup
 -----------------------------------------------------
@@ -165,3 +188,7 @@ current parser correctness failure. The filename convention should be unified,
 the file should document its role more clearly, and the recovery/success-state
 APIs can be cleaned up later. I do not agree with removing `ok_` or weakening
 `Previous()` assertions in isolation.
+
+That narrow cleanup slice is now complete. The remaining parser follow-through
+is documentation or later lexer/parser contract work, not an active blocker for
+resuming adjacent compiler or Canopus work.

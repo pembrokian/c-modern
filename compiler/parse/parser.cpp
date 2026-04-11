@@ -3,7 +3,13 @@
 #include <cassert>
 #include <utility>
 
+#include "compiler/support/module_paths.h"
+
 namespace mc::parse {
+
+// parser.cpp owns parser infrastructure shared across the grammar split in
+// parser_decls.cpp, parser_statements.cpp, and parser_expr.cpp: token walking,
+// common recovery, and small AST construction helpers live here.
 
 Parser::Parser(const mc::lex::LexResult& lexed_module,
                const std::filesystem::path& file_path,
@@ -13,7 +19,7 @@ Parser::Parser(const mc::lex::LexResult& lexed_module,
 ParseResult Parser::Run() {
     auto source_file = std::make_unique<SourceFile>();
     source_file->span.begin = Current().span.begin;
-    if (file_path_.filename() == "internal.mc") {
+    if (mc::support::IsInternalModulePath(file_path_)) {
         source_file->module_kind = SourceFile::ModuleKind::kInternal;
     }
 
@@ -115,15 +121,15 @@ bool Parser::RequireSourceSeparator(const char* context) {
 
 void Parser::SynchronizeTopLevel() {
     while (!AtEnd()) {
-        if (Match(TokenKind::kNewline)) {
-            SkipNewlines();
-            return;
-        }
-
         if (Check(TokenKind::kFunc) || Check(TokenKind::kStruct) || Check(TokenKind::kEnum) || Check(TokenKind::kDistinct) ||
             Check(TokenKind::kType) || Check(TokenKind::kVar) || Check(TokenKind::kConst) || Check(TokenKind::kExtern) ||
             Check(TokenKind::kAt)) {
             return;
+        }
+
+        if (Match(TokenKind::kNewline)) {
+            SkipNewlines();
+            continue;
         }
 
         Advance();
@@ -162,6 +168,14 @@ void Parser::SkipStatementSeparator() {
         return;
     }
     ReportError(Current(), "expected newline between statements");
+}
+
+void Parser::RequireStatementSeparatorOrSync() {
+    const std::size_t diagnostic_count = diagnostics_.diagnostics().size();
+    SkipStatementSeparator();
+    if (diagnostics_.diagnostics().size() != diagnostic_count) {
+        SynchronizeStatement();
+    }
 }
 
 void Parser::ConsumeMemberSeparator() {

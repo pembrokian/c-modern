@@ -16,9 +16,10 @@ items are live semantic problems, some are useful architectural direction for a
 later phase, and some are already closed or too broad for the current staged
 compiler boundary.
 
-Cross-check summary
--------------------
-The current tree was checked before triage.
+Initial cross-check summary
+---------------------------
+The current tree was checked before triage. The later landed status is
+recorded separately below.
 
 - `ValidateGlobals()` already begins with `assert(scopes_.empty())`, and the
   function already documents that global validation relies on `global_symbols_`
@@ -42,6 +43,22 @@ The current tree was checked before triage.
   before duplicate names in the same pattern are filtered out.
 - The non-short-circuit const-binary evaluation path is now split into its own
   helper instead of staying inline inside `EvaluateConstExpr()`.
+
+Implementation status
+---------------------
+The narrow sema follow-through selected here has now landed.
+
+- Bucket 1 item 1 is closed in practice: the duplicate binding-or-assignment
+  regression is covered by `TestDuplicateBindingOrAssignDoesNotRecordInvalidFact`
+  in `tests/sema/sema_fixture_tests.cpp`, and `mc_sema_fixture_unit` currently
+  passes with no invalid `binding_or_assign_facts` recorded for that case.
+- Bucket 1 item 2 is closed in code: `ConvertConstValue()` now uses
+  `long double` truncation plus an exclusive upper bound for `i64`
+  conversions, and the focused `TestFloatToIntConstConversionHonorsInt64Bounds`
+  regression in `tests/sema/sema_fixture_tests.cpp` passes.
+- The remaining sema critique work is therefore no longer a small correctness
+  queue. What remains is checker lookup pressure, import-resolution boundary
+  cleanup, and sema/MIR contract documentation.
 
 Bucket 1 -- Fix In A Narrow Sema Follow-Through
 -----------------------------------------------
@@ -236,3 +253,7 @@ matches the current AST contract. It should not be treated as a mandate for a
 broad checker rewrite. The right response is to fix the local correctness gaps,
 document the already-important sema/MIR boundary more clearly, and keep the
 larger factoring work explicitly deferred.
+
+Those local correctness gaps are now closed in the current tree. The remaining
+Phase 127 sema follow-through is documentation or later architecture work, not
+an active blocker for Canopus-facing work.

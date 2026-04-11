@@ -36,6 +36,8 @@ using mc::support::DiagnosticSeverity;
 
 class Parser {
   public:
+    // The parser borrows tokens from the lexer result and reports directly into
+    // the caller-owned diagnostic sink. Both must outlive the Parser.
     Parser(const mc::lex::LexResult& lexed_module,
            const std::filesystem::path& file_path,
            mc::support::DiagnosticSink& diagnostics);
@@ -56,6 +58,8 @@ class Parser {
     void SkipNewlines();
     bool RequireSourceSeparator(const char* context);
     void SynchronizeTopLevel();
+    // ParseIdentifier snapshots Current().lexeme before Advance() invalidates
+    // the current-token view for callers that need the identifier text.
     std::optional<std::string> ParseIdentifier(const char* message);
 
     ImportDecl ParseImportDecl(mc::support::SourcePosition start);
@@ -145,6 +149,7 @@ class Parser {
 
     bool LooksLikeBindingStmt() const;
     void SkipStatementSeparator();
+    void RequireStatementSeparatorOrSync();
     void ConsumeMemberSeparator();
     void SynchronizeStatement();
     bool IsLiteral(TokenKind kind) const;
@@ -163,6 +168,9 @@ class Parser {
     std::filesystem::path file_path_;
     mc::support::DiagnosticSink& diagnostics_;
     std::size_t index_ = 0;
+    // ok_ carries lexer failure state into parsing and is also cleared on
+    // parser-reported errors. The broader lexer/parser result contract is kept
+    // intentionally unchanged here.
     bool ok_ = true;
     bool allow_aggregate_init_ = true;
 

@@ -1,4 +1,5 @@
 SourceFile
+  ModuleKind=ordinary
   FuncDecl name=test
     returns:
       NamedType name=i32

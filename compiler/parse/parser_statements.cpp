@@ -24,7 +24,7 @@ std::unique_ptr<Stmt> Parser::ParseBlockStmt() {
         } else {
             SynchronizeStatement();
         }
-        SkipStatementSeparator();
+        RequireStatementSeparatorOrSync();
     }
 
     const auto* close = Consume(TokenKind::kRBrace, "expected '}' to close block");
@@ -111,7 +111,7 @@ std::unique_ptr<Stmt> Parser::ParseSwitchStmt(mc::support::SourcePosition start)
             ReportError(Current(), "expected case or default in switch");
             SynchronizeStatement();
         }
-        SkipStatementSeparator();
+        RequireStatementSeparatorOrSync();
     }
     const auto* close = Consume(TokenKind::kRBrace, "expected '}' after switch body");
     stmt->span.end = close != nullptr ? close->span.end : Previous().span.end;
@@ -142,10 +142,10 @@ std::vector<std::unique_ptr<Stmt>> Parser::ParseCaseBodyStatements() {
     if (!IsCaseBoundary() && !Check(TokenKind::kNewline) && !AtEnd()) {
         statements.push_back(ParseStatement());
     }
-    SkipStatementSeparator();
+    RequireStatementSeparatorOrSync();
     while (!IsCaseBoundary() && !AtEnd()) {
         statements.push_back(ParseStatement());
-        SkipStatementSeparator();
+        RequireStatementSeparatorOrSync();
     }
     return statements;
 }

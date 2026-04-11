@@ -68,7 +68,7 @@ Repository numbering note
 - Phase 124 through Phase 126 are occupied by the concrete authority-
   lifecycle stress wave.
 - Proposed compiler planning now reserves Phase 127 for
-  `docs/plan/phase127_project_mode_multi_file_modules.txt`.
+  `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
 - The next speculative Canopus continuation therefore starts at Phase 128.
 
 Repository status note

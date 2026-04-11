@@ -8,9 +8,25 @@
 namespace mc::ast {
 namespace {
 
+// AST dumps are deterministic fixture-facing text, not ad hoc debug output.
+// Keep the format stable and intentional: indentation is two spaces per depth
+// level, traversal order follows source-owned child ordering, and recursive
+// dumps stop at kMaxDumpDepth instead of recursing without bound.
+
 using Indent = int;
 
 constexpr int kMaxDumpDepth = 512;
+
+std::string_view ToString(SourceFile::ModuleKind kind) {
+    switch (kind) {
+        case SourceFile::ModuleKind::kOrdinary:
+            return "ordinary";
+        case SourceFile::ModuleKind::kInternal:
+            return "internal";
+    }
+
+    MC_UNREACHABLE("unhandled SourceFile::ModuleKind in ToString");
+}
 
 std::string_view ToString(TypeExpr::Kind kind) {
     switch (kind) {
@@ -154,13 +170,26 @@ bool ReachedDumpDepthLimit(std::ostringstream& stream, Indent indent, int depth)
 
 std::string_view SecondaryTextLabel(const Expr& expr) {
     switch (expr.kind) {
+        case Expr::Kind::kName:
+            return " secondary=";
         case Expr::Kind::kQualifiedName:
             return " member=";
         case Expr::Kind::kLiteral:
             return " kind=";
-        default:
+        case Expr::Kind::kUnary:
+        case Expr::Kind::kBinary:
+        case Expr::Kind::kRange:
+        case Expr::Kind::kCall:
+        case Expr::Kind::kField:
+        case Expr::Kind::kDerefField:
+        case Expr::Kind::kIndex:
+        case Expr::Kind::kSlice:
+        case Expr::Kind::kAggregateInit:
+        case Expr::Kind::kParen:
             return " secondary=";
     }
+
+    MC_UNREACHABLE("unhandled Expr::Kind in SecondaryTextLabel");
 }
 
 void DumpType(const TypeExpr& type, std::ostringstream& stream, Indent indent, int depth = 0);
@@ -530,10 +559,8 @@ void DumpDecl(const Decl& decl, std::ostringstream& stream, Indent indent, int d
 std::string DumpSourceFile(const SourceFile& source_file) {
     std::ostringstream stream;
     WriteLine(stream, 0, "SourceFile");
-
-    if (source_file.module_kind == SourceFile::ModuleKind::kInternal) {
-        WriteLine(stream, 1, "ModuleKind=internal");
-    }
+    WriteIndent(stream, 1);
+    stream << "ModuleKind=" << ToString(source_file.module_kind) << '\n';
 
     for (const auto& import_decl : source_file.imports) {
         WriteIndent(stream, 1);
