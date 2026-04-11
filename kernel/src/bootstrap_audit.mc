@@ -207,6 +207,33 @@ struct Phase119NamespacePressureAuditInputs {
     dynamic_namespace_visible: u32
 }
 
+struct Phase120RunningSystemSupportAuditInputs {
+    phase119: debug.Phase119NamespacePressureAudit
+    service_policy_owner_pid: u32
+    running_service_count: usize
+    fixed_directory_count: usize
+    shared_control_endpoint_id: u32
+    retained_reply_endpoint_id: u32
+    program_capability_count: usize
+    wait_handle_count: usize
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
+struct Phase121KernelImageContractAuditInputs {
+    phase120: debug.Phase120RunningSystemSupportAudit
+    kernel_manifest_visible: u32
+    kernel_target_visible: u32
+    kernel_runtime_startup_visible: u32
+    bootstrap_target_family_visible: u32
+    emitted_image_input_visible: u32
+    linked_kernel_executable_visible: u32
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1103,4 +1130,12 @@ func build_phase118_delegated_request_reply_audit(inputs: Phase118DelegatedReque
 
 func build_phase119_namespace_pressure_audit(inputs: Phase119NamespacePressureAuditInputs) debug.Phase119NamespacePressureAudit {
     return debug.Phase119NamespacePressureAudit{ phase118: inputs.phase118, directory_owner_pid: inputs.directory_owner_pid, directory_entry_count: inputs.directory_entry_count, log_service_key: inputs.log_service_key, echo_service_key: inputs.echo_service_key, transfer_service_key: inputs.transfer_service_key, shared_directory_endpoint_id: inputs.shared_directory_endpoint_id, log_service_program_slot: inputs.log_service_program_slot, echo_service_program_slot: inputs.echo_service_program_slot, transfer_service_program_slot: inputs.transfer_service_program_slot, log_service_program_object_id: inputs.log_service_program_object_id, echo_service_program_object_id: inputs.echo_service_program_object_id, transfer_service_program_object_id: inputs.transfer_service_program_object_id, log_service_wait_handle_slot: inputs.log_service_wait_handle_slot, echo_service_wait_handle_slot: inputs.echo_service_wait_handle_slot, transfer_service_wait_handle_slot: inputs.transfer_service_wait_handle_slot, dynamic_namespace_visible: inputs.dynamic_namespace_visible }
+}
+
+func build_phase120_running_system_support_audit(inputs: Phase120RunningSystemSupportAuditInputs) debug.Phase120RunningSystemSupportAudit {
+    return debug.Phase120RunningSystemSupportAudit{ phase119: inputs.phase119, service_policy_owner_pid: inputs.service_policy_owner_pid, running_service_count: inputs.running_service_count, fixed_directory_count: inputs.fixed_directory_count, shared_control_endpoint_id: inputs.shared_control_endpoint_id, retained_reply_endpoint_id: inputs.retained_reply_endpoint_id, program_capability_count: inputs.program_capability_count, wait_handle_count: inputs.wait_handle_count, dynamic_loading_visible: inputs.dynamic_loading_visible, service_manager_visible: inputs.service_manager_visible, dynamic_namespace_visible: inputs.dynamic_namespace_visible }
+}
+
+func build_phase121_kernel_image_contract_audit(inputs: Phase121KernelImageContractAuditInputs) debug.Phase121KernelImageContractAudit {
+    return debug.Phase121KernelImageContractAudit{ phase120: inputs.phase120, kernel_manifest_visible: inputs.kernel_manifest_visible, kernel_target_visible: inputs.kernel_target_visible, kernel_runtime_startup_visible: inputs.kernel_runtime_startup_visible, bootstrap_target_family_visible: inputs.bootstrap_target_family_visible, emitted_image_input_visible: inputs.emitted_image_input_visible, linked_kernel_executable_visible: inputs.linked_kernel_executable_visible, dynamic_loading_visible: inputs.dynamic_loading_visible, service_manager_visible: inputs.service_manager_visible, dynamic_namespace_visible: inputs.dynamic_namespace_visible }
 }

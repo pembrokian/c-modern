@@ -115,6 +115,33 @@ struct Phase119NamespacePressureAudit {
     dynamic_namespace_visible: u32
 }
 
+struct Phase120RunningSystemSupportAudit {
+    phase119: Phase119NamespacePressureAudit
+    service_policy_owner_pid: u32
+    running_service_count: usize
+    fixed_directory_count: usize
+    shared_control_endpoint_id: u32
+    retained_reply_endpoint_id: u32
+    program_capability_count: usize
+    wait_handle_count: usize
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
+struct Phase121KernelImageContractAudit {
+    phase120: Phase120RunningSystemSupportAudit
+    kernel_manifest_visible: u32
+    kernel_target_visible: u32
+    kernel_runtime_startup_visible: u32
+    bootstrap_target_family_visible: u32
+    emitted_image_input_visible: u32
+    linked_kernel_executable_visible: u32
+    dynamic_loading_visible: u32
+    service_manager_visible: u32
+    dynamic_namespace_visible: u32
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -551,6 +578,77 @@ func validate_phase119_namespace_pressure_audit(audit: Phase119NamespacePressure
         return false
     }
     if audit.phase118.phase117.transfer_service_transfer.control_endpoint_id != audit.shared_directory_endpoint_id {
+        return false
+    }
+    return audit.dynamic_namespace_visible == 0
+}
+
+func validate_phase120_running_system_support_statement(audit: Phase120RunningSystemSupportAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase119_namespace_pressure_audit(audit.phase119, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.service_policy_owner_pid != audit.phase119.directory_owner_pid {
+        return false
+    }
+    if audit.running_service_count != audit.phase119.directory_entry_count {
+        return false
+    }
+    if audit.running_service_count != 3 {
+        return false
+    }
+    if audit.fixed_directory_count != 1 {
+        return false
+    }
+    if audit.shared_control_endpoint_id != audit.phase119.shared_directory_endpoint_id {
+        return false
+    }
+    if audit.retained_reply_endpoint_id != audit.phase119.phase118.retained_receive_endpoint_id {
+        return false
+    }
+    if audit.retained_reply_endpoint_id != audit.phase119.phase118.phase117.transfer_endpoint_id {
+        return false
+    }
+    if audit.program_capability_count != 3 {
+        return false
+    }
+    if audit.wait_handle_count != 3 {
+        return false
+    }
+    if audit.dynamic_loading_visible != 0 {
+        return false
+    }
+    if audit.service_manager_visible != 0 {
+        return false
+    }
+    return audit.dynamic_namespace_visible == 0
+}
+
+func validate_phase121_kernel_image_contract_hardening(audit: Phase121KernelImageContractAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase120_running_system_support_statement(audit.phase120, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.kernel_manifest_visible != 1 {
+        return false
+    }
+    if audit.kernel_target_visible != 1 {
+        return false
+    }
+    if audit.kernel_runtime_startup_visible != 1 {
+        return false
+    }
+    if audit.bootstrap_target_family_visible != 1 {
+        return false
+    }
+    if audit.emitted_image_input_visible != 1 {
+        return false
+    }
+    if audit.linked_kernel_executable_visible != 1 {
+        return false
+    }
+    if audit.dynamic_loading_visible != 0 {
+        return false
+    }
+    if audit.service_manager_visible != 0 {
         return false
     }
     return audit.dynamic_namespace_visible == 0

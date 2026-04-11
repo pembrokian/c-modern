@@ -1,0 +1,166 @@
+Phase 121 -- Kernel Image Contract Hardening
+============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 120 running-system support statement by
+publishing one explicit kernel image-contract hardening step over the same
+already-landed Canopus kernel artifact.
+
+This document is both the Phase 121 execution note and its closeout.
+It does not claim a broader loader model, dynamic discovery, dynamic loading,
+a service manager, a wider target-family admission, or a compiler wave.
+It records one narrow image-contract hardening step over the real kernel
+artifact that Phase 120 already made honest.
+
+Repository status note
+----------------------
+- Phase 117 already published one bounded init-orchestrated multi-service
+  bring-up over the landed log, echo, and transfer owners.
+- Phase 118 then published one bounded delegated request-reply path together
+  with one explicit invalidated-source refusal after delegation.
+- Phase 119 then answered the next namespace pressure point with one fixed
+  init-owned three-entry service directory over that same landed service set.
+- Phase 120 then published one canonical running-system support statement
+  over that same admitted running-system slice.
+- The next honest gap is not another runtime mechanism. It is keeping the
+  admitted kernel image contract explicit so the published support wording,
+  emitted artifact shape, and kernel target identity stay aligned.
+
+Problem being solved
+--------------------
+- The repository already had a real first-running-kernel and running-system
+  support statement, but the current image/target contract still lived mostly
+  in the manifest, emitted artifacts, and support wording instead of in one
+  explicit proof-owned contract step.
+- Without this step, later work could blur the admitted kernel image shape
+  into broader loader policy, target-family growth, or compiler expansion.
+- The repository needed one small phase that made the image contract honest
+  without reopening sema, MIR, backend, ABI, or `hal` work.
+
+Core rule
+---------
+- Keep the current kernel owners and service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed Phase 117 through Phase 120 artifact truth rather than
+  inventing a new running-system mechanism.
+- Publish the admitted image contract explicitly and keep all remaining
+  non-goals explicit.
+- Do not widen into dynamic loading, a service manager, broader target-family
+  admission, or a broader freestanding workflow statement.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 121 note recording the kernel image-contract hardening
+   step and the decision to keep compiler work closed
+2. one debug-owned Phase 121 audit that packages the landed Phase 120 support
+   statement together with the explicit kernel manifest and emitted-artifact
+   contract markers
+3. one narrow audit builder and one root-proof helper that publish the
+   manifest, target identity, runtime startup, emitted image-input contract,
+   and linked executable contract explicitly
+4. one advance of the real kernel proof marker from Phase 120 to Phase 121
+   only after the image-contract audit succeeds
+5. refreshed roadmap, current-position note, kernel README, repository map,
+   freestanding test README, decision log, and backlog entries
+6. one focused Phase 121 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new contract path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the admitted running-system
+slice is already real, but the image and target contract still need one
+explicit proof-owned hardening pass before later work widens anything else.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one explicit kernel image-contract
+  hardening step over the real kernel artifact
+- the admitted contract keeps the manifest, bootstrap target identity,
+  runtime startup, emitted image-input contract, and linked executable shape
+  explicit
+- the current image contract still stops well short of dynamic loading, a
+  service manager, broader target-family admission, or compiler reopening
+- the repository can advance its published Canopus position without widening
+  compiler or low-level ownership surfaces
+
+Deliverables
+------------
+- one canonical Phase 121 closeout note in `docs/plan/`
+- one debug-owned Phase 121 image-contract audit plus the narrow audit
+  builder and root-proof helper needed to publish the explicit contract
+  honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 121 marker only after the image-contract audit succeeds
+- refreshed roadmap, current-position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog so the repository
+  records both the landed image contract and the decision not to expand
+  compiler work in this phase
+- one focused Phase 121 freestanding kernel regression with a projected MIR
+  golden for the new audit surface
+
+Suggested execution order
+-------------------------
+1. Add the smallest audit shape needed to revalidate the landed Phase 120
+   support statement together with the explicit kernel image contract.
+2. Advance the kernel proof marker to 121 only after that audit succeeds.
+3. Publish the canonical image-contract hardening note.
+4. Add the focused Phase 121 freestanding kernel regression for build, run,
+   publication, and MIR checks.
+5. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 121 marker without
+  widening the admitted running-system slice beyond the already-landed
+  Phase 117 through Phase 120 truth
+- one aggregate debug-owned audit proves that the kernel image contract stays
+  explicit through the manifest, target identity, runtime startup, emitted
+  image-input contract, and linked executable shape
+- the canonical Phase 121 note, running-system support note, position note,
+  kernel README, and repository map all publish the same admitted slice
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 121 boundary consistently
+
+Non-goals
+---------
+- dynamic service discovery or a general namespace model
+- dynamic loading or a broader init-owned service framework
+- public freestanding `mc run` or `mc test` workflow admission
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase121KernelImageContractAudit` and validator
+  that package the landed Phase 120 support statement together with explicit
+  kernel manifest and emitted-artifact contract markers
+- added one narrow `bootstrap_audit` builder plus one root-proof helper so
+  the real kernel artifact publishes that image contract mechanically and
+  advances the proof marker to 121 only after it remains true
+- published one canonical `docs/plan/phase121_kernel_image_contract_hardening.txt`
+  note naming the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR
+  golden for the Phase 121 image-contract boundary
+- refreshed the roadmap, current-position note, kernel README, repository
+  map, freestanding test README, decision log, and backlog so the repository
+  records both the landed image contract and the decision not to expand
+  compiler work in this phase
+
+Closeout statement
+------------------
+Phase 121 is complete as a kernel image-contract hardening step.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now has one explicit published image contract over the
+landed Phase 120 running-system support statement, and the compiler stays
+closed because this phase needed publication and audit rather than new
+language or backend work.

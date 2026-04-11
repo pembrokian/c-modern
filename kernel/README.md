@@ -6,8 +6,10 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 119 has moved the repository-owned kernel artifact beyond the landed
-  Phase 118 delegated request-reply follow-through into one bounded init-owned fixed service-directory step.
+- Phase 121 has moved the repository-owned kernel artifact beyond the landed
+  Phase 120 running-system support statement into one bounded kernel image-contract hardening step.
+- Phase 120 has moved the repository-owned kernel artifact beyond the landed
+  Phase 119 namespace-pressure audit into one bounded running-system support statement.
 - Phase 104 remains the landed critique-response hardening pass over that same
   owned kernel artifact: timer wake consumption, bootstrap layout validation,
   endpoint and capability helper contracts, boot-log overflow visibility, and
@@ -42,8 +44,8 @@ Current files
 -------------
 
 - `build.toml`: freestanding kernel manifest for the current proof slice and
-  the explicit kernel image-input contract carried through the Phase 119
-  namespace-pressure audit step
+  the explicit kernel image-input contract carried through the Phase 121
+  image-contract hardening step
 - `src/main.mc`: explicit architecture entry, first-user-entry, endpoint-
   plus-handle-core setup, bounded syscall-byte-IPC setup, bounded capability-
   carrying transfer setup, bounded init-owned multi-service orchestration,
@@ -66,7 +68,8 @@ Current files
   interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115
   timer-ownership audit, Phase 116 MMU activation-barrier audit, Phase 117
   init-orchestrated multi-service audit, Phase 118 delegated request-reply
-  audit, and Phase 119 namespace-pressure audit
+  audit, Phase 119 namespace-pressure audit, Phase 120 running-system
+  support audit, and Phase 121 kernel image-contract hardening audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -116,8 +119,9 @@ Phase boundary
   multi-service bring-up step, one bounded delegated request-reply follow-through step,
   and one bounded init-owned fixed service-directory step.
 - The repository can now honestly claim one first running Canopus kernel
-  slice with an explicit Phase 119 namespace-pressure audit over the landed
-  Phase 118 delegated request-reply follow-through:
+  slice with an explicit Phase 120 running-system support statement over the
+  landed Phase 118 delegated request-reply follow-through and a landed
+  Phase 121 kernel image-contract hardening step:
   explicit
   boot
   entry,
@@ -137,7 +141,9 @@ Phase boundary
   route plus one invalidated-source refusal published explicitly over the
   landed transfer-service owner, and with one fixed init-owned three-entry
   service directory published explicitly as the current namespace-pressure
-  answer.
+  answer, and with one bounded running-system support statement plus one
+  bounded image-contract hardening step publishing that same admitted slice
+  without widening into a broader service framework.
 - It does not yet claim general loading, dynamic service discovery,
   namespace policy, kill semantics, or a general running init-owned service
   framework.

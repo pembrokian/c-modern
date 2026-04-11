@@ -19,7 +19,7 @@ void ExpectPhase116BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase116_mmu_barrier_run_output.txt",
                                                              "freestanding kernel phase116 mmu barrier run");
-    if (!run_outcome.exited || run_outcome.exit_code != 119) {
+    if (!run_outcome.exited || run_outcome.exit_code != 121) {
         Fail("phase116 freestanding kernel mmu barrier run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -61,15 +61,15 @@ void ExpectPhase116PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string position = ReadFile(position_path);
     ExpectOutputContains(position,
-                         "after Phase 119 landed the namespace-pressure audit",
+                         "after Phase 120 published the running-system support statement",
                          "phase116 position note should advance the current repository position");
     ExpectOutputContains(position,
-                         "landed Phase 119 namespace-pressure audit.",
+                         "landed Phase 120 running-system support statement.",
                          "phase116 position note should reference the new closeout");
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 119 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 120 has moved the repository-owned kernel artifact beyond the landed",
                          "phase116 kernel README should record the new hardware-boundary status");
     ExpectOutputContains(kernel_readme,
                          "MMU activation barrier follow-through",
@@ -77,7 +77,7 @@ void ExpectPhase116PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 119 namespace-pressure kernel target",
+                         "currently a Phase 120 running-system-support kernel target",
                          "phase116 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase116_mmu_activation_barrier_follow_through.cpp",
@@ -115,7 +115,7 @@ void ExpectPhase116MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE119_MARKER] type=i32",
+            "ConstGlobal names=[PHASE121_MARKER] type=i32",
             "TypeDecl kind=struct name=mmu.ActivationBarrierObservation",
             "Function name=hal.memory_barrier",
             "Function name=mmu.activate_with_barrier returns=[mmu.ActivationBarrierObservation]",

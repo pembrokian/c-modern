@@ -1,0 +1,147 @@
+Canopus Running-System Support Statement
+========================================
+
+Status
+------
+PUBLISHED
+
+Purpose
+-------
+Record the current admitted Canopus running-system slice separately from the
+broader position note so the repository can state exactly what the landed
+Phase 117 through Phase 121 work does and does not support.
+
+This note is intentionally narrower than the current-position assessment.
+It does not claim a general Canopus platform, dynamic loading, dynamic
+service discovery, a service manager, broader freestanding workflow support,
+or wider target-family admission.
+
+Repository status note
+----------------------
+- Phase 109 already published one first running Canopus kernel slice over the
+  repository-owned kernel artifact.
+- Phase 117 then turned the landed log, echo, and transfer proofs into one
+  explicit init-orchestrated multi-service bring-up.
+- Phase 118 then published one delegated request-reply path together with one
+  explicit invalidated-source refusal after delegation.
+- Phase 119 then answered the next namespace pressure point with one fixed
+  init-owned three-entry service directory over that same service set.
+- Phase 120 now publishes those running-system truths together as one
+  explicit support statement tied to the same regression-owned kernel
+  artifact.
+- Phase 121 then hardens the image contract for that same admitted slice so
+  the manifest, target identity, runtime startup, emitted image-input
+  contract, and linked executable shape stay explicit.
+- Phase 120 now publishes those running-system truths together as one
+  explicit support statement tied to the same regression-owned kernel
+  artifact.
+
+Core rule
+---------
+- Keep this running-system support statement separate from the broader
+  position note.
+- State only the admitted Phase 117 through Phase 121 running-system slice,
+  not a larger platform ambition.
+- State only the admitted Phase 117 through Phase 120 running-system slice,
+  not a larger platform ambition.
+- Keep service policy init-owned and explicit.
+- Reopen broader running-system claims only when a later kernel proof lands
+  them honestly.
+
+admitted support-statement posture: first admitted running-system support
+statement only, not a general Canopus platform or broader freestanding
+workflow guarantee.
+
+Frozen support matrix
+---------------------
+- supported compiler host and produced proof-artifact target family: Darwin
+  arm64 bootstrap target family only
+- admitted runtime environment: repository-owned freestanding kernel target
+  built through `mc build --project kernel/build.toml --target kernel --build-dir <dir>`
+- admitted mechanism boundary: explicit boot entry, first user entry,
+  endpoint and handle state, syscall-owned byte IPC, attached-handle
+  transfer, program-cap spawn and wait, timer-backed wake, bootstrap-
+  capability handoff, and the earlier Phase 109 first-running-kernel slice
+- admitted running-system boundary: one init-orchestrated log, echo, and
+  transfer service set, one delegated request-derived reply route with one
+  explicit invalidated-source refusal, and one fixed init-owned three-entry
+  service directory over one shared control endpoint
+- admitted proof set: Phase 109 first-running-kernel slice audit, Phase 110
+  ownership split audit, Phase 111 scheduler and lifecycle ownership
+  clarification, Phase 112 syscall boundary thinness audit, Phase 113
+  interrupt-entry and generic-dispatch boundary, Phase 114 address-space and
+  MMU ownership split, Phase 115 timer ownership hardening, Phase 116 MMU
+  activation barrier follow-through, Phase 117 init-orchestrated multi-
+  service bring-up, Phase 118 delegated request-reply follow-through, Phase
+  119 namespace-pressure audit, Phase 120 running-system support audit, and
+  Phase 121 kernel image-contract hardening
+- unsupported today: dynamic discovery, a general namespace model, dynamic
+  loading, a service manager, broader init policy, public freestanding `mc
+  run` or `mc test`, broader target-family admission, multicore claims, and
+  general packaging or install policy
+
+Usage and audit
+---------------
+Build from source on the supported host:
+
+```sh
+cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/debug -j4
+```
+
+The produced compiler entrypoint on the supported host is:
+
+```sh
+build/debug/bin/mc
+```
+
+Supported command pattern for the admitted running-system slice:
+
+```sh
+build/debug/bin/mc build --project kernel/build.toml --target kernel --build-dir <dir>
+```
+
+Repo-owned audit entrypoint for this support statement:
+
+```sh
+ctest --test-dir build/debug -R mc_tool_freestanding_unit --output-on-failure
+```
+
+Artifact expectations
+---------------------
+- `build/debug/bin/mc` is the produced compiler entrypoint for the admitted
+  running-system slice on the supported host
+- `build/` is disposable generated state
+- command-local `--build-dir` trees are disposable generated state and should
+  be treated as build outputs, not source inputs
+- grouped kernel proof outputs should prefer semantic suite roots such as
+  `build/debug/tool/freestanding/...`
+
+Known limitations
+-----------------
+- the supported host target remains Darwin arm64 only
+- the repository still publishes only one bounded kernel lane, not a broad
+  product matrix
+- the repository still does not claim dynamic discovery, a general namespace
+  model, dynamic loading, a service manager, or a broader init framework
+- the repository still does not claim public freestanding `mc run` or `mc
+  test` workflow support
+- the repository still does not claim broad device, filesystem, portability,
+  packaging, or install policy
+
+Practical support statement
+---------------------------
+The current repository can honestly claim one bounded running-system support statement over the repository-owned Canopus kernel artifact: one explicit
+init-orchestrated log, echo, and transfer service set, one delegated
+request-derived reply route with one explicit invalidated-source refusal, one
+fixed init-owned three-entry service directory over the landed first running
+kernel slice, and one explicit image-contract hardening step that keeps the
+manifest, target identity, runtime startup, emitted image-input contract, and
+linked executable shape reviewable.
+
+The repository still does not claim a general Canopus platform, broader
+freestanding workflow support, dynamic discovery, dynamic loading, a service
+manager, or a broader namespace or loader model.
+
+Everything outside that slice should be treated as explicitly unsupported
+until a later phase note and proof layer admit it.

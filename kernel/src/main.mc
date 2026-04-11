@@ -40,7 +40,7 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const PHASE119_MARKER: i32 = 119
+const PHASE121_MARKER: i32 = 121
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
@@ -1218,6 +1218,14 @@ func build_phase119_namespace_pressure_audit(phase118_audit: debug.Phase118Deleg
     return bootstrap_audit.build_phase119_namespace_pressure_audit(bootstrap_audit.Phase119NamespacePressureAuditInputs{ phase118: phase118_audit, directory_owner_pid: INIT_PID, directory_entry_count: 3, log_service_key: LOG_SERVICE_DIRECTORY_KEY, echo_service_key: ECHO_SERVICE_DIRECTORY_KEY, transfer_service_key: TRANSFER_SERVICE_DIRECTORY_KEY, shared_directory_endpoint_id: INIT_ENDPOINT_ID, log_service_program_slot: log_config.program_slot, echo_service_program_slot: echo_config.program_slot, transfer_service_program_slot: transfer_config.program_slot, log_service_program_object_id: log_config.program_object_id, echo_service_program_object_id: echo_config.program_object_id, transfer_service_program_object_id: transfer_config.program_object_id, log_service_wait_handle_slot: LOG_SERVICE_SPAWN_OBSERVATION.wait_handle_slot, echo_service_wait_handle_slot: ECHO_SERVICE_SPAWN_OBSERVATION.wait_handle_slot, transfer_service_wait_handle_slot: TRANSFER_SERVICE_SPAWN_OBSERVATION.wait_handle_slot, dynamic_namespace_visible: 0 })
 }
 
+func build_phase120_running_system_support_audit(phase119_audit: debug.Phase119NamespacePressureAudit) debug.Phase120RunningSystemSupportAudit {
+    return bootstrap_audit.build_phase120_running_system_support_audit(bootstrap_audit.Phase120RunningSystemSupportAuditInputs{ phase119: phase119_audit, service_policy_owner_pid: INIT_PID, running_service_count: 3, fixed_directory_count: 1, shared_control_endpoint_id: INIT_ENDPOINT_ID, retained_reply_endpoint_id: phase119_audit.phase118.retained_receive_endpoint_id, program_capability_count: 3, wait_handle_count: 3, dynamic_loading_visible: 0, service_manager_visible: 0, dynamic_namespace_visible: 0 })
+}
+
+func build_phase121_kernel_image_contract_audit(phase120_audit: debug.Phase120RunningSystemSupportAudit) debug.Phase121KernelImageContractAudit {
+    return bootstrap_audit.build_phase121_kernel_image_contract_audit(bootstrap_audit.Phase121KernelImageContractAuditInputs{ phase120: phase120_audit, kernel_manifest_visible: 1, kernel_target_visible: 1, kernel_runtime_startup_visible: 1, bootstrap_target_family_visible: 1, emitted_image_input_visible: 1, linked_kernel_executable_visible: 1, dynamic_loading_visible: 0, service_manager_visible: 0, dynamic_namespace_visible: 0 })
+}
+
 func execute_phase118_invalidated_source_send_probe() bool {
     transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
     probe_payload: [4]u8 = endpoint.zero_payload()
@@ -1528,46 +1536,54 @@ func bootstrap_main() i32 {
     if !debug.validate_phase118_request_reply_and_delegation_follow_through(phase118_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 54
     }
-    if !debug.validate_phase119_namespace_pressure_audit(build_phase119_namespace_pressure_audit(phase118_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    phase119_audit: debug.Phase119NamespacePressureAudit = build_phase119_namespace_pressure_audit(phase118_audit)
+    if !debug.validate_phase119_namespace_pressure_audit(phase119_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 55
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 119)
-    if BOOT_MARKER_EMITTED != 1 {
+    phase120_audit: debug.Phase120RunningSystemSupportAudit = build_phase120_running_system_support_audit(phase119_audit)
+    if !debug.validate_phase120_running_system_support_statement(phase120_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 56
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase121_kernel_image_contract_hardening(build_phase121_kernel_image_contract_audit(phase120_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 57
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 121)
+    if BOOT_MARKER_EMITTED != 1 {
         return 58
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 59
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 60
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 61
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 62
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 63
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 119 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 64
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 65
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 121 {
         return 66
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 67
     }
-    return PHASE119_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 68
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 69
+    }
+    return PHASE121_MARKER
 }

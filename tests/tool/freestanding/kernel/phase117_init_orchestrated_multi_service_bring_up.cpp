@@ -19,7 +19,7 @@ void ExpectPhase117BehaviorSlice(const std::filesystem::path& build_dir,
     const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
                                                              build_dir / "kernel_phase117_multi_service_run_output.txt",
                                                              "freestanding kernel phase117 multi-service run");
-    if (!run_outcome.exited || run_outcome.exit_code != 119) {
+    if (!run_outcome.exited || run_outcome.exit_code != 121) {
         Fail("phase117 freestanding kernel multi-service run should exit with the current kernel proof marker:\n" +
              run_output);
     }
@@ -65,15 +65,15 @@ void ExpectPhase117PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string position = ReadFile(position_path);
     ExpectOutputContains(position,
-                         "after Phase 119 landed the namespace-pressure audit",
+                         "after Phase 120 published the running-system support statement",
                          "phase117 position note should advance the current repository position");
     ExpectOutputContains(position,
-                         "landed Phase 119 namespace-pressure audit.",
+                         "landed Phase 120 running-system support statement.",
                          "phase117 position note should reference the new closeout");
 
     const std::string kernel_readme = ReadFile(kernel_readme_path);
     ExpectOutputContains(kernel_readme,
-                         "Phase 119 has moved the repository-owned kernel artifact beyond the landed",
+                         "Phase 120 has moved the repository-owned kernel artifact beyond the landed",
                          "phase117 kernel README should record the new running-system status");
     ExpectOutputContains(kernel_readme,
                          "bounded init-orchestrated multi-service bring-up",
@@ -81,7 +81,7 @@ void ExpectPhase117PublicationSlice(const std::filesystem::path& phase_doc_path,
 
     const std::string repo_map = ReadFile(repo_map_path);
     ExpectOutputContains(repo_map,
-                         "currently a Phase 119 namespace-pressure kernel target",
+                         "currently a Phase 120 running-system-support kernel target",
                          "phase117 repository map should describe the current kernel boundary");
     ExpectOutputContains(repo_map,
                          "phase117_init_orchestrated_multi_service_bring_up.cpp",
@@ -109,7 +109,7 @@ void ExpectPhase117MirStructureSlice(const std::filesystem::path& mir_path,
     ExpectMirFirstMatchProjectionFile(
         kernel_mir,
         {
-            "ConstGlobal names=[PHASE119_MARKER] type=i32",
+            "ConstGlobal names=[PHASE121_MARKER] type=i32",
             "TypeDecl kind=struct name=debug.Phase117MultiServiceBringUpAudit",
             "Function name=bootstrap_audit.build_phase117_multi_service_bring_up_audit returns=[debug.Phase117MultiServiceBringUpAudit]",
             "Function name=debug.validate_phase117_init_orchestrated_multi_service_bring_up returns=[bool]",

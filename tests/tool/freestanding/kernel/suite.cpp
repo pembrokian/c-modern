@@ -62,6 +62,9 @@ void RunFreestandingKernelPhase118RequestReplyAndDelegationFollowThrough(const s
 void RunFreestandingKernelPhase119NamespacePressureAudit(const std::filesystem::path& source_root,
                                                          const std::filesystem::path& binary_root,
                                                          const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase120RunningSystemSupportStatement(const std::filesystem::path& source_root,
+                                                                const std::filesystem::path& binary_root,
+                                                                const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -85,6 +88,7 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase117InitOrchestratedMultiServiceBringUp(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase118RequestReplyAndDelegationFollowThrough(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase119NamespacePressureAudit(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase120RunningSystemSupportStatement(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

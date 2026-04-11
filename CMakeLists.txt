@@ -166,6 +166,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase117_init_orchestrated_multi_service_bring_up.cpp
     tests/tool/freestanding/kernel/phase118_request_reply_and_delegation_follow_through.cpp
     tests/tool/freestanding/kernel/phase119_namespace_pressure_audit.cpp
+    tests/tool/freestanding/kernel/phase120_running_system_support_statement.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp

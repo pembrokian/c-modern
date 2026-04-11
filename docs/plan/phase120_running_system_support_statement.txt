@@ -1,0 +1,167 @@
+Phase 120 -- Running-System Support Statement
+=============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 119 namespace-pressure audit by publishing
+one canonical running-system support statement for the already-landed Phase
+117 through Phase 119 slice instead of leaving that broader running-system
+truth split across closeouts, README text, and position notes.
+
+This document is both the Phase 120 execution note and its closeout.
+It does not claim a general namespace model, dynamic discovery, dynamic
+loading, a service manager, a broader init framework, or a compiler wave.
+It records one narrow running-system support statement over the real kernel
+artifact that Phase 119 already made honest.
+
+Repository status note
+----------------------
+- Phase 117 already published one bounded init-orchestrated multi-service
+  bring-up over the landed log, echo, and transfer owners.
+- Phase 118 then published one bounded delegated request-reply path together
+  with one explicit invalidated-source refusal after delegation.
+- Phase 119 then answered the next namespace pressure point with one fixed
+  init-owned three-entry service directory over that same landed service set.
+- That left the next owner narrower than another mechanism phase: the
+  repository now had a broader running-system truth than its published
+  support notes admitted, but it still lacked one single canonical statement
+  naming that admitted running-system slice and its remaining deferrals.
+
+Problem being solved
+--------------------
+- The speculative post-Phase-119 roadmap reserved Phase 120 for one running-
+  system support statement if the prior running-system phases landed
+  honestly.
+- The repository already had the bounded running-system behavior needed for
+  that publication boundary, but the current position note still said the
+  next honest work was to publish that statement later.
+- Without this step, the repository risked repeating the same drift Phase 109
+  closed for the first running-kernel statement: the landed slice could be
+  undersold as still provisional or oversold as if the next owner were
+  dynamic discovery, a service framework, or compiler growth.
+
+Core rule
+---------
+- Keep the current kernel owners and service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed Phase 117 through Phase 119 artifact truth rather than
+  inventing a new running-system mechanism.
+- Publish the admitted running-system slice explicitly and keep all remaining
+  non-goals explicit.
+- Do not widen into dynamic loading, a service manager, general namespace
+  policy, or a broader freestanding workflow statement.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 120 note recording the running-system support
+   statement and the decision to keep compiler work closed
+2. one canonical running-system support note in `docs/plan/` that names the
+   admitted service, request-reply, and fixed-directory slice explicitly
+3. one narrow aggregate root-module audit that revalidates the landed Phase
+   117 through Phase 119 truth as one support-statement contract and advances
+   the real kernel marker from 119 to 120 only after that aggregate remains
+   true
+4. refreshed roadmap, current-position note, kernel status, repository map,
+   freestanding README, decision log, and backlog entries
+5. one focused Phase 120 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new aggregate audit path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the needed running-system
+behavior is already real. The next honest owner is publication and audit, not
+another service mechanism and not another compiler surface.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one bounded running-system support
+  statement over the real kernel artifact
+- that admitted slice includes one init-orchestrated three-service set, one
+  delegated request-derived reply route with one explicit invalidated-source
+  refusal, and one fixed init-owned three-entry service directory
+- the current running-system truth still stops well short of dynamic
+  discovery, dynamic loading, a service manager, or a broader public
+  freestanding workflow claim
+- the repository can advance its published Canopus position without widening
+  compiler or low-level ownership surfaces
+
+Deliverables
+------------
+- one canonical Phase 120 closeout note in `docs/plan/`
+- one canonical running-system support note in `docs/plan/`
+- one narrow debug-owned Phase 120 aggregate audit plus one root-proof helper
+  that publish the admitted running-system statement mechanically
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 120 marker only after the running-system support audit succeeds
+- refreshed roadmap, current-position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog entries
+- one focused Phase 120 freestanding kernel regression with a projected MIR
+  golden for the new audit surface
+
+Suggested execution order
+-------------------------
+1. Add the smallest aggregate root-module audit needed to revalidate the
+   landed Phase 117 through Phase 119 truth as one support-statement
+   contract.
+2. Advance the kernel proof marker to 120 only after that audit succeeds.
+3. Publish the canonical running-system support note.
+4. Add the focused Phase 120 freestanding regression for build, run,
+   publication, and MIR checks.
+5. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 120 marker without
+  widening the admitted running-system slice beyond the already-landed Phase
+  117 through Phase 119 truth
+- one aggregate debug-owned audit proves that the running-system support
+  statement is grounded in the landed init-owned service, delegation, and
+  fixed-directory boundaries
+- the canonical Phase 120 note, running-system support note, position note,
+  kernel README, and repository map all publish the same admitted slice
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 120 boundary consistently
+
+Non-goals
+---------
+- dynamic service discovery or a general namespace model
+- dynamic loading or a broader init-owned service framework
+- public freestanding `mc run` or `mc test` workflow admission
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase120RunningSystemSupportAudit` and validator
+  that package the landed Phase 117 through Phase 119 running-system truth as
+  one support-statement contract
+- added one narrow `bootstrap_audit` builder plus one root-module helper so
+  the real kernel artifact publishes that running-system statement
+  mechanically and advances the proof marker to 120 only after it remains
+  true
+- published one canonical `docs/plan/canopus_running_system_support_statement.txt`
+  support note naming the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR
+  golden for the Phase 120 running-system support boundary
+- refreshed the roadmap, current-position note, kernel README, repository
+  map, freestanding test README, decision log, and backlog so the repository
+  records both the landed support statement and the decision not to expand
+  compiler work in this phase
+
+Closeout statement
+------------------
+Phase 120 is complete as a running-system support statement.
+The repository still claims only one bounded first running Canopus kernel
+slice, but that slice now has one explicit published running-system support
+statement over the landed init-owned multi-service, delegated request-reply,
+and fixed-directory boundaries, and the compiler stays closed because this
+phase needed publication and audit rather than new language or backend work.
