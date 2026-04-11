@@ -1,0 +1,433 @@
+Phase 124 Through Phase 137 -- Speculative Post-Phase-123 Canopus Roadmap
+=========================================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the completed Phase 123 plateau audit
+over the current Canopus running-system slice.
+
+This document is intentionally forward-looking and tentative.
+It does not replace `docs/plan/plan.txt`.
+It does not replace the concrete Phase 109 through Phase 124 closeout notes.
+It gives one plausible ordering for the next Canopus wave if the repository
+keeps following the same evidence-first rules used so far:
+
+- one owner-local gap at a time
+- one real mechanism, stress proof, or boundary probe at a time
+- one explicit exit criterion per phase
+- no broader platform claim before the next stressed system slice is honest
+
+Relationship to companion notes
+-------------------------------
+This roadmap is meant to stay aligned with:
+
+- `docs/plan/admin/modern_c_canopus_readiness_position.txt`
+- `docs/plan/admin/canopus_post_phase109_speculative_roadmap.txt`
+- `docs/plan/phase123_next_plateau_audit.txt`
+- `docs/plan/phase124_delegation_chain_stress.txt`
+- `docs/plan/canopus_running_system_support_statement.txt`
+- `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
+- `docs/arch/canopus/canopus_lite_v0.txt`
+- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_sys_interface_v0.txt`
+- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+
+If those notes define the current admitted slice, the Phase 123 plateau, the
+landed Phase 124 authority-stress step, and the longer-term ownership target,
+this roadmap suggests one practical phase
+ordering for the next bounded implementation wave after that plateau became
+real.
+
+Repository numbering note
+-------------------------
+- Phase 81 through Phase 95 are occupied by the concrete freestanding bring-up
+  and support-freeze wave.
+- Phase 96 through Phase 124 are occupied by the concrete first-kernel,
+  ownership-hardening, hardware-boundary, running-system, plateau-freeze, and
+  first authority-stress waves.
+- The next speculative continuation therefore starts at Phase 124.
+
+Repository status note
+----------------------
+- The repository can now honestly claim one bounded small running-system
+  plateau over a real Canopus kernel artifact.
+- That plateau remains intentionally narrow: explicit authority, bounded IPC
+  and lifecycle behavior, one bounded init-owned service set, one bounded
+  namespace answer, and explicit image plus target truth over the same owned
+  artifact.
+- The strongest next question is no longer whether the repository can build a
+  clean small kernel and system at all. It is whether that same model remains
+  correct under deeper authority, failure, composition, and device-boundary
+  pressure without forcing broader kernel policy or premature language churn.
+
+What this roadmap is trying to answer
+-------------------------------------
+- What likely comes after the first honest post-Phase-123 plateau if the
+  repository keeps growing Canopus conservatively?
+- Which follow-on fronts belong first to stress-testing authority, failure,
+  IPC composition, and device boundaries rather than to new platform breadth?
+- In what order should the repository pressure the current model so the next
+  larger subsystem question becomes honest rather than speculative?
+
+Core rule
+---------
+- Treat the next wave primarily as model validation under stress, not as a
+  feature land-grab.
+- Keep the current Modern C core closed unless a real stress phase exposes a
+  concrete parser, sema, MIR, backend, ABI, target, or `hal` owner gap.
+- Preserve explicit authority, explicit failure visibility, and explicit
+  ownership boundaries even when composition becomes deeper.
+- Do not let stress phases drift into performance work, broad policy layers,
+  or platform-completion claims.
+
+Kernel invariants
+-----------------
+These invariants apply across all phases in this roadmap:
+
+- no subsystem may require knowledge of another subsystem's internal state in
+  order to perform its normal owned behavior
+- all cross-subsystem interaction must pass through explicit interfaces,
+  ownership-visible helpers, or dependency-visible boundaries
+- no new syscall, namespace hook, or device hook should be added without an
+  explicit argument that the current owner is insufficient
+- no stress phase should silently turn into optimization or throughput work
+  before the correctness boundary it is testing is already explicit
+- no kernel feature should encode user-space policy that can remain explicit
+  in init or in ordinary services
+
+Roadmap bands
+-------------
+
+Band A - Stress Authority Lifetime And Invalidation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 124 through 126 should test the kernel's strongest current claim first:
+that explicit authority remains explicit under deeper composition.
+
+Likely themes:
+- multi-hop delegation without ambient leakage
+- invalidation, rejection, and lifetime auditability
+- long-lived versus short-lived authority paths
+- explicit leak and dangling-reference detection at the contract boundary
+
+Why this band comes first:
+- if explicit authority does not survive deeper composition, later IPC,
+  failure, and device experiments will normalize the wrong coupling instead of
+  exposing it.
+
+Phase 124 through Phase 126 -- Authority Lifecycle Stress
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Goal:
+- prove that delegated authority remains valid, bounded, and revocable under
+  deeper composition.
+
+Suggested scope:
+- multi-hop delegation chains
+- revocation or invalidation behavior
+- long-lived versus short-lived capability handling
+- explicit detection of leaks, dangling references, and invalid access paths
+
+Exit criteria:
+- no ambient authority leakage across delegation chains
+- invalidated authority is rejected consistently
+- lifetime handling remains explicit and mechanically auditable
+
+Non-goal:
+- introducing a broader policy layer for authority management
+
+Phase 124 -- Delegation Chain Stress
+- Phase 124 is now concrete as one delegation-chain stress step over the
+  landed retained-handle authority path.
+- Exit criterion: one bounded multi-hop delegation chain preserves explicit
+  authority ownership, rejects ambient reuse, and leaves each hop auditable
+  without widening the kernel into a general authority framework.
+
+Phase 125 -- Invalidation And Rejection Audit
+- Exit criterion: one explicit invalidation or authority-loss path is carried
+  across the current system model and rejected consistently at all relevant
+  use sites without reopening a full revocation algebra.
+
+Phase 126 -- Authority Lifetime Classification
+- Exit criterion: the repository can distinguish one bounded long-lived
+  authority path from one bounded short-lived authority path and prove that
+  the lifetime handling stays explicit and mechanically auditable.
+
+Guardrail for this band:
+- start with invalidation, rejection, and lifetime auditability first
+- treat broader revocation machinery as deferred unless these phases prove it
+  is the narrowest honest next owner
+
+Band B - Make Failure Semantics Explicit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 127 through 129 should make failure a first-class system fact before
+IPC composition is widened further.
+
+Likely themes:
+- service death handling
+- partial failure propagation
+- restart or replacement without kernel supervision
+- capability rebinding only where the service model proves it belongs
+
+Why this band comes next:
+- failure pressure already exists inside delegation, IPC, and service
+  orchestration; making it explicit now is safer than normalizing hidden
+  coupling through broader composition patterns first.
+
+Phase 127 through Phase 129 -- Failure Semantics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Goal:
+- make failure a first-class part of the model without importing kernel-side
+  recovery policy.
+
+Suggested scope:
+- service death handling
+- partial failure propagation
+- restart and replacement behavior
+- capability re-binding after failure
+
+Exit criteria:
+- service disappearance does not corrupt kernel policy boundaries
+- partial failure is observable and bounded
+- restart behavior remains explicit and service-owned
+
+Non-goal:
+- turning the kernel into a recovery or supervision framework
+
+Phase 127 -- Service Death Observation
+- Exit criterion: one bounded service-disappearance path becomes observable and
+  explicit without corrupting kernel ownership boundaries or introducing a
+  kernel-side supervision policy.
+
+Phase 128 -- Partial Failure Propagation
+- Exit criterion: one partial-failure path can cross the current request,
+  reply, and authority boundaries while remaining explicit, bounded, and free
+  of hidden scheduler or recovery semantics.
+
+Phase 129 -- Explicit Restart Or Replacement Probe
+- Exit criterion: one bounded restart or replacement story can be expressed as
+  service-owned policy without turning the kernel into a recovery framework.
+
+Band C - Stress IPC Composition Under The Clarified Model
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 130 through 132 should test deeper IPC composition only after authority
+and failure contracts are clearer.
+
+Likely themes:
+- fan-in and fan-out patterns under bounded pressure
+- backpressure and blocking behavior
+- message lifetime and reuse boundaries
+- copy and ownership rules under deeper composition
+
+Why this band comes after failure:
+- IPC composition should be stressed after the repository already knows what
+  explicit failure and invalidation look like inside the same system model.
+
+Phase 130 through Phase 132 -- IPC Composition Stress
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Goal:
+- prove that IPC remains correct when composed more deeply, after authority and
+  failure contracts are already clearer.
+
+Suggested scope:
+- fan-in and fan-out patterns
+- backpressure and blocking behavior
+- message lifetime semantics
+- copy, ownership, and reuse boundaries
+
+Exit criteria:
+- no scheduler leakage into IPC semantics
+- no implicit ordering assumptions are required for correctness
+- blocking behavior stays clean under bounded composition pressure
+
+Non-goal:
+- optimizing IPC for performance before correctness is stressed
+
+Phase 130 -- Fan-In Or Fan-Out Composition Probe
+- Exit criterion: one bounded fan-in or fan-out topology preserves explicit
+  ownership and does not leak scheduler policy into IPC semantics.
+
+Phase 131 -- Backpressure And Blocking Audit
+- Exit criterion: one bounded backpressure case preserves clean block or wake
+  ownership without requiring hidden ordering assumptions for correctness.
+
+Phase 132 -- Message Lifetime And Reuse Audit
+- Exit criterion: one bounded message lifetime and reuse path proves that copy,
+  ownership, and retirement rules remain explicit under deeper composition.
+
+Band D - Attempt One Narrow Device-Service Experiment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 133 through 136 should test one real interrupt-facing service path only
+after authority, failure, and IPC composition already hold under stress.
+
+Phase 133 through Phase 136 -- Device boundary experiment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Goal:
+- prove that real devices can be attached without letting driver policy move
+  into the kernel.
+
+Suggested scope:
+- one real device exposed as a service
+- interrupt to service handoff
+- DMA and buffer ownership boundaries
+- device failure handling
+
+Exit criteria:
+- the kernel does not become a driver framework
+- buffer ownership remains explicit
+- device failure does not trigger broad kernel policy growth
+
+Non-goal:
+- a general in-kernel device stack
+
+Phase 133 -- Minimal Device-Service Handoff
+- Exit criterion: one real device-facing event path can cross from interrupt or
+  kernel mediation into one user-space service without turning the kernel into
+  a driver framework.
+
+Phase 134 -- Buffer Ownership Boundary Audit
+- Exit criterion: one bounded device buffer path keeps ownership explicit end
+  to end without adding an in-kernel policy layer.
+
+Phase 135 -- Device Failure Containment Probe
+- Exit criterion: one bounded device-failure path remains explicit and does not
+  trigger broad kernel policy growth.
+
+Phase 136 -- Optional DMA-Or-Equivalent Follow-Through
+- Exit criterion: only if Phase 133 through Phase 135 prove it is the narrowest
+  next owner, one bounded DMA or equivalent transfer-boundary truth can be
+  admitted without widening into a general in-kernel driver stack.
+
+Guardrail for this band:
+- DMA remains optional and should stay deferred unless the narrower device-
+  service path proves it is the immediate next owner
+
+Band E - Rebuild Only If Earlier Stress Exposes A Distorted Owner
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phase 137 should remain conditional.
+It is not an automatic culmination of the roadmap.
+
+Phase 137 -- Optional subsystem rebuild
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Goal:
+- re-implement one already-landed subsystem using the newer structure and
+  verify that the replacement fits the ownership model better.
+
+Suggested candidates:
+- IPC
+- scheduler
+- capability handling
+
+Exit criteria:
+- the new version fits the model with fewer exceptions or hacks
+- the rebuild increases clarity rather than adding incidental complexity
+
+Why this band is conditional:
+- a subsystem rebuild is honest only when earlier stress phases expose repeated
+  distortion in an already-landed owner.
+- if no such distortion appears, the right answer is to skip this entirely.
+
+Phase 137 -- Conditional Subsystem Rebuild
+- Exit criterion: one already-landed subsystem is re-implemented only because
+  the earlier stress phases proved that the replacement fits the ownership
+  model with fewer exceptions or hacks, not because the roadmap demanded a
+  rebuild for its own sake.
+
+Cross-cutting constraints
+-------------------------
+Any future roadmap derived from these ideas should keep these constraints
+explicit:
+
+- no phase should widen syscall surface, namespace policy, or device policy
+  without proving why the current owner is insufficient
+- no stress phase should silently turn into performance work before the
+  correctness boundary is explicit
+- no failure phase should turn the kernel into a recovery supervisor
+- no device experiment should introduce a broad in-kernel driver framework
+- no rebuild phase should happen without concrete evidence from earlier phases
+
+Likely ordering bias
+--------------------
+If the repository keeps following the same pattern, the safest order is:
+
+1. stress authority lifetime and invalidation first
+2. make failure explicit before wider IPC composition
+3. test IPC composition only after authority and failure contracts are clearer
+4. attempt one narrow device-service path only after those stress bands hold
+5. rebuild only if the earlier bands expose a distorted owner
+
+That ordering keeps the repository from hiding structural defects behind
+larger subsystem growth or platform ambition.
+
+What not to do next
+-------------------
+- Full filesystem support
+- Networking stack work
+- Multicore scheduling work
+- Language changes without a concrete pressure point
+
+These areas are deferred because they are more likely to hide structural bugs
+than to validate the current model.
+
+What this unlocks
+-----------------
+If the stress phases land cleanly, the repository can begin to treat several
+larger questions as honest next-step options instead of speculation:
+
+- a principled filesystem as a service
+- a real namespace model, or a confident decision to avoid one
+- long-lived services with stable authority graphs
+- user-space device stacks
+- performance work after correctness is already proven
+- multicore as an extension of an explicit model, not a replacement for it
+- a real service ecosystem built from composable parts
+- language changes only where system pressure proves they are needed
+- a stable platform boundary between kernel, services, and programs
+
+Decision rule
+-------------
+The next milestone class should be accepted only if it proves one of the
+following:
+
+- the current model still works when stressed
+- a subsystem can be added without forcing changes to unrelated owners
+- the new behavior remains explicit, bounded, and mechanically auditable
+
+If a proposed milestone does not meet that standard, it should not be treated
+as the next phase.
+
+Non-goals
+---------
+- treating this roadmap as a committed execution plan
+- declaring a broader Canopus platform because the current small system is now
+  cleanly staged
+- reopening Modern C core-language design before a stress phase exposes a real
+  owner gap
+- introducing recovery supervision, driver frameworks, or broad namespace
+  policy as shortcuts around the current explicit model
+
+Summary
+-------
+Phase 109 through Phase 124 establish a correct small system, one honest
+plateau over it, and one first post-plateau authority-stress step.
+The next phase class should establish that the same system remains correct
+under authority, failure, IPC, and device-boundary pressure.
+
+The best future roadmap therefore is not “bigger system next.”
+It is “stress the current model until the next larger subsystem question is
+honest.”
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- The current position note remains the canonical statement of present truth.
+- The current admitted boundary now includes the landed Phase 124
+  delegation-chain stress step; later stress phases should only widen that
+  boundary when another concrete proof lands.
+- If a smaller honest plateau appears earlier than Phase 137, that is success,
+  not roadmap failure.
+- If a real stress phase exposes a compiler or language distortion, reopen the
+  narrowest owning layer only at that proof boundary.

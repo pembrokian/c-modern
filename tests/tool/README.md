@@ -29,7 +29,20 @@ Current structure
     `kernel/phase108_kernel_image_program_cap_audit.cpp`,
     `kernel/phase109_first_running_kernel_slice_audit.cpp`,
       `kernel/phase110_kernel_ownership_split_audit.cpp`,
-      `kernel/phase111_scheduler_lifecycle_ownership_clarification.cpp`: one kernel proof per file.
+      `kernel/phase111_scheduler_lifecycle_ownership_clarification.cpp`,
+      `kernel/phase112_syscall_boundary_thinness_audit.cpp`,
+      `kernel/phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`,
+      `kernel/phase114_address_space_and_mmu_ownership_split.cpp`,
+      `kernel/phase115_timer_ownership_hardening.cpp`,
+      `kernel/phase116_mmu_activation_barrier_follow_through.cpp`,
+      `kernel/phase117_init_orchestrated_multi_service_bring_up.cpp`,
+      `kernel/phase118_request_reply_and_delegation_follow_through.cpp`,
+      `kernel/phase119_namespace_pressure_audit.cpp`,
+      `kernel/phase120_running_system_support_statement.cpp`,
+      `kernel/phase121_kernel_image_contract_hardening.cpp`,
+      `kernel/phase122_target_surface_audit.cpp`,
+      `kernel/phase123_next_plateau_audit.cpp`, and
+      `kernel/phase124_delegation_chain_stress.cpp`: one kernel proof per file.
   - late ownership-hardening kernel audits also keep adjacent `.mirproj.txt`
     files for projected MIR golden expectations.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-

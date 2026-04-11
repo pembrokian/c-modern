@@ -40,10 +40,15 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const PHASE123_MARKER: i32 = 123
+const PHASE124_MARKER: i32 = 124
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
+const PHASE124_INTERMEDIARY_PID: u32 = 4
+const PHASE124_FINAL_HOLDER_PID: u32 = 5
+const PHASE124_CONTROL_HANDLE_SLOT: u32 = 1
+const PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT: u32 = 2
+const PHASE124_FINAL_RECEIVE_HANDLE_SLOT: u32 = 3
 
 var KERNEL: state.KernelDescriptor
 var PROCESS_SLOTS: [3]state.ProcessSlot
@@ -108,6 +113,11 @@ var TRANSFER_SERVICE_EMIT_OBSERVATION: syscall.ReceiveObservation
 var TRANSFER_SERVICE_TRANSFER: transfer_service.TransferObservation
 var TRANSFER_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
 var PHASE118_INVALIDATED_SOURCE_SEND_STATUS: syscall.SyscallStatus
+var PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS: syscall.SyscallStatus
+var PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS: syscall.SyscallStatus
+var PHASE124_FINAL_SEND_STATUS: syscall.SyscallStatus
+var PHASE124_FINAL_SEND_SOURCE_PID: u32
+var PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH: usize
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -173,6 +183,11 @@ func reset_kernel_state() {
     TRANSFER_SERVICE_TRANSFER = transfer_service.TransferObservation{ service_pid: 0, client_pid: 0, control_endpoint_id: 0, transferred_endpoint_id: 0, transferred_rights: 0, tag: transfer_service.CapabilityTransferTag.None, grant_len: 0, grant_byte0: 0, grant_byte1: 0, grant_byte2: 0, grant_byte3: 0, emit_len: 0, emit_byte0: 0, emit_byte1: 0, emit_byte2: 0, emit_byte3: 0, grant_count: 0, emit_count: 0 }
     TRANSFER_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
     PHASE118_INVALIDATED_SOURCE_SEND_STATUS = syscall.SyscallStatus.None
+    PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS = syscall.SyscallStatus.None
+    PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS = syscall.SyscallStatus.None
+    PHASE124_FINAL_SEND_STATUS = syscall.SyscallStatus.None
+    PHASE124_FINAL_SEND_SOURCE_PID = 0
+    PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH = 0
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -1234,6 +1249,98 @@ func build_phase123_next_plateau_audit(phase122_audit: debug.Phase122TargetSurfa
     return bootstrap_audit.build_phase123_next_plateau_audit(bootstrap_audit.Phase123NextPlateauAuditInputs{ phase122: phase122_audit, running_kernel_truth_visible: 1, running_system_truth_visible: 1, kernel_image_truth_visible: 1, target_surface_truth_visible: 1, broader_platform_visible: 0, broad_target_support_visible: 0, general_loading_visible: 0, compiler_reopening_visible: 0 })
 }
 
+func build_phase124_delegation_chain_audit(phase123_audit: debug.Phase123NextPlateauAudit) debug.Phase124DelegationChainAudit {
+    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
+    return bootstrap_audit.build_phase124_delegation_chain_audit(bootstrap_audit.Phase124DelegationChainAuditInputs{ phase123: phase123_audit, delegator_pid: INIT_PID, intermediary_pid: PHASE124_INTERMEDIARY_PID, final_holder_pid: PHASE124_FINAL_HOLDER_PID, control_endpoint_id: INIT_ENDPOINT_ID, delegated_endpoint_id: TRANSFER_ENDPOINT_ID, delegator_source_handle_slot: transfer_config.init_received_handle_slot, intermediary_receive_handle_slot: PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT, final_receive_handle_slot: PHASE124_FINAL_RECEIVE_HANDLE_SLOT, first_invalidated_send_status: PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS, second_invalidated_send_status: PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS, final_send_status: PHASE124_FINAL_SEND_STATUS, final_send_source_pid: PHASE124_FINAL_SEND_SOURCE_PID, final_endpoint_queue_depth: PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH, ambient_authority_visible: 0, compiler_reopening_visible: 0 })
+}
+
+func execute_phase124_delegation_chain_probe() bool {
+    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
+    local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
+    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
+    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, INIT_ENDPOINT_ID)
+    local_endpoints = endpoint.install_endpoint(local_endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
+
+    init_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
+    init_table = capability.install_endpoint_handle(init_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+    init_table = capability.install_endpoint_handle(init_table, transfer_config.init_received_handle_slot, TRANSFER_ENDPOINT_ID, 5)
+
+    intermediary_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_INTERMEDIARY_PID)
+    intermediary_table = capability.install_endpoint_handle(intermediary_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+
+    final_table: capability.HandleTable = capability.handle_table_for_owner(PHASE124_FINAL_HOLDER_PID)
+    final_table = capability.install_endpoint_handle(final_table, PHASE124_CONTROL_HANDLE_SLOT, INIT_ENDPOINT_ID, 5)
+
+    grant_payload: [4]u8 = endpoint.zero_payload()
+    grant_payload[0] = 67
+    grant_payload[1] = 72
+    grant_payload[2] = 65
+    grant_payload[3] = 73
+    first_send: syscall.SendResult = syscall.perform_send(local_gate, init_table, local_endpoints, INIT_PID, syscall.build_transfer_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, grant_payload, transfer_config.init_received_handle_slot))
+    init_table = first_send.handle_table
+    local_endpoints = first_send.endpoints
+    local_gate = first_send.gate
+    if syscall.status_score(first_send.status) != 2 {
+        return false
+    }
+
+    first_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, intermediary_table, local_endpoints, syscall.build_transfer_receive_request(PHASE124_CONTROL_HANDLE_SLOT, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT))
+    intermediary_table = first_receive.handle_table
+    local_endpoints = first_receive.endpoints
+    local_gate = first_receive.gate
+    if syscall.status_score(first_receive.observation.status) != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(intermediary_table, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+
+    init_invalidated_send: syscall.SendResult = syscall.perform_send(local_gate, init_table, local_endpoints, INIT_PID, syscall.build_send_request(transfer_config.init_received_handle_slot, 4, grant_payload))
+    PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS = init_invalidated_send.status
+    if syscall.status_score(PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS) != 8 {
+        return false
+    }
+
+    second_send: syscall.SendResult = syscall.perform_send(local_gate, intermediary_table, local_endpoints, PHASE124_INTERMEDIARY_PID, syscall.build_transfer_send_request(PHASE124_CONTROL_HANDLE_SLOT, 4, grant_payload, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT))
+    intermediary_table = second_send.handle_table
+    local_endpoints = second_send.endpoints
+    local_gate = second_send.gate
+    if syscall.status_score(second_send.status) != 2 {
+        return false
+    }
+
+    second_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, final_table, local_endpoints, syscall.build_transfer_receive_request(PHASE124_CONTROL_HANDLE_SLOT, PHASE124_FINAL_RECEIVE_HANDLE_SLOT))
+    final_table = second_receive.handle_table
+    local_endpoints = second_receive.endpoints
+    local_gate = second_receive.gate
+    if syscall.status_score(second_receive.observation.status) != 2 {
+        return false
+    }
+    if capability.find_endpoint_for_handle(final_table, PHASE124_FINAL_RECEIVE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
+        return false
+    }
+
+    intermediary_invalidated_send: syscall.SendResult = syscall.perform_send(local_gate, intermediary_table, local_endpoints, PHASE124_INTERMEDIARY_PID, syscall.build_send_request(PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT, 4, grant_payload))
+    PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS = intermediary_invalidated_send.status
+    if syscall.status_score(PHASE124_INTERMEDIARY_INVALIDATED_SEND_STATUS) != 8 {
+        return false
+    }
+
+    final_payload: [4]u8 = endpoint.zero_payload()
+    final_payload[0] = 72
+    final_payload[1] = 79
+    final_payload[2] = 80
+    final_payload[3] = 50
+    final_send: syscall.SendResult = syscall.perform_send(local_gate, final_table, local_endpoints, PHASE124_FINAL_HOLDER_PID, syscall.build_send_request(PHASE124_FINAL_RECEIVE_HANDLE_SLOT, 4, final_payload))
+    PHASE124_FINAL_SEND_STATUS = final_send.status
+    PHASE124_FINAL_SEND_SOURCE_PID = final_send.endpoints.slots[1].messages[0].source_pid
+    PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH = final_send.endpoints.slots[1].queued_messages
+    if syscall.status_score(PHASE124_FINAL_SEND_STATUS) != 2 {
+        return false
+    }
+    return PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH == 1
+}
+
 func execute_phase118_invalidated_source_send_probe() bool {
     transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
     probe_payload: [4]u8 = endpoint.zero_payload()
@@ -1562,43 +1669,49 @@ func bootstrap_main() i32 {
     if !debug.validate_phase123_next_plateau_audit(build_phase123_next_plateau_audit(phase122_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 59
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, 123)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !execute_phase124_delegation_chain_probe() {
         return 60
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase124_delegation_chain_stress(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit)), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 61
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, 124)
+    if BOOT_MARKER_EMITTED != 1 {
         return 62
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 63
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 64
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 65
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 66
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 67
     }
-    if state.log_detail_at(BOOT_LOG, 4) != 123 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 68
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 69
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != 124 {
         return 70
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 71
     }
-    return PHASE123_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 72
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 73
+    }
+    return PHASE124_MARKER
 }

@@ -287,13 +287,6 @@ Phase 123 -- Next Plateau Audit
   truths exactly, together with the still-deferred areas that remain outside
   that plateau.
 
-Phase 124 -- Delegation Chain Stress
-- Phase 124 is now concrete as one delegation-chain stress step over the
-  landed retained-handle authority path.
-- Exit criterion: one bounded two-hop delegation chain preserves explicit
-  ownership, rejects ambient reuse at each prior holder, and leaves the final
-  holder auditable without widening into a general authority framework.
-
 Likely ordering bias
 --------------------
 If the repository keeps following the same pattern, the safest order is:
@@ -327,9 +320,7 @@ Interpretation guide
   through the first running-kernel, first ownership-split, first lifecycle-
   owner clarification, first syscall-boundary clarification, first interrupt-
   boundary clarification, and first address-space/MMU split wave.
-- Phase 123 now supplies the first small honest plateau for this kernel lane,
-  and Phase 124 now proves that one deeper delegation chain still fits the
-  same explicit authority model; the next question is which pressure deserves
-  the next bounded widening after that authority-stress step.
+- Phase 123 now supplies the first small honest plateau for this kernel lane;
+  the next question is which pressure deserves the next bounded widening.
 - If a real next kernel step exposes a compiler or language distortion,
   reopen the narrowest owning layer only at that proof boundary.

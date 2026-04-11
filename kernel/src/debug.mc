@@ -166,6 +166,25 @@ struct Phase123NextPlateauAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase124DelegationChainAudit {
+    phase123: Phase123NextPlateauAudit
+    delegator_pid: u32
+    intermediary_pid: u32
+    final_holder_pid: u32
+    control_endpoint_id: u32
+    delegated_endpoint_id: u32
+    delegator_source_handle_slot: u32
+    intermediary_receive_handle_slot: u32
+    final_receive_handle_slot: u32
+    first_invalidated_send_status: syscall.SyscallStatus
+    second_invalidated_send_status: syscall.SyscallStatus
+    final_send_status: syscall.SyscallStatus
+    final_send_source_pid: u32
+    final_endpoint_queue_depth: usize
+    ambient_authority_visible: u32
+    compiler_reopening_visible: u32
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -729,6 +748,73 @@ func validate_phase123_next_plateau_audit(audit: Phase123NextPlateauAudit, sched
         return false
     }
     if audit.general_loading_visible != 0 {
+        return false
+    }
+    return audit.compiler_reopening_visible == 0
+}
+
+func validate_phase124_delegation_chain_stress(audit: Phase124DelegationChainAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase123_next_plateau_audit(audit.phase123, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.delegator_pid != audit.phase123.phase122.phase121.phase120.phase119.phase118.phase117.running_slice.init_pid {
+        return false
+    }
+    if audit.intermediary_pid == 0 {
+        return false
+    }
+    if audit.final_holder_pid == 0 {
+        return false
+    }
+    if audit.intermediary_pid == audit.delegator_pid {
+        return false
+    }
+    if audit.final_holder_pid == audit.delegator_pid {
+        return false
+    }
+    if audit.intermediary_pid == audit.final_holder_pid {
+        return false
+    }
+    if audit.control_endpoint_id != audit.phase123.phase122.phase121.phase120.phase119.phase118.phase117.init_endpoint_id {
+        return false
+    }
+    if audit.delegated_endpoint_id != audit.phase123.phase122.phase121.phase120.phase119.phase118.phase117.transfer_endpoint_id {
+        return false
+    }
+    if audit.control_endpoint_id == audit.delegated_endpoint_id {
+        return false
+    }
+    if audit.delegator_source_handle_slot == 0 {
+        return false
+    }
+    if audit.intermediary_receive_handle_slot == 0 {
+        return false
+    }
+    if audit.final_receive_handle_slot == 0 {
+        return false
+    }
+    if audit.delegator_source_handle_slot == audit.intermediary_receive_handle_slot {
+        return false
+    }
+    if audit.intermediary_receive_handle_slot == audit.final_receive_handle_slot {
+        return false
+    }
+    if syscall.status_score(audit.first_invalidated_send_status) != 8 {
+        return false
+    }
+    if syscall.status_score(audit.second_invalidated_send_status) != 8 {
+        return false
+    }
+    if syscall.status_score(audit.final_send_status) != 2 {
+        return false
+    }
+    if audit.final_send_source_pid != audit.final_holder_pid {
+        return false
+    }
+    if audit.final_endpoint_queue_depth != 1 {
+        return false
+    }
+    if audit.ambient_authority_visible != 0 {
         return false
     }
     return audit.compiler_reopening_visible == 0

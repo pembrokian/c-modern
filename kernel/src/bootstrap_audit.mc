@@ -258,6 +258,25 @@ struct Phase123NextPlateauAuditInputs {
     compiler_reopening_visible: u32
 }
 
+struct Phase124DelegationChainAuditInputs {
+    phase123: debug.Phase123NextPlateauAudit
+    delegator_pid: u32
+    intermediary_pid: u32
+    final_holder_pid: u32
+    control_endpoint_id: u32
+    delegated_endpoint_id: u32
+    delegator_source_handle_slot: u32
+    intermediary_receive_handle_slot: u32
+    final_receive_handle_slot: u32
+    first_invalidated_send_status: syscall.SyscallStatus
+    second_invalidated_send_status: syscall.SyscallStatus
+    final_send_status: syscall.SyscallStatus
+    final_send_source_pid: u32
+    final_endpoint_queue_depth: usize
+    ambient_authority_visible: u32
+    compiler_reopening_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1170,4 +1189,8 @@ func build_phase122_target_surface_audit(inputs: Phase122TargetSurfaceAuditInput
 
 func build_phase123_next_plateau_audit(inputs: Phase123NextPlateauAuditInputs) debug.Phase123NextPlateauAudit {
     return debug.Phase123NextPlateauAudit{ phase122: inputs.phase122, running_kernel_truth_visible: inputs.running_kernel_truth_visible, running_system_truth_visible: inputs.running_system_truth_visible, kernel_image_truth_visible: inputs.kernel_image_truth_visible, target_surface_truth_visible: inputs.target_surface_truth_visible, broader_platform_visible: inputs.broader_platform_visible, broad_target_support_visible: inputs.broad_target_support_visible, general_loading_visible: inputs.general_loading_visible, compiler_reopening_visible: inputs.compiler_reopening_visible }
+}
+
+func build_phase124_delegation_chain_audit(inputs: Phase124DelegationChainAuditInputs) debug.Phase124DelegationChainAudit {
+    return debug.Phase124DelegationChainAudit{ phase123: inputs.phase123, delegator_pid: inputs.delegator_pid, intermediary_pid: inputs.intermediary_pid, final_holder_pid: inputs.final_holder_pid, control_endpoint_id: inputs.control_endpoint_id, delegated_endpoint_id: inputs.delegated_endpoint_id, delegator_source_handle_slot: inputs.delegator_source_handle_slot, intermediary_receive_handle_slot: inputs.intermediary_receive_handle_slot, final_receive_handle_slot: inputs.final_receive_handle_slot, first_invalidated_send_status: inputs.first_invalidated_send_status, second_invalidated_send_status: inputs.second_invalidated_send_status, final_send_status: inputs.final_send_status, final_send_source_pid: inputs.final_send_source_pid, final_endpoint_queue_depth: inputs.final_endpoint_queue_depth, ambient_authority_visible: inputs.ambient_authority_visible, compiler_reopening_visible: inputs.compiler_reopening_visible }
 }

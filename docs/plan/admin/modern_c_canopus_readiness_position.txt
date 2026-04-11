@@ -7,7 +7,7 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position after Phase 123 published one explicit plateau audit over the landed running kernel slice.
+Record one maintained repository position after Phase 124 published one explicit delegation-chain stress step over the landed running kernel slice.
 
 This note answers four questions that now matter:
 
@@ -18,7 +18,7 @@ This note answers four questions that now matter:
 
 This note is not a support statement, a full phase plan, or a claim that the
 full Canopus architecture is implemented.
-It does not replace the Phase 109 through Phase 123 closeouts, the Canopus
+It does not replace the Phase 109 through Phase 124 closeouts, the Canopus
 architecture notes, or the narrower hosted and freestanding support
 statements.
 
@@ -42,6 +42,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/phase121_kernel_image_contract_hardening.txt`
 - `docs/plan/phase122_target_surface_audit.txt`
 - `docs/plan/phase123_next_plateau_audit.txt`
+- `docs/plan/phase124_delegation_chain_stress.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
 - `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
 - `docs/plan/freestanding_support_statement.txt`
@@ -57,28 +58,25 @@ current working position after that first running slice became real.
 Current repository truth
 ------------------------
 - Modern C still has a repository-bounded hosted `v0.2` plateau, and it now
-  also has a separate bounded freestanding or kernel lane that reaches one
-  first running Canopus kernel slice.
+  also has a separate bounded freestanding or kernel lane that now reaches one
+  small running-system plateau for Canopus.
 - The repository-owned kernel is no longer merely a proof sketch. It now
   builds and runs one explicit bounded kernel artifact with real boot entry,
   first user entry, endpoint and handle state, syscall-owned byte IPC,
   attached-handle transfer, program-cap spawn and wait, timer-backed wake,
-  bootstrap-capability handoff, bounded service follow-through, kernel image
-  and program-cap audit, an aggregate Phase 109 running-slice audit, a landed
-  Phase 110 ownership split, a landed Phase 111 lifecycle-owner
-  clarification, a landed Phase 112 syscall-boundary thinness audit, a landed
-  Phase 113 interrupt-entry and generic-dispatch boundary, a landed Phase 114
-  address-space and MMU ownership split, a landed Phase 115 timer ownership
-  hardening, a landed Phase 116 MMU activation barrier follow-through, a
-  landed Phase 117 init-orchestrated multi-service bring-up, a landed
-  Phase 118 delegated request-reply follow-through, a landed Phase 119
-  namespace-pressure audit, a landed Phase 120 running-system support
-  statement, a landed Phase 121 kernel image-contract hardening step, and a
-  landed Phase 122 target-surface audit, and a landed Phase 123 next-plateau
-  audit.
+  bootstrap-capability handoff, bounded service follow-through, ownership
+  split and lifecycle-owner clarification, thinner syscall and interrupt
+  boundaries, clearer address-space versus MMU ownership, timer hardening,
+  one MMU activation barrier follow-through, one bounded init-orchestrated
+  multi-service answer, one delegated request-reply plus invalidation answer,
+  one fixed-directory namespace-pressure answer, one running-system support
+  statement, one landed Phase 121 kernel image-contract hardening step, one
+  target-surface audit, one landed Phase 123 next-plateau audit, and one
+  landed Phase 124 delegation-chain stress step over that same admitted slice.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
-  implementation slice rather than only for freestanding representation proofs.
+  and running-system slice rather than only for freestanding representation
+  proofs.
 - The repository still does not claim full Canopus Lite completion, a general
   Canopus platform, broad target support, general loading or packaging,
   multicore truth, broader device policy, or a mature freestanding workflow
@@ -86,7 +84,8 @@ Current repository truth
 
 Canopus position
 ----------------
-Canopus is now in a first running-kernel state, not merely a readiness state.
+Canopus is now beyond a first-running-kernel claim and into a first small
+running-system plateau.
 
 That statement is intentionally narrow.
 It means:
@@ -96,31 +95,23 @@ It means:
 - the current admitted slice is still a small capability-based microkernel in
   a fixed-size, table-driven, single-core, inspectable form
 - explicit boot, user entry, IPC, authority transfer, spawn, wait, sleep or
-  wake, and bounded user-space service policy are now real inside that slice
+  wake, bounded init-owned service orchestration, and a bounded namespace
+  answer are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
-The speculative Phase 96 through Phase 109 roadmap is complete as a roadmap
-horizon, the first ownership-hardening plus hardware-boundary wave through
-Phase 116 is now concrete. That wave closed with the MMU activation barrier follow-through.
-The first bounded running-system follow-through at Phase 117, the next
-bounded delegated request-reply follow-through at Phase 118, the next
-fixed-directory namespace-pressure answer at Phase 119, and the next running-
-system support statement at Phase 120, the kernel image contract at
-Phase 121, the target surface at Phase 122, and the next plateau audit at
-Phase 123 are now also concrete,
-but the implementation itself is still at an early kernel plateau rather than
-at architectural completion.
-
-This position also records the landed Phase 120 running-system support statement.
-This position also records the landed Phase 121 kernel image-contract hardening step.
-This position also records the landed Phase 122 target-surface audit.
-This position also records the landed Phase 123 next-plateau audit.
+Phase 96 through Phase 124 are now concrete as one first real kernel wave,
+one ownership and hardware-boundary clarification wave, one first bounded
+running-system and plateau freeze wave, and one first post-plateau authority-
+stress step.
+That is meaningful implementation progress, but it is still an early system
+plateau rather than architectural completion.
 
 Kernel maturity and quality
 ---------------------------
 The current kernel should be treated as an early but real implementation
-slice with better evidence quality than its size might suggest.
+slice with better evidence quality and stronger boundary discipline than its
+size might suggest.
 
 Quality strengths:
 
@@ -133,13 +124,13 @@ Quality strengths:
 - user-space policy is still visible as user-space policy; the kernel has not
   yet drifted into an in-kernel service framework
 - the implementation pressure so far has been answered mostly with explicit
-  helper contracts, build truth, and audit functions rather than with hidden
-  runtime machinery
+  helper contracts, ownership splits, build truth, and audit functions rather
+  than with hidden runtime machinery
 
 Quality limits:
 
-- the owned kernel tree is still flat and tightly staged; it is not yet close
-  to the end-state subsystem layout
+- the owned kernel tree is still young and partly staged; it is not yet close
+  to the full end-state subsystem layout
 - the current artifact is still one bounded kernel lane on the bootstrap
   Darwin arm64 target family, not a broad kernel-product support matrix
 - scheduler, trap, MMU, loader, namespace, device, and service management are
@@ -150,11 +141,13 @@ Quality limits:
 
 Modern C position
 -----------------
-Modern C should now be treated as kernel-slice-capable in repository terms.
+Modern C should now be treated as small-running-system-capable in repository
+terms for this Canopus lane.
 
 That is stronger than the older readiness statement.
 The repository now proves that Modern C can carry one first running kernel
-slice, not just that it seems suitable to start one.
+plus bounded running-system slice, not just that it seems suitable to start
+one.
 
 It is still intentionally weaker than any claim that Modern C is a finished
 kernel platform language.
@@ -167,8 +160,9 @@ What the current repository now proves well:
 - user-to-kernel and user-to-user state transitions without hidden runtime or
   language-level scheduler machinery
 - enough compiler and backend truth to keep the real kernel artifact, its MIR,
-  its delegated request-reply contract, its fixed service-directory answer,
-  and its emitted image inputs aligned through regression tests
+  its service-orchestration and delegated-request contracts, its fixed
+  service-directory answer, and its emitted image inputs aligned through
+  regression tests
 
 What it still does not prove:
 
@@ -181,16 +175,18 @@ What it still does not prove:
 
 Working engineering stance
 --------------------------
-The right stance after Phase 123 is still conservative.
-The current plateau published by Phase 123 is still intentionally narrow.
+The right stance after Phase 124 is still conservative.
+The current plateau carried forward by Phase 124 is still intentionally
+narrow.
 
 - treat the current core language as sufficient until a real next kernel step
   proves otherwise
-- expect the next meaningful pressure to land first on interrupt, timer, MMU,
-  target and build truth, ABI or backend edges, and narrow `hal` or hardware
-  hooks rather than on new syntax
+- expect the next meaningful pressure to land first on stress-testing the
+  current authority, IPC, failure, and device boundaries, then on target,
+  build, ABI, or narrow `hal` edges rather than on new syntax
 - preserve the small-microkernel and user-space-policy bias while the current
-  kernel grows from one bounded slice into a slightly broader running system
+  kernel grows from one bounded slice into a slightly more stressed and
+  better-defended running system
 - refuse claims that outrun the proof surface, especially on portability,
   packaging, loader scope, or service-management generality
 
@@ -223,20 +219,24 @@ What still needs discipline as implementation grows:
 
 Next milestone themes and work areas
 ------------------------------------
-The next milestones should not be described as “more of the same roadmap”.
-They should be described as consolidation and selective widening from the
-first running slice.
+The next milestones should not be described as a broader platform wave.
+They should be described as pressure-testing the current model before any
+larger widening claims are entertained.
 
 Recommended work themes:
 
 - kernel ownership hardening: preserve the landed `sys`, `cap`, `ipc`, `mm`,
   `sched`, `lifecycle`, and `debug` seams, and extract new owners only where
   the next real kernel step proves one boundary is still too blurry
-- hardware-boundary truth: widen only the narrow architecture, trap, timer,
-  MMU, barrier, and interrupt hooks required for the next real kernel step
-- running-system follow-through: grow from bounded service proofs toward a
-  slightly broader init-owned running system without skipping straight to a
-  general namespace, loader, or service framework
+- authority and lifecycle stress: prove that delegated authority, invalidation,
+  and lifetime handling remain explicit under deeper composition without
+  importing a broader kernel policy layer
+- IPC and failure stress: prove that IPC composition, backpressure, service
+  failure, and partial-failure observation stay explicit without letting
+  scheduler or recovery policy leak into the wrong owner
+- device-boundary experiments: only after the above, test whether one real
+  device-service path can fit the current ownership model without turning the
+  kernel into a driver framework
 - target and image hardening: keep manifest, relink, emitted-artifact, and
   kernel-image ownership explicit as the kernel build path grows beyond the
   current bootstrap lane
@@ -271,30 +271,20 @@ Recommended practical reading
 -----------------------------
 The best current practical reading is:
 
-The repository now has one honest first running Canopus kernel slice with one
-bounded init-orchestrated multi-service bring-up, one bounded delegated
-request-reply follow-through, one bounded fixed service-directory answer, one
-published running-system support statement over that same landed slice, one
-explicit image-contract hardening step over that same artifact, one explicit
-target-surface audit over that same artifact, one explicit next-plateau audit
-over that same artifact, and the current Modern C implementation is strong
-enough to grow that slice further without assuming a new language wave first.
+The repository now has one honest small Canopus running-system plateau over a
+real kernel artifact, and the current Modern C implementation is strong enough
+to stress and selectively widen that plateau further without assuming a new
+language wave first.
 
-The next honest work is to pressure or selectively widen that plateau around
-real kernel evidence, not to claim platform completion or to chase
-speculative language machinery.
+The next honest work is to stress authority, IPC, failure, and device
+boundaries around real kernel evidence, not to claim platform completion or to
+chase speculative language machinery.
 
 Bottom line
 -----------
-Canopus should currently be described as a bounded first running kernel with a
-landed Phase 120 running-system support statement, Phase 121 image contract
-hardening step, and Phase 122 target-surface audit over the earlier Phase 119
-namespace-pressure audit,
-Phase 118 delegated request-reply follow-through, Phase 117 init-orchestrated
-multi-service bring-up, timer-owned wake path, and MMU publication boundary,
-plus a landed Phase 123 next-plateau audit over that same admitted slice, and
-Modern C should currently be described as capable of carrying that running
-kernel slice.
+Canopus should currently be described as a bounded small running system over a
+real microkernel artifact, and Modern C should currently be described as
+capable of carrying that kernel and running-system slice.
 
 Both statements are meaningful, but both remain intentionally narrow.
 The repository is beyond readiness and beyond pure proof sketches, yet still

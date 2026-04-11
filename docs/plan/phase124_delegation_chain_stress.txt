@@ -1,0 +1,168 @@
+Phase 124 -- Delegation Chain Stress
+====================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 123 next-plateau audit by proving one
+bounded multi-hop delegation chain over the same already-landed Canopus
+kernel artifact.
+
+This document is both the Phase 124 execution note and its closeout.
+It does not claim a broader revocation framework, broader failure semantics,
+general authority graphs, dynamic service discovery, or a compiler wave.
+It records one narrow authority-stress step over the real kernel artifact that
+Phase 123 already kept explicit.
+
+Repository status note
+----------------------
+- Phase 118 already proved one delegated request-reply follow-through plus one
+  invalidated-source refusal over the landed transfer-service owner.
+- Phase 119 through Phase 123 then froze the current small running-system
+  plateau around namespace, support, image, target, and publication truth.
+- The next honest gap is not a new kernel subsystem. It is proving that the
+  same explicit-authority style survives one deeper delegation chain without
+  ambient reuse and without reopening compiler work.
+
+Problem being solved
+--------------------
+- The repository already had one retained transferred handle after the landed
+  Phase 118 service follow-through, but it still lacked one explicit proof
+  that the same authority could move through a second hop while each previous
+  holder lost reuse rights.
+- Without this step, later failure, IPC-composition, or device-boundary work
+  could blur whether deeper authority composition still belongs to the landed
+  kernel owners or needs a broader framework.
+- The repository needed one small phase that stressed delegation lifetime
+  honestly through the existing syscall, capability, endpoint, bootstrap-audit,
+  and debug owners rather than through new service machinery.
+
+Core rule
+---------
+- Keep the current kernel owners and service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed retained-handle truth from Phase 118 rather than inventing
+  a broader authority manager.
+- Prove one two-hop delegation chain with explicit invalidation at each prior
+  holder.
+- Do not widen into a general revocation algebra, broader failure policy,
+  dynamic namespace, or a new service framework.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 124 note recording the delegation-chain stress step and
+   the decision to keep compiler work closed
+2. one debug-owned Phase 124 audit that packages the landed Phase 123 plateau
+   together with one bounded two-hop delegation chain over the retained
+   transferred endpoint handle
+3. one narrow root-proof helper that drives the chain through existing
+   syscall, capability, and endpoint owners, records both invalidated-source
+   refusals, and proves that the final holder can still use the delegated
+   authority
+4. one advance of the real kernel proof marker from Phase 123 to Phase 124
+   only after that chain succeeds
+5. refreshed roadmap, position note, kernel README, repository map,
+   freestanding test README, decision log, and backlog entries
+6. one focused Phase 124 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new authority-chain path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current plateau is real,
+and the next narrow pressure is proving that explicit authority still stays
+explicit under one deeper hop before later phases widen failure, IPC, or
+device boundaries.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one bounded delegation-chain stress
+  step over the real kernel artifact
+- the landed retained handle from the Phase 118 slice can move through one
+  intermediary and one final holder while both prior holders lose reuse rights
+- the current authority answer still stops well short of a broader revocation
+  framework, service manager, namespace model, or compiler reopening
+- the repository can widen Canopus evidence quality through kernel-owner proof
+  pressure rather than through new language or backend work
+
+Deliverables
+------------
+- one canonical Phase 124 closeout note in `docs/plan/`
+- one debug-owned Phase 124 delegation-chain audit plus one narrow root-proof
+  helper that publishes the two-hop chain honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a Phase
+  124 marker only after the delegation-chain stress succeeds
+- refreshed roadmap, position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog so the repository
+  records both the landed authority-chain step and the decision not to expand
+  compiler work in this phase
+- one focused Phase 124 freestanding kernel regression with a projected MIR
+  golden for the new delegation-chain surface
+
+Suggested execution order
+-------------------------
+1. Add the smallest root-proof helper needed to drive a two-hop delegation
+   chain through existing syscall and capability owners.
+2. Add the Phase 124 debug-owned audit and validator over that chain.
+3. Advance the kernel proof marker to 124 only after the new audit succeeds.
+4. Publish the canonical delegation-chain stress note.
+5. Add the focused Phase 124 freestanding regression for build, run,
+   publication, and MIR checks.
+6. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 124 marker without
+  widening the admitted slice beyond the already-landed Phase 123 plateau
+- one aggregate debug-owned audit proves that delegated authority can move
+  through one intermediary hop while the previous holders are refused reuse
+  and the final holder can still act through the transferred endpoint
+- the canonical Phase 124 note, roadmap, position note, and kernel README all
+  publish the same authority-stress boundary
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 124 boundary consistently
+
+Non-goals
+---------
+- a broader revocation or invalidation framework
+- failure propagation, restart policy, or supervision semantics
+- dynamic service discovery or a broader namespace model
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+- introducing another service owner just to stage the extra delegation hop
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase124DelegationChainAudit` and validator that
+  package the landed Phase 123 plateau together with one two-hop delegation
+  chain over the retained transferred endpoint handle
+- added one narrow root-proof helper that drives the chain locally through the
+  existing syscall, capability, and endpoint owners, records two refused
+  invalidated-source actions, and proves that the final holder can still send
+  through the delegated endpoint
+- advanced the real kernel proof marker to 124 only after that audit remains
+  true
+- published one canonical `docs/plan/phase124_delegation_chain_stress.txt`
+  note naming the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR golden
+  for the Phase 124 delegation-chain boundary
+- refreshed the roadmap, position note, kernel README, repository map,
+  freestanding test README, decision log, and backlog so the repository
+  records both the landed authority-chain stress step and the decision not to
+  expand compiler work
+
+Closeout statement
+------------------
+Phase 124 is complete as a delegation-chain stress step.
+The repository still claims only one bounded small Canopus running-system
+plateau, but that plateau now includes one explicit proof that delegated
+authority can survive one deeper hop without ambient reuse, and the compiler
+stays closed because this phase needed authority-stress evidence rather than
+new language or backend work.
