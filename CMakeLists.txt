@@ -171,6 +171,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase122_target_surface_audit.cpp
     tests/tool/freestanding/kernel/phase123_next_plateau_audit.cpp
     tests/tool/freestanding/kernel/phase124_delegation_chain_stress.cpp
+    tests/tool/freestanding/kernel/phase125_invalidation_and_rejection_audit.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp

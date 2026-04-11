@@ -41,8 +41,9 @@ Current structure
       `kernel/phase120_running_system_support_statement.cpp`,
       `kernel/phase121_kernel_image_contract_hardening.cpp`,
       `kernel/phase122_target_surface_audit.cpp`,
-      `kernel/phase123_next_plateau_audit.cpp`, and
-      `kernel/phase124_delegation_chain_stress.cpp`: one kernel proof per file.
+      `kernel/phase123_next_plateau_audit.cpp`,
+      `kernel/phase124_delegation_chain_stress.cpp`, and
+      `kernel/phase125_invalidation_and_rejection_audit.cpp`: one kernel proof per file.
   - late ownership-hardening kernel audits also keep adjacent `.mirproj.txt`
     files for projected MIR golden expectations.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-

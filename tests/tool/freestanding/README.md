@@ -36,6 +36,7 @@ Structure
   - `phase122_target_surface_audit.cpp`: real-kernel target-surface audit.
   - `phase123_next_plateau_audit.cpp`: real-kernel next-plateau audit.
   - `phase124_delegation_chain_stress.cpp`: real-kernel delegation-chain stress audit.
+  - `phase125_invalidation_and_rejection_audit.cpp`: real-kernel invalidation and rejection audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

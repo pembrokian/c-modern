@@ -1,0 +1,173 @@
+Phase 125 -- Invalidation And Rejection Audit
+============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 124 delegation-chain stress step by proving
+one explicit authority-loss path over the same already-landed Canopus kernel
+artifact.
+
+This document is both the Phase 125 execution note and its closeout.
+It does not claim a broader revocation framework, service-death handling,
+restart policy, general failure semantics, or a compiler wave.
+It records one narrow invalidation and rejection step over the real kernel
+artifact that Phase 124 already kept explicit.
+
+Repository status note
+----------------------
+- Phase 118 already proved one invalidated-source refusal after one delegated
+  request-reply follow-through over the landed transfer-service owner.
+- Phase 124 then proved that the same explicit-authority model survives one
+  deeper two-hop delegation chain while each prior holder loses reuse rights.
+- The next honest gap is not a broader authority framework. It is proving
+  that one explicit authority-loss path can be carried through the current
+  syscall and capability model and rejected consistently at the actual use
+  sites without reopening compiler work.
+
+Problem being solved
+--------------------
+- The repository already had destructive transfer invalidation, but it still
+  lacked one published aggregate proof that an explicitly invalidated holder
+  is rejected consistently across the current use sites rather than only at
+  one transferred-source send point.
+- Without this step, later lifetime, failure, or device-boundary work could
+  blur whether the current model already has an honest authority-loss answer
+  or whether broader revocation machinery is required immediately.
+- The repository needed one small phase that stressed explicit handle loss
+  through the existing syscall, capability, endpoint, bootstrap-audit, and
+  debug owners rather than through a new kernel policy layer.
+
+Core rule
+---------
+- Keep the current kernel owners and service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed handle-table owner and the existing invalid-handle
+  rejection path rather than inventing a revocation algebra.
+- Prove one explicit authority-loss path at the final holder of the landed
+  Phase 124 delegation chain.
+- Do not widen into a general revocation framework, broader failure policy,
+  restart logic, dynamic namespace growth, or a new service owner.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 125 note recording the invalidation and rejection step
+   and the decision to keep compiler work closed
+2. one debug-owned Phase 125 audit that packages the landed Phase 124
+   delegation-chain truth together with one explicit final-holder authority-
+   loss path
+3. one narrow root-proof helper that removes the delegated handle from the
+   final holder, proves both send and receive reject that invalidated handle,
+   and proves that the holder's separate control authority still works
+4. one advance of the real kernel proof marker from Phase 124 to Phase 125
+   only after that invalidation audit succeeds
+5. refreshed roadmap, position note, kernel README, repository map,
+   freestanding test READMEs, decision log, and backlog entries
+6. one focused Phase 125 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new invalidation path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current authority model
+already proves destructive transfer and deeper delegation. The next narrow
+pressure is publishing one explicit authority-loss answer before later phases
+widen failure, lifetime, or IPC composition work.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one bounded invalidation and
+  rejection audit step over the real kernel artifact
+- one final holder from the landed Phase 124 delegation chain can lose the
+  delegated handle explicitly and then be refused consistently at both send
+  and receive use sites
+- that authority-loss answer still stops well short of a broader revocation
+  algebra, failure framework, service manager, or compiler reopening
+- the current kernel model can answer one more authority-lifecycle question
+  through existing owners rather than by forcing new policy machinery
+
+Deliverables
+------------
+- one canonical Phase 125 closeout note in `docs/plan/`
+- one debug-owned Phase 125 invalidation audit plus one narrow root-proof
+  helper that publishes the explicit authority-loss path honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 125 marker only after the invalidation and rejection audit remains
+  true
+- refreshed roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed invalidation step and the decision not to expand
+  compiler work
+- one focused Phase 125 freestanding kernel regression plus a projected MIR
+  golden for the new invalidation boundary
+
+Suggested execution order
+-------------------------
+1. Add the smallest root-proof helper needed to invalidate one delegated
+   final-holder handle and observe rejection at the current use sites.
+2. Add the Phase 125 debug-owned audit and validator over that invalidation
+   path.
+3. Advance the kernel proof marker to 125 only after the new audit remains
+   true.
+4. Publish the canonical invalidation and rejection note.
+5. Add the focused Phase 125 freestanding regression for build, run,
+   publication, and MIR checks.
+6. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 125 marker without
+  widening the admitted slice beyond the already-landed Phase 124 authority
+  chain step
+- one aggregate debug-owned audit proves that one explicit authority-loss path
+  is rejected consistently at the current send and receive use sites while a
+  separate surviving control handle still works
+- the canonical Phase 125 note, roadmap, position note, and kernel README all
+  publish the same invalidation boundary
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 125 boundary consistently
+
+Non-goals
+---------
+- a broader revocation or capability-lifetime framework
+- service death handling, restart policy, or partial-failure routing
+- dynamic service discovery or a broader namespace model
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+- adding another service owner just to stage one invalidation path
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase125InvalidationAudit` and validator that package
+  the landed Phase 124 delegation-chain truth together with one explicit
+  final-holder authority-loss path
+- added one narrow root-proof helper that removes the delegated handle from
+  the final holder, records refused send and refused receive actions on that
+  invalidated handle, and proves the holder's separate control handle still
+  works
+- advanced the real kernel proof marker to 125 only after that audit remains
+  true
+- published one canonical `docs/plan/phase125_invalidation_and_rejection_audit.txt`
+  note naming the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR golden
+  for the Phase 125 invalidation boundary
+- refreshed the roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed invalidation step and the decision not to expand
+  compiler work
+
+Closeout statement
+------------------
+Phase 125 is complete as an invalidation and rejection audit step.
+The repository still claims only one bounded small Canopus running-system
+plateau, but that plateau now includes one explicit proof that a delegated
+handle can be invalidated at the final holder and then rejected consistently
+at the current use sites, and the compiler stays closed because this phase
+needed authority-loss evidence rather than new language or backend work.

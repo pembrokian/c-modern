@@ -1,4 +1,4 @@
-Phase 124 And Beyond -- Speculative Post-Phase-123 Canopus Roadmap
+Phase 125 And Beyond -- Speculative Post-Phase-123 Canopus Roadmap
 =================================================================
 
 Status
@@ -12,7 +12,7 @@ plateau audit.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
-It does not replace the concrete Phase 109 through Phase 120 closeout notes.
+It does not replace the concrete Phase 109 through Phase 125 closeout notes.
 It gives one plausible ordering for the next Canopus wave if the repository
 keeps following the same evidence-first rules used so far:
 
@@ -39,6 +39,8 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/phase119_namespace_pressure_audit.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
 - `docs/plan/phase123_next_plateau_audit.txt`
+- `docs/plan/phase124_delegation_chain_stress.txt`
+- `docs/plan/phase125_invalidation_and_rejection_audit.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
@@ -62,7 +64,7 @@ Repository numbering note
   boundary.
 - Phase 121 through Phase 123 are occupied by the concrete image, target, and
   plateau freeze wave.
-- The next speculative continuation therefore starts at Phase 124.
+- The next speculative continuation therefore starts at Phase 125.
 
 Repository status note
 ----------------------
@@ -75,8 +77,9 @@ Repository status note
   multi-service bring-up, one landed delegated request-reply plus
   invalidated-source follow-through, one landed fixed service-directory
   namespace-pressure audit, one landed running-system support statement, one
-  landed image-contract hardening step, one landed target-surface audit, and
-  one landed next-plateau audit over that same artifact.
+  landed image-contract hardening step, one landed target-surface audit, one
+  landed next-plateau audit, one landed delegation-chain stress step, and one
+  landed invalidation and rejection audit step over that same artifact.
 - That slice remains intentionally small: fixed-size tables, explicit
   authority, bounded IPC and lifecycle paths, bounded service proofs, one
   image plus support audit over the real kernel artifact, one explicit
@@ -294,6 +297,14 @@ Phase 124 -- Delegation Chain Stress
   ownership, rejects ambient reuse at each prior holder, and leaves the final
   holder auditable without widening into a general authority framework.
 
+Phase 125 -- Invalidation And Rejection Audit
+- Phase 125 is now concrete as one invalidation and rejection audit step over
+  the landed delegation-chain authority path.
+- Exit criterion: one explicit authority-loss path is carried through the
+  current syscall and capability model, rejected consistently at the current
+  send and receive use sites, and kept narrow enough that the kernel still
+  does not claim a broader revocation algebra.
+
 Likely ordering bias
 --------------------
 If the repository keeps following the same pattern, the safest order is:
@@ -328,8 +339,10 @@ Interpretation guide
   owner clarification, first syscall-boundary clarification, first interrupt-
   boundary clarification, and first address-space/MMU split wave.
 - Phase 123 now supplies the first small honest plateau for this kernel lane,
-  and Phase 124 now proves that one deeper delegation chain still fits the
-  same explicit authority model; the next question is which pressure deserves
-  the next bounded widening after that authority-stress step.
+  Phase 124 now proves that one deeper delegation chain still fits the same
+  explicit authority model, and Phase 125 now proves that one explicit
+  authority-loss path is rejected consistently without forcing broader
+  revocation machinery; the next question is which pressure deserves the next
+  bounded widening after that authority-lifecycle step.
 - If a real next kernel step exposes a compiler or language distortion,
   reopen the narrowest owning layer only at that proof boundary.

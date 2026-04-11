@@ -277,6 +277,22 @@ struct Phase124DelegationChainAuditInputs {
     compiler_reopening_visible: u32
 }
 
+struct Phase125InvalidationAuditInputs {
+    phase124: debug.Phase124DelegationChainAudit
+    invalidated_holder_pid: u32
+    control_endpoint_id: u32
+    invalidated_endpoint_id: u32
+    invalidated_handle_slot: u32
+    rejected_send_status: syscall.SyscallStatus
+    rejected_receive_status: syscall.SyscallStatus
+    surviving_control_send_status: syscall.SyscallStatus
+    surviving_control_source_pid: u32
+    surviving_control_queue_depth: usize
+    authority_loss_visible: u32
+    broader_revocation_visible: u32
+    compiler_reopening_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1193,4 +1209,8 @@ func build_phase123_next_plateau_audit(inputs: Phase123NextPlateauAuditInputs) d
 
 func build_phase124_delegation_chain_audit(inputs: Phase124DelegationChainAuditInputs) debug.Phase124DelegationChainAudit {
     return debug.Phase124DelegationChainAudit{ phase123: inputs.phase123, delegator_pid: inputs.delegator_pid, intermediary_pid: inputs.intermediary_pid, final_holder_pid: inputs.final_holder_pid, control_endpoint_id: inputs.control_endpoint_id, delegated_endpoint_id: inputs.delegated_endpoint_id, delegator_source_handle_slot: inputs.delegator_source_handle_slot, intermediary_receive_handle_slot: inputs.intermediary_receive_handle_slot, final_receive_handle_slot: inputs.final_receive_handle_slot, first_invalidated_send_status: inputs.first_invalidated_send_status, second_invalidated_send_status: inputs.second_invalidated_send_status, final_send_status: inputs.final_send_status, final_send_source_pid: inputs.final_send_source_pid, final_endpoint_queue_depth: inputs.final_endpoint_queue_depth, ambient_authority_visible: inputs.ambient_authority_visible, compiler_reopening_visible: inputs.compiler_reopening_visible }
+}
+
+func build_phase125_invalidation_audit(inputs: Phase125InvalidationAuditInputs) debug.Phase125InvalidationAudit {
+    return debug.Phase125InvalidationAudit{ phase124: inputs.phase124, invalidated_holder_pid: inputs.invalidated_holder_pid, control_endpoint_id: inputs.control_endpoint_id, invalidated_endpoint_id: inputs.invalidated_endpoint_id, invalidated_handle_slot: inputs.invalidated_handle_slot, rejected_send_status: inputs.rejected_send_status, rejected_receive_status: inputs.rejected_receive_status, surviving_control_send_status: inputs.surviving_control_send_status, surviving_control_source_pid: inputs.surviving_control_source_pid, surviving_control_queue_depth: inputs.surviving_control_queue_depth, authority_loss_visible: inputs.authority_loss_visible, broader_revocation_visible: inputs.broader_revocation_visible, compiler_reopening_visible: inputs.compiler_reopening_visible }
 }

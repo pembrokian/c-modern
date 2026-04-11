@@ -77,6 +77,9 @@ void RunFreestandingKernelPhase123NextPlateauAudit(const std::filesystem::path& 
 void RunFreestandingKernelPhase124DelegationChainStress(const std::filesystem::path& source_root,
                                                         const std::filesystem::path& binary_root,
                                                         const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase125InvalidationAndRejectionAudit(const std::filesystem::path& source_root,
+                                                                const std::filesystem::path& binary_root,
+                                                                const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
@@ -105,6 +108,7 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
     RunFreestandingKernelPhase122TargetSurfaceAudit(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase123NextPlateauAudit(source_root, binary_root, mc_path);
     RunFreestandingKernelPhase124DelegationChainStress(source_root, binary_root, mc_path);
+    RunFreestandingKernelPhase125InvalidationAndRejectionAudit(source_root, binary_root, mc_path);
 }
 
 }  // namespace tool_tests

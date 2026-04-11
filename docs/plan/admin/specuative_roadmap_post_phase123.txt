@@ -147,6 +147,8 @@ Phase 124 -- Delegation Chain Stress
   without widening the kernel into a general authority framework.
 
 Phase 125 -- Invalidation And Rejection Audit
+- Phase 125 is now concrete as one invalidation and rejection audit step over
+  the landed delegation-chain authority path.
 - Exit criterion: one explicit invalidation or authority-loss path is carried
   across the current system model and rejected consistently at all relevant
   use sites without reopening a full revocation algebra.

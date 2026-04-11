@@ -185,6 +185,22 @@ struct Phase124DelegationChainAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase125InvalidationAudit {
+    phase124: Phase124DelegationChainAudit
+    invalidated_holder_pid: u32
+    control_endpoint_id: u32
+    invalidated_endpoint_id: u32
+    invalidated_handle_slot: u32
+    rejected_send_status: syscall.SyscallStatus
+    rejected_receive_status: syscall.SyscallStatus
+    surviving_control_send_status: syscall.SyscallStatus
+    surviving_control_source_pid: u32
+    surviving_control_queue_depth: usize
+    authority_loss_visible: u32
+    broader_revocation_visible: u32
+    compiler_reopening_visible: u32
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -815,6 +831,49 @@ func validate_phase124_delegation_chain_stress(audit: Phase124DelegationChainAud
         return false
     }
     if audit.ambient_authority_visible != 0 {
+        return false
+    }
+    return audit.compiler_reopening_visible == 0
+}
+
+func validate_phase125_invalidation_and_rejection_audit(audit: Phase125InvalidationAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase124_delegation_chain_stress(audit.phase124, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.invalidated_holder_pid != audit.phase124.final_holder_pid {
+        return false
+    }
+    if audit.control_endpoint_id != audit.phase124.control_endpoint_id {
+        return false
+    }
+    if audit.invalidated_endpoint_id != audit.phase124.delegated_endpoint_id {
+        return false
+    }
+    if audit.invalidated_handle_slot != audit.phase124.final_receive_handle_slot {
+        return false
+    }
+    if audit.invalidated_handle_slot == 0 {
+        return false
+    }
+    if syscall.status_score(audit.rejected_send_status) != 8 {
+        return false
+    }
+    if syscall.status_score(audit.rejected_receive_status) != 8 {
+        return false
+    }
+    if syscall.status_score(audit.surviving_control_send_status) != 2 {
+        return false
+    }
+    if audit.surviving_control_source_pid != audit.invalidated_holder_pid {
+        return false
+    }
+    if audit.surviving_control_queue_depth != 1 {
+        return false
+    }
+    if audit.authority_loss_visible != 1 {
+        return false
+    }
+    if audit.broader_revocation_visible != 0 {
         return false
     }
     return audit.compiler_reopening_visible == 0
