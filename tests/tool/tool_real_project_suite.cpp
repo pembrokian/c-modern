@@ -2377,6 +2377,39 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
 
 namespace mc::tool_tests {
 
+namespace {
+
+struct RealProjectTestCase {
+    std::string_view name;
+    void (*fn)(const std::filesystem::path&, const std::filesystem::path&, const std::filesystem::path&);
+};
+
+constexpr RealProjectTestCase kRealProjectTestCases[] = {
+    {"grep-lite", &TestRealGrepLiteProject},
+    {"file-walker", &TestRealFileWalkerProject},
+    {"hash-tool", &TestRealHashToolProject},
+    {"arena-expr", &TestRealArenaExprToolProject},
+    {"worker-queue", &TestRealWorkerQueueProject},
+    {"pipe-handoff", &TestRealPipeHandoffProject},
+    {"pipe-ready", &TestRealPipeReadyProject},
+    {"line-filter-relay", &TestRealLineFilterRelayProject},
+    {"evented-echo", &TestRealEventedEchoProject},
+    {"review-board", &TestRealReviewBoardProject},
+    {"issue-rollup", &TestRealIssueRollupProject},
+    {"issue-rollup-imported-aggregate-const", &TestIssueRollupImportedAggregateConstPressure},
+};
+
+const RealProjectTestCase* FindRealProjectTestCase(std::string_view case_name) {
+    for (const auto& test_case : kRealProjectTestCases) {
+        if (test_case.name == case_name) {
+            return &test_case;
+        }
+    }
+    return nullptr;
+}
+
+}  // namespace
+
 void RunRealProjectToolSuite(const std::filesystem::path& source_root,
                              const std::filesystem::path& binary_root,
                              const std::filesystem::path& mc_path) {
@@ -2394,6 +2427,17 @@ void RunRealProjectToolSuite(const std::filesystem::path& source_root,
     TestRealReviewBoardProject(source_root, suite_root, mc_path);
     TestRealIssueRollupProject(source_root, suite_root, mc_path);
     TestIssueRollupImportedAggregateConstPressure(source_root, suite_root, mc_path);
+}
+
+void RunRealProjectToolSuiteCase(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path,
+                                 std::string_view case_name) {
+    const RealProjectTestCase* test_case = FindRealProjectTestCase(case_name);
+    if (test_case == nullptr) {
+        Fail("unknown real-project case selector: " + std::string(case_name));
+    }
+    test_case->fn(source_root, binary_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

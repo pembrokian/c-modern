@@ -144,10 +144,8 @@ void TestProjectTestCommandFailsOnOrdinaryFailure(const std::filesystem::path& b
         "    return 0\n"
         "}\n");
     WriteFile(project_root / "tests/failing_test.mc",
-              "import testing\n"
-              "\n"
               "func test_failure() *i32 {\n"
-              "    return testing.fail()\n"
+              "    return (*i32)((uintptr)(1))\n"
               "}\n");
 
     const std::filesystem::path build_dir = binary_root / "test_failure_build";
@@ -571,6 +569,79 @@ void TestProjectTestTimeoutFailsDeterministically(const std::filesystem::path& b
                          "mc test should print the overall target failure verdict on timeout");
 }
 
+void TestDuplicateOrdinaryTestModuleNamesExplainBootstrapRule(const std::filesystem::path& binary_root,
+                                                              const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "duplicate_ordinary_test_module_project";
+    const std::filesystem::path project_path = WriteTestProject(
+        project_root,
+        "func main() i32 {\n"
+        "    return 0\n"
+        "}\n");
+    WriteFile(project_root / "tests/alpha/shared_test.mc",
+              "func test_alpha() *i32 {\n"
+              "    return nil\n"
+              "}\n");
+    WriteFile(project_root / "tests/beta/shared_test.mc",
+              "func test_beta() *i32 {\n"
+              "    return nil\n"
+              "}\n");
+
+    const std::filesystem::path build_dir = binary_root / "duplicate_ordinary_test_module_build";
+    std::filesystem::remove_all(build_dir);
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "test",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string()},
+                                                     build_dir / "duplicate_ordinary_test_module_output.txt",
+                                                     "duplicate ordinary test module names");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("mc test should reject duplicate ordinary test module stems across discovered test roots:\n" + output);
+    }
+    ExpectOutputContains(output,
+                         "duplicate ordinary test module name discovered: shared_test",
+                         "duplicate ordinary test module names should mention the conflicting module stem");
+    ExpectOutputContains(output,
+                         "bootstrap ordinary test discovery requires globally unique file stems across all configured test roots",
+                         "duplicate ordinary test module names should explain the bootstrap uniqueness rule");
+}
+
+void TestGeneratedOrdinaryRunnerRequiresRepositoryStdlibRoot(const std::filesystem::path& binary_root,
+                                                             const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "external_generated_runner_project";
+    const std::filesystem::path project_path = WriteTestProject(
+        project_root,
+        "func main() i32 {\n"
+        "    return 0\n"
+        "}\n");
+    WriteFile(project_root / "tests/sample_test.mc",
+              "func test_sample() *i32 {\n"
+              "    return nil\n"
+              "}\n");
+
+    const std::filesystem::path build_dir = std::filesystem::temp_directory_path() / "mc_phase127_external_generated_runner_build";
+    std::filesystem::remove_all(build_dir);
+    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
+                                                      "test",
+                                                      "--project",
+                                                      project_path.generic_string(),
+                                                      "--build-dir",
+                                                      build_dir.generic_string()},
+                                                     build_dir / "external_generated_runner_output.txt",
+                                                     "generated ordinary runner repository root discovery");
+    std::filesystem::remove_all(build_dir);
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("mc test should fail explicitly when generated ordinary test runner stdlib discovery cannot find the repository root:\n" + output);
+    }
+    ExpectOutputContains(output,
+                         "unable to discover repository root for generated ordinary test runner imports from",
+                         "generated ordinary test runner should fail with an explicit repository-root discovery diagnostic");
+    ExpectOutputContains(output,
+                         "repository stdlib root is required",
+                         "generated ordinary test runner should explain why repository-root discovery matters");
+}
+
 void TestDuplicateTargetRootsFailEarly(const std::filesystem::path& binary_root,
                                        const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "duplicate_target_root_project";
@@ -892,6 +963,8 @@ void RunWorkflowToolSuite(const std::filesystem::path& source_root,
     TestProjectAmbiguousImportFails(source_root, suite_root, mc_path);
     TestDuplicateModuleRootFailsEarly(suite_root, mc_path);
     TestProjectTestTimeoutFailsDeterministically(suite_root, mc_path);
+    TestDuplicateOrdinaryTestModuleNamesExplainBootstrapRule(suite_root, mc_path);
+    TestGeneratedOrdinaryRunnerRequiresRepositoryStdlibRoot(suite_root, mc_path);
     TestDuplicateTargetRootsFailEarly(suite_root, mc_path);
     TestExecutableTargetRejectsNonStaticLibraryLink(suite_root, mc_path);
     TestProjectModeMultiFileModulesBuildAndRun(suite_root, mc_path);

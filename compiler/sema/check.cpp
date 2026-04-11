@@ -794,6 +794,15 @@ class Checker {
             return;
         }
 
+        const auto lookup_seeded_type = [&](std::string_view name) -> const TypeDeclSummary* {
+            for (const auto& type_decl : module_->type_decls) {
+                if (type_decl.name == name) {
+                    return &type_decl;
+                }
+            }
+            return nullptr;
+        };
+
         std::unordered_set<std::string> seen_import_names;
         for (const auto& import_decl : source_file_.imports) {
             if (!seen_import_names.insert(import_decl.module_name).second) {
@@ -814,7 +823,7 @@ class Checker {
             for (const auto& type_decl : imported_module->type_decls) {
                 TypeDeclSummary qualified_type = RewriteImportedTypeDecl(type_decl, import_decl.module_name, imported_type_names);
                 if (!type_symbols_.emplace(qualified_type.name, qualified_type.kind).second) {
-                    const TypeDeclSummary* existing_type = LookupLocalTypeDecl(qualified_type.name);
+                    const TypeDeclSummary* existing_type = lookup_seeded_type(qualified_type.name);
                     if (existing_type != nullptr && EquivalentTypeDeclSummary(*existing_type, qualified_type)) {
                         continue;
                     }

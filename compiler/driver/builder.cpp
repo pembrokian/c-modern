@@ -999,13 +999,42 @@ void AddImportedExternDeclarations(mc::mir::Module& module,
 
 std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& units,
                                                  const mc::mir::Module& entry_module,
-                                                 const std::filesystem::path& entry_source_path) {
+                                                 const std::filesystem::path& entry_source_path,
+                                                 support::DiagnosticSink& diagnostics) {
     auto merged = std::make_unique<mc::mir::Module>();
     std::unordered_set<std::string> seen_imports;
     std::unordered_set<std::string> seen_types;
     std::unordered_set<std::string> seen_functions;
     std::unordered_set<std::string> seen_globals;
-    std::unordered_set<std::string> defined_by_deps;
+    std::unordered_map<std::string, std::filesystem::path> defined_functions;
+    const auto append_function = [&](const mc::mir::Function& function,
+                                     const std::filesystem::path& source_path) -> bool {
+        if (function.is_extern) {
+            if (!seen_functions.insert(function.name).second) {
+                return true;
+            }
+            merged->functions.push_back(function);
+            return true;
+        }
+
+        const std::filesystem::path normalized_source = std::filesystem::absolute(source_path).lexically_normal();
+        const auto [existing, inserted] = defined_functions.emplace(function.name, normalized_source);
+        if (!inserted) {
+            diagnostics.Report({
+                .file_path = normalized_source,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "duplicate non-extern function definition during module merge: " + function.name +
+                           "; first defined in " + existing->second.generic_string(),
+            });
+            return false;
+        }
+
+        seen_functions.insert(function.name);
+        merged->functions.push_back(function);
+        return true;
+    };
+
     for (const auto& unit : units) {
         if (unit.source_path == std::filesystem::absolute(entry_source_path).lexically_normal()) {
             continue;
@@ -1035,14 +1064,9 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
             }
         }
         for (const auto& function : unit_module.functions) {
-            if (function.is_extern && !seen_functions.insert(function.name).second) {
-                continue;
+            if (!append_function(function, unit.source_path)) {
+                return {};
             }
-            if (!function.is_extern) {
-                defined_by_deps.insert(function.name);
-                seen_functions.insert(function.name);
-            }
-            merged->functions.push_back(function);
         }
     }
 
@@ -1070,16 +1094,8 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
         }
     }
     for (const auto& function : entry_module.functions) {
-        if (function.is_extern) {
-            if (!seen_functions.insert(function.name).second) {
-                continue;
-            }
-            merged->functions.push_back(function);
-            continue;
-        }
-        if (!defined_by_deps.count(function.name)) {
-            seen_functions.insert(function.name);
-            merged->functions.push_back(function);
+        if (!append_function(function, entry_source_path)) {
+            return {};
         }
     }
     return merged;
@@ -2078,7 +2094,10 @@ std::optional<BuildUnit> CompileToMir(const CommandOptions& options,
 
     BuildUnit& entry_unit = units->back();
     if (include_imports_for_build && units->size() > 1) {
-        auto merged_module = MergeBuildUnits(*units, *entry_unit.mir_result.module, entry_unit.source_path);
+        auto merged_module = MergeBuildUnits(*units, *entry_unit.mir_result.module, entry_unit.source_path, diagnostics);
+        if (!merged_module) {
+            return std::nullopt;
+        }
         if (!mc::mir::ValidateModule(*merged_module, entry_unit.source_path, diagnostics)) {
             return std::nullopt;
         }

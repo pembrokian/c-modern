@@ -120,6 +120,11 @@ void RunRealProjectToolSuite(const std::filesystem::path& source_root,
                              const std::filesystem::path& binary_root,
                              const std::filesystem::path& mc_path);
 
+void RunRealProjectToolSuiteCase(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path,
+                                 std::string_view case_name);
+
 void RunFreestandingBootstrapToolSuite(const std::filesystem::path& source_root,
                                        const std::filesystem::path& binary_root,
                                        const std::filesystem::path& mc_path);

@@ -262,17 +262,146 @@ void PrintArtifactTargets(const support::DumpTargets& dump_targets,
     stream << "staticlib: " << build_targets.static_library.generic_string() << '\n';
 }
 
+struct DirectSourceBuildResult {
+    std::filesystem::path source_path;
+    support::DumpTargets dump_targets;
+    support::BuildArtifactTargets build_targets;
+    std::filesystem::path executable_path;
+};
+
+std::optional<DirectSourceBuildResult> BuildDirectSource(const CommandOptions& options,
+                                                         support::DiagnosticSink& diagnostics) {
+    const auto checked = CompileToMir(options, diagnostics, true);
+    if (!checked.has_value()) {
+        return std::nullopt;
+    }
+
+    const auto dump_targets = support::ComputeDumpTargets(checked->source_path, options.build_dir);
+    const auto build_targets = support::ComputeBuildArtifactTargets(checked->source_path, options.build_dir);
+
+    if (options.dump_ast &&
+        !WriteTextArtifact(dump_targets.ast,
+                           mc::ast::DumpSourceFile(*checked->parse_result.source_file),
+                           "AST dump",
+                           diagnostics)) {
+        return std::nullopt;
+    }
+
+    if (options.dump_mir &&
+        !WriteTextArtifact(dump_targets.mir,
+                           mc::mir::DumpModule(*checked->mir_result.module),
+                           "MIR dump",
+                           diagnostics)) {
+        return std::nullopt;
+    }
+
+    if (options.dump_backend) {
+        const auto backend_result = mc::codegen_llvm::LowerModule(*checked->mir_result.module,
+                                                                  checked->source_path,
+                                                                  {.target = mc::codegen_llvm::BootstrapTargetConfig()},
+                                                                  diagnostics);
+        if (!backend_result.ok ||
+            !WriteTextArtifact(dump_targets.backend,
+                               mc::codegen_llvm::DumpModule(*backend_result.module),
+                               "backend dump",
+                               diagnostics)) {
+            return std::nullopt;
+        }
+    }
+
+    const auto build_result = mc::codegen_llvm::BuildExecutable(
+        *checked->mir_result.module,
+        checked->source_path,
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .runtime_source_path = DiscoverHostedRuntimeSupportSource(checked->source_path),
+            .artifacts = {
+                .llvm_ir_path = build_targets.llvm_ir,
+                .object_path = build_targets.object,
+                .executable_path = build_targets.executable,
+            },
+        },
+        diagnostics);
+    if (!build_result.ok) {
+        return std::nullopt;
+    }
+
+    return DirectSourceBuildResult {
+        .source_path = checked->source_path,
+        .dump_targets = dump_targets,
+        .build_targets = build_targets,
+        .executable_path = build_result.artifacts.executable_path,
+    };
+}
+
+void PrintDirectSourceBuildSummary(const DirectSourceBuildResult& build_result,
+                                   bool emit_dump_paths) {
+    std::cout << "built " << build_result.source_path.generic_string() << " -> "
+              << build_result.executable_path.generic_string()
+              << " (bootstrap phase 5 executable path)" << '\n';
+
+    if (emit_dump_paths) {
+        PrintArtifactTargets(build_result.dump_targets, build_result.build_targets, std::cout);
+    }
+}
+
+std::string MergeRenderedDiagnostics(std::string_view primary,
+                                     std::string_view secondary) {
+    if (primary.empty()) {
+        return std::string(secondary);
+    }
+    if (secondary.empty()) {
+        return std::string(primary);
+    }
+
+    std::string merged(primary);
+    if (!merged.empty() && merged.back() != '\n') {
+        merged.push_back('\n');
+    }
+    merged.append(secondary);
+    return merged;
+}
+
 
 
 std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& units,
                                                  const mc::mir::Module& entry_module,
-                                                 const std::filesystem::path& entry_source_path) {
+                                                 const std::filesystem::path& entry_source_path,
+                                                 support::DiagnosticSink& diagnostics) {
     auto merged = std::make_unique<mc::mir::Module>();
     std::unordered_set<std::string> seen_imports;
     std::unordered_set<std::string> seen_types;
     std::unordered_set<std::string> seen_functions;
     std::unordered_set<std::string> seen_globals;
-    std::unordered_set<std::string> defined_by_deps;
+    std::unordered_map<std::string, std::filesystem::path> defined_functions;
+    const auto append_function = [&](const mc::mir::Function& function,
+                                     const std::filesystem::path& source_path) -> bool {
+        if (function.is_extern) {
+            if (!seen_functions.insert(function.name).second) {
+                return true;
+            }
+            merged->functions.push_back(function);
+            return true;
+        }
+
+        const std::filesystem::path normalized_source = std::filesystem::absolute(source_path).lexically_normal();
+        const auto [existing, inserted] = defined_functions.emplace(function.name, normalized_source);
+        if (!inserted) {
+            diagnostics.Report({
+                .file_path = normalized_source,
+                .span = support::kDefaultSourceSpan,
+                .severity = support::DiagnosticSeverity::kError,
+                .message = "duplicate non-extern function definition during module merge: " + function.name +
+                           "; first defined in " + existing->second.generic_string(),
+            });
+            return false;
+        }
+
+        seen_functions.insert(function.name);
+        merged->functions.push_back(function);
+        return true;
+    };
+
     for (const auto& unit : units) {
         if (unit.source_path == std::filesystem::absolute(entry_source_path).lexically_normal()) {
             continue;
@@ -302,14 +431,9 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
             }
         }
         for (const auto& function : unit_module.functions) {
-            if (function.is_extern && !seen_functions.insert(function.name).second) {
-                continue;
+            if (!append_function(function, unit.source_path)) {
+                return {};
             }
-            if (!function.is_extern) {
-                defined_by_deps.insert(function.name);
-                seen_functions.insert(function.name);
-            }
-            merged->functions.push_back(function);
         }
     }
 
@@ -337,16 +461,8 @@ std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& u
         }
     }
     for (const auto& function : entry_module.functions) {
-        if (function.is_extern) {
-            if (!seen_functions.insert(function.name).second) {
-                continue;
-            }
-            merged->functions.push_back(function);
-            continue;
-        }
-        if (!defined_by_deps.count(function.name)) {
-            seen_functions.insert(function.name);
-            merged->functions.push_back(function);
+        if (!append_function(function, entry_source_path)) {
+            return {};
         }
     }
     return merged;
@@ -607,7 +723,8 @@ std::optional<DiscoveredTargetTests> DiscoverTargetTests(const ProjectFile& proj
                 .file_path = test_file,
                 .span = support::kDefaultSourceSpan,
                 .severity = support::DiagnosticSeverity::kError,
-                .message = "duplicate ordinary test module name discovered: " + module_name,
+                .message = "duplicate ordinary test module name discovered: " + module_name +
+                           "; bootstrap ordinary test discovery requires globally unique file stems across all configured test roots",
             });
             return std::nullopt;
         }
@@ -629,6 +746,8 @@ std::optional<DiscoveredTargetTests> DiscoverTargetTests(const ProjectFile& proj
         }
         return left.function_name < right.function_name;
     });
+    // Reordering compiler regressions is safe because each case executes in its
+    // own isolated build directory under compiler_regressions/<index>.
     std::sort(discovered.regression_cases.begin(), discovered.regression_cases.end(), [](const CompilerRegressionCase& left, const CompilerRegressionCase& right) {
         if (left.kind != right.kind) {
             return static_cast<int>(left.kind) < static_cast<int>(right.kind);
@@ -676,11 +795,12 @@ std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesyste
     return std::nullopt;
 }
 
-std::vector<std::filesystem::path> BuildTestImportRoots(const ProjectFile& project,
-                                                        const ProjectTarget& target,
-                                                        const std::vector<std::filesystem::path>& cli_import_roots,
-                                                        const std::vector<std::filesystem::path>& test_roots,
-                                                        const std::filesystem::path& generated_root) {
+std::optional<std::vector<std::filesystem::path>> BuildTestImportRoots(const ProjectFile& project,
+                                                                       const ProjectTarget& target,
+                                                                       const std::vector<std::filesystem::path>& cli_import_roots,
+                                                                       const std::vector<std::filesystem::path>& test_roots,
+                                                                       const std::filesystem::path& generated_root,
+                                                                       support::DiagnosticSink& diagnostics) {
     std::vector<std::filesystem::path> roots;
     std::unordered_set<std::string> seen;
     const auto append = [&](const std::filesystem::path& root) {
@@ -697,50 +817,112 @@ std::vector<std::filesystem::path> BuildTestImportRoots(const ProjectFile& proje
     for (const auto& root : ComputeProjectImportRoots(project, target, cli_import_roots)) {
         append(root);
     }
-    if (const auto repo_root = DiscoverRepositoryRoot(generated_root); repo_root.has_value()) {
-        const std::filesystem::path stdlib_root = *repo_root / "stdlib";
-        if (std::filesystem::exists(stdlib_root)) {
-            append(stdlib_root);
-        }
+    const auto repo_root = DiscoverRepositoryRoot(generated_root);
+    if (!repo_root.has_value()) {
+        diagnostics.Report({
+            .file_path = project.path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "unable to discover repository root for generated ordinary test runner imports from " +
+                       generated_root.generic_string() + "; repository stdlib root is required",
+        });
+        return std::nullopt;
     }
+    const std::filesystem::path stdlib_root = *repo_root / "stdlib";
+    if (!std::filesystem::exists(stdlib_root)) {
+        diagnostics.Report({
+            .file_path = project.path,
+            .span = support::kDefaultSourceSpan,
+            .severity = support::DiagnosticSeverity::kError,
+            .message = "generated ordinary test runner requires repository stdlib import root, but it was not found at " +
+                       stdlib_root.generic_string(),
+        });
+        return std::nullopt;
+    }
+    append(stdlib_root);
     return roots;
 }
 
 std::string BuildOrdinaryRunnerSource(const std::vector<OrdinaryTestCase>& ordinary_tests) {
     std::ostringstream source;
     const std::string total_tests = std::to_string(ordinary_tests.size());
-    source << "import errors\n";
-    source << "import fmt\n";
     source << "import io\n";
     source << "import mem\n";
     for (const auto& ordinary_test : ordinary_tests) {
         source << "import " << ordinary_test.module_name << "\n";
     }
     source << "\n";
-    source << "func write_summary(total: i32, failures: i32) i32 {\n";
-    source << "    alloc: *mem.Allocator = mem.default_allocator()\n";
-    source << "    passed: i32 = total - failures\n";
-    source << "    total_buf: *Buffer<u8>\n";
-    source << "    passed_buf: *Buffer<u8>\n";
-    source << "    failed_buf: *Buffer<u8>\n";
-    source << "    total_err: errors.Error\n";
-    source << "    passed_err: errors.Error\n";
-    source << "    failed_err: errors.Error\n";
-    source << "    total_buf, total_err = fmt.sprint_i32(alloc, total)\n";
-    source << "    passed_buf, passed_err = fmt.sprint_i32(alloc, passed)\n";
-    source << "    failed_buf, failed_err = fmt.sprint_i32(alloc, failures)\n";
-    source << "    if total_err != 0 || passed_err != 0 || failed_err != 0 {\n";
-    source << "        if total_buf != nil {\n";
-    source << "            mem.buffer_free<u8>(total_buf)\n";
-    source << "        }\n";
-    source << "        if passed_buf != nil {\n";
-    source << "            mem.buffer_free<u8>(passed_buf)\n";
-    source << "        }\n";
-    source << "        if failed_buf != nil {\n";
-    source << "            mem.buffer_free<u8>(failed_buf)\n";
-    source << "        }\n";
-    source << "        return 1\n";
+    source << "@private\n";
+    source << "const ASCII_ZERO: u8 = 48\n";
+    source << "@private\n";
+    source << "const ASCII_MINUS: u8 = 45\n";
+    source << "@private\n";
+    source << "const I32_MIN_VALUE: i32 = -2147483648\n";
+    source << "@private\n";
+    source << "const I32_MIN_ABS: u64 = 2147483648\n";
+    source << "\n";
+    source << "func decimal_len_u64(value: u64) usize {\n";
+    source << "    digits: usize = 1\n";
+    source << "    current: u64 = value\n";
+    source << "    while current >= 10 {\n";
+    source << "        current = current / 10\n";
+    source << "        digits = digits + 1\n";
     source << "    }\n";
+    source << "    return digits\n";
+    source << "}\n";
+    source << "\n";
+    source << "func write_decimal_u64(dst: Slice<u8>, value: u64) usize {\n";
+    source << "    digits: usize = decimal_len_u64(value)\n";
+    source << "    index: usize = digits\n";
+    source << "    current: u64 = value\n";
+    source << "    while index > 0 {\n";
+    source << "        index = index - 1\n";
+    source << "        dst[index] = (u8)((u64)(ASCII_ZERO) + (current % 10))\n";
+    source << "        current = current / 10\n";
+    source << "    }\n";
+    source << "    return digits\n";
+    source << "}\n";
+    source << "\n";
+    source << "func sprint_i32(value: i32) *Buffer<u8> {\n";
+    source << "    alloc: *mem.Allocator = mem.default_allocator()\n";
+    source << "    negative: bool = value < 0\n";
+    source << "    magnitude: u64\n";
+    source << "    if negative {\n";
+    source << "        if value == I32_MIN_VALUE {\n";
+    source << "            magnitude = I32_MIN_ABS\n";
+    source << "        } else {\n";
+    source << "            magnitude = (u64)(0 - value)\n";
+    source << "        }\n";
+    source << "    } else {\n";
+    source << "        magnitude = (u64)(value)\n";
+    source << "    }\n";
+    source << "\n";
+    source << "    digits: usize = decimal_len_u64(magnitude)\n";
+    source << "    cap: usize = digits\n";
+    source << "    if negative {\n";
+    source << "        cap = cap + 1\n";
+    source << "    }\n";
+    source << "\n";
+    source << "    buf: *Buffer<u8> = mem.buffer_new<u8>(alloc, cap)\n";
+    source << "    if buf == nil {\n";
+    source << "        return nil\n";
+    source << "    }\n";
+    source << "\n";
+    source << "    bytes: Slice<u8> = mem.slice_from_buffer<u8>(buf)\n";
+    source << "    if negative {\n";
+    source << "        bytes[0] = ASCII_MINUS\n";
+    source << "        write_decimal_u64(bytes[1:cap], magnitude)\n";
+    source << "    } else {\n";
+    source << "        write_decimal_u64(bytes, magnitude)\n";
+    source << "    }\n";
+    source << "    return buf\n";
+    source << "}\n";
+    source << "\n";
+    source << "func write_summary(total: i32, failures: i32) i32 {\n";
+    source << "    passed: i32 = total - failures\n";
+    source << "    total_buf: *Buffer<u8> = sprint_i32(total)\n";
+    source << "    passed_buf: *Buffer<u8> = sprint_i32(passed)\n";
+    source << "    failed_buf: *Buffer<u8> = sprint_i32(failures)\n";
     source << "    if total_buf == nil || passed_buf == nil || failed_buf == nil {\n";
     source << "        if total_buf != nil {\n";
     source << "            mem.buffer_free<u8>(total_buf)\n";
@@ -832,42 +1014,30 @@ bool RunOrdinaryTestsForTarget(const ProjectFile& project,
         return false;
     }
 
-    ProjectFile runner_project = project;
-    runner_project.build_dir = build_dir;
-
-    ProjectTarget runner_target;
-    runner_target.name = target.name + "-tests";
-    runner_target.kind = "exe";
-    runner_target.package_name = target.package_name;
-    runner_target.root = runner_path;
-    runner_target.mode = test_mode;
-    runner_target.env = options.env_override.value_or(target.env);
-    runner_target.target = target.target;
-    runner_target.links = target.links;
-    runner_target.link_inputs = target.link_inputs;
-    runner_target.module_search_paths = BuildTestImportRoots(project, target, options.import_roots, test_roots, generated_root);
-    runner_target.package_roots = target.package_roots;
-    runner_target.runtime_startup = "default";
-
-    std::unordered_set<std::string> visiting_targets;
-    auto runner_graph = BuildResolvedTargetGraph(runner_project,
-                                                 runner_target,
-                                                 {},
-                                                 diagnostics,
-                                                 visiting_targets);
-    if (!runner_graph.has_value()) {
+    const auto runner_import_roots = BuildTestImportRoots(project,
+                                                          target,
+                                                          options.import_roots,
+                                                          test_roots,
+                                                          generated_root,
+                                                          diagnostics);
+    if (!runner_import_roots.has_value()) {
         std::cerr << diagnostics.Render() << '\n';
         return false;
     }
+    CommandOptions runner_options;
+    runner_options.source_path = runner_path;
+    runner_options.build_dir = generated_root;
+    runner_options.build_dir_explicit = true;
+    runner_options.import_roots = *runner_import_roots;
 
-    auto build_result = BuildProjectTarget(*runner_graph, diagnostics);
-    if (!build_result.has_value() || !build_result->executable_path.has_value()) {
+    const auto build_result = BuildDirectSource(runner_options, diagnostics);
+    if (!build_result.has_value()) {
         std::cerr << diagnostics.Render() << '\n';
         return false;
     }
 
     const auto output_path = generated_root / "runner.stdout.txt";
-    const auto run_result = RunExecutableCapture(*build_result->executable_path, {}, output_path, target.tests.timeout_ms);
+    const auto run_result = RunExecutableCapture(build_result->executable_path, {}, output_path, target.tests.timeout_ms);
     if (!run_result.output.empty()) {
         std::cout << run_result.output;
         if (run_result.output.back() != '\n') {
@@ -995,10 +1165,12 @@ bool EvaluateRunOutputCase(const CompilerRegressionCase& regression_case,
         return false;
     }
 
+    const std::string build_diagnostics = diagnostics.Render();
+
     support::DiagnosticSink output_diagnostics;
     const auto expected = ReadSourceText(regression_case.expectation_path, output_diagnostics);
     if (!expected.has_value()) {
-        failure_detail = output_diagnostics.Render();
+        failure_detail = MergeRenderedDiagnostics(build_diagnostics, output_diagnostics.Render());
         return false;
     }
     const CapturedCommandResult run_result = RunExecutableCapture(build_targets.executable,
@@ -1215,73 +1387,13 @@ int RunCheck(const CommandOptions& options) {
 int RunBuild(const CommandOptions& options) {
     support::DiagnosticSink diagnostics;
     if (ClassifyInvocation(options) == InvocationKind::kDirectSource) {
-        const auto checked = CompileToMir(options, diagnostics, true);
-        if (!checked.has_value()) {
+        const auto build_result = BuildDirectSource(options, diagnostics);
+        if (!build_result.has_value()) {
             std::cerr << diagnostics.Render() << '\n';
             return 1;
         }
 
-        const auto dump_targets = support::ComputeDumpTargets(checked->source_path, options.build_dir);
-        const auto build_targets = support::ComputeBuildArtifactTargets(checked->source_path, options.build_dir);
-
-        if (options.dump_ast &&
-            !WriteTextArtifact(dump_targets.ast,
-                               mc::ast::DumpSourceFile(*checked->parse_result.source_file),
-                               "AST dump",
-                               diagnostics)) {
-            std::cerr << diagnostics.Render() << '\n';
-            return 1;
-        }
-
-        if (options.dump_mir &&
-            !WriteTextArtifact(dump_targets.mir,
-                               mc::mir::DumpModule(*checked->mir_result.module),
-                               "MIR dump",
-                               diagnostics)) {
-            std::cerr << diagnostics.Render() << '\n';
-            return 1;
-        }
-
-        if (options.dump_backend) {
-            const auto backend_result = mc::codegen_llvm::LowerModule(*checked->mir_result.module,
-                                                                      checked->source_path,
-                                                                      {.target = mc::codegen_llvm::BootstrapTargetConfig()},
-                                                                      diagnostics);
-            if (!backend_result.ok ||
-                !WriteTextArtifact(dump_targets.backend,
-                                   mc::codegen_llvm::DumpModule(*backend_result.module),
-                                   "backend dump",
-                                   diagnostics)) {
-                std::cerr << diagnostics.Render() << '\n';
-                return 1;
-            }
-        }
-
-        const auto build_result = mc::codegen_llvm::BuildExecutable(
-            *checked->mir_result.module,
-            checked->source_path,
-            {
-                .target = mc::codegen_llvm::BootstrapTargetConfig(),
-                .runtime_source_path = DiscoverHostedRuntimeSupportSource(checked->source_path),
-                .artifacts = {
-                    .llvm_ir_path = build_targets.llvm_ir,
-                    .object_path = build_targets.object,
-                    .executable_path = build_targets.executable,
-                },
-            },
-            diagnostics);
-        if (!build_result.ok) {
-            std::cerr << diagnostics.Render() << '\n';
-            return 1;
-        }
-
-        std::cout << "built " << checked->source_path.generic_string() << " -> "
-                  << build_result.artifacts.executable_path.generic_string()
-                  << " (bootstrap phase 5 executable path)" << '\n';
-
-        if (options.emit_dump_paths) {
-            PrintArtifactTargets(dump_targets, build_targets, std::cout);
-        }
+        PrintDirectSourceBuildSummary(*build_result, options.emit_dump_paths);
 
         return 0;
     }
@@ -1298,7 +1410,11 @@ int RunBuild(const CommandOptions& options) {
     }
 
     const BuildUnit& entry_unit = build_result->units.back();
-    auto merged_module = MergeBuildUnits(build_result->units, *entry_unit.mir_result.module, entry_unit.source_path);
+    auto merged_module = MergeBuildUnits(build_result->units, *entry_unit.mir_result.module, entry_unit.source_path, diagnostics);
+    if (!merged_module) {
+        std::cerr << diagnostics.Render() << '\n';
+        return 1;
+    }
     if (!mc::mir::ValidateModule(*merged_module, entry_unit.source_path, diagnostics)) {
         std::cerr << diagnostics.Render() << '\n';
         return 1;
@@ -1358,12 +1474,15 @@ int RunBuild(const CommandOptions& options) {
 
 int RunRun(const CommandOptions& options) {
     if (ClassifyInvocation(options) == InvocationKind::kDirectSource) {
-        const int build_status = RunBuild(options);
-        if (build_status != 0) {
-            return build_status;
+        support::DiagnosticSink diagnostics;
+        const auto build_result = BuildDirectSource(options, diagnostics);
+        if (!build_result.has_value()) {
+            std::cerr << diagnostics.Render() << '\n';
+            return 1;
         }
-        const auto build_targets = support::ComputeBuildArtifactTargets(options.source_path, options.build_dir);
-        return RunExecutableCommand(build_targets.executable, options.run_arguments);
+
+        PrintDirectSourceBuildSummary(*build_result, options.emit_dump_paths);
+        return RunExecutableCommand(build_result->executable_path, options.run_arguments);
     }
 
     support::DiagnosticSink diagnostics;

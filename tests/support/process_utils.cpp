@@ -38,6 +38,24 @@ std::string QuoteShellArg(std::string_view argument) {
     return quoted;
 }
 
+std::filesystem::path TimestampTickProbePath() {
+    return std::filesystem::current_path() / ".mc_timestamp_tick_probe";
+}
+
+std::filesystem::file_time_type TouchTimestampTickProbe(const std::filesystem::path& probe_path,
+                                                        std::uint64_t generation) {
+    std::ofstream stream(probe_path, std::ios::binary | std::ios::trunc);
+    if (!stream.is_open()) {
+        Fail("failed to open timestamp probe file: " + probe_path.generic_string());
+    }
+    stream << generation << '\n';
+    stream.close();
+    if (!stream) {
+        Fail("failed to write timestamp probe file: " + probe_path.generic_string());
+    }
+    return std::filesystem::last_write_time(probe_path);
+}
+
 std::string JoinCommand(const std::vector<std::string>& args) {
     std::string command;
     for (std::size_t index = 0; index < args.size(); ++index) {
@@ -204,7 +222,26 @@ void ExpectOutputContains(std::string_view output,
 }
 
 void SleepForTimestampTick() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    const std::filesystem::path probe_path = TimestampTickProbePath();
+    std::uint64_t generation = 0;
+    std::filesystem::file_time_type baseline{};
+    if (std::filesystem::exists(probe_path)) {
+        baseline = std::filesystem::last_write_time(probe_path);
+    } else {
+        baseline = TouchTimestampTickProbe(probe_path, generation);
+        ++generation;
+    }
+
+    for (int attempt = 0; attempt < 200; ++attempt) {
+        const auto next_time = TouchTimestampTickProbe(probe_path, generation);
+        if (next_time > baseline) {
+            return;
+        }
+        ++generation;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    Fail("timed out waiting for filesystem timestamp tick at " + probe_path.generic_string());
 }
 
 std::filesystem::file_time_type RequireWriteTime(const std::filesystem::path& path) {

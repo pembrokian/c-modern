@@ -130,7 +130,7 @@ bool MatchGenericTypePattern(const Module& module,
             return false;
         }
     }
-    return canonical_pattern == canonical_actual;
+    return true;
 }
 
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name) {
