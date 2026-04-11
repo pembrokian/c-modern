@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -552,6 +553,429 @@ void TestEnumPayloadLayoutUsesSharedAlignedStorage() {
     Expect(!build_diagnostics.HasErrors(), "object emission for mixed-alignment enum payloads should not emit backend diagnostics");
 }
 
+void TestPayloadFreeEnumEqualityBuildsScalarTagCompare() {
+    mc::mir::TypeDecl flag {
+        .kind = mc::mir::TypeDecl::Kind::kEnum,
+        .name = "Flag",
+        .variants = {
+            {.name = "Ready"},
+            {.name = "Waiting"},
+        },
+    };
+
+    mc::mir::Instruction ready_lhs {
+        .kind = mc::mir::Instruction::Kind::kSymbolRef,
+        .result = "%v0",
+        .type = mc::sema::NamedType("Flag"),
+        .target_kind = mc::mir::Instruction::TargetKind::kOther,
+        .target_name = "Ready",
+    };
+
+    mc::mir::Instruction ready_rhs {
+        .kind = mc::mir::Instruction::Kind::kSymbolRef,
+        .result = "%v1",
+        .type = mc::sema::NamedType("Flag"),
+        .target_kind = mc::mir::Instruction::TargetKind::kOther,
+        .target_name = "Ready",
+    };
+
+    mc::mir::Instruction equal {
+        .kind = mc::mir::Instruction::Kind::kBinary,
+        .result = "%v2",
+        .type = mc::sema::BoolType(),
+        .op = "==",
+        .operands = {"%v0", "%v1"},
+    };
+
+    mc::mir::BasicBlock entry {
+        .label = "entry0",
+        .instructions = {ready_lhs, ready_rhs, equal},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v2"},
+        },
+    };
+
+    mc::mir::Function function {
+        .name = "payload_free_enum_eq",
+        .return_types = {mc::sema::BoolType()},
+        .blocks = {entry},
+    };
+
+    mc::mir::Module module {
+        .type_decls = {flag},
+        .functions = {function},
+    };
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_payload_free_enum_eq";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        module,
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "payload_free_enum_eq.ll",
+                .object_path = artifact_dir / "payload_free_enum_eq.o",
+            },
+        },
+        diagnostics);
+    Expect(object_result.ok, "payload-free enum equality should emit executable LLVM IR successfully");
+    Expect(!diagnostics.HasErrors(), "payload-free enum equality should not emit backend diagnostics");
+
+    std::ifstream ir_stream(artifact_dir / "payload_free_enum_eq.ll");
+    Expect(ir_stream.good(), "payload-free enum equality should write LLVM IR output");
+    const std::string ir((std::istreambuf_iterator<char>(ir_stream)), std::istreambuf_iterator<char>());
+    Expect(ir.find("extractvalue {i64}") != std::string::npos,
+           "payload-free enum equality should extract the enum tag before comparing");
+    Expect(ir.find("icmp eq i64") != std::string::npos,
+           "payload-free enum equality should compare scalar i64 tags");
+}
+
+void TestPayloadBearingEnumEqualityBuildsTagAndPayloadCompare() {
+    mc::mir::TypeDecl option {
+        .kind = mc::mir::TypeDecl::Kind::kEnum,
+        .name = "Option",
+        .variants = {
+            {.name = "None"},
+            {.name = "Some", .payload_fields = {{"value", mc::sema::NamedType("i32")}}},
+        },
+    };
+
+    mc::mir::Instruction lhs_value {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v0",
+        .type = mc::sema::NamedType("i32"),
+        .op = "7",
+    };
+
+    mc::mir::Instruction rhs_value {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v1",
+        .type = mc::sema::NamedType("i32"),
+        .op = "7",
+    };
+
+    mc::mir::Instruction lhs_some {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v2",
+        .type = mc::sema::NamedType("Option"),
+        .target = "Option.Some",
+        .target_name = "Some",
+        .target_base_type = mc::sema::NamedType("Option"),
+        .operands = {"%v0"},
+    };
+
+    mc::mir::Instruction rhs_some {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v3",
+        .type = mc::sema::NamedType("Option"),
+        .target = "Option.Some",
+        .target_name = "Some",
+        .target_base_type = mc::sema::NamedType("Option"),
+        .operands = {"%v1"},
+    };
+
+    mc::mir::Instruction equal {
+        .kind = mc::mir::Instruction::Kind::kBinary,
+        .result = "%v4",
+        .type = mc::sema::BoolType(),
+        .op = "==",
+        .operands = {"%v2", "%v3"},
+    };
+
+    mc::mir::BasicBlock entry {
+        .label = "entry0",
+        .instructions = {lhs_value, rhs_value, lhs_some, rhs_some, equal},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v4"},
+        },
+    };
+
+    mc::mir::Function function {
+        .name = "payload_bearing_enum_eq",
+        .return_types = {mc::sema::BoolType()},
+        .blocks = {entry},
+    };
+
+    mc::mir::Module module {
+        .type_decls = {option},
+        .functions = {function},
+    };
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_payload_bearing_enum_eq";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        module,
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "payload_bearing_enum_eq.ll",
+                .object_path = artifact_dir / "payload_bearing_enum_eq.o",
+            },
+        },
+        diagnostics);
+    Expect(object_result.ok, "payload-bearing enum equality should emit executable LLVM IR successfully");
+    Expect(!diagnostics.HasErrors(), "payload-bearing enum equality should not emit backend diagnostics");
+
+    std::ifstream ir_stream(artifact_dir / "payload_bearing_enum_eq.ll");
+    Expect(ir_stream.good(), "payload-bearing enum equality should write LLVM IR output");
+    const std::string ir((std::istreambuf_iterator<char>(ir_stream)), std::istreambuf_iterator<char>());
+    Expect(ir.find("extractvalue {i64, [4 x i8]}") != std::string::npos,
+           "payload-bearing enum equality should extract enum tags before comparing");
+    Expect(ir.find("getelementptr inbounds {i64, [4 x i8]}, ptr") != std::string::npos,
+           "payload-bearing enum equality should address the payload storage for bytewise comparison");
+    Expect(ir.find("load i32") != std::string::npos,
+           "payload-bearing enum equality should compare the payload bytes through integer chunk loads");
+    Expect(ir.find("and i1") != std::string::npos,
+           "payload-bearing enum equality should combine tag and payload equality checks");
+}
+
+void TestPayloadBearingEnumOrderingBuildsTagAndFieldLexicographicCompare() {
+    mc::mir::TypeDecl option {
+        .kind = mc::mir::TypeDecl::Kind::kEnum,
+        .name = "Option",
+        .variants = {
+            {.name = "None"},
+            {.name = "Some", .payload_fields = {{"value", mc::sema::NamedType("i32")}}},
+        },
+    };
+
+    mc::mir::Instruction lhs_value {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v0",
+        .type = mc::sema::NamedType("i32"),
+        .op = "1",
+    };
+
+    mc::mir::Instruction rhs_value {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v1",
+        .type = mc::sema::NamedType("i32"),
+        .op = "2",
+    };
+
+    mc::mir::Instruction lhs_some {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v2",
+        .type = mc::sema::NamedType("Option"),
+        .target = "Option.Some",
+        .target_name = "Some",
+        .target_base_type = mc::sema::NamedType("Option"),
+        .operands = {"%v0"},
+    };
+
+    mc::mir::Instruction rhs_some {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v3",
+        .type = mc::sema::NamedType("Option"),
+        .target = "Option.Some",
+        .target_name = "Some",
+        .target_base_type = mc::sema::NamedType("Option"),
+        .operands = {"%v1"},
+    };
+
+    mc::mir::Instruction less_than {
+        .kind = mc::mir::Instruction::Kind::kBinary,
+        .result = "%v4",
+        .type = mc::sema::BoolType(),
+        .op = "<",
+        .operands = {"%v2", "%v3"},
+    };
+
+    mc::mir::BasicBlock entry {
+        .label = "entry0",
+        .instructions = {lhs_value, rhs_value, lhs_some, rhs_some, less_than},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v4"},
+        },
+    };
+
+    mc::mir::Function function {
+        .name = "payload_bearing_enum_lt",
+        .return_types = {mc::sema::BoolType()},
+        .blocks = {entry},
+    };
+
+    mc::mir::Module module {
+        .type_decls = {option},
+        .functions = {function},
+    };
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_payload_bearing_enum_lt";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        module,
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "payload_bearing_enum_lt.ll",
+                .object_path = artifact_dir / "payload_bearing_enum_lt.o",
+            },
+        },
+        diagnostics);
+    Expect(object_result.ok, "payload-bearing enum ordering should emit executable LLVM IR successfully");
+    Expect(!diagnostics.HasErrors(), "payload-bearing enum ordering should not emit backend diagnostics");
+
+    std::ifstream ir_stream(artifact_dir / "payload_bearing_enum_lt.ll");
+    Expect(ir_stream.good(), "payload-bearing enum ordering should write LLVM IR output");
+    const std::string ir((std::istreambuf_iterator<char>(ir_stream)), std::istreambuf_iterator<char>());
+    Expect(ir.find("icmp slt i64") != std::string::npos,
+           "payload-bearing enum ordering should compare enum tags or signed payload fields with scalar ordering ops");
+    Expect(ir.find("select i1") != std::string::npos,
+           "payload-bearing enum ordering should build lexicographic field ordering with select instructions");
+    Expect(ir.find("load i32") != std::string::npos,
+           "payload-bearing enum ordering should load typed payload fields before ordering comparisons");
+}
+
+void TestNestedPayloadBearingEnumOrderingBuildsRecursiveCompare() {
+    mc::mir::TypeDecl inner {
+        .kind = mc::mir::TypeDecl::Kind::kEnum,
+        .name = "Inner",
+        .variants = {
+            {.name = "Small", .payload_fields = {{"value", mc::sema::NamedType("i32")}}},
+            {.name = "Large", .payload_fields = {{"value", mc::sema::NamedType("i32")}}},
+        },
+    };
+
+    mc::mir::TypeDecl outer {
+        .kind = mc::mir::TypeDecl::Kind::kEnum,
+        .name = "Outer",
+        .variants = {
+            {.name = "Wrap", .payload_fields = {{"inner", mc::sema::NamedType("Inner")}}},
+            {.name = "Empty"},
+        },
+    };
+
+    mc::mir::Instruction lhs_scalar {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v0",
+        .type = mc::sema::NamedType("i32"),
+        .op = "1",
+    };
+
+    mc::mir::Instruction rhs_scalar {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v1",
+        .type = mc::sema::NamedType("i32"),
+        .op = "2",
+    };
+
+    mc::mir::Instruction lhs_inner {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v2",
+        .type = mc::sema::NamedType("Inner"),
+        .target = "Inner.Small",
+        .target_name = "Small",
+        .target_base_type = mc::sema::NamedType("Inner"),
+        .operands = {"%v0"},
+    };
+
+    mc::mir::Instruction rhs_inner {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v3",
+        .type = mc::sema::NamedType("Inner"),
+        .target = "Inner.Small",
+        .target_name = "Small",
+        .target_base_type = mc::sema::NamedType("Inner"),
+        .operands = {"%v1"},
+    };
+
+    mc::mir::Instruction lhs_outer {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v4",
+        .type = mc::sema::NamedType("Outer"),
+        .target = "Outer.Wrap",
+        .target_name = "Wrap",
+        .target_base_type = mc::sema::NamedType("Outer"),
+        .operands = {"%v2"},
+    };
+
+    mc::mir::Instruction rhs_outer {
+        .kind = mc::mir::Instruction::Kind::kVariantInit,
+        .result = "%v5",
+        .type = mc::sema::NamedType("Outer"),
+        .target = "Outer.Wrap",
+        .target_name = "Wrap",
+        .target_base_type = mc::sema::NamedType("Outer"),
+        .operands = {"%v3"},
+    };
+
+    mc::mir::Instruction less_than {
+        .kind = mc::mir::Instruction::Kind::kBinary,
+        .result = "%v6",
+        .type = mc::sema::BoolType(),
+        .op = "<",
+        .operands = {"%v4", "%v5"},
+    };
+
+    mc::mir::BasicBlock entry {
+        .label = "entry0",
+        .instructions = {lhs_scalar, rhs_scalar, lhs_inner, rhs_inner, lhs_outer, rhs_outer, less_than},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v6"},
+        },
+    };
+
+    mc::mir::Function function {
+        .name = "nested_payload_bearing_enum_lt",
+        .return_types = {mc::sema::BoolType()},
+        .blocks = {entry},
+    };
+
+    mc::mir::Module module {
+        .type_decls = {inner, outer},
+        .functions = {function},
+    };
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_nested_payload_bearing_enum_lt";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        module,
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "nested_payload_bearing_enum_lt.ll",
+                .object_path = artifact_dir / "nested_payload_bearing_enum_lt.o",
+            },
+        },
+        diagnostics);
+    Expect(object_result.ok, "nested payload-bearing enum ordering should emit executable LLVM IR successfully");
+    Expect(!diagnostics.HasErrors(), "nested payload-bearing enum ordering should not emit backend diagnostics");
+
+    std::ifstream ir_stream(artifact_dir / "nested_payload_bearing_enum_lt.ll");
+    Expect(ir_stream.good(), "nested payload-bearing enum ordering should write LLVM IR output");
+    const std::string ir((std::istreambuf_iterator<char>(ir_stream)), std::istreambuf_iterator<char>());
+    Expect(ir.find("variant.0.field.0.lhs") != std::string::npos,
+           "nested payload-bearing enum ordering should materialize nested field loads");
+    Expect(ir.find("same.lt") != std::string::npos,
+           "nested payload-bearing enum ordering should build recursive same-variant ordering state");
+    Expect(ir.find("icmp slt i64") != std::string::npos,
+           "nested payload-bearing enum ordering should still compare nested enum tags as scalar discriminants");
+}
+
 }  // namespace
 
 int main() {
@@ -564,5 +988,9 @@ int main() {
     TestLowerModuleLowersCheckedIntegerSemantics();
     TestLowerModuleLowersRepresentationPreservingConversions();
     TestEnumPayloadLayoutUsesSharedAlignedStorage();
+    TestPayloadFreeEnumEqualityBuildsScalarTagCompare();
+    TestPayloadBearingEnumEqualityBuildsTagAndPayloadCompare();
+    TestPayloadBearingEnumOrderingBuildsTagAndFieldLexicographicCompare();
+    TestNestedPayloadBearingEnumOrderingBuildsRecursiveCompare();
     return 0;
 }

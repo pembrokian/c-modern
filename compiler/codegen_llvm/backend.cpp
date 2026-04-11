@@ -73,6 +73,7 @@ struct ExecutableValue {
     std::string text;
     BackendTypeInfo type;
     std::optional<std::string> storage_slot;
+    std::optional<sema::Type> source_type;
 };
 
 struct ExecutableStringConstant {
@@ -923,11 +924,13 @@ void RecordExecutableValue(ExecutableFunctionState& state,
                            const std::string& result_name,
                            const std::string& text,
                            const BackendTypeInfo& type,
-                           std::optional<std::string> storage_slot = std::nullopt) {
+                           std::optional<std::string> storage_slot = std::nullopt,
+                           std::optional<sema::Type> source_type = std::nullopt) {
     state.values[result_name] = {
         .text = text,
         .type = type,
         .storage_slot = std::move(storage_slot),
+        .source_type = std::move(source_type),
     };
 }
 
@@ -1046,6 +1049,566 @@ std::string PreferredOperandType(const ExecutableValue& lhs,
         return rhs.type.backend_name;
     }
     return lhs.type.backend_name;
+}
+
+std::string_view StripConstSourceName(std::string_view source_name) {
+    constexpr std::string_view kConstPrefix = "const ";
+    while (source_name.rfind(kConstPrefix, 0) == 0) {
+        source_name.remove_prefix(kConstPrefix.size());
+    }
+    return source_name;
+}
+
+std::string_view NamedSourceDeclName(std::string_view source_name) {
+    source_name = StripConstSourceName(source_name);
+    const std::size_t generic_start = source_name.find('<');
+    if (generic_start != std::string_view::npos) {
+        source_name = source_name.substr(0, generic_start);
+    }
+    return source_name;
+}
+
+std::optional<std::size_t> ParseEnumPayloadSize(const BackendTypeInfo& type_info) {
+    if (type_info.backend_name == "{i64}") {
+        return 0;
+    }
+
+    constexpr std::string_view kPrefix = "{i64, ";
+    if (type_info.backend_name.rfind(kPrefix, 0) != 0 || type_info.backend_name.size() <= kPrefix.size() + 1 ||
+        type_info.backend_name.back() != '}') {
+        return std::nullopt;
+    }
+
+    const std::string_view payload_type = std::string_view(type_info.backend_name).substr(
+        kPrefix.size(), type_info.backend_name.size() - kPrefix.size() - 1);
+    return ParseBackendArrayLength(payload_type);
+}
+
+struct EnumCompareInfo {
+    sema::Type source_type;
+    const mir::TypeDecl* type_decl = nullptr;
+    EnumBackendLayout layout;
+    std::size_t payload_size = 0;
+    std::vector<std::vector<sema::Type>> variant_field_types;
+};
+
+std::optional<EnumCompareInfo> ResolveEnumCompareInfo(const mir::Module& module,
+                                                      const ExecutableValue& value) {
+    if (!value.source_type.has_value()) {
+        return std::nullopt;
+    }
+
+    sema::Type source_type = StripMirAliasOrDistinct(module, *value.source_type);
+    while (source_type.kind == sema::Type::Kind::kConst && !source_type.subtypes.empty()) {
+        source_type = StripMirAliasOrDistinct(module, source_type.subtypes.front());
+    }
+
+    if (source_type.kind != sema::Type::Kind::kNamed) {
+        return std::nullopt;
+    }
+
+    const mir::TypeDecl* type_decl = FindTypeDecl(module, source_type.name);
+    if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kEnum) {
+        return std::nullopt;
+    }
+
+    const auto lowered_layout = LowerEnumLayout(module, *type_decl, source_type);
+    if (!lowered_layout.has_value()) {
+        return std::nullopt;
+    }
+
+    const auto payload_size = ParseEnumPayloadSize(value.type);
+    if (!payload_size.has_value()) {
+        return std::nullopt;
+    }
+
+    std::vector<std::vector<sema::Type>> variant_field_types;
+    variant_field_types.reserve(type_decl->variants.size());
+    for (const auto& raw_variant : type_decl->variants) {
+        mir::VariantDecl variant = raw_variant;
+        if (!type_decl->type_params.empty()) {
+            for (auto& field : variant.payload_fields) {
+                field.second = sema::SubstituteTypeParams(std::move(field.second), type_decl->type_params, source_type.subtypes);
+            }
+        }
+
+        std::vector<sema::Type> field_types;
+        field_types.reserve(variant.payload_fields.size());
+        for (const auto& field : variant.payload_fields) {
+            field_types.push_back(field.second);
+        }
+        variant_field_types.push_back(std::move(field_types));
+    }
+
+    return EnumCompareInfo{
+        .source_type = std::move(source_type),
+        .type_decl = type_decl,
+        .layout = *lowered_layout,
+        .payload_size = *payload_size,
+        .variant_field_types = std::move(variant_field_types),
+    };
+}
+
+std::string EmitEnumPayloadFieldPointer(const std::string& enum_slot,
+                                       const EnumBackendLayout& layout,
+                                       std::size_t payload_offset,
+                                       std::size_t function_index,
+                                       std::size_t block_index,
+                                       std::size_t instruction_index,
+                                       std::string_view suffix,
+                                       std::vector<std::string>& output_lines);
+
+std::string EmitEnumPayloadChunkLoad(const std::string& aggregate_slot,
+                                     const ExecutableValue& value,
+                                     std::size_t payload_size,
+                                     std::size_t payload_offset,
+                                     std::size_t chunk_size,
+                                     std::size_t function_index,
+                                     std::size_t block_index,
+                                     std::size_t instruction_index,
+                                     std::string_view suffix,
+                                     std::vector<std::string>& output_lines) {
+    const std::string payload_ptr = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix) + ".payload";
+    output_lines.push_back(payload_ptr + " = getelementptr inbounds " + value.type.backend_name + ", ptr " + aggregate_slot + ", i64 0, i32 1");
+
+    const std::string byte_ptr = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix) + ".byte";
+    output_lines.push_back(byte_ptr + " = getelementptr inbounds [" + std::to_string(payload_size) + " x i8], ptr " + payload_ptr + ", i64 0, i64 " +
+                           std::to_string(payload_offset));
+
+    const std::string chunk_type = "i" + std::to_string(chunk_size * 8);
+    const std::string chunk_value = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix) + ".load";
+    output_lines.push_back(chunk_value + " = load " + chunk_type + ", ptr " + byte_ptr + ", align 1");
+    return chunk_value;
+}
+
+bool EmitScalarComparison(std::string_view op,
+                          const ExecutableValue& lhs,
+                          const ExecutableValue& rhs,
+                          std::size_t function_index,
+                          std::size_t block_index,
+                          std::size_t instruction_index,
+                          std::string_view suffix,
+                          std::vector<std::string>& output_lines,
+                          std::string& result) {
+    const std::string temp = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix);
+    if (IsFloatType(lhs.type)) {
+        const char* predicate = nullptr;
+        if (op == "==") {
+            predicate = "oeq";
+        } else if (op == "!=") {
+            predicate = "one";
+        } else if (op == "<") {
+            predicate = "olt";
+        } else if (op == "<=") {
+            predicate = "ole";
+        } else if (op == ">") {
+            predicate = "ogt";
+        } else if (op == ">=") {
+            predicate = "oge";
+        }
+        if (predicate == nullptr) {
+            return false;
+        }
+        output_lines.push_back(temp + " = fcmp " + std::string(predicate) + " " + lhs.type.backend_name + " " + lhs.text + ", " + rhs.text);
+        result = temp;
+        return true;
+    }
+
+    if (lhs.type.backend_name == "ptr" && op != "==" && op != "!=") {
+        return false;
+    }
+
+    const bool is_unsigned = lhs.type.backend_name == "i1" || IsUnsignedSourceType(lhs.type.source_name) || lhs.type.backend_name == "ptr";
+    const char* predicate = nullptr;
+    if (op == "==") {
+        predicate = "eq";
+    } else if (op == "!=") {
+        predicate = "ne";
+    } else if (op == "<") {
+        predicate = is_unsigned ? "ult" : "slt";
+    } else if (op == "<=") {
+        predicate = is_unsigned ? "ule" : "sle";
+    } else if (op == ">") {
+        predicate = is_unsigned ? "ugt" : "sgt";
+    } else if (op == ">=") {
+        predicate = is_unsigned ? "uge" : "sge";
+    }
+    if (predicate == nullptr) {
+        return false;
+    }
+
+    output_lines.push_back(temp + " = icmp " + std::string(predicate) + " " + lhs.type.backend_name + " " + lhs.text + ", " + rhs.text);
+    result = temp;
+    return true;
+}
+
+bool EmitOrderedEnumFieldComparison(const mir::Module& module,
+                                    const sema::Type& field_type,
+                                    const BackendTypeInfo& backend_type,
+                                    const std::string& lhs_text,
+                                    const std::string& rhs_text,
+                                    std::size_t function_index,
+                                    std::size_t block_index,
+                                    std::size_t instruction_index,
+                                    std::string_view suffix,
+                                    const std::filesystem::path& source_path,
+                                    support::DiagnosticSink& diagnostics,
+                                    std::vector<std::string>& output_lines,
+                                    std::string& eq_result,
+                                    std::string& lt_result,
+                                    std::string& gt_result) {
+    const sema::Type stripped_type = StripMirAliasOrDistinct(module, field_type);
+    ExecutableValue lhs_value{
+        .text = lhs_text,
+        .type = backend_type,
+        .source_type = stripped_type,
+    };
+    ExecutableValue rhs_value{
+        .text = rhs_text,
+        .type = backend_type,
+        .source_type = stripped_type,
+    };
+
+    if (const auto enum_info = ResolveEnumCompareInfo(module, lhs_value); enum_info.has_value()) {
+        const auto emit_enum_ordering_components = [&](const ExecutableValue& enum_lhs,
+                                                       const ExecutableValue& enum_rhs,
+                                                       const EnumCompareInfo& nested_info,
+                                                       std::string_view nested_suffix,
+                                                       std::string& nested_eq,
+                                                       std::string& nested_lt,
+                                                       std::string& nested_gt,
+                                                       const auto& self) -> bool {
+            const std::string nested_base = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(nested_suffix);
+            const std::string nested_lhs_tag = nested_base + ".lhs.tag";
+            const std::string nested_rhs_tag = nested_base + ".rhs.tag";
+            const std::string nested_tag_eq = nested_base + ".tag.eq";
+            const std::string nested_tag_lt = nested_base + ".tag.lt";
+            const std::string nested_tag_gt = nested_base + ".tag.gt";
+            output_lines.push_back(nested_lhs_tag + " = extractvalue " + enum_lhs.type.backend_name + " " + enum_lhs.text + ", 0");
+            output_lines.push_back(nested_rhs_tag + " = extractvalue " + enum_rhs.type.backend_name + " " + enum_rhs.text + ", 0");
+            output_lines.push_back(nested_tag_eq + " = icmp eq i64 " + nested_lhs_tag + ", " + nested_rhs_tag);
+            output_lines.push_back(nested_tag_lt + " = icmp slt i64 " + nested_lhs_tag + ", " + nested_rhs_tag);
+            output_lines.push_back(nested_tag_gt + " = icmp sgt i64 " + nested_lhs_tag + ", " + nested_rhs_tag);
+
+            if (nested_info.payload_size == 0) {
+                nested_eq = nested_tag_eq;
+                nested_lt = nested_tag_lt;
+                nested_gt = nested_tag_gt;
+                return true;
+            }
+
+            const std::string nested_lhs_slot = EmitAggregateStackSlot(enum_lhs,
+                                                                       function_index,
+                                                                       block_index,
+                                                                       instruction_index,
+                                                                       std::string(nested_suffix) + ".lhs.slot",
+                                                                       output_lines);
+            const std::string nested_rhs_slot = EmitAggregateStackSlot(enum_rhs,
+                                                                       function_index,
+                                                                       block_index,
+                                                                       instruction_index,
+                                                                       std::string(nested_suffix) + ".rhs.slot",
+                                                                       output_lines);
+
+            std::string same_variant_eq = "false";
+            std::string same_variant_lt = "false";
+            std::string same_variant_gt = "false";
+            for (std::size_t variant_index = nested_info.variant_field_types.size(); variant_index > 0; --variant_index) {
+                const std::size_t actual_index = variant_index - 1;
+                std::string variant_eq = "true";
+                std::string variant_lt = "false";
+                std::string variant_gt = "false";
+                for (std::size_t field_index = nested_info.variant_field_types[actual_index].size(); field_index > 0; --field_index) {
+                    const std::size_t actual_field_index = field_index - 1;
+                    const std::string field_suffix_base = std::string(nested_suffix) + ".variant." + std::to_string(actual_index) + ".field." + std::to_string(actual_field_index);
+                    const std::string nested_lhs_field_slot = EmitEnumPayloadFieldPointer(nested_lhs_slot,
+                                                                                          nested_info.layout,
+                                                                                          nested_info.layout.variant_payload_offsets[actual_index][actual_field_index],
+                                                                                          function_index,
+                                                                                          block_index,
+                                                                                          instruction_index,
+                                                                                          field_suffix_base + ".lhs.ptr",
+                                                                                          output_lines);
+                    const std::string nested_rhs_field_slot = EmitEnumPayloadFieldPointer(nested_rhs_slot,
+                                                                                          nested_info.layout,
+                                                                                          nested_info.layout.variant_payload_offsets[actual_index][actual_field_index],
+                                                                                          function_index,
+                                                                                          block_index,
+                                                                                          instruction_index,
+                                                                                          field_suffix_base + ".rhs.ptr",
+                                                                                          output_lines);
+                    const BackendTypeInfo& nested_field_backend_type = nested_info.layout.variant_field_types[actual_index][actual_field_index];
+                    const std::string nested_lhs_field = nested_base + ".variant." + std::to_string(actual_index) + ".field." + std::to_string(actual_field_index) + ".lhs";
+                    const std::string nested_rhs_field = nested_base + ".variant." + std::to_string(actual_index) + ".field." + std::to_string(actual_field_index) + ".rhs";
+                    output_lines.push_back(nested_lhs_field + " = load " + nested_field_backend_type.backend_name + ", ptr " + nested_lhs_field_slot + ", align " +
+                                           std::to_string(nested_field_backend_type.alignment));
+                    output_lines.push_back(nested_rhs_field + " = load " + nested_field_backend_type.backend_name + ", ptr " + nested_rhs_field_slot + ", align " +
+                                           std::to_string(nested_field_backend_type.alignment));
+
+                    ExecutableValue nested_lhs_field_value{
+                        .text = nested_lhs_field,
+                        .type = nested_field_backend_type,
+                        .source_type = nested_info.variant_field_types[actual_index][actual_field_index],
+                    };
+                    ExecutableValue nested_rhs_field_value{
+                        .text = nested_rhs_field,
+                        .type = nested_field_backend_type,
+                        .source_type = nested_info.variant_field_types[actual_index][actual_field_index],
+                    };
+
+                    std::string field_eq;
+                    std::string field_lt;
+                    std::string field_gt;
+                    if (const auto deeper_enum = ResolveEnumCompareInfo(module, nested_lhs_field_value); deeper_enum.has_value()) {
+                        if (!self(nested_lhs_field_value,
+                                  nested_rhs_field_value,
+                                  *deeper_enum,
+                                  field_suffix_base,
+                                  field_eq,
+                                  field_lt,
+                                  field_gt,
+                                  self)) {
+                            return false;
+                        }
+                    } else if (!EmitScalarComparison("==", nested_lhs_field_value, nested_rhs_field_value, function_index, block_index, instruction_index, field_suffix_base + ".eq", output_lines, field_eq) ||
+                               !EmitScalarComparison("<", nested_lhs_field_value, nested_rhs_field_value, function_index, block_index, instruction_index, field_suffix_base + ".lt", output_lines, field_lt) ||
+                               !EmitScalarComparison(">", nested_lhs_field_value, nested_rhs_field_value, function_index, block_index, instruction_index, field_suffix_base + ".gt", output_lines, field_gt)) {
+                        ReportBackendError(source_path,
+                                           "LLVM bootstrap executable emission does not support payload-bearing enum ordering for field type '" +
+                                               sema::FormatType(nested_info.variant_field_types[actual_index][actual_field_index]) + "'",
+                                           diagnostics);
+                        return false;
+                    }
+
+                    const std::string next_variant_eq = nested_base + ".variant." + std::to_string(actual_index) + ".eq." + std::to_string(actual_field_index);
+                    const std::string next_variant_lt = nested_base + ".variant." + std::to_string(actual_index) + ".lt." + std::to_string(actual_field_index);
+                    const std::string next_variant_gt = nested_base + ".variant." + std::to_string(actual_index) + ".gt." + std::to_string(actual_field_index);
+                    output_lines.push_back(next_variant_eq + " = and i1 " + field_eq + ", " + variant_eq);
+                    output_lines.push_back(next_variant_lt + " = select i1 " + field_eq + ", i1 " + variant_lt + ", i1 " + field_lt);
+                    output_lines.push_back(next_variant_gt + " = select i1 " + field_eq + ", i1 " + variant_gt + ", i1 " + field_gt);
+                    variant_eq = next_variant_eq;
+                    variant_lt = next_variant_lt;
+                    variant_gt = next_variant_gt;
+                }
+
+                const std::string variant_match = nested_base + ".variant." + std::to_string(actual_index) + ".match";
+                const std::string next_same_eq = nested_base + ".same.eq." + std::to_string(actual_index);
+                const std::string next_same_lt = nested_base + ".same.lt." + std::to_string(actual_index);
+                const std::string next_same_gt = nested_base + ".same.gt." + std::to_string(actual_index);
+                output_lines.push_back(variant_match + " = icmp eq i64 " + nested_lhs_tag + ", " + std::to_string(actual_index));
+                output_lines.push_back(next_same_eq + " = select i1 " + variant_match + ", i1 " + variant_eq + ", i1 " + same_variant_eq);
+                output_lines.push_back(next_same_lt + " = select i1 " + variant_match + ", i1 " + variant_lt + ", i1 " + same_variant_lt);
+                output_lines.push_back(next_same_gt + " = select i1 " + variant_match + ", i1 " + variant_gt + ", i1 " + same_variant_gt);
+                same_variant_eq = next_same_eq;
+                same_variant_lt = next_same_lt;
+                same_variant_gt = next_same_gt;
+            }
+
+            nested_eq = nested_base + ".eq";
+            nested_lt = nested_base + ".lt";
+            nested_gt = nested_base + ".gt";
+            output_lines.push_back(nested_eq + " = select i1 " + nested_tag_eq + ", i1 " + same_variant_eq + ", i1 false");
+            output_lines.push_back(nested_lt + " = select i1 " + nested_tag_eq + ", i1 " + same_variant_lt + ", i1 " + nested_tag_lt);
+            output_lines.push_back(nested_gt + " = select i1 " + nested_tag_eq + ", i1 " + same_variant_gt + ", i1 " + nested_tag_gt);
+            return true;
+        };
+
+        return emit_enum_ordering_components(lhs_value,
+                                             rhs_value,
+                                             *enum_info,
+                                             suffix,
+                                             eq_result,
+                                             lt_result,
+                                             gt_result,
+                                             emit_enum_ordering_components);
+    }
+
+    if (!EmitScalarComparison("==", lhs_value, rhs_value, function_index, block_index, instruction_index, std::string(suffix) + ".eq", output_lines, eq_result) ||
+        !EmitScalarComparison("<", lhs_value, rhs_value, function_index, block_index, instruction_index, std::string(suffix) + ".lt", output_lines, lt_result) ||
+        !EmitScalarComparison(">", lhs_value, rhs_value, function_index, block_index, instruction_index, std::string(suffix) + ".gt", output_lines, gt_result)) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission does not support payload-bearing enum ordering for field type '" +
+                               sema::FormatType(field_type) + "'",
+                           diagnostics);
+        return false;
+    }
+
+    return true;
+}
+
+void EmitEnumCompare(const mir::Instruction& instruction,
+                     std::size_t function_index,
+                     std::size_t block_index,
+                     std::size_t instruction_index,
+                     std::string_view compare_predicate,
+                     const ExecutableValue& lhs,
+                     const ExecutableValue& rhs,
+                     const EnumCompareInfo& compare_info,
+                     const std::filesystem::path& source_path,
+                     const mir::BasicBlock& block,
+                     support::DiagnosticSink& diagnostics,
+                     const BackendTypeInfo& result_type,
+                     ExecutableFunctionState& state,
+                     std::vector<std::string>& output_lines,
+                     bool& emitted) {
+    emitted = false;
+    const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+    const std::string lhs_tag = temp + ".lhs.tag";
+    const std::string rhs_tag = temp + ".rhs.tag";
+    output_lines.push_back(lhs_tag + " = extractvalue " + lhs.type.backend_name + " " + lhs.text + ", 0");
+    output_lines.push_back(rhs_tag + " = extractvalue " + rhs.type.backend_name + " " + rhs.text + ", 0");
+
+    if (compare_info.payload_size == 0) {
+        output_lines.push_back(temp + " = icmp " + std::string(compare_predicate) + " i64 " + lhs_tag + ", " + rhs_tag);
+        RecordExecutableValue(state, instruction.result, temp, result_type);
+        emitted = true;
+        return;
+    }
+
+    const std::string tag_eq = temp + ".tag.eq";
+    output_lines.push_back(tag_eq + " = icmp eq i64 " + lhs_tag + ", " + rhs_tag);
+
+    const std::string lhs_slot = EmitAggregateStackSlot(lhs,
+                                                        function_index,
+                                                        block_index,
+                                                        instruction_index,
+                                                        "enum.compare.lhs.slot",
+                                                        output_lines);
+    const std::string rhs_slot = EmitAggregateStackSlot(rhs,
+                                                        function_index,
+                                                        block_index,
+                                                        instruction_index,
+                                                        "enum.compare.rhs.slot",
+                                                        output_lines);
+
+    if (instruction.op == "==" || instruction.op == "!=") {
+        std::string combined = instruction.op == "==" ? tag_eq : temp + ".tag.ne";
+        if (instruction.op == "!=") {
+            output_lines.push_back(combined + " = icmp ne i64 " + lhs_tag + ", " + rhs_tag);
+        }
+
+        constexpr std::size_t kChunkSizes[] = {8, 4, 2, 1};
+        std::size_t payload_offset = 0;
+        std::size_t compare_index = 0;
+        while (payload_offset < compare_info.payload_size) {
+            std::size_t chunk_size = 1;
+            for (const std::size_t candidate : kChunkSizes) {
+                if (payload_offset + candidate <= compare_info.payload_size) {
+                    chunk_size = candidate;
+                    break;
+                }
+            }
+
+            const std::string chunk_suffix = "enum.compare.chunk." + std::to_string(compare_index);
+            const std::string lhs_chunk = EmitEnumPayloadChunkLoad(lhs_slot,
+                                                                   lhs,
+                                                                   compare_info.payload_size,
+                                                                   payload_offset,
+                                                                   chunk_size,
+                                                                   function_index,
+                                                                   block_index,
+                                                                   instruction_index,
+                                                                   chunk_suffix + ".lhs",
+                                                                   output_lines);
+            const std::string rhs_chunk = EmitEnumPayloadChunkLoad(rhs_slot,
+                                                                   rhs,
+                                                                   compare_info.payload_size,
+                                                                   payload_offset,
+                                                                   chunk_size,
+                                                                   function_index,
+                                                                   block_index,
+                                                                   instruction_index,
+                                                                   chunk_suffix + ".rhs",
+                                                                   output_lines);
+            const std::string chunk_type = "i" + std::to_string(chunk_size * 8);
+            const std::string chunk_compare = temp + ".payload." + std::to_string(compare_index);
+            output_lines.push_back(chunk_compare + " = icmp " + std::string(compare_predicate) + " " + chunk_type + " " + lhs_chunk + ", " + rhs_chunk);
+
+            const std::string next_combined = temp + ".combine." + std::to_string(compare_index);
+            output_lines.push_back(next_combined + " = " + std::string(instruction.op == "==" ? "and" : "or") + " i1 " + combined + ", " + chunk_compare);
+            combined = next_combined;
+            payload_offset += chunk_size;
+            ++compare_index;
+        }
+
+        output_lines.push_back(temp + " = or i1 " + combined + ", false");
+        RecordExecutableValue(state, instruction.result, temp, result_type);
+        emitted = true;
+        return;
+    }
+
+    const std::string tag_order = temp + ".tag.order";
+    output_lines.push_back(tag_order + " = icmp " + std::string(compare_predicate) + " i64 " + lhs_tag + ", " + rhs_tag);
+
+    const std::string default_same_tag = instruction.op == "<=" || instruction.op == ">=" ? "true" : "false";
+    std::string same_tag_result = default_same_tag;
+    for (std::size_t variant_index = compare_info.variant_field_types.size(); variant_index > 0; --variant_index) {
+        const std::size_t actual_index = variant_index - 1;
+        std::string variant_result = default_same_tag;
+        for (std::size_t field_index = compare_info.variant_field_types[actual_index].size(); field_index > 0; --field_index) {
+            const std::size_t actual_field_index = field_index - 1;
+            const std::string field_suffix = "enum.order.variant." + std::to_string(actual_index) + ".field." + std::to_string(actual_field_index);
+            const std::string lhs_field_slot = EmitEnumPayloadFieldPointer(lhs_slot,
+                                                                           compare_info.layout,
+                                                                           compare_info.layout.variant_payload_offsets[actual_index][actual_field_index],
+                                                                           function_index,
+                                                                           block_index,
+                                                                           instruction_index,
+                                                                           field_suffix + ".lhs.ptr",
+                                                                           output_lines);
+            const std::string rhs_field_slot = EmitEnumPayloadFieldPointer(rhs_slot,
+                                                                           compare_info.layout,
+                                                                           compare_info.layout.variant_payload_offsets[actual_index][actual_field_index],
+                                                                           function_index,
+                                                                           block_index,
+                                                                           instruction_index,
+                                                                           field_suffix + ".rhs.ptr",
+                                                                           output_lines);
+            const BackendTypeInfo& field_backend_type = compare_info.layout.variant_field_types[actual_index][actual_field_index];
+            const std::string lhs_field = temp + ".variant." + std::to_string(actual_index) + ".field." + std::to_string(actual_field_index) + ".lhs";
+            const std::string rhs_field = temp + ".variant." + std::to_string(actual_index) + ".field." + std::to_string(actual_field_index) + ".rhs";
+            output_lines.push_back(lhs_field + " = load " + field_backend_type.backend_name + ", ptr " + lhs_field_slot + ", align " +
+                                   std::to_string(field_backend_type.alignment));
+            output_lines.push_back(rhs_field + " = load " + field_backend_type.backend_name + ", ptr " + rhs_field_slot + ", align " +
+                                   std::to_string(field_backend_type.alignment));
+
+            std::string field_eq;
+            std::string field_lt;
+            std::string field_gt;
+            if (!EmitOrderedEnumFieldComparison(*state.module,
+                                                compare_info.variant_field_types[actual_index][actual_field_index],
+                                                field_backend_type,
+                                                lhs_field,
+                                                rhs_field,
+                                                function_index,
+                                                block_index,
+                                                instruction_index,
+                                                field_suffix,
+                                                source_path,
+                                                diagnostics,
+                                                output_lines,
+                                                field_eq,
+                                                field_lt,
+                                                field_gt)) {
+                return;
+            }
+
+            const std::string selected_order = instruction.op == "<" || instruction.op == "<=" ? field_lt : field_gt;
+            const std::string next_variant_result = temp + ".variant." + std::to_string(actual_index) + ".step." + std::to_string(actual_field_index);
+            output_lines.push_back(next_variant_result + " = select i1 " + field_eq + ", i1 " + variant_result + ", i1 " + selected_order);
+            variant_result = next_variant_result;
+        }
+
+        const std::string variant_match = temp + ".variant." + std::to_string(actual_index) + ".match";
+        const std::string next_same_tag = temp + ".same_tag." + std::to_string(actual_index);
+        output_lines.push_back(variant_match + " = icmp eq i64 " + lhs_tag + ", " + std::to_string(actual_index));
+        output_lines.push_back(next_same_tag + " = select i1 " + variant_match + ", i1 " + variant_result + ", i1 " + same_tag_result);
+        same_tag_result = next_same_tag;
+    }
+
+    output_lines.push_back(temp + " = select i1 " + tag_eq + ", i1 " + same_tag_result + ", i1 " + tag_order);
+    RecordExecutableValue(state, instruction.result, temp, result_type);
+    emitted = true;
 }
 
 struct BinaryOpcodeEntry {
@@ -1491,6 +2054,27 @@ bool EmitBinaryInstruction(const mir::Instruction& instruction,
     const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
     const std::string compare_predicate = ComparePredicateForLLVM(instruction, lhs);
     if (!compare_predicate.empty()) {
+        const auto lhs_enum = ResolveEnumCompareInfo(*state.module, lhs);
+        const auto rhs_enum = ResolveEnumCompareInfo(*state.module, rhs);
+        if (lhs_enum.has_value() && rhs_enum.has_value()) {
+            bool emitted = false;
+            EmitEnumCompare(instruction,
+                            function_index,
+                            block_index,
+                            instruction_index,
+                            compare_predicate,
+                            lhs,
+                            rhs,
+                            *lhs_enum,
+                            source_path,
+                            block,
+                            diagnostics,
+                            result_type,
+                            state,
+                            output_lines,
+                            emitted);
+            return emitted;
+        }
         const std::string operand_type = PreferredOperandType(lhs, rhs);
         const std::string compare_opcode = IsFloatType(lhs.type) ? "fcmp" : "icmp";
         output_lines.push_back(temp + " = " + compare_opcode + " " + compare_predicate + " " + operand_type +
@@ -1606,7 +2190,7 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
         current_value = next_value;
     }
 
-    RecordExecutableValue(state, instruction.result, current_value, aggregate_type);
+    RecordExecutableValue(state, instruction.result, current_value, aggregate_type, std::nullopt, instruction.type);
     return true;
 }
 
@@ -1747,7 +2331,7 @@ bool EmitVariantInitInstruction(const mir::Instruction& instruction,
     const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
     output_lines.push_back(result_temp + " = load " + layout.aggregate_type.backend_name + ", ptr " + enum_slot + ", align " +
                            std::to_string(layout.aggregate_type.alignment));
-    RecordExecutableValue(state, instruction.result, result_temp, layout.aggregate_type);
+    RecordExecutableValue(state, instruction.result, result_temp, layout.aggregate_type, std::nullopt, instruction.type);
     return true;
 }
 
@@ -1802,7 +2386,7 @@ bool EmitVariantMatchInstruction(const mir::Instruction& instruction,
     const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
     output_lines.push_back(tag_temp + " = extractvalue " + layout.aggregate_type.backend_name + " " + selector.text + ", 0");
     output_lines.push_back(result_temp + " = icmp eq i64 " + tag_temp + ", " + std::to_string(variant_index));
-    RecordExecutableValue(state, instruction.result, result_temp, result_type);
+    RecordExecutableValue(state, instruction.result, result_temp, result_type, std::nullopt, instruction.type);
     return true;
 }
 
@@ -1889,7 +2473,7 @@ bool EmitVariantExtractInstruction(const mir::Instruction& instruction,
     const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
     output_lines.push_back(result_temp + " = load " + result_type.backend_name + ", ptr " + field_slot + ", align " +
                            std::to_string(result_type.alignment));
-    RecordExecutableValue(state, instruction.result, result_temp, result_type);
+    RecordExecutableValue(state, instruction.result, result_temp, result_type, std::nullopt, instruction.type);
     return true;
 }
 
@@ -1971,7 +2555,7 @@ bool EmitArenaNewInstruction(const mir::Instruction& instruction,
     output_lines.push_back(used_slot + " = getelementptr inbounds {ptr, i64, i64, ptr}, ptr " + arena.text + ", i64 0, i32 2");
     output_lines.push_back(stored_used + " = select i1 " + fits + ", i64 " + next_used + ", i64 " + used);
     output_lines.push_back("store i64 " + stored_used + ", ptr " + used_slot + ", align 8");
-    RecordExecutableValue(state, instruction.result, result_ptr, result_type);
+    RecordExecutableValue(state, instruction.result, result_ptr, result_type, std::nullopt, instruction.type);
     return true;
 }
 
@@ -2098,7 +2682,7 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
     const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
     output_lines.push_back(temp + " = call " + LLVMTypeName(result_type) + " " + function_it->second + "(" +
                            args.str() + ")");
-    RecordExecutableValue(state, instruction.result, temp, result_type);
+    RecordExecutableValue(state, instruction.result, temp, result_type, std::nullopt, instruction.type);
     return true;
 }
 
@@ -2289,10 +2873,10 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 output_lines.push_back(init_temp + " = insertvalue {ptr, i64} zeroinitializer, ptr " + data_temp + ", 0");
                 output_lines.push_back(value_temp + " = insertvalue {ptr, i64} " + init_temp + ", i64 " +
                                        std::to_string(string_constant->second.length) + ", 1");
-                RecordExecutableValue(state, instruction.result, value_temp, type_info);
+                RecordExecutableValue(state, instruction.result, value_temp, type_info, std::nullopt, instruction.type);
                 return true;
             }
-            RecordExecutableValue(state, instruction.result, FormatLLVMLiteral(type_info, instruction.op), type_info);
+            RecordExecutableValue(state, instruction.result, FormatLLVMLiteral(type_info, instruction.op), type_info, std::nullopt, instruction.type);
             return true;
         }
 
@@ -2503,7 +3087,8 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                   instruction.result,
                                   temp,
                                   type_info,
-                                  IsAggregateType(type_info) ? std::optional<std::string>(local_slot) : std::nullopt);
+                                  IsAggregateType(type_info) ? std::optional<std::string>(local_slot) : std::nullopt,
+                                  instruction.type);
             return true;
         }
 
@@ -2578,7 +3163,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             }
 
             if (instruction.op == "+") {
-                RecordExecutableValue(state, instruction.result, operand.text, type_info);
+                RecordExecutableValue(state, instruction.result, operand.text, type_info, std::nullopt, instruction.type);
                 return true;
             }
 
@@ -2611,7 +3196,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 return false;
             }
 
-            RecordExecutableValue(state, instruction.result, temp, type_info);
+            RecordExecutableValue(state, instruction.result, temp, type_info, std::nullopt, instruction.type);
             return true;
         }
 
@@ -2685,7 +3270,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 const std::string value_temp = LLVMTempName(function_index, block_index, instruction_index);
                 output_lines.push_back(value_temp + " = insertvalue " + lowered_layout->aggregate_type.backend_name +
                                        " zeroinitializer, i64 " + std::to_string(variant_index) + ", 0");
-                RecordExecutableValue(state, instruction.result, value_temp, lowered_layout->aggregate_type);
+                RecordExecutableValue(state, instruction.result, value_temp, lowered_layout->aggregate_type, std::nullopt, instruction.type);
                 return true;
             }
 
@@ -2700,7 +3285,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                     return false;
                 }
 
-                RecordExecutableValue(state, instruction.result, function_it->second, type_info);
+                RecordExecutableValue(state, instruction.result, function_it->second, type_info, std::nullopt, instruction.type);
                 return true;
             }
 
@@ -2716,7 +3301,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
             output_lines.push_back(temp + " = load " + type_info.backend_name + ", ptr " + global_it->second.backend_name +
                                    ", align " + std::to_string(type_info.alignment));
-            RecordExecutableValue(state, instruction.result, temp, type_info);
+            RecordExecutableValue(state, instruction.result, temp, type_info, std::nullopt, instruction.type);
             return true;
         }
 
@@ -2760,7 +3345,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 return false;
             }
 
-            RecordExecutableValue(state, instruction.result, operand.text, result_type);
+            RecordExecutableValue(state, instruction.result, operand.text, result_type, std::nullopt, instruction.type);
             return true;
         }
 
@@ -2796,7 +3381,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             const std::string opcode = instruction.kind == mir::Instruction::Kind::kPointerToInt ? "ptrtoint" : "inttoptr";
             output_lines.push_back(temp + " = " + opcode + " " + operand.type.backend_name + " " + operand.text +
                                    " to " + result_type.backend_name);
-            RecordExecutableValue(state, instruction.result, temp, result_type);
+            RecordExecutableValue(state, instruction.result, temp, result_type, std::nullopt, instruction.type);
             return true;
         }
 
@@ -3744,7 +4329,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 return false;
             }
 
-            RecordExecutableValue(state, instruction.result, coerced_value, field_type);
+            RecordExecutableValue(state, instruction.result, coerced_value, field_type, std::nullopt, instruction.type);
             return true;
         }
 
@@ -3812,7 +4397,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             const std::string result_temp = LLVMTempName(function_index, block_index, instruction_index);
             output_lines.push_back(result_temp + " = load " + result_type.backend_name + ", ptr " + ptr_temp + ", align " +
                                    std::to_string(result_type.alignment));
-            RecordExecutableValue(state, instruction.result, result_temp, result_type);
+            RecordExecutableValue(state, instruction.result, result_temp, result_type, std::nullopt, instruction.type);
             return true;
         }
 
