@@ -71,6 +71,7 @@ std::optional<VariantDecl> InstantiateMirVariantDecl(const TypeDecl& type_decl,
 
 sema::Type CanonicalMirType(const Module& module, const sema::Type& type);
 bool IsAddressOfLvalueKind(ast::Expr::Kind kind);
+sema::Type RepresentationMirType(const Module& module, const sema::Type& type);
 bool IsIntegerType(const Module& module, const sema::Type& type);
 bool IsFloatType(const Module& module, const sema::Type& type);
 bool IsNumericType(const Module& module, const sema::Type& type);
@@ -105,6 +106,7 @@ bool HasAtomicOrderMetadata(const Instruction& instruction);
 bool HasCompareExchangeOrderMetadata(const Instruction& instruction);
 std::string AtomicMetadataText(const Instruction& instruction);
 ExplicitConversionKind ClassifyMirConversion(const Module& module, const sema::Type& source_type, const sema::Type& target_type);
+bool HasSameMirRepresentation(const Module& module, const sema::Type& source_type, const sema::Type& target_type);
 Instruction::ArithmeticSemantics ClassifyBinaryArithmeticSemantics(const Module& module,
                                                                    std::string_view op,
                                                                    const sema::Type& result_type);

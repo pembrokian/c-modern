@@ -69,6 +69,19 @@ sema::Type CanonicalMirType(const Module& module, const sema::Type& type) {
     return sema::CanonicalizeBuiltinType(StripMirAliasOrDistinct(module, type));
 }
 
+sema::Type RepresentationMirType(const Module& module, const sema::Type& type) {
+    sema::Type representation = StripMirAliasOrDistinct(module, type);
+    while (representation.kind == sema::Type::Kind::kConst && !representation.subtypes.empty()) {
+        representation = StripMirAliasOrDistinct(module, std::move(representation.subtypes.front()));
+    }
+
+    representation = sema::CanonicalizeBuiltinType(std::move(representation));
+    for (auto& subtype : representation.subtypes) {
+        subtype = RepresentationMirType(module, subtype);
+    }
+    return representation;
+}
+
 bool IsIntegerType(const Module& module, const sema::Type& type) {
     return sema::IsIntegerType(CanonicalMirType(module, type));
 }
@@ -291,6 +304,10 @@ ExplicitConversionKind ClassifyMirConversion(const Module& module, const sema::T
     }
 
     return ExplicitConversionKind::kGeneric;
+}
+
+bool HasSameMirRepresentation(const Module& module, const sema::Type& source_type, const sema::Type& target_type) {
+    return RepresentationMirType(module, source_type) == RepresentationMirType(module, target_type);
 }
 
 Instruction::ArithmeticSemantics ClassifyBinaryArithmeticSemantics(const Module& module,

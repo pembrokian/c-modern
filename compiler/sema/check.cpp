@@ -5,6 +5,7 @@
 #include "compiler/sema/type_predicates.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <fstream>
@@ -1433,6 +1434,7 @@ class Checker {
     }
 
     void ValidateGlobals() {
+        assert(scopes_.empty());
         std::size_t global_index = 0;
         for (const auto& decl : source_file_.decls) {
             if (decl.kind != Decl::Kind::kConst && decl.kind != Decl::Kind::kVar) {
@@ -2226,10 +2228,14 @@ class Checker {
             }
             case Expr::Kind::kCall:
                 return record(AnalyzeCall(expr));
-            case Expr::Kind::kField:
-            case Expr::Kind::kDerefField: {
+            case Expr::Kind::kField: {
                 const Type base = AnalyzeExpr(*expr.left);
                 return record(AnalyzeFieldSelection(base, expr.text, expr.span));
+            }
+            case Expr::Kind::kDerefField: {
+                const Type base = StripType(AnalyzeExpr(*expr.left), *module_, TypeStripMode::kAliasesOnly);
+                const Type pointee = base.kind == Type::Kind::kPointer && !base.subtypes.empty() ? base.subtypes.front() : UnknownType();
+                return record(pointee);
             }
             case Expr::Kind::kIndex: {
                 const Type base = StripType(AnalyzeExpr(*expr.left), *module_, TypeStripMode::kAliasesOnly);

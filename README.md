@@ -203,7 +203,7 @@ Grouped regression targets:
 - tool workflow validation: `mc_tool_workflow_unit`
 - tool build-state and incremental rebuild validation: `mc_tool_build_state_unit`
 - tool real-project workflow validation: `mc_tool_real_project_unit`
-- tool freestanding proof validation: `mc_tool_freestanding_unit`
+- tool freestanding proof validation: `mc_tool_freestanding_bootstrap_unit`, `mc_tool_freestanding_kernel_shard1_unit` through `mc_tool_freestanding_kernel_shard5_unit`, and `mc_tool_freestanding_system_unit`
 - codegen stdlib executable validation: `mc_codegen_executable_stdlib_unit`
 - codegen project executable validation: `mc_codegen_executable_project_unit`
 

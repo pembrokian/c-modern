@@ -796,6 +796,10 @@ bool ValidateModule(const Module& module,
                             ClassifyMirConversion(module, operand_types.front(), instruction.type) != ExplicitConversionKind::kGeneric) {
                             report("convert must use a dedicated conversion opcode when one exists in function " + function.name);
                         }
+                        if (operand_types.size() == 1 &&
+                            !HasSameMirRepresentation(module, operand_types.front(), instruction.type)) {
+                            report("convert requires representation-preserving source and target types in function " + function.name);
+                        }
                         break;
                     case Instruction::Kind::kConvertNumeric:
                         if (instruction.result.empty()) {

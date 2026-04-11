@@ -708,10 +708,80 @@ std::vector<std::filesystem::path> BuildTestImportRoots(const ProjectFile& proje
 
 std::string BuildOrdinaryRunnerSource(const std::vector<OrdinaryTestCase>& ordinary_tests) {
     std::ostringstream source;
+    const std::string total_tests = std::to_string(ordinary_tests.size());
+    source << "import errors\n";
+    source << "import fmt\n";
     source << "import io\n";
+    source << "import mem\n";
     for (const auto& ordinary_test : ordinary_tests) {
         source << "import " << ordinary_test.module_name << "\n";
     }
+    source << "\n";
+    source << "func write_summary(total: i32, failures: i32) i32 {\n";
+    source << "    alloc: *mem.Allocator = mem.default_allocator()\n";
+    source << "    passed: i32 = total - failures\n";
+    source << "    total_buf: *Buffer<u8>\n";
+    source << "    passed_buf: *Buffer<u8>\n";
+    source << "    failed_buf: *Buffer<u8>\n";
+    source << "    total_err: errors.Error\n";
+    source << "    passed_err: errors.Error\n";
+    source << "    failed_err: errors.Error\n";
+    source << "    total_buf, total_err = fmt.sprint_i32(alloc, total)\n";
+    source << "    passed_buf, passed_err = fmt.sprint_i32(alloc, passed)\n";
+    source << "    failed_buf, failed_err = fmt.sprint_i32(alloc, failures)\n";
+    source << "    if total_err != 0 || passed_err != 0 || failed_err != 0 {\n";
+    source << "        if total_buf != nil {\n";
+    source << "            mem.buffer_free<u8>(total_buf)\n";
+    source << "        }\n";
+    source << "        if passed_buf != nil {\n";
+    source << "            mem.buffer_free<u8>(passed_buf)\n";
+    source << "        }\n";
+    source << "        if failed_buf != nil {\n";
+    source << "            mem.buffer_free<u8>(failed_buf)\n";
+    source << "        }\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    if total_buf == nil || passed_buf == nil || failed_buf == nil {\n";
+    source << "        if total_buf != nil {\n";
+    source << "            mem.buffer_free<u8>(total_buf)\n";
+    source << "        }\n";
+    source << "        if passed_buf != nil {\n";
+    source << "            mem.buffer_free<u8>(passed_buf)\n";
+    source << "        }\n";
+    source << "        if failed_buf != nil {\n";
+    source << "            mem.buffer_free<u8>(failed_buf)\n";
+    source << "        }\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    defer mem.buffer_free<u8>(total_buf)\n";
+    source << "    defer mem.buffer_free<u8>(passed_buf)\n";
+    source << "    defer mem.buffer_free<u8>(failed_buf)\n";
+    source << "    total_bytes: Slice<u8> = mem.slice_from_buffer<u8>(total_buf)\n";
+    source << "    passed_bytes: Slice<u8> = mem.slice_from_buffer<u8>(passed_buf)\n";
+    source << "    failed_bytes: Slice<u8> = mem.slice_from_buffer<u8>(failed_buf)\n";
+    source << "    total_text: str = str{ ptr: total_bytes.ptr, len: total_bytes.len }\n";
+    source << "    passed_text: str = str{ ptr: passed_bytes.ptr, len: passed_bytes.len }\n";
+    source << "    failed_text: str = str{ ptr: failed_bytes.ptr, len: failed_bytes.len }\n";
+    source << "    if io.write(total_text) != 0 {\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    if io.write(\" tests, \" ) != 0 {\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    if io.write(passed_text) != 0 {\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    if io.write(\" passed, \" ) != 0 {\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    if io.write(failed_text) != 0 {\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    if io.write_line(\" failed\") != 0 {\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    return 0\n";
+    source << "}\n";
     source << "\n";
     source << "func main() i32 {\n";
     source << "    failures: i32 = 0\n";
@@ -728,15 +798,12 @@ std::string BuildOrdinaryRunnerSource(const std::vector<OrdinaryTestCase>& ordin
         source << "        failures = failures + 1\n";
         source << "    }\n";
     }
-    for (std::size_t failures = 0; failures <= ordinary_tests.size(); ++failures) {
-        source << "    if failures == " << failures << " {\n";
-        source << "        if io.write_line(\"" << ordinary_tests.size() << " tests, " << (ordinary_tests.size() - failures)
-               << " passed, " << failures << " failed\") != 0 {\n";
-        source << "            return 1\n";
-        source << "        }\n";
-        source << "        return " << (failures == 0 ? 0 : 1) << "\n";
-        source << "    }\n";
-    }
+    source << "    if write_summary(" << total_tests << ", failures) != 0 {\n";
+    source << "        return 1\n";
+    source << "    }\n";
+    source << "    if failures == 0 {\n";
+    source << "        return 0\n";
+    source << "    }\n";
     source << "    return 1\n";
     source << "}\n";
     return source.str();

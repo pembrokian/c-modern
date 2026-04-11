@@ -15,6 +15,15 @@
 
 namespace mc::codegen_llvm {
 
+bool ValidateBootstrapTarget(const TargetConfig& target,
+                            const std::filesystem::path& source_path,
+                            support::DiagnosticSink& diagnostics);
+
+bool ValidateExecutableBackendCapabilities(const mir::Module& module,
+                                          const TargetConfig& target,
+                                          const std::filesystem::path& source_path,
+                                          support::DiagnosticSink& diagnostics);
+
 void ReportBackendError(const std::filesystem::path& source_path,
                         const std::string& message,
                         support::DiagnosticSink& diagnostics);
@@ -90,6 +99,13 @@ LowerResult LowerInspectModule(const mir::Module& module,
                                const std::filesystem::path& source_path,
                                const TargetConfig& target,
                                support::DiagnosticSink& diagnostics);
+
+bool RenderLlvmModule(const mir::Module& module,
+                      const TargetConfig& target,
+                      const std::filesystem::path& source_path,
+                      bool wrap_hosted_main,
+                      support::DiagnosticSink& diagnostics,
+                      std::string& llvm_ir);
 
 struct FunctionLoweringState {
     std::size_t function_index = 0;

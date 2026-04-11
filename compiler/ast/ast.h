@@ -117,7 +117,7 @@ struct DefaultCase : Node {
 //   kRange           : left = begin, right = end (nullptr means open end)
 //   kCall            : left = callee, args = argument list, type_args = explicit type args
 //   kField           : left = base, text = field name
-//   kDerefField      : left = base, text = field name
+//   kDerefField      : left = base
 //   kIndex           : left = base, right = index
 //   kSlice           : left = base, right = begin, extra = end
 //   kAggregateInit   : text = type name (may be empty for inferred), field_inits = fields

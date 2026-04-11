@@ -79,7 +79,8 @@ Test layout rule
 Validation policy
 -----------------
 - During Canopus-focused iteration, run the narrowest owning Canopus-facing
-  checks first, especially `mc_tool_freestanding_unit`.
+  checks first, especially the owning freestanding slice (`mc_tool_freestanding_bootstrap_unit`,
+  the relevant `mc_tool_freestanding_kernel_shardN_unit`, or `mc_tool_freestanding_system_unit`).
 - If a change touches compiler ownership directly, also run the narrowest
   relevant compiler suites for that layer, such as parser, sema, MIR, or other
   tool tests.

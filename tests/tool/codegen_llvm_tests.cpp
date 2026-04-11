@@ -243,6 +243,85 @@ void TestLowerModuleRejectsUnsupportedInstruction() {
            "instruction diagnostic should name the unsupported MIR opcode");
 }
 
+void TestBuildObjectFileRejectsUnsupportedExecutableInstructionBeforeIrEmission() {
+    auto module = MakeMinimalSupportedModule();
+    module.functions[0].blocks[0].instructions.push_back({
+        .kind = mc::mir::Instruction::Kind::kAtomicCompareExchange,
+        .result = "%v1",
+        .type = mc::sema::BoolType(),
+        .operands = {"%v0", "%v0", "%v0", "%v0", "%v0"},
+    });
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_atomic_compare_exchange_preflight";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        module,
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "atomic_compare_exchange.ll",
+                .object_path = artifact_dir / "atomic_compare_exchange.o",
+            },
+        },
+        diagnostics);
+
+    Expect(!object_result.ok, "unsupported executable MIR should fail before object emission");
+    Expect(diagnostics.HasErrors(), "unsupported executable MIR should emit backend diagnostics");
+    Expect(diagnostics.Render().find("does not yet support MIR instruction 'atomic_compare_exchange' before LLVM IR emission") !=
+               std::string::npos,
+           "object emission diagnostic should report the executable preflight failure boundary");
+    Expect(!std::filesystem::exists(artifact_dir / "atomic_compare_exchange.ll"),
+           "unsupported executable MIR should not write an LLVM IR artifact");
+}
+
+    void TestBuildObjectFileFreestandingOmitsHostedRuntimePrologue() {
+        auto target = mc::codegen_llvm::BootstrapTargetConfig();
+        target.hosted = false;
+
+        const std::filesystem::path artifact_dir =
+         std::filesystem::temp_directory_path() / "mc_codegen_llvm_freestanding_object";
+        std::error_code remove_error;
+        std::filesystem::remove_all(artifact_dir, remove_error);
+
+        mc::support::DiagnosticSink diagnostics;
+        const auto object_result = mc::codegen_llvm::BuildObjectFile(
+         MakeMinimalSupportedModule(),
+         "tests/cases/hello.mc",
+         {
+             .target = target,
+             .artifacts = {
+              .llvm_ir_path = artifact_dir / "freestanding.ll",
+              .object_path = artifact_dir / "freestanding.o",
+             },
+             .wrap_hosted_main = false,
+         },
+         diagnostics);
+
+        Expect(object_result.ok, "freestanding object emission should succeed for minimal supported MIR");
+        Expect(!diagnostics.HasErrors(), "freestanding object emission should not emit backend diagnostics for minimal supported MIR");
+
+        std::ifstream ir_stream(artifact_dir / "freestanding.ll");
+        Expect(ir_stream.good(), "freestanding object emission should write LLVM IR output");
+        const std::string ir((std::istreambuf_iterator<char>(ir_stream)), std::istreambuf_iterator<char>());
+        Expect(ir.find("declare void @exit(i32)") == std::string::npos,
+            "freestanding object emission should not declare hosted exit support when unused");
+        Expect(ir.find("declare ptr @malloc(i64)") == std::string::npos,
+            "freestanding object emission should not declare malloc when unused");
+        Expect(ir.find("declare void @free(ptr)") == std::string::npos,
+            "freestanding object emission should not declare free when unused");
+        Expect(ir.find("define i32 @__mc_hosted_entry") == std::string::npos,
+            "freestanding object emission should not synthesize the hosted entry wrapper");
+        Expect(ir.find("define private void @__mc_trap()") != std::string::npos,
+            "freestanding object emission should still provide the shared trap helper");
+        Expect(ir.find("call void @exit(i32 134)") == std::string::npos,
+            "freestanding trap helper should not call hosted exit support");
+    }
+
 void TestLowerModuleLowersCheckedIntegerSemantics() {
     mc::mir::Instruction lhs {
         .kind = mc::mir::Instruction::Kind::kLoadLocal,
@@ -985,6 +1064,8 @@ int main() {
     TestLowerModuleRejectsUnsupportedTarget();
     TestLowerModuleAcceptsFreestandingBootstrapTarget();
     TestLowerModuleRejectsUnsupportedInstruction();
+    TestBuildObjectFileRejectsUnsupportedExecutableInstructionBeforeIrEmission();
+    TestBuildObjectFileFreestandingOmitsHostedRuntimePrologue();
     TestLowerModuleLowersCheckedIntegerSemantics();
     TestLowerModuleLowersRepresentationPreservingConversions();
     TestEnumPayloadLayoutUsesSharedAlignedStorage();

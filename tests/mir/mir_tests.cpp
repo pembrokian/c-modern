@@ -1579,6 +1579,43 @@ void TestValidatorRejectsGenericConvertThatShouldBeExplicitFamily() {
     }
 }
 
+void TestValidatorRejectsGenericConvertWithDifferentRepresentation() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+    mc::mir::Function function;
+    function.name = "broken_repr_convert";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::BoolType(),
+                .op = "true",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConvert,
+                .result = "%v1",
+                .type = mc::sema::NamedType("u8"),
+                .target = "u8",
+                .operands = {"%v0"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should reject generic convert when source and target representations differ");
+    }
+    if (diagnostics.Render().find("convert requires representation-preserving source and target types") == std::string::npos) {
+        Fail("validator should explain representation-mismatched generic convert");
+    }
+}
+
 void TestValidatorRejectsAggregateDuplicateNamedField() {
     mc::support::DiagnosticSink diagnostics;
     mc::mir::Module module;
@@ -3133,6 +3170,7 @@ int main() {
     TestValidatorRejectsCallArgumentTypeMismatch();
     TestValidatorRejectsAggregateFieldTypeMismatch();
     TestValidatorRejectsGenericConvertThatShouldBeExplicitFamily();
+    TestValidatorRejectsGenericConvertWithDifferentRepresentation();
     TestValidatorRejectsAggregateDuplicateNamedField();
     TestValidatorRejectsVariantExtractPayloadMismatch();
     TestValidatorRejectsBadSymbolRefType();

@@ -1,0 +1,263 @@
+Phase 127 -- Backend Critique Treatment
+=======================================
+
+Source document
+---------------
+- docs/agent/critiques/compiler/phase127/backend_phase127.txt
+
+Purpose
+-------
+This note reviews the Phase 127 backend critique against the current tree and
+records how each identified issue should be treated: fix now, accept but defer,
+already closed or partially outdated, or reject as proposed.
+
+The goal is not to land every critique item in one wave. The repository rule is
+still to prefer narrow, mechanical follow-through over broad subsystem rewrites.
+
+Pre-work cross-check
+--------------------
+Before triaging the findings, the current code was checked against the critique.
+
+- The backend is no longer one undifferentiated file. Type lowering now lives in
+  `compiler/codegen_llvm/backend_types.cpp`; inspect-path lowering lives in
+  `compiler/codegen_llvm/backend_inspect.cpp`; dump rendering lives in
+  `compiler/codegen_llvm/backend_dump.cpp`; symbol naming lives in
+  `compiler/codegen_llvm/backend_names.cpp`.
+- `compiler/codegen_llvm/backend.cpp` still mixes executable LLVM IR emission
+  with host-toolchain invocation, so the host-toolchain split concern remains
+  real even though the critique's broader "five responsibilities in one file"
+  framing is partly outdated.
+- `compiler/codegen_llvm/backend.cpp` already has a file-level comment
+  describing the inspect path, the executable path, and the switch-maintenance
+  hazard.
+- `compiler/mir/mir_validate.cpp` already rejects `kSliceFromBuffer` before
+  backend emission. The backend-side error is now a defensive backstop, not the
+  primary enforcement point.
+- `compiler/mir/mir_validate.cpp` already validates the semantic shape of
+    `kAtomicCompareExchange`, and the executable build path now reports the
+    bootstrap LLVM backend capability failure before LLVM IR emission starts.
+
+Bucket 1 -- Fix In A Narrow Backend Hardening Pass
+--------------------------------------------------
+
+1. Enum equality compares raw payload bytes, including padding.
+   Treatment: accept and fix.
+   Reason: this is a real correctness bug. Equality and inequality should use a
+   structured comparison: tag first, then the active payload fields only. The
+   current byte-chunk compare can produce false negatives from indeterminate or
+   merely different padding.
+
+2. `kBufferNew` hardcodes `malloc(i64 32)` for the buffer header.
+   Treatment: accept and fix.
+   Reason: the hardcoded size is brittle even inside the bootstrap slice. LLVM
+   IR should compute the aggregate size mechanically with a null GEP and
+   `ptrtoint`, not by embedding one host-size constant.
+
+3. `RunHostCommand` uses `std::system` and loses captured toolchain output.
+   Treatment: accept and fix, but not by cloning logic ad hoc.
+   Reason: the critique is right about diagnostic loss. The right treatment is
+   to move backend host-tool invocation onto the repository's existing fork/exec
+   capture model or a shared support-layer subprocess helper, so stderr/stdout
+   becomes a compiler diagnostic instead of side-channel terminal noise.
+
+4. Backend diagnostics should report the emitted `.ll` artifact path when LLVM
+   IR compilation fails.
+   Treatment: accept and fold into the host-command follow-through.
+   Reason: textual LLVM IR is intentionally inspectable in this backend. When
+   clang rejects the IR, the artifact path is part of the minimum useful error.
+
+5. The builder/backend flow leaves stale artifact state ambiguous on failure.
+   Treatment: accept, but solve it as artifact invalidation rather than blind
+   deletion.
+   Reason: the critique correctly spots stale-artifact risk. I do not agree with
+   deleting every `.ll` file on failure, because the latest emitted IR is often
+   the most useful debugging artifact. The right fix is to ensure failed builds
+   do not leave build-state claiming success and do not let stale object/runtime
+   outputs remain valid inputs. Keep useful IR when it corresponds to the failed
+   attempt; invalidate success state instead.
+
+Bucket 2 -- Accept In Spirit, But Fix At The Right Layer
+--------------------------------------------------------
+
+6. `kAtomicCompareExchange` is rejected only in the backend.
+    Treatment: fixed at the executable backend boundary.
+    Reason: the generic MIR validator still stays about MIR correctness rather
+    than LLVM-backend feature flags, but the bootstrap executable build path now
+    performs a target-aware capability check before LLVM IR emission instead of
+    failing only inside instruction rendering.
+
+7. Generic `kConvert` relies on backend-name equality in the LLVM backend.
+    Treatment: fixed at the MIR/sema boundary.
+    Reason: the backend check was too late, but MIR validation still should not
+    depend on LLVM backend names. The landed follow-through tightens generic
+    conversion validation around representation-preserving conversions using
+    MIR/sema type facts, so unsupported generic converts are rejected before
+    backend emission.
+
+8. Freestanding LLVM executable emission still assumes hosted helper pieces in
+   a few places (`@exit`, unconditional libc declarations, hosted helper shape).
+    Treatment: fixed for the bootstrap backend hardening slice; broader
+    freestanding executable completion still remains deferred.
+    Reason: the landed follow-through removes unconditional hosted/libc prologue
+    emission from freestanding object generation, keeps hosted entry wrapping
+    gated on hosted targets, and gives freestanding trap emission a non-hosted
+    shape. That closes the critique's immediate hardcoded-hosted assumptions
+    without overstating the current bootstrap LLVM path as a fully complete
+    freestanding executable backend.
+
+9. The hosted entry wrapper hardcodes `{ptr, i64}` for `Slice<cstr>`.
+   Treatment: accept as future ABI-generalization work, not as a current bug.
+   Reason: this is an honest bootstrap assumption for the one hosted target
+   slice. When slice layout or non-64-bit hosted targets become active, derive
+   the wrapper parameter type from lowered type information instead of spelling
+   the current layout directly.
+
+Bucket 3 -- Accept, But Defer
+-----------------------------
+
+10. Extract host-toolchain invocation from `backend.cpp`.
+    Treatment: fixed.
+    Reason: the remaining I/O-heavy host-toolchain code has now been moved out
+    of `compiler/codegen_llvm/backend.cpp` into a sibling backend-host file, so
+    executable LLVM IR rendering and host-toolchain execution no longer share
+    the same implementation unit. That closes the narrow structural split the
+    critique called for without widening into toolchain-table abstraction or
+    other later portability work.
+
+11. Make host tool invocation table-driven instead of hardcoding `xcrun`.
+    Treatment: fixed for the current bootstrap backend slice.
+    Reason: host command construction now derives the launcher prefix from
+    target configuration instead of spelling `xcrun` at each object, runtime,
+    link, and archive call site. This keeps the current one-host-target-first
+    policy intact while removing the repeated hardcoded launcher assumption from
+    backend execution flow. Broader multi-toolchain expansion still remains
+    later work, but the local abstraction point is now in place.
+
+12. Add lookup maps for functions, types, and globals.
+    Treatment: defer.
+    Reason: real scalability win, not a current correctness issue. The critique
+    is right, but this is exactly the sort of performance cleanup that should be
+    driven by workload pressure rather than bundled into a correctness pass.
+
+13. Deduplicate identical string literals at module scope.
+    Treatment: defer.
+    Reason: valid size optimization, not a semantic defect. Revisit when binary
+    size or IR volume becomes measurable pressure in real workloads.
+
+14. `EmitOrderedEnumFieldComparison` can generate large IR for large enums.
+    Treatment: defer.
+    Reason: the critique identifies real IR growth, but this is a quality-of-
+    implementation concern for a future scale slice, not a blocker for the
+    current bootstrap target.
+
+15. `LowerFunctionReturnType` is recomputed more often than necessary.
+    Treatment: defer.
+    Reason: easy local cleanup, but low value unless a nearby change is already
+    touching call emission.
+
+Bucket 4 -- Already Closed, Partially Closed, Or Outdated
+---------------------------------------------------------
+
+16. "Single 5360-line file with five major concerns."
+    Treatment: partly outdated.
+    Reason: several concerns named in the critique have already moved into
+    sibling files. The remaining valid concern is narrower: executable lowering
+    and host-toolchain execution still share `backend.cpp`.
+
+17. `kSliceFromBuffer` should be rejected before backend emission.
+    Treatment: already closed.
+    Reason: `compiler/mir/mir_validate.cpp` already reports that
+    `slice_from_buffer` must lower away before MIR validation succeeds. Keep the
+    backend-side error as a defensive assertion, but do not treat this as an
+    open planning item.
+
+18. File-level backend documentation is missing.
+    Treatment: mostly closed.
+    Reason: `compiler/codegen_llvm/backend.cpp` already has a top-level comment
+    covering the dual paths and the switch maintenance rule. It should be kept
+    accurate when touched again, but it is no longer absent.
+
+19. Switch-maintenance hazard is undocumented.
+    Treatment: already closed as documentation, still open as a tooling idea.
+    Reason: the file header already warns that forgetting a new MIR instruction
+    kind will fail at runtime, not compile time. That does not give us a compile-
+    time guard, but the critique's claim that the requirement is undocumented is
+    no longer current.
+
+Bucket 5 -- Do Not Take The Proposed Fix As Written
+---------------------------------------------------
+
+20. Remove `MC_UNREACHABLE` from `RenderExecutableInstruction` so `-Wswitch-enum`
+    can warn.
+    Treatment: reject as proposed.
+    Reason: I do not want to weaken the runtime fail-fast path just to chase a
+    warning that may or may not be enforced uniformly in all builds. Keep the
+    hard failure. If we later want compile-time exhaustiveness help, do it with
+    a deliberate warning policy or a different structural technique, not by
+    deleting the backend's defensive trap.
+
+21. Treat the hardcoded bootstrap target itself as a defect.
+    Treatment: reject as stated.
+    Reason: the docs explicitly permit one hosted target first. The defect is
+    not that the bootstrap configuration is specific; the defect is that the
+    host tool invocation is not yet isolated well enough to admit a second host
+    cleanly.
+
+22. Delete stale IR artifacts unconditionally on any failure.
+    Treatment: reject as stated.
+    Reason: that would throw away exactly the artifact developers need when LLVM
+    IR generation or host compilation fails. Invalidate success state and stale
+    object linkage instead; do not make debugging harder.
+
+Low-Priority Cleanups Worth Taking Opportunistically
+---------------------------------------------------
+
+23. `RenderExecutableTerminator` ends with `return false` after a closed switch.
+    Treatment: accept as a tiny readability cleanup when touched.
+
+24. `EmitValueRepresentationCoercion` should document the intentionally handled
+    coercion set.
+    Treatment: accept as documentation cleanup.
+
+25. `QuoteShellArg` should note the POSIX single-quote escaping invariant.
+    Treatment: accept as documentation cleanup.
+
+26. `EmitEnumCompare` and `EmitOrderedEnumFieldComparison` should have a short
+    function-level comment once the equality fix lands.
+    Treatment: accept as follow-on documentation cleanup.
+
+27. `EmitVariantInitInstruction` should note that zero-initialization makes
+    padding deterministic.
+    Treatment: accept as documentation cleanup.
+
+28. `EmitArenaNewInstruction` could use one comment describing the alignment-mask
+    precondition.
+    Treatment: accept as documentation cleanup.
+
+29. `RenderExecutableFunction` could reject empty block lists before emitting
+    the function header.
+    Treatment: accept as small cleanup, but low urgency because the current path
+    already discards the partial stream on failure.
+
+30. Function-scoped string-constant collection is acceptable for now.
+    Treatment: no action.
+    Reason: the critique itself treats this as a scale issue, not a bug.
+
+31. The shell-injection review does not identify an active exploit in the
+    current quoting logic.
+    Treatment: no action beyond replacing `std::system` for diagnostics and
+    process control quality.
+
+Recommended Follow-Through Order
+--------------------------------
+If this critique is turned into code work, the narrowest honest sequence is:
+
+1. Fix enum equality and buffer-header sizing.
+2. Replace backend host-command execution with captured subprocess execution,
+   and include `.ll` artifact paths in diagnostics.
+3. Tighten failure-state invalidation so stale outputs are not treated as good
+   build inputs.
+4. Tighten generic-convert validation at the MIR/sema boundary.
+5. Leave broader portability, freestanding completion, and performance work for
+    dedicated later phases rather than smuggling them into a critique-response
+    patch.

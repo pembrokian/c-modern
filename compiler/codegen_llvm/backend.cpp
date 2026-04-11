@@ -26,12 +26,10 @@
 // The allocation alignment is rounded up to the pointer size of the target.
 // Changing the Arena struct in the runtime requires updating this function.
 #include <cstdlib>
-#include <fstream>
 #include <optional>
 #include <set>
 #include <sstream>
 #include <string_view>
-#include <sys/wait.h>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -55,9 +53,9 @@ bool IsBootstrapTarget(const TargetConfig& target) {
            target.object_format == kBootstrapObjectFormat;
 }
 
-bool ValidateBootstrapTarget(const TargetConfig& target,
-                            const std::filesystem::path& source_path,
-                            support::DiagnosticSink& diagnostics) {
+bool ValidateBootstrapTargetImpl(const TargetConfig& target,
+                                const std::filesystem::path& source_path,
+                                support::DiagnosticSink& diagnostics) {
     if (IsBootstrapTarget(target)) {
         return true;
     }
@@ -67,6 +65,33 @@ bool ValidateBootstrapTarget(const TargetConfig& target,
                            target.triple + "' target_family='" + target.target_family + "'",
                        diagnostics);
     return false;
+}
+
+bool ValidateExecutableBackendCapabilitiesImpl(const mir::Module& module,
+                                              const TargetConfig& target,
+                                              const std::filesystem::path& source_path,
+                                              support::DiagnosticSink& diagnostics) {
+    if (!IsBootstrapTarget(target)) {
+        return true;
+    }
+
+    for (const auto& function : module.functions) {
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                if (instruction.kind != mir::Instruction::Kind::kAtomicCompareExchange) {
+                    continue;
+                }
+
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission does not yet support MIR instruction 'atomic_compare_exchange' before LLVM IR emission in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 struct ExecutableValue {
@@ -1436,6 +1461,91 @@ bool EmitOrderedEnumFieldComparison(const mir::Module& module,
     return true;
 }
 
+bool EmitEnumPayloadEqualityComparison(const mir::Module& module,
+                                       const EnumCompareInfo& compare_info,
+                                       const std::string& lhs_slot,
+                                       const std::string& rhs_slot,
+                                       const std::string& lhs_tag,
+                                       std::size_t function_index,
+                                       std::size_t block_index,
+                                       std::size_t instruction_index,
+                                       const std::filesystem::path& source_path,
+                                       support::DiagnosticSink& diagnostics,
+                                       std::vector<std::string>& output_lines,
+                                       std::string& payload_eq_result) {
+    const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
+    std::string same_tag_eq = "true";
+    for (std::size_t variant_index = compare_info.variant_field_types.size(); variant_index > 0; --variant_index) {
+        const std::size_t actual_index = variant_index - 1;
+        std::string variant_eq = "true";
+        for (std::size_t field_index = compare_info.variant_field_types[actual_index].size(); field_index > 0; --field_index) {
+            const std::size_t actual_field_index = field_index - 1;
+            const std::string field_suffix = "enum.equal.variant." + std::to_string(actual_index) + ".field." +
+                                             std::to_string(actual_field_index);
+            const std::string lhs_field_slot = EmitEnumPayloadFieldPointer(lhs_slot,
+                                                                           compare_info.layout,
+                                                                           compare_info.layout.variant_payload_offsets[actual_index][actual_field_index],
+                                                                           function_index,
+                                                                           block_index,
+                                                                           instruction_index,
+                                                                           field_suffix + ".lhs.ptr",
+                                                                           output_lines);
+            const std::string rhs_field_slot = EmitEnumPayloadFieldPointer(rhs_slot,
+                                                                           compare_info.layout,
+                                                                           compare_info.layout.variant_payload_offsets[actual_index][actual_field_index],
+                                                                           function_index,
+                                                                           block_index,
+                                                                           instruction_index,
+                                                                           field_suffix + ".rhs.ptr",
+                                                                           output_lines);
+            const BackendTypeInfo& field_backend_type = compare_info.layout.variant_field_types[actual_index][actual_field_index];
+            const std::string lhs_field = temp + ".variant." + std::to_string(actual_index) + ".field." +
+                                          std::to_string(actual_field_index) + ".lhs";
+            const std::string rhs_field = temp + ".variant." + std::to_string(actual_index) + ".field." +
+                                          std::to_string(actual_field_index) + ".rhs";
+            output_lines.push_back(lhs_field + " = load " + field_backend_type.backend_name + ", ptr " + lhs_field_slot + ", align " +
+                                   std::to_string(field_backend_type.alignment));
+            output_lines.push_back(rhs_field + " = load " + field_backend_type.backend_name + ", ptr " + rhs_field_slot + ", align " +
+                                   std::to_string(field_backend_type.alignment));
+
+            std::string field_eq;
+            std::string field_lt;
+            std::string field_gt;
+            if (!EmitOrderedEnumFieldComparison(module,
+                                                compare_info.variant_field_types[actual_index][actual_field_index],
+                                                field_backend_type,
+                                                lhs_field,
+                                                rhs_field,
+                                                function_index,
+                                                block_index,
+                                                instruction_index,
+                                                field_suffix,
+                                                source_path,
+                                                diagnostics,
+                                                output_lines,
+                                                field_eq,
+                                                field_lt,
+                                                field_gt)) {
+                return false;
+            }
+
+            const std::string next_variant_eq = temp + ".variant." + std::to_string(actual_index) + ".eq." +
+                                                std::to_string(actual_field_index);
+            output_lines.push_back(next_variant_eq + " = and i1 " + variant_eq + ", " + field_eq);
+            variant_eq = next_variant_eq;
+        }
+
+        const std::string variant_match = temp + ".variant." + std::to_string(actual_index) + ".match";
+        const std::string next_same_tag = temp + ".same_tag.eq." + std::to_string(actual_index);
+        output_lines.push_back(variant_match + " = icmp eq i64 " + lhs_tag + ", " + std::to_string(actual_index));
+        output_lines.push_back(next_same_tag + " = select i1 " + variant_match + ", i1 " + variant_eq + ", i1 " + same_tag_eq);
+        same_tag_eq = next_same_tag;
+    }
+
+    payload_eq_result = same_tag_eq;
+    return true;
+}
+
 void EmitEnumCompare(const mir::Instruction& instruction,
                      std::size_t function_index,
                      std::size_t block_index,
@@ -1482,56 +1592,31 @@ void EmitEnumCompare(const mir::Instruction& instruction,
                                                         output_lines);
 
     if (instruction.op == "==" || instruction.op == "!=") {
-        std::string combined = instruction.op == "==" ? tag_eq : temp + ".tag.ne";
-        if (instruction.op == "!=") {
-            output_lines.push_back(combined + " = icmp ne i64 " + lhs_tag + ", " + rhs_tag);
+        std::string payload_eq;
+        if (!EmitEnumPayloadEqualityComparison(*state.module,
+                                               compare_info,
+                                               lhs_slot,
+                                               rhs_slot,
+                                               lhs_tag,
+                                               function_index,
+                                               block_index,
+                                               instruction_index,
+                                               source_path,
+                                               diagnostics,
+                                               output_lines,
+                                               payload_eq)) {
+            return;
         }
 
-        constexpr std::size_t kChunkSizes[] = {8, 4, 2, 1};
-        std::size_t payload_offset = 0;
-        std::size_t compare_index = 0;
-        while (payload_offset < compare_info.payload_size) {
-            std::size_t chunk_size = 1;
-            for (const std::size_t candidate : kChunkSizes) {
-                if (payload_offset + candidate <= compare_info.payload_size) {
-                    chunk_size = candidate;
-                    break;
-                }
-            }
-
-            const std::string chunk_suffix = "enum.compare.chunk." + std::to_string(compare_index);
-            const std::string lhs_chunk = EmitEnumPayloadChunkLoad(lhs_slot,
-                                                                   lhs,
-                                                                   compare_info.payload_size,
-                                                                   payload_offset,
-                                                                   chunk_size,
-                                                                   function_index,
-                                                                   block_index,
-                                                                   instruction_index,
-                                                                   chunk_suffix + ".lhs",
-                                                                   output_lines);
-            const std::string rhs_chunk = EmitEnumPayloadChunkLoad(rhs_slot,
-                                                                   rhs,
-                                                                   compare_info.payload_size,
-                                                                   payload_offset,
-                                                                   chunk_size,
-                                                                   function_index,
-                                                                   block_index,
-                                                                   instruction_index,
-                                                                   chunk_suffix + ".rhs",
-                                                                   output_lines);
-            const std::string chunk_type = "i" + std::to_string(chunk_size * 8);
-            const std::string chunk_compare = temp + ".payload." + std::to_string(compare_index);
-            output_lines.push_back(chunk_compare + " = icmp " + std::string(compare_predicate) + " " + chunk_type + " " + lhs_chunk + ", " + rhs_chunk);
-
-            const std::string next_combined = temp + ".combine." + std::to_string(compare_index);
-            output_lines.push_back(next_combined + " = " + std::string(instruction.op == "==" ? "and" : "or") + " i1 " + combined + ", " + chunk_compare);
-            combined = next_combined;
-            payload_offset += chunk_size;
-            ++compare_index;
+        if (instruction.op == "==") {
+            output_lines.push_back(temp + " = and i1 " + tag_eq + ", " + payload_eq);
+        } else {
+            const std::string tag_ne = temp + ".tag.ne";
+            const std::string payload_ne = temp + ".payload.ne";
+            output_lines.push_back(tag_ne + " = icmp ne i64 " + lhs_tag + ", " + rhs_tag);
+            output_lines.push_back(payload_ne + " = xor i1 " + payload_eq + ", true");
+            output_lines.push_back(temp + " = or i1 " + tag_ne + ", " + payload_ne);
         }
-
-        output_lines.push_back(temp + " = or i1 " + combined + ", false");
         RecordExecutableValue(state, instruction.result, temp, result_type);
         emitted = true;
         return;
@@ -1723,6 +1808,11 @@ struct CheckedHelperRequirements {
     std::set<std::size_t> shift_widths;
 };
 
+struct ExecutableRuntimeRequirements {
+    bool needs_malloc = false;
+    bool needs_free = false;
+};
+
 void SeedFunctionValueTypes(const mir::Function& function,
                             std::unordered_map<std::string, sema::Type>& value_types) {
     value_types.clear();
@@ -1885,6 +1975,23 @@ bool CollectCheckedHelperRequirements(const mir::Module& module,
         }
     }
     return true;
+}
+
+ExecutableRuntimeRequirements CollectExecutableRuntimeRequirements(const mir::Module& module) {
+    ExecutableRuntimeRequirements requirements;
+    for (const auto& function : module.functions) {
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                if (instruction.kind == mir::Instruction::Kind::kBufferNew) {
+                    requirements.needs_malloc = true;
+                }
+                if (instruction.kind == mir::Instruction::Kind::kBufferFree) {
+                    requirements.needs_free = true;
+                }
+            }
+        }
+    }
+    return requirements;
 }
 
 bool EmitBoundsCheckCall(const mir::Instruction& instruction,
@@ -4188,12 +4295,16 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             const std::string zero_temp = LLVMTempName(function_index, block_index, instruction_index) + ".zero";
             const std::string alloc_bytes = LLVMTempName(function_index, block_index, instruction_index) + ".alloc_bytes";
             const std::string data_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".data_ptr";
+            const std::string buffer_size_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".buf_size.ptr";
+            const std::string buffer_size = LLVMTempName(function_index, block_index, instruction_index) + ".buf_size";
             const std::string buffer_ptr = LLVMTempName(function_index, block_index, instruction_index) + ".buf_ptr";
             output_lines.push_back(bytes_temp + " = mul i64 " + cap_i64 + ", " + std::to_string(element_type.size));
             output_lines.push_back(zero_temp + " = icmp eq i64 " + bytes_temp + ", 0");
             output_lines.push_back(alloc_bytes + " = select i1 " + zero_temp + ", i64 1, i64 " + bytes_temp);
             output_lines.push_back(data_ptr + " = call ptr @malloc(i64 " + alloc_bytes + ")");
-            output_lines.push_back(buffer_ptr + " = call ptr @malloc(i64 32)");
+            output_lines.push_back(buffer_size_ptr + " = getelementptr inbounds {ptr, i64, i64, ptr}, ptr null, i64 1");
+            output_lines.push_back(buffer_size + " = ptrtoint ptr " + buffer_size_ptr + " to i64");
+            output_lines.push_back(buffer_ptr + " = call ptr @malloc(i64 " + buffer_size + ")");
 
             const std::string ptr_slot = LLVMTempName(function_index, block_index, instruction_index) + ".ptr_slot";
             const std::string len_slot = LLVMTempName(function_index, block_index, instruction_index) + ".len_slot";
@@ -4905,12 +5016,19 @@ bool RenderHostedEntryWrapper(const mir::Module& module,
     return true;
 }
 
-bool RenderLlvmModule(const mir::Module& module,
-                      const TargetConfig& target,
-                      const std::filesystem::path& source_path,
-                      bool wrap_hosted_main,
-                      support::DiagnosticSink& diagnostics,
-                      std::string& llvm_ir) {
+bool RenderLlvmModuleImpl(const mir::Module& module,
+                          const TargetConfig& target,
+                          const std::filesystem::path& source_path,
+                          bool wrap_hosted_main,
+                          support::DiagnosticSink& diagnostics,
+                          std::string& llvm_ir) {
+    if (wrap_hosted_main && !target.hosted) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission cannot synthesize a hosted entry wrapper for a freestanding target",
+                           diagnostics);
+        return false;
+    }
+
     const mir::Function* main_function = FindFunction(module, "main");
     if (wrap_hosted_main && main_function == nullptr) {
         ReportBackendError(source_path,
@@ -4938,15 +5056,28 @@ bool RenderLlvmModule(const mir::Module& module,
         return false;
     }
 
+    const ExecutableRuntimeRequirements runtime_requirements = CollectExecutableRuntimeRequirements(module);
+
     std::ostringstream stream;
     stream << "source_filename = \"" << source_path.filename().generic_string() << "\"\n";
     stream << "target triple = \"" << target.triple << "\"\n\n";
-    stream << "declare void @exit(i32)\n";
-    stream << "declare ptr @malloc(i64)\n";
-    stream << "declare void @free(ptr)\n\n";
+    if (target.hosted) {
+        stream << "declare void @exit(i32)\n";
+    }
+    if (runtime_requirements.needs_malloc) {
+        stream << "declare ptr @malloc(i64)\n";
+    }
+    if (runtime_requirements.needs_free) {
+        stream << "declare void @free(ptr)\n";
+    }
+    if (target.hosted || runtime_requirements.needs_malloc || runtime_requirements.needs_free) {
+        stream << "\n";
+    }
     stream << "define private void @__mc_trap() {\n";
     stream << "entry:\n";
-    stream << "  call void @exit(i32 134)\n";
+    if (target.hosted) {
+        stream << "  call void @exit(i32 134)\n";
+    }
     stream << "  unreachable\n";
     stream << "}\n\n";
     stream << "define private void @__mc_check_bounds_index(i64 %index, i64 %len) {\n";
@@ -5067,63 +5198,36 @@ bool RenderLlvmModule(const mir::Module& module,
     return true;
 }
 
-std::string QuoteShellArg(std::string_view argument) {
-    std::string quoted;
-    quoted.reserve(argument.size() + 2);
-    quoted.push_back('\'');
-    for (const char ch : argument) {
-        if (ch == '\'') {
-            quoted += "'\\''";
-            continue;
-        }
-        quoted.push_back(ch);
-    }
-    quoted.push_back('\'');
-    return quoted;
-}
-
-std::string JoinCommand(const std::vector<std::string>& args) {
-    std::ostringstream command;
-    for (std::size_t index = 0; index < args.size(); ++index) {
-        if (index > 0) {
-            command << ' ';
-        }
-        command << QuoteShellArg(args[index]);
-    }
-    return command.str();
-}
-
-bool RunHostCommand(const std::vector<std::string>& args,
-                    const std::filesystem::path& source_path,
-                    support::DiagnosticSink& diagnostics,
-                    const std::string& description) {
-    const std::string command = JoinCommand(args);
-    const int raw_status = std::system(command.c_str());
-    if (raw_status == 0) {
-        return true;
-    }
-
-    int exit_code = raw_status;
-#ifdef WIFEXITED
-    if (WIFEXITED(raw_status)) {
-        exit_code = WEXITSTATUS(raw_status);
-    }
-#endif
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap backend failed to " + description + " using host toolchain command: " + command +
-                           " (exit=" + std::to_string(exit_code) + ")",
-                       diagnostics);
-    return false;
-}
-
 }  // namespace
+
+bool ValidateBootstrapTarget(const TargetConfig& target,
+                            const std::filesystem::path& source_path,
+                            support::DiagnosticSink& diagnostics) {
+    return ValidateBootstrapTargetImpl(target, source_path, diagnostics);
+}
+
+bool ValidateExecutableBackendCapabilities(const mir::Module& module,
+                                          const TargetConfig& target,
+                                          const std::filesystem::path& source_path,
+                                          support::DiagnosticSink& diagnostics) {
+    return ValidateExecutableBackendCapabilitiesImpl(module, target, source_path, diagnostics);
+}
+
+bool RenderLlvmModule(const mir::Module& module,
+                      const TargetConfig& target,
+                      const std::filesystem::path& source_path,
+                      bool wrap_hosted_main,
+                      support::DiagnosticSink& diagnostics,
+                      std::string& llvm_ir) {
+    return RenderLlvmModuleImpl(module, target, source_path, wrap_hosted_main, diagnostics, llvm_ir);
+}
 
 TargetConfig BootstrapTargetConfig() {
     return {
         .triple = std::string(kBootstrapTriple),
         .target_family = std::string(kBootstrapTargetFamily),
         .object_format = std::string(kBootstrapObjectFormat),
+        .host_tool_prefix = {"xcrun"},
         .hosted = true,
     };
 }
@@ -5142,220 +5246,19 @@ LowerResult LowerModule(const mir::Module& module,
 ObjectBuildResult BuildObjectFile(const mir::Module& module,
                                   const std::filesystem::path& source_path,
                                   const ObjectBuildOptions& options,
-                                  support::DiagnosticSink& diagnostics) {
-    if (!ValidateBootstrapTarget(options.target, source_path, diagnostics)) {
-        return {};
-    }
-
-    std::string llvm_ir;
-    if (!RenderLlvmModule(module, options.target, source_path, options.wrap_hosted_main, diagnostics, llvm_ir)) {
-        return {};
-    }
-
-    std::filesystem::create_directories(options.artifacts.llvm_ir_path.parent_path());
-    std::filesystem::create_directories(options.artifacts.object_path.parent_path());
-
-    {
-        std::ofstream output(options.artifacts.llvm_ir_path, std::ios::binary);
-        output << llvm_ir;
-        if (!output) {
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend could not write LLVM IR artifact '" +
-                                   options.artifacts.llvm_ir_path.generic_string() + "'",
-                               diagnostics);
-            return {};
-        }
-    }
-
-    if (!RunHostCommand({"xcrun",
-                         "clang",
-                         "-target",
-                         options.target.triple,
-                         "-x",
-                         "ir",
-                         options.artifacts.llvm_ir_path.generic_string(),
-                         "-c",
-                         "-o",
-                         options.artifacts.object_path.generic_string()},
-                        source_path,
-                        diagnostics,
-                        "emit an object file")) {
-        return {};
-    }
-
-    return {
-        .artifacts = options.artifacts,
-        .ok = true,
-    };
-}
+                                  support::DiagnosticSink& diagnostics);
 
 LinkResult LinkExecutable(const std::filesystem::path& source_path,
                           const LinkOptions& options,
-                          support::DiagnosticSink& diagnostics) {
-    if (!ValidateBootstrapTarget(options.target, source_path, diagnostics)) {
-        return {};
-    }
-
-    std::filesystem::create_directories(options.executable_path.parent_path());
-    std::filesystem::create_directories(options.runtime_object_path.parent_path());
-
-    if (!options.runtime_source_path.has_value()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend requires an explicit runtime support source path",
-                           diagnostics);
-        return {};
-    }
-
-    const auto& runtime_support_source = *options.runtime_source_path;
-    if (!std::filesystem::exists(runtime_support_source)) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend could not read runtime support source '" +
-                               runtime_support_source.generic_string() + "'",
-                           diagnostics);
-        return {};
-    }
-    for (const auto& input_path : options.extra_input_paths) {
-        if (!std::filesystem::exists(input_path)) {
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend could not read explicit link input '" +
-                                   input_path.generic_string() + "'",
-                               diagnostics);
-            return {};
-        }
-    }
-
-    const bool runtime_object_missing = !std::filesystem::exists(options.runtime_object_path);
-    const bool runtime_source_is_newer = !runtime_object_missing &&
-                                         std::filesystem::last_write_time(runtime_support_source) >
-                                             std::filesystem::last_write_time(options.runtime_object_path);
-    if (runtime_object_missing || runtime_source_is_newer) {
-        if (!RunHostCommand({"xcrun",
-                             "clang",
-                             "-target",
-                             options.target.triple,
-                             "-c",
-                             runtime_support_source.generic_string(),
-                             "-o",
-                             options.runtime_object_path.generic_string()},
-                            source_path,
-                            diagnostics,
-                            "compile runtime support")) {
-            return {};
-        }
-    }
-
-    std::vector<std::string> link_command = {
-        "xcrun",
-        "clang",
-        "-target",
-        options.target.triple,
-    };
-    for (const auto& object_path : options.object_paths) {
-        link_command.push_back(object_path.generic_string());
-    }
-    for (const auto& input_path : options.extra_input_paths) {
-        link_command.push_back(input_path.generic_string());
-    }
-    for (const auto& library_path : options.library_paths) {
-        link_command.push_back(library_path.generic_string());
-    }
-    link_command.push_back(options.runtime_object_path.generic_string());
-    link_command.push_back("-o");
-    link_command.push_back(options.executable_path.generic_string());
-
-    if (!RunHostCommand(link_command,
-                        source_path,
-                        diagnostics,
-                        "link an executable")) {
-        return {};
-    }
-
-    return {
-        .runtime_object_path = options.runtime_object_path,
-        .executable_path = options.executable_path,
-        .ok = true,
-    };
-}
+                          support::DiagnosticSink& diagnostics);
 
 ArchiveResult ArchiveStaticLibrary(const std::filesystem::path& source_path,
                                    const ArchiveOptions& options,
-                                   support::DiagnosticSink& diagnostics) {
-    if (!ValidateBootstrapTarget(options.target, source_path, diagnostics)) {
-        return {};
-    }
-
-    std::filesystem::create_directories(options.archive_path.parent_path());
-    if (options.object_paths.empty()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend cannot archive an empty static library",
-                           diagnostics);
-        return {};
-    }
-
-    std::vector<std::string> archive_command = {
-        "xcrun",
-        "libtool",
-        "-static",
-        "-o",
-        options.archive_path.generic_string(),
-    };
-    for (const auto& object_path : options.object_paths) {
-        archive_command.push_back(object_path.generic_string());
-    }
-
-    if (!RunHostCommand(archive_command,
-                        source_path,
-                        diagnostics,
-                        "archive a hosted static library")) {
-        return {};
-    }
-
-    return {
-        .archive_path = options.archive_path,
-        .ok = true,
-    };
-}
+                                   support::DiagnosticSink& diagnostics);
 
 BuildResult BuildExecutable(const mir::Module& module,
                             const std::filesystem::path& source_path,
                             const BuildOptions& options,
-                            support::DiagnosticSink& diagnostics) {
-    const auto object_result = BuildObjectFile(module,
-                                               source_path,
-                                               {
-                                                   .target = options.target,
-                                                   .artifacts = {
-                                                       .llvm_ir_path = options.artifacts.llvm_ir_path,
-                                                       .object_path = options.artifacts.object_path,
-                                                   },
-                                                   .wrap_hosted_main = true,
-                                               },
-                                               diagnostics);
-    if (!object_result.ok) {
-        return {};
-    }
-    const std::filesystem::path runtime_object_path = options.artifacts.object_path.parent_path() /
-                                                      (options.artifacts.object_path.stem().generic_string() + ".runtime.o");
-
-    const auto link_result = LinkExecutable(source_path,
-                                            {
-                                                .target = options.target,
-                                                .object_paths = {options.artifacts.object_path},
-                                                .extra_input_paths = {},
-                                                .library_paths = {},
-                                                .runtime_source_path = options.runtime_source_path,
-                                                .runtime_object_path = runtime_object_path,
-                                                .executable_path = options.artifacts.executable_path,
-                                            },
-                                            diagnostics);
-    if (!link_result.ok) {
-        return {};
-    }
-
-    return {
-        .artifacts = options.artifacts,
-        .ok = true,
-    };
-}
+                            support::DiagnosticSink& diagnostics);
 
 }  // namespace mc::codegen_llvm

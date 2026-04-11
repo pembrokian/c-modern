@@ -37,6 +37,41 @@ mc::parse::ParseResult ParseText(const std::string& source, mc::support::Diagnos
     return mc::parse::Parse(lexed, "<test>", diagnostics);
 }
 
+std::unique_ptr<mc::ast::Expr> MakeNestedAggregateExpr(int depth) {
+    auto expr = std::make_unique<mc::ast::Expr>();
+    expr->kind = mc::ast::Expr::Kind::kAggregateInit;
+    expr->text = "Node";
+    if (depth == 0) {
+        auto leaf = std::make_unique<mc::ast::Expr>();
+        leaf->kind = mc::ast::Expr::Kind::kLiteral;
+        leaf->text = "0";
+        leaf->secondary_text = "int_lit";
+        expr->field_inits.push_back({
+            .has_name = true,
+            .name = "value",
+            .value = std::move(leaf),
+        });
+        return expr;
+    }
+
+    expr->field_inits.push_back({
+        .has_name = true,
+        .name = "next",
+        .value = MakeNestedAggregateExpr(depth - 1),
+    });
+    return expr;
+}
+
+std::size_t CountOccurrences(const std::string& text, const std::string& needle) {
+    std::size_t count = 0;
+    std::size_t position = 0;
+    while ((position = text.find(needle, position)) != std::string::npos) {
+        ++count;
+        position += needle.size();
+    }
+    return count;
+}
+
 void TestDiagnosticFormatting() {
     const mc::support::Diagnostic diagnostic {
         .file_path = "tests/cases/hello.mc",
@@ -369,6 +404,43 @@ void TestParserPreservesBindingAssignmentAmbiguity() {
            "ambiguous node should preserve the identifier list");
 }
 
+    void TestAstDumpDepthLimitAppliesThroughHelperBoundaries() {
+        mc::ast::SourceFile source_file;
+
+        mc::ast::Decl function_decl;
+        function_decl.kind = mc::ast::Decl::Kind::kFunc;
+        function_decl.name = "deep_dump";
+
+        auto body = std::make_unique<mc::ast::Stmt>();
+        body->kind = mc::ast::Stmt::Kind::kBlock;
+
+        auto return_stmt = std::make_unique<mc::ast::Stmt>();
+        return_stmt->kind = mc::ast::Stmt::Kind::kReturn;
+        return_stmt->exprs.push_back(MakeNestedAggregateExpr(520));
+        body->statements.push_back(std::move(return_stmt));
+
+        auto switch_stmt = std::make_unique<mc::ast::Stmt>();
+        switch_stmt->kind = mc::ast::Stmt::Kind::kSwitch;
+        switch_stmt->exprs.push_back(MakeNestedAggregateExpr(1));
+
+        mc::ast::SwitchCase case_node;
+        case_node.pattern.kind = mc::ast::CasePattern::Kind::kExpr;
+        case_node.pattern.expr = MakeNestedAggregateExpr(520);
+        switch_stmt->switch_cases.push_back(std::move(case_node));
+        body->statements.push_back(std::move(switch_stmt));
+
+        function_decl.body = std::move(body);
+        source_file.decls.push_back(std::move(function_decl));
+
+        const auto dump = mc::ast::DumpSourceFile(source_file);
+        Expect(dump.find("FieldInit name=next") != std::string::npos,
+            "deep aggregate dump should still include nested field initializers before truncation");
+        Expect(dump.find("ExprCasePattern") != std::string::npos,
+            "deep switch dump should still include case patterns before truncation");
+        Expect(CountOccurrences(dump, "<max depth reached>") >= 2,
+            "dump depth limiting should apply through field-init and case-pattern helper boundaries");
+    }
+
 }  // namespace
 
 int main() {
@@ -384,5 +456,6 @@ int main() {
     TestParserRejectsArrayLiteralCallArgumentWithoutHanging();
     TestParserHandlesMultiTargetAssignment();
     TestParserPreservesBindingAssignmentAmbiguity();
+    TestAstDumpDepthLimitAppliesThroughHelperBoundaries();
     return 0;
 }

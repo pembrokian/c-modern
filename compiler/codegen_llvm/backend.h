@@ -25,6 +25,7 @@ struct TargetConfig {
     std::string triple;
     std::string target_family;
     std::string object_format;
+    std::vector<std::string> host_tool_prefix;
     bool hosted = true;
 };
 

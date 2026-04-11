@@ -128,6 +128,36 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
                                     const std::filesystem::path& mc_path);
 
+void RunFreestandingKernelToolSuiteShard(const std::filesystem::path& source_root,
+                                         const std::filesystem::path& binary_root,
+                                         const std::filesystem::path& mc_path,
+                                         int shard);
+
+void RunFreestandingKernelToolSuiteCase(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path,
+                                        std::string_view case_name);
+
+void RunFreestandingKernelToolSuiteShard1(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path);
+
+void RunFreestandingKernelToolSuiteShard2(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path);
+
+void RunFreestandingKernelToolSuiteShard3(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path);
+
+void RunFreestandingKernelToolSuiteShard4(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path);
+
+void RunFreestandingKernelToolSuiteShard5(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path);
+
 void RunFreestandingSystemToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
                                     const std::filesystem::path& mc_path);

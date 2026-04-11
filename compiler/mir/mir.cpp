@@ -76,6 +76,8 @@ bool MatchGenericTypePattern(const Module& module,
                              const sema::Type& actual,
                              const std::unordered_map<std::string, bool>& type_param_set,
                              std::unordered_map<std::string, sema::Type>& bindings) {
+    // This performs one-directional matching from an expected generic pattern
+    // onto an actual type while accumulating type-parameter bindings.
     const sema::Type canonical_pattern = CanonicalMirType(module, pattern);
     const sema::Type canonical_actual = CanonicalMirType(module, actual);
 
@@ -106,8 +108,8 @@ bool MatchGenericTypePattern(const Module& module,
             }
             break;
         default:
-            if (canonical_pattern.metadata != canonical_actual.metadata || canonical_pattern.subtypes.size() != canonical_actual.subtypes.size()) {
-                return canonical_pattern == canonical_actual;
+            if (canonical_pattern.metadata != canonical_actual.metadata) {
+                return false;
             }
             break;
     }
@@ -124,8 +126,7 @@ bool MatchGenericTypePattern(const Module& module,
             return false;
         }
     }
-    return canonical_pattern.kind == sema::Type::Kind::kNamed || canonical_pattern.subtypes.empty() || canonical_pattern == canonical_actual ||
-           canonical_pattern.metadata == canonical_actual.metadata;
+    return canonical_pattern == canonical_actual;
 }
 
 const TypeDecl* FindMirTypeDecl(const Module& module, std::string_view name) {

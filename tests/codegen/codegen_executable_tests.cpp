@@ -263,6 +263,48 @@ void RunBuiltFixtureWithIrSnippets(const std::filesystem::path& mc_path,
                          "run built executable " + artifacts.executable.generic_string());
 }
 
+void RunBuiltFixtureWithIrSnippetChecks(const std::filesystem::path& mc_path,
+                                        const std::filesystem::path& source_path,
+                                        const std::filesystem::path& build_dir,
+                                        int expected_exit_code,
+                                        const std::vector<std::string>& run_args,
+                                        const std::vector<std::string>& required_ir_snippets,
+                                        const std::vector<std::string>& forbidden_ir_snippets) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          source_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build " + source_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
+    if (!std::filesystem::exists(artifacts.llvm_ir) ||
+        !std::filesystem::exists(artifacts.object) ||
+        !std::filesystem::exists(artifacts.executable)) {
+        Fail("expected build artifacts for fixture: " + source_path.generic_string());
+    }
+
+    const std::string llvm_ir = ReadFile(artifacts.llvm_ir);
+    for (const auto& snippet : required_ir_snippets) {
+        if (llvm_ir.find(snippet) == std::string::npos) {
+            Fail("expected LLVM IR snippet '" + snippet + "' in " + artifacts.llvm_ir.generic_string());
+        }
+    }
+    for (const auto& snippet : forbidden_ir_snippets) {
+        if (llvm_ir.find(snippet) != std::string::npos) {
+            Fail("unexpected LLVM IR snippet '" + snippet + "' in " + artifacts.llvm_ir.generic_string());
+        }
+    }
+
+    ExpectExecutableExit(artifacts.executable,
+                         run_args,
+                         expected_exit_code,
+                         "run built executable " + artifacts.executable.generic_string());
+}
+
 void RunBuiltIrFixtureWithSnippets(const std::filesystem::path& mc_path,
                                    const std::filesystem::path& source_path,
                                    const std::filesystem::path& build_dir,
@@ -932,6 +974,33 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                            {},
                            {"call void @__mc_check_bounds_slice"});
 
+    const std::filesystem::path enum_payload_equality_source = work_root / "enum_payload_equality.mc";
+    WriteFile(enum_payload_equality_source,
+              "enum Color {\n"
+              "    Red(value: u8)\n"
+              "    Blue\n"
+              "}\n"
+              "\n"
+              "func same(left: Color, right: Color) bool {\n"
+              "    return left == right\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    left: Color = Color.Red(7)\n"
+              "    right: Color = Color.Red(7)\n"
+              "    if same(left, right) {\n"
+              "        return 0\n"
+              "    }\n"
+              "    return 1\n"
+              "}\n");
+    RunBuiltFixtureWithIrSnippetChecks(mc_path,
+                                       enum_payload_equality_source,
+                                       work_root / "enum_payload_equality_build",
+                                       0,
+                                       {},
+                                       {" = load i8, ptr ", " = select i1 "},
+                                       {"enum.compare.chunk"});
+
     const std::filesystem::path hosted_args_source = work_root / "hosted_main_args.mc";
     WriteFile(hosted_args_source,
               "func main(args: Slice<cstr>) i32 {\n"
@@ -1336,11 +1405,15 @@ void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
                     0,
                     {});
 
-    RunBuiltFixture(mc_path,
-                    source_root / "examples/canonical/hosted_default_allocator_use.mc",
-                    work_root / "hosted_default_allocator_use_build",
-                    0,
-                    {});
+    RunBuiltFixtureWithIrSnippetChecks(mc_path,
+                                       source_root / "examples/canonical/hosted_default_allocator_use.mc",
+                                       work_root / "hosted_default_allocator_use_build",
+                                       0,
+                                       {},
+                                       {"getelementptr inbounds {ptr, i64, i64, ptr}, ptr null, i64 1",
+                                        " = ptrtoint ptr ",
+                                        " = call ptr @malloc(i64 %"},
+                                       {"call ptr @malloc(i64 32)"});
 
     RunBuiltFixture(mc_path,
                     source_root / "examples/canonical/bounded_ring_buffer.mc",

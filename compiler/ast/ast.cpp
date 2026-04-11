@@ -252,7 +252,7 @@ void DumpType(const TypeExpr& type, std::ostringstream& stream, Indent indent, i
     }
 }
 
-void DumpFieldInit(const FieldInit& init, std::ostringstream& stream, Indent indent) {
+void DumpFieldInit(const FieldInit& init, std::ostringstream& stream, Indent indent, int depth) {
     WriteIndent(stream, indent);
     stream << "FieldInit";
     if (init.has_name) {
@@ -260,7 +260,7 @@ void DumpFieldInit(const FieldInit& init, std::ostringstream& stream, Indent ind
     }
     stream << '\n';
     if (init.value != nullptr) {
-        DumpExpr(*init.value, stream, indent + 1);
+        DumpExpr(*init.value, stream, indent + 1, depth + 1);
     }
 }
 
@@ -316,12 +316,12 @@ void DumpExpr(const Expr& expr, std::ostringstream& stream, Indent indent, int d
     if (!expr.field_inits.empty()) {
         WriteLine(stream, indent + 1, "inits:");
         for (const auto& init : expr.field_inits) {
-            DumpFieldInit(init, stream, indent + 2);
+            DumpFieldInit(init, stream, indent + 2, depth + 1);
         }
     }
 }
 
-void DumpCasePattern(const CasePattern& pattern, std::ostringstream& stream, Indent indent) {
+void DumpCasePattern(const CasePattern& pattern, std::ostringstream& stream, Indent indent, int depth) {
     WriteIndent(stream, indent);
     stream << (pattern.kind == CasePattern::Kind::kExpr ? "ExprCasePattern" : "VariantCasePattern");
     if (!pattern.variant_name.empty()) {
@@ -330,7 +330,7 @@ void DumpCasePattern(const CasePattern& pattern, std::ostringstream& stream, Ind
     stream << '\n';
 
     if (pattern.expr != nullptr) {
-        DumpExpr(*pattern.expr, stream, indent + 1);
+        DumpExpr(*pattern.expr, stream, indent + 1, depth + 1);
     }
 
     if (!pattern.bindings.empty()) {
@@ -415,7 +415,7 @@ void DumpStmt(const Stmt& stmt, std::ostringstream& stream, Indent indent, int d
         WriteLine(stream, indent + 1, "cases:");
         for (const auto& case_node : stmt.switch_cases) {
             WriteLine(stream, indent + 2, "SwitchCase:");
-            DumpCasePattern(case_node.pattern, stream, indent + 3);
+            DumpCasePattern(case_node.pattern, stream, indent + 3, depth + 1);
             for (const auto& item : case_node.statements) {
                 DumpStmt(*item, stream, indent + 3, depth + 1);
             }
