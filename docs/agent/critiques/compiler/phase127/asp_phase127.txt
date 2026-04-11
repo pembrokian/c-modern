@@ -1,0 +1,165 @@
+COMPILER CRITIQUE — ast.cpp (requested as "asp.cpp")
+Phase: phase127
+Reviewer: Senior Compiler Systems Engineer
+Date: 2026-04-11
+
+NOTE: No file named "asp.cpp" exists in the repository. This review covers
+compiler/ast/ast.cpp, the nearest candidate. If a different file was intended,
+this review should be discarded.
+
+File: compiler/ast/ast.cpp (549 lines)
+Role: AST serialisation / debug dump
+
+─────────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+─────────────────────────────────────────────────────────────────────────────
+
+Strengths:
+- The file has a single, well-scoped responsibility: human-readable text dumps
+  of every AST node kind. All implementation lives in an anonymous namespace;
+  only DumpSourceFile is exported.
+- Forward declarations (DumpType, DumpExpr, DumpStmt, DumpDecl) break the
+  mutual recursion cleanly without any circular-include risk.
+- The kMaxDumpDepth guard prevents runaway recursion on pathological or
+  adversarially constructed ASTs.
+
+Concerns:
+- Dump logic is tightly coupled to AST node layout via direct field access.
+  Adding a new node field (e.g. source-level notes) requires matching edits
+  across multiple Dump* functions with no compile-time enforcement. A visitor
+  or accept() protocol would make additions auditable.
+- DumpFieldInit and DumpCasePattern do NOT receive or propagate a depth
+  counter. DumpExpr calls DumpFieldInit, and DumpExpr is depth-guarded, but
+  DumpCasePattern calls DumpExpr without passing the caller's depth. This
+  means a switch{case{}...} with deeply nested expressions could bypass the
+  depth limit by one level for the case-pattern wrapper.
+- The two responsibilities of ToString() (kind → string for dump labels) and
+  the actual dump traversal are interleaved. Extracting ToString variants to a
+  shared header (shared with MIR, sema dumps) would reduce duplication across
+  the compiler.
+
+─────────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+─────────────────────────────────────────────────────────────────────────────
+
+- ReachedDumpDepthLimit: checks `depth <= kMaxDumpDepth`, returns false (no
+  limit hit). Returns true when depth > 512. Semantically correct.
+- SecondaryTextLabel: the default branch returns " secondary=" for any Expr
+  kind not explicitly listed. For kName, kUnary, kBinary, etc. the
+  secondary_text field is typically empty so it is never emitted, but if a
+  future kind populates secondary_text without being whitelisted here, the
+  label will be " secondary=" rather than something meaningful. This is a
+  future-proofing gap, not a current bug.
+- There is no "unhandled kind" sentinel in the DumpDecl/DumpExpr/DumpStmt
+  functions beyond the MC_UNREACHABLE at the end of ToString. If a new
+  Decl::Kind is added and only ToString is updated (not DumpDecl), the dump
+  silently omits fields. Adding a static_assert or exhaustive switch inside
+  each Dump* function would catch this at compile time.
+- DumpSourceFile emits ModuleKind only for kInternal, silently nothing for
+  the default kind. If a third module kind is added, the dump gives no hint
+  of it.
+
+─────────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+─────────────────────────────────────────────────────────────────────────────
+
+- The code is uniformly structured: every Dump* function follows the same
+  depth-guard → label emit → child recurse pattern. Easy to scan.
+- WriteIndent + WriteLine are helpers reused consistently. Minor concern: the
+  same pair is defined independently in check.cpp (sema dump). A single shared
+  utility in compiler/support would eliminate the duplicate.
+- DumpExpr is the longest function (~80 lines) but all branches are
+  structurally identical. No simplification is needed.
+- The Indent type alias (int) is a typedef-style alias that adds little
+  beyond documentation. A named struct or a small class with an increment
+  operator would make the contract explicit (non-negative, bounded).
+
+─────────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+─────────────────────────────────────────────────────────────────────────────
+
+- All child pointers are dereferenced only after null checks (`if (child !=
+  nullptr)`). The code is safe.
+- The depth limit of 512 is generous for real source files but a stack depth
+  of 512 * (DumpExpr frame ≈ a few KB) could theoretically exhaust the native
+  stack. Since DumpExpr is the deepest path and uses an ostringstream (not
+  the call stack for output), and real source trees rarely exceed depth ~30,
+  this is acceptable for a bootstrap compiler.
+- std::ostringstream in DumpSourceFile: building the entire dump into one
+  stream before returning means the full dump is held in memory at once. For
+  pathological inputs this could be large. Since dump is a debug aid, this is
+  acceptable; switching to a streaming approach would require a more complex
+  API.
+
+─────────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+─────────────────────────────────────────────────────────────────────────────
+
+- Each WriteLine call appends to an ostringstream with a '\n'. This is
+  efficient for small outputs and acceptable for a debug dump path.
+- DumpAttributes is called from DumpDecl for each parameter attribute too
+  (via the param loop). The outer loop is O(params × attributes). No issue
+  for realistic inputs.
+- DumpType for procedure kinds iterates params then returns separately. All
+  vectors are iterated once. O(n) across all nodes.
+- No pre-sizing of the ostringstream: a reserve() upfront based on the source
+  file size would reduce reallocations for large files, but given this is a
+  dump function running rarely, it is not a priority.
+
+─────────────────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+─────────────────────────────────────────────────────────────────────────────
+
+- The dump output format is consumed by golden fixture tests. Any whitespace
+  or label change is a breaking change that requires mass fixture updates.
+  The format is deterministic (no address printing, no timestamps) which is
+  correct for fixture-based testing.
+- ToString functions in this file partially overlap with similar functions in
+  check.cpp and mir_dump.cpp. A shared ast_display.h with constexpr string
+  tables would be the right long-term home.
+- DumpSourceFile is the only exported symbol from this file. The anonymous
+  namespace prevents ODR issues. This is the idiomatic pattern; maintain it.
+
+─────────────────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+─────────────────────────────────────────────────────────────────────────────
+
+- No file-level comment explaining the dump format semantics (e.g. indented
+  with 2-space levels, depth-limited at 512). A brief block comment at the
+  top would help contributors adding new node kinds.
+- Individual functions are self-explanatory. The kMaxDumpDepth constant is
+  named clearly.
+- MC_UNREACHABLE in ToString functions serves as both documentation and a
+  runtime guard. Good pattern.
+
+─────────────────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+─────────────────────────────────────────────────────────────────────────────
+
+CRITICAL:
+  None. The file is correct and safe for its current scope.
+
+ARCHITECTURAL:
+  A1. Pass depth to DumpCasePattern and DumpFieldInit, or convert DumpExpr to
+      pass depth to all helpers it calls. Prevents depth-limit bypass in switch
+      case patterns with nested expressions.
+  A2. Extract the WriteIndent/WriteLine pair to compiler/support to eliminate
+      the duplicate definitions in check.cpp and any future dump files.
+  A3. Consider a visitor/accept() interface on AST nodes so the dump logic does
+      not need to be updated in lock-step with node field additions. Even a
+      simple DumpVisitor base class with virtual methods per kind would add
+      compile-time coverage.
+
+SIMPLICITY / MAINTAINABILITY:
+  S1. Add a file-level block comment describing the dump format contract (2-
+      space indentation, kMaxDumpDepth, field ordering).
+  S2. Add an exhaustive switch (or static_assert) inside DumpDecl/DumpExpr/
+      DumpStmt for each Kind, even if the body is the same for all cases. This
+      makes the compiler warn when a new kind is added without a dump branch.
+  S3. Unify the SecondaryTextLabel switch to cover all Expr::Kind values
+      explicitly rather than relying on a generic default.
+
+PERFORMANCE (OPTIONAL):
+  P1. Pre-reserve a chunk of the ostringstream buffer proportional to the
+      number of AST nodes if dump latency becomes observable. Currently not a
+      priority.

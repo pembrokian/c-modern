@@ -1,0 +1,370 @@
+COMPILER CRITIQUE — backend.cpp
+Phase: phase127
+Reviewer: Senior Compiler Systems Engineer
+Date: 2026-04-11
+
+File: compiler/codegen_llvm/backend.cpp (5360 lines)
+Role: MIR → textual LLVM IR translation, plus host toolchain invocation
+      (xcrun clang/libtool) to produce object files, static libraries, and
+      linked executables.
+
+─────────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+─────────────────────────────────────────────────────────────────────────────
+
+Strengths:
+- The dual-path architecture (inspect/dump path via LowerInspectModule and
+  executable-emission path via RenderLlvmModule) is a reasonable bootstrap
+  choice: the dump path produces readable pseudo-IR for developer inspection
+  while the emission path produces LLVM-valid IR.
+- `RenderExecutableInstruction` is a large but uniform switch: every case
+  has the same structure (validate result, validate operands, lower types,
+  emit LLVM lines, record value). The uniformity makes the file comprehensible
+  despite its size.
+- Type lowering behind `LowerInstructionType` and `LowerAggregateFieldStorageType`
+  is centralised. All instruction handlers call through this abstraction,
+  which ensures the same lowering rules are applied everywhere.
+- The `ExecutableFunctionState` struct cleanly bundles per-function emission
+  state, making instruction handlers stateless functions that can be tested
+  or read in isolation.
+- `CheckedHelperRequirements` and `CollectCheckedHelperRequirements` correctly
+  collect which runtime check helpers are needed before emitting them, so
+  unused helpers (e.g. shift-check for programs without shifts) are not
+  emitted.
+
+Significant Concerns:
+
+C1. SINGLE 5360-LINE FILE WITH MULTIPLE MAJOR CONCERNS
+  The file contains at least four logically separate responsibilities:
+    a) Type lowering (LowerInstructionType, LowerEnumLayout, etc.)
+    b) Value resolution and name generation (ResolveExecutableValue, LLVMTempName etc.)
+    c) Per-instruction emission (RenderExecutableInstruction and the ~15
+       helper Emit*Instruction functions that back it)
+    d) Module-level emission (RenderLlvmModule, RenderExecutableFunction, the
+       global/extern/terminator renderers)
+    e) Host toolchain invocation (BuildObjectFile, LinkExecutable,
+       ArchiveStaticLibrary, BuildExecutable, RunHostCommand)
+  Placing all five in one file makes the dependency graph opaque. In
+  particular, (e) is a side-effectful I/O layer and should be separated from
+  (a)-(d) which are pure IR transforms. A backend/host_toolchain.cpp split
+  would improve layering.
+
+C2. ARM64/macOS TARGET IS ENTIRELY HARDCODED
+  BootstrapTargetConfig() returns `kBootstrapTriple = "arm64-apple-darwin"`
+  with `kBootstrapObjectFormat = "macho"`. All toolchain commands use `xcrun
+  clang` and `xcrun libtool`, which are macOS-only SDKs. When the compiler is
+  needed on Linux or ARM64 Linux (e.g. for CI or cross-compilation of the
+  kernel target), every toolchain invocation must be changed. The host command
+  emission should be table-driven by TargetConfig:
+    .compile_tool: ["clang", "-target", ...] vs ["xcrun", "clang", "-target", ...]
+  The triple and object format are already in TargetConfig; the problem is
+  the xcrun prefix is unconditional.
+
+C3. RunHostCommand USES std::system — ERRORS ARE LOST TO THE DIAGNOSTIC SINK
+  BuildObjectFile, LinkExecutable, and ArchiveStaticLibrary all invoke
+  RunHostCommand, which calls std::system(). When clang fails to compile the
+  generated LLVM IR, it writes the error to stderr. The compiler sees only
+  "exit=1"; the error message from clang is interleaved with the compiler's
+  own stdout. In a CI environment where stderr is captured separately, this
+  produces confusing output. The diagnostic pattern in RunExecutableCapture
+  (in driver.cpp, which captures stdout+stderr from child processes) is the
+  right model; RunHostCommand should use the same approach so that toolchain
+  error messages are folded into DiagnosticSink.
+
+C4. RenderExecutableInstruction SWITCH HAS NO COMPILE-TIME EXHAUSTION GUARD
+  The switch over mir::Instruction::Kind ends with MC_UNREACHABLE, which is
+  correct for runtime. However, adding a new MIR instruction kind and forgetting
+  to add a case in the switch causes a runtime crash rather than a compile-time
+  error. With `-Wswitch-enum` (GCC/Clang), an unhandled enum constant in a
+  switch without a default generates a warning. The file should ensure this
+  warning is enabled (the build is currently compiled with -Wall but the
+  MC_UNREACHABLE at the end suppresses the compiler's warning by satisfying
+  the control flow). Removing MC_UNREACHABLE and instead using `[[likely]]`
+  on nothing would re-enable the warning. Alternatively, document the
+  exhaustion requirement in a comment.
+
+C5. BufferNew HARDCODES BUFFER HEADER SIZE AS 32
+  In EmitBufferNew (the kBufferNew case):
+    output_lines.push_back("... = call ptr @malloc(i64 32)");
+  The constant 32 is the byte size of `{ptr, i64, i64, ptr}` on a 64-bit
+  host. If the Buffer layout changes (e.g. a 32-bit target is ever added), or
+  if a different alignment is required, this silent constant will produce a
+  buffer overflow or underallocation. The correct approach is to emit:
+    %sizeof.buf = getelementptr {ptr, i64, i64, ptr}, ptr null, i64 1
+    %sizeof.val = ptrtoint ptr %sizeof.buf to i64
+  and pass `%sizeof.val` to malloc, as is standard in LLVM IR.
+
+─────────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+─────────────────────────────────────────────────────────────────────────────
+
+CORRECTNESS: EmitEnumCompare BYTE COMPARISON CAN PRODUCE FALSE NEGATIVES
+  (Identified in prior reading; confirmed by full review.)
+  EmitEnumCompare for `==`/`!=` compares the entire enum aggregate using
+  byte-level chunks (memcmp-style). Enum layout includes padding bytes
+  (between the i64 tag and the payload, and within the payload struct for
+  alignment). Two logically equal enum values that were constructed through
+  different paths — one via zeroinitializer (variant_init does zero the entire
+  aggregate slot), one via a load from a buffer that may contain stale padding
+  bytes — can compare unequal. This is observable:
+    let a = colour.Red(255u8)
+    let b: Colour = load_from_extern_buffer()   ; Colour == Red(255), but
+    ; the padding bytes in b's allocation are indeterminate
+    if a == b { ... }   ; may incorrectly be false
+  The canonical fix in LLVM IR is to compare field-by-field (tag, then each
+  payload field), which EmitOrderedEnumFieldComparison already does for ordered
+  comparisons. EmitEnumCompare == / != should use a tag comparison + per-field
+  comparison instead of byte extraction.
+
+CORRECTNESS: kAtomicCompareExchange IS UNIMPLEMENTED BUT NOT SURFACED AT MIR
+  LOWERING TIME
+  The kAtomicCompareExchange case in RenderExecutableInstruction immediately
+  reports an error. This means programs that use atomic-compare-exchange
+  compile fine through sema and MIR lowering, but fail only at backend
+  emission. This is a late error that should be caught earlier. The MIR
+  validator or the lowering pass should detect and report this as a
+  "not supported in bootstrap backend" condition at lower time, not at
+  instruction emission.
+
+CORRECTNESS: kConvert INSTRUCTION REQUIRES IDENTICAL BACKEND NAMES
+  The kConvert case in RenderExecutableInstruction:
+    if (operand.type.backend_name != result_type.backend_name) { error; }
+  This means a MIR `convert` instruction emitted for any type pair that does
+  not have an identical LLVM backend name is silently rejected. If the MIR
+  lowering ever emits `convert` for a type pair that differs at the LLVM
+  level (e.g. distinct named types that lower to different structs), the
+  backend will report a confusing "representation-preserving convert only"
+  error with no source location. A MIR-level validation pass should
+  check that `convert` is only applied to types with the same backend
+  representation.
+
+CORRECTNESS: kSliceFromBuffer IS EXPECTED TO LOWER BEFORE EXECUTABLE EMISSION
+  The kSliceFromBuffer case reports:
+    "slice_from_buffer should lower before executable emission"
+  This is a lowering invariant that is not enforced by the MIR validator. If
+  a lowering pass fails to pre-lower kSliceFromBuffer, the error appears at
+  backend emission time with no source position. The MIR validator should
+  reject kSliceFromBuffer in fully-lowered modules.
+
+CORRECTNESS: string constant globals are function-scoped — potential
+  SIZE INFLATION FOR REPEATED LITERALS
+  In RenderExecutableFunction(), identical string literals in different
+  functions produce distinct globals:
+    @.mc.str.0.0 = private unnamed_addr constant [6 x i8] c"hello\00" (in fn 0)
+    @.mc.str.1.0 = private unnamed_addr constant [6 x i8] c"hello\00" (in fn 1)
+  This is not a correctness issue (LLVM will deduplicate with -O2), but for
+  the bootstrap debug path everything is -O0, so duplicate literals inflate
+  the binary. A module-level string constant table (keyed by decoded string
+  value) would avoid this.
+
+─────────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+─────────────────────────────────────────────────────────────────────────────
+
+- `EmitBinaryInstruction`, `EmitAggregateInitInstruction`, `EmitSliceInstruction`,
+  `EmitVariantInitInstruction`, etc. are the right extraction strategy: the
+  instruction dispatch switch delegates to these helpers and stays manageable.
+  The pattern should be continued for any future instruction kinds.
+- `QuoteShellArg` is correct and compact. The `"'\\''"`-expansion idiom for
+  POSIX single-quote escaping is a well-known pattern and the code comment
+  explaining it would be welcome.
+- `RenderExecutableTerminator` could use `MC_UNREACHABLE` after the switch
+  instead of `return false`. The trailing `return false` is dead code after
+  the kNone case and misleads readers into thinking there is a legitimate
+  non-switch exit.
+- `EmitValueRepresentationCoercion` handles only `i1↔i8` coercions and returns
+  `false` for all other pairs, causing callers to report a generic error. A
+  comment stating the full set of coercions that are expected would make it
+  clear which cases are missing versus which are intentionally unsupported.
+- `LowerFunctionReturnType` is called multiple times per call-instruction
+  emission (once to check if there's a return type, once to lower it for the
+  result). Combining these into a single call would halve the lowering work
+  and reduce the error-reporting surface.
+
+─────────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+─────────────────────────────────────────────────────────────────────────────
+
+SAFETY: RunHostCommand + std::system SHELL INJECTION VECTOR
+  QuoteShellArg correctly wraps arguments in POSIX single quotes and handles
+  embedded single quotes via `'\''`. The arguments to RunHostCommand come from
+  the compiler itself (path strings, the triple string), not from user-
+  provided identifiers. Source file paths entered by the user do feed into
+  the clang arguments via `source_path.generic_string()`. On macOS, the
+  `generic_string()` of a std::filesystem::path is a UTF-8 path. A path
+  containing a single quote — e.g. `/home/user's-project/main.mc` — produces:
+    clang ... '/home/user'\''s-project/main.mc' -c -o ...
+  which is correct shell escaping. The single-quote replacement is handled
+  correctly. No injection risk for valid filesystem paths.
+
+SAFETY: BuildObjectFile WRITES PARTIAL LLVM IR TO DISK ON FAILURE
+  `BuildObjectFile` writes the LLVM IR file to disk with:
+    std::ofstream output(options.artifacts.llvm_ir_path, ...);
+    output << llvm_ir;
+  But `RenderLlvmModule` only assigns `llvm_ir` after all emission succeeds.
+  If `RenderLlvmModule` returns false, `llvm_ir` is empty and the file write
+  does not happen. This is correct — the IR file is only written on success.
+  However, if a previous successful build produced an IR file and the current
+  build fails earlier in the pipeline (e.g. in sema), the old IR file is left
+  on disk. An incremental build that invokes `xcrun clang` directly on the
+  old IR file would silently use stale IR. The IR file should be deleted
+  (or marked stale) when a build fails.
+
+SAFETY: ARENA ALIGNMENT MASK USES C++ NEGATIVE CAST
+  In EmitArenaNewInstruction:
+    std::to_string(-static_cast<long long>(element_type.alignment))
+  For alignment values up to INT64_MAX this is correct two's-complement
+  arithmetic, producing the alignment mask. For alignment == 0 (which is
+  rejected by `alignment > 1` check) or for alignment > INT64_MAX (impossible
+  for a bootstrap type), this would be UB. The guard is present; a comment
+  noting the precondition would help.
+
+SAFETY: RenderExecutableFunction ACCEPTS FUNCTIONS WITH ZERO BLOCKS
+  The code checks for empty blocks and reports an error, but only after
+  emitting the function header and all alloca instructions. If the function
+  has no blocks, the partial header is already in the ostringstream. Since
+  that stream is part of the accumulating module IR for `RenderLlvmModule`,
+  the module IR accumulation is now corrupt (function header with no body).
+  However, `RenderLlvmModule` returns false on any function failure, discarding
+  the entire stream. So the partially-emitted function header is never written
+  to disk. This is safe, but early-exit before emitting the header would be
+  cleaner.
+
+─────────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+─────────────────────────────────────────────────────────────────────────────
+
+- `FindTypeDecl`, `FindFunction`, `FindMirLocal`, `FindMirGlobal` are all O(n)
+  linear scans over module.type_decls, module.functions, function.locals,
+  module.globals respectively. These are called from per-instruction emit
+  paths. For a module with N functions, M instructions per function, and K
+  type decls:
+    total type lookups ≈ O(M * N * K)
+  For modules with hundreds of functions and dozens of types this is
+  acceptable, but approaching thousands of functions (post-Phase 4) the O(n²)
+  scans will dominate emit time. Lookup maps built once at the start of
+  RenderLlvmModule would reduce this to O(1) per lookup:
+    std::unordered_map<std::string, const mir::TypeDecl*> type_decl_index;
+    std::unordered_map<std::string, const mir::Function*> function_index;
+  mir.cpp's FindMirTypeDecl/FindMirFunction have the same issue; a shared
+  resolved-index passed into the emission context would amortise both.
+- String-constant emission in `RenderExecutableFunction` creates a new
+  `string_constants` map per function by scanning all blocks and instructions.
+  For functions with many string literals this is fine. The function-scoped
+  map is then moved into `ExecutableFunctionState`, which is also fine.
+- `EmitOrderedEnumFieldComparison` generates O(variants × fields) LLVM
+  instructions per enum comparison, using a tree of branches. For an enum with
+  10 variants each with 3 string payload fields, this generates ≈30 GEP+load
+  sequences per comparison. At high function density this will produce large
+  IR functions and slow down `llc`.
+
+─────────────────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+─────────────────────────────────────────────────────────────────────────────
+
+- The backend writes intermediate LLVM IR to disk as `.ll` files in the
+  build artifact directory before invoking clang. For multi-unit projects
+  with hundreds of modules, this produces hundreds of `.ll` files. The IR
+  files have diagnostic value (developers can inspect the generated IR), but
+  they are not cleaned up between builds. For correctness, old `.ll` files
+  should be invalidated when their source module changes.
+- The design choice to use textual LLVM IR (not the LLVM C++ API) means
+  the compiler can be built without LLVM headers. This is excellent for
+  bootstrapping, but means LLVM IR correctness errors (type mismatches,
+  malformed GEP index types, etc.) are not caught until `xcrun clang -x ir`
+  runs. The clang error messages reference line numbers in the `.ll` file, not
+  source positions in the `.mc` file. When something goes wrong in the IR,
+  developers must manually inspect the `.ll` file. The artifact path should be
+  printed in the diagnostic to facilitate this.
+- `RenderLlvmModule` emits `declare void @exit(i32)`, `declare ptr @malloc(i64)`,
+  `declare void @free(ptr)` unconditionally for every module, even freestanding
+  modules that should not link against libc. The freestanding path currently
+  avoids calling these intrinsics at the source level, but the declarations are
+  still present in the IR. For strict freestanding compliance, these
+  declarations should only be emitted when the target is hosted.
+- The `@__mc_trap()` helper calls `@exit(i32 134)` unconditionally. For
+  freestanding targets (kernel, no libc), `@exit` is not available. The
+  freestanding target should replace `@exit(134)` with a target-specific trap
+  instruction (e.g. `call void asm sideeffect "udf #0", ""()` for ARM64).
+- The hosted entry wrapper `@__mc_hosted_entry` hardcodes `{ptr, i64} %args`
+  as the parameter type for the args slice. This ties the entry point ABI to
+  the current `Slice<cstr>` lowering. If the Slice representation changes
+  (e.g. to `{ptr, i32}` on 32-bit targets), the wrapper must also change.
+
+─────────────────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+─────────────────────────────────────────────────────────────────────────────
+
+- The top of the file should have a module-level comment explaining the two
+  emission paths (inspect vs executable), the design choice to use textual
+  LLVM IR, and the ARM64/macOS restriction. Currently there is no file-level
+  comment.
+- `EmitEnumCompare` is one of the most complex functions in the file and has
+  no function-level comment. The algorithm (byte-chunk extraction + icmp for
+  equality; recursive ordered field comparison for ordering) deserves
+  explanation.
+- `EmitValueRepresentationCoercion` silently returns false for all cases other
+  than i1⟷i8. It should document which coercions it intentionally handles and
+  which it expects callers to handle (or which are MIR invariants).
+- `QuoteShellArg` uses the standard POSIX single-quote escaping technique;
+  a one-line comment explaining the invariant would prevent future modifications
+  from weakening the escaping.
+- The zero-initializer write in `EmitVariantInitInstruction` (store zeroinit
+  before storing payload fields) is a deliberate design to ensure padding bytes
+  are zeros, which partially mitigates the enum comparison bug described above.
+  This design choice is not documented; a comment noting "zeroinitializer
+  ensures deterministic padding for equality comparisons" would clarify intent.
+
+─────────────────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+─────────────────────────────────────────────────────────────────────────────
+
+CRITICAL:
+  1. (C: EmitEnumCompare) Fix enum equality comparison to compare tag + each
+     payload field individually (as a field-structured icmp chain), rather than
+     raw byte extraction. The zeroinitializer write in EmitVariantInitInstruction
+     partially mitigates this, but external sources of enum values (extern
+     function returns, arena-allocated enums) may have indeterminate padding.
+     Field-by-field comparison is the correct and portable approach.
+
+  2. (C5 / Safety) Replace the hardcoded `@malloc(i64 32)` in kBufferNew with
+     a `getelementptr null` size computation, making it resilient to layout
+     changes without silent size mismatches.
+
+CORRECTNESS:
+  3. (kAtomicCompareExchange) Detect unsupported instructions at MIR validation
+     time (or lowering pass entry) rather than at backend emission time.
+     Emit a clear "not supported in bootstrap backend" error at the MIR layer.
+  4. (kConvert) Add an assertion or MIR validator check that `convert` is only
+     used for types with identical LLVM representations, catching this class
+     of error before it reaches the backend.
+  5. (kSliceFromBuffer) Add a MIR validator check that `slice_from_buffer`
+     does not appear in fully-lowered modules. Remove the runtime error from the
+     backend switch.
+  6. (Safety: stale IR file) Delete or atomically replace the `.ll` artifact
+     when a compile fails, to prevent incremental builds from picking up stale
+     IR from a previous successful build.
+
+ARCHITECTURAL:
+  7. (C3) Replace `std::system` with a subprocess capture mechanism equivalent
+     to RunExecutableCapture in driver.cpp, folding toolchain diagnostic output
+     into DiagnosticSink so test failures and CI logs show the full error chain.
+  8. (C1) Extract host toolchain invocation (RunHostCommand, BuildObjectFile,
+     LinkExecutable, ArchiveStaticLibrary, BuildExecutable) into a separate
+     file (e.g. backend/host_toolchain.cpp). This separates pure IR transforms
+     from I/O side-effects.
+  9. (C2) Make the xcrun prefix table-driven in TargetConfig, allowing Linux
+     and cross-compilation hosts without modifying the toolchain call sites.
+
+PERFORMANCE:
+  10. Pre-build lookup maps for type_decls, functions, and globals at the top
+      of RenderLlvmModule and pass them through the emission context, replacing
+      the O(n) FindTypeDecl/FindFunction scans called per instruction.
+
+DOCUMENTATION:
+  11. Add a file-level comment to backend.cpp explaining the textual-LLVM-IR
+      strategy, the dual emit paths, and the ARM64/macOS bootstrap constraint.
+  12. Add a function comment to EmitEnumCompare and EmitOrderedEnumFieldComparison
+      describing the comparison algorithm and its invariants.
+  13. Add a one-line comment to QuoteShellArg documenting the POSIX single-quote
+      escaping contract.

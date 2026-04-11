@@ -1,0 +1,226 @@
+COMPILER CRITIQUE — parser.cpp
+Phase: phase127
+Reviewer: Senior Compiler Systems Engineer
+Date: 2026-04-11
+
+File: compiler/parse/parser.cpp (292 lines)
+Role: Parser infrastructure — token navigation, error recovery, binding-tail
+      helpers, and the top-level parse entry point. Actual grammar rules live
+      in parser_decls.cpp, parser_expr.cpp, parser_statements.cpp.
+
+─────────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+─────────────────────────────────────────────────────────────────────────────
+
+Strengths:
+- Clean split: this file contains only the parser infrastructure (token
+  navigation, error bookkeeping, synchronisation helpers) and the top-level
+  Run() driver. Grammar-specific parsing is in companion files. This respects
+  the Single Responsibility Principle at file granularity.
+- AggInitGuard is a well-structured RAII state-guard for the allow_aggregate_
+  init_ flag. Using RAII for parser-context flags prevents forgetting to
+  restore state on early return from a parsing function.
+- Peek(offset) returning the EOF token (last element) instead of crashing on
+  out-of-bounds is a safe fallback. All grammar lookahead is bounded.
+- LooksLikeBindingStmt and LooksLikeBareNameListAssignment implement bounded
+  O(k) lookahead without consuming tokens, using Peek(). Any grammar
+  ambiguity is resolved by inspection rather than backtracking.
+
+Concerns:
+
+C1. OK-FLAG BOOLEAN + DIAGNOSTIC SINK DUAL ERROR CHANNEL
+  The parser maintains ok_ as a boolean and also routes errors through
+  diagnostics_. Some call sites that consume ParseResult check .ok, others
+  check diagnostics_.HasErrors(). The Run() method returns `.ok = ok_ &&
+  !diagnostics_.HasErrors()` — the conjunction is redundant because every
+  call to ReportError sets ok_ = false AND adds to diagnostics_. If ever a
+  diagnostic is reported via diagnostics_ directly (without going through
+  ReportError), ok_ and diagnostics_ could diverge. The dual state is fragile.
+  Prefer a single source of truth: derive ok from !diagnostics_.HasErrors()
+  and remove ok_.
+
+C2. SynchronizeTopLevel UNCONDITIONALLY ADVANCES ON kNewline
+  SynchronizeTopLevel matches kNewline (Match consumes it), then calls
+  SkipNewlines and returns. This means it exits after the first newline it
+  finds, leaving the parser at the next token. This is correct for most
+  recovery scenarios. However, if the offending token is on a line by itself
+  with a newline before any other syntax (e.g. a stray operator on its own
+  line), the recovery skips just one newline, which may leave the parser in
+  the middle of the erroneous construct on the next call to ParseTopLevelDecl.
+  A guard that only exits when the next token is actually a known top-level
+  starter (the Check block it already has) would be safer.
+
+C3. ParseIdentifier RETURNS THE LEXEME BEFORE Advance
+  The current sequence is correct:
+    const auto text = Current().lexeme;
+    Advance();
+    return text;
+  This is safe but slightly non-obvious because the textual order suggests
+  "read text of Current, advance, return text that was Current's". If this
+  were ever refactored to move the Advance() call before the assignment (e.g.
+  `Advance(); return Previous().lexeme;`) it would still be correct. The
+  current order is readable; a comment noting the token is captured before
+  advancing would help new contributors.
+
+C4. MISSING SYNCHRONISATION ENTRY POINT AFTER STATEMENT-LEVEL ERRORS
+  SkipStatementSeparator reports an error if neither kNewline nor a known stop
+  token is found. It does NOT call SynchronizeStatement. The caller is
+  responsible for invoking SynchronizeStatement on error. This requires every
+  caller of SkipStatementSeparator to check for errors and call
+  SynchronizeStatement, which is a latent omission risk. Combining into a
+  single "require-statement-separator-or-sync" function would make recovery
+  automatic at every call site.
+
+─────────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+─────────────────────────────────────────────────────────────────────────────
+
+- Peek(offset): `const auto target = index_ + offset;` uses size_t arithmetic.
+  If index_ + offset overflows (extremely unlikely, would require more than
+  SIZE_MAX/2 tokens), this wraps around, and `target < tokens_.size()` would
+  be false, causing Peek to return the EOF token. For any practical input this
+  is impossible. For safety, a static_assert or precondition comment on the
+  maximum valid offset (currently at most 3 from the callers) would help.
+
+- Previous() has assert(index_ > 0). This is the only assertion in the file.
+  Run() is the only caller-driven entry point; it calls SkipNewlines() before
+  any Advance(), and SkipNewlines() calls Match() which calls Advance() only
+  on success. The assert is safe. However, if someone calls Previous() before
+  any Advance during parse, the assert fires in debug but is UB in release
+  builds (assert is disabled). A non-assert check returning a dummy token
+  would be safer in production.
+
+- RequireSourceSeparator: `if (AtEnd() || Check(kNewline))` — At EOF, the
+  parser accepts missing newlines at the end of the file. This is intentional
+  (allows source files without a trailing newline). Correct.
+
+- Match → Advance contract: Match is the primary token consumption function.
+  Advance is called only from Match, Consume, ParseIdentifier, and the
+  SynchronizeX functions. The invariant that index_ never exceeds tokens_.size()
+  is maintained by the AtEnd() guard in Advance. Verified correct.
+
+- IsAssignmentTarget: includes kParen with a recursive check on the left
+  child. This correctly handles (x) = value. kSlice/kIndex on the left are
+  not listed, meaning slice_expr[i] and arr[..] are valid assignment targets
+  via the non-name path in CheckAssignableTarget (the else branch just calls
+  AnalyzeExpr). This is intentional in the bootstrap since full lvalue
+  analysis is in MIR.
+
+─────────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+─────────────────────────────────────────────────────────────────────────────
+
+- The token navigation primitives (Check, Match, Advance, Consume, Peek) are
+  the canonical recursive-descent patterns. They are small, clear, and named
+  well.
+- AggInitGuard is the right pattern: 4 lines, zero ambiguity. If a parser
+  helper function returns early for any reason, the guard automatically
+  restores state. This is better than passing bool flags down the call stack.
+- ParseBindingTail handles type annotation and initialisation in one function,
+  reducing duplication between var/const/binding declarations. The bool
+  parameters (allow_storage_without_initializer, missing_initializer_message)
+  are slightly awkward — a struct with flags would be cleaner if the parameter
+  count grows.
+- LooksLikeBindingStmt and LooksLikeBareNameListAssignment have similar
+  lookahead loop structures that could share a helper: "advance past
+  comma-separated identifier pairs". The current duplication is minor.
+- ConsumeMemberSeparator accepts either comma or newline as a separator, which
+  is a design decision for the language grammar (struct fields can be
+  comma-OR-newline separated). This is correct but slightly surprising;
+  a comment stating the grammar intent would help.
+
+─────────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+─────────────────────────────────────────────────────────────────────────────
+
+- All token access goes through Current()/Peek()/Previous() which are bounds-
+  safe. No raw tokens[index] accesses outside these three methods in this file.
+- No raw memory management. Nodes are created via std::make_unique<>; the
+  ParseResult carries unique_ptr<SourceFile>.
+- ReportError marks ok_ = false and reports to diagnostics_. After any error,
+  parsing continues in error recovery mode. The grammar rules in companion
+  files are responsible for not dereference-using optional results that may be
+  nullopt due to errors. The pattern is sound as long as callers check
+  optionals before dereferencing.
+- ParseBindingTail returns a value (not optional). On error, the returned
+  binding will have empty type_ann and no initializers. Callers must check
+  diagnostics_.HasErrors() to know whether the result is usable.
+
+─────────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+─────────────────────────────────────────────────────────────────────────────
+
+- All operations are O(1) or O(k) for bounded lookahead. The parser is
+  single-pass over the token stream with no backtracking. Correct and fast.
+- The SynchronizeTopLevel and SynchronizeStatement functions walk tokens
+  forward until a recovery point. The worst case is the entire rest of the
+  file after a severe error, consuming O(n) tokens. This is the correct and
+  expected behaviour for error recovery.
+- No per-token allocations in the core parsing primitives. Node allocation
+  happens only in ParseXxx factories.
+- SkipNewlines uses a while(Match(kNewline)) loop. For files with many blank
+  lines this is O(blank_lines) but this is negligible.
+
+─────────────────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+─────────────────────────────────────────────────────────────────────────────
+
+- The Parser class is constructed with a reference to LexResult and a
+  reference to DiagnosticSink. Both must outlive the parser. This is enforced
+  by construction site, not by ownership. A comment on Parser's constructor
+  documenting this lifetime requirement would reduce risk.
+- The file_path_ is stored by value (filesystem::path), not by reference.
+  This is correct and avoids dangling reference issues.
+- ParseResult.ok combines ok_ and diagnostics_, which should be equivalent.
+  If the MCI (module compilation interface) layer ever re-checks ok without
+  looking at diagnostics_, the dual boolean becomes a source of divergence.
+  See design concern C1.
+- The `if (file_path_.filename() == "internal.mc")` check for module kind is
+  a naming convention used as a semantic signal. This is the accepted bootstrap
+  heuristic (documented in memory notes), but it couples the parser to a
+  filename convention that should ideally live in a shared constant.
+
+─────────────────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+─────────────────────────────────────────────────────────────────────────────
+
+- The file has no top-level comment. A brief paragraph describing the two-
+  responsibility split (infrastructure here, grammar rules in companion files)
+  with a pointer to parser_internal.h would help newcomers orient themselves.
+- AggInitGuard has its invariant clear from the constructor/destructor bodies.
+- The phase flow in Run() (skip newlines → imports → decls → end) is readable
+  inline. A short comment labelling the grammar production this maps to would
+  add cross-reference value (e.g. "// SourceFile := ImportDecl* TopLevelDecl*").
+- assert vs. diagnostic choice: Previous() uses assert; ReportError() uses
+  diagnostic. The distinction (programmer error vs. user error) is correct, but
+  documenting the convention would help future contributors decide which to use.
+
+─────────────────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+─────────────────────────────────────────────────────────────────────────────
+
+CRITICAL:
+  None. The parser infrastructure is correct and safe.
+
+CORRECTNESS / SAFETY:
+  1. (C1) Remove the ok_ boolean field. Compute ParseResult.ok exclusively from
+     !diagnostics_.HasErrors(). This eliminates the divergence risk. If a
+     lexer-level error sets lexed.ok but adds no diagnostic, address that at
+     the source.
+  2. (C4) Create a RequireStatementSeparatorOrSync() helper that combines
+     SkipStatementSeparator with a SynchronizeStatement call on failure, so
+     every statement boundary automatically recovers on error rather than
+     relying on callers to remember to call synchronise.
+
+ARCHITECTURAL:
+  3. Replace the `file_path_.filename() == "internal.mc"` magic string with a
+     named constant (e.g. kInternalModuleFilename) defined in a shared header.
+     The same string is used in check.cpp (IsInternalModulePath) — unify them.
+
+SIMPLICITY:
+  4. Add a file-level block comment describing the parser architecture split
+     and the invariant that this file only contains token navigation, not
+     grammar rules.
+  5. Extract the common "advance past comma-separated identifier pairs"
+     lookahead pattern shared by LooksLikeBindingStmt and
+     LooksLikeBareNameListAssignment into a private helper.

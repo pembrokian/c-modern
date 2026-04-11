@@ -170,7 +170,7 @@ Guardrail for this band:
 
 Band B - Make Failure Semantics Explicit
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 127 through 129 should make failure a first-class system fact before
+Phases 128 through 129 should make failure a first-class system fact before
 IPC composition is widened further.
 
 Likely themes:
@@ -220,7 +220,7 @@ Phase 130 -- Explicit Restart Or Replacement Probe
 
 Band C - Stress IPC Composition Under The Clarified Model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 130 through 132 should test deeper IPC composition only after authority
+Phases 131 through 133 should test deeper IPC composition only after authority
 and failure contracts are clearer.
 
 Likely themes:

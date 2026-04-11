@@ -1,0 +1,278 @@
+COMPILER CRITIQUE — check.cpp
+Phase: phase127
+Reviewer: Senior Compiler Systems Engineer
+Date: 2026-04-11
+
+File: compiler/sema/check.cpp (3099 lines)
+Role: Semantic analysis — symbol collection, type checking, const evaluation,
+      layout computation, import resolution, module surface export
+
+─────────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+─────────────────────────────────────────────────────────────────────────────
+
+Strengths:
+- The phase ordering in Checker::Run() is documented as a numbered comment
+  sequence (SeedImportedSymbols → CollectTopLevelDecls → ValidateTypeDecls →
+  ValidateDeclVisibility → ValidateGlobals → ValidateFunctionSignatures →
+  ValidateFunctions → BuildModuleLookupMaps). This makes the dependency
+  ordering explicit and auditable.
+- The public API cleanly separates full-import mode (CheckProgram), single-
+  file mode (CheckSourceFile), and the internal recursive traversal
+  (CheckProgramInternal). The choice of which to call is clear from the name.
+- Import cycle detection using a kVisiting/kDone state machine is correct and
+  minimal.
+- Const evaluation (EvaluateConstExpr) implements short-circuit evaluation for
+  && and || correctly, which avoids false "not a constant expression" errors on
+  short-circuit branches.
+
+Significant Concerns:
+
+C1. MONOLITHIC CHECKER CLASS (3099 lines)
+  The Checker class conflates at least five distinct responsibilities:
+    (a) Symbol table management (value_symbols_, type_symbols_, scopes_)
+    (b) Type layout computation (ComputeTypeLayout, ComputeTypeLayouts)
+    (c) Const evaluation (EvaluateConstExpr, EvaluateTopLevelConst)
+    (d) Expression type analysis (AnalyzeExpr, AnalyzeCall, etc.)
+    (e) Statement checking (CheckStmt*, CheckBindingLike, etc.)
+  Each of these is large enough to be its own compilation unit with its own
+  header. The monolith makes it hard to unit-test any subsystem in isolation
+  and makes the file long enough that incremental reasoning is difficult.
+
+C2. O(n) LOOKUP DURING O(n) PHASES → O(n²) OVERALL
+  FindFunctionSignature, FindTypeDecl, FindGlobalSummary, FindMutableTypeDecl
+  are all linear scans over module vectors. These are called from within loops
+  that iterate the same collections (ValidateFunctions, ValidateTypeDecls,
+  CollectTopLevelDecls). BuildModuleLookupMaps is called only at the end;
+  during all checker phases the compiler uses O(n) per lookup. For k functions
+  calling CheckFunctionSignatures with O(k) lookups each = O(k²). For the
+  expected module sizes (< 200 declarations) this is invisible, but the lookup
+  maps should be built after CollectTopLevelDecls so the validation phases can
+  use them.
+
+C3. DEREF-FIELD TYPE ANALYSIS GAP
+  In AnalyzeExpr, kField and kDerefField are handled by the same case:
+    const Type base = AnalyzeExpr(*expr.left);
+    return record(AnalyzeFieldSelection(base, expr.text, expr.span));
+  For kDerefField (ptr->field), expr.left is a pointer expression. The base
+  type returned is *Foo, not Foo. AnalyzeFieldSelection and LookupStructType
+  strip aliases but NOT pointer indirection. So field lookup on a *Foo type
+  silently returns UnknownType (no error, but also no field type recorded). The
+  MIR lowering correctly handles ->field separately, so this bootstrap path
+  works, but it means the sema phase does not validate or record types for ->
+  accesses. Any sema-level analysis that relies on expr_types for deref-field
+  expressions will get UnknownType, which could mask genuine type errors.
+
+C4. IMPORT RESOLUTION COUPLED TO FILESYSTEM IN CHECKER
+  ResolveImportPathForCheck performs filesystem::exists() calls and
+  filesystem::absolute() during semantic analysis. The Checker should receive
+  a pre-resolved import map (as it does in project mode via the
+  CheckOptions::imported_modules path), but in direct source mode the checker
+  drives its own filesystem walk. This creates a hidden coupling between the
+  checker and the host filesystem and makes the checker hard to test without
+  real files on disk.
+
+C5. INCONSISTENT INDENTATION IN CHECKER CONSTRUCTOR
+  The Checker constructor mixes 8-space and 16-space indentation for its
+  initialiser list. This is a minor style issue but in a file of this size it
+  indicates the constructor was modified piecemeal without a final style pass.
+
+─────────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+─────────────────────────────────────────────────────────────────────────────
+
+BUG: DEREF-FIELD FIELD ACCESS NOT TYPE-CHECKED (see C3 above)
+  The consequence is that `ptr->undefined_field` does not report a sema error;
+  the MIR lowering will catch it or emit incorrect code. Priority: medium.
+
+BUG RISK: GLOBAL VALIDATION RELIES ON IMPLICIT SCOPE STATE
+  ValidateGlobals calls AnalyzeExpr with no local scopes pushed (scopes_ is
+  empty). AnalyzeExpr falls through to global_symbols_ only if local scopes
+  don't contain the name. This works because ValidateGlobals runs before any
+  function body is checked, so global_symbols_ is fully populated. BUT: if a
+  future refactoring reorders phases, or calls ValidateGlobals after pushing a
+  scope for another purpose, this implicit assumption breaks silently with
+  wrong name resolution under the scope shadow.
+  Recommendation: Assert scopes_.empty() at the start of ValidateGlobals.
+
+CORRECTNESS: EvaluateConstExpr CONST CACHE SAFETY
+  const_eval_cache_ maps name → ConstValue. This cache is only consulted for
+  top-level named constants (EvaluateTopLevelConst). The cache is safe against
+  cross-contamination because constants are module-scoped and there is one
+  Checker instance per module. Confirmed correct.
+
+CORRECTNESS: CONVERT FLOAT→INT CAN TRUNCATE TO INT64 MAX
+  In ConvertConstValue, the float-to-integer path checks:
+    if (value.float_value < std::numeric_limits<std::int64_t>::min() || ...)
+  The cast of INT64_MIN to double is not exact (the nearest double is slightly
+  smaller), so a float value exactly at the representable boundary might pass
+  the range check but overflow on static_cast. The correct guard is to check
+  in double arithmetic: static_cast<double>(INT64_MAX) rounds up to
+  9223372036854775808.0, so values in (INT64_MAX, INT64_MAX+1) double-wise
+  could pass. This is a known floating-point pitfall. The current check is
+  approximately correct for all practically computed constants but a rigorously
+  correct implementation would use std::numeric_limits<std::int64_t>::max() +1
+  (as double) as the upper bound.
+
+CORRECTNESS: BINDING-OR-ASSIGN RESOLUTION RACE ON DUPLICATE NAMES
+  CheckBindingOrAssign checks LookupValue(name) to decide assign vs bind.
+  If the same name appears twice in the binding pattern (e.g. `a, a := ...`),
+  the second occurrence will see the first binding (just created in the same
+  call), causing the second to be classified as assign when it should be a
+  duplicate binding error. BindValue already emits "duplicate local binding",
+  so the error is reported, but the ResolutionFact recorded in the module has
+  kAssign for the second slot, which may confuse the MIR lowering of the same
+  statement.
+
+CORRECTNESS: VALIDATE_VISIBLE_DECL_TYPES HAS IDENTICAL CASE LABELS
+  In ValidateVisibleDeclTypes, both kConst and kVar dispatch to:
+    ReportVisiblePrivateTypeLeaks(decl, "global", leaked_private_types);
+  The string "global" is used for both const and var, which is acceptable for
+  the error message, but the comment in source uses "global" for both rather
+  than "const" vs "var". Non-critical but confusing.
+
+─────────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+─────────────────────────────────────────────────────────────────────────────
+
+- AnalyzeExpr is 200+ lines but uniformly structured: each Expr::Kind has a
+  clean case block. The `record` lambda cleanly handles type annotation.
+  Readable as-is.
+- CheckStmt similarly delegates to focused helpers (CheckSwitch, CheckForIn,
+  etc.). The delegation pattern is good.
+- EvaluateConstExpr is the most complex function (~120 lines). The kBinary
+  case has duplicated paths for short-circuit vs non-short-circuit operators.
+  Extracting the non-short-circuit path into a helper would reduce the visual
+  nesting.
+- The scopes_ vector (deque-like stack of maps) is the right data structure.
+  LookupValue's reverse iteration is idiomatically correct.
+- FlattenQualifiedBaseExpr is helper for a subtle qualified-name analysis path
+  and is clearly documented via its usage in AnalyzeFlattenedQualifiedValue.
+  Good.
+- AlignTo and related helpers are small and correct. They are local to the
+  anonymous namespace; they are also needed in the MIR layout pass. Exposing
+  them in a shared sema/layout_utils.h would eliminate the implicit
+  duplication risk.
+
+─────────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+─────────────────────────────────────────────────────────────────────────────
+
+- All AST child pointer accesses (e.g. `expr.left->`) are guarded by null
+  checks. The code is memory-safe.
+- EvaluateTopLevelConst uses an active_names set for cycle detection on a
+  per-call basis. The set is passed by reference so nested calls share it,
+  which is correct for cycle detection. However, the set is recreated at each
+  ValidateGlobals site (via `std::unordered_set<std::string> active_names;`),
+  meaning the detection guard is per-global-binding, not shared across the
+  whole validation pass. This is correct (different bindings can share
+  sub-expressions without forming cycles), but the comment in EvaluateConstExpr
+  should make this explicit for future readers.
+- ParseFile opens std::ifstream with ios::binary. On platforms where line
+  endings differ this is correct; on POSIX it makes no difference. Safe.
+- CheckProgramInternal uses unordered_map<filesystem::path, ...> for cache and
+  visit_state. The hash of filesystem::path uses the string representation,
+  which means two paths that refer to the same inode but differ in string form
+  (e.g. /a/../b/c vs /b/c) would result in duplicate processing. The callers
+  normalise paths with lexically_normal(), which is the right mitigation.
+  Confirm this is applied consistently: it is at all call sites.
+
+─────────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+─────────────────────────────────────────────────────────────────────────────
+
+- O(n²) symbol lookup (see C2). For > 500 top-level declarations this will
+  become visible. The fix is to build a hash map after CollectTopLevelDecls and
+  use it in all subsequent phases.
+- IsKnownTypeName calls FindTypeDecl (O(n)) and std::find on type_params
+  (O(k)). For deeply generic code with many type params this is called per-
+  type-node per-parameter validation. Not critical today.
+- EvaluateConstExpr for kAggregateInit allocates std::vector<optional<ConstValue>>
+  and std::vector<string> with size = number of fields. For large structs used
+  as compile-time constants this could be non-trivial, but constant structs in
+  practice are small.
+- const_eval_cache_ prevents re-evaluation of named constants. This is
+  important if the same constant is referenced many times in an expression
+  (e.g. array sizes). Confirmed present and correct.
+
+─────────────────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+─────────────────────────────────────────────────────────────────────────────
+
+- The Checker produces Module* output that is then consumed by the MIR
+  lowering pass. The boundary contract is: Module contains type_decls,
+  functions (signatures only), globals, expr_types (source-span → Type map),
+  binding_or_assign_facts, for_in_facts. Any change to this contract requires
+  coordinated updates in both check.cpp and mir_lower.cpp. The contract is not
+  formally documented; adding a comment listing the invariants on a checked
+  Module would help cross-boundary maintenance.
+- The visible module surface (BuildImportVisibleModuleSurface) strips private
+  symbols before caching. The visible_cache therefore stores the import-visible
+  surface, not the full module. If any code path tries to look up private
+  symbols through the cached visible surface it will fail silently. This is
+  correct by design but the distinction between "full checked module" and
+  "visible module surface" should be enforced by type (separate types), not
+  just by naming convention.
+- CheckSourceFile is a thin bypass that skips import resolution entirely. It
+  should only be used for unit tests of single-file semantics. A doc comment
+  on this function would prevent it from being misused in production code paths.
+
+─────────────────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+─────────────────────────────────────────────────────────────────────────────
+
+- The phase ordering comment in Run() is excellent. It explains the dependency
+  reasoning for each step. This standard should be applied to the other phases
+  too (ValidateTypeDecls, ValidateVisibleDeclTypes, ValidateGlobals).
+- LookupVariant has a detailed comment explaining the split logic for qualified
+  variant names (`"Foo.Bar"` vs `"mod.Foo.Bar"`). Good pattern: complex
+  parsing logic deserves a comment.
+- Most helper methods (MakeLeafStmt, BindValue, PushScope, etc.) are self-
+  documenting by name and body. No issue.
+- ComputeTypeLayout lacks a comment explaining the enum layout convention
+  (i64 tag + payload bytes) and why this specific layout was chosen. The
+  backend.cpp has a header comment about the Arena layout assumption; the same
+  pattern should be applied here.
+
+─────────────────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+─────────────────────────────────────────────────────────────────────────────
+
+CRITICAL:
+  1. (C3) Fix kDerefField type analysis to dereference the pointer before
+     field lookup in AnalyzeFieldSelection. Either strip pointer indirection in
+     AnalyzeFieldSelection when the kind is kPointer, or explicitly dereference
+     before calling AnalyzeFieldSelection for the kDerefField case:
+       const Type base = AnalyzeExpr(*expr.left);
+       const Type pointee = IsPointer(base) ? base.subtypes.front() : base;
+       return record(AnalyzeFieldSelection(pointee, expr.text, expr.span));
+     This closes a semantic correctness gap where `ptr->bad_field` does not
+     produce a type error.
+
+ARCHITECTURAL:
+  2. (C2) Build internal lookup maps (function + type) immediately after
+     CollectTopLevelDecls so that all validation phases use O(1) lookup.
+     The BuildModuleLookupMaps call at the end should remain for the exported
+     Module, but internal checker lookups should use a private hash map.
+  3. (C1) Incrementally extract the layout computation subsystem into a
+     sema/layout.cpp + sema/layout.h. The ComputeTypeLayout, ComputeTypeLayouts,
+     AlignTo functions form a self-contained unit with clear inputs (TypeDecl
+     summaries) and outputs (LayoutInfo). This reduces the Checker class size
+     and makes layout testable in isolation.
+  4. (C4) Introduce an ImportResolver interface that the Checker depends on.
+     The default implementation does the filesystem walk; a test double returns
+     pre-loaded modules. This decouples the checker from the filesystem.
+
+CORRECTNESS / SAFETY:
+  5. Add assert(scopes_.empty()) at the start of ValidateGlobals to document
+     and enforce the implicit assumption about phase ordering.
+  6. Fix the float-to-int const conversion boundary check to use the correct
+     representable double bounds (see §2 above).
+  7. Detect duplicate names within a binding-or-assign pattern before
+     classifying each slot's resolution, and report a duplicate-binding error
+     rather than allowing the second occurrence to resolve as an assign.
+
+SIMPLICITY:
+  8. Add a file-level block comment describing the checker phases, the module
+     output contract, and the visible-surface / full-module distinction.
+  9. Share WriteIndent / WriteLine with ast.cpp via compiler/support.

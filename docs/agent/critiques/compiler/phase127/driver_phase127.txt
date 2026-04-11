@@ -1,0 +1,256 @@
+COMPILER CRITIQUE — driver.cpp
+Phase: phase127
+Reviewer: Senior Compiler Systems Engineer
+Date: 2026-04-11
+
+File: compiler/driver/driver.cpp (1475 lines)
+Role: CLI parsing, pipeline orchestration, test discovery & execution, module
+      merging, regression case evaluation.
+
+─────────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+─────────────────────────────────────────────────────────────────────────────
+
+Strengths:
+- Command dispatch (check/build/run/test/dump-paths) is cleanly separated into
+  RunCheck, RunBuild, RunRun, RunTest, RunDumpPaths, each responsible for a
+  single user-facing operation.
+- ParseCommandOptions is a self-contained function; it parses argv into a
+  CommandOptions value and reports errors to a provided stream, returning
+  std::nullopt on failure. No global state is touched during parsing.
+- The constexpr BoolFlag table in ParseCommandOptions avoids a cascade of
+  nearly-identical if/else blocks for boolean flags.
+- The test infrastructure correctly separates "ordinary tests" (source-level
+  test functions), "compiler regressions" (check-pass, check-fail, run-output,
+  mir), and uses sorted, deterministic discovery (SortPaths, std::sort) to
+  ensure test ordering is predictable across runs.
+
+Significant Concerns:
+
+C1. TEST INFRASTRUCTURE OWNERSHIP IN THE DRIVER
+  The driver currently owns: test discovery (DiscoverOrdinaryTestsInFile,
+  DiscoverTargetTests, ParseCompilerManifest), test runner source generation
+  (BuildOrdinaryRunnerSource), regression case evaluation (EvaluateCheckPass/
+  CheckFail/MirCase/RunOutputCase), and test execution (RunOrdinaryTestsFor
+  Target, RunCompilerRegressionCases). This is ≈600 lines of test infra
+  embedded in the driver. When the test runner grows more features (e.g. filter
+  by test name, parallel execution), the driver becomes the wrong place. A
+  dedicated testing module (compiler/driver/test_runner.cpp) would isolate this
+  concern and keep the driver's orchestration logic readable.
+
+C2. BuildOrdinaryRunnerSource IS O(n²) IN OUTPUT SIZE
+  The function generates one `if failures == N` branch for every possible
+  integer from 0 to test_count. With 200 tests, this emits 201 branches
+  (and 201 corresponding `return` statements), all compiled at link time. The
+  correct implementation is:
+    if failures == 0 { return 0 }
+    return 1
+  with the summary printed from a loop. The current approach compiles and runs
+  correctly for small test counts but would generate a several-thousand-line
+  function for large suites, causing both large binary size and high compile
+  time for the generated runner.
+
+C3. MergeBuildUnits SILENTLY PREFERS FIRST DEFINITION
+  When merging dependency modules, functions that appear in multiple deps are
+  deduplicated by keeping the first occurrence (seen_functions insert/second
+  check). If two dependencies define the same non-extern function (due to a
+  shared import or a duplicate linking), the second definition is silently
+  discarded. This is the correct behaviour for extern declarations, but for
+  defined functions it masks a real build error: ambiguous or duplicate
+  definitions should be reported, not silently resolved by order. A diagnostic
+  should be issued for non-extern duplicate definitions.
+
+C4. RunRun IN DIRECT SOURCE MODE CALLS RunBuild THEN READS OUTPUT PATH
+  RunRun in direct-source mode calls RunBuild (which writes the executable to
+  disk) and then computes the executable path independently via
+  ComputeBuildArtifactTargets to run it:
+    const int build_status = RunBuild(options);
+    const auto build_targets = support::ComputeBuildArtifactTargets(...);
+    return RunExecutableCommand(build_targets.executable, ...);
+  If RunBuild writes to a different path than what ComputeBuildArtifactTargets
+  returns (e.g. if the mapping changes in one place but not the other), RunRun
+  silently fails at execution. RunBuild should return the executable path
+  rather than forcing the caller to recompute it.
+
+C5. REPOSITORY ROOT DISCOVERY IS A HEURISTIC THAT FAILS OUTSIDE THE REPO
+  DiscoverRepositoryRoot walks up the directory tree looking for sibling
+  `stdlib` and `runtime` directories. When the compiler is invoked from outside
+  the repository (e.g. from an installed location, or from a test that uses a
+  temporary directory), this heuristic returns nullopt, silently omitting the
+  stdlib import root. The build should fail explicitly with a clear "stdlib
+  not found" diagnostic rather than silently omitting it.
+
+C6. PLATFORM-SPECIFIC POSIX HEADERS WITH NO ABSTRACTION
+  <fcntl.h>, <signal.h>, <sys/wait.h>, <unistd.h> are included directly in the
+  driver. The subprocess and process management code (RunExecutableCapture,
+  RunExecutableCommand) uses fork/exec directly. While the compiler targets
+  macOS today, the direct-include approach means adding Windows support (even
+  for the driver shim only) requires changes throughout this file. Abstracting
+  subprocess execution into a compiler/support/process.h interface would
+  confine platform code to one location.
+
+─────────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+─────────────────────────────────────────────────────────────────────────────
+
+CORRECTNESS: EvaluateRunOutputCase USES TWO SEPARATE DiagnosticSinks
+  The function creates `diagnostics` for the compile+run phase and
+  `output_diagnostics` for reading the expected file. If reading the expected
+  file fails, `failure_detail = output_diagnostics.Render()`. But if both
+  diagnostics_ and output_diagnostics have errors, only one is surfaced in the
+  failure_detail. The caller (RunCompilerRegressionCases) prints failure_detail
+  but not the primary diagnostics. Merging both sinks or reporting both sets of
+  errors would give more complete failure information.
+
+CORRECTNESS: SORTING REGRESSION CASES BY KIND THEN PATH CAN RE-ORDER TESTS
+  The regression cases are sorted by kind (kCheckPass < kCheckFail < etc.) and
+  within each kind by source path. This changes the order from the manifest
+  declaration order. If a later check-fail test depends on a side effect of an
+  earlier check-pass test (e.g. caching of a checked module), re-ordering could
+  change test results. Currently there are no such dependencies (each case uses
+  its own build_dir), so the sort is safe. A comment noting why the re-ordering
+  is safe would prevent future regressions from this assumption.
+
+CORRECTNESS: TrimWhitespace USES isspace WITH UNSIGNED CAST
+  `std::isspace(static_cast<unsigned char>(text[begin]))` is the correct
+  pattern to avoid UB on signed char inputs. This is correctly done here.
+
+CORRECTNESS: DUPLICATE MODULE NAMES IN ORDINARY TEST DISCOVERY
+  DiscoverTargetTests uses DiscoverFilesRecursive which sorts by path, then
+  inserts module names (file stems) into a seen_modules set. If two test files
+  in different subdirectories have the same stem (e.g. `tests/a/utils_test.mc`
+  and `tests/b/utils_test.mc`), the check fires and returns an error. This
+  restriction is a bootstrap simplification (module names must be globally
+  unique); the error message should clearly explain this constraint.
+
+─────────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+─────────────────────────────────────────────────────────────────────────────
+
+- The BoolFlag table in ParseCommandOptions is an excellent example of data-
+  driven dispatch for a small, uniform set of flags. Extend it when new boolean
+  flags are added rather than adding new if/else branches.
+- RunCheck and RunBuild have symmetric structure: direct-source path followed
+  by project-target path. The repeated pattern of checking diagnostics and
+  printing to std::cerr could be factored into a helper:
+    bool ReportAndReturn(support::DiagnosticSink& sink, std::ostream& err);
+  But the duplication is not severe enough to be a priority.
+- The kUsage string is embedded as a raw multi-line string. For a bootstrap
+  compiler this is fine; for a production compiler it would be auto-generated
+  from a structured description. No change needed now.
+- MergeBuildUnits is a ~90-line function with five nested passes over the
+  deps and entry module. The structure is clear (process deps first, then
+  entry) but the five inner loops for imports, type_decls, globals, functions
+  (deps), and functions (entry) are moderately repetitive. A helper template
+  parameterised on the merge predicate would reduce the boilerplate, but that
+  adds indirection for modest gain.
+
+─────────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+─────────────────────────────────────────────────────────────────────────────
+
+- BuildOrdinaryRunnerSource embeds test function names directly into generated
+  source code (e.g. `source << "import " << ordinary_test.module_name`). Test
+  module names are file stems of discovered `.mc` files. File stems come from
+  filesystem discovery, not from arbitrary user input. Since file stems must be
+  valid identifiers to be usable as module names in the generated source, the
+  risk of code injection through a malicious filename is low — but a validation
+  step asserting that module_name matches `[a-zA-Z_][a-zA-Z0-9_]*` would make
+  this contract explicit.
+- std::ifstream / std::ofstream usage in ParseCompilerManifest and
+  WriteTextArtifact use ios::binary mode consistently. Safe.
+- The RunTest path collects test targets from an unordered_map<string,
+  ProjectTarget> and then sorts them by name to produce deterministic output.
+  The sort is important for reproducible test output. Correct.
+- Timeout enforcement via RunExecutableCapture: if a test executable hangs
+  indefinitely and timeout_ms is nullopt, the compiler waits forever. For
+  CI environments this should be unacceptable. The driver should provide a
+  default maximum timeout when the manifest does not specify one.
+
+─────────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+─────────────────────────────────────────────────────────────────────────────
+
+- BuildOrdinaryRunnerSource O(n²) issue (see C2) is the most important
+  performance concern. For 50+ tests the generated file exceeds several hundred
+  lines of if-statements.
+- DiscoverFilesRecursive walks the filesystem tree for each suffix type
+  separately (`_test.mc`, `compiler_manifest.txt`). For large test suites a
+  single pass that categorises by suffix at each entry would halve the work.
+- ParseCommandOptions is O(flags × args): for 4 bool flags and 10 command-
+  line arguments, the inner loop runs 40 iterations. For a CLI entry point
+  this is negligible.
+- MergeBuildUnits builds unordered_set<string> for each collection type. For
+  a merged module of 50 units each with 100 functions, this is efficient.
+
+─────────────────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+─────────────────────────────────────────────────────────────────────────────
+
+- The driver is the single entry point that connects lex → parse → sema → MIR
+  → codegen. Its test infrastructure (EvaluateCheckPassCase, etc.) re-invokes
+  CompileToMir for each regression case, which means each case re-runs the full
+  pipeline including import resolution and module parsing. For a test suite of
+  hundreds of cases, this could be slow (no module caching between cases within
+  the same run). The existing per-case build dir design prevents caching;
+  document this trade-off.
+- The `mc test` command discovers and runs tests embedded in the PROJECT itself
+  (regressions in `tests/`) as well as ordinary .mc test files. The boundary
+  between "project tests" and "regression tests in the compiler's own test
+  suite" is not clearly articulated. The AGENTS.md test conventions fill this
+  gap for contributors, but a driver-level help message or `--list-targets`
+  flag would help CI tooling.
+- The "bootstrap phase X" strings in std::cout output are phase-tagging labels
+  that help identify what code path produced a given build result. These are
+  informational but not machine-parseable. If CI tooling ever needs to parse
+  driver output, a structured format (JSON lines) would be better.
+
+─────────────────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+─────────────────────────────────────────────────────────────────────────────
+
+- The kUsage string is comprehensive and up to date with the available subcom-
+  mands. Each flag is listed in all relevant subcommand signatures.
+- MergeBuildUnits lacks a function-level comment explaining the merge semantics:
+  why deps are processed first, why the entry module's definitions take
+  precedence over dependency re-definitions, and what the resulting module
+  represents (a fully linked module suitable for codegen).
+- DiscoverRepositoryRoot's heuristic is not documented. Why `stdlib` and
+  `runtime` as markers? A comment linking to the project layout docs would help
+  contributors understand why this heuristic was chosen.
+- ParseCompilerManifest correctly reports line numbers in error spans. This is
+  the right pattern; all text-format parsers should do the same.
+
+─────────────────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+─────────────────────────────────────────────────────────────────────────────
+
+CRITICAL:
+  1. (C2) Fix BuildOrdinaryRunnerSource to emit a single `if failures == 0`
+     plus a summary print, replacing the O(n) if-chain. The generated runner
+     becomes O(1) in size regardless of test count:
+       source << "    if failures == 0 { return 0 }\n";
+       source << "    return 1\n";
+     The summary line count can be computed at generation time, not at runtime.
+
+CORRECTNESS:
+  2. (C3) Emit a diagnostic for non-extern duplicate function definitions in
+     MergeBuildUnits rather than silently discarding the second definition.
+  3. (C4) Return the output executable path from RunBuild so RunRun does not
+     need to independently re-derive it. Use a BuildResult struct that carries
+     the artifact paths.
+  4. (C5) Make DiscoverRepositoryRoot failure explicit: report a diagnostic
+     "stdlib not found; pass --import-root to specify the stdlib location"
+     rather than silently omitting the stdlib from the import roots.
+
+ARCHITECTURAL:
+  5. (C1) Extract the test infrastructure (discovery, manifest parsing, runner
+     generation, regression evaluation) into compiler/driver/test_runner.cpp +
+     .h, keeping driver.cpp focused on pipeline orchestration.
+  6. (C6) Abstract subprocess execution behind a compiler/support/process.h
+     interface so platform-specific POSIX headers are confined to one file.
+
+PERFORMANCE:
+  7. Add a default per-test timeout (e.g. 30 seconds) when `--timeout` and the
+     manifest timeout are both absent, to prevent CI hangs on infinite-loop
+     test regressions.

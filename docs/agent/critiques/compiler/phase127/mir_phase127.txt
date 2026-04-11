@@ -1,0 +1,240 @@
+COMPILER CRITIQUE — mir.cpp
+Phase: phase127
+Reviewer: Senior Compiler Systems Engineer
+Date: 2026-04-11
+
+File: compiler/mir/mir.cpp (265 lines)
+Role: MIR utility functions — special-call classification, generic type
+      pattern matching, field/function/type declaration lookup, variant
+      display utilities.
+
+─────────────────────────────────────────────────────────────────────────────
+1. DESIGN & ARCHITECTURE
+─────────────────────────────────────────────────────────────────────────────
+
+Strengths:
+- The file is focused on utility operations over the MIR data model. No
+  lowering, no validation, no dump logic resides here. The scope is
+  appropriately narrow.
+- The kSpecialCallTable data-driven approach for classifying hal/mem/sync
+  intrinsics is clean. Adding a new special call is a one-line table entry
+  rather than a new conditional branch.
+- MatchesSpecialCallName checks the combined length before doing the substring
+  match, avoiding an unnecessary string allocation.
+- All three Find* functions (FindMirTypeDecl, FindMirGlobalDecl,
+  FindMirFunction) carry a comment acknowledging the O(n) scan and stating the
+  intent to add a lookup table when module sizes grow. This is an honest and
+  auditable design note.
+
+Concerns:
+
+C1. MatchGenericTypePattern FINAL RETURN CONDITION IS TOO BROAD
+  After iterating and matching all subtypes, the function returns:
+    return canonical_pattern.kind == sema::Type::Kind::kNamed
+        || canonical_pattern.subtypes.empty()
+        || canonical_pattern == canonical_actual
+        || canonical_pattern.metadata == canonical_actual.metadata;
+  For kProcedure types, metadata encodes the parameter count. Two procedure
+  types with the same subtypes but different parameter counts (e.g. different
+  metadata due to different param/return split) would still match here because
+  `canonical_pattern.subtypes.empty()` could be false while
+  `canonical_pattern.metadata == canonical_actual.metadata` holds. But the
+  issue is the OR chain: if subtypes are empty and metadata differs, the
+  `subtypes.empty()` clause returns true regardless. This could accept
+  mismatched procedure signatures in generic type matching. The final return
+  should only be `true` if all structural components match:
+    return canonical_pattern == canonical_actual;
+
+C2. MatchGenericTypePattern default: FALLTHROUGH CREATES UNREACHABLE PATH
+  The switch default case:
+    if (canonical_pattern.metadata != canonical_actual.metadata ||
+        canonical_pattern.subtypes.size() != canonical_actual.subtypes.size()) {
+        return canonical_pattern == canonical_actual;
+    }
+    break;
+  This breaks out of the switch and falls into the subtype matching loop.
+  The `return canonical_pattern == canonical_actual` is reached when metadata
+  or subtype count differs AND falls through the switch. But immediately after
+  the switch is a size re-check:
+    if (canonical_pattern.subtypes.size() != canonical_actual.subtypes.size())
+        return false;
+  This is a redundant re-check; the subtype size mismatch was already handled
+  inside the switch's default branch for non-kNamed, non-kArray kinds. The
+  code as written is correct but the redundant size check after the switch is
+  confusing. Simplify the default branch to always `break` and rely on the
+  post-switch size check for all kinds.
+
+C3. DUPLICATE LINEAR SCAN FUNCTIONS ACROSS TRANSLATION UNITS
+  FindMirTypeDecl, FindMirFunction, FindMirGlobalDecl in mir.cpp perform the
+  same linear scan as FindFunction, FindMirLocal, FindMirGlobal in backend.cpp.
+  These are defined in separate translation units and are unrelated at the
+  linker level, but conceptually they answer the same query. One canonical set
+  should exist in mir.cpp (or a mir_lookup.h), with the backend using them via
+  the MIR API rather than re-implementing the same scan.
+
+C4. AtomicMetadataText PARTIAL VALIDITY CHECK
+  The function checks:
+    if (!instruction.atomic_success_order.empty() ||
+        !instruction.atomic_failure_order.empty()) {
+        if (instruction.atomic_success_order.empty() ||
+            instruction.atomic_failure_order.empty()) {
+            return {};  // return empty string for partially invalid state
+        }
+    }
+  Returning an empty string on a partially-filled compare-exchange metadata is
+  a silent error path. The caller (dump or validation) receives "" and cannot
+  distinguish "no atomic metadata" from "invalid atomic metadata". An
+  `std::optional<std::string>` return would make the error case explicit.
+
+─────────────────────────────────────────────────────────────────────────────
+2. CORRECTNESS & SOUNDNESS
+─────────────────────────────────────────────────────────────────────────────
+
+BUG RISK: MatchGenericTypePattern OVER-ACCEPTING PROCEDURE TYPES
+  See C1. Pattern matching for procedure types with subtypes but mismatched
+  metadata could succeed incorrectly. This affects generic function dispatch
+  when a generic function is overloaded (or adjacent functions share a type
+  parameter). Since the bootstrap does not support function overloading, this
+  is low probability, but the fix is straightforward.
+
+CORRECTNESS: FindMirVariantDecl USES rfind FOR QUALIFIED SEPARATION
+  `variant_name.rfind('.')` splits on the last dot. This correctly handles
+  `"mod.Foo.Bar"` → qualified_type=`"mod.Foo"`, leaf=`"Bar"`. If a module
+  name itself contains dots (which the current naming convention does not
+  support), this would mis-split. Not a current issue; document the assumption.
+
+CORRECTNESS: MatchesTargetDisplay PARTIAL MATCH ON SUFFIX
+  The function strips the last component of type.name at the last dot and
+  checks if target equals that suffix. E.g. for type.name = "io.Error", it
+  strips to "Error" and checks if target == "Error". This means a type named
+  "FooError" in the local module would also match if target is "Error". The
+  intent is to allow short-form variant names in MIR dumps. This is acceptable
+  for dump/display purposes, but if MatchesTargetDisplay is ever used for
+  semantic matching (beyond display purposes), the partial match could be a
+  bug. Audit every call site to confirm this is dump-only.
+
+CORRECTNESS: FunctionProcedureType PARAMETER ORDERING
+  FunctionProcedureType collects all locals where is_parameter is true, in
+  declaration order. The MIR convention is that parameters appear first in the
+  locals list. If a function is constructed with out-of-order locals (non-
+  parameter locals interspersed before parameter locals), the collected param
+  types would be wrong. This is a documentation/convention contract; a comment
+  or assert on the parameter ordering invariant would help.
+
+─────────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY & ELEGANCE
+─────────────────────────────────────────────────────────────────────────────
+
+- MatchesSpecialCallName is a neat two-condition check. The length pre-filter
+  before the substring comparison is a micro-optimisation that also improves
+  readability.
+- ClassifySpecialCall iterates the table and returns on first match. Since the
+  table is small and fixed, a constexpr table + linear search is efficient and
+  maintainable. If the table grows beyond ~20 entries, a sorted table +
+  binary search or a hash map would be appropriate.
+- CanonicalVariantDisplayName has a clear 3-branch structure. Correct and
+  readable.
+- MatchGenericTypePattern is the most complex function (~60 lines). The switch
+  inside should be extracted into a helper (TypeStructureCompatible) that only
+  validates structural compatibility without the subtype recursion. This would
+  make the top-level function read as: structural-check then recurse-subtypes.
+
+─────────────────────────────────────────────────────────────────────────────
+4. SAFETY & ROBUSTNESS
+─────────────────────────────────────────────────────────────────────────────
+
+- All pointer returns (FindMir*) return nullptr on not-found. All callers in
+  the codebase check for nullptr before dereferencing. Safe.
+- No memory allocation in the hot paths (ClassifySpecialCall, MatchGenericType
+  Pattern). AtomicMetadataText allocates a std::string but it is a utility
+  function called rarely.
+- MatchGenericTypePattern recursion depth is bounded by the nesting depth of
+  type parameters. For `Slice<Array<Array<T>>>`, depth would be 3. No stack
+  overflow risk in practice.
+
+─────────────────────────────────────────────────────────────────────────────
+5. PERFORMANCE & SCALABILITY
+─────────────────────────────────────────────────────────────────────────────
+
+- Linear scans in Find* are O(n) over module declarations. The comments note
+  this is intentional for the bootstrap. Acceptable for module sizes < ~500
+  declarations. When lookup tables are added, these functions should be the
+  first to be replaced.
+- MatchGenericTypePattern uses unordered_map<string, sema::Type> for bindings
+  and unordered_map<string, bool> for type_param_set. For functions with ≤5
+  type parameters (the typical case), the hash map overhead may exceed a
+  linear scan. A small_vector or flat map would be faster for this use case.
+- FindMirFieldType calls BuiltinAggregateFields which allocates a vector on
+  each call. This is called per field-access instruction during MIR validation
+  or emission. Caching the builtin fields for a given type, or making
+  BuiltinAggregateFields return a span into a static table, would reduce
+  allocations.
+
+─────────────────────────────────────────────────────────────────────────────
+6. SYSTEM-LEVEL CONCERNS
+─────────────────────────────────────────────────────────────────────────────
+
+- The kSpecialCallTable is the single source of truth for which calls map to
+  intrinsics in the backend. If a special call is added to this table but not
+  handled in the backend's special-call emission path, the backend will
+  silently fall through to a regular call. A static_assert or exhaustive switch
+  in the backend that maps SpecialCallKind to emission would close this gap.
+- This file is included by both mir_lower.cpp and backend.cpp (via mir.h) and
+  provides utilities that bridge the sema/MIR boundary. The dependency is
+  uni-directional (MIR → sema types) which is correct. No circular dependency.
+- MatchesGenericFunctionType is the primary function used by the MIR lowering
+  to select the right generic function instance. Its correctness directly
+  affects whether the right code is generated for generic calls. Given the
+  over-accepting bug risk in C1, this warrants a dedicated test suite entry
+  for generic procedure type matching.
+
+─────────────────────────────────────────────────────────────────────────────
+7. DOCUMENTATION & REASONING
+─────────────────────────────────────────────────────────────────────────────
+
+- The three Find* functions carry explicit comments stating the bootstrap
+  limitation and the conditions under which a lookup table should be added.
+  This is the right pattern: honest, actionable, not just "TODO".
+- MatchGenericTypePattern has no function-level comment. Given its complexity
+  and its role in generic dispatch, a comment explaining: (a) what "pattern
+  matching" means here (one-directional binding, not bidirectional unification),
+  (b) the expected type_param_set input, and (c) the bindings output semantics,
+  would be valuable.
+- AtomicMetadataText is self-describing from its name but the partial-validity
+  sentinel (returning "") is not documented. A comment is needed.
+
+─────────────────────────────────────────────────────────────────────────────
+PRIORITISED RECOMMENDATIONS
+─────────────────────────────────────────────────────────────────────────────
+
+CRITICAL:
+  1. (C1) Fix the final return condition in MatchGenericTypePattern. After all
+     subtypes have been verified to match, the function should return:
+       return canonical_pattern == canonical_actual;
+     rather than the current OR chain. The current condition can falsely accept
+     structurally different types in some edge cases involving procedures with
+     matching subtypes but different param/return splits.
+
+CORRECTNESS:
+  2. Add a doc comment to MatchGenericTypePattern explaining the one-directional
+     binding semantics, input contract (type_param_set), and output contract
+     (bindings populated on return=true).
+  3. Change AtomicMetadataText to return std::optional<std::string> so callers
+     can distinguish "no metadata" (nullopt) from "invalid partial metadata"
+     (a clearly invalid string or an error). Update call sites accordingly.
+
+ARCHITECTURAL:
+  4. (C3) Consolidate the FindMirTypeDecl / FindMirGlobalDecl / FindMirFunction
+     linear scans into a single canonical set (in mir.cpp / mir.h) and remove
+     the re-implementations in backend.cpp. The backend should call into the
+     MIR API rather than duplicate the lookup logic.
+  5. When module sizes grow, add index maps to mir::Module (type_decl_lookup,
+     function_lookup, global_lookup) using the same pattern already used in the
+     sema Module. The Find* functions can then use these maps with an O(1)
+     fallback to linear scan when maps are absent.
+
+SIMPLICITY:
+  6. Simplify the switch inside MatchGenericTypePattern by extracting a
+     TypeStructureCompatible(pattern, actual) helper that validates only the
+     non-subtype structural fields, and letting the main function call it before
+     the subtype recursion loop. Remove the post-switch redundant size check.
