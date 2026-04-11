@@ -4,7 +4,7 @@ import bootstrap_services
 import capability
 import debug
 import echo_service
-import endpoint
+import ipc
 import init
 import log_service
 import state
@@ -167,7 +167,7 @@ func build_phase131_fan_out_composition_audit(context: LatePhaseProofContext, co
     return bootstrap_audit.build_phase131_fan_out_composition_audit(bootstrap_audit.Phase131FanOutCompositionAuditInputs{ phase130: phase130_audit, composition_policy_owner_pid: context.init_pid, composition_service_pid: PHASE131_COMPOSITION_STATE.wait_observation.child_pid, composition_service_key: context.composition_service_directory_key, composition_wait_handle_slot: composition_config.wait_handle_slot, fixed_directory_entry_count: 4, control_endpoint_id: composition_config.control_endpoint_id, echo_endpoint_id: composition_config.echo_endpoint_id, log_endpoint_id: composition_config.log_endpoint_id, request_receive_status: PHASE131_COMPOSITION_STATE.request_receive_observation.status, echo_fanout_status: PHASE131_COMPOSITION_STATE.echo_fanout_observation.status, echo_fanout_endpoint_id: PHASE131_COMPOSITION_STATE.echo_fanout_observation.endpoint_id, log_fanout_status: PHASE131_COMPOSITION_STATE.log_fanout_observation.status, log_fanout_endpoint_id: PHASE131_COMPOSITION_STATE.log_fanout_observation.endpoint_id, echo_reply_status: PHASE131_COMPOSITION_STATE.echo_reply_observation.status, log_ack_status: PHASE131_COMPOSITION_STATE.log_ack_observation.status, aggregate_reply_status: PHASE131_COMPOSITION_STATE.aggregate_reply_observation.status, composition_wait_status: PHASE131_COMPOSITION_STATE.wait_observation.status, aggregate_reply_byte0: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte0, aggregate_reply_byte1: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte1, aggregate_reply_byte2: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte2, aggregate_reply_byte3: PHASE131_COMPOSITION_STATE.observation.aggregate_reply_byte3, explicit_composition_visible: 1, kernel_broker_visible: 0, dynamic_namespace_visible: 0, compiler_reopening_visible: 0 })
 }
 
-func build_composition_service_execution_state(gate: syscall.SyscallGate, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, init_handle_table: capability.HandleTable, child_handle_table: capability.HandleTable, wait_table: capability.WaitTable, endpoints: endpoint.EndpointTable, init_image: init.InitImage) bootstrap_services.CompositionServiceExecutionState {
+func build_composition_service_execution_state(gate: syscall.SyscallGate, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, init_handle_table: capability.HandleTable, child_handle_table: capability.HandleTable, wait_table: capability.WaitTable, endpoints: ipc.EndpointTable, init_image: init.InitImage) bootstrap_services.CompositionServiceExecutionState {
     return bootstrap_services.CompositionServiceExecutionState{ program_capability: PHASE131_COMPOSITION_STATE.program_capability, gate: gate, process_slots: process_slots, task_slots: task_slots, init_handle_table: init_handle_table, child_handle_table: child_handle_table, wait_table: wait_table, endpoints: endpoints, init_image: init_image, child_address_space: PHASE131_COMPOSITION_STATE.child_address_space, child_user_frame: PHASE131_COMPOSITION_STATE.child_user_frame, echo_peer_state: PHASE131_COMPOSITION_STATE.echo_peer_state, log_peer_state: PHASE131_COMPOSITION_STATE.log_peer_state, spawn_observation: PHASE131_COMPOSITION_STATE.spawn_observation, request_receive_observation: PHASE131_COMPOSITION_STATE.request_receive_observation, echo_fanout_observation: PHASE131_COMPOSITION_STATE.echo_fanout_observation, echo_peer_receive_observation: PHASE131_COMPOSITION_STATE.echo_peer_receive_observation, echo_reply_send_observation: PHASE131_COMPOSITION_STATE.echo_reply_send_observation, echo_reply_observation: PHASE131_COMPOSITION_STATE.echo_reply_observation, log_fanout_observation: PHASE131_COMPOSITION_STATE.log_fanout_observation, log_peer_receive_observation: PHASE131_COMPOSITION_STATE.log_peer_receive_observation, log_ack_send_observation: PHASE131_COMPOSITION_STATE.log_ack_send_observation, log_ack_observation: PHASE131_COMPOSITION_STATE.log_ack_observation, aggregate_reply_send_observation: PHASE131_COMPOSITION_STATE.aggregate_reply_send_observation, aggregate_reply_observation: PHASE131_COMPOSITION_STATE.aggregate_reply_observation, wait_observation: PHASE131_COMPOSITION_STATE.wait_observation, observation: PHASE131_COMPOSITION_STATE.observation, ready_queue: PHASE131_COMPOSITION_STATE.ready_queue }
 }
 
@@ -187,9 +187,9 @@ func phase131_composition_probe_succeeded() bool {
 
 func execute_phase124_delegation_chain_probe(context: LatePhaseProofContext, transfer_config: bootstrap_services.TransferServiceConfig) bool {
     local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, context.init_pid, context.init_endpoint_id)
-    local_endpoints = endpoint.install_endpoint(local_endpoints, context.init_pid, context.transfer_endpoint_id)
+    local_endpoints: ipc.EndpointTable = ipc.empty_table()
+    local_endpoints = ipc.install_endpoint(local_endpoints, context.init_pid, context.init_endpoint_id)
+    local_endpoints = ipc.install_endpoint(local_endpoints, context.init_pid, context.transfer_endpoint_id)
 
     init_table: capability.HandleTable = capability.handle_table_for_owner(context.init_pid)
     init_table = capability.install_endpoint_handle(init_table, context.phase124_control_handle_slot, context.init_endpoint_id, 3)
@@ -201,7 +201,7 @@ func execute_phase124_delegation_chain_probe(context: LatePhaseProofContext, tra
     final_table: capability.HandleTable = capability.handle_table_for_owner(context.phase124_final_holder_pid)
     final_table = capability.install_endpoint_handle(final_table, context.phase124_control_handle_slot, context.init_endpoint_id, 3)
 
-    grant_payload: [4]u8 = endpoint.zero_payload()
+    grant_payload: [4]u8 = ipc.zero_payload()
     grant_payload[0] = 67
     grant_payload[1] = 72
     grant_payload[2] = 65
@@ -256,7 +256,7 @@ func execute_phase124_delegation_chain_probe(context: LatePhaseProofContext, tra
         return false
     }
 
-    final_payload: [4]u8 = endpoint.zero_payload()
+    final_payload: [4]u8 = ipc.zero_payload()
     final_payload[0] = 72
     final_payload[1] = 79
     final_payload[2] = 80
@@ -273,9 +273,9 @@ func execute_phase124_delegation_chain_probe(context: LatePhaseProofContext, tra
 
 func execute_phase125_invalidation_probe(context: LatePhaseProofContext, transfer_config: bootstrap_services.TransferServiceConfig) bool {
     local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, context.init_pid, context.init_endpoint_id)
-    local_endpoints = endpoint.install_endpoint(local_endpoints, context.init_pid, context.transfer_endpoint_id)
+    local_endpoints: ipc.EndpointTable = ipc.empty_table()
+    local_endpoints = ipc.install_endpoint(local_endpoints, context.init_pid, context.init_endpoint_id)
+    local_endpoints = ipc.install_endpoint(local_endpoints, context.init_pid, context.transfer_endpoint_id)
 
     init_table: capability.HandleTable = capability.handle_table_for_owner(context.init_pid)
     init_table = capability.install_endpoint_handle(init_table, context.phase124_control_handle_slot, context.init_endpoint_id, 3)
@@ -287,7 +287,7 @@ func execute_phase125_invalidation_probe(context: LatePhaseProofContext, transfe
     final_table: capability.HandleTable = capability.handle_table_for_owner(context.phase124_final_holder_pid)
     final_table = capability.install_endpoint_handle(final_table, context.phase124_control_handle_slot, context.init_endpoint_id, 3)
 
-    grant_payload: [4]u8 = endpoint.zero_payload()
+    grant_payload: [4]u8 = ipc.zero_payload()
     grant_payload[0] = 67
     grant_payload[1] = 72
     grant_payload[2] = 65
@@ -343,7 +343,7 @@ func execute_phase125_invalidation_probe(context: LatePhaseProofContext, transfe
         return false
     }
 
-    control_payload: [4]u8 = endpoint.zero_payload()
+    control_payload: [4]u8 = ipc.zero_payload()
     control_payload[0] = 76
     control_payload[1] = 79
     control_payload[2] = 83
@@ -364,13 +364,13 @@ func execute_phase126_authority_lifetime_probe(context: LatePhaseProofContext, t
     }
 
     local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, context.phase124_final_holder_pid, context.init_endpoint_id)
+    local_endpoints: ipc.EndpointTable = ipc.empty_table()
+    local_endpoints = ipc.install_endpoint(local_endpoints, context.phase124_final_holder_pid, context.init_endpoint_id)
 
     final_table: capability.HandleTable = capability.handle_table_for_owner(context.phase124_final_holder_pid)
     final_table = capability.install_endpoint_handle(final_table, context.phase124_control_handle_slot, context.init_endpoint_id, 3)
 
-    control_payload: [4]u8 = endpoint.zero_payload()
+    control_payload: [4]u8 = ipc.zero_payload()
     control_payload[0] = 76
     control_payload[1] = 79
     control_payload[2] = 83

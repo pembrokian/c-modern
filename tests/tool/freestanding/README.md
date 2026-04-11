@@ -42,6 +42,7 @@ Structure
   - `phase129_partial_failure_propagation.cpp`: real-kernel partial-failure propagation audit.
   - `phase130_explicit_restart_or_replacement.cpp`: real-kernel explicit restart-or-replacement audit.
   - `phase131_fan_in_or_fan_out_composition.cpp`: real-kernel bounded fan-out composition audit.
+  - `phase132_backpressure_and_blocking.cpp`: real-kernel bounded backpressure and blocking audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

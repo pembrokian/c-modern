@@ -7,7 +7,7 @@ PLANNED
 
 Purpose
 -------
-Continue from the planned Phase 132 backpressure step by making message-slot,
+Continue from the completed Phase 132 backpressure step by making message-slot,
 payload, and attached-handle lifetime explicit enough that bounded queue reuse
 remains mechanically auditable under deeper IPC composition.
 
@@ -44,7 +44,7 @@ Problem being solved
 
 Core rule
 ---------
-- Message lifetime belongs to endpoint and capability owners.
+- Message lifetime belongs to ipc and capability owners.
 - The kernel may describe when a message is queued, delivered, retired,
   scrubbed, and safe to reuse. It must not invent a general heap, hidden
   retention policy, or automatic recovery layer.
@@ -72,7 +72,7 @@ Targeted boundary shape:
 
 1. one canonical Phase 133 execution note that defines message lifetime and
    reuse as owner-local runtime truth
-2. one additive message-state refinement under the `endpoint` owner so queued,
+2. one additive message-state refinement under the `ipc` owner so queued,
    delivered, retired, and reusable states are explicit enough for later
    stress work
 3. one additive capability-retirement slice that makes attached-handle source
@@ -107,23 +107,23 @@ Required implementation surfaces
 --------------------------------
 The owning implementation surfaces for this phase are:
 
-1. `kernel/src/endpoint/00_types.mc`
+1. `kernel/src/ipc/00_types.mc`
    - refine the message-state model so retirement and reusability are explicit
    - preferred shape: an additive state or equivalent additive metadata rather
      than a broad queue rewrite
 
-2. `kernel/src/endpoint/01_queue.mc`
+2. `kernel/src/ipc/01_queue.mc`
    - implement deterministic slot retirement, payload clearing, and safe reuse
      rules
    - keep the queue fixed-size and mechanical
 
-3. `kernel/src/endpoint/02_runtime.mc`
+3. `kernel/src/ipc/02_runtime.mc`
    - publish the runtime transition surface for repeated send and receive over
    - the same endpoint path
    - ensure the runtime result can distinguish invalid, blocked, delivered,
      and safely reusable states as needed
 
-4. `kernel/src/endpoint/03_validation.mc`
+4. `kernel/src/ipc/04_validation.mc`
    - validate message retirement and reuse invariants directly
    - keep validation local to endpoint lifetime truth
 

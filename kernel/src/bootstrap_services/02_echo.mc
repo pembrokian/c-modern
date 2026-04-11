@@ -20,7 +20,7 @@ func spawn_echo_service(config: EchoServiceConfig, execution: EchoServiceExecuti
 }
 
 func execute_echo_service_request_reply(config: EchoServiceConfig, execution: EchoServiceExecutionState) EchoServiceExecutionResult {
-    request_payload: [4]u8 = endpoint.zero_payload()
+    request_payload: [4]u8 = ipc.zero_payload()
     request_payload[0] = config.request_byte0
     request_payload[1] = config.request_byte1
     request_send_result: syscall.SendResult = syscall.perform_send(execution.gate, execution.init_handle_table, execution.endpoints, config.init_pid, syscall.build_send_request(config.init_endpoint_handle_slot, 2, request_payload))

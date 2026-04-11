@@ -21,12 +21,13 @@ files = [
 	"src/capability/03_validation.mc",
 ]
 
-[targets.kernel.module_sets.endpoint]
+[targets.kernel.module_sets.ipc]
 files = [
-	"src/endpoint/00_types.mc",
-	"src/endpoint/01_queue.mc",
-	"src/endpoint/02_runtime.mc",
-	"src/endpoint/03_validation.mc",
+	"src/ipc/00_types.mc",
+	"src/ipc/01_queue.mc",
+	"src/ipc/02_runtime.mc",
+	"src/ipc/03_failure.mc",
+	"src/ipc/04_validation.mc",
 ]
 
 [targets.kernel.module_sets.debug]
@@ -37,6 +38,7 @@ files = [
 	"src/debug/03_phase124_126.mc",
 	"src/debug/04_phase128_130.mc",
 	"src/debug/05_phase131.mc",
+	"src/debug/06_phase132.mc",
 ]
 
 [targets.kernel.module_sets.bootstrap_audit]

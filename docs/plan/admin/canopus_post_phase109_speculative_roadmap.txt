@@ -76,6 +76,8 @@ Repository numbering note
   step.
 - Phase 130 is occupied by the concrete bounded explicit restart or
   replacement probe.
+- Phase 132 is occupied by the concrete bounded backpressure and blocking
+  audit.
 - Proposed compiler planning now reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
 - The next speculative Canopus continuation therefore starts at Phase 131.
@@ -87,6 +89,9 @@ Repository numbering note
   the landed service-death and partial-failure path.
 - Phase 131 is now concrete as one bounded fan-out composition probe over the
   landed explicit replacement path plus one new composed echo-and-log owner.
+- Phase 132 is now concrete as one bounded backpressure and blocking audit
+  over the landed fan-out composition path plus one real sender-block and one
+  real receiver-block follow-through.
 
 Repository status note
 ----------------------

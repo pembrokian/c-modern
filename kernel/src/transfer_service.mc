@@ -1,4 +1,4 @@
-import endpoint
+import ipc
 import syscall
 
 enum CapabilityTransferTag {
@@ -76,7 +76,7 @@ func record_grant(state: TransferServiceState, observation: syscall.ReceiveObser
 }
 
 func emit_payload(state: TransferServiceState) [4]u8 {
-    payload: [4]u8 = endpoint.zero_payload()
+    payload: [4]u8 = ipc.zero_payload()
     payload[0] = state.last_grant_byte0
     payload[1] = state.last_grant_byte1
     payload[2] = state.last_grant_byte2

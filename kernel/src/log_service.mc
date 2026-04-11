@@ -1,4 +1,4 @@
-import endpoint
+import ipc
 import syscall
 
 enum LogMessageTag {
@@ -49,7 +49,7 @@ func record_ack(state: LogServiceState, ack_byte: u8) LogServiceState {
 }
 
 func ack_payload() [4]u8 {
-    payload: [4]u8 = endpoint.zero_payload()
+    payload: [4]u8 = ipc.zero_payload()
     payload[0] = 33
     return payload
 }

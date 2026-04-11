@@ -48,7 +48,8 @@ Current structure
       `kernel/phase128_service_death_observation.cpp`, and
       `kernel/phase129_partial_failure_propagation.cpp`, and
       `kernel/phase130_explicit_restart_or_replacement.cpp`, and
-      `kernel/phase131_fan_in_or_fan_out_composition.cpp`: one kernel proof per file.
+      `kernel/phase131_fan_in_or_fan_out_composition.cpp`, and
+      `kernel/phase132_backpressure_and_blocking.cpp`: one kernel proof per file.
   - late ownership-hardening kernel audits also keep adjacent `.mirproj.txt`
     files for projected MIR golden expectations.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-

@@ -64,19 +64,19 @@ func validate_bootstrap_layout_contracts(audit: BootstrapLayoutAudit) bool {
 }
 
 func validate_endpoint_and_capability_contracts(audit: EndpointCapabilityAudit) bool {
-    payload: [4]u8 = endpoint.zero_payload()
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, audit.init_pid, audit.init_endpoint_id)
-    enqueue_one: endpoint.EndpointTable = endpoint.enqueue_message(local_endpoints, 0, endpoint.byte_message(2, audit.init_pid, audit.init_endpoint_id, 0, payload))
-    if !endpoint.enqueue_succeeded(local_endpoints, enqueue_one, 0) {
+    payload: [4]u8 = ipc.zero_payload()
+    local_endpoints: ipc.EndpointTable = ipc.empty_table()
+    local_endpoints = ipc.install_endpoint(local_endpoints, audit.init_pid, audit.init_endpoint_id)
+    enqueue_one: ipc.EndpointTable = ipc.enqueue_message(local_endpoints, 0, ipc.byte_message(2, audit.init_pid, audit.init_endpoint_id, 0, payload))
+    if !ipc.enqueue_succeeded(local_endpoints, enqueue_one, 0) {
         return false
     }
-    enqueue_two: endpoint.EndpointTable = endpoint.enqueue_message(enqueue_one, 0, endpoint.byte_message(3, audit.init_pid, audit.init_endpoint_id, 0, payload))
-    if !endpoint.enqueue_succeeded(enqueue_one, enqueue_two, 0) {
+    enqueue_two: ipc.EndpointTable = ipc.enqueue_message(enqueue_one, 0, ipc.byte_message(3, audit.init_pid, audit.init_endpoint_id, 0, payload))
+    if !ipc.enqueue_succeeded(enqueue_one, enqueue_two, 0) {
         return false
     }
-    enqueue_three: endpoint.EndpointTable = endpoint.enqueue_message(enqueue_two, 0, endpoint.byte_message(4, audit.init_pid, audit.init_endpoint_id, 0, payload))
-    if endpoint.enqueue_succeeded(enqueue_two, enqueue_three, 0) {
+    enqueue_three: ipc.EndpointTable = ipc.enqueue_message(enqueue_two, 0, ipc.byte_message(4, audit.init_pid, audit.init_endpoint_id, 0, payload))
+    if ipc.enqueue_succeeded(enqueue_two, enqueue_three, 0) {
         return false
     }
 
@@ -141,7 +141,7 @@ func validate_state_hardening_contracts(audit: StateHardeningAudit) bool {
 
 func validate_syscall_contract_hardening(audit: SyscallHardeningAudit) bool {
     local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    payload: [4]u8 = endpoint.zero_payload()
+    payload: [4]u8 = ipc.zero_payload()
     payload[0] = 81
     payload[1] = 85
     payload[2] = 69
@@ -149,8 +149,8 @@ func validate_syscall_contract_hardening(audit: SyscallHardeningAudit) bool {
 
     local_handles: capability.HandleTable = capability.handle_table_for_owner(audit.init_pid)
     local_handles = capability.install_endpoint_handle(local_handles, audit.init_endpoint_handle_slot, audit.init_endpoint_id, 3)
-    local_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    local_endpoints = endpoint.install_endpoint(local_endpoints, audit.init_pid, audit.init_endpoint_id)
+    local_endpoints: ipc.EndpointTable = ipc.empty_table()
+    local_endpoints = ipc.install_endpoint(local_endpoints, audit.init_pid, audit.init_endpoint_id)
 
     send_one: syscall.SendResult = syscall.perform_send(local_gate, local_handles, local_endpoints, audit.init_pid, syscall.build_send_request(audit.init_endpoint_handle_slot, 4, payload))
     send_two: syscall.SendResult = syscall.perform_send(send_one.gate, send_one.handle_table, send_one.endpoints, audit.init_pid, syscall.build_send_request(audit.init_endpoint_handle_slot, 4, payload))
@@ -226,8 +226,8 @@ func validate_syscall_contract_hardening(audit: SyscallHardeningAudit) bool {
     transfer_handles: capability.HandleTable = capability.handle_table_for_owner(audit.init_pid)
     transfer_handles = capability.install_endpoint_handle(transfer_handles, audit.init_endpoint_handle_slot, audit.init_endpoint_id, 3)
     transfer_handles = capability.install_endpoint_handle(transfer_handles, audit.transfer_source_handle_slot, 2, 5)
-    transfer_endpoints: endpoint.EndpointTable = endpoint.empty_table()
-    transfer_endpoints = endpoint.install_endpoint(transfer_endpoints, audit.init_pid, audit.init_endpoint_id)
+    transfer_endpoints: ipc.EndpointTable = ipc.empty_table()
+    transfer_endpoints = ipc.install_endpoint(transfer_endpoints, audit.init_pid, audit.init_endpoint_id)
     transfer_send: syscall.SendResult = syscall.perform_send(local_gate, transfer_handles, transfer_endpoints, audit.init_pid, syscall.build_transfer_send_request(audit.init_endpoint_handle_slot, 4, payload, audit.transfer_source_handle_slot))
     if capability.find_endpoint_for_handle(transfer_send.handle_table, audit.transfer_source_handle_slot) != 0 {
         return false

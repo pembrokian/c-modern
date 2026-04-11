@@ -1,7 +1,7 @@
 import address_space
 import capability
 import echo_service
-import endpoint
+import ipc
 import init
 import lifecycle
 import mmu
@@ -70,7 +70,7 @@ struct LogServiceExecutionState {
     init_handle_table: capability.HandleTable
     child_handle_table: capability.HandleTable
     wait_table: capability.WaitTable
-    endpoints: endpoint.EndpointTable
+    endpoints: ipc.EndpointTable
     init_image: init.InitImage
     child_address_space: address_space.AddressSpace
     child_user_frame: address_space.UserEntryFrame
@@ -113,7 +113,7 @@ struct EchoServiceExecutionState {
     init_handle_table: capability.HandleTable
     child_handle_table: capability.HandleTable
     wait_table: capability.WaitTable
-    endpoints: endpoint.EndpointTable
+    endpoints: ipc.EndpointTable
     init_image: init.InitImage
     child_address_space: address_space.AddressSpace
     child_user_frame: address_space.UserEntryFrame
@@ -161,7 +161,7 @@ struct TransferServiceExecutionState {
     init_handle_table: capability.HandleTable
     child_handle_table: capability.HandleTable
     wait_table: capability.WaitTable
-    endpoints: endpoint.EndpointTable
+    endpoints: ipc.EndpointTable
     init_image: init.InitImage
     child_address_space: address_space.AddressSpace
     child_user_frame: address_space.UserEntryFrame
@@ -231,7 +231,7 @@ struct CompositionServiceExecutionState {
     init_handle_table: capability.HandleTable
     child_handle_table: capability.HandleTable
     wait_table: capability.WaitTable
-    endpoints: endpoint.EndpointTable
+    endpoints: ipc.EndpointTable
     init_image: init.InitImage
     child_address_space: address_space.AddressSpace
     child_user_frame: address_space.UserEntryFrame
@@ -292,7 +292,7 @@ func empty_composition_flow_observation() CompositionFlowObservation {
 }
 
 func empty_composition_service_execution_state() CompositionServiceExecutionState {
-    return CompositionServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: endpoint.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), echo_peer_state: echo_service.service_state(0, 0), log_peer_state: log_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), request_receive_observation: syscall.empty_receive_observation(), echo_fanout_observation: syscall.empty_send_observation(), echo_peer_receive_observation: syscall.empty_receive_observation(), echo_reply_send_observation: syscall.empty_send_observation(), echo_reply_observation: syscall.empty_receive_observation(), log_fanout_observation: syscall.empty_send_observation(), log_peer_receive_observation: syscall.empty_receive_observation(), log_ack_send_observation: syscall.empty_send_observation(), log_ack_observation: syscall.empty_receive_observation(), aggregate_reply_send_observation: syscall.empty_send_observation(), aggregate_reply_observation: syscall.empty_receive_observation(), wait_observation: syscall.empty_wait_observation(), observation: empty_composition_flow_observation(), ready_queue: state.empty_queue() }
+    return CompositionServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), echo_peer_state: echo_service.service_state(0, 0), log_peer_state: log_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), request_receive_observation: syscall.empty_receive_observation(), echo_fanout_observation: syscall.empty_send_observation(), echo_peer_receive_observation: syscall.empty_receive_observation(), echo_reply_send_observation: syscall.empty_send_observation(), echo_reply_observation: syscall.empty_receive_observation(), log_fanout_observation: syscall.empty_send_observation(), log_peer_receive_observation: syscall.empty_receive_observation(), log_ack_send_observation: syscall.empty_send_observation(), log_ack_observation: syscall.empty_receive_observation(), aggregate_reply_send_observation: syscall.empty_send_observation(), aggregate_reply_observation: syscall.empty_receive_observation(), wait_observation: syscall.empty_wait_observation(), observation: empty_composition_flow_observation(), ready_queue: state.empty_queue() }
 }
 
 func composition_service_result(state: CompositionServiceExecutionState, succeeded: u32) CompositionServiceExecutionResult {

@@ -2,7 +2,7 @@ import address_space
 import capability
 import debug
 import echo_service
-import endpoint
+import ipc
 import init
 import log_service
 import mmu

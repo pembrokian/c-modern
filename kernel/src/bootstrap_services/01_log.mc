@@ -22,7 +22,7 @@ func spawn_log_service(config: LogServiceConfig, execution: LogServiceExecutionS
 }
 
 func execute_log_service_request_reply(config: LogServiceConfig, execution: LogServiceExecutionState) LogServiceExecutionResult {
-    request_payload: [4]u8 = endpoint.zero_payload()
+    request_payload: [4]u8 = ipc.zero_payload()
     request_payload[0] = config.request_byte
 
     request_send_result: syscall.SendResult = syscall.perform_send(execution.gate, execution.init_handle_table, execution.endpoints, config.init_pid, syscall.build_send_request(config.init_endpoint_handle_slot, 1, request_payload))

@@ -35,7 +35,7 @@ func spawn_transfer_service(config: TransferServiceConfig, execution: TransferSe
 }
 
 func execute_user_to_user_capability_transfer(config: TransferServiceConfig, execution: TransferServiceExecutionState) TransferServiceExecutionResult {
-    grant_payload: [4]u8 = endpoint.zero_payload()
+    grant_payload: [4]u8 = ipc.zero_payload()
     grant_payload[0] = config.grant_byte0
     grant_payload[1] = config.grant_byte1
     grant_payload[2] = config.grant_byte2

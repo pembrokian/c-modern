@@ -1,4 +1,4 @@
-import endpoint
+import ipc
 import syscall
 
 enum EchoMessageTag {
@@ -55,7 +55,7 @@ func record_request(state: EchoServiceState, observation: syscall.ReceiveObserva
 }
 
 func reply_payload(state: EchoServiceState) [4]u8 {
-    payload: [4]u8 = endpoint.zero_payload()
+    payload: [4]u8 = ipc.zero_payload()
     payload[0] = state.last_request_byte0
     payload[1] = state.last_request_byte1
     return payload

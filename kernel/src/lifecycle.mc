@@ -31,6 +31,24 @@ func block_task_on_timer(task_slots: [3]state.TaskSlot, task_slot: u32) TaskTran
     return TaskTransition{ task_slots: updated_task_slots, task_id: selected_task.tid, applied: 1 }
 }
 
+func block_task_on_endpoint_send(task_slots: [3]state.TaskSlot, task_slot: u32) TaskTransition {
+    selected_task: state.TaskSlot = state.task_slot_at(task_slots, task_slot)
+    if !state.can_block_task(selected_task) {
+        return TaskTransition{ task_slots: task_slots, task_id: 0, applied: 0 }
+    }
+    updated_task_slots: [3]state.TaskSlot = state.with_updated_task_slot(task_slots, task_slot, state.blocked_task_slot_on_endpoint_send(selected_task))
+    return TaskTransition{ task_slots: updated_task_slots, task_id: selected_task.tid, applied: 1 }
+}
+
+func block_task_on_endpoint_receive(task_slots: [3]state.TaskSlot, task_slot: u32) TaskTransition {
+    selected_task: state.TaskSlot = state.task_slot_at(task_slots, task_slot)
+    if !state.can_block_task(selected_task) {
+        return TaskTransition{ task_slots: task_slots, task_id: 0, applied: 0 }
+    }
+    updated_task_slots: [3]state.TaskSlot = state.with_updated_task_slot(task_slots, task_slot, state.blocked_task_slot_on_endpoint_receive(selected_task))
+    return TaskTransition{ task_slots: updated_task_slots, task_id: selected_task.tid, applied: 1 }
+}
+
 func ready_task(task_slots: [3]state.TaskSlot, task_slot: u32) TaskTransition {
     selected_task: state.TaskSlot = state.task_slot_at(task_slots, task_slot)
     if state.task_state_score(selected_task.state) == 1 {
@@ -105,6 +123,36 @@ func validate_task_transition_contracts() bool {
         return false
     }
     if resumed_task.stack_top != ready_seed.stack_top {
+        return false
+    }
+
+    blocked_send: TaskTransition = block_task_on_endpoint_send(tasks, 1)
+    if blocked_send.applied == 0 {
+        return false
+    }
+    if state.task_state_score(state.task_slot_at(blocked_send.task_slots, 1).state) != 32 {
+        return false
+    }
+    resumed_after_send: TaskTransition = ready_task(blocked_send.task_slots, 1)
+    if resumed_after_send.applied == 0 {
+        return false
+    }
+    if state.task_state_score(state.task_slot_at(resumed_after_send.task_slots, 1).state) != 4 {
+        return false
+    }
+
+    blocked_receive: TaskTransition = block_task_on_endpoint_receive(tasks, 1)
+    if blocked_receive.applied == 0 {
+        return false
+    }
+    if state.task_state_score(state.task_slot_at(blocked_receive.task_slots, 1).state) != 64 {
+        return false
+    }
+    resumed_after_receive: TaskTransition = ready_task(blocked_receive.task_slots, 1)
+    if resumed_after_receive.applied == 0 {
+        return false
+    }
+    if state.task_state_score(state.task_slot_at(resumed_after_receive.task_slots, 1).state) != 4 {
         return false
     }
 

@@ -9,6 +9,9 @@ Current status
 - Phase 131 has moved the repository-owned kernel artifact beyond the landed
   Phase 130 explicit restart or replacement step into one bounded fan-out
   composition probe.
+- Phase 132 has moved the repository-owned kernel artifact beyond the landed
+  Phase 131 fan-out composition step into one bounded backpressure and
+  blocking audit.
 - Phase 130 has moved the repository-owned kernel artifact beyond the landed
   Phase 129 partial failure propagation step into one bounded explicit
   restart or replacement probe.
@@ -63,7 +66,7 @@ Current status
   authority lifetime classification step, one bounded service death
   observation step, one bounded partial failure propagation step, and one
   bounded explicit restart or replacement probe, and one bounded fan-out
-  composition probe.
+  composition probe, and one bounded backpressure and blocking audit.
 
 Current files
 -------------
@@ -80,7 +83,8 @@ Current files
   and rejection audit step, one bounded authority lifetime classification
   step, one bounded service death observation step, one bounded partial
   failure propagation step, one bounded explicit restart or replacement
-  probe, one bounded fan-out composition probe, and thin root orchestration
+  probe, one bounded fan-out composition probe, one bounded backpressure and
+  blocking audit, and thin root orchestration
   across the owned scheduler, lifecycle, bootstrap helper, and debug audit
   modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
@@ -110,8 +114,8 @@ Current files
   delegation-chain stress audit, Phase 125 invalidation and rejection audit,
   Phase 126 authority lifetime classification audit, Phase 128 service death
   observation audit, Phase 129 partial failure propagation audit, and Phase
-  130 explicit restart or replacement audit, and Phase 131 fan-out
-  composition audit
+  130 explicit restart or replacement audit, Phase 131 fan-out
+  composition audit, and Phase 132 backpressure and blocking audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -129,16 +133,16 @@ Current files
   `module_sets.capability`, owning bounded bootstrap capability slots,
   per-process handle-table state, explicit wait-handle state, and explicit
   handle-move helpers
-- `src/endpoint/`: one logical `endpoint` module split through
-  `module_sets.endpoint`, owning bounded endpoint table, queued-message ring,
-  attached-handle message state plus endpoint-owned runtime queue helpers for
-  the landed syscall slice
+- `src/ipc/`: one logical `ipc` module split through `module_sets.ipc`,
+  owning bounded endpoint table, queued-message ring, attached-handle message
+  state, endpoint-close failure cleanup, and IPC-owned runtime queue helpers
+  for the landed syscall slice
 - `src/interrupt.mc`: bounded interrupt controller, architecture-entry
   records, and generic dispatch classification for the landed timer-backed
   wake path
 - `src/syscall.mc`: bounded syscall gate, byte-plus-capability request,
-  spawn-and-wait request, and thin observation state over capability,
-  endpoint, address-space, and lifecycle owners
+  spawn-and-wait request, and thin observation state over capability, ipc,
+  address-space, and lifecycle owners
 - `src/init.mc`: bounded boot-bundled init image descriptor plus explicit init
   bootstrap-capability handoff records
 

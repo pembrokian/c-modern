@@ -303,3 +303,40 @@ struct Phase131FanOutCompositionAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase132BackpressureAudit {
+    phase131: Phase131FanOutCompositionAudit
+    endpoint_id: u32
+    sender_pid: u32
+    receiver_pid: u32
+    sender_tid: u32
+    receiver_tid: u32
+    sender_task_slot: u32
+    receiver_task_slot: u32
+    blocked_send_status: syscall.SyscallStatus
+    blocked_send_reason: syscall.BlockReason
+    blocked_send_task_state: state.TaskState
+    blocked_send_queue_depth: usize
+    blocked_send_waiter_task_slot: u32
+    sender_wake_status: syscall.SyscallStatus
+    sender_wake_task_state: state.TaskState
+    sender_wake_reason: ipc.EndpointWakeReason
+    sender_wake_task_id: u32
+    sender_wake_ready_count: usize
+    sender_wake_queue_depth: usize
+    sender_wake_waiter_task_slot: u32
+    blocked_receive_status: syscall.SyscallStatus
+    blocked_receive_reason: syscall.BlockReason
+    blocked_receive_task_state: state.TaskState
+    blocked_receive_queue_depth: usize
+    blocked_receive_waiter_task_slot: u32
+    receiver_wake_status: syscall.SyscallStatus
+    receiver_wake_task_state: state.TaskState
+    receiver_wake_reason: ipc.EndpointWakeReason
+    receiver_wake_task_id: u32
+    receiver_wake_ready_count: usize
+    receiver_wake_queue_depth: usize
+    receiver_wake_waiter_task_slot: u32
+    kernel_policy_visible: u32
+    compiler_reopening_visible: u32
+}
+

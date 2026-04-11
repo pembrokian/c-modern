@@ -15,6 +15,8 @@ enum TaskState {
     Boot,
     Ready,
     BlockedOnTimer,
+    BlockedOnEndpointSend,
+    BlockedOnEndpointReceive,
     Exited,
 }
 
@@ -247,6 +249,18 @@ func single_ready_queue(tid: u32) ReadyQueue {
     return ReadyQueue{ count: 1, slots: slots }
 }
 
+func append_ready_queue(queue: ReadyQueue, tid: u32) ReadyQueue {
+    if tid == 0 {
+        return queue
+    }
+    if queue.count >= 3 {
+        return queue
+    }
+    slots: [3]u32 = queue.slots
+    slots[queue.count] = tid
+    return ReadyQueue{ count: queue.count + 1, slots: slots }
+}
+
 func boot_ready_queue(tid: u32) ReadyQueue {
     return single_ready_queue(tid)
 }
@@ -316,6 +330,20 @@ func blocked_task_slot(slot: TaskSlot) TaskSlot {
     return TaskSlot{ tid: slot.tid, owner_pid: slot.owner_pid, address_space_id: slot.address_space_id, state: TaskState.BlockedOnTimer, entry_pc: slot.entry_pc, stack_top: slot.stack_top }
 }
 
+func blocked_task_slot_on_endpoint_send(slot: TaskSlot) TaskSlot {
+    if !can_block_task(slot) {
+        return slot
+    }
+    return TaskSlot{ tid: slot.tid, owner_pid: slot.owner_pid, address_space_id: slot.address_space_id, state: TaskState.BlockedOnEndpointSend, entry_pc: slot.entry_pc, stack_top: slot.stack_top }
+}
+
+func blocked_task_slot_on_endpoint_receive(slot: TaskSlot) TaskSlot {
+    if !can_block_task(slot) {
+        return slot
+    }
+    return TaskSlot{ tid: slot.tid, owner_pid: slot.owner_pid, address_space_id: slot.address_space_id, state: TaskState.BlockedOnEndpointReceive, entry_pc: slot.entry_pc, stack_top: slot.stack_top }
+}
+
 func log_actor_at(log: BootLog, index: usize) u32 {
     if index >= log.count {
         return 0
@@ -356,6 +384,10 @@ func task_state_score(state: TaskState) i32 {
         return 4
     case TaskState.BlockedOnTimer:
         return 8
+    case TaskState.BlockedOnEndpointSend:
+        return 32
+    case TaskState.BlockedOnEndpointReceive:
+        return 64
     case TaskState.Exited:
         return 16
     default:

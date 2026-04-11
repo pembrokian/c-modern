@@ -179,6 +179,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase129_partial_failure_propagation.cpp
     tests/tool/freestanding/kernel/phase130_explicit_restart_or_replacement.cpp
     tests/tool/freestanding/kernel/phase131_fan_in_or_fan_out_composition.cpp
+    tests/tool/freestanding/kernel/phase132_backpressure_and_blocking.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -286,6 +287,7 @@ set(MC_FREESTANDING_KERNEL_CASES
     phase129_partial_failure_propagation
     phase130_explicit_restart_or_replacement
     phase131_fan_in_or_fan_out_composition
+    phase132_backpressure_and_blocking
 )
 
 foreach(kernel_case IN LISTS MC_FREESTANDING_KERNEL_CASES)
