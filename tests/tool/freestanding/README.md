@@ -37,6 +37,7 @@ Structure
   - `phase123_next_plateau_audit.cpp`: real-kernel next-plateau audit.
   - `phase124_delegation_chain_stress.cpp`: real-kernel delegation-chain stress audit.
   - `phase125_invalidation_and_rejection_audit.cpp`: real-kernel invalidation and rejection audit.
+  - `phase126_authority_lifetime_classification.cpp`: real-kernel authority lifetime classification audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

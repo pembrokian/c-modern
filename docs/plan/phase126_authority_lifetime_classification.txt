@@ -1,0 +1,172 @@
+Phase 126 -- Authority Lifetime Classification
+==============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 125 invalidation and rejection audit step
+by proving one explicit long-lived versus short-lived authority distinction
+over the same already-landed Canopus kernel artifact.
+
+This document is both the Phase 126 execution note and its closeout.
+It does not claim a broader lifetime framework, service-death handling,
+restart policy, general failure semantics, or a compiler wave.
+It records one narrow authority lifetime classification step over the real
+kernel artifact that Phase 125 already kept explicit.
+
+Repository status note
+----------------------
+- Phase 124 already proved that the same explicit-authority model survives one
+  deeper two-hop delegation chain while each prior holder loses reuse rights.
+- Phase 125 then proved that one explicit final-holder authority-loss path is
+  rejected consistently at the current send and receive use sites while a
+  separate control handle survives.
+- The next honest gap is not a broader lifetime framework. It is proving that
+  the current model can distinguish one bounded long-lived authority path from
+  one bounded short-lived delegated path without reopening compiler work.
+
+Problem being solved
+--------------------
+- The repository already had one surviving control handle and one invalidated
+  delegated handle after Phase 125, but it still lacked one published
+  aggregate proof that those two paths belong to different bounded lifetime
+  classes rather than to one implicit authority bucket.
+- Without this step, later failure, IPC-composition, or device-boundary work
+  could blur whether the current model already has an honest lifetime answer
+  or whether a broader framework is required immediately.
+- The repository needed one small phase that classified lifetime through the
+  existing syscall, capability, endpoint, bootstrap-audit, and debug owners
+  rather than through a new kernel policy layer.
+
+Core rule
+---------
+- Keep the current kernel owners and service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed surviving control-handle path and the existing invalidated
+  delegated-handle path rather than inventing a lifetime framework.
+- Prove one bounded long-lived authority path and one bounded short-lived
+  authority path at the final holder of the landed Phase 124 delegation chain.
+- Do not widen into a general lifetime framework, broader failure policy,
+  restart logic, dynamic namespace growth, or a new service owner.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 126 note recording the authority lifetime
+   classification step and the decision to keep compiler work closed
+2. one debug-owned Phase 126 audit that packages the landed Phase 125
+   invalidation truth together with one explicit long-lived versus short-lived
+   authority classification at the final holder
+3. one narrow root-proof helper that replays the landed invalidation path,
+   proves the delegated handle stays rejected as the short-lived path, and
+   proves the separate control handle remains reusable as the long-lived path
+4. one advance of the real kernel proof marker from Phase 125 to Phase 126
+   only after that lifetime audit succeeds
+5. refreshed roadmap, position note, kernel README, repository map,
+   freestanding test READMEs, decision log, and backlog entries
+6. one focused Phase 126 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new lifetime path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current authority model
+already proves deeper delegation and explicit invalidation. The next narrow
+pressure is publishing one explicit lifetime distinction before later phases
+widen failure or IPC-composition work.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one bounded authority lifetime
+  classification step over the real kernel artifact
+- one final holder from the landed Phase 124 delegation chain can retain one
+  long-lived control handle while losing one short-lived delegated handle
+- that lifetime answer still stops well short of a broader lifetime
+  framework, failure framework, service manager, or compiler reopening
+- the current kernel model can answer one more authority-lifecycle question
+  through existing owners rather than by forcing new policy machinery
+
+Deliverables
+------------
+- one canonical Phase 126 closeout note in `docs/plan/`
+- one debug-owned Phase 126 authority lifetime audit plus one narrow root-
+  proof helper that publishes the long-lived versus short-lived distinction
+  honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 126 marker only after the lifetime classification audit remains true
+- refreshed roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed lifetime step and the decision not to expand
+  compiler work
+- one focused Phase 126 freestanding kernel regression plus a projected MIR
+  golden for the new lifetime boundary
+
+Suggested execution order
+-------------------------
+1. Add the smallest root-proof helper needed to replay the Phase 125
+   invalidation path and then reuse the surviving control handle once more.
+2. Add the Phase 126 debug-owned audit and validator over that lifetime
+   distinction.
+3. Advance the kernel proof marker to 126 only after the new audit remains
+   true.
+4. Publish the canonical authority lifetime classification note.
+5. Add the focused Phase 126 freestanding regression for build, run,
+   publication, and MIR checks.
+6. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 126 marker without
+  widening the admitted slice beyond the already-landed Phase 125
+  invalidation boundary
+- one aggregate debug-owned audit proves that one explicit long-lived control
+  handle remains reusable while one explicit short-lived delegated handle
+  remains rejected after invalidation
+- the canonical Phase 126 note, roadmap, position note, and kernel README all
+  publish the same lifetime boundary
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 126 boundary consistently
+
+Non-goals
+---------
+- a broader lifetime or revocation framework
+- service death handling, restart policy, or partial-failure routing
+- dynamic service discovery or a broader namespace model
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+- adding another service owner just to stage one lifetime distinction
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase126AuthorityLifetimeAudit` and validator that
+  package the landed Phase 125 invalidation truth together with one explicit
+  long-lived versus short-lived authority classification
+- added one narrow root-proof helper that replays the final-holder
+  invalidation path, records the delegated-handle rejection as the short-lived
+  path, and proves the control handle remains reusable as the long-lived path
+- advanced the real kernel proof marker to 126 only after that audit remains
+  true
+- published one canonical
+  `docs/plan/phase126_authority_lifetime_classification.txt` note naming the
+  admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR golden
+  for the Phase 126 lifetime boundary
+- refreshed the roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed lifetime step and the decision not to expand
+  compiler work
+
+Closeout statement
+------------------
+Phase 126 is complete as an authority lifetime classification step.
+The repository still claims only one bounded small Canopus running-system
+plateau, but that plateau now includes one explicit proof that the final
+holder keeps one long-lived control path while one short-lived delegated path
+is invalidated and stays rejected, and the compiler stays closed because this
+phase needed lifetime evidence rather than new language or backend work.

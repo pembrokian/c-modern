@@ -293,6 +293,22 @@ struct Phase125InvalidationAuditInputs {
     compiler_reopening_visible: u32
 }
 
+struct Phase126AuthorityLifetimeAuditInputs {
+    phase125: debug.Phase125InvalidationAudit
+    classified_holder_pid: u32
+    long_lived_endpoint_id: u32
+    short_lived_endpoint_id: u32
+    long_lived_handle_slot: u32
+    short_lived_handle_slot: u32
+    repeat_long_lived_send_status: syscall.SyscallStatus
+    repeat_long_lived_source_pid: u32
+    repeat_long_lived_queue_depth: usize
+    long_lived_class_visible: u32
+    short_lived_class_visible: u32
+    broader_lifetime_framework_visible: u32
+    compiler_reopening_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
@@ -1213,4 +1229,8 @@ func build_phase124_delegation_chain_audit(inputs: Phase124DelegationChainAuditI
 
 func build_phase125_invalidation_audit(inputs: Phase125InvalidationAuditInputs) debug.Phase125InvalidationAudit {
     return debug.Phase125InvalidationAudit{ phase124: inputs.phase124, invalidated_holder_pid: inputs.invalidated_holder_pid, control_endpoint_id: inputs.control_endpoint_id, invalidated_endpoint_id: inputs.invalidated_endpoint_id, invalidated_handle_slot: inputs.invalidated_handle_slot, rejected_send_status: inputs.rejected_send_status, rejected_receive_status: inputs.rejected_receive_status, surviving_control_send_status: inputs.surviving_control_send_status, surviving_control_source_pid: inputs.surviving_control_source_pid, surviving_control_queue_depth: inputs.surviving_control_queue_depth, authority_loss_visible: inputs.authority_loss_visible, broader_revocation_visible: inputs.broader_revocation_visible, compiler_reopening_visible: inputs.compiler_reopening_visible }
+}
+
+func build_phase126_authority_lifetime_audit(inputs: Phase126AuthorityLifetimeAuditInputs) debug.Phase126AuthorityLifetimeAudit {
+    return debug.Phase126AuthorityLifetimeAudit{ phase125: inputs.phase125, classified_holder_pid: inputs.classified_holder_pid, long_lived_endpoint_id: inputs.long_lived_endpoint_id, short_lived_endpoint_id: inputs.short_lived_endpoint_id, long_lived_handle_slot: inputs.long_lived_handle_slot, short_lived_handle_slot: inputs.short_lived_handle_slot, repeat_long_lived_send_status: inputs.repeat_long_lived_send_status, repeat_long_lived_source_pid: inputs.repeat_long_lived_source_pid, repeat_long_lived_queue_depth: inputs.repeat_long_lived_queue_depth, long_lived_class_visible: inputs.long_lived_class_visible, short_lived_class_visible: inputs.short_lived_class_visible, broader_lifetime_framework_visible: inputs.broader_lifetime_framework_visible, compiler_reopening_visible: inputs.compiler_reopening_visible }
 }

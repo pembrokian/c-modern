@@ -7,7 +7,7 @@ PUBLISHED
 
 Purpose
 -------
-Record one maintained repository position after Phase 125 published one explicit invalidation and rejection audit step over the landed running kernel slice.
+Record one maintained repository position after Phase 126 published one explicit authority lifetime classification step over the landed running kernel slice.
 
 This note answers four questions that now matter:
 
@@ -18,7 +18,7 @@ This note answers four questions that now matter:
 
 This note is not a support statement, a full phase plan, or a claim that the
 full Canopus architecture is implemented.
-It does not replace the Phase 109 through Phase 125 closeouts, the Canopus
+It does not replace the Phase 109 through Phase 126 closeouts, the Canopus
 architecture notes, or the narrower hosted and freestanding support
 statements.
 
@@ -44,6 +44,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/phase123_next_plateau_audit.txt`
 - `docs/plan/phase124_delegation_chain_stress.txt`
 - `docs/plan/phase125_invalidation_and_rejection_audit.txt`
+- `docs/plan/phase126_authority_lifetime_classification.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
 - `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
 - `docs/plan/freestanding_support_statement.txt`
@@ -73,9 +74,10 @@ Current repository truth
   one fixed-directory namespace-pressure answer, one running-system support
   statement, one landed Phase 121 kernel image-contract hardening step, one
   target-surface audit, one landed Phase 123 next-plateau audit, one landed
-  Phase 124 delegation-chain stress step, and one landed Phase 125
-  invalidation and rejection audit step over that same admitted slice.
-- The landed Phase 124 delegation-chain stress step and the landed Phase 125 invalidation and rejection audit step both belong to that same admitted slice rather than to a broader authority or failure framework.
+  Phase 124 delegation-chain stress step, one landed Phase 125 invalidation
+  and rejection audit step, and one landed Phase 126 authority lifetime
+  classification step over that same admitted slice.
+- The landed Phase 124 delegation-chain stress step, the landed Phase 125 invalidation and rejection audit step, and the landed Phase 126 authority lifetime classification step all belong to that same admitted slice rather than to a broader authority or failure framework.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -103,10 +105,11 @@ It means:
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
-Phase 96 through Phase 125 are now concrete as one first real kernel wave,
+Phase 96 through Phase 126 are now concrete as one first real kernel wave,
 one ownership and hardware-boundary clarification wave, one first bounded
 running-system and plateau freeze wave, and two first post-plateau
-authority-lifecycle stress steps.
+authority-lifecycle stress steps plus one explicit lifetime-classification
+step.
 That is meaningful implementation progress, but it is still an early system
 plateau rather than architectural completion.
 
@@ -178,8 +181,8 @@ What it still does not prove:
 
 Working engineering stance
 --------------------------
-The right stance after Phase 125 is still conservative.
-The current plateau carried forward by Phase 125 is still intentionally
+The right stance after Phase 126 is still conservative.
+The current plateau carried forward by Phase 126 is still intentionally
 narrow.
 
 - treat the current core language as sufficient until a real next kernel step

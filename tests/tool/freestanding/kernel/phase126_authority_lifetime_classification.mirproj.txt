@@ -1,0 +1,3 @@
+  TypeDecl kind=struct name=debug.Phase126AuthorityLifetimeAudit
+  Function name=bootstrap_audit.build_phase126_authority_lifetime_audit returns=[debug.Phase126AuthorityLifetimeAudit]
+  Function name=debug.validate_phase126_authority_lifetime_classification returns=[bool]

@@ -201,6 +201,22 @@ struct Phase125InvalidationAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase126AuthorityLifetimeAudit {
+    phase125: Phase125InvalidationAudit
+    classified_holder_pid: u32
+    long_lived_endpoint_id: u32
+    short_lived_endpoint_id: u32
+    long_lived_handle_slot: u32
+    short_lived_handle_slot: u32
+    repeat_long_lived_send_status: syscall.SyscallStatus
+    repeat_long_lived_source_pid: u32
+    repeat_long_lived_queue_depth: usize
+    long_lived_class_visible: u32
+    short_lived_class_visible: u32
+    broader_lifetime_framework_visible: u32
+    compiler_reopening_visible: u32
+}
+
 func validate_phase108_kernel_image_and_program_cap_contracts(contract: Phase108ProgramCapContract) bool {
     if !capability.is_program_capability(contract.bootstrap_program_capability) {
         return false
@@ -874,6 +890,61 @@ func validate_phase125_invalidation_and_rejection_audit(audit: Phase125Invalidat
         return false
     }
     if audit.broader_revocation_visible != 0 {
+        return false
+    }
+    return audit.compiler_reopening_visible == 0
+}
+
+func validate_phase126_authority_lifetime_classification(audit: Phase126AuthorityLifetimeAudit, scheduler_contract_hardened: u32, lifecycle_contract_hardened: u32, capability_contract_hardened: u32, ipc_contract_hardened: u32, address_space_contract_hardened: u32, interrupt_contract_hardened: u32, timer_contract_hardened: u32, barrier_contract_hardened: u32) bool {
+    if !validate_phase125_invalidation_and_rejection_audit(audit.phase125, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return false
+    }
+    if audit.classified_holder_pid != audit.phase125.invalidated_holder_pid {
+        return false
+    }
+    if audit.long_lived_endpoint_id != audit.phase125.control_endpoint_id {
+        return false
+    }
+    if audit.short_lived_endpoint_id != audit.phase125.invalidated_endpoint_id {
+        return false
+    }
+    if audit.long_lived_handle_slot == 0 {
+        return false
+    }
+    if audit.short_lived_handle_slot == 0 {
+        return false
+    }
+    if audit.long_lived_handle_slot == audit.short_lived_handle_slot {
+        return false
+    }
+    if audit.short_lived_handle_slot != audit.phase125.invalidated_handle_slot {
+        return false
+    }
+    if syscall.status_score(audit.phase125.surviving_control_send_status) != 2 {
+        return false
+    }
+    if audit.phase125.surviving_control_source_pid != audit.classified_holder_pid {
+        return false
+    }
+    if audit.phase125.surviving_control_queue_depth != 1 {
+        return false
+    }
+    if syscall.status_score(audit.repeat_long_lived_send_status) != 2 {
+        return false
+    }
+    if audit.repeat_long_lived_source_pid != audit.classified_holder_pid {
+        return false
+    }
+    if audit.repeat_long_lived_queue_depth != 2 {
+        return false
+    }
+    if audit.long_lived_class_visible != 1 {
+        return false
+    }
+    if audit.short_lived_class_visible != 1 {
+        return false
+    }
+    if audit.broader_lifetime_framework_visible != 0 {
         return false
     }
     return audit.compiler_reopening_visible == 0

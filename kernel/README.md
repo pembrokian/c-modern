@@ -6,6 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 126 has moved the repository-owned kernel artifact beyond the landed
+  Phase 125 invalidation and rejection audit step into one bounded authority
+  lifetime classification step.
 - Phase 125 has moved the repository-owned kernel artifact beyond the landed
   Phase 124 delegation-chain stress step into one bounded invalidation and
   rejection audit step.
@@ -47,7 +50,8 @@ Current status
   bring-up step, one bounded delegated request-reply follow-through step, one
   bounded init-owned fixed service-directory step, one bounded target-surface
   audit, one bounded next-plateau audit, one bounded delegation-chain stress
-  step, and one bounded invalidation and rejection audit step.
+  step, one bounded invalidation and rejection audit step, and one bounded
+  authority lifetime classification step.
 
 The landed slice still includes one bounded init-orchestrated multi-service bring-up step.
 
@@ -63,10 +67,11 @@ Current files
   one bounded delegated request-reply follow-through, one bounded fixed
   service-directory publication step, one bounded next-plateau publication
   step, one bounded delegation-chain stress step, one bounded invalidation
-  and rejection audit step, and thin root orchestration across the owned
-  scheduler, lifecycle, bootstrap helper, and debug audit modules
+  and rejection audit step, one bounded authority lifetime classification
+  step, and thin root orchestration across the owned scheduler, lifecycle,
+  bootstrap helper, and debug audit modules
 - `src/bootstrap_audit.mc`: extracted Phase 104 contract hardening helpers,
-  bounded service validation helpers, and Phase 108-125 audit builders used by
+  bounded service validation helpers, and Phase 108-126 audit builders used by
   the root proof module
 - `src/bootstrap_services.mc`: extracted bounded log, echo, and transfer
   service execution flows plus explicit service config and state packaging used
@@ -84,8 +89,8 @@ Current files
   audit, Phase 119 namespace-pressure audit, Phase 120 running-system
   support audit, Phase 121 kernel image-contract hardening audit, Phase 122
   target-surface audit, Phase 123 next-plateau audit, Phase 124
-  delegation-chain stress audit, and Phase 125 invalidation and rejection
-  audit
+  delegation-chain stress audit, Phase 125 invalidation and rejection audit,
+  and Phase 126 authority lifetime classification audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -135,15 +140,17 @@ Phase boundary
   init-orchestrated multi-service bring-up step, one bounded delegated
   request-reply follow-through step, one bounded init-owned fixed service-
   directory step, one bounded target-surface audit, one bounded next-plateau
-  audit, one bounded delegation-chain stress step, and one bounded
-  invalidation and rejection audit step.
+  audit, one bounded delegation-chain stress step, one bounded invalidation
+  and rejection audit step, and one bounded authority lifetime classification
+  step.
 - The repository can now honestly claim one first running Canopus kernel
   slice with an explicit Phase 120 running-system support statement over the
   landed Phase 118 delegated request-reply follow-through, landed Phase 121
   kernel image-contract hardening step, landed Phase 122 target-surface
   audit, a landed Phase 123 next-plateau audit, a landed Phase 124
-  delegation-chain stress step, and a landed Phase 125 invalidation and
-  rejection audit step:
+  delegation-chain stress step, a landed Phase 125 invalidation and
+  rejection audit step, and a landed Phase 126 authority lifetime
+  classification step:
   explicit
   boot
   entry,
@@ -166,9 +173,9 @@ Phase boundary
   answer, and with one bounded running-system support statement plus one
   bounded image-contract hardening step plus one bounded target-surface audit
   plus one bounded next-plateau audit plus one bounded delegation-chain
-  stress step plus one bounded invalidation and rejection audit step
-  publishing that same admitted slice without widening into a broader service
-  framework.
+  stress step plus one bounded invalidation and rejection audit step plus one
+  bounded authority lifetime classification step publishing that same
+  admitted slice without widening into a broader service framework.
 - It does not yet claim general loading, dynamic service discovery,
   namespace policy, kill semantics, or a general running init-owned service
   framework.

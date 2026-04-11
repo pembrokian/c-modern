@@ -41,6 +41,7 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/phase123_next_plateau_audit.txt`
 - `docs/plan/phase124_delegation_chain_stress.txt`
 - `docs/plan/phase125_invalidation_and_rejection_audit.txt`
+- `docs/plan/phase126_authority_lifetime_classification.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
 - `docs/arch/canopus/canopus_lite_v0.txt`
@@ -64,7 +65,9 @@ Repository numbering note
   boundary.
 - Phase 121 through Phase 123 are occupied by the concrete image, target, and
   plateau freeze wave.
-- The next speculative continuation therefore starts at Phase 125.
+- Phase 124 through Phase 126 are occupied by the concrete authority-
+  lifecycle stress wave.
+- The next speculative continuation therefore starts at Phase 127.
 
 Repository status note
 ----------------------
@@ -79,7 +82,8 @@ Repository status note
   namespace-pressure audit, one landed running-system support statement, one
   landed image-contract hardening step, one landed target-surface audit, one
   landed next-plateau audit, one landed delegation-chain stress step, and one
-  landed invalidation and rejection audit step over that same artifact.
+  landed invalidation and rejection audit step, and one landed authority
+  lifetime classification step over that same artifact.
 - That slice remains intentionally small: fixed-size tables, explicit
   authority, bounded IPC and lifecycle paths, bounded service proofs, one
   image plus support audit over the real kernel artifact, one explicit
@@ -304,6 +308,14 @@ Phase 125 -- Invalidation And Rejection Audit
   current syscall and capability model, rejected consistently at the current
   send and receive use sites, and kept narrow enough that the kernel still
   does not claim a broader revocation algebra.
+
+Phase 126 -- Authority Lifetime Classification
+- Phase 126 is now concrete as one authority lifetime classification step
+  over the landed invalidation and rejection audit path.
+- Exit criterion: one bounded long-lived control-authority path and one
+  bounded short-lived delegated-authority path are classified explicitly,
+  and the long-lived path remains reusable after the short-lived path is
+  invalidated without widening into a broader lifetime framework.
 
 Likely ordering bias
 --------------------
