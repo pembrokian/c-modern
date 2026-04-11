@@ -1,5 +1,6 @@
 #include "compiler/sema/check.h"
 #include "compiler/sema/const_eval.h"
+#include "compiler/sema/layout.h"
 #include "compiler/sema/module_resolver.h"
 #include "compiler/sema/type_utils.h"
 #include "compiler/sema/type_predicates.h"
@@ -9,6 +10,7 @@
 #include <cmath>
 #include <cstddef>
 #include <fstream>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string_view>
@@ -203,14 +205,6 @@ std::optional<Expr> FlattenQualifiedBaseExpr(const Expr& expr) {
     return base_expr;
 }
 
-std::size_t AlignTo(std::size_t value, std::size_t alignment) {
-    if (alignment == 0) {
-        return value;
-    }
-    const std::size_t remainder = value % alignment;
-    return remainder == 0 ? value : value + (alignment - remainder);
-}
-
 bool IsNumericType(const Type& type, const Module& module) {
     const Type stripped = CanonicalizeBuiltinType(StripType(type, module, TypeStripMode::kAliasesOnly));
     return mc::sema::IsNumericType(stripped);
@@ -304,14 +298,17 @@ class Checker {
         //      can detect conflicts with exported names.
         //   2. CollectTopLevelDecls — populates the module's top-level summaries.
         //      Type and function lookup before this point is incomplete.
-        //   3. ValidateTypeDecls   — validates struct/enum/distinct/alias fields
+        //   3. BuildCheckerLookupMaps — refreshes checker-private O(1) lookups
+        //      over the collected top-level summaries.
+        //   4. ValidateTypeDecls   — validates struct/enum/distinct/alias fields
         //      and triggers ComputeTypeLayouts.
-        //   4. ValidateVisibleDecls — validates @private and public surface use.
-        //   5. ValidateGlobals     — checks global const/var declarations.
-        //   6. ValidateFunctions   — type-checks function bodies using the fully
+        //   5. ValidateVisibleDecls — validates @private and public surface use.
+        //   6. ValidateGlobals     — checks global const/var declarations.
+        //   7. ValidateFunctions   — type-checks function bodies using the fully
         //      populated module summary.
         SeedImportedSymbols();
         CollectTopLevelDecls();
+        BuildCheckerLookupMaps();
         ValidateDeclVisibility();
         ValidateTypeDecls();
         ValidateVisibleDeclTypes();
@@ -423,6 +420,9 @@ class Checker {
     std::optional<ConstValue> EvaluateTopLevelConst(std::string_view name, bool report_errors,
                                                     std::unordered_set<std::string>& active_names) {
         const std::string key(name);
+        // active_names is scoped to a single top-level initializer walk so
+        // recursive references diagnose cycles without polluting later const
+        // evaluations for unrelated globals.
         if (!active_names.insert(key).second) {
             if (report_errors) {
                 Report(source_file_.span, "compile-time constant cycle detected for " + key);
@@ -478,11 +478,13 @@ class Checker {
                 if (!std::isfinite(value.float_value)) {
                     return std::nullopt;
                 }
-                if (value.float_value < static_cast<double>(std::numeric_limits<std::int64_t>::min()) ||
-                    value.float_value > static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
+                const long double truncated = std::trunc(static_cast<long double>(value.float_value));
+                const long double min_value = static_cast<long double>(std::numeric_limits<std::int64_t>::min());
+                const long double max_exclusive = static_cast<long double>(std::numeric_limits<std::int64_t>::max()) + 1.0L;
+                if (truncated < min_value || truncated >= max_exclusive) {
                     return std::nullopt;
                 }
-                return MakeConstValue(static_cast<std::int64_t>(value.float_value));
+                return MakeConstValue(static_cast<std::int64_t>(truncated));
             }
             return std::nullopt;
         }
@@ -493,6 +495,38 @@ class Checker {
             }
         }
         return std::nullopt;
+    }
+
+    std::optional<ConstValue> EvaluateConstBinaryExpr(const Expr& expr,
+                                                      bool report_errors,
+                                                      std::unordered_set<std::string>& active_names) {
+        if (expr.left == nullptr || expr.right == nullptr) {
+            return std::nullopt;
+        }
+        if (expr.text == "&&" || expr.text == "||") {
+            const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
+            if (!left.has_value() || left->kind != ConstValue::Kind::kBool) {
+                return std::nullopt;
+            }
+            if (expr.text == "&&" && !left->bool_value) {
+                return MakeConstValue(false);
+            }
+            if (expr.text == "||" && left->bool_value) {
+                return MakeConstValue(true);
+            }
+            const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
+            if (!right.has_value()) {
+                return std::nullopt;
+            }
+            return EvaluateConstBinaryOp(expr.text, *left, *right);
+        }
+
+        const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
+        const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
+        if (!left.has_value() || !right.has_value()) {
+            return std::nullopt;
+        }
+        return EvaluateConstBinaryOp(expr.text, *left, *right);
     }
 
     struct EnumConstDesignator {
@@ -520,7 +554,7 @@ class Checker {
             return std::nullopt;
         }
 
-        const TypeDeclSummary* type_decl = FindTypeDecl(*module_, enum_name);
+        const TypeDeclSummary* type_decl = LookupLocalTypeDecl(enum_name);
         if (type_decl == nullptr || type_decl->kind != Decl::Kind::kEnum || type_expr == nullptr) {
             return std::nullopt;
         }
@@ -645,32 +679,7 @@ class Checker {
                 return EvaluateConstUnaryOp(expr.text, *operand);
             }
             case Expr::Kind::kBinary: {
-                if (expr.left == nullptr || expr.right == nullptr) {
-                    return std::nullopt;
-                }
-                if (expr.text == "&&" || expr.text == "||") {
-                    const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
-                    if (!left.has_value() || left->kind != ConstValue::Kind::kBool) {
-                        return std::nullopt;
-                    }
-                    if (expr.text == "&&" && !left->bool_value) {
-                        return MakeConstValue(false);
-                    }
-                    if (expr.text == "||" && left->bool_value) {
-                        return MakeConstValue(true);
-                    }
-                    const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
-                    if (!right.has_value()) {
-                        return std::nullopt;
-                    }
-                    return EvaluateConstBinaryOp(expr.text, *left, *right);
-                }
-                const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
-                const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
-                if (!left.has_value() || !right.has_value()) {
-                    return std::nullopt;
-                }
-                return EvaluateConstBinaryOp(expr.text, *left, *right);
+                return EvaluateConstBinaryExpr(expr, report_errors, active_names);
             }
             case Expr::Kind::kCall: {
                 if (expr.type_target == nullptr && expr.left != nullptr) {
@@ -805,7 +814,7 @@ class Checker {
             for (const auto& type_decl : imported_module->type_decls) {
                 TypeDeclSummary qualified_type = RewriteImportedTypeDecl(type_decl, import_decl.module_name, imported_type_names);
                 if (!type_symbols_.emplace(qualified_type.name, qualified_type.kind).second) {
-                    const TypeDeclSummary* existing_type = FindTypeDecl(*module_, qualified_type.name);
+                    const TypeDeclSummary* existing_type = LookupLocalTypeDecl(qualified_type.name);
                     if (existing_type != nullptr && EquivalentTypeDeclSummary(*existing_type, qualified_type)) {
                         continue;
                     }
@@ -1056,7 +1065,7 @@ class Checker {
     }
 
     bool IsKnownTypeName(const std::string& name, const std::vector<std::string>& type_params) const {
-        return IsBuiltinNamedType(name) || FindTypeDecl(*module_, name) != nullptr ||
+        return IsBuiltinNamedType(name) || LookupLocalTypeDecl(name) != nullptr ||
                std::find(type_params.begin(), type_params.end(), name) != type_params.end();
     }
 
@@ -1125,7 +1134,7 @@ class Checker {
             case ast::TypeExpr::Kind::kNamed:
                 if (!IsKnownTypeName(type_expr->name, type_params)) {
                     Report(span, "unknown type: " + type_expr->name);
-                } else if (const auto* type_decl = FindTypeDecl(*module_, type_expr->name); type_decl != nullptr) {
+                } else if (const auto* type_decl = LookupLocalTypeDecl(type_expr->name); type_decl != nullptr) {
                     const std::size_t expected = type_decl->type_params.size();
                     const std::size_t actual = type_expr->type_args.size();
                     if (expected == 0 && actual != 0) {
@@ -1208,7 +1217,11 @@ class Checker {
             }
         }
 
-        ComputeTypeLayouts();
+        mc::sema::ComputeTypeLayouts(*module_,
+                                     source_file_.span,
+                                     [this](const mc::support::SourceSpan& span, const std::string& message) {
+                                         Report(span, message);
+                                     });
     }
 
     void ValidateTypeDeclAttributes(const Decl& decl, TypeDeclSummary& summary) {
@@ -1249,187 +1262,6 @@ class Checker {
                 saw_abi_c = true;
                 summary.is_abi_c = true;
             }
-        }
-    }
-
-    LayoutInfo ComputeTypeLayout(const Type& type, const mc::support::SourceSpan& span, std::unordered_set<std::string>& active_types) {
-        switch (type.kind) {
-            case Type::Kind::kBool:
-                return {.valid = true, .size = 1, .alignment = 1};
-            case Type::Kind::kString:
-                return {.valid = true, .size = 16, .alignment = 8};
-            case Type::Kind::kPointer:
-                return {.valid = true, .size = 8, .alignment = 8};
-            case Type::Kind::kProcedure:
-                return {.valid = true, .size = 8, .alignment = 8};
-            case Type::Kind::kConst:
-                return type.subtypes.empty() ? LayoutInfo {} : ComputeTypeLayout(type.subtypes.front(), span, active_types);
-            case Type::Kind::kArray: {
-                if (type.subtypes.empty()) {
-                    return {};
-                }
-                const LayoutInfo element_layout = ComputeTypeLayout(type.subtypes.front(), span, active_types);
-                if (!element_layout.valid) {
-                    return {};
-                }
-                const auto length = mc::support::ParseArrayLength(type.metadata);
-                if (!length.has_value()) {
-                    Report(span, "array layout requires an integer constant length, got " + type.metadata);
-                    return {};
-                }
-                return {
-                    .valid = true,
-                    .size = element_layout.size * *length,
-                    .alignment = element_layout.alignment,
-                };
-            }
-            case Type::Kind::kNamed:
-                break;
-            case Type::Kind::kUnknown:
-            case Type::Kind::kVoid:
-            case Type::Kind::kNil:
-            case Type::Kind::kIntLiteral:
-            case Type::Kind::kFloatLiteral:
-            case Type::Kind::kTuple:
-            case Type::Kind::kRange:
-                return {};
-        }
-
-        if (type.name == "i8" || type.name == "u8") {
-            return {.valid = true, .size = 1, .alignment = 1};
-        }
-        if (type.name == "i16" || type.name == "u16") {
-            return {.valid = true, .size = 2, .alignment = 2};
-        }
-        if (type.name == "i32" || type.name == "u32" || type.name == "f32") {
-            return {.valid = true, .size = 4, .alignment = 4};
-        }
-        if (type.name == "i64" || type.name == "u64" || type.name == "isize" || type.name == "usize" || type.name == "uintptr" ||
-            type.name == "f64") {
-            return {.valid = true, .size = 8, .alignment = 8};
-        }
-        if (type.name == "Slice") {
-            return {.valid = true, .size = 16, .alignment = 8};
-        }
-        if (type.name == "Buffer") {
-            return {.valid = true, .size = 32, .alignment = 8};
-        }
-
-        TypeDeclSummary* type_decl = FindMutableTypeDecl(type.name);
-        if (type_decl == nullptr) {
-            Report(span, "layout is not available for type " + FormatType(type));
-            return {};
-        }
-
-        if (type_decl->kind == Decl::Kind::kDistinct || type_decl->kind == Decl::Kind::kTypeAlias) {
-            return ComputeTypeLayout(InstantiateTypeDeclAliasedType(*type_decl, type), span, active_types);
-        }
-
-        if (type_decl->kind == Decl::Kind::kEnum) {
-            if (type_decl->type_params.empty() && type_decl->layout.valid) {
-                return type_decl->layout;
-            }
-
-            const std::string active_key = FormatType(type);
-            if (!active_types.insert(active_key).second) {
-                Report(span, "type layout cycle requires indirection: " + active_key);
-                return {};
-            }
-
-            LayoutInfo layout;
-            layout.valid = true;
-            std::size_t payload_size = 0;
-            std::size_t payload_alignment = 1;
-            for (const auto& variant : type_decl->variants) {
-                std::size_t variant_size = 0;
-                std::size_t variant_alignment = 1;
-                for (const auto& payload_field : variant.payload_fields) {
-                    Type field_type = payload_field.second;
-                    if (!type_decl->type_params.empty()) {
-                        field_type = SubstituteTypeParams(std::move(field_type), type_decl->type_params, type.subtypes);
-                    }
-                    const LayoutInfo field_layout = ComputeTypeLayout(field_type, span, active_types);
-                    if (!field_layout.valid) {
-                        active_types.erase(active_key);
-                        return {};
-                    }
-                    variant_size = AlignTo(variant_size, field_layout.alignment);
-                    variant_size += field_layout.size;
-                    variant_alignment = std::max(variant_alignment, field_layout.alignment);
-                }
-                variant_size = AlignTo(variant_size, variant_alignment);
-                payload_size = std::max(payload_size, variant_size);
-                payload_alignment = std::max(payload_alignment, variant_alignment);
-            }
-
-            // Bootstrap enum layout matches the backend's current default
-            // tagged-union lowering: an i64 tag plus enough payload storage for
-            // the largest variant.
-            layout.alignment = std::max<std::size_t>(8, payload_alignment);
-            layout.size = AlignTo(8 + payload_size, layout.alignment);
-
-            active_types.erase(active_key);
-            if (type_decl->type_params.empty()) {
-                type_decl->layout = layout;
-            }
-            return layout;
-        }
-
-        if (type_decl->kind != Decl::Kind::kStruct) {
-            Report(span, "layout is not available for type " + type_decl->name + " in bootstrap sema");
-            return {};
-        }
-
-        if (type_decl->type_params.empty() && type_decl->layout.valid) {
-            return type_decl->layout;
-        }
-
-        const std::string active_key = FormatType(type);
-        if (!active_types.insert(active_key).second) {
-            Report(span, "type layout cycle requires indirection: " + active_key);
-            return {};
-        }
-
-        LayoutInfo layout;
-        layout.valid = true;
-        layout.alignment = type_decl->is_packed ? 1 : 0;
-        std::size_t size = 0;
-        const auto instantiated_fields = InstantiateTypeDeclFields(*type_decl, type);
-        for (const auto& field : instantiated_fields) {
-            const LayoutInfo field_layout = ComputeTypeLayout(field.second, span, active_types);
-            if (!field_layout.valid) {
-                active_types.erase(active_key);
-                return {};
-            }
-            const std::size_t field_alignment = type_decl->is_packed ? 1 : field_layout.alignment;
-            size = AlignTo(size, field_alignment);
-            layout.field_offsets.push_back(size);
-            size += field_layout.size;
-            layout.alignment = std::max(layout.alignment, field_alignment);
-        }
-        layout.size = AlignTo(size, layout.alignment);
-
-        active_types.erase(active_key);
-        if (type_decl->type_params.empty()) {
-            type_decl->layout = layout;
-        }
-        return layout;
-    }
-
-    void ComputeTypeLayouts() {
-        std::unordered_set<std::string> active_types;
-        for (auto& type_decl : module_->type_decls) {
-            if (type_decl.kind != Decl::Kind::kStruct && type_decl.kind != Decl::Kind::kEnum) {
-                continue;
-            }
-            if (!type_decl.type_params.empty()) {
-                continue;
-            }
-            if (type_decl.layout.valid) {
-                continue;
-            }
-            (void)ComputeTypeLayout(NamedType(type_decl.name), source_file_.span, active_types);
-            active_types.clear();
         }
     }
 
@@ -1498,7 +1330,7 @@ class Checker {
                 continue;
             }
 
-            const FunctionSignature* signature = FindFunctionSignature(*module_, decl.name);
+            const FunctionSignature* signature = LookupLocalFunctionSignature(decl.name);
             if (signature == nullptr) {
                 continue;
             }
@@ -1514,7 +1346,7 @@ class Checker {
                 continue;
             }
 
-            const FunctionSignature* signature = FindFunctionSignature(*module_, decl.name);
+            const FunctionSignature* signature = LookupLocalFunctionSignature(decl.name);
             if (signature == nullptr || decl.body == nullptr) {
                 continue;
             }
@@ -1664,12 +1496,78 @@ class Checker {
         };
     }
 
+    bool HasDuplicateBindingOrAssignBindNames(const Stmt& stmt,
+                                              const std::vector<BindingOrAssignResolution>& resolutions) {
+        std::unordered_set<std::string> seen_bind_names;
+        bool has_duplicates = false;
+        for (std::size_t index = 0; index < stmt.pattern.names.size() && index < resolutions.size(); ++index) {
+            if (resolutions[index] != BindingOrAssignResolution::kBind) {
+                continue;
+            }
+            if (!seen_bind_names.insert(stmt.pattern.names[index]).second) {
+                Report(stmt.span, "duplicate local binding: " + stmt.pattern.names[index]);
+                has_duplicates = true;
+            }
+        }
+        return has_duplicates;
+    }
+
+    void BuildCheckerLookupMaps() {
+        checker_function_lookup_.clear();
+        checker_function_lookup_.reserve(module_->functions.size());
+        for (const auto& function : module_->functions) {
+            checker_function_lookup_.emplace(function.name, &function);
+        }
+
+        checker_type_decl_lookup_.clear();
+        checker_type_decl_lookup_.reserve(module_->type_decls.size());
+        for (const auto& type_decl : module_->type_decls) {
+            checker_type_decl_lookup_.emplace(type_decl.name, &type_decl);
+        }
+
+        std::size_t global_name_count = 0;
+        for (const auto& global : module_->globals) {
+            global_name_count += global.names.size();
+        }
+        checker_global_lookup_.clear();
+        checker_global_lookup_.reserve(global_name_count);
+        for (const auto& global : module_->globals) {
+            for (const auto& name : global.names) {
+                checker_global_lookup_.emplace(name, &global);
+            }
+        }
+    }
+
+    const FunctionSignature* LookupLocalFunctionSignature(std::string_view name) const {
+        const auto found = checker_function_lookup_.find(std::string(name));
+        if (found != checker_function_lookup_.end()) {
+            return found->second;
+        }
+        return nullptr;
+    }
+
+    const TypeDeclSummary* LookupLocalTypeDecl(std::string_view name) const {
+        const auto found = checker_type_decl_lookup_.find(std::string(name));
+        if (found != checker_type_decl_lookup_.end()) {
+            return found->second;
+        }
+        return nullptr;
+    }
+
+    const GlobalSummary* LookupLocalGlobalSummary(std::string_view name) const {
+        const auto found = checker_global_lookup_.find(std::string(name));
+        if (found != checker_global_lookup_.end()) {
+            return found->second;
+        }
+        return nullptr;
+    }
+
     const TypeDeclSummary* LookupStructType(const Type& type) const {
         const Type stripped = StripType(type, *module_, TypeStripMode::kAliasesOnly);
         if (stripped.kind != Type::Kind::kNamed) {
             return nullptr;
         }
-        return FindTypeDecl(*module_, stripped.name);
+        return LookupLocalTypeDecl(stripped.name);
     }
 
     std::optional<Type> LookupBuiltinMemberType(const Type& raw_base, std::string_view member_name) const {
@@ -1712,7 +1610,7 @@ class Checker {
         }
 
         if (stripped_base.kind == Type::Kind::kNamed) {
-            if (const auto* type_decl = FindTypeDecl(*module_, stripped_base.name);
+            if (const auto* type_decl = LookupLocalTypeDecl(stripped_base.name);
                 type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
                 const auto variant = LookupVariant(stripped_base, member_name);
                 if (variant.has_value()) {
@@ -1801,10 +1699,10 @@ class Checker {
     }
 
     Type AnalyzeQualifiedFunctionOrEnum(const Expr& expr) {
-        if (const auto* function = FindFunctionSignature(*module_, expr.text + "." + expr.secondary_text); function != nullptr) {
+        if (const auto* function = LookupLocalFunctionSignature(expr.text + "." + expr.secondary_text); function != nullptr) {
             return InstantiateFunctionType(*function, expr, CombineQualifiedName(expr));
         }
-        if (const auto* type_decl = FindTypeDecl(*module_, expr.text); type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
+        if (const auto* type_decl = LookupLocalTypeDecl(expr.text); type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
             const std::size_t expected = type_decl->type_params.size();
             const std::size_t actual = expr.type_args.size();
             if (expected == 0 && actual != 0) {
@@ -1851,7 +1749,7 @@ class Checker {
 
         const Type stripped_base = StripType(base_type, *module_, TypeStripMode::kAliasesOnly);
         if (stripped_base.kind == Type::Kind::kNamed) {
-            if (const auto* type_decl = FindTypeDecl(*module_, stripped_base.name);
+            if (const auto* type_decl = LookupLocalTypeDecl(stripped_base.name);
                 type_decl != nullptr && type_decl->kind == Decl::Kind::kEnum) {
                 for (const auto& variant : type_decl->variants) {
                     if (variant.name == expr.secondary_text) {
@@ -1870,7 +1768,7 @@ class Checker {
             return std::nullopt;
         }
 
-        const TypeDeclSummary* type_decl = FindTypeDecl(*module_, stripped_selector.name);
+        const TypeDeclSummary* type_decl = LookupLocalTypeDecl(stripped_selector.name);
         if (type_decl == nullptr) {
             return std::nullopt;
         }
@@ -2080,10 +1978,10 @@ class Checker {
                     }
                     return record(binding->type);
                 }
-                if (const auto* function = FindFunctionSignature(*module_, expr.text); function != nullptr) {
+                if (const auto* function = LookupLocalFunctionSignature(expr.text); function != nullptr) {
                     return record(InstantiateFunctionType(*function, expr, expr.text));
                 }
-                if (const auto* global = FindGlobalSummary(*module_, expr.text); global != nullptr) {
+                if (const auto* global = LookupLocalGlobalSummary(expr.text); global != nullptr) {
                     if (!expr.type_args.empty()) {
                         Report(expr.span, "type arguments apply only to functions: " + expr.text);
                         return record(UnknownType());
@@ -2097,7 +1995,7 @@ class Checker {
                 if (const auto binding = LookupValue(expr.text); binding.has_value()) {
                     return record(AnalyzeQualifiedBoundValue(expr, *binding));
                 }
-                if (const auto* global = FindGlobalSummary(*module_, expr.text); global != nullptr) {
+                if (const auto* global = LookupLocalGlobalSummary(expr.text); global != nullptr) {
                     return record(AnalyzeQualifiedGlobalValue(expr, *global));
                 }
                 if (const Module* imported_module = FindImportedModule(expr.text); imported_module != nullptr) {
@@ -2546,6 +2444,11 @@ class Checker {
         for (const auto& name : stmt.pattern.names) {
             resolutions.push_back(LookupValue(name).has_value() ? BindingOrAssignResolution::kAssign : BindingOrAssignResolution::kBind);
         }
+
+        if (HasDuplicateBindingOrAssignBindNames(stmt, resolutions)) {
+            return;
+        }
+
         RecordBindingOrAssignFact(stmt, resolutions);
 
         for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
@@ -2726,6 +2629,9 @@ class Checker {
     std::unordered_map<std::string, Decl::Kind> value_symbols_;
     std::unordered_map<std::string, Decl::Kind> type_symbols_;
     std::unordered_map<std::string, ValueBinding> global_symbols_;
+    std::unordered_map<std::string, const FunctionSignature*> checker_function_lookup_;
+    std::unordered_map<std::string, const TypeDeclSummary*> checker_type_decl_lookup_;
+    std::unordered_map<std::string, const GlobalSummary*> checker_global_lookup_;
     std::unordered_map<std::string, ConstValue> const_eval_cache_;
     std::unordered_set<std::string> private_value_names_;
     std::unordered_set<std::string> private_type_names_;
@@ -2810,6 +2716,9 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
             imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(found->second, import_decl.module_name);
         }
     } else {
+        // Bootstrap direct-source checking still owns the fallback filesystem
+        // import resolution path. Project-mode callers can bypass it entirely
+        // by supplying options.imported_modules with already-checked surfaces.
         for (const auto& import_decl : source_file.imports) {
             const auto resolved_import = ResolveImportPathForCheck(normalized_path,
                                                                    import_decl.module_name,

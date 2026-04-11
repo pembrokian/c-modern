@@ -1,0 +1,167 @@
+Phase 127 -- Parser Critique Treatment
+=====================================
+
+Source document
+---------------
+- docs/agent/critiques/compiler/phase127/parser_phase127.txt
+
+Purpose
+-------
+This note reviews the Phase 127 `parser.cpp` critique against the current tree
+and records how each identified issue should be treated: fix next, accept but
+defer, already closed or lower priority than framed, or reject as proposed.
+
+This critique is largely about parser infrastructure hygiene rather than a live
+front-end correctness failure. The important distinction is between useful API
+cleanup and changes that would add churn without solving an observed problem.
+
+Cross-check summary
+-------------------
+The current tree was checked before triage.
+
+- The parser still stores `ok_` and seeds it from `lexed_module.ok`, while the
+  final parse result still returns `ok = ok_ && !diagnostics_.HasErrors()`.
+- `SynchronizeTopLevel()` still returns after consuming one newline and then
+  skipping subsequent newlines, before checking again whether the next token is
+  a valid top-level starter.
+- `ParseIdentifier()` still captures `Current().lexeme` before advancing.
+- `SkipStatementSeparator()` still reports an error without invoking
+  `SynchronizeStatement()` itself.
+- The current statement-parse call sites in `parser_statements.cpp` already do
+  explicit synchronization around failed statement parses, so the critique's
+  omission risk is about API design rather than a currently broken caller.
+- `Previous()` still uses an `assert(index_ > 0)` precondition.
+- The parser still uses the literal filename `"internal.mc"` to mark internal
+  modules.
+- There is still no top-level file comment describing the infrastructure split
+  between this file and the grammar companion files.
+
+Bucket 1 -- Accept, But Do The Minimal Honest Cleanup
+-----------------------------------------------------
+
+1. Architectural hygiene: replace the duplicated `"internal.mc"` filename
+   literal with one shared constant.
+   Treatment: accept and fix when this area is next touched.
+   Reason: the same convention is used outside the parser as well. This is a
+   genuine cross-file bootstrap contract and should live behind a named shared
+   constant rather than repeated string literals.
+
+2. Documentation: add a file-level comment describing the split between parser
+   infrastructure here and grammar rules in the companion translation units.
+   Treatment: accept.
+   Reason: cheap, accurate, and useful for future contributors.
+
+3. Documentation: add a short note on the parser constructor or class contract
+   about input/diagnostic lifetime expectations.
+   Treatment: accept as low-priority documentation cleanup.
+   Reason: the current ownership model is fine, but implicit.
+
+Bucket 2 -- Accept In Spirit, But Not Exactly As Proposed
+---------------------------------------------------------
+
+4. C1: remove `ok_` and derive parser success solely from diagnostics.
+   Treatment: accept in spirit, reject the immediate simplification as stated.
+   Reason: the current `ok_` is not just parser-local redundancy; it is seeded
+   from `lexed_module.ok`, so it also carries lexer failure state into the parse
+   result. Before removing it, the success contract between lexing and parsing
+   should be unified explicitly. I agree the dual channel is inelegant; I do
+   not agree with deleting it blindly.
+
+5. C4: create a `RequireStatementSeparatorOrSync()` helper.
+   Treatment: accept in spirit, defer.
+   Reason: this would make the recovery contract harder to misuse. But the
+   current call sites already perform explicit synchronization, so this is an
+   API-hardening cleanup rather than a live correctness fix.
+
+6. C2: tighten `SynchronizeTopLevel()` so it exits only at a known top-level
+   starter.
+   Treatment: accept as a possible resilience improvement, not as a current
+   bug.
+   Reason: the current behavior is simple and generally adequate. In the cited
+   stray-token-on-its-own-line scenario the parser may need one more recovery
+   cycle, but this is not evidence of unsound parsing today.
+
+7. C3: comment `ParseIdentifier()` so the capture-before-advance contract is
+   more obvious.
+   Treatment: accept as tiny documentation cleanup only.
+   Reason: the code is already correct; this is a reader-orientation point.
+
+Bucket 3 -- Real, But Deferred
+------------------------------
+
+8. Simplify repeated lookahead structure between `LooksLikeBindingStmt()` and
+   `LooksLikeBareNameListAssignment()`.
+   Treatment: defer.
+   Reason: small maintainability win, low urgency.
+
+9. Add a comment to `ConsumeMemberSeparator()` explaining the comma-or-newline
+   grammar choice.
+   Treatment: accept as low-priority documentation cleanup.
+   Reason: this is surprising enough to be worth stating, but not urgent.
+
+10. Consider a more explicit success-state contract across lexer and parser.
+    Treatment: defer.
+    Reason: this is the real architectural issue behind C1. It is broader than
+    deleting one field from `Parser`.
+
+Bucket 4 -- Already Closed Or Lower Priority Than Framed
+--------------------------------------------------------
+
+11. Correctness concern: statement-separator recovery is currently broken by
+    missing caller synchronization.
+    Treatment: lower priority than framed.
+    Reason: the current statement parser already synchronizes around failed
+    statement parses at the relevant call sites. The helper split is still a
+    maintainability hazard, but not an observed broken recovery path.
+
+12. Criticality framing: `Previous()` must stop using `assert` immediately and
+    return a dummy token in release builds.
+    Treatment: reject that framing.
+    Reason: `Previous()` precondition failure is a programmer bug, not a user
+    input error. Keeping the assertion is the right default for parser-internal
+    misuse unless the API is intentionally widened.
+
+13. Criticality framing: the parser infrastructure has a live correctness bug.
+    Treatment: reject.
+    Reason: after cross-checking, the critique's own overall assessment is the
+    right one: there is no critical parser-infrastructure defect here.
+
+Bucket 5 -- Do Not Take As Proposed
+-----------------------------------
+
+14. Remove `ok_` now without first reconciling lexer and parser success state.
+    Treatment: reject as written.
+    Reason: because `ok_` is seeded from `lexed_module.ok`, removing it is not
+    a pure parser-local cleanup. The contract needs one deliberate redesign,
+    not a one-line deletion.
+
+15. Replace `Previous()` with a production fallback token instead of asserting.
+    Treatment: reject.
+    Reason: swallowing parser-internal misuse with a dummy token would make real
+    parser bugs harder to diagnose.
+
+16. Treat `SynchronizeTopLevel()` as a correctness bug that must be rewritten
+    ahead of other parser work.
+    Treatment: reject that sequencing.
+    Reason: at most this is a resilience improvement. It should not jump ahead
+    of more concrete front-end work without an observed failure case.
+
+Recommended Follow-Through Order
+--------------------------------
+If this critique is converted into code work, the narrowest honest order is:
+
+1. Replace the shared `"internal.mc"` convention with one named constant used
+   by parser and semantic import handling.
+2. Add a short file-level comment explaining the parser infrastructure split.
+3. If parser recovery work is already in flight, consider consolidating
+   statement-separator handling into a helper that synchronizes by contract.
+4. Revisit the dual success-state (`lexed.ok` plus diagnostics) only as part of
+   a deliberate lexer/parser result-contract cleanup.
+
+Bottom line
+-----------
+The `parser.cpp` critique identifies a few valid cleanup targets, but not a
+current parser correctness failure. The filename convention should be unified,
+the file should document its role more clearly, and the recovery/success-state
+APIs can be cleaned up later. I do not agree with removing `ok_` or weakening
+`Previous()` assertions in isolation.

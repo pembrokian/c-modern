@@ -1,0 +1,218 @@
+Phase 127 -- Driver Critique Treatment
+=====================================
+
+Source document
+---------------
+- docs/agent/critiques/compiler/phase127/driver_phase127.txt
+
+Purpose
+-------
+This note reviews the Phase 127 `driver.cpp` critique against the current tree
+and records how each identified issue should be treated: fix next, accept but
+defer, already closed or partly outdated, or reject as proposed.
+
+The driver critique mixes one real correctness defect, a few worthwhile local
+cleanups, and several broad architecture suggestions. The right response is to
+separate those rather than treat all of them as one refactor queue.
+
+Cross-check summary
+-------------------
+The current tree was checked before triage.
+
+- `BuildOrdinaryRunnerSource()` no longer emits one `if failures == N` branch
+  per count. It now emits a single `if failures == 0 { return 0 }` followed by
+  `return 1`, so the critique's O(n^2)-style generated tail is already gone.
+- `MergeBuildUnits()` still silently keeps the first non-extern definition seen
+  in dependency order and suppresses later non-extern duplicates without any
+  diagnostic.
+- `RunRun()` in direct-source mode still calls `RunBuild()` and then
+  independently recomputes the executable path with
+  `ComputeBuildArtifactTargets()`.
+- `DiscoverRepositoryRoot()` is still heuristic, but it is not a general
+  direct-source build path dependency. In the current file it is used only by
+  `BuildTestImportRoots()` for generated ordinary-test runners.
+- `EvaluateRunOutputCase()` still uses separate diagnostic sinks for the build
+  path and for expectation-file loading, and only one rendered sink reaches the
+  final `failure_detail`.
+- Regression cases are still sorted by kind and path, but there is still no
+  comment documenting why that reordering is safe.
+- The ordinary-test duplicate-module diagnostic still reports only the module
+  name and does not explain that the current bootstrap rule is global stem
+  uniqueness across discovered test roots.
+- No default timeout is applied when ordinary tests or run-output regressions
+  omit a timeout.
+- The driver still includes POSIX process headers directly.
+
+Bucket 1 -- Fix In A Narrow Driver Hardening Pass
+-------------------------------------------------
+
+1. C3: `MergeBuildUnits()` silently prefers the first non-extern definition.
+   Treatment: accept and fix.
+   Reason: this is the clearest live correctness problem in the file. Keeping
+   the first dependency-provided body and silently discarding a second defined
+   body is acceptable for duplicated extern declarations, but not for real
+   duplicate definitions. The merge path should diagnose non-extern conflicts
+   rather than resolve them by encounter order.
+
+2. C4: direct-source `RunRun()` recomputes the executable path after `RunBuild()`.
+   Treatment: accept and fix, but through a small build-result API rather than
+   another ad hoc helper.
+   Reason: the critique is right about the duplication risk. The honest fix is
+   to let the direct-source build path return artifact information, not just an
+   exit code, so the run path can consume the same authoritative executable
+   path that the build path produced.
+
+3. Correctness: `EvaluateRunOutputCase()` surfaces only one of its two
+   diagnostic sinks.
+   Treatment: accept and fix.
+   Reason: this is a real reporting-quality bug. When expected-output loading
+   fails, the caller currently loses any earlier compile/build diagnostics from
+   the primary sink. The function should merge or concatenate both rendered
+   diagnostics when both matter.
+
+Bucket 2 -- Accept In Spirit, But Fix At The Right Boundary
+-----------------------------------------------------------
+
+4. C5: repository-root discovery should fail explicitly instead of silently
+   omitting stdlib.
+   Treatment: accept the issue, reject the critique's broad framing.
+   Reason: the current code path is narrower than the critique claims.
+   `DiscoverRepositoryRoot()` is used here only to add the repository `stdlib`
+   root for generated ordinary-test runners. It is not the general source-mode
+   build mechanism. The right treatment is a clearer failure surface in the
+   generated-test import-root path, or better shared runtime/stdlib discovery,
+   not treating all driver invocation modes as silently stdlib-dependent.
+
+5. C1: test infrastructure ownership is too broad for `driver.cpp`.
+   Treatment: accept in spirit, but defer the extraction.
+   Reason: the critique is directionally right. Discovery, manifest parsing,
+   generated-runner emission, and regression execution are a coherent subsystem.
+   But splitting them now is architecture work, not the next smallest fix.
+
+6. C6: subprocess execution should move behind a support-layer process API.
+   Treatment: accept in spirit, but defer.
+   Reason: this is valid portability and isolation work. It is not the next
+   correctness fix in the driver, and it should be handled as a shared support
+   boundary rather than one local cleanup.
+
+7. System-level: regression-case ordering by kind then path should document why
+   it is safe.
+   Treatment: accept as a documentation cleanup.
+   Reason: each case currently gets its own build directory, so the reordering
+   is safe under the current design. The missing piece is the comment, not a
+   behavioral rollback to manifest order.
+
+8. Correctness/UX: duplicate ordinary-test module names should explain the
+   bootstrap uniqueness rule more clearly.
+   Treatment: accept as a small diagnostic improvement.
+   Reason: the current message reports the duplicate name but not the rule.
+   Since discovery uses file stems as module names, the restriction is real and
+   should be surfaced explicitly.
+
+Bucket 3 -- Real, But Deferred
+------------------------------
+
+9. C1 / architectural extraction: move test infrastructure out of the driver.
+   Treatment: defer.
+   Reason: worthwhile, but it is not a narrow critique-response patch.
+
+10. C6 / architectural extraction: isolate POSIX process code behind support.
+    Treatment: defer.
+    Reason: same conclusion as above. This belongs in a shared process-abstraction
+    slice, not as incidental churn in `driver.cpp`.
+
+11. Safety/policy: provide a default timeout for tests when none is specified.
+    Treatment: defer as a policy decision.
+    Reason: the critique is right that an unbounded wait is undesirable in CI,
+    but the exact default and where it should apply are policy questions. This
+    should be taken intentionally rather than slipped in as an unexamined magic
+    number.
+
+12. System-level: document that regression cases intentionally do not share a
+    case cache because each case gets an isolated build directory.
+    Treatment: defer as documentation.
+    Reason: this is a useful note for future scale work, but not a behavior bug.
+
+13. System-level/UX: clarify the boundary between project ordinary tests and
+    compiler regression cases.
+    Treatment: defer.
+    Reason: the critique is pointing at user-facing clarity, not a correctness
+    defect. A help-text or listing enhancement can wait for a broader test UX
+    pass.
+
+14. Documentation: add a function-level comment to `MergeBuildUnits()`.
+    Treatment: accept as low-priority documentation cleanup.
+    Reason: the merge order and precedence rules are important enough to state,
+    especially once duplicate-definition diagnostics are tightened.
+
+15. Documentation: comment the repository-root heuristic and why it looks for
+    `stdlib` and `runtime`.
+    Treatment: accept as low-priority documentation cleanup.
+    Reason: the heuristic is currently local and understandable once found, but
+    not self-justifying.
+
+Bucket 4 -- Already Closed Or Partly Outdated
+---------------------------------------------
+
+16. C2: `BuildOrdinaryRunnerSource()` is O(n^2) in generated output size.
+    Treatment: already closed.
+    Reason: the generated runner now ends with a constant-size success/failure
+    return path. The critique is describing an older implementation.
+
+17. Critical recommendation: replace the `failures == N` chain with a single
+    `failures == 0` check.
+    Treatment: already closed.
+    Reason: the current source generator already does exactly that.
+
+18. Correctness: sorting regression cases by kind then path is unsafe today.
+    Treatment: lower priority than framed.
+    Reason: the missing comment is real; the current behavior is not known-bad
+    because each case runs in its own isolated build directory.
+
+19. Repository-root discovery as a universal source-mode failure path.
+    Treatment: partly outdated.
+    Reason: in the current file the heuristic affects generated ordinary-test
+    runner import roots, not all direct-source driver operations.
+
+Bucket 5 -- Do Not Take As Proposed
+-----------------------------------
+
+20. Treat the current driver/test infrastructure colocation as an immediate
+    design defect that must be extracted before smaller fixes.
+    Treatment: reject as immediate work.
+    Reason: the critique is useful as direction, but not as sequencing. The
+    current file is still navigable enough that the smaller correctness fixes
+    should land first.
+
+21. Treat the lack of a default timeout as a blocker-level correctness bug.
+    Treatment: reject that framing.
+    Reason: it is a policy hole, not a semantic bug in current execution flow.
+    It deserves an explicit choice, not emergency treatment.
+
+22. Replace the repetitive inner loops in `MergeBuildUnits()` with templated
+    merge helpers now.
+    Treatment: reject as immediate work.
+    Reason: the current implementation is repetitive but straightforward. Until
+    the duplicate-definition behavior is corrected, abstraction would hide the
+    semantics more than it would help.
+
+Recommended Follow-Through Order
+--------------------------------
+If this critique is converted into code work, the narrowest honest order is:
+
+1. Diagnose duplicate non-extern definitions in `MergeBuildUnits()`.
+2. Let the direct-source build path return artifact information so `RunRun()`
+   stops recomputing the executable path.
+3. Merge or concatenate diagnostics in `EvaluateRunOutputCase()`.
+4. Improve the duplicate ordinary-test module diagnostic and document the
+   safe regression-case sort order.
+5. Leave test-runner extraction, process abstraction, timeout policy, and
+   broader test UX cleanup for later dedicated work.
+
+Bottom line
+-----------
+The `driver.cpp` critique contains one live merge correctness defect, one real
+artifact-path API cleanup, one reporting defect, and several valid but clearly
+deferred architecture suggestions. The most severe performance complaint in the
+critique is already fixed. The right response is narrow driver hardening first,
+not a wholesale test-runner extraction pass.

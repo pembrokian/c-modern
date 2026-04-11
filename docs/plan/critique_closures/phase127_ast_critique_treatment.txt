@@ -1,0 +1,153 @@
+Phase 127 -- AST Critique Treatment
+==================================
+
+Source document
+---------------
+- docs/agent/critiques/compiler/phase127/ast_phase127.txt
+
+Purpose
+-------
+This note reviews the Phase 127 `ast.cpp` critique against the current tree
+and records how each identified issue should be treated: fix next, accept but
+defer, already closed or outdated, or reject as proposed.
+
+This critique is narrower than the driver or checker critiques. Most of the
+useful items are dump-contract hardening and documentation work rather than
+semantic bugs.
+
+Cross-check summary
+-------------------
+The current tree was checked before triage.
+
+- `DumpFieldInit()` now takes a `depth` parameter and passes `depth + 1` into
+  `DumpExpr()`.
+- `DumpCasePattern()` also takes `depth` and passes `depth + 1` when dumping
+  its nested expression.
+- `SecondaryTextLabel()` still uses a small special-case switch and a generic
+  default label for all other expression kinds.
+- `DumpSourceFile()` still emits `ModuleKind=internal` only for internal
+  modules and emits no explicit line for the default module kind.
+- The file still has no top-level block comment describing the dump contract.
+- `WriteIndent()` / `WriteLine()` remain local duplicates of similarly named
+  helpers in sema dump code.
+- `DumpStmt()` and `DumpDecl()` are intentionally structural dumps over shared
+  fields, not large per-kind switch statements.
+
+Bucket 1 -- Fix In A Narrow Dump-Contract Pass
+----------------------------------------------
+
+1. A1: depth propagation through helper nodes.
+  Treatment: already closed.
+  Reason: the critique's most concrete hardening item has already landed.
+  Both `DumpFieldInit()` and `DumpCasePattern()` now receive `depth` and pass
+  it through to nested expression dumps.
+
+2. Correctness/future-proofing: `DumpSourceFile()` only prints module kind for
+  `kInternal`.
+  Treatment: accept as a small hardening fix when the file is next touched.
+  Reason: this is not a live bug today because the module-kind domain is still
+  tiny, but the critique is right that silently omitting non-internal kinds is
+  brittle if the enum grows.
+
+Bucket 2 -- Accept In Spirit, But Keep The Response Proportional
+----------------------------------------------------------------
+
+3. `SecondaryTextLabel()` relies on a generic default branch.
+  Treatment: accept as low-priority maintainability cleanup.
+  Reason: this is not currently wrong. The dump only mislabels future kinds if
+  they start using `secondary_text` without updating the label helper. That is
+  worth tightening eventually, but not urgent.
+
+4. Documentation: add a short file-level comment describing indentation,
+  depth-limiting, and deterministic fixture intent.
+  Treatment: accept.
+  Reason: this is cheap, useful context for contributors, and aligned with the
+  critique's strongest documentation point.
+
+5. Documentation/maintenance: note that dump-format changes are fixture-
+  visible and therefore intentional-contract changes.
+  Treatment: accept as part of the same documentation pass.
+  Reason: the critique is right that this file's output is a testing contract,
+  not just ad hoc debugging text.
+
+Bucket 3 -- Real, But Deferred
+------------------------------
+
+6. Long-term deduplication: move shared display/string helpers into a common
+  location if AST, sema, and MIR dump code keep drifting together.
+  Treatment: defer.
+  Reason: the overlap exists, but there is not enough demonstrated pressure to
+  justify another shared support surface right now.
+
+7. Maintenance hardening: make future missing-kind updates more auditable.
+  Treatment: defer.
+  Reason: the critique's instinct is good, but the best mechanism is not yet
+  obvious. A compile-time exhaustiveness scheme for the structural dump layer
+  is less straightforward than the critique suggests.
+
+Bucket 4 -- Already Closed Or Lower Priority Than Framed
+--------------------------------------------------------
+
+8. A1 / design concern: case-pattern and field-init dumps bypass the depth
+  limit by not propagating `depth`.
+  Treatment: already closed.
+  Reason: the current code now propagates `depth` through both helpers.
+
+9. Criticality framing: the file has a meaningful correctness bug today.
+  Treatment: reject that framing.
+  Reason: the critique itself says there is no critical issue, and that is the
+  correct conclusion after cross-checking the current code.
+
+10. Performance suggestion: pre-reserve the dump stream buffer now.
+   Treatment: no action.
+   Reason: there is no evidence this debug-only path is under memory or speed
+   pressure.
+
+Bucket 5 -- Do Not Take As Proposed
+-----------------------------------
+
+11. A2: move `WriteIndent()` / `WriteLine()` to `compiler/support` now.
+   Treatment: reject as immediate work.
+   Reason: these helpers are tiny and local. Exporting them to a shared layer
+   would widen API surface for negligible benefit unless a broader dump-utility
+   consolidation is already in flight.
+
+12. A3: introduce a visitor or `accept()` protocol for AST dumping now.
+   Treatment: reject as disproportionate.
+   Reason: this file is small, deterministic, and already isolated. A full
+   visitor protocol would be much more invasive than the current maintenance
+   burden justifies.
+
+13. S2: add exhaustive switches inside `DumpDecl()` / `DumpExpr()` /
+   `DumpStmt()`.
+   Treatment: reject as written.
+   Reason: the current dump functions are intentionally structural. They dump
+   common optional fields and child lists independent of the enum kind, while
+   the `ToString()` helpers already provide fail-fast handling for missing kind
+   labels. Forcing large duplicate switches into the dump bodies would add
+   churn without equivalent safety.
+
+14. Simplicity suggestion: replace the `Indent` alias with a bespoke wrapper
+   type now.
+   Treatment: reject.
+   Reason: this is overengineering for a local dump helper.
+
+Recommended Follow-Through Order
+--------------------------------
+If this critique is converted into code work, the narrowest honest order is:
+
+1. Add a brief file-level comment describing the dump contract and fixture
+  sensitivity.
+2. Make `DumpSourceFile()` emit module-kind text in a form that stays honest if
+  the module-kind enum expands.
+3. Optionally tighten `SecondaryTextLabel()` coverage the next time an
+  expression kind starts using `secondary_text` in a new way.
+4. Leave shared dump helpers, compile-time coverage mechanisms, and visitor
+  architecture out of this pass.
+
+Bottom line
+-----------
+The `ast.cpp` critique is mostly maintenance guidance. Its most concrete bug
+claim about depth propagation is already fixed. The worthwhile remaining work is
+small dump-contract documentation plus one or two future-proofing cleanups, not
+an architectural rewrite of AST dumping.

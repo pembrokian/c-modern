@@ -60,6 +60,9 @@ bool HasCompareExchangeOrderMetadata(const Instruction& instruction) {
 }
 
 std::string AtomicMetadataText(const Instruction& instruction) {
+    // This is a dump-formatting helper, not a validation API. An empty string
+    // means either no atomic metadata or a partially-populated compare-exchange
+    // pair that validation should reject before dumps matter.
     if (!instruction.atomic_success_order.empty() || !instruction.atomic_failure_order.empty()) {
         if (instruction.atomic_success_order.empty() || instruction.atomic_failure_order.empty()) {
             return {};
@@ -229,6 +232,8 @@ bool MatchesGenericFunctionType(const Module& module,
 }
 
 const VariantDecl* FindMirVariantDecl(const TypeDecl& type_decl, std::string_view variant_name) {
+    // MIR qualified variant spellings use the final '.' to separate the owning
+    // type name from the variant leaf, matching current qualified-name rules.
     const std::size_t separator = variant_name.rfind('.');
     const std::string qualified_type = separator == std::string_view::npos ? type_decl.name : std::string(variant_name.substr(0, separator));
     const std::string leaf_name = separator == std::string_view::npos ? std::string(variant_name) : std::string(variant_name.substr(separator + 1));

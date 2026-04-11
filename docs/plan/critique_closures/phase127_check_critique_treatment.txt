@@ -1,0 +1,238 @@
+Phase 127 -- Check Critique Treatment
+====================================
+
+Source document
+---------------
+- docs/agent/critiques/compiler/phase127/check_phase127.txt
+
+Purpose
+-------
+This note reviews the Phase 127 `check.cpp` critique against the current tree
+and records how each identified issue should be treated: fix next, accept but
+defer, already closed or outdated, or reject as proposed.
+
+The goal is to respond to the critique honestly rather than mechanically. Some
+items are live semantic problems, some are useful architectural direction for a
+later phase, and some are already closed or too broad for the current staged
+compiler boundary.
+
+Cross-check summary
+-------------------
+The current tree was checked before triage.
+
+- `ValidateGlobals()` already begins with `assert(scopes_.empty())`, and the
+  function already documents that global validation relies on `global_symbols_`
+  after `CollectTopLevelDecls()`.
+- The dereference-field critique item is outdated for the current tree.
+  `Expr::Kind::kDerefField` is the postfix dereference `expr.*` node, not a
+  `ptr->field` selection node, so `AnalyzeExpr()` is correct to record only the
+  pointee type there.
+- `BuildModuleLookupMaps()` still runs only at the end of checking, and it
+  still builds exported lookup maps only for functions and type declarations.
+- `ResolveImportPathForCheck()` still performs filesystem probing during the
+  recursive `CheckProgramInternal()` path when pre-resolved imported modules are
+  not supplied.
+- Type layout computation now lives in dedicated `compiler/sema/layout.*`
+  helpers instead of remaining inside `Checker`.
+- The constructor indentation issue cited in the critique is still visible in
+  `Checker` and in the first lines of `Run()`.
+- The float-to-int constant conversion path still uses direct `double`
+  comparisons against `int64_t` min/max bounds.
+- `CheckBindingOrAssign()` still records bind-vs-assign facts from `LookupValue`
+  before duplicate names in the same pattern are filtered out.
+- The non-short-circuit const-binary evaluation path is now split into its own
+  helper instead of staying inline inside `EvaluateConstExpr()`.
+
+Bucket 1 -- Fix In A Narrow Sema Follow-Through
+-----------------------------------------------
+
+1. Correctness: duplicate names inside one binding-or-assign pattern can record
+   the wrong resolution facts.
+   Treatment: accept and fix.
+   Reason: the critique is right that `a, a := ...` is currently classified by
+   repeated `LookupValue()` before duplicate-pattern validation has stabilized.
+   `BindValue()` still reports the duplicate local binding, so this is not a
+   silent accept bug, but the recorded fact can misdescribe the statement and
+   make later consumers reason about the wrong bind-vs-assign shape.
+
+2. Correctness: float-to-int constant conversion uses boundary checks that are
+   only approximately correct at the `double`/`int64_t` edge.
+  Treatment: accept, after the pattern-resolution fix.
+   Reason: this is a real numeric edge case, not just theoretical hand-wringing.
+  It should be tightened, but it does not outrank the currently reachable
+  bind-vs-assign fact issue.
+
+Bucket 2 -- Accept In Spirit, But Fix At The Right Boundary
+-----------------------------------------------------------
+
+4. C2: build lookup maps earlier so checker phases stop doing repeated linear
+   scans.
+   Treatment: accept in spirit, but do not simply move
+   `BuildModuleLookupMaps()` earlier unchanged.
+   Reason: the critique is directionally right about O(n^2) lookup pressure.
+   The right fix is a private checker-side lookup structure built immediately
+   after `CollectTopLevelDecls()`, not reusing the exported-module lookup maps
+   as an ad hoc internal cache. If this is taken on, include global lookup at
+   the same time rather than improving only functions and type declarations.
+
+5. C4: import resolution is too tightly coupled to the filesystem.
+   Treatment: accept in principle, defer the interface work.
+   Reason: the critique overstates the coupling slightly because project-mode
+   callers can already provide `CheckOptions::imported_modules`. The real issue
+   is the fallback direct-source / recursive-check path, which still performs
+   filesystem probing inside sema-owned flow. That is a valid architectural
+   cleanup, but it belongs in a dedicated import-resolution boundary pass rather
+   than in a narrow critique-response patch.
+
+6. System-level: the checked-module output contract is not explicitly documented.
+   Treatment: accept as documentation work at the sema/MIR boundary.
+   Reason: `expr_types`, binding facts, for-in facts, top-level summaries, and
+   visible-surface rewriting are all important cross-phase contracts. A short
+   repository-facing comment or note would reduce boundary drift. This is worth
+   doing, but it should land as documentation, not be confused with a behavior
+   fix.
+
+7. System-level: the difference between a full checked module and an import-
+   visible surface is enforced mostly by naming convention.
+   Treatment: accept in spirit, but defer.
+   Reason: the critique points at a real architectural seam, but introducing
+   separate types for full modules versus visible surfaces is broader than this
+   critique wave should take on. Keep the distinction explicit in comments and
+   helper naming for now.
+
+Bucket 3 -- Real, But Deferred
+------------------------------
+
+8. C1: the `Checker` class is still monolithic.
+  Treatment: partially addressed.
+  Reason: the checker is still large, but the layout slice has now been
+  extracted into `compiler/sema/layout.*`, which was the cleanest first split.
+  Further decomposition across const-eval, expression typing, statement
+  checking, and import handling remains deferred.
+
+9. Architectural recommendation: extract layout computation into a dedicated
+   `sema/layout.*` pair.
+  Treatment: fixed.
+  Reason: type layout computation now lives in a dedicated sema layout unit and
+  is invoked from the checker via a narrow report callback.
+
+10. Simplicity: extract the non-short-circuit binary path from
+    `EvaluateConstExpr()`.
+   Treatment: fixed.
+   Reason: the ordinary const-binary path now lives in its own helper, leaving
+   `EvaluateConstExpr()` responsible mainly for expression-kind dispatch.
+
+11. Performance: `IsKnownTypeName()` and other validation paths still rely on
+    linear `Find*` helpers.
+    Treatment: defer with C2.
+    Reason: this is part of the same lookup-structure issue. It should not be
+    tracked as a separate immediate task.
+
+12. Documentation: `ComputeTypeLayout()` should explain the current enum layout
+    convention.
+  Treatment: fixed.
+  Reason: the extracted layout unit now carries an explicit comment describing
+  the current tagged-union enum layout convention.
+
+13. Documentation: `CheckSourceFile()` should document that it is the narrow
+    single-file bypass and not the full import-aware program path.
+    Treatment: accept as low-priority documentation cleanup.
+    Reason: the function is small and correct, but a brief doc comment would
+    make misuse harder.
+
+14. Robustness/documentation: const-eval cycle detection should clarify that
+    `active_names` is intentionally scoped per top-level initializer walk.
+  Treatment: fixed.
+  Reason: the top-level const evaluator now documents that `active_names` is
+  intentionally scoped to one initializer walk.
+
+15. Style: constructor / early-`Run()` indentation is inconsistent.
+    Treatment: accept as opportunistic cleanup only.
+    Reason: the critique is correct, but style-only churn should not be mixed
+    into semantic fixes unless that exact block is already being edited.
+
+Bucket 4 -- Already Closed Or Lower Priority Than Framed
+--------------------------------------------------------
+
+16. C3 / correctness framing: `kDerefField` is not semantically field-checked.
+  Treatment: already outdated.
+  Reason: the current AST contract uses `Expr::Kind::kDerefField` for postfix
+  dereference `expr.*`, not `ptr->field`. The separate field-selection check
+  still lives on `Expr::Kind::kField`, so the critique no longer names a live
+  semantic bug in this tree.
+
+17. Bug risk: `ValidateGlobals()` relies on implicit scope state with no guard.
+    Treatment: already closed.
+    Reason: the file now has `assert(scopes_.empty())` at the start of
+    `ValidateGlobals()`, plus an explanatory comment about why global lookup is
+    valid at that point in the phase ordering.
+
+18. Correctness: `const_eval_cache_` may cross-contaminate unrelated scopes.
+    Treatment: no action.
+    Reason: the critique itself confirms the cache is safe under the current
+    one-checker-per-module design. This is not an open issue.
+
+19. Robustness: path normalization for recursive import checking may be
+    inconsistent.
+    Treatment: already effectively handled.
+    Reason: the current recursive program-check path normalizes source paths via
+    `absolute(...).lexically_normal()` before caching and visit-state tracking.
+    No new work should be queued from this item.
+
+20. Performance: aggregate-constant evaluation allocates helper vectors for
+    struct constants.
+    Treatment: no action for now.
+    Reason: this is a scale concern without current evidence of pressure.
+
+Bucket 5 -- Do Not Take As Proposed
+-----------------------------------
+
+21. C5 / correctness framing: identical `"global"` strings in
+    `ValidateVisibleDeclTypes()` are a meaningful semantic issue.
+    Treatment: reject as a substantive bug.
+    Reason: the duplicated string is mildly untidy, but both declaration kinds
+    are top-level globals and the emitted diagnostic category is still accurate.
+    A wording tweak is optional; it does not merit bug-level treatment.
+
+22. Simplicity: move `AlignTo()` into a shared `sema/layout_utils.h` now.
+    Treatment: reject as immediate work.
+    Reason: sharing a tiny helper across files is only worthwhile when there is
+    active duplication pressure. Pulling it into a new shared header now would
+    widen API surface more than it helps.
+
+23. Simplicity: share `WriteIndent()` / `WriteLine()` through `compiler/support`
+    immediately.
+    Treatment: reject as immediate work.
+    Reason: these helpers are tiny dump-format utilities. A support-layer move
+    would be churn, not progress, unless several dump paths are being unified in
+    the same pass.
+
+24. Architectural recommendation: enforce full-module versus visible-surface
+    separation by type right away.
+    Treatment: reject as immediate work.
+    Reason: I agree with the direction, but not with treating it as the next
+    practical response to this critique. The immediate need is clearer local
+    documentation and disciplined helper boundaries, not a new module-type split
+    mid-bootstrap.
+
+Recommended Follow-Through Order
+--------------------------------
+If this critique is converted into code work, the narrowest honest order is:
+
+1. Fix duplicate-name bind-vs-assign fact recording in one pattern.
+2. Tighten float-to-int constant conversion bounds and add a focused regression
+   test for the boundary cases.
+3. If lookup cost becomes measurable, add checker-private lookup maps after
+   `CollectTopLevelDecls()` rather than repurposing exported lookup-map state.
+4. Leave checker decomposition, import-resolver abstraction, visible-surface
+   type separation, and helper deduplication for dedicated later work.
+
+Bottom line
+-----------
+The `check.cpp` critique contains one smaller but real fact-recording bug, one
+worthwhile numeric edge-case cleanup, and several valid longer-term
+architectural suggestions, plus one stale `kDerefField` claim that no longer
+matches the current AST contract. It should not be treated as a mandate for a
+broad checker rewrite. The right response is to fix the local correctness gaps,
+document the already-important sema/MIR boundary more clearly, and keep the
+larger factoring work explicitly deferred.

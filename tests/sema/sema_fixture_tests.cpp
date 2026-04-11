@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -41,6 +42,17 @@ mc::parse::ParseResult ParseText(const std::string& source,
                                  mc::support::DiagnosticSink& diagnostics) {
     const auto lexed = mc::lex::Lex(source, path.generic_string(), diagnostics);
     return mc::parse::Parse(lexed, path, diagnostics);
+}
+
+mc::sema::CheckResult CheckText(const std::string& source,
+                                const std::filesystem::path& path,
+                                mc::support::DiagnosticSink& diagnostics,
+                                const mc::sema::CheckOptions& options = {}) {
+    const auto parsed = ParseText(source, path, diagnostics);
+    if (!parsed.ok) {
+        mc::test_support::Fail("source should parse successfully: " + path.generic_string() + "\n" + diagnostics.Render());
+    }
+    return mc::sema::CheckProgram(*parsed.source_file, path, options, diagnostics);
 }
 
 FixtureCase BuildFixtureCase(const mc::test_support::DiscoveredFixture& fixture) {
@@ -155,6 +167,69 @@ void TestImportedModuleSurfaceQualifiesNamedTypes() {
     }
 }
 
+void TestDuplicateBindingOrAssignDoesNotRecordInvalidFact() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "func demo() i32 {\n"
+        "    value, value = 1, 2\n"
+        "    return 0\n"
+        "}\n",
+        "<duplicate-binding-or-assign>",
+        diagnostics);
+    if (!parsed.ok) {
+        mc::test_support::Fail("duplicate binding-or-assignment fixture should parse successfully:\n" + diagnostics.Render());
+    }
+
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<duplicate-binding-or-assign>", diagnostics);
+    if (checked.ok) {
+        mc::test_support::Fail("duplicate binding-or-assignment should fail semantic checking");
+    }
+    if (diagnostics.Render().find("duplicate local binding: value") == std::string::npos) {
+        mc::test_support::Fail("duplicate binding-or-assignment should report the duplicate local binding");
+    }
+
+    const auto& function = parsed.source_file->decls.front();
+    if (function.body == nullptr || function.body->statements.empty() || function.body->statements.front() == nullptr) {
+        mc::test_support::Fail("duplicate binding-or-assignment fixture should produce a function body statement");
+    }
+
+    if (mc::sema::FindBindingOrAssignFact(*checked.module, *function.body->statements.front()) != nullptr) {
+        mc::test_support::Fail("duplicate binding-or-assignment should not record an invalid semantic fact");
+    }
+}
+
+void TestFloatToIntConstConversionHonorsInt64Bounds() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto checked = CheckText(
+        "const MIN_OK: i64 = (i64)(-9223372036854775808.0)\n"
+        "const TOO_BIG: i64 = (i64)(9223372036854775808.0)\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return 0\n"
+        "}\n",
+        "<float-to-int-bounds>",
+        diagnostics);
+
+    if (checked.ok) {
+        mc::test_support::Fail("float-to-int constant conversion should reject the exclusive int64 upper bound");
+    }
+    if (diagnostics.Render().find("top-level const initializer must be a compile-time constant") == std::string::npos) {
+        mc::test_support::Fail("float-to-int constant conversion should reject out-of-range constants during const evaluation");
+    }
+
+    const auto* min_ok = mc::sema::FindGlobalSummary(*checked.module, "MIN_OK");
+    if (min_ok == nullptr || min_ok->constant_values.empty() || !min_ok->constant_values.front().has_value() ||
+        min_ok->constant_values.front()->kind != mc::sema::ConstValue::Kind::kInteger ||
+        min_ok->constant_values.front()->integer_value != std::numeric_limits<std::int64_t>::min()) {
+        mc::test_support::Fail("float-to-int constant conversion should still accept the inclusive int64 lower bound");
+    }
+
+    const auto* too_big = mc::sema::FindGlobalSummary(*checked.module, "TOO_BIG");
+    if (too_big == nullptr || too_big->constant_values.empty() || too_big->constant_values.front().has_value()) {
+        mc::test_support::Fail("float-to-int constant conversion should not materialize an out-of-range constant value");
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -191,6 +266,8 @@ int main(int argc, char** argv) {
     }
 
     TestImportedModuleSurfaceQualifiesNamedTypes();
+    TestDuplicateBindingOrAssignDoesNotRecordInvalidFact();
+    TestFloatToIntConstConversionHonorsInt64Bounds();
 
     return 0;
 }

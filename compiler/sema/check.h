@@ -130,6 +130,13 @@ struct SourceSpanEqual {
     }
 };
 
+// Module is the checked semantic product that downstream stages consume.
+// A full module produced by CheckProgram / CheckSourceFile contains the entire
+// top-level summary plus implementation-only facts such as expr_types,
+// binding_or_assign_facts, and for_in_facts that MIR lowering relies on.
+// Import-visible surfaces intentionally reuse this struct during bootstrap, but
+// BuildImportVisibleModuleSurface strips those local-only facts and keeps only
+// declarations and hidden-name sets that imported semantic checking needs.
 struct Module {
     ast::SourceFile::ModuleKind module_kind = ast::SourceFile::ModuleKind::kOrdinary;
     std::string package_identity;
@@ -171,6 +178,8 @@ CheckResult CheckProgram(const ast::SourceFile& source_file,
                          const std::filesystem::path& file_path,
                          support::DiagnosticSink& diagnostics);
 
+// Single-file semantic checking entry point. This bypasses import resolution
+// and therefore does not populate imported module surfaces.
 CheckResult CheckSourceFile(const ast::SourceFile& source_file,
                             const std::filesystem::path& file_path,
                             support::DiagnosticSink& diagnostics);
