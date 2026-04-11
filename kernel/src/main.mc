@@ -45,6 +45,8 @@ const PHASE125_MARKER: i32 = 125
 const PHASE125_MARKER_DETAIL: u32 = 125
 const PHASE126_MARKER: i32 = 126
 const PHASE126_MARKER_DETAIL: u32 = 126
+const PHASE128_MARKER: i32 = 128
+const PHASE128_MARKER_DETAIL: u32 = 128
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
@@ -130,6 +132,10 @@ var PHASE125_SURVIVING_CONTROL_QUEUE_DEPTH: usize
 var PHASE126_REPEAT_LONG_LIVED_SEND_STATUS: syscall.SyscallStatus
 var PHASE126_REPEAT_LONG_LIVED_SOURCE_PID: u32
 var PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH: usize
+var PHASE128_OBSERVED_SERVICE_PID: u32
+var PHASE128_OBSERVED_SERVICE_KEY: u32
+var PHASE128_OBSERVED_WAIT_HANDLE_SLOT: u32
+var PHASE128_OBSERVED_EXIT_CODE: i32
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -208,6 +214,10 @@ func reset_kernel_state() {
     PHASE126_REPEAT_LONG_LIVED_SEND_STATUS = syscall.SyscallStatus.None
     PHASE126_REPEAT_LONG_LIVED_SOURCE_PID = 0
     PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH = 0
+    PHASE128_OBSERVED_SERVICE_PID = 0
+    PHASE128_OBSERVED_SERVICE_KEY = 0
+    PHASE128_OBSERVED_WAIT_HANDLE_SLOT = 0
+    PHASE128_OBSERVED_EXIT_CODE = 0
 }
 
 func record_boot_stage(stage_value: state.BootStage, detail: u32) {
@@ -1282,6 +1292,10 @@ func build_phase126_authority_lifetime_audit(phase125_audit: debug.Phase125Inval
     return bootstrap_audit.build_phase126_authority_lifetime_audit(bootstrap_audit.Phase126AuthorityLifetimeAuditInputs{ phase125: phase125_audit, classified_holder_pid: PHASE124_FINAL_HOLDER_PID, long_lived_endpoint_id: INIT_ENDPOINT_ID, short_lived_endpoint_id: TRANSFER_ENDPOINT_ID, long_lived_handle_slot: PHASE124_CONTROL_HANDLE_SLOT, short_lived_handle_slot: PHASE124_FINAL_RECEIVE_HANDLE_SLOT, repeat_long_lived_send_status: PHASE126_REPEAT_LONG_LIVED_SEND_STATUS, repeat_long_lived_source_pid: PHASE126_REPEAT_LONG_LIVED_SOURCE_PID, repeat_long_lived_queue_depth: PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH, long_lived_class_visible: 1, short_lived_class_visible: 1, broader_lifetime_framework_visible: 0, compiler_reopening_visible: 0 })
 }
 
+func build_phase128_service_death_observation_audit(phase126_audit: debug.Phase126AuthorityLifetimeAudit) debug.Phase128ServiceDeathObservationAudit {
+    return bootstrap_audit.build_phase128_service_death_observation_audit(bootstrap_audit.Phase128ServiceDeathObservationAuditInputs{ phase126: phase126_audit, observed_service_pid: PHASE128_OBSERVED_SERVICE_PID, observed_service_key: PHASE128_OBSERVED_SERVICE_KEY, observed_wait_handle_slot: PHASE128_OBSERVED_WAIT_HANDLE_SLOT, observed_exit_code: PHASE128_OBSERVED_EXIT_CODE, fixed_directory_entry_count: 3, service_death_visible: 1, kernel_supervision_visible: 0, service_restart_visible: 0, broader_failure_framework_visible: 0, compiler_reopening_visible: 0 })
+}
+
 func execute_phase124_delegation_chain_probe() bool {
     transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
     local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
@@ -1557,6 +1571,24 @@ func execute_phase126_authority_lifetime_probe() bool {
         return false
     }
     return PHASE126_REPEAT_LONG_LIVED_QUEUE_DEPTH == 2
+}
+
+func execute_phase128_service_death_observation_probe() bool {
+    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
+    if syscall.status_score(LOG_SERVICE_WAIT_OBSERVATION.status) != 2 {
+        return false
+    }
+    PHASE128_OBSERVED_SERVICE_PID = LOG_SERVICE_WAIT_OBSERVATION.child_pid
+    PHASE128_OBSERVED_SERVICE_KEY = LOG_SERVICE_DIRECTORY_KEY
+    PHASE128_OBSERVED_WAIT_HANDLE_SLOT = LOG_SERVICE_WAIT_OBSERVATION.wait_handle_slot
+    PHASE128_OBSERVED_EXIT_CODE = LOG_SERVICE_WAIT_OBSERVATION.exit_code
+    if PHASE128_OBSERVED_SERVICE_PID != LOG_SERVICE_SPAWN_OBSERVATION.child_pid {
+        return false
+    }
+    if PHASE128_OBSERVED_WAIT_HANDLE_SLOT != log_config.wait_handle_slot {
+        return false
+    }
+    return PHASE128_OBSERVED_EXIT_CODE == log_config.exit_code
 }
 
 func execute_phase118_invalidated_source_send_probe() bool {
@@ -1905,43 +1937,49 @@ func bootstrap_main() i32 {
     if !debug.validate_phase126_authority_lifetime_classification(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit)))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 65
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, PHASE126_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !execute_phase128_service_death_observation_probe() {
         return 66
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !debug.validate_phase128_service_death_observation(build_phase128_service_death_observation_audit(build_phase126_authority_lifetime_audit(build_phase125_invalidation_audit(build_phase124_delegation_chain_audit(build_phase123_next_plateau_audit(phase122_audit))))), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 67
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE128_MARKER_DETAIL)
+    if BOOT_MARKER_EMITTED != 1 {
         return 68
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 69
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 70
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 71
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 72
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 73
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE126_MARKER_DETAIL {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 74
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 75
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE128_MARKER_DETAIL {
         return 76
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 77
     }
-    return PHASE126_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 78
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 79
+    }
+    return PHASE128_MARKER
 }

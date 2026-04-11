@@ -1,0 +1,173 @@
+Phase 128 -- Service Death Observation
+======================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the completed Phase 126 authority lifetime classification step
+by proving one explicit service-death observation path over the same already-
+landed Canopus kernel artifact.
+
+This document is both the Phase 128 execution note and its closeout.
+It does not claim restart policy, service replacement, partial-failure
+propagation, a broader supervision framework, or a compiler wave.
+It records one narrow failure-observation step over the real kernel artifact
+that earlier phases already kept explicit.
+
+Repository status note
+----------------------
+- Phase 124 through Phase 126 already proved that delegated authority stays
+  explicit across deeper delegation, explicit invalidation, and one bounded
+  long-lived versus short-lived lifetime classification.
+- The same landed running-system slice already carried bounded log, echo, and
+  transfer service executions plus concrete wait observations for those
+  services.
+- The next honest gap is not restart policy or a supervision framework. It is
+  publishing one explicit statement that one bounded service disappearance is
+  observable through the current owners without reopening compiler work.
+
+Problem being solved
+--------------------
+- The repository already had concrete service exit observations in the real
+  kernel artifact, but it still lacked one published aggregate proof that one
+  service death becomes explicit and reviewable as a failure fact rather than
+  disappearing into earlier service-handshake proofs.
+- Without this step, later failure, IPC-composition, or device-boundary work
+  could blur whether the current model already has an honest service-death
+  observation answer or whether the kernel needs immediate supervision or
+  restart machinery.
+- The repository needed one small phase that classifies one service-death path
+  through the existing bootstrap-service, wait-handle, init-owned directory,
+  bootstrap-audit, and debug owners rather than through a new policy layer.
+
+Core rule
+---------
+- Keep the current kernel owners and fixed service topology intact.
+- Keep the compiler, sema, MIR, backend, ABI, and `hal` surfaces closed.
+- Reuse the landed log-service exit observation rather than inventing a
+  broader recovery framework.
+- Prove one bounded service death becomes visible through the current wait
+  observation and fixed-directory publication path.
+- Do not widen into restart logic, service replacement, kernel supervision,
+  dynamic namespace growth, or a new service owner.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 128 note recording the service-death observation step
+   and the decision to keep compiler work closed
+2. one debug-owned Phase 128 audit that packages the landed Phase 126 truth
+   together with one explicit log-service death observation over the real
+   kernel artifact
+3. one narrow root-proof helper that reuses the landed log-service wait
+   observation, proves the service death stays visible as an exit fact, and
+   proves the kernel still does not grow a supervision or restart owner
+4. one advance of the real kernel proof marker from Phase 126 to Phase 128
+   only after that service-death audit succeeds
+5. refreshed roadmap, position note, kernel README, repository map,
+   freestanding test READMEs, decision log, and backlog entries
+6. one focused Phase 128 freestanding regression that checks build, run,
+   publication wording, and MIR visibility of the new failure-observation path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this step now because the current running-system
+artifact already has real service exit facts and a fixed init-owned namespace
+answer. The next narrow pressure is publishing one explicit service-death
+observation before later phases widen partial-failure or restart work.
+
+What this phase proves
+----------------------
+- the repository can now honestly publish one bounded service-death
+  observation step over the real kernel artifact
+- one bounded service disappearance is visible through an explicit wait
+  observation and remains tied to the fixed init-owned directory answer
+- that failure answer still stops well short of a broader supervision,
+  restart, or recovery framework
+- the current kernel model can answer one more failure-semantics question
+  through existing owners rather than by forcing new policy machinery
+
+Deliverables
+------------
+- one canonical Phase 128 closeout note in `docs/plan/`
+- one debug-owned Phase 128 service-death observation audit plus one narrow
+  root-proof helper that publishes the log-service disappearance boundary
+  honestly
+- updated `kernel/src/main.mc` so the real kernel artifact advances to a
+  Phase 128 marker only after the service-death observation audit remains true
+- refreshed roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed failure step and the decision not to expand
+  compiler work
+- one focused Phase 128 freestanding kernel regression plus a projected MIR
+  golden for the new failure-observation boundary
+
+Suggested execution order
+-------------------------
+1. Add the smallest root-proof helper needed to replay the landed log-service
+   wait observation as one explicit service-death fact.
+2. Add the Phase 128 debug-owned audit and validator over that observation.
+3. Advance the kernel proof marker to 128 only after the new audit remains
+   true.
+4. Publish the canonical service-death observation note.
+5. Add the focused Phase 128 freestanding regression for build, run,
+   publication, and MIR checks.
+6. Refresh roadmap, position, kernel status, repository map, decision log,
+   and backlog publication.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 128 marker without
+  widening the admitted slice beyond the already-landed service and authority
+  boundaries
+- one aggregate debug-owned audit proves that one explicit service death is
+  observable through the existing wait-observation path while the kernel still
+  does not claim supervision or restart policy
+- the canonical Phase 128 note, roadmap, position note, and kernel README all
+  publish the same service-death boundary
+- the compiler and low-level surfaces stay unchanged in this phase
+- the focused regression proves the docs, source call sites, emitted objects,
+  and MIR all expose the Phase 128 boundary consistently
+
+Non-goals
+---------
+- a broader failure, restart, or supervision framework
+- partial-failure propagation across richer IPC topologies
+- dynamic service discovery or a broader namespace model
+- reopening sema, MIR, backend, ABI, `hal`, or target work
+- adding another service owner just to stage one service-death observation
+
+Implemented slice
+-----------------
+- added one debug-owned `Phase128ServiceDeathObservationAudit` and validator
+  that package the landed Phase 126 truth together with one explicit
+  log-service death observation
+- added one narrow root-proof helper that reuses the landed log-service wait
+  observation, records the observed service pid, wait handle, and exit code,
+  and proves the kernel still does not claim supervision or restart policy
+- advanced the real kernel proof marker to 128 only after that audit remains
+  true
+- published one canonical `docs/plan/phase128_service_death_observation.txt`
+  note naming the admitted slice and its explicit deferrals
+- added one focused freestanding kernel regression plus a projected MIR golden
+  for the Phase 128 service-death boundary
+- refreshed the roadmap, position note, kernel README, repository map,
+  freestanding test READMEs, decision log, and backlog so the repository
+  records both the landed failure step and the decision not to expand
+  compiler work
+
+Closeout statement
+------------------
+Phase 128 is complete as a service death observation step.
+The repository still claims only one bounded small Canopus running-system
+plateau, but that plateau now includes one explicit proof that a bounded
+service disappearance is observable through the landed wait-handle path while
+the kernel stays free of supervision and restart policy, and the compiler
+stays closed because this phase needed failure evidence rather than new
+language or backend work.

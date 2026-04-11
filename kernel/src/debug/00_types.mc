@@ -217,3 +217,17 @@ struct Phase126AuthorityLifetimeAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase128ServiceDeathObservationAudit {
+    phase126: Phase126AuthorityLifetimeAudit
+    observed_service_pid: u32
+    observed_service_key: u32
+    observed_wait_handle_slot: u32
+    observed_exit_code: i32
+    fixed_directory_entry_count: usize
+    service_death_visible: u32
+    kernel_supervision_visible: u32
+    service_restart_visible: u32
+    broader_failure_framework_visible: u32
+    compiler_reopening_visible: u32
+}
+
