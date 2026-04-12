@@ -16,6 +16,7 @@ struct SpecialCallEntry {
 };
 
 constexpr SpecialCallEntry kSpecialCallTable[] = {
+    {"panic", "", SpecialCallKind::kPanic},
     {"mmio_ptr", "hal", SpecialCallKind::kMmioPtr},
     {"buffer_new", "mem", SpecialCallKind::kBufferNew},
     {"buffer_free", "mem", SpecialCallKind::kBufferFree},
@@ -32,6 +33,9 @@ constexpr SpecialCallEntry kSpecialCallTable[] = {
 };
 
 bool MatchesSpecialCallName(std::string_view callee_name, const SpecialCallEntry& entry) {
+    if (entry.module_name.empty()) {
+        return callee_name == entry.leaf_name;
+    }
     return callee_name == entry.leaf_name ||
            (callee_name.starts_with(entry.module_name) && callee_name.size() == entry.module_name.size() + 1 + entry.leaf_name.size() &&
             callee_name[entry.module_name.size()] == '.' &&

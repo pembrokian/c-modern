@@ -909,3 +909,4 @@ Current design pressures revealed by these programs
 - Volatile and atomics must remain clearly separated, or systems programmers will misuse one for the other.
 - Distinct types strengthen the no-implicit-conversion rule without dragging in a heavier type system.
 - Arrays, slices, and buffers need explicit conversion points or ownership becomes ambiguous again.
+- Non-recoverable internal invariants can now stay explicit as `if !cond { panic(code) }` without widening recoverable `Error` flow into a second control-flow system.

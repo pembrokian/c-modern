@@ -187,6 +187,10 @@ std::string DumpModule(const Module& module) {
                         terminator << ']';
                     }
                     break;
+                case Terminator::Kind::kPanic:
+                    terminator << "terminator panic value="
+                               << (block.terminator.values.empty() ? std::string("<?>") : block.terminator.values.front());
+                    break;
                 case Terminator::Kind::kBranch:
                     terminator << "terminator branch target=" << block.terminator.true_target;
                     break;

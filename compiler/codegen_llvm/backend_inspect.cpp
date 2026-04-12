@@ -916,6 +916,30 @@ bool LowerTerminator(const mir::BasicBlock& block,
             return true;
         }
 
+        case mir::Terminator::Kind::kPanic: {
+            if (block.terminator.values.size() != 1) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap backend requires panic terminators to use exactly one fault code value in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            std::string code;
+            if (!ResolveValue(state,
+                              block.terminator.values.front(),
+                              function,
+                              block,
+                              source_path,
+                              diagnostics,
+                              code)) {
+                return false;
+            }
+
+            backend_block.terminator = "panic " + code;
+            return true;
+        }
+
         case mir::Terminator::Kind::kBranch: {
             std::string target;
             if (!ResolveBlock(state, block.terminator.true_target, function, block, source_path, diagnostics, target)) {

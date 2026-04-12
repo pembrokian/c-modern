@@ -480,6 +480,76 @@ void TestPhase83NarrowHalAdmissionAndConsoleProof(const std::filesystem::path& s
 
 }
 
+void TestPhase138FreestandingFatalPrimitive(const std::filesystem::path& source_root,
+                                            const std::filesystem::path& binary_root,
+                                            const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "freestanding_panic_project";
+    std::filesystem::remove_all(project_root);
+
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase138-freestanding\"\n"
+              "default = \"boot\"\n"
+              "\n"
+              "[targets.boot]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase138\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"" + std::string(mc::kBootstrapTargetFamily) + "\"\n"
+              "\n"
+              "[targets.boot.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.boot.runtime]\n"
+              "startup = \"bootstrap_main\"\n");
+    WriteFile(project_root / "src/main.mc",
+              "func bootstrap_main() i32 {\n"
+              "    ok: bool = false\n"
+              "    if !ok {\n"
+              "        panic(138)\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n");
+
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path build_dir = binary_root / "freestanding_panic_build";
+    std::filesystem::remove_all(build_dir);
+
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "boot",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / "freestanding_panic_build_output.txt",
+                                                                 "freestanding panic build");
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail("phase138 freestanding panic build should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(project_root / "src/main.mc", build_dir);
+    const std::string panic_mir = ReadFile(dump_targets.mir);
+    const std::string panic_llvm_ir = ReadFile(build_targets.llvm_ir);
+    ExpectOutputContains(panic_mir,
+                         "terminator panic value=",
+                         "phase138 freestanding MIR should preserve the explicit panic terminator");
+    ExpectOutputContains(panic_llvm_ir,
+                         "define private void @__mc_panic(i64 %code)",
+                         "phase138 freestanding LLVM IR should emit the shared panic helper");
+    ExpectOutputContains(panic_llvm_ir,
+                         "call void @__mc_panic(i64 138)",
+                         "phase138 freestanding LLVM IR should preserve the fatal fault code");
+    if (panic_llvm_ir.find("call void @exit(i32") != std::string::npos) {
+        Fail("phase138 freestanding panic helper should not route through hosted exit support");
+    }
+}
+
 }  // namespace
 
 namespace mc::tool_tests {
@@ -490,6 +560,7 @@ void RunFreestandingBootstrapToolSuite(const std::filesystem::path& source_root,
     TestPhase81FreestandingBootstrapAndHal(source_root, binary_root, mc_path);
     TestPhase82FreestandingArtifactAndEntryHardening(source_root, binary_root, mc_path);
     TestPhase83NarrowHalAdmissionAndConsoleProof(source_root, binary_root, mc_path);
+    TestPhase138FreestandingFatalPrimitive(source_root, binary_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

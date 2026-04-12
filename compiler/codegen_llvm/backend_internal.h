@@ -242,6 +242,8 @@ inline std::string_view ToString(mir::Terminator::Kind kind) {
             return "branch";
         case mir::Terminator::Kind::kCondBranch:
             return "cond_branch";
+        case mir::Terminator::Kind::kPanic:
+            return "panic";
     }
 
     MC_UNREACHABLE("unhandled mir::Terminator::Kind in codegen_llvm::ToString");

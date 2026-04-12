@@ -145,6 +145,7 @@ struct Terminator {
         kReturn,
         kBranch,
         kCondBranch,
+        kPanic,
     };
 
     Kind kind = Kind::kNone;

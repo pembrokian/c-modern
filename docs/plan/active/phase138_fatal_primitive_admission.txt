@@ -1,0 +1,297 @@
+Phase 138 -- Fatal Primitive Admission
+======================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Continue from the current explicit `(value, Error)` language plateau by
+admitting one bounded fatal primitive for non-recoverable failure without
+reopening hidden propagation, exception semantics, or a broader panic runtime.
+
+This document records the landed Phase 138 slice.
+It captures the admitted source contract, semantic checking, MIR truth,
+backend lowering, documentation, and focused proof coverage that now define
+the fatal primitive as part of the Modern C source contract.
+It does not claim `require`, a recoverable `expect` mechanism, a formal panic
+keyword, message-carrying crash objects, stack unwinding, or a broader
+error-system redesign.
+
+Repository status note
+----------------------
+- The language already commits to explicit `(value, Error)` returns, explicit
+  discard, and no hidden propagation in the current admitted slice.
+- The remaining open error-handling question is ergonomic follow-through,
+  not a second recoverable control-flow system.
+- Canopus and freestanding kernel work now have real pressure for one
+  architecturally explicit fatal path that is stronger than a testing helper
+  or debug-only assertion but narrower than a language-level assertion family.
+- The strongest critique against a first-pass `require` admission is that it
+  may be only spelling sugar for `if !cond { panic(code) }` unless the
+  repository can prove a semantically distinct benefit.
+- The narrower honest next step is therefore one explicit fatal primitive
+  first, with `require` deferred until real invariant-heavy consumers prove
+  that plain `if` plus the fatal primitive is not enough.
+
+Problem being solved
+--------------------
+- The current language can model recoverable failure explicitly, but it has no
+  first-class compiler-owned way to terminate immediately from source while
+  preserving one shared fatal contract across sema, MIR, and backend lowering.
+- Kernel and freestanding proof code can emulate this today through helper
+  functions or target-local traps, but those paths do not yet give the
+  compiler one deterministic no-return fatal primitive.
+- Without one bounded admission here, fatal paths will keep drifting into ad
+  hoc helper patterns that are harder to check, harder to lower consistently,
+  and harder to compare against any later `require` proposal.
+
+Core rule
+---------
+- Phase 138 admits one fatal primitive only.
+- Recoverable contract failures remain on the explicit `Error` path.
+- The admitted source form should be a compiler-known `panic(code)` or
+  equivalent fatal builtin using ordinary call syntax, not a new control-flow
+  keyword.
+- Failing `panic(code)` must be treated as no-return control flow by sema,
+  MIR, and backend lowering.
+- The mechanism must carry one machine-readable failure code.
+- Keep compiler-owned fatal semantics narrow and deterministic.
+- Do not add stack unwinding, hidden propagation, recovery callbacks, cleanup
+  guarantees on fatal exit, or a general runtime panic object.
+
+Planning rule for this phase
+----------------------------
+Use this sanity check on every Phase 138 change:
+
+- making one fatal path explicit, compiler-visible, and mechanically trivial:
+  admissible
+- shortening recoverable error flow or adding a second branch family:
+  wrong phase
+
+If a proposed change mainly helps invariant spelling rather than introducing
+one primitive fatal capability, it belongs in a later `require` decision once
+the repository has experience with plain `if` plus `panic(code)`.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 138 execution note that defines a compiler-known fatal
+   primitive as the sole new failure feature in this phase
+2. one concrete source contract for `panic(code)` or one equivalent builtin
+   fatal form that keeps ordinary call syntax and avoids a new keyword-owned
+   branch construct
+3. one semantic rule that validates the fault-code shape and marks the call as
+   no-return
+4. one MIR representation and validation path that preserves explicit fatal
+   semantics without lowering them away too early
+5. one backend lowering path that routes the fatal edge through the existing
+   narrow trap or abort mechanism with deterministic code emission
+6. one focused proof set covering sema, MIR, backend, and one freestanding or
+   kernel-shaped consumer using `if !cond { panic(code) }`
+7. one explicit deferral of `require` until the repository can compare it
+   against this primitive on real code rather than on taste alone
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because fatal-path pressure is now real
+in the Canopus direction, but the smallest honest answer is one primitive
+fatal form rather than a broader failure-language redesign or an early
+`require` admission.
+
+Landed contract summary
+-----------------------
+- The admitted fatal primitive is `panic(code)`.
+- `panic(code)` uses ordinary call syntax; no new keyword was added.
+- The operand must be exactly one non-negative compile-time integer fault code.
+- Sema treats `panic(code)` as no-return control flow.
+- MIR preserves the fatal edge explicitly as a dedicated panic terminator.
+- LLVM lowering routes the fatal edge through the existing narrow trap or abort path via a dedicated helper rather than a broader runtime panic framework.
+- Real invariant sites continue to use plain `if !cond { panic(code) }`; `require` remains deferred.
+
+What this phase should try to prove
+-----------------------------------
+- one source-level fatal primitive can express unrecoverable failure without
+  distorting the existing explicit `Error` model
+- sema can classify the fatal call as no-return and keep surrounding control
+  flow honest
+- MIR can preserve the fatal edge explicitly enough for validation and
+  deterministic dumps
+- the backend can lower failure to one deterministic target trap or abort path
+  without inventing a runtime framework
+- one real freestanding or kernel-shaped proof can use `if !cond { panic(code)
+  }` for an internal invariant while ordinary recoverable failures stay
+  explicit
+- the repository can defer `require` honestly until it knows whether plain
+  `if` plus `panic(code)` is sufficient in real code
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/arch/modern-c/open_decisions.txt`
+   - narrow the open question to whether anything beyond the fatal primitive is
+     later justified
+   - explicitly keep `require` deferred pending real code pressure
+
+2. `docs/arch/modern-c/key_decisions.txt`
+   - record the settled rationale for admitting a compiler-known fatal
+     primitive first while leaving recoverable error flow on explicit `Error`
+     returns
+   - explicitly note why this phase does not also admit `require`, `expect`,
+     or a panic keyword
+
+3. `docs/arch/modern-c/language/language_spec.txt`
+   - define the admitted fatal primitive semantics, accepted operand shape,
+     and no-return effect
+   - keep the ordinary error-handling section otherwise unchanged
+
+4. `docs/arch/modern-c/language/syntax/grammar_spec.txt`
+   - touch only if builtin-spelling or reserved-word policy needs an explicit
+     syntax note
+   - prefer keeping the ordinary call grammar unchanged in this phase
+
+5. `docs/arch/modern-c/language/canonical_programs.txt`
+   - add or refresh one narrow example showing explicit `if` plus `panic(code)`
+     on an internal invariant while ordinary fallible operations still return
+     `Error`
+
+6. `compiler/lex/`
+   - touch only if the chosen builtin spelling requires reserved treatment
+   - prefer avoiding token-surface widening if ordinary identifier-plus-call
+     syntax is sufficient
+
+7. `compiler/parse/` and `compiler/ast/`
+   - keep parser and AST changes as small as possible
+   - preferred shape: preserve ordinary call parsing and represent the builtin
+     through existing call nodes unless one explicit marker is required later
+
+8. `compiler/sema/`
+   - recognize the fatal builtin, validate the fault code as the chosen scalar
+     or constant category, and mark the call as no-return in control-flow
+     analysis
+   - keep the builtin separate from ordinary `Error` typing rules and from
+     library-call behavior
+
+9. `compiler/mir/`
+   - add explicit MIR lowering and validation for the fatal primitive
+   - preserve deterministic dumps that make the fatal edge visible
+
+10. `compiler/codegen_llvm/`
+    - lower the fatal path to the narrowest existing primitive the target path
+      already owns
+    - preferred shape: route through one explicit trap or abort primitive
+      rather than synthesizing a richer runtime contract
+
+11. `compiler/support/` and `compiler/driver/`
+    - touch only if one explicit diagnostic, dump, or builtin-plumbing helper
+      is required for deterministic ownership of the new primitive
+    - do not widen CLI policy in this phase
+
+12. `tests/sema/`, `tests/mir/`, and `tests/codegen/`
+    - add the narrowest fixtures proving no-return truth, MIR preservation,
+      and executable lowering
+    - include one negative diagnostic fixture for malformed builtin use
+
+13. `tests/parser/`
+    - touch only if builtin-spelling decisions require parser-visible coverage
+    - otherwise keep parser coverage unchanged to prove the ordinary call
+      grammar remains enough
+
+14. `tests/tool/` or one freestanding proof owner under
+    `tests/tool/freestanding/`
+    - add one real consumer proof that uses `if !cond { panic(code) }` as a
+      fatal invariant path in a kernel-shaped or freestanding slice
+    - keep that proof bounded to fatal primitive semantics rather than a
+      broader panic runtime
+
+Deliverables
+------------
+- one canonical Phase 138 execution plan in `docs/plan/active/`
+- one settled source-level fatal primitive contract
+- one sema, MIR, and backend slice implementing the compiler-known fatal form
+- one focused documentation update across open decisions, key decisions,
+  language spec, and canonical programs
+- one focused regression set across sema, MIR, backend, and one real consumer
+  proof
+- one explicit deferral statement for `require`
+- one decision-log entry if the landed implementation intentionally stops short
+  of a fuller fatal-runtime design
+
+Implemented proof set
+---------------------
+- sema misuse coverage for non-constant `panic(code)` fault codes
+- MIR fixture coverage showing the dedicated panic terminator
+- LLVM backend unit coverage showing panic lowering through the owned helper path
+- one freestanding bootstrap proof using `if !cond { panic(code) }` as an internal invariant edge
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 138 boundary in docs: fatal primitive first, no `require`,
+   no `expect`, no panic keyword, no recoverable-flow redesign.
+2. Choose and document the exact compiler-known fatal form, preferably
+   `panic(code)`.
+3. Land sema recognition, fault-code legality, and no-return control-flow
+   treatment.
+4. Lower the primitive explicitly into MIR and make the fatal edge visible in
+   MIR validation and dumps.
+5. Lower the fatal edge through one narrow backend trap or abort path.
+6. Refresh language and decision docs only after the implementation shape is
+   settled.
+7. Add focused sema, MIR, backend, and real-consumer proof coverage.
+8. Publish `require` as explicitly deferred pending comparison against real use
+   of `if` plus `panic(code)`.
+
+Preferred proof points
+----------------------
+1. One valid `panic(code)` use is treated as no-return by semantic analysis.
+2. One malformed builtin use fails with a narrow diagnostic.
+3. One semantic proof shows that code after an unconditional `panic(code)` edge
+   is treated as unreachable.
+4. One MIR dump shows the fatal edge explicitly rather than as an ordinary
+   library call.
+5. One executable or freestanding proof shows the fatal edge lowers through
+   the owned trap or abort primitive.
+6. One ordinary recoverable `(value, Error)` path remains unchanged in the same
+   proof set.
+7. One invariant site is written as `if !cond { panic(code) }`, proving the
+   repository can evaluate real code before deciding whether `require` adds
+   enough meaning later.
+
+Exit criteria
+-------------
+- the language docs define one compiler-known fatal primitive and explicitly
+  leave recoverable errors on the existing `Error` path
+- sema, MIR, and backend all implement the same fatal primitive contract
+- the fatal edge is treated as no-return across semantic analysis and MIR
+  validation
+- deterministic tests cover semantic legality, semantic misuse, MIR truth, and
+  backend lowering
+- at least one real freestanding or kernel-shaped proof uses `if !cond {
+  panic(code) }` honestly for an internal invariant
+- the repository explicitly defers `require`, `expect`, hidden propagation,
+  stack unwinding, and a broader runtime failure framework in this phase
+
+Exit status
+-----------
+- satisfied: the language docs now define `panic(code)` and keep recoverable errors on the explicit `Error` path
+- satisfied: sema, MIR, and backend implement the same no-return fatal contract
+- satisfied: focused regressions cover semantic legality, semantic misuse, MIR truth, backend lowering, and one freestanding consumer
+- satisfied: `require`, `expect`, hidden propagation, stack unwinding, and broader runtime failure work remain explicitly deferred
+
+Non-goals
+---------
+- a `require` feature
+- a recoverable `expect` feature
+- a formal panic keyword or panic-expression family distinct from ordinary call
+  syntax
+- message-carrying crash objects or formatted panic payloads
+- stack unwinding, cleanup-on-trap guarantees, or exception semantics
+- hidden propagation helpers for `Error`
+- redesigning the existing explicit `(value, Error)` model
+- broad target-runtime or debug-framework expansion beyond one owned fatal
+  primitive

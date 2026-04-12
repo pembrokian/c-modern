@@ -455,6 +455,7 @@ class FunctionLowerer {
             case SpecialCallKind::kMemoryBarrier:
             case SpecialCallKind::kAtomicCompareExchange:
             case SpecialCallKind::kNone:
+            case SpecialCallKind::kPanic:
             case SpecialCallKind::kMmioPtr:
             case SpecialCallKind::kVolatileLoad:
             case SpecialCallKind::kVolatileStore:
@@ -489,6 +490,18 @@ class FunctionLowerer {
                                     ValueInfo* result) {
         if (kind == SpecialCallKind::kNone) {
             return false;
+        }
+
+        if (kind == SpecialCallKind::kPanic) {
+            if (args.size() != 1) {
+                Report({}, "panic(code) expects exactly one argument during MIR lowering");
+                return false;
+            }
+            auto& block = function_.blocks[*current_block_];
+            block.terminator.kind = Terminator::Kind::kPanic;
+            block.terminator.values = {args.front().value};
+            current_block_ = std::nullopt;
+            return true;
         }
 
         if (kind == SpecialCallKind::kArenaNew) {

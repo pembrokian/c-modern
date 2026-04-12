@@ -1,0 +1,5 @@
+Module
+  Function name=abort_now returns=[i32]
+    Block label=entry0
+      const %v0:int_literal op=138
+      terminator panic value=%v0

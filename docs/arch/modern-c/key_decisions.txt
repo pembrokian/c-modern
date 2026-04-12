@@ -69,7 +69,27 @@ Consequence:
 - hosted runtime failures should preserve errno-classification through the encoded scalar channel
 - richer message, source-context, cause-chaining, or heap-backed error objects remain a later follow-up rather than part of the current admitted slice
 
-4. Module Visibility And Package-Internal Sharing
+4. Fatal Primitive Admission Boundary
+
+Decision:
+- admit one compiler-known fatal primitive, `panic(code)`, using ordinary call syntax
+- require exactly one non-negative compile-time integer fault code
+- treat `panic(code)` as no-return control flow in sema, MIR, and backend lowering
+- keep recoverable failure on the explicit `(value, Error)` path
+- do not admit `require`, `expect`, a panic keyword, unwinding, or a broader runtime panic object in the same slice
+
+Why:
+- real freestanding and kernel-shaped code now needs one explicit fatal path that is stronger than a helper convention but narrower than a second failure system
+- ordinary call syntax keeps the parser and source contract small while still letting the compiler own fatal semantics directly
+- preserving the fatal edge explicitly in sema and MIR is more mechanically honest than lowering it immediately into an ordinary library call
+- admitting `require` at the same time would mostly be spelling sugar until real invariant-heavy code proves it carries distinct semantic value
+
+Consequence:
+- internal invariants can now use `if !cond { panic(code) }` without changing the recoverable `Error` model
+- MIR and backend ownership now include one deterministic fatal edge that lowers through the existing narrow trap or abort path
+- any later proposal for `require`, richer panic payloads, or recoverable convenience helpers must justify itself against the landed `panic(code)` baseline in real code
+
+5. Module Visibility And Package-Internal Sharing
 
 Decision:
 - ordinary top-level declarations are public to legal importers by default

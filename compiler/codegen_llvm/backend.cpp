@@ -1811,6 +1811,7 @@ struct CheckedHelperRequirements {
 struct ExecutableRuntimeRequirements {
     bool needs_malloc = false;
     bool needs_free = false;
+    bool needs_panic = false;
 };
 
 void SeedFunctionValueTypes(const mir::Function& function,
@@ -1988,6 +1989,9 @@ ExecutableRuntimeRequirements CollectExecutableRuntimeRequirements(const mir::Mo
                 if (instruction.kind == mir::Instruction::Kind::kBufferFree) {
                     requirements.needs_free = true;
                 }
+            }
+            if (block.terminator.kind == mir::Terminator::Kind::kPanic) {
+                requirements.needs_panic = true;
             }
         }
     }
@@ -4651,6 +4655,36 @@ bool RenderExecutableTerminator(const mir::BasicBlock& block,
             return true;
         }
 
+        case mir::Terminator::Kind::kPanic: {
+            if (block.terminator.values.size() != 1) {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires panic terminators to use exactly one fault code value in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            ExecutableValue code;
+            if (!ResolveExecutableValue(state,
+                                        block.terminator.values.front(),
+                                        block,
+                                        source_path,
+                                        diagnostics,
+                                        code)) {
+                return false;
+            }
+
+            if (code.type.backend_name == "i64") {
+                output_lines.push_back("call void @__mc_panic(i64 " + code.text + ")");
+            } else {
+                const std::string widened_code = "%panic.code." + block.label;
+                output_lines.push_back(widened_code + " = zext " + code.type.backend_name + " " + code.text + " to i64");
+                output_lines.push_back("call void @__mc_panic(i64 " + widened_code + ")");
+            }
+            output_lines.push_back("unreachable");
+            return true;
+        }
+
         case mir::Terminator::Kind::kBranch: {
             std::string label;
             if (!ResolveExecutableBlock(state, block.terminator.true_target, block, source_path, diagnostics, label)) {
@@ -5080,6 +5114,17 @@ bool RenderLlvmModuleImpl(const mir::Module& module,
     }
     stream << "  unreachable\n";
     stream << "}\n\n";
+    if (runtime_requirements.needs_panic) {
+        stream << "define private void @__mc_panic(i64 %code) {\n";
+        stream << "entry:\n";
+        if (target.hosted) {
+            stream << "  %exit.code = trunc i64 %code to i32\n";
+            stream << "  call void @exit(i32 %exit.code)\n";
+        }
+        stream << "  call void @__mc_trap()\n";
+        stream << "  unreachable\n";
+        stream << "}\n\n";
+    }
     stream << "define private void @__mc_check_bounds_index(i64 %index, i64 %len) {\n";
     stream << "entry:\n";
     stream << "  %neg = icmp slt i64 %index, 0\n";

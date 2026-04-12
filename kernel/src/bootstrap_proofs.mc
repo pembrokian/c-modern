@@ -211,7 +211,7 @@ func execute_phase124_delegation_chain_probe(context: LatePhaseProofContext, tra
     local_endpoints = first_send.endpoints
     local_gate = first_send.gate
     if syscall.status_score(first_send.status) != 2 {
-        return false
+        panic(1251)
     }
 
     first_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, intermediary_table, local_endpoints, syscall.build_transfer_receive_request(context.phase124_control_handle_slot, context.phase124_intermediary_receive_handle_slot))
@@ -219,7 +219,7 @@ func execute_phase124_delegation_chain_probe(context: LatePhaseProofContext, tra
     local_endpoints = first_receive.endpoints
     local_gate = first_receive.gate
     if syscall.status_score(first_receive.observation.status) != 2 {
-        return false
+        panic(1252)
     }
     if capability.find_endpoint_for_handle(intermediary_table, context.phase124_intermediary_receive_handle_slot) != context.transfer_endpoint_id {
         return false
@@ -322,19 +322,19 @@ func execute_phase125_invalidation_probe(context: LatePhaseProofContext, transfe
     local_endpoints = second_receive.endpoints
     local_gate = second_receive.gate
     if syscall.status_score(second_receive.observation.status) != 2 {
-        return false
+        panic(1253)
     }
 
     invalidated_final_table: capability.HandleTable = capability.remove_handle(final_table, context.phase124_final_receive_handle_slot)
     if !capability.handle_remove_succeeded(final_table, invalidated_final_table, context.phase124_final_receive_handle_slot) {
-        return false
+        panic(1254)
     }
     final_table = invalidated_final_table
 
     rejected_send: syscall.SendResult = syscall.perform_send(local_gate, final_table, local_endpoints, context.phase124_final_holder_pid, syscall.build_send_request(context.phase124_final_receive_handle_slot, 4, grant_payload))
     PHASE125_REJECTED_SEND_STATUS = rejected_send.status
     if syscall.status_score(PHASE125_REJECTED_SEND_STATUS) != 8 {
-        return false
+        panic(1255)
     }
 
     rejected_receive: syscall.ReceiveResult = syscall.perform_receive(local_gate, final_table, local_endpoints, syscall.build_receive_request(context.phase124_final_receive_handle_slot))

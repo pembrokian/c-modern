@@ -1429,10 +1429,16 @@ class Checker {
         return false;
     }
 
+    bool ExprAlwaysTerminates(const Expr& expr) const {
+        return IsPanicBuiltinCall(expr);
+    }
+
     bool StmtAlwaysReturns(const Stmt& stmt) const {
         switch (stmt.kind) {
             case Stmt::Kind::kReturn:
                 return true;
+            case Stmt::Kind::kExpr:
+                return !stmt.exprs.empty() && stmt.exprs.front() != nullptr && ExprAlwaysTerminates(*stmt.exprs.front());
             case Stmt::Kind::kBlock:
                 return StmtListAlwaysReturns(stmt.statements);
             case Stmt::Kind::kIf:
@@ -1504,6 +1510,45 @@ class Checker {
             .span = stmt.span,
             .resolution = resolution,
         };
+    }
+
+    bool IsPanicBuiltinCall(const Expr& expr) const {
+        if (expr.kind != Expr::Kind::kCall || expr.left == nullptr || expr.type_target != nullptr) {
+            return false;
+        }
+        if (expr.left->kind == Expr::Kind::kName) {
+            return expr.left->text == "panic";
+        }
+        if (expr.left->kind == Expr::Kind::kQualifiedName) {
+            return CombineQualifiedName(*expr.left) == "panic";
+        }
+        return false;
+    }
+
+    Type AnalyzePanicBuiltinCall(const Expr& expr, const std::vector<Type>& arg_types) {
+        if (expr.args.size() != 1) {
+            Report(expr.span,
+                   "panic(code) expects exactly 1 argument but got " + std::to_string(expr.args.size()));
+            return VoidType();
+        }
+
+        const Type& code_type = arg_types.front();
+        if (!IsUnknown(code_type) && !IsIntegerLikeType(code_type, *module_)) {
+            Report(expr.args.front()->span,
+                   "panic(code) requires an integer fault code but got " + FormatType(code_type));
+        }
+
+        std::unordered_set<std::string> active_names;
+        const auto code_value = EvaluateConstExpr(*expr.args.front(), true, active_names);
+        if (!code_value.has_value() || code_value->kind != ConstValue::Kind::kInteger) {
+            Report(expr.args.front()->span, "panic(code) requires a compile-time integer fault code");
+            return VoidType();
+        }
+        if (code_value->integer_value < 0) {
+            Report(expr.args.front()->span, "panic(code) requires a non-negative fault code");
+        }
+
+        return VoidType();
     }
 
     bool HasDuplicateBindingOrAssignBindNames(const Stmt& stmt,
@@ -1886,6 +1931,10 @@ class Checker {
         arg_types.reserve(expr.args.size());
         for (const auto& arg : expr.args) {
             arg_types.push_back(AnalyzeExpr(*arg));
+        }
+
+        if (IsPanicBuiltinCall(expr)) {
+            return AnalyzePanicBuiltinCall(expr, arg_types);
         }
 
         if (!IsUnknown(conversion_target)) {

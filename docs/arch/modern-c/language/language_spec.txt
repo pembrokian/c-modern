@@ -401,6 +401,7 @@ func read() (Data, Error)
 
 Errors are ordinary values.
 The language provides no exceptions and no implicit propagation operator in v0.2.
+The language also admits one fatal primitive for non-recoverable invariant failure: `panic(code)`.
 
 Recommended standard library conventions:
 - Error is the conventional fallible-operation type.
@@ -419,11 +420,22 @@ Known cost:
 - Explicit error handling is intentionally verbose in deeply nested or recursive code.
 - This cost is accepted in v0.2 and should be addressed first through library conventions, not hidden control-flow features.
 
+Fatal primitive rule:
+- `panic(code)` uses ordinary call syntax and is compiler-known rather than a standard library function.
+- `panic(code)` requires exactly one non-negative compile-time integer fault code.
+- `panic(code)` never returns; control flow after an unconditional `panic(code)` is unreachable.
+- `panic(code)` is for non-recoverable internal failure. Recoverable operations must remain on the explicit `Error` path.
+- The language does not add `require`, `expect`, stack unwinding, or cleanup guarantees as part of this primitive.
+
 Example:
 
 data, err = read()
 if err != nil {
     return err
+}
+
+if header_len > packet_len {
+    panic(138)
 }
 
 11. Control Flow

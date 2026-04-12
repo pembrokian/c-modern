@@ -23,6 +23,7 @@ struct ValuePiece {
 
 enum class SpecialCallKind {
     kNone,
+    kPanic,
     kMmioPtr,
     kBufferNew,
     kBufferFree,

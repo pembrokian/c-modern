@@ -35,8 +35,13 @@ bool ValidateFunctionStructure(const Function& function,
                 fail("unterminated MIR block in function " + function.name + ": " + block.label);
                 break;
             case Terminator::Kind::kReturn:
+            case Terminator::Kind::kPanic:
                 if (!block.terminator.true_target.empty() || !block.terminator.false_target.empty()) {
-                    fail("return terminator must not name branch targets in function " + function.name + ": " + block.label);
+                    fail(std::string(block.terminator.kind == Terminator::Kind::kReturn ? "return" : "panic") +
+                         " terminator must not name branch targets in function " + function.name + ": " + block.label);
+                }
+                if (block.terminator.kind == Terminator::Kind::kPanic && block.terminator.values.size() != 1) {
+                    fail("panic terminator must carry exactly one fault code value in function " + function.name + ": " + block.label);
                 }
                 break;
             case Terminator::Kind::kBranch:

@@ -1589,6 +1589,17 @@ bool ValidateModule(const Module& module,
                         }
                     }
                     break;
+                case Terminator::Kind::kPanic:
+                    if (block.terminator.values.size() == 1 && !defined_values.contains(block.terminator.values.front())) {
+                        report("panic terminator must use one defined MIR fault code in function " + function.name);
+                    } else if (block.terminator.values.size() == 1) {
+                        const auto found_type = value_types.find(block.terminator.values.front());
+                        const sema::Type code_type = found_type == value_types.end() ? sema::UnknownType() : found_type->second;
+                        if (!sema::IsUnknown(code_type) && !IsIntegerLikeType(module, code_type)) {
+                            report("panic terminator fault code must have integer type in function " + function.name);
+                        }
+                    }
+                    break;
                 case Terminator::Kind::kBranch:
                     break;
                 case Terminator::Kind::kCondBranch:

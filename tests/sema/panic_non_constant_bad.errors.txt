@@ -1,0 +1,1 @@
+panic(code) requires a compile-time integer fault code

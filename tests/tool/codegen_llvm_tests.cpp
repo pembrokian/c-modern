@@ -46,6 +46,33 @@ mc::mir::Module MakeMinimalSupportedModule() {
     };
 }
 
+mc::mir::Module MakePanicModule() {
+    mc::mir::Instruction code {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%v0",
+        .type = mc::sema::NamedType("i64"),
+        .op = "77",
+    };
+
+    mc::mir::BasicBlock entry {
+        .label = "entry0",
+        .instructions = {code},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kPanic,
+            .values = {"%v0"},
+        },
+    };
+
+    mc::mir::Function main_function {
+        .name = "main",
+        .blocks = {entry},
+    };
+
+    return {
+        .functions = {main_function},
+    };
+}
+
 void TestBootstrapTargetConfigIsStable() {
     const auto target = mc::codegen_llvm::BootstrapTargetConfig();
     Expect(target.triple == "arm64-apple-darwin25.4.0", "bootstrap target triple should stay frozen");
@@ -321,6 +348,40 @@ void TestBuildObjectFileRejectsUnsupportedExecutableInstructionBeforeIrEmission(
         Expect(ir.find("call void @exit(i32 134)") == std::string::npos,
             "freestanding trap helper should not call hosted exit support");
     }
+
+void TestBuildObjectFileLowersPanicTerminator() {
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_panic_object";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        MakePanicModule(),
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "panic.ll",
+                .object_path = artifact_dir / "panic.o",
+            },
+            .wrap_hosted_main = false,
+        },
+        diagnostics);
+
+    Expect(object_result.ok, "panic terminator object emission should succeed");
+    Expect(!diagnostics.HasErrors(), "panic terminator object emission should not emit backend diagnostics");
+
+    std::ifstream ir_stream(artifact_dir / "panic.ll");
+    Expect(ir_stream.good(), "panic terminator object emission should write LLVM IR output");
+    const std::string ir((std::istreambuf_iterator<char>(ir_stream)), std::istreambuf_iterator<char>());
+    Expect(ir.find("define private void @__mc_panic(i64 %code)") != std::string::npos,
+           "panic terminator lowering should emit the shared panic helper");
+    Expect(ir.find("call void @__mc_panic(i64 77)") != std::string::npos,
+           "panic terminator lowering should preserve the fault code operand");
+    Expect(ir.find("call void @exit(i32 %exit.code)") != std::string::npos,
+           "hosted panic lowering should route through exit with the panic code");
+}
 
 void TestLowerModuleLowersCheckedIntegerSemantics() {
     mc::mir::Instruction lhs {
@@ -1066,6 +1127,7 @@ int main() {
     TestLowerModuleRejectsUnsupportedInstruction();
     TestBuildObjectFileRejectsUnsupportedExecutableInstructionBeforeIrEmission();
     TestBuildObjectFileFreestandingOmitsHostedRuntimePrologue();
+    TestBuildObjectFileLowersPanicTerminator();
     TestLowerModuleLowersCheckedIntegerSemantics();
     TestLowerModuleLowersRepresentationPreservingConversions();
     TestEnumPayloadLayoutUsesSharedAlignedStorage();
