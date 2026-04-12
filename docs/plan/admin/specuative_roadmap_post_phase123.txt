@@ -263,14 +263,17 @@ Non-goal:
 - optimizing IPC for performance before correctness is stressed
 
 Phase 131 -- Fan-In Or Fan-Out Composition Probe
+- Phase 131 is now concrete as one bounded fan-out composition probe over the landed partial-failure and retained-handle authority path.
 - Exit criterion: one bounded fan-in or fan-out topology preserves explicit
   ownership and does not leak scheduler policy into IPC semantics.
 
 Phase 132 -- Backpressure And Blocking Audit
+- Phase 132 is now concrete as one bounded backpressure and blocking audit over the landed fan-out composition path.
 - Exit criterion: one bounded backpressure case preserves clean block or wake
   ownership without requiring hidden ordering assumptions for correctness.
 
 Phase 133 -- Message Lifetime And Reuse Audit
+- Phase 133 is now concrete as one bounded message lifetime and reuse audit over the landed fan-out and backpressure path.
 - Exit criterion: one bounded message lifetime and reuse path proves that copy,
   ownership, and retirement rules remain explicit under deeper composition.
 
@@ -300,19 +303,23 @@ Non-goal:
 - a general in-kernel device stack
 
 Phase 134 -- Minimal Device-Service Handoff
+- Phase 134 is now concrete as one bounded UART receive device-service handoff over the landed message-lifetime and interrupt-entry path.
 - Exit criterion: one real device-facing event path can cross from interrupt or
   kernel mediation into one user-space service without turning the kernel into
   a driver framework.
 
 Phase 135 -- Buffer Ownership Boundary Audit
+- Phase 135 is now concrete as one bounded buffer ownership boundary audit over the landed device-service handoff path.
 - Exit criterion: one bounded device buffer path keeps ownership explicit end
   to end without adding an in-kernel policy layer.
 
 Phase 136 -- Device Failure Containment Probe
+- Phase 136 is now concrete as one bounded device failure containment probe over the landed device-service handoff and buffer-ownership path.
 - Exit criterion: one bounded device-failure path remains explicit and does not
   trigger broad kernel policy growth.
 
 Phase 137 -- Optional DMA-Or-Equivalent Follow-Through
+- Phase 137 is now concrete as one bounded optional completion-backed follow-through over the landed device-service and buffer-ownership path.
 - Exit criterion: only if Phase 134 through Phase 136 prove it is the narrowest
   next owner, one bounded DMA or equivalent transfer-boundary truth can be
   admitted without widening into a general in-kernel driver stack.

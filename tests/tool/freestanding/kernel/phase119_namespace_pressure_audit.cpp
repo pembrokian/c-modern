@@ -103,8 +103,8 @@ void RunFreestandingKernelPhase119NamespacePressureAudit(const std::filesystem::
                                                                     "phase119_namespace_pressure_audit.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase119_namespace_pressure_audit.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase119_namespace_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
@@ -125,7 +125,7 @@ void RunFreestandingKernelPhase119NamespacePressureAudit(const std::filesystem::
     const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase119BehaviorSlice(build_dir, build_targets);
     ExpectPhase119PublicationSlice(phase_doc_path,
-                                   common_paths.roadmap_path,
+                                   ResolveCanopusRoadmapPath(source_root, 119),
                                    common_paths.kernel_readme_path,
                                    common_paths.repo_map_path,
                                    common_paths.freestanding_readme_path,

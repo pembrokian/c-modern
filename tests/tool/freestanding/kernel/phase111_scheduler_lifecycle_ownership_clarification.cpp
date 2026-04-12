@@ -87,8 +87,8 @@ void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const
                                                                     "phase111_scheduler_lifecycle_ownership_clarification.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase111_scheduler_lifecycle_ownership_clarification.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase111_lifecycle_ownership_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",

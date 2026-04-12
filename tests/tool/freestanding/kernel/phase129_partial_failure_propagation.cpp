@@ -118,8 +118,8 @@ void RunFreestandingKernelPhase129PartialFailurePropagation(const std::filesyste
     const std::filesystem::path tool_readme_path = source_root / "tests" / "tool" / "README.md";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase129_partial_failure_propagation.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase129_partial_failure_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
@@ -140,7 +140,7 @@ void RunFreestandingKernelPhase129PartialFailurePropagation(const std::filesyste
     const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase129BehaviorSlice(build_dir, build_targets);
     ExpectPhase129PublicationSlice(phase_doc_path,
-                                   common_paths.roadmap_path,
+                                   ResolveCanopusRoadmapPath(source_root, 129),
                                    position_path,
                                    common_paths.kernel_readme_path,
                                    common_paths.repo_map_path,

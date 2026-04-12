@@ -142,12 +142,18 @@ void RunFreestandingKernelPhase144StatefulKeyValueServiceFollowThrough(const std
 void RunFreestandingKernelPhase145ServiceRestartFailureAndUsagePressureAudit(const std::filesystem::path& source_root,
                                                                              const std::filesystem::path& binary_root,
                                                                              const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase146ServiceShapeConsolidation(const std::filesystem::path& source_root,
+                                                            const std::filesystem::path& binary_root,
+                                                            const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase147IpcShapeAuditUnderRealUsage(const std::filesystem::path& source_root,
+                                                              const std::filesystem::path& binary_root,
+                                                              const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
 
-const std::array<KernelTestCase, 42> kKernelTestCases = {{
+const std::array<KernelTestCase, 44> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
@@ -174,22 +180,24 @@ const std::array<KernelTestCase, 42> kKernelTestCases = {{
     {"phase124_delegation_chain_stress", 5, &RunFreestandingKernelPhase124DelegationChainStress},
     {"phase125_invalidation_and_rejection_audit", 5, &RunFreestandingKernelPhase125InvalidationAndRejectionAudit},
     {"phase126_authority_lifetime_classification", 5, &RunFreestandingKernelPhase126AuthorityLifetimeClassification},
-    {"phase128_service_death_observation", 5, &RunFreestandingKernelPhase128ServiceDeathObservation},
-    {"phase129_partial_failure_propagation", 5, &RunFreestandingKernelPhase129PartialFailurePropagation},
-    {"phase130_explicit_restart_or_replacement", 5, &RunFreestandingKernelPhase130ExplicitRestartOrReplacement},
-    {"phase131_fan_in_or_fan_out_composition", 5, &RunFreestandingKernelPhase131FanInOrFanOutComposition},
-    {"phase132_backpressure_and_blocking", 5, &RunFreestandingKernelPhase132BackpressureAndBlocking},
-    {"phase133_message_lifetime_and_reuse", 5, &RunFreestandingKernelPhase133MessageLifetimeAndReuse},
-    {"phase134_minimal_device_service_handoff", 5, &RunFreestandingKernelPhase134MinimalDeviceServiceHandoff},
-    {"phase135_buffer_ownership_boundary_audit", 5, &RunFreestandingKernelPhase135BufferOwnershipBoundaryAudit},
-    {"phase136_device_failure_containment_probe", 5, &RunFreestandingKernelPhase136DeviceFailureContainmentProbe},
-    {"phase137_optional_dma_or_equivalent_follow_through", 5, &RunFreestandingKernelPhase137OptionalDmaOrEquivalentFollowThrough},
-    {"phase140_serial_ingress_composed_service_graph", 5, &RunFreestandingKernelPhase140SerialIngressComposedServiceGraph},
-    {"phase141_interactive_service_system_scope_freeze", 5, &RunFreestandingKernelPhase141InteractiveServiceSystemScopeFreeze},
-    {"phase142_serial_shell_command_routing", 5, &RunFreestandingKernelPhase142SerialShellCommandRouting},
-    {"phase143_long_lived_log_service_follow_through", 5, &RunFreestandingKernelPhase143LongLivedLogServiceFollowThrough},
-    {"phase144_stateful_key_value_service_follow_through", 5, &RunFreestandingKernelPhase144StatefulKeyValueServiceFollowThrough},
-    {"phase145_service_restart_failure_and_usage_pressure_audit", 5, &RunFreestandingKernelPhase145ServiceRestartFailureAndUsagePressureAudit},
+    {"phase128_service_death_observation", 6, &RunFreestandingKernelPhase128ServiceDeathObservation},
+    {"phase129_partial_failure_propagation", 6, &RunFreestandingKernelPhase129PartialFailurePropagation},
+    {"phase130_explicit_restart_or_replacement", 6, &RunFreestandingKernelPhase130ExplicitRestartOrReplacement},
+    {"phase131_fan_in_or_fan_out_composition", 6, &RunFreestandingKernelPhase131FanInOrFanOutComposition},
+    {"phase132_backpressure_and_blocking", 6, &RunFreestandingKernelPhase132BackpressureAndBlocking},
+    {"phase133_message_lifetime_and_reuse", 7, &RunFreestandingKernelPhase133MessageLifetimeAndReuse},
+    {"phase134_minimal_device_service_handoff", 7, &RunFreestandingKernelPhase134MinimalDeviceServiceHandoff},
+    {"phase135_buffer_ownership_boundary_audit", 7, &RunFreestandingKernelPhase135BufferOwnershipBoundaryAudit},
+    {"phase136_device_failure_containment_probe", 7, &RunFreestandingKernelPhase136DeviceFailureContainmentProbe},
+    {"phase137_optional_dma_or_equivalent_follow_through", 7, &RunFreestandingKernelPhase137OptionalDmaOrEquivalentFollowThrough},
+    {"phase140_serial_ingress_composed_service_graph", 8, &RunFreestandingKernelPhase140SerialIngressComposedServiceGraph},
+    {"phase141_interactive_service_system_scope_freeze", 8, &RunFreestandingKernelPhase141InteractiveServiceSystemScopeFreeze},
+    {"phase142_serial_shell_command_routing", 8, &RunFreestandingKernelPhase142SerialShellCommandRouting},
+    {"phase143_long_lived_log_service_follow_through", 9, &RunFreestandingKernelPhase143LongLivedLogServiceFollowThrough},
+    {"phase144_stateful_key_value_service_follow_through", 9, &RunFreestandingKernelPhase144StatefulKeyValueServiceFollowThrough},
+    {"phase145_service_restart_failure_and_usage_pressure_audit", 9, &RunFreestandingKernelPhase145ServiceRestartFailureAndUsagePressureAudit},
+    {"phase146_service_shape_consolidation", 9, &RunFreestandingKernelPhase146ServiceShapeConsolidation},
+    {"phase147_ipc_shape_audit_under_real_usage", 9, &RunFreestandingKernelPhase147IpcShapeAuditUnderRealUsage},
 }};
 
 void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,
@@ -261,6 +269,30 @@ void RunFreestandingKernelToolSuiteShard5(const std::filesystem::path& source_ro
                                           const std::filesystem::path& binary_root,
                                           const std::filesystem::path& mc_path) {
     RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 5);
+}
+
+void RunFreestandingKernelToolSuiteShard6(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path) {
+    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 6);
+}
+
+void RunFreestandingKernelToolSuiteShard7(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path) {
+    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 7);
+}
+
+void RunFreestandingKernelToolSuiteShard8(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path) {
+    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 8);
+}
+
+void RunFreestandingKernelToolSuiteShard9(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& binary_root,
+                                          const std::filesystem::path& mc_path) {
+    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 9);
 }
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,

@@ -18,6 +18,8 @@ Record one maintained repository position after Phase 142 published one bounded 
 Record one maintained repository position after Phase 143 published one bounded long-lived log-service follow-through over that same slice.
 Record one maintained repository position after Phase 144 published one bounded stateful key-value service follow-through over that same slice.
 Record one maintained repository position after Phase 145 published one bounded service restart, failure, and usage pressure audit over that same slice.
+Record one maintained repository position after Phase 146 published one bounded service-shape consolidation step over that same slice.
+Record one maintained repository position after Phase 147 published one bounded IPC-shape audit under real usage over that same slice.
 
 This note answers four questions that now matter:
 
@@ -61,6 +63,8 @@ This position statement is meant to stay aligned with:
 - `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
 - `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
 - `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
 - `docs/plan/phase121_kernel_image_contract_hardening.txt`
 - `docs/plan/phase122_target_surface_audit.txt`
@@ -150,6 +154,8 @@ Current repository truth
   that same admitted slice rather than to a broader storage layer, database
   abstraction, middleware framework, or reopened compiler wave.
 - The landed Phase 145 service restart, failure, and usage pressure audit also belongs to that same admitted slice rather than to a broader supervision, recovery, rebinding, or reopened compiler wave.
+- The landed Phase 146 service-shape consolidation step also belongs to that same admitted slice rather than to a broader service framework, runtime abstraction, dynamic registration model, or reopened compiler wave.
+- The landed Phase 147 IPC-shape audit under real usage also belongs to that same admitted slice rather than to a broader message bus, dynamic payload model, transport rewrite, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation

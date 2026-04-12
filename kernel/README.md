@@ -6,33 +6,41 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
-- Phase 142 has moved the repository-owned kernel artifact beyond the landed Phase 141 shell-owner freeze into one bounded serial shell command-routing step.
-- Phase 142 therefore now publishes one bounded serial shell command-routing step.
-- Phase 143 has moved the repository-owned kernel artifact beyond the landed Phase 142 shell command-routing step into one bounded long-lived log-service follow-through.
-- Phase 143 therefore now publishes one bounded long-lived log-service follow-through.
+- Phase 146 has moved the repository-owned kernel artifact beyond the landed Phase 145 restart-and-usage audit into one bounded service-shape consolidation step.
+- Phase 146 therefore now publishes one bounded service-shape consolidation step.
+- Phase 147 has moved the repository-owned kernel artifact beyond the landed Phase 146 service-shape consolidation step into one bounded IPC-shape audit under real usage.
+- Phase 147 therefore now publishes one bounded IPC-shape audit under real usage.
 - Phase 144 has moved the repository-owned kernel artifact beyond the landed Phase 143 long-lived log-service step into one bounded stateful key-value service follow-through.
 - Phase 144 therefore now publishes one bounded stateful key-value service follow-through.
 - Phase 145 has moved the repository-owned kernel artifact beyond the landed Phase 144 stateful key-value step into one bounded service restart, failure, and usage pressure audit.
 - Phase 145 therefore now publishes one bounded service restart, failure, and usage pressure audit.
+- Phase 143 has moved the repository-owned kernel artifact beyond the landed Phase 142 shell command-routing step into one bounded long-lived log-service follow-through.
+- Phase 143 therefore now publishes one bounded long-lived log-service follow-through.
+- Phase 142 has moved the repository-owned kernel artifact beyond the landed Phase 141 shell-owner freeze into one bounded serial shell command-routing step.
+- Phase 142 therefore now publishes one bounded serial shell command-routing step.
 - Phase 141 has moved the repository-owned kernel artifact beyond the landed Phase 140 composed-graph step into one bounded interactive service system scope freeze with a concrete shell owner and a concrete key-value owner.
 - Phase 141 therefore now publishes one bounded interactive service system scope freeze.
-
-- Phase 137 has moved the repository-owned kernel artifact beyond the landed
-  Phase 136 containment step into one bounded optional completion-backed UART
-  receive follow-through.
-- Phase 137 therefore now publishes one bounded optional completion-backed UART receive follow-through.
 - Phase 140 has moved the repository-owned kernel artifact beyond the landed
   Phase 137 completion-backed step into one bounded serial-ingress composed
   service graph.
 - Phase 140 therefore now publishes one bounded serial-ingress composed service graph.
+- Phase 137 has moved the repository-owned kernel artifact beyond the landed
+  Phase 136 containment step into one bounded optional completion-backed UART
+  receive follow-through.
+- Phase 137 therefore now publishes one bounded optional completion-backed UART receive follow-through.
+- Phase 136 has moved the repository-owned kernel artifact beyond the landed
+  Phase 135 ownership step into one bounded device failure containment probe.
 - Phase 135 has moved the repository-owned kernel artifact beyond the landed
   Phase 134 minimal device-service handoff into one bounded UART receive-frame
   ownership boundary audit.
-- Phase 136 has moved the repository-owned kernel artifact beyond the landed
-  Phase 135 ownership step into one bounded device failure containment probe.
 - Phase 134 has moved the repository-owned kernel artifact beyond the landed
   Phase 133 message lifetime and reuse audit into one bounded UART receive
   device-service handoff.
+- Phase 133 has moved the repository-owned kernel artifact beyond the landed
+  Phase 132 backpressure and blocking audit into one bounded message lifetime and reuse audit.
+- Phase 132 has moved the repository-owned kernel artifact beyond the landed
+  Phase 131 fan-out composition probe into one bounded backpressure and
+  blocking audit.
 - Phase 131 has moved the repository-owned kernel artifact beyond the landed
   Phase 130 explicit restart or replacement step into one bounded fan-out
   composition probe.
@@ -112,7 +120,7 @@ Current files
   step, one bounded service death observation step, one bounded partial
   failure propagation step, one bounded explicit restart or replacement
   probe, one bounded fan-out composition probe, one bounded device failure
-  containment probe, one bounded serial-ingress composed service graph, one bounded serial shell command-routing step, one bounded long-lived log-service follow-through step, and thin root orchestration across the owned scheduler,
+  containment probe, one bounded serial-ingress composed service graph, one bounded serial shell command-routing step, one bounded long-lived log-service follow-through step, one bounded service-shape consolidation step, one bounded IPC-shape audit under real usage, and thin root orchestration across the owned scheduler,
   lifecycle, bootstrap helper, and debug audit modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
   `module_sets.bootstrap_audit`, owning the extracted Phase 104 contract
@@ -142,9 +150,10 @@ Current files
   Phase 126 authority lifetime classification audit, Phase 128 service death
   observation audit, Phase 129 partial failure propagation audit, Phase 130
   explicit restart or replacement audit, Phase 131 fan-out composition audit,
-  Phase 134 minimal device-service handoff audit, Phase 135 buffer ownership
-  boundary audit, Phase 136 device failure containment audit, Phase 137
-  optional completion-backed follow-through audit, Phase 140 serial-ingress composed service-graph audit, Phase 141 interactive-service scope-freeze audit, Phase 142 serial shell command-routing audit, Phase 143 long-lived log-service audit, Phase 144 stateful key-value audit, and Phase 145 service restart and usage-pressure audit
+  Phase 132 backpressure and blocking audit, Phase 133 message lifetime and
+  reuse audit, Phase 134 minimal device-service handoff audit, Phase 135
+  buffer ownership boundary audit, Phase 136 device failure containment audit,
+  Phase 137 optional completion-backed follow-through audit, Phase 140 serial-ingress composed service-graph audit, Phase 141 interactive-service scope-freeze audit, Phase 142 serial shell command-routing audit, Phase 143 long-lived log-service audit, Phase 144 stateful key-value audit, Phase 145 service restart and usage-pressure audit, Phase 146 service-shape consolidation audit, and Phase 147 IPC-shape audit under real usage
 - `src/log_service.mc`: bounded log-service protocol state, retained in-memory
   ordered log state, explicit overwrite-on-full policy, acknowledgment
   payload, retained-log observation records, and final handshake observation

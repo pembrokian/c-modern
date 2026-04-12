@@ -98,8 +98,8 @@ void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const
                                                                     "phase113_interrupt_entry_and_generic_dispatch_boundary.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase113_interrupt_entry_and_generic_dispatch_boundary.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase113_interrupt_boundary_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
@@ -120,7 +120,7 @@ void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const
     const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase113BehaviorSlice(build_dir, build_targets);
     ExpectPhase113PublicationSlice(phase_doc_path,
-                                   common_paths.roadmap_path,
+                                   ResolveCanopusRoadmapPath(source_root, 113),
                                    common_paths.repo_map_path,
                                    common_paths.freestanding_readme_path,
                                    common_paths.decision_log_path,

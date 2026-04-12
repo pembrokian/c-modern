@@ -1,6 +1,7 @@
 BUILD_DIR ?= build/debug
 CONFIG ?= Debug
 MC ?= $(BUILD_DIR)/bin/mc
+CTEST_JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
 
 .PHONY: build test first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate freestanding-support-audit release-snapshot-prep clean-legacy-build-debris format dump-paths clean
 
@@ -9,7 +10,7 @@ build:
 	cmake --build "$(BUILD_DIR)"
 
 test: build
-	ctest --test-dir "$(BUILD_DIR)" --output-on-failure
+	ctest --test-dir "$(BUILD_DIR)" -j"$(CTEST_JOBS)" --output-on-failure
 
 first-use-smoke: build
 	ctest --test-dir "$(BUILD_DIR)" -R '^mc_first_use_smoke$$' --output-on-failure

@@ -3,21 +3,34 @@ Phase 147 -- IPC Shape Audit Under Real Usage
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
-Continue from the planned Phase 146 service-shape consolidation step by
+Continue from the completed Phase 146 service-shape consolidation step by
 revisiting request, reply, and payload shape under repeated real usage of the
 landed shell, log, and key-value system rather than under synthetic
 composition pressure alone.
 
-This document is an execution plan for Phase 147.
-It defines one bounded IPC-shape phase that must land as explicit message-
-vocabulary and helper truth over the real interactive system before it is
-treated as a stable communication pattern.
-It does not claim dynamic typing, a message bus, a general serialization
-layer, or a broad transport rewrite.
+This document records the landed Phase 147 slice.
+It defines one bounded IPC-shape phase that lands as an explicit sufficiency
+judgment over the real interactive system before the repository widens into
+broader messaging claims.
+It does not claim dynamic payload typing, a message bus, a general
+serialization layer, or a broad transport rewrite.
+It does not claim dynamic payload typing, a generic message bus, a general serialization layer, or compiler expansion.
+
+Phase result
+------------
+Phase 147 is complete as one bounded IPC-shape audit under repeated real usage of the landed interactive-service slice.
+
+The landed repository slice now includes:
+
+- one repeated mixed shell workflow that exercises `log append`, `log tail`, `kv set`, repeated `kv get`, and repeated `log tail` over the real shell-to-service path
+- one explicit judgment that the current compact shell-plus-service message vocabulary remains sufficient for the landed small system
+- one explicit judgment that reply shapes remain intentionally service-local rather than collapsing into a generic reply algebra
+- one explicit service-to-service observation path where `kv_service` emits its fixed write observation into `log_service` under repeated use
+- one focused Phase 147 audit and one focused freestanding regression over the same repeated-usage IPC-shape boundary
 
 Relationship to companion notes
 -------------------------------
@@ -36,12 +49,12 @@ Repository status note
 ----------------------
 - Earlier phases already proved bounded IPC composition, backpressure,
   message-lifetime truth, and one compact four-byte shell route.
-- The current small system is now useful enough to reveal whether request and
-  reply shapes feel natural under repeated command traffic rather than only
-  under one-off proofs.
-- The repository therefore no longer needs another abstract IPC stress phase
-  first. It needs one usage-grounded audit of whether the current message
-  vocabulary remains sufficient or exposes one narrow helper opportunity.
+- Phase 146 extracted the minimal service shape, but it still reused a
+  structural snapshot of the Phase 145 restart path rather than one repeated
+  mixed-service shell workflow.
+- The repository therefore needed one usage-grounded audit of whether the
+  current message vocabulary remains sufficient under repeated real command
+  traffic.
 
 Problem being solved
 --------------------
@@ -51,9 +64,9 @@ Problem being solved
 - Without one explicit audit, later growth could answer that awkwardness by
   reaching too quickly for dynamic message formats, wider frameworks, or a bus
   abstraction.
-- The repository therefore needs one bounded phase that classifies current
-  IPC-shape friction honestly and admits at most one ownership-visible helper
-  or vocabulary adjustment if the real system proves it necessary.
+- The repository therefore needed one bounded phase that classifies current
+  IPC-shape friction honestly and records whether the current vocabulary is
+  already sufficient.
 
 Core rule
 ---------
@@ -97,10 +110,14 @@ Targeted boundary shape:
 
 Chosen outcome
 --------------
-Chosen outcome: yes.
+Chosen outcome: landed with no new transport or compiler helper admitted.
 
-The repository should take this phase because message-shape friction is the
-most likely first structural limit exposed by the landed interactive system.
+The repeated shell workflow exposed no evidence that the current compact
+vocabulary is insufficient for the landed shell, log, and key-value system.
+The landed repeated shell workflow confirms that the current compact shell-plus-service message vocabulary remains sufficient for this bounded slice.
+Request construction remains explicit and shell-owned, reply shapes remain
+intentionally service-local, and the fixed key-value write observation into
+`log_service` remains sufficient as the service-to-service path in this band.
 
 What this phase should try to prove
 -----------------------------------
@@ -154,13 +171,22 @@ The owning implementation surfaces for this phase are:
 
 Deliverables
 ------------
-- one canonical Phase 147 execution plan in `docs/plan/active/`
+- one canonical Phase 147 execution note in `docs/plan/active/`
 - one explicit IPC-shape judgment for the landed interactive system
-- zero or one narrow helper or vocabulary adjustment justified by repeated use
-- one debug-owned Phase 147 audit over the real request and reply paths
+- zero new transport or compiler helpers because the current vocabulary proved sufficient in this bounded slice
+- one debug-owned Phase 147 audit over the real repeated request and reply paths
 - one focused freestanding regression plus projected MIR golden for the Phase
   147 boundary
-- refreshed supporting docs only after the IPC-shape judgment is stable
+- refreshed supporting docs aligned to the landed repeated-usage IPC judgment
+
+Execution summary
+-----------------
+1. Keep the landed transport, shell routing, and service semantics unchanged.
+2. Exercise one repeated mixed shell workflow over `log_service` and `kv_service` rather than only the Phase 145 restart path.
+3. Confirm that request construction remains shell-owned and explicit without admitting a generic request helper or transport widening.
+4. Confirm that reply shapes remain intentionally service-local: `log tail` returns a retained-state pair while `kv get` returns a key-value-plus-found-state reply.
+5. Confirm that the existing fixed service-to-service observation path from `kv_service` into `log_service` remains explicit and sufficient.
+6. Add one Phase 147 audit, one projected MIR golden, and aligned docs over that bounded IPC-shape judgment.
 
 Suggested execution order
 -------------------------
@@ -198,9 +224,18 @@ Exit criteria
   Phase 147 boundary
 - the compiler and low-level toolchain surfaces remain unchanged in this phase
 
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 147 slice
+- the landed repeated shell workflow confirms that the current compact shell-plus-service message vocabulary remains sufficient for the real log-plus-key-value usage band
+- request construction remains explicit and shell-owned without justifying a generic request helper, payload-width expansion, or transport rewrite
+- reply-shape divergence remains intentional and service-local: `log tail` publishes retained log bytes while `kv get` publishes key, value, and found-state truth
+- the fixed `kv_service` write observation into `log_service` remains the explicit service-to-service observation path for this band
+- compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces remain closed in this phase
+
 Non-goals
 ---------
-- dynamic message typing or generic serialization
+- dynamic payload typing or generic serialization
 - a message bus, broker, or general communication framework
 - hidden transport widening detached from the real system pressure
 - broader shell redesign, discovery, or platform growth

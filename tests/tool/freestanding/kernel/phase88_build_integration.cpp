@@ -69,7 +69,7 @@ void RunFreestandingKernelPhase88BuildIntegrationAudit(const std::filesystem::pa
 
     const std::filesystem::path project_path = project_root / "build.toml";
     const std::filesystem::path build_dir = binary_root / "kernel_build_integration_build";
-    std::filesystem::remove_all(build_dir);
+    MaybeCleanBuildDir(build_dir);
 
     BuildProjectTargetAndExpectSuccess(mc_path,
                                        project_path,

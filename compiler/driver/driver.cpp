@@ -1384,6 +1384,57 @@ int RunCheck(const CommandOptions& options) {
     return 0;
 }
 
+namespace {
+
+bool CollectAllGraphSourcePaths(const TargetBuildGraph& graph,
+                                std::filesystem::file_time_type cutoff) {
+    for (const auto& node : graph.compile_graph.nodes) {
+        for (const auto& source_path : node.source_paths) {
+            std::error_code ec;
+            const auto mtime = std::filesystem::last_write_time(source_path, ec);
+            if (ec || mtime >= cutoff) {
+                return false;
+            }
+        }
+    }
+    for (const auto& linked : graph.linked_targets) {
+        if (!CollectAllGraphSourcePaths(linked, cutoff)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsProjectBuildFreshForDump(const TargetBuildGraph& graph) {
+    if (graph.compile_graph.nodes.empty()) {
+        return false;
+    }
+    const auto& entry_node = graph.compile_graph.nodes.back();
+    const auto dump_targets = support::ComputeLogicalDumpTargets(entry_node.artifact_key, graph.compile_graph.build_dir);
+    const auto build_targets = support::ComputeLogicalBuildArtifactTargets(entry_node.artifact_key, graph.compile_graph.build_dir);
+    const bool is_exe = IsExecutableTargetKind(graph.target.kind);
+    const std::filesystem::path& primary_artifact = is_exe ? build_targets.executable : build_targets.static_library;
+    std::error_code ec;
+    if (!std::filesystem::exists(dump_targets.mir, ec) || ec) {
+        return false;
+    }
+    if (!std::filesystem::exists(primary_artifact, ec) || ec) {
+        return false;
+    }
+    const auto dump_time = std::filesystem::last_write_time(dump_targets.mir, ec);
+    if (ec) {
+        return false;
+    }
+    const auto build_time = std::filesystem::last_write_time(primary_artifact, ec);
+    if (ec) {
+        return false;
+    }
+    const auto cutoff = std::min(dump_time, build_time);
+    return CollectAllGraphSourcePaths(graph, cutoff);
+}
+
+}  // namespace
+
 int RunBuild(const CommandOptions& options) {
     support::DiagnosticSink diagnostics;
     if (ClassifyInvocation(options) == InvocationKind::kDirectSource) {
@@ -1403,6 +1454,12 @@ int RunBuild(const CommandOptions& options) {
         std::cerr << diagnostics.Render() << '\n';
         return 1;
     }
+
+    if (options.dump_mir && !options.dump_ast && !options.dump_backend && IsProjectBuildFreshForDump(*graph)) {
+        std::cout << "target " << graph->target.name << " up to date\n";
+        return 0;
+    }
+
     auto build_result = BuildProjectTarget(*graph, diagnostics);
     if (!build_result.has_value() || build_result->units.empty()) {
         std::cerr << diagnostics.Render() << '\n';

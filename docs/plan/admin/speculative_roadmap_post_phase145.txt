@@ -220,10 +220,7 @@ Why this band comes first:
   pattern, and failing to do so now risks normalizing accidental complexity.
 
 Phase 146 -- Service Shape Consolidation
-- Exit criterion: the repository can publish one explicit Phase 146 note that
-  classifies the common structural shape shared by shell, log, and key-value
-  owners, identifies where they intentionally differ, and records which parts
-  belong to user-space convention rather than to kernel or language surfaces.
+- Phase 146 is now concrete as one bounded service-shape consolidation step with one published minimal service-shape statement, one explicit shell-syntax-versus-service-semantics boundary, one explicit intentional-difference classification, and compiler or framework surfaces kept closed.
 
 Preferred proof points:
 - one canonical service-shape description exists and is grounded in the landed
@@ -235,7 +232,7 @@ Preferred proof points:
 
 Band B - Re-Audit IPC Under Real Usage
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Once the service shape is described, the repository should revisit IPC from
+Once the landed service shape is described, the repository should revisit IPC from
 the perspective of repeated human-meaningful use rather than from synthetic
 stress alone.
 
@@ -250,10 +247,7 @@ Why this band comes next:
   the landed interactive system.
 
 Phase 147 -- IPC Shape Audit Under Real Usage
-- Exit criterion: the repository can show whether the current shell-plus-log-
-  plus-key-value message vocabulary remains sufficient under repeated real
-  usage, and if not, can justify at most one narrow helper or vocabulary
-  adjustment without widening into dynamic typing, a bus, or a framework.
+- Phase 147 is now concrete as one bounded IPC-shape audit under real usage with one repeated mixed shell workflow, one explicit service-local reply-shape judgment, and transport or compiler surfaces kept closed.
 
 Preferred proof points:
 - at least one concrete awkward request or reply path is classified honestly

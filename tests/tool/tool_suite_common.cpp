@@ -1,5 +1,6 @@
 #include "tests/tool/tool_suite_common.h"
 
+#include <cstdlib>
 #include <sstream>
 #include <vector>
 
@@ -45,6 +46,29 @@ FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::files
         .decision_log_path = source_root / "docs" / "plan" / "decision_log.txt",
         .backlog_path = source_root / "docs" / "plan" / "backlog.txt",
     };
+}
+
+std::filesystem::path ResolveCanopusRoadmapPath(const std::filesystem::path& source_root,
+                                                int phase_number) {
+    const std::filesystem::path admin_root = source_root / "docs" / "plan" / "admin";
+    if (phase_number <= 123) {
+        return admin_root / "specuative_roadmap_post_phase109.txt";
+    }
+    if (phase_number <= 137) {
+        return admin_root / "specuative_roadmap_post_phase123.txt";
+    }
+    if (phase_number <= 145) {
+        return admin_root / "canopus_post_phase109_speculative_roadmap.txt";
+    }
+    return admin_root / "speculative_roadmap_post_phase145.txt";
+}
+
+void MaybeCleanBuildDir(const std::filesystem::path& build_dir) {
+    const char* force_clean_env = std::getenv("MC_TEST_FORCE_CLEAN_BUILDS");
+    if (force_clean_env == nullptr || std::string_view(force_clean_env) == "0") {
+        return;
+    }
+    std::filesystem::remove_all(build_dir);
 }
 
 std::filesystem::path ResolvePlanDocPath(const std::filesystem::path& source_root,

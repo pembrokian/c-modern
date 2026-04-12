@@ -112,8 +112,8 @@ void RunFreestandingKernelPhase117InitOrchestratedMultiServiceBringUp(const std:
                                                                     "phase117_init_orchestrated_multi_service_bring_up.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase117_init_orchestrated_multi_service_bring_up.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase117_multi_service_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
@@ -134,7 +134,7 @@ void RunFreestandingKernelPhase117InitOrchestratedMultiServiceBringUp(const std:
     const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase117BehaviorSlice(build_dir, build_targets);
     ExpectPhase117PublicationSlice(phase_doc_path,
-                                   common_paths.roadmap_path,
+                                   ResolveCanopusRoadmapPath(source_root, 117),
                                    common_paths.kernel_readme_path,
                                    common_paths.repo_map_path,
                                    common_paths.freestanding_readme_path,

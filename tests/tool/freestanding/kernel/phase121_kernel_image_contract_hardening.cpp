@@ -119,8 +119,8 @@ void RunFreestandingKernelPhase121KernelImageContractHardening(const std::filesy
                                                 "modern_c_canopus_readiness_position.txt";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase121_kernel_image_contract_hardening.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase121_image_contract_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
@@ -142,7 +142,7 @@ void RunFreestandingKernelPhase121KernelImageContractHardening(const std::filesy
     ExpectPhase121BehaviorSlice(build_dir, build_targets);
     ExpectPhase121PublicationSlice(phase_doc_path,
                                    support_note_path,
-                                   common_paths.roadmap_path,
+                                   ResolveCanopusRoadmapPath(source_root, 121),
                                    position_path,
                                    common_paths.kernel_readme_path,
                                    common_paths.repo_map_path,

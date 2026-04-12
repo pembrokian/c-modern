@@ -18,7 +18,7 @@ void RunFreestandingKernelPhase104CritiqueHardening(const std::filesystem::path&
                                                     const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path build_dir = binary_root / "kernel_phase104_hardening_build";
-    std::filesystem::remove_all(build_dir);
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",

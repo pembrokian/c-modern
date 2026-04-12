@@ -735,3 +735,56 @@ struct Phase145ServiceRestartFailureAndUsagePressureAudit {
     durable_persistence_visible: u32
     compiler_reopening_visible: u32
 }
+
+struct Phase146ServiceShapeConsolidationAudit {
+    phase145: Phase145ServiceRestartFailureAndUsagePressureAudit
+    serial_service_pid: u32
+    shell_service_pid: u32
+    log_service_pid: u32
+    kv_service_pid: u32
+    init_policy_owner_pid: u32
+    serial_forward: serial_service.SerialCompositionObservation
+    shell_route: shell_service.ShellRoutingObservation
+    log_retention: log_service.LogRetentionObservation
+    kv_retention: kv_service.KvRetentionObservation
+    restart: init.ServiceRestartObservation
+    serial_endpoint_handle_slot: u32
+    shell_endpoint_handle_slot: u32
+    log_endpoint_handle_slot: u32
+    kv_endpoint_handle_slot: u32
+    fixed_boot_wiring_visible: u32
+    service_local_request_reply_visible: u32
+    shell_syntax_boundary_visible: u32
+    service_semantic_boundary_visible: u32
+    explicit_failure_exposure_visible: u32
+    init_owned_restart_visible: u32
+    intentional_shell_difference_visible: u32
+    intentional_stateful_difference_visible: u32
+    dynamic_service_framework_visible: u32
+    dynamic_registration_visible: u32
+    compiler_reopening_visible: u32
+}
+
+struct Phase147IpcShapeAudit {
+    phase146: Phase146ServiceShapeConsolidationAudit
+    serial_service_pid: u32
+    shell_service_pid: u32
+    log_service_pid: u32
+    kv_service_pid: u32
+    serial_observation: serial_service.SerialCompositionObservation
+    log_append_route: shell_service.ShellRoutingObservation
+    log_tail_route: shell_service.ShellRoutingObservation
+    kv_set_route: shell_service.ShellRoutingObservation
+    kv_get_route: shell_service.ShellRoutingObservation
+    repeated_log_tail_route: shell_service.ShellRoutingObservation
+    repeated_kv_get_route: shell_service.ShellRoutingObservation
+    log_retention: log_service.LogRetentionObservation
+    kv_retention: kv_service.KvRetentionObservation
+    request_construction_sufficient_visible: u32
+    reply_shape_service_local_visible: u32
+    compact_encoding_sufficient_visible: u32
+    service_to_service_observation_visible: u32
+    generic_message_bus_visible: u32
+    dynamic_payload_typing_visible: u32
+    compiler_reopening_visible: u32
+}

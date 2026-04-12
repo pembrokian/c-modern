@@ -51,12 +51,12 @@ void RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit(const std::fi
                                                                    const std::filesystem::path& binary_root,
                                                                    const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path build_dir = binary_root / "kernel_phase114_address_space_mmu_build";
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
     const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
                                                                     "phase114_address_space_and_mmu_ownership_split.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase114_address_space_and_mmu_ownership_split.mirproj.txt";
-    std::filesystem::remove_all(build_dir);
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",

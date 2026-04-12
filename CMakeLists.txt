@@ -191,6 +191,8 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase143_long_lived_log_service_follow_through.cpp
     tests/tool/freestanding/kernel/phase144_stateful_key_value_service_follow_through.cpp
     tests/tool/freestanding/kernel/phase145_service_restart_failure_and_usage_pressure_audit.cpp
+    tests/tool/freestanding/kernel/phase146_service_shape_consolidation.cpp
+    tests/tool/freestanding/kernel/phase147_ipc_shape_audit_under_real_usage.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -266,6 +268,10 @@ add_test(NAME mc_tool_freestanding_kernel_shard2_unit COMMAND mc_tool_freestandi
 add_test(NAME mc_tool_freestanding_kernel_shard3_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-3)
 add_test(NAME mc_tool_freestanding_kernel_shard4_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-4)
 add_test(NAME mc_tool_freestanding_kernel_shard5_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-5)
+add_test(NAME mc_tool_freestanding_kernel_shard6_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-6)
+add_test(NAME mc_tool_freestanding_kernel_shard7_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-7)
+add_test(NAME mc_tool_freestanding_kernel_shard8_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-8)
+add_test(NAME mc_tool_freestanding_kernel_shard9_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-9)
 
 set(MC_FREESTANDING_KERNEL_CASES
     phase85_endpoint_queue
@@ -310,6 +316,8 @@ set(MC_FREESTANDING_KERNEL_CASES
     phase143_long_lived_log_service_follow_through
     phase144_stateful_key_value_service_follow_through
     phase145_service_restart_failure_and_usage_pressure_audit
+    phase146_service_shape_consolidation
+    phase147_ipc_shape_audit_under_real_usage
 )
 
 foreach(kernel_case IN LISTS MC_FREESTANDING_KERNEL_CASES)

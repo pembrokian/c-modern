@@ -334,6 +334,21 @@ struct Phase142ShellCommandRouteResult {
     succeeded: u32
 }
 
+struct Phase147IpcShapeWorkflowResult {
+    serial_state: serial_service.SerialServiceState
+    shell_state: shell_service.ShellServiceState
+    log_state: log_service.LogServiceState
+    echo_state: echo_service.EchoServiceState
+    kv_state: kv_service.KvServiceState
+    log_append_route: shell_service.ShellRoutingObservation
+    log_tail_route: shell_service.ShellRoutingObservation
+    kv_set_route: shell_service.ShellRoutingObservation
+    kv_get_route: shell_service.ShellRoutingObservation
+    repeated_log_tail_route: shell_service.ShellRoutingObservation
+    repeated_kv_get_route: shell_service.ShellRoutingObservation
+    succeeded: u32
+}
+
 func log_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_translation_root: mmu.TranslationRoot) LogServiceConfig {
     return LogServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: LOG_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: LOG_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte: LOG_SERVICE_REQUEST_BYTE, exit_code: LOG_SERVICE_EXIT_CODE, program_slot: LOG_SERVICE_PROGRAM_SLOT, program_object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
 }

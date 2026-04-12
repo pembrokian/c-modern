@@ -54,6 +54,8 @@ Structure
   - `phase143_long_lived_log_service_follow_through.cpp`: real-kernel bounded long-lived log-service follow-through audit.
   - `phase144_stateful_key_value_service_follow_through.cpp`: real-kernel bounded stateful key-value service follow-through audit.
   - `phase145_service_restart_failure_and_usage_pressure_audit.cpp`: real-kernel bounded service restart, failure, and usage pressure audit.
+  - `phase146_service_shape_consolidation.cpp`: real-kernel bounded service-shape consolidation audit.
+  - `phase147_ipc_shape_audit_under_real_usage.cpp`: real-kernel bounded IPC-shape audit under repeated real usage.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

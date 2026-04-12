@@ -123,8 +123,8 @@ void RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(const std::f
     const std::filesystem::path stdlib_readme_path = source_root / "stdlib" / "README.md";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase116_mmu_activation_barrier_follow_through.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase116_mmu_barrier_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
@@ -145,7 +145,7 @@ void RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(const std::f
     const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase116BehaviorSlice(build_dir, build_targets);
     ExpectPhase116PublicationSlice(phase_doc_path,
-                                   common_paths.roadmap_path,
+                                   ResolveCanopusRoadmapPath(source_root, 116),
                                    common_paths.kernel_readme_path,
                                    common_paths.repo_map_path,
                                    common_paths.freestanding_readme_path,

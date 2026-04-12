@@ -3,7 +3,7 @@ Phase 146 -- Service Shape Consolidation
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -12,12 +12,27 @@ audit by extracting the minimal common service shape from the landed shell,
 log, and key-value owners before the repository widens into more service
 surfaces.
 
-This document is an execution plan for Phase 146.
-It defines one bounded service-shape phase that must land as explicit
-service-owned structure and audit truth before it is treated as a stable
-Canopus pattern.
+This document records the landed Phase 146 slice.
+It defines one bounded service-shape consolidation step that lands as
+published service-owned structure plus audit truth before it is treated as a
+stable Canopus pattern.
 It does not claim a service framework, a generic runtime, dynamic discovery,
-or a broader platform expansion.
+dynamic registration, or a broader platform expansion.
+It does not claim service framework, dynamic registration, or compiler expansion.
+It does not define reply algebra, request identity, idempotency, replay semantics, or restart-completion guarantees in this phase.
+
+Phase result
+------------
+Phase 146 is complete as one bounded service-shape consolidation step over the real kernel artifact.
+
+The landed repository slice now includes:
+
+- one explicit minimal service-shape statement grounded in the landed `shell_service`, `log_service`, and `kv_service` owners
+- one explicit statement that every landed service owner begins from init-owned fixed boot wiring, carries one explicit endpoint-handle authority, and publishes one service-local request or reply consequence rather than hiding shape inside a framework
+- one explicit split where serial_service owns frame transport, shell_service owns shell syntax and routing, and peer services own service semantics
+- one explicit classification that `shell_service` intentionally differs as a syntax-and-routing owner while `log_service` and `kv_service` intentionally differ as retained-state owners with service-local reply truth
+- one explicit statement that reply semantics, request identity, and restart guarantees over time remain later-phase work rather than hidden framework behavior
+- one focused Phase 146 audit and one focused freestanding regression over the same bounded service-shape boundary
 
 Relationship to companion notes
 -------------------------------
@@ -97,10 +112,10 @@ Targeted boundary shape:
 
 Chosen outcome
 --------------
-Chosen outcome: yes.
+Chosen outcome: landed.
 
-The repository should take this phase because it now has enough real service
-truth to extract a pattern, and failing to do so would make later growth less
+The repository took this phase because it had enough real service truth to
+extract a pattern, and failing to do so would have made later growth less
 honest.
 
 What this phase should try to prove
@@ -111,6 +126,8 @@ What this phase should try to prove
   accidental
 - the shell transport-syntax boundary versus service semantic boundary is
   described explicitly
+- the phase can state which time-based semantics remain intentionally
+  undefined rather than accidentally implied
 - the resulting pattern can remain a user-space convention without a new
   kernel or runtime abstraction
 
@@ -155,29 +172,22 @@ The owning implementation surfaces for this phase are:
 
 Deliverables
 ------------
-- one canonical Phase 146 execution plan in `docs/plan/active/`
+- one canonical Phase 146 execution note in `docs/plan/active/`
 - one explicit published service-shape statement grounded in shell, log, and
   key-value owners
-- one smallest-necessary cleanup slice if the extracted pattern exposes
-  accidental structural drift
-- one debug-owned Phase 146 audit over the landed service tree
+- one additive debug-owned Phase 146 audit over the landed service tree
 - one focused freestanding regression plus projected MIR golden for the Phase
   146 boundary
-- refreshed supporting docs only after the service-shape statement is stable
+- refreshed supporting docs aligned to the landed service-shape statement
 
-Suggested execution order
--------------------------
-1. Freeze the Phase 146 boundary in docs: pattern extraction, no service
-   framework, no broader platform widening.
-2. Classify the current shell, log, and key-value service shape directly in
-   the landed source tree.
-3. Record which differences are intentional and which are accidental.
-4. Apply only the smallest structural cleanup needed to keep the extracted
-   pattern honest.
-5. Add the Phase 146 audit over the real service tree.
-6. Advance the kernel proof marker to 146 only after the published pattern
-   and the code-owned audit agree.
-7. Add the focused freestanding regression and projected MIR golden.
+Execution summary
+-----------------
+1. Keep the landed Phase 142 through Phase 145 behavior unchanged.
+2. Publish one explicit minimal service shape instead of introducing a runtime service model.
+3. Classify fixed boot wiring, explicit endpoint-handle authority, service-local request or reply truth, failure visibility, and restart consequence directly from the landed service owners.
+4. Keep the split between serial transport ownership, shell syntax ownership, and peer-service semantics explicit.
+5. Add one Phase 146 audit, one projected MIR golden, and aligned docs over that bounded service-shape statement.
+6. Advance the kernel proof marker to 146 only after the published statement and the code-owned audit agree.
 
 Preferred proof points
 ----------------------
@@ -202,10 +212,21 @@ Exit criteria
   Phase 146 boundary
 - the compiler and low-level toolchain surfaces remain unchanged in this phase
 
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 146 slice
+- the repository now publishes one explicit minimal service shape over the landed shell, log, and key-value owners without introducing a framework
+- the service-shape statement is explicit that every landed service owner starts from init-owned fixed wiring, carries one explicit endpoint-handle authority, and publishes one owner-local request or reply consequence
+- `serial_service` owns frame transport, `shell_service` owns shell syntax and routing, and peer services own service semantics
+- `shell_service` is intentionally different as a syntax-and-routing owner, while `log_service` and `kv_service` are intentionally different as retained-state owners with service-local reply truth and restart consequences
+- Phase 146 still deliberately leaves reply algebra, request identity, replay handling, and restart-completion guarantees to later phases rather than implying them informally
+- compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces remain closed in this phase
+
 Non-goals
 ---------
 - a generic service runtime, framework, or registration mechanism
 - dynamic discovery, broker, or orchestration layers
+- dynamic registration or service inheritance machinery
 - broader storage, networking, scheduling, or platform growth
 - reopening sema, MIR, backend, ABI, target, runtime, or `hal`
 - claiming a reusable service pattern from prose alone without a landed audit

@@ -9,7 +9,7 @@ Purpose
 -------
 Continue from the planned Phase 149 restart-contract step by rebuilding the
 same bounded shell, log, and key-value system using only the surviving
-lessons from Phase 146 through Phase 149 and measuring whether the second
+lessons from landed Phase 146 through Phase 149 and measuring whether the second
 version is simpler than the first.
 
 This document is an execution plan for Phase 150.

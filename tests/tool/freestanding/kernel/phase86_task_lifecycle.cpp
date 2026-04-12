@@ -249,7 +249,7 @@ void RunFreestandingKernelPhase86TaskLifecycleProof(const std::filesystem::path&
 
     const std::filesystem::path project_path = project_root / "build.toml";
     const std::filesystem::path build_dir = binary_root / "task_lifecycle_build";
-    std::filesystem::remove_all(build_dir);
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",

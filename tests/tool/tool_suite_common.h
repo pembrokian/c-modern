@@ -24,6 +24,11 @@ struct FreestandingKernelCommonPaths {
 
 FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::filesystem::path& source_root);
 
+std::filesystem::path ResolveCanopusRoadmapPath(const std::filesystem::path& source_root,
+                                                int phase_number);
+
+void MaybeCleanBuildDir(const std::filesystem::path& build_dir);
+
 std::filesystem::path ResolvePlanDocPath(const std::filesystem::path& source_root,
                                          std::string_view file_name);
 

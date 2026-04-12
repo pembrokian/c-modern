@@ -28,8 +28,8 @@ void ExpectPhase112BehaviorSlice(const std::filesystem::path& build_dir,
     if (!std::filesystem::exists(object_dir / "kernel__capability.o")) {
         Fail("phase112 syscall boundary audit should emit the capability module object");
     }
-    if (!std::filesystem::exists(object_dir / "kernel__endpoint.o")) {
-        Fail("phase112 syscall boundary audit should emit the endpoint module object");
+    if (!std::filesystem::exists(object_dir / "kernel__ipc.o")) {
+        Fail("phase112 syscall boundary audit should emit the ipc module object");
     }
     if (!std::filesystem::exists(object_dir / "_Users_ro_dev_c_modern_kernel_src_address_space.mc.o")) {
         Fail("phase112 syscall boundary audit should emit the address-space module object");
@@ -79,10 +79,10 @@ void ExpectPhase112MirStructureSlice(const std::filesystem::path& mir_path,
             "Function name=capability.resolve_attached_transfer_handle returns=[capability.AttachedTransferResolution]",
             "Function name=capability.install_received_endpoint_handle returns=[capability.ReceivedHandleInstall]",
             "Function name=capability.validate_syscall_capability_boundary returns=[bool]",
-            "Function name=endpoint.build_runtime_message returns=[endpoint.KernelMessage]",
-            "Function name=endpoint.enqueue_runtime_message returns=[endpoint.RuntimeSendResult]",
-            "Function name=endpoint.receive_runtime_message returns=[endpoint.RuntimeReceiveResult]",
-            "Function name=endpoint.validate_syscall_ipc_boundary returns=[bool]",
+            "Function name=ipc.build_runtime_message returns=[ipc.KernelMessage]",
+            "Function name=ipc.enqueue_runtime_message returns=[ipc.RuntimeSendResult]",
+            "Function name=ipc.receive_runtime_message returns=[ipc.RuntimeReceiveResult]",
+            "Function name=ipc.validate_syscall_ipc_boundary returns=[bool]",
             "Function name=debug.validate_phase112_syscall_boundary_thinness returns=[bool]",
         },
         expected_projection_path,
@@ -99,8 +99,8 @@ void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesy
                                                                     "phase112_syscall_boundary_thinness_audit.txt");
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase112_syscall_boundary_thinness_audit.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase112_syscall_boundary_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",

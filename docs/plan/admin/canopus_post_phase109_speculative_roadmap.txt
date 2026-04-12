@@ -181,6 +181,9 @@ Why this band comes first:
   is not missing infrastructure. It is losing focus and trying to widen into
   several systems at once.
 
+Phase 140 -- Serial-Ingress Composed Service Graph
+- Phase 140 is now concrete as one bounded serial-ingress composed service graph, routing from UART through a serial service into a composition service that fans out to echo and log services, while keeping broker, dynamic routing, compiler, and framework surfaces closed in this phase.
+
 Phase 141 -- Interactive Service System Scope Freeze
 - Phase 141 is now concrete as one bounded interactive service system scope freeze with one concrete shell owner, one concrete key-value owner, one fixed graph rooted at serial ingress, and one explicit statement that the compiler, broker, and framework surfaces stay closed in this phase.
 

@@ -67,6 +67,21 @@ std::string JoinCommand(const std::vector<std::string>& args) {
     return command;
 }
 
+std::string SummarizeTextForFailure(std::string_view text) {
+    constexpr std::size_t kMaxPreview = 320;
+    constexpr std::size_t kHeadPreview = 200;
+    constexpr std::size_t kTailPreview = 80;
+
+    if (text.size() <= kMaxPreview) {
+        return std::string(text);
+    }
+
+    const std::size_t truncated_chars = text.size() - (kHeadPreview + kTailPreview);
+    return std::string(text.substr(0, kHeadPreview)) +
+           " ...<truncated " + std::to_string(truncated_chars) + " chars>... " +
+           std::string(text.substr(text.size() - kTailPreview));
+}
+
 void SetSocketTimeout(int fd,
                       int timeout_ms,
                       const std::string& context) {
@@ -216,8 +231,9 @@ void ExpectOutputContains(std::string_view output,
                           std::string_view needle,
                           const std::string& context) {
     if (output.find(needle) == std::string::npos) {
-        Fail(context + ": expected output to contain '" + std::string(needle) + "', got '" +
-             std::string(output) + "'");
+        Fail(context + ": expected output to contain '" + std::string(needle) +
+             "', output preview '" + SummarizeTextForFailure(output) +
+             "' (length=" + std::to_string(output.size()) + ")");
     }
 }
 

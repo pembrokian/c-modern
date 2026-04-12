@@ -118,8 +118,8 @@ void RunFreestandingKernelPhase125InvalidationAndRejectionAudit(const std::files
     const std::filesystem::path tool_readme_path = source_root / "tests" / "tool" / "README.md";
     const std::filesystem::path mir_projection_path = source_root / "tests" / "tool" / "freestanding" / "kernel" /
                                                       "phase125_invalidation_and_rejection_audit.mirproj.txt";
-    const std::filesystem::path build_dir = binary_root / "kernel_phase125_invalidation_build";
-    std::filesystem::remove_all(build_dir);
+    const std::filesystem::path build_dir = binary_root / "kernel_build";
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",
@@ -140,7 +140,7 @@ void RunFreestandingKernelPhase125InvalidationAndRejectionAudit(const std::files
     const auto dump_targets = mc::support::ComputeDumpTargets(common_paths.main_source_path, build_dir);
     ExpectPhase125BehaviorSlice(build_dir, build_targets);
     ExpectPhase125PublicationSlice(phase_doc_path,
-                                   common_paths.roadmap_path,
+                                   ResolveCanopusRoadmapPath(source_root, 125),
                                    position_path,
                                    common_paths.kernel_readme_path,
                                    common_paths.repo_map_path,

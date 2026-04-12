@@ -18,7 +18,7 @@ void RunFreestandingKernelPhase99SyscallByteIpc(const std::filesystem::path& sou
                                                 const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path build_dir = binary_root / "kernel_syscall_byte_ipc_build";
-    std::filesystem::remove_all(build_dir);
+    MaybeCleanBuildDir(build_dir);
 
     const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
                                                                   "build",

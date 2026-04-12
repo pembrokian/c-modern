@@ -3,20 +3,24 @@ Phase 132 -- Backpressure And Blocking Audit
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
-Continue from the planned Phase 131 composition step by making queue pressure,
+Continue from the landed Phase 131 composition step by making queue pressure,
 blocking, and wakeup behavior real kernel-owned mechanism rather than a thin
 audit over return codes that never mutate scheduler-visible state.
 
-This document is an execution plan for Phase 132.
-It defines one bounded backpressure phase that must land as concrete endpoint,
-state, lifecycle, scheduler, and syscall behavior before it is admitted as a
-debug audit or regression.
+This document records the landed Phase 132 slice.
+It defines one bounded backpressure phase that lands as concrete endpoint,
+state, lifecycle, scheduler, and syscall behavior over the real kernel
+artifact.
 It does not claim fairness guarantees, dynamic queue sizing, throughput work,
 or a broader scheduler rewrite.
+
+Phase result
+------------
+Phase 132 is complete as one bounded backpressure and blocking audit.
 
 Repository status note
 ----------------------
@@ -50,7 +54,7 @@ Core rule
   just a new validation helper or new expected output file.
 - Debug audits, MIR projections, and tool regressions are acceptance artifacts
   only.
-- Keep compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
+- Keep the compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
 
 Planning rule for this band
 ---------------------------
