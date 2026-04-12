@@ -6,6 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 141 has moved the repository-owned kernel artifact beyond the landed Phase 140 composed-graph step into one bounded interactive service system scope freeze with a concrete shell owner and a concrete key-value owner.
+- Phase 141 therefore now publishes one bounded interactive service system scope freeze.
+
 - Phase 137 has moved the repository-owned kernel artifact beyond the landed
   Phase 136 containment step into one bounded optional completion-backed UART
   receive follow-through.
@@ -139,9 +142,15 @@ Current files
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
   reply payload, and final exchange observation records
 - `src/serial_service.mc`: bounded serial-service protocol state, one
-  service-owned copied receive-frame log, one fixed forwarded composition
-  request observation, one aggregate-reply observation, and one service-local
+  service-owned copied receive-frame log, one fixed forwarded shell request
+  observation, one aggregate-reply observation, and one service-local
   malformed-input classification path
+- `src/shell_service.mc`: bounded shell-service command classification,
+  fixed service routing, bounded reply shaping, and one explicit split
+  between serial transport ownership and shell semantics
+- `src/kv_service.mc`: bounded key-value service state, one fixed key slot,
+  one fixed value slot, and one explicit stateful service owner admitted by
+  the Phase 141 slice
 - `src/transfer_service.mc`: bounded transfer-service grant state, emitted
   payload construction, and final transfer observation records
 - `src/uart.mc`: bounded UART receive-frame staging owner, bounded optional

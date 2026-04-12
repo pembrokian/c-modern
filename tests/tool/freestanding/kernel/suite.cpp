@@ -127,12 +127,15 @@ void RunFreestandingKernelPhase137OptionalDmaOrEquivalentFollowThrough(const std
 void RunFreestandingKernelPhase140SerialIngressComposedServiceGraph(const std::filesystem::path& source_root,
                                                                     const std::filesystem::path& binary_root,
                                                                     const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase141InteractiveServiceSystemScopeFreeze(const std::filesystem::path& source_root,
+                                                                      const std::filesystem::path& binary_root,
+                                                                      const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
 
-const std::array<KernelTestCase, 37> kKernelTestCases = {{
+const std::array<KernelTestCase, 38> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
@@ -170,6 +173,7 @@ const std::array<KernelTestCase, 37> kKernelTestCases = {{
     {"phase136_device_failure_containment_probe", 5, &RunFreestandingKernelPhase136DeviceFailureContainmentProbe},
     {"phase137_optional_dma_or_equivalent_follow_through", 5, &RunFreestandingKernelPhase137OptionalDmaOrEquivalentFollowThrough},
     {"phase140_serial_ingress_composed_service_graph", 5, &RunFreestandingKernelPhase140SerialIngressComposedServiceGraph},
+    {"phase141_interactive_service_system_scope_freeze", 5, &RunFreestandingKernelPhase141InteractiveServiceSystemScopeFreeze},
 }};
 
 void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,

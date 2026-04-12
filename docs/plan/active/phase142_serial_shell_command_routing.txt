@@ -1,0 +1,169 @@
+Phase 142 -- Serial Shell Command Routing
+=========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the Phase 141 scope freeze by turning the landed serial-ingress
+path into one bounded user-facing shell route over the real kernel artifact.
+
+This document records the intended Phase 142 slice.
+It defines one shell-owned command-routing step that should make the system
+meaningfully usable by a human instead of only auditable by a proof harness.
+It does not claim a general shell runtime, scripting, dynamic command
+registration, or service discovery.
+
+Repository status note
+----------------------
+- Phase 140 already proved one fixed serial-ingress graph through existing
+  service owners.
+- Phase 141 should freeze the next graph around a distinct shell owner plus
+  echo, log, and key-value service targets.
+- The next honest move is therefore to route bounded commands through that
+  graph rather than to widen state or failure semantics first.
+
+Problem being solved
+--------------------
+- The current serial path proves service composition, but it does not yet give
+  a human one fixed shell vocabulary that can drive the system naturally.
+- Without one shell-owned command-routing step, later log and key-value work
+  would remain transport- or test-shaped rather than user-facing.
+- The repository therefore needs one bounded shell route that parses a fixed
+  command set and dispatches to fixed services while keeping transport and
+  routing owners separate.
+
+Core rule
+---------
+- `serial_service` owns framing and validated ingress only.
+- `shell_service` owns command parsing, command classification, and fixed
+  routing policy.
+- Peer services own their own request interpretation and reply facts.
+- Keep the command language intentionally small and deterministic.
+- Do not add a generic REPL framework, stream vocabulary, or command plugin
+  model.
+
+Chosen command route
+--------------------
+Chosen route: yes.
+
+The Phase 142 route should be:
+
+1. UART ingress publishes one bounded frame to `serial_service`.
+2. `serial_service` validates the frame and forwards one bounded shell payload
+   to `shell_service`.
+3. `shell_service` parses one of the admitted commands:
+   - `echo <text>`
+   - `log append <text>`
+   - `log tail`
+   - `kv set <key> <value>`
+   - `kv get <key>`
+4. `shell_service` routes to the fixed target service and returns one bounded
+   reply payload back through `serial_service`.
+5. `serial_service` emits one explicit final reply observation.
+
+Why this is the right next step
+-------------------------------
+- It creates real user pressure without broadening the kernel.
+- It keeps shell semantics in one owner instead of burying them in serial
+  transport or init wiring.
+- It gives later long-lived state phases a natural ingress path.
+- It creates the first honest malformed-input surface shaped by usage rather
+  than by isolated unit probes alone.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/bootstrap_services/05_serial.mc`
+   - forward validated ingress to one fixed shell endpoint rather than to the
+     prior composition-only route
+
+2. `kernel/src/bootstrap_services/06_shell.mc`
+   - introduce one bounded shell-service execution owner for command parsing
+     and fixed service dispatch
+
+3. `kernel/src/bootstrap_services/00_types.mc`
+   - add only the smallest command, reply, and shell-observation structures
+     needed for explicit routing
+
+4. `kernel/src/serial_service.mc`
+   - preserve framing, malformed-frame handling, and final reply emission as
+     transport-owned behavior
+
+5. `kernel/src/shell_service.mc`
+   - own command tokenization, command classification, routing decisions, and
+     malformed-command consequences
+
+6. `kernel/src/echo_service.mc`
+   - accept shell-routed echo requests without widening beyond the existing
+     bounded echo contract
+
+7. `kernel/src/log_service.mc`
+   - accept shell-routed append and query requests on the existing bounded log
+     path, even if long-lived retention is deferred to Phase 143
+
+8. `kernel/src/kv_service.mc`
+   - accept the first fixed shell-routed set or get requests, even if richer
+     state semantics are deferred to Phase 144
+
+9. `kernel/src/main.mc` and `kernel/src/init.mc`
+   - install and boot the fixed shell path over the real kernel artifact
+
+10. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+    - add one audit path exposing command classification, target routing, and
+      malformed-command handling as explicit observations
+
+11. `tests/tool/freestanding/kernel/`
+    - add one focused Phase 142 regression plus one projected MIR golden over
+      the shell-owned routing path
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one additive `serial_service` to `shell_service` handoff
+2. one bounded shell parser over one fixed command vocabulary
+3. one fixed route from shell to echo, log, or key-value service owners
+4. one explicit malformed-command path
+5. one reply path back through the transport owner
+
+Suggested execution order
+-------------------------
+1. Freeze the command vocabulary in docs and types.
+2. Add the shell-service owner and its fixed endpoint wiring.
+3. Route validated serial ingress to the shell owner.
+4. Implement bounded command parsing and one explicit malformed-command path.
+5. Wire the fixed dispatch routes to echo, log, and key-value owners.
+6. Record explicit reply observations through `serial_service`.
+7. Add the Phase 142 audit, regression, and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One human-entered bounded command can drive each admitted service path.
+2. One malformed command is rejected explicitly by the shell owner.
+3. The kernel does not become a command interpreter or routing framework.
+4. Route ownership remains in shell and service code rather than in generic
+   helpers.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 142 marker
+- one bounded serial shell parses the fixed admitted command vocabulary
+- shell-owned routing reaches echo, log, and key-value service paths over the
+  real kernel artifact
+- one malformed-command path is explicit and auditable
+- replies return through `serial_service` with explicit final observation
+- the Phase 142 audit and focused regression prove the same shell-owned
+  routing boundary across build, run, docs, and MIR
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- scripting, loops, variables, pipelines, or a general shell language
+- dynamic command registration or dynamic service discovery
+- unbounded input handling or terminal editing features
+- persistence guarantees for log or key-value state in this phase
+- reopening sema, MIR, backend, ABI, target, or `hal`

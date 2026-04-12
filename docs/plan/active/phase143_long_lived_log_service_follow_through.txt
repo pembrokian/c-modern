@@ -1,0 +1,148 @@
+Phase 143 -- Long-Lived Log Service Follow-Through
+=================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the bounded shell path by making `log_service` retain real state
+across multiple requests instead of behaving only as a transactional proof
+endpoint.
+
+This document records the intended Phase 143 slice.
+It defines one bounded long-lived log owner over the real shell-driven system.
+It does not claim durable persistence, a filesystem, an indexing engine, or a
+general observability stack.
+
+Repository status note
+----------------------
+- Phase 142 should make the serial path human-usable through a distinct shell
+  owner.
+- Once that path exists, the strongest next pressure is state that survives
+  across repeated use rather than another transport or parsing expansion.
+- `log_service` is the narrowest real stateful owner already present in the
+  repository, so it is the right first place to make repeated use matter.
+
+Problem being solved
+--------------------
+- The repository already has a real log service path, but it is still too easy
+  for that path to remain handshake-shaped rather than meaningfully stateful.
+- Without one long-lived log phase, the shell can route commands but the
+  system still will not prove that one service can carry evolving state across
+  time.
+- The repository therefore needs one bounded in-memory retained-log path with
+  one query surface that a human can use repeatedly without rebooting.
+
+Core rule
+---------
+- Keep log ownership inside `log_service`.
+- Retain only bounded in-memory state in this phase.
+- Keep append and query semantics explicit; do not infer policy from transport
+  or shell helpers.
+- Prefer one simple retained-log structure and one simple query form over a
+  broader filtering or indexing vocabulary.
+- Do not widen into persistence, files, storage hierarchy, or generalized
+  monitoring policy.
+
+Chosen retained-log shape
+-------------------------
+Chosen shape: yes.
+
+The Phase 143 log service should:
+
+1. accept repeated `log append <text>` requests from the shell path
+2. retain a bounded in-memory ordered log across multiple requests
+3. answer one bounded `log tail` or equivalent query from retained state
+4. expose bounded truncation or overwrite behavior only through explicit
+   service-owned policy when the retained log is full
+5. publish one explicit observation showing that multiple requests contributed
+   to one retained log state
+
+Why this is the right next step
+-------------------------------
+- It introduces real evolving state with the fewest new abstractions.
+- It pressures message ownership, reply shaping, and repeated-use lifecycle in
+  a way one-shot requests cannot.
+- It keeps the next stateful step inside an existing service owner rather than
+  multiplying new owners too early.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/bootstrap_services/01_log.mc`
+   - extend the bounded log execution owner to retain explicit in-memory state
+     across multiple requests
+
+2. `kernel/src/bootstrap_services/00_types.mc`
+   - add only the smallest retained-log state, query-request, and reply-shape
+     facts needed to represent the long-lived log boundary
+
+3. `kernel/src/log_service.mc`
+   - own append, retention, overflow consequence, and query reply semantics
+
+4. `kernel/src/bootstrap_services/06_shell.mc` and `kernel/src/shell_service.mc`
+   - route `log append` and `log tail` explicitly without absorbing log
+     storage policy
+
+5. `kernel/src/serial_service.mc`
+   - continue to own only transport-facing final reply emission and framing
+
+6. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path exposing retained-log growth, bounded query replies,
+     and overflow consequence as explicit observations
+
+7. `kernel/src/main.mc`
+   - keep boot wiring explicit while the log owner gains long-lived state
+
+8. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 143 regression plus one projected MIR golden over
+     retained-log behavior across multiple requests
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one additive retained-log state inside the existing log owner
+2. one shell-driven append path that mutates retained state across requests
+3. one bounded retained-state query path
+4. one explicit bounded-full consequence owned by the log service
+5. one audit proving that state survived across more than one request
+
+Suggested execution order
+-------------------------
+1. Freeze the retained-log boundary in docs: bounded in-memory state only.
+2. Extend log-service state and reply structures.
+3. Route shell `log append` requests into the retained-log path.
+4. Route shell `log tail` requests into one bounded query path.
+5. Expose one explicit bounded-full or overwrite consequence.
+6. Add the Phase 143 audit, regression, and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. Multiple shell-driven appends contribute to one retained log before reboot.
+2. One query reply proves that later requests can observe earlier state.
+3. Overflow policy is explicit and service-owned, not hidden in transport or
+   IPC helpers.
+4. The phase does not claim persistence beyond the current kernel lifetime.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 143 marker
+- `log_service` retains bounded explicit state across multiple shell-driven
+  requests
+- one bounded query path returns information derived from retained state
+- one bounded-full consequence is explicit and auditable
+- the Phase 143 audit and focused regression prove the same retained-log
+  boundary across build, run, docs, and MIR
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- durable persistence, files, or block-device semantics
+- rich filtering, search, subscriptions, or streaming log views
+- generalized metrics or observability frameworks
+- shifting log retention policy into shell, serial, or kernel helpers
+- reopening sema, MIR, backend, ABI, target, or `hal`

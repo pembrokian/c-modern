@@ -1,0 +1,170 @@
+Phase 145 -- Service Restart, Failure, And Usage Pressure Audit
+===============================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the landed shell, log, and key-value system slices by applying
+real failure, restart, and repeated-use pressure to a user-meaningful system
+rather than to a synthetic proof graph alone.
+
+This document records the intended Phase 145 slice.
+It defines one bounded failure-and-restart audit over the interactive-service
+system.
+It does not claim a kernel supervisor, durable recovery, transparent state
+preservation, or a broader reliability framework.
+
+Repository status note
+----------------------
+- Earlier phases already proved bounded service death, partial failure, and
+  explicit restart or replacement on narrower service paths.
+- Phase 142 through Phase 144 should turn the shell, log, and key-value path
+  into a small system a human can actually use.
+- The next honest question is therefore whether that system remains usable
+  when one stateful service disappears and later returns, and whether the
+  resulting pain points stay in user space or expose a specific owner gap.
+
+Problem being solved
+--------------------
+- Failure has already been pressure-tested abstractly, but not yet against one
+  small interactive system whose loss matters to real usage.
+- Without one user-meaningful failure audit, the repository can overestimate
+  the model's practicality because restarts were only proved on narrower proof
+  paths.
+- The repository therefore needs one bounded workflow where a stateful service
+  is lost, the shell path observes the consequence, init or a retained owner
+  performs one explicit restart or replacement, and the resulting usability
+  cost is recorded honestly.
+
+Core rule
+---------
+- Keep failure and restart policy explicit in init, shell, and service owners.
+- Do not turn the kernel into a supervisor.
+- Prefer one stateful service as the audit target; do not spread failure logic
+  across every service at once.
+- Make post-restart state truth explicit. If state is lost on restart in this
+  phase, that loss must be visible rather than hidden.
+- Treat newly exposed pain points as evidence: either user-space design work
+  or one concrete kernel or language owner gap.
+
+Chosen audit scenario
+---------------------
+Chosen scenario: yes.
+
+The Phase 145 audit should target `kv_service` first.
+
+The bounded workflow should be:
+
+1. a shell-driven workflow performs at least one `kv set` and one `kv get`
+   successfully
+2. `kv_service` is then lost explicitly during a later shell-driven workflow
+   or between requests
+3. the shell path observes one explicit failure consequence rather than hiding
+   it behind transport ambiguity
+4. init or one retained explicit owner performs one bounded restart or
+   replacement of `kv_service`
+5. the shell path retries one bounded key-value workflow and records the
+   post-restart truth
+6. if retained state is not preserved across restart in this phase, the empty
+   or reset state must be explicit and auditable
+
+Why this is the right next step
+-------------------------------
+- It applies failure pressure where a human can actually feel it.
+- It forces the repository to decide which parts of restart semantics belong
+  to init and services rather than to the kernel.
+- It gives the clearest possible discriminator for whether the small system is
+  worth using or still too awkward.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/kv_service.mc`
+   - remain the primary failure target and publish explicit unavailable or
+     reset-state consequences after restart
+
+2. `kernel/src/shell_service.mc`
+   - own shell-visible error reporting and retry behavior without absorbing
+     restart policy
+
+3. `kernel/src/log_service.mc`
+   - optionally record one fixed restart or failure observation without
+     widening into a reliability framework
+
+4. `kernel/src/init.mc` and `kernel/src/main.mc`
+   - own one explicit restart or replacement path over retained authority or
+     boot wiring already present in the system model
+
+5. `kernel/src/capability/`, `kernel/src/lifecycle.mc`, and `kernel/src/ipc/`
+   - touch only where one additive explicit restart, observation, or endpoint
+     consequence is required by the bounded audit
+
+6. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path exposing failure observation, restart action,
+     post-restart state truth, and any user-visible awkwardness
+
+7. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 145 regression plus one projected MIR golden over
+     the bounded failure-and-restart workflow
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one bounded shell-driven successful key-value workflow
+2. one bounded key-value service loss path
+3. one explicit shell-visible failure consequence
+4. one explicit init-owned restart or replacement path
+5. one explicit post-restart truth classification, including visible state
+   reset if persistence is still deferred
+
+Suggested execution order
+-------------------------
+1. Freeze the bounded failure workflow in docs: no kernel supervisor, one
+   stateful service target, explicit post-restart truth.
+2. Add shell-visible failure classification for missing or dead key-value
+   service interactions.
+3. Wire one explicit restart or replacement path through init.
+4. Re-run one bounded key-value workflow after restart.
+5. Record whether state reset or recovery occurred, and keep that truth
+   explicit.
+6. Add the Phase 145 audit, regression, and projected MIR golden.
+7. Record any exposed pain points as either user-space design work or a
+   specific owner gap for a later phase.
+
+Preferred proof points
+----------------------
+1. One real user-facing workflow succeeds before failure.
+2. One later workflow sees an explicit shell-visible failure when
+   `kv_service` disappears.
+3. One restart path restores bounded usefulness without a kernel supervisor.
+4. The post-restart state truth is explicit, even if it is an empty reset
+   state.
+5. At least one resulting awkwardness is classified honestly rather than
+   papered over.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 145 marker
+- one bounded shell-driven key-value workflow succeeds before failure
+- one explicit service-loss consequence is visible through the shell path
+- one explicit init-owned restart or replacement path restores bounded system
+  usefulness
+- the post-restart state truth is explicit and auditable
+- the Phase 145 audit and focused regression prove the same failure-and-
+  restart boundary across build, run, docs, and MIR
+- any newly exposed awkwardness is classified as user-space work or one
+  concrete owner gap rather than hidden inside broader framework growth
+
+Non-goals
+---------
+- automatic supervision or ambient kernel recovery policy
+- transparent durable state preservation across restart
+- broader reliability, persistence, or orchestration frameworks
+- applying the restart audit to every service owner at once
+- reopening sema, MIR, backend, ABI, target, or `hal` unless one concrete gap
+  is exposed by the landed workflow

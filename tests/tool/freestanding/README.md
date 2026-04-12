@@ -49,6 +49,7 @@ Structure
   - `phase136_device_failure_containment_probe.cpp`: real-kernel bounded UART device-failure containment audit.
   - `phase137_optional_dma_or_equivalent_follow_through.cpp`: real-kernel bounded optional completion-backed UART receive follow-through audit.
   - `phase140_serial_ingress_composed_service_graph.cpp`: real-kernel bounded serial-ingress composed service-graph audit.
+  - `phase141_interactive_service_system_scope_freeze.cpp`: real-kernel bounded shell-owner and key-value-owner scope-freeze audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

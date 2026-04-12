@@ -67,11 +67,9 @@ Repository numbering note
 - Phase 139 is occupied by the concrete conditional subsystem rebuild decision
   and explicit deferral.
 - Phase 140 is occupied by the concrete serial-ingress composed service graph.
-- Phase 141 is occupied by the concrete interactive service system scope
-  freeze with a shell owner and a bounded key-value owner.
 - Proposed compiler planning still reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
-- The next speculative Canopus continuation therefore starts at Phase 142.
+- The next speculative Canopus continuation therefore starts at Phase 141.
 
 Repository status note
 ----------------------
@@ -166,7 +164,8 @@ Roadmap bands
 
 Band A - Freeze One Interactive Service System Boundary
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This first move is now landed.
+The first move should be to choose one real system and freeze its boundary so
+the repository does not diffuse effort across unrelated service ideas.
 
 Likely themes:
 - serial shell as the single user-facing ingress
@@ -180,7 +179,10 @@ Why this band comes first:
   several systems at once.
 
 Phase 141 -- Interactive Service System Scope Freeze
-- Phase 141 is now concrete as one bounded interactive service system scope freeze with one concrete shell owner, one concrete key-value owner, one fixed graph rooted at serial ingress, and one explicit statement that the compiler, broker, and framework surfaces stay closed in this phase.
+- Exit criterion: the repository can publish one explicit Phase 141 note that
+  names the chosen small system, its fixed service graph, the bounded command
+  vocabulary, the owned shell, log, and key-value responsibilities, and the
+  non-goals that remain outside this wave.
 
 Preferred proof points:
 - one canonical graph rooted at serial ingress is named explicitly

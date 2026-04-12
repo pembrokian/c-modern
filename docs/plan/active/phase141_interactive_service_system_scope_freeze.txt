@@ -1,0 +1,218 @@
+Phase 141 -- Interactive Service System Scope Freeze
+===================================================
+
+Status
+------
+COMPLETE
+
+Purpose
+-------
+Continue from the completed Phase 140 serial-ingress composed service graph
+by landing one bounded interactive service system scope freeze before the
+repository widens into several unrelated follow-on experiments.
+
+This document records the landed Phase 141 slice.
+It turns the speculative post-Phase-140 roadmap into one concrete next-system
+boundary the repository now implements and audits.
+It does not claim a broad shell environment, a broker, dynamic service
+discovery, a storage subsystem, or a larger platform expansion.
+
+Phase result
+------------
+Phase 141 is complete as one bounded interactive service system scope freeze with concrete shell and key-value service owners.
+
+The landed repository slice now includes:
+
+- one concrete `shell_service` owner that classifies a fixed bounded command
+  vocabulary and owns the transport-to-command boundary
+- one concrete `kv_service` owner admitted as the new bounded stateful service
+- one concrete Phase 141 root path that forwards the bounded serial request to
+  `shell_service` rather than directly to a composition owner
+- one focused Phase 141 audit and one focused freestanding regression that keep
+  the graph, owner split, and non-goals explicit
+
+It does not claim a shell framework, dynamic discovery, a broker, or compiler expansion.
+
+Repository status note
+----------------------
+- Phase 140 already proved that one real UART-backed ingress path can drive
+  one fixed service-owned route through `serial_service` and
+  `composition_service` without turning the kernel into a broker.
+- The repository therefore no longer needs another abstract pressure phase to
+  prove that bounded service composition exists at all.
+- The next honest risk is diffusion: adding several service ideas at once,
+  or jumping to filesystem, networking, or performance work before one small
+  usable system reveals where the model is actually awkward.
+- Phase 141 closes that immediate diffusion risk by landing one shell-owned
+  boundary and one key-value owner without widening into the later command,
+  restart, or persistence phases.
+
+Problem being solved
+--------------------
+- The roadmap now points toward one interactive shell plus long-lived log and
+  key-value service ecosystem, but that target is still only described at the
+  roadmap level.
+- Without one explicit scope-freeze phase, later implementation could blur
+  transport, shell, routing, and service ownership, or drift into an
+  unbounded command surface.
+- The repository therefore needs one canonical Phase 141 note that fixes the
+  chosen system graph, names the service owners, and states what this wave
+  will not attempt.
+
+Core rule
+---------
+- Freeze one small system, not many.
+- Separate serial transport from shell semantics: `serial_service` continues
+  to own bounded ingress framing, while one distinct shell owner owns command
+  parsing and routing policy.
+- Keep the service graph fixed and named.
+- Keep persistence, recovery, and namespace policy explicit in service and
+  init owners rather than in kernel helpers.
+- Keep compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
+
+Chosen system boundary
+----------------------
+Chosen boundary: landed.
+
+The landed Phase 141 system is:
+
+1. UART ingress publishes one bounded frame to `serial_service`.
+2. `serial_service` validates framing and forwards one bounded shell request
+   to a new fixed `shell_service` owner.
+3. `shell_service` interprets one fixed bounded command vocabulary and routes
+  to existing or newly admitted fixed services.
+4. The initially admitted service set is:
+   - `echo_service`
+   - `log_service`
+   - one new bounded `kv_service`
+5. The initially admitted fixed graph is:
+
+   UART -> serial_service -> shell_service -> { echo_service, log_service, kv_service }
+
+6. The initially admitted shell vocabulary is bounded to one minimal real
+   system surface:
+   - `echo <text>`
+   - `log append <text>`
+   - `log tail`
+   - `kv set <key> <value>`
+   - `kv get <key>`
+
+Why this is the right next step
+-------------------------------
+- It preserves the already-landed serial-ingress proof as the transport seed
+  instead of discarding it.
+- It forces the next work to be user-facing and stateful without broadening
+  into a general service platform.
+- It names one real implementation target clearly enough that later phases can
+  be judged against explicit exit criteria rather than taste.
+- It gives the repository one narrow place to decide whether shell semantics
+  belong in a distinct service owner instead of being absorbed by
+  `serial_service` or init.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this landed phase are:
+
+1. `docs/plan/admin/canopus_post_phase109_speculative_roadmap.txt`
+   - keep the roadmap aligned with the now-chosen concrete Phase 141 through
+     Phase 145 system target
+
+2. `docs/plan/active/phase141_interactive_service_system_scope_freeze.txt`
+   - publish the canonical boundary for the interactive-service wave
+
+3. `kernel/src/bootstrap_services/00_types.mc`
+   - reserve only the smallest named service-identity, command-shape, or
+     observation slots needed to represent the frozen graph explicitly
+
+4. `kernel/src/bootstrap_services/05_serial.mc`
+   - identify the future transport-to-shell handoff point while keeping Phase
+     141 primarily a scope and owner freeze
+
+5. `kernel/src/serial_service.mc`
+   - preserve transport ownership and make explicit that command semantics do
+     not belong here
+
+6. `kernel/src/shell_service.mc`
+   - concrete owner for bounded command parsing and routing introduced by this
+     scope freeze
+
+7. `kernel/src/kv_service.mc`
+   - concrete owner for bounded long-lived key-value state introduced by this
+     scope freeze
+
+8. `kernel/src/main.mc` and `kernel/src/init.mc`
+   - keep future service installation and boot wiring explicit and thin
+
+9. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that proves the graph and vocabulary stayed fixed
+
+10. `tests/tool/freestanding/kernel/`
+    - add one focused Phase 141 regression that freezes the chosen graph and
+      service set before behavior widens in later phases
+
+Chosen slice for this phase
+---------------------------
+Landed boundary shape:
+
+1. one canonical Phase 141 execution note that fixes the interactive-service
+   target system
+2. one explicit service graph rooted at the landed serial-ingress path
+3. one explicit split between transport ownership and shell ownership
+4. one fixed initial shell vocabulary and service set
+5. one audit or regression owner that prevents later silent drift
+6. one concrete root-owned Phase 141 handoff from `serial_service` to
+  `shell_service`
+
+Execution summary
+-----------------
+1. Freeze the Phase 141 system boundary in docs: one shell, one log owner,
+  one key-value owner, and one fixed graph.
+2. Land `shell_service` and `kv_service` as concrete repository-owned kernel
+  modules.
+3. Route the bounded Phase 141 serial handoff through `shell_service` while
+  keeping transport semantics inside `serial_service`.
+4. Add one debug-owned and test-owned scope-freeze audit proving the graph is
+  still fixed and transport ownership remains separate from shell semantics.
+5. Advance the kernel proof marker to 141 after the boundary is named
+  consistently in docs, boot wiring, and regression ownership.
+
+Preferred proof points
+----------------------
+1. The repository names one shell owner rather than smearing command parsing
+   across init, serial transport, and peers.
+2. The service set is fixed to echo, log, and key-value only.
+3. The command set is fixed and auditable rather than open-ended.
+4. The phase makes later shell and stateful work narrower, not broader.
+
+Exit criteria
+-------------
+- the repository has one published Phase 141 note freezing the interactive
+  service-system boundary
+- the admitted graph, service owners, and initial shell vocabulary are named
+  explicitly and consistently
+- transport ownership remains with `serial_service`, while shell semantics are
+  assigned to one distinct shell owner
+- the phase names `kv_service` as a new bounded stateful service owner without
+  claiming broader storage semantics
+- one audit or focused regression proves the Phase 141 boundary did not drift
+  during implementation
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 141 slice
+- the repository now has concrete `shell_service` and `kv_service` owners in
+  the kernel tree
+- the root Phase 141 path forwards the bounded serial request to
+  `shell_service` and validates the fixed graph through a dedicated audit
+- compiler, sema, MIR, backend, ABI, target, and `hal` surfaces remain closed
+
+Non-goals
+---------
+- implementing the full shell path in this phase
+- implementing persistence, restart policy, or recovery semantics in this
+  phase
+- admitting filesystem, networking, multicore, or throughput work
+- adding a general command interpreter, broker, namespace, or service
+  discovery mechanism
+- reopening sema, MIR, backend, ABI, target, or `hal`

@@ -1,0 +1,152 @@
+Phase 144 -- Stateful Key-Value Service Follow-Through
+======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the long-lived log follow-through by admitting one bounded
+stateful key-value service that can be used directly from the shell path and
+through one fixed two-service interaction.
+
+This document records the intended Phase 144 slice.
+It defines one bounded in-memory key-value owner for the interactive-service
+system.
+It does not claim a storage subsystem, a database abstraction layer, durable
+recovery, or general service middleware.
+
+Repository status note
+----------------------
+- Phase 143 should prove that one existing service owner can retain state
+  across repeated shell-driven requests.
+- The next honest pressure is a second, richer stateful owner where request
+  shape, lookup semantics, overwrite behavior, and service-to-service use are
+  all more demanding than append-only log growth.
+- A bounded key-value service is the smallest real system owner that adds
+  those pressures without hiding them inside a larger subsystem.
+
+Problem being solved
+--------------------
+- The shell path alone proves user-facing interaction, and the long-lived log
+  path proves repeated state, but neither yet proves richer state mutation and
+  lookup semantics.
+- Without one key-value phase, the system still lacks the most natural small
+  stateful service a user would expect to rely on repeatedly.
+- The repository therefore needs one bounded in-memory key-value owner that
+  supports explicit set and get behavior and composes with at least one second
+  service path.
+
+Core rule
+---------
+- Keep key-value state, lookup, overwrite, and missing-key semantics inside
+  `kv_service`.
+- Keep shell ownership limited to parsing and fixed route selection.
+- Any key-value to log interaction must remain explicit and fixed, not a
+  generalized middleware or hook system.
+- Keep the table bounded and deterministic.
+- Do not widen into persistence, transactions, namespaces, or a general data
+  model.
+
+Chosen key-value shape
+----------------------
+Chosen shape: yes.
+
+The Phase 144 key-value service should:
+
+1. accept shell-routed `kv set <key> <value>` requests
+2. accept shell-routed `kv get <key>` requests
+3. retain bounded in-memory entries across multiple requests
+4. define explicit overwrite and missing-key replies
+5. drive one fixed second-service interaction, preferably one bounded log
+   append recording that a set or overwrite occurred
+
+Why this is the right next step
+-------------------------------
+- It adds real mutable state and lookup pressure without widening the kernel.
+- It creates one honest service-to-service path rooted in useful behavior
+  rather than in composition for its own sake.
+- It pressures ownership and reply contracts more directly than append-only
+  logging alone.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/bootstrap_services/07_kv.mc`
+   - introduce one bounded key-value execution owner for retained in-memory
+     entries, lookup, and overwrite semantics
+
+2. `kernel/src/bootstrap_services/00_types.mc`
+   - add only the smallest key-value request, reply, and retained-state facts
+     needed for explicit bounded semantics
+
+3. `kernel/src/kv_service.mc`
+   - own the key-value table, missing-key consequence, overwrite semantics,
+     and optional fixed log-record interaction
+
+4. `kernel/src/bootstrap_services/06_shell.mc` and `kernel/src/shell_service.mc`
+   - route `kv set` and `kv get` requests without absorbing key-value policy
+
+5. `kernel/src/log_service.mc`
+   - if key-value writes are recorded, accept that one fixed write-observation
+     path without becoming a general audit framework
+
+6. `kernel/src/main.mc` and `kernel/src/init.mc`
+   - install and wire the new key-value owner explicitly in the boot graph
+
+7. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path exposing retained entries, missing-key replies,
+     overwrite behavior, and the fixed second-service interaction
+
+8. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 144 regression plus one projected MIR golden over
+     the key-value path and its fixed service-to-service follow-through
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one new bounded key-value owner with retained explicit in-memory state
+2. one shell-driven set path
+3. one shell-driven get path
+4. one explicit missing-key and overwrite contract
+5. one fixed key-value to log interaction proving a useful two-service path
+
+Suggested execution order
+-------------------------
+1. Freeze the bounded key-value contract in docs and types.
+2. Introduce the key-value owner and explicit boot wiring.
+3. Route shell `kv set` and `kv get` requests into that owner.
+4. Implement retained-state, missing-key, and overwrite behavior.
+5. Add one fixed write-observation path into `log_service`.
+6. Add the Phase 144 audit, regression, and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One set request changes state observed by a later get request.
+2. One overwrite path is explicit and deterministic.
+3. One missing-key request returns an explicit bounded consequence.
+4. One key-value write can drive one fixed second-service log observation
+   without widening into middleware.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 144 marker
+- `kv_service` retains bounded explicit state across multiple shell-driven
+  requests
+- `kv set` and `kv get` work over the real shell path
+- missing-key and overwrite behavior are explicit and auditable
+- one fixed key-value to log interaction is real over the kernel artifact
+- the Phase 144 audit and focused regression prove the same key-value boundary
+  across build, run, docs, and MIR
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- durable persistence or restart survival of key-value state
+- transactions, indexing, iteration, deletion, or broader query vocabulary
+- generic event hooks, middleware, or service-discovery growth
+- widening into filesystem or database infrastructure
+- reopening sema, MIR, backend, ABI, target, or `hal`

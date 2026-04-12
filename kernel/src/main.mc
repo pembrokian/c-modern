@@ -9,9 +9,11 @@ import ipc
 import init
 import interrupt
 import lifecycle
+import kv_service
 import log_service
 import mmu
 import sched
+import shell_service
 import serial_service
 import state
 import syscall
@@ -66,14 +68,22 @@ const PHASE137_MARKER: i32 = 137
 const PHASE137_MARKER_DETAIL: u32 = 137
 const PHASE140_MARKER: i32 = 140
 const PHASE140_MARKER_DETAIL: u32 = 140
+const PHASE141_MARKER: i32 = 141
+const PHASE141_MARKER_DETAIL: u32 = 141
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
 const COMPOSITION_SERVICE_DIRECTORY_KEY: u32 = 4
 const SERIAL_SERVICE_DIRECTORY_KEY: u32 = 5
+const KV_SERVICE_DIRECTORY_KEY: u32 = 6
+const SHELL_SERVICE_DIRECTORY_KEY: u32 = 7
 const COMPOSITION_ECHO_ENDPOINT_ID: u32 = 3
 const COMPOSITION_LOG_ENDPOINT_ID: u32 = 4
 const SERIAL_SERVICE_ENDPOINT_ID: u32 = TRANSFER_ENDPOINT_ID
+const KV_SERVICE_ENDPOINT_ID: u32 = 5
+const SHELL_SERVICE_ENDPOINT_ID: u32 = 6
+const PHASE141_SHELL_PID: u32 = 4
+const PHASE141_KV_PID: u32 = 5
 const UART_RECEIVE_VECTOR: u32 = 33
 const UART_COMPLETION_VECTOR: u32 = 34
 const UART_SOURCE_ACTOR: u32 = 134
@@ -1872,43 +1882,68 @@ func bootstrap_main() i32 {
     if !debug.validate_phase140_serial_ingress_composed_service_graph(phase140_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 96
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, PHASE140_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
+
+    phase141_request_len: usize = serial_service.forwarded_request_len(SERIAL_SERVICE_RECEIVE_OBSERVATION.payload_len)
+    phase141_request_payload: [4]u8 = serial_service.forwarded_request_payload(SERIAL_SERVICE_RECEIVE_OBSERVATION.payload_len, SERIAL_SERVICE_RECEIVE_OBSERVATION.payload)
+    phase141_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
+    phase141_serial_state = serial_service.record_forward(phase141_serial_state, SHELL_SERVICE_ENDPOINT_ID, syscall.SyscallStatus.Ok, phase141_request_len, phase141_request_payload)
+    phase141_shell_state: shell_service.ShellServiceState = shell_service.record_request(shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID), phase141_serial_state.owner_pid, SHELL_SERVICE_ENDPOINT_ID, phase141_request_len, phase141_request_payload)
+    phase141_log_state: log_service.LogServiceState = LOG_SERVICE_STATE
+    phase141_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
+    phase141_kv_state: kv_service.KvServiceState = kv_service.record_set(kv_service.service_state(PHASE141_KV_PID, 1), PHASE141_SHELL_PID, KV_SERVICE_ENDPOINT_ID, 75, 86)
+    phase141_reply_payload: [4]u8 = shell_service.reply_payload(phase141_shell_state, phase141_echo_state, phase141_log_state, phase141_kv_state)
+    phase141_shell_state = shell_service.record_reply(phase141_shell_state, syscall.SyscallStatus.Ok, 2, phase141_reply_payload)
+    phase141_audit: debug.Phase141InteractiveServiceSystemScopeFreezeAudit = bootstrap_audit.build_phase141_interactive_service_system_scope_freeze_audit(bootstrap_audit.Phase141InteractiveServiceSystemScopeFreezeAuditInputs{ phase140: phase140_audit, serial_service_pid: phase141_serial_state.owner_pid, shell_service_pid: phase141_shell_state.owner_pid, kv_service_pid: phase141_kv_state.owner_pid, serial_forward_endpoint_id: phase141_serial_state.forward_endpoint_id, serial_forward_status: phase141_serial_state.forward_status, serial_forward_request_len: phase141_serial_state.forwarded_request_len, serial_forward_request_byte0: phase141_serial_state.forwarded_request_byte0, serial_forward_request_byte1: phase141_serial_state.forwarded_request_byte1, shell_tag: phase141_shell_state.last_tag, shell_request_len: phase141_shell_state.last_request_len, shell_request_byte0: phase141_shell_state.last_byte0, shell_request_byte1: phase141_shell_state.last_byte1, shell_request_byte2: phase141_shell_state.last_byte2, shell_endpoint_id: SHELL_SERVICE_ENDPOINT_ID, echo_endpoint_id: COMPOSITION_ECHO_ENDPOINT_ID, log_endpoint_id: COMPOSITION_LOG_ENDPOINT_ID, kv_endpoint_id: KV_SERVICE_ENDPOINT_ID, echo_route_count: phase141_shell_state.echo_route_count, log_route_count: phase141_shell_state.log_route_count, kv_route_count: phase141_shell_state.kv_route_count, invalid_command_count: phase141_shell_state.invalid_command_count, shell_reply_status: phase141_shell_state.reply_status, shell_reply_len: phase141_shell_state.reply_len, shell_reply_byte0: phase141_shell_state.reply_byte0, shell_reply_byte1: phase141_shell_state.reply_byte1, shell_reply_byte2: phase141_shell_state.reply_byte2, shell_reply_byte3: phase141_shell_state.reply_byte3, fixed_vocabulary_visible: 1, kernel_broker_visible: 0, dynamic_routing_visible: 0, general_shell_framework_visible: 0, compiler_reopening_visible: 0 })
+    if !debug.validate_phase141_interactive_service_system_scope_freeze(phase141_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 97
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE140_MARKER_DETAIL)
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE141_MARKER_DETAIL)
+    if BOOT_MARKER_EMITTED != 1 {
         return 98
     }
-    if BOOT_LOG.count != 5 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 99
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG.count != 6 {
         return 100
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 101
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 102
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 103
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 104
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE140_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 105
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE140_MARKER_DETAIL {
         return 106
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 5)) != 16 {
         return 107
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 5) != ARCH_ACTOR {
         return 108
     }
-    return PHASE140_MARKER
+    if state.log_detail_at(BOOT_LOG, 5) != PHASE141_MARKER_DETAIL {
+        return 109
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 110
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 111
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 112
+    }
+    return PHASE141_MARKER
 }

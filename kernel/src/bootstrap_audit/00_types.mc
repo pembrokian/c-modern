@@ -6,6 +6,7 @@ import ipc
 import init
 import log_service
 import mmu
+import shell_service
 import state
 import syscall
 import timer
@@ -430,6 +431,42 @@ struct Phase140SerialIngressComposedServiceGraphAuditInputs {
     kernel_broker_visible: u32
     dynamic_routing_visible: u32
     general_service_graph_visible: u32
+    compiler_reopening_visible: u32
+}
+
+struct Phase141InteractiveServiceSystemScopeFreezeAuditInputs {
+    phase140: debug.Phase140SerialIngressComposedServiceGraphAudit
+    serial_service_pid: u32
+    shell_service_pid: u32
+    kv_service_pid: u32
+    serial_forward_endpoint_id: u32
+    serial_forward_status: syscall.SyscallStatus
+    serial_forward_request_len: usize
+    serial_forward_request_byte0: u8
+    serial_forward_request_byte1: u8
+    shell_tag: shell_service.ShellCommandTag
+    shell_request_len: usize
+    shell_request_byte0: u8
+    shell_request_byte1: u8
+    shell_request_byte2: u8
+    shell_endpoint_id: u32
+    echo_endpoint_id: u32
+    log_endpoint_id: u32
+    kv_endpoint_id: u32
+    echo_route_count: usize
+    log_route_count: usize
+    kv_route_count: usize
+    invalid_command_count: usize
+    shell_reply_status: syscall.SyscallStatus
+    shell_reply_len: usize
+    shell_reply_byte0: u8
+    shell_reply_byte1: u8
+    shell_reply_byte2: u8
+    shell_reply_byte3: u8
+    fixed_vocabulary_visible: u32
+    kernel_broker_visible: u32
+    dynamic_routing_visible: u32
+    general_shell_framework_visible: u32
     compiler_reopening_visible: u32
 }
 
