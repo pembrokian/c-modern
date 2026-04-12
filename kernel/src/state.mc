@@ -67,7 +67,7 @@ struct BootRecord {
 
 struct BootLog {
     count: usize
-    entries: [6]BootRecord
+    entries: [8]BootRecord
 }
 
 struct BootLogAppendResult {
@@ -273,14 +273,16 @@ func empty_record() BootRecord {
     return BootRecord{ stage: BootStage.Reset, actor: 0, detail: 0 }
 }
 
-func zero_boot_records() [6]BootRecord {
-    entries: [6]BootRecord
+func zero_boot_records() [8]BootRecord {
+    entries: [8]BootRecord
     entries[0] = empty_record()
     entries[1] = empty_record()
     entries[2] = empty_record()
     entries[3] = empty_record()
     entries[4] = empty_record()
     entries[5] = empty_record()
+    entries[6] = empty_record()
+    entries[7] = empty_record()
     return entries
 }
 
@@ -289,10 +291,10 @@ func empty_log() BootLog {
 }
 
 func append_record(log: BootLog, stage: BootStage, actor: u32, detail: u32) BootLogAppendResult {
-    if log.count >= 6 {
+    if log.count >= 8 {
         return BootLogAppendResult{ log: log, appended: 0 }
     }
-    entries: [6]BootRecord = log.entries
+    entries: [8]BootRecord = log.entries
     entries[log.count] = BootRecord{ stage: stage, actor: actor, detail: detail }
     return BootLogAppendResult{ log: BootLog{ count: log.count + 1, entries: entries }, appended: 1 }
 }

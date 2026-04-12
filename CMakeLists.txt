@@ -187,6 +187,8 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase137_optional_dma_or_equivalent_follow_through.cpp
     tests/tool/freestanding/kernel/phase140_serial_ingress_composed_service_graph.cpp
     tests/tool/freestanding/kernel/phase141_interactive_service_system_scope_freeze.cpp
+    tests/tool/freestanding/kernel/phase142_serial_shell_command_routing.cpp
+    tests/tool/freestanding/kernel/phase143_long_lived_log_service_follow_through.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -302,6 +304,8 @@ set(MC_FREESTANDING_KERNEL_CASES
     phase137_optional_dma_or_equivalent_follow_through
     phase140_serial_ingress_composed_service_graph
     phase141_interactive_service_system_scope_freeze
+    phase142_serial_shell_command_routing
+    phase143_long_lived_log_service_follow_through
 )
 
 foreach(kernel_case IN LISTS MC_FREESTANDING_KERNEL_CASES)

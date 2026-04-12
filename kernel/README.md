@@ -6,6 +6,10 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 142 has moved the repository-owned kernel artifact beyond the landed Phase 141 shell-owner freeze into one bounded serial shell command-routing step.
+- Phase 142 therefore now publishes one bounded serial shell command-routing step.
+- Phase 143 has moved the repository-owned kernel artifact beyond the landed Phase 142 shell command-routing step into one bounded long-lived log-service follow-through.
+- Phase 143 therefore now publishes one bounded long-lived log-service follow-through.
 - Phase 141 has moved the repository-owned kernel artifact beyond the landed Phase 140 composed-graph step into one bounded interactive service system scope freeze with a concrete shell owner and a concrete key-value owner.
 - Phase 141 therefore now publishes one bounded interactive service system scope freeze.
 
@@ -86,7 +90,7 @@ Current status
   message lifetime and reuse audit, one bounded UART receive device-service
   handoff, one bounded UART receive-frame ownership boundary audit, and one
   bounded device failure containment probe, and one bounded optional
-  completion-backed UART receive follow-through, and one bounded serial-ingress composed service graph.
+  completion-backed UART receive follow-through, one bounded serial-ingress composed service graph, one bounded serial shell command-routing step, and one bounded long-lived log-service follow-through.
 
 Current files
 -------------
@@ -104,7 +108,7 @@ Current files
   step, one bounded service death observation step, one bounded partial
   failure propagation step, one bounded explicit restart or replacement
   probe, one bounded fan-out composition probe, one bounded device failure
-  containment probe, one bounded serial-ingress composed service graph, and thin root orchestration across the owned scheduler,
+  containment probe, one bounded serial-ingress composed service graph, one bounded serial shell command-routing step, one bounded long-lived log-service follow-through step, and thin root orchestration across the owned scheduler,
   lifecycle, bootstrap helper, and debug audit modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
   `module_sets.bootstrap_audit`, owning the extracted Phase 104 contract
@@ -135,10 +139,12 @@ Current files
   observation audit, Phase 129 partial failure propagation audit, Phase 130
   explicit restart or replacement audit, Phase 131 fan-out composition audit,
   Phase 134 minimal device-service handoff audit, Phase 135 buffer ownership
-  boundary audit, Phase 136 device failure containment audit, and Phase 137
-  optional completion-backed follow-through audit, and Phase 140 serial-ingress composed service-graph audit
-- `src/log_service.mc`: bounded log-service protocol state, acknowledgment
-  payload, and final handshake observation records
+  boundary audit, Phase 136 device failure containment audit, Phase 137
+  optional completion-backed follow-through audit, Phase 140 serial-ingress composed service-graph audit, Phase 141 interactive-service scope-freeze audit, Phase 142 serial shell command-routing audit, and Phase 143 long-lived log-service audit
+- `src/log_service.mc`: bounded log-service protocol state, retained in-memory
+  ordered log state, explicit overwrite-on-full policy, acknowledgment
+  payload, retained-log observation records, and final handshake observation
+  records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
   reply payload, and final exchange observation records
 - `src/serial_service.mc`: bounded serial-service protocol state, one
@@ -146,8 +152,9 @@ Current files
   observation, one aggregate-reply observation, and one service-local
   malformed-input classification path
 - `src/shell_service.mc`: bounded shell-service command classification,
-  fixed service routing, bounded reply shaping, and one explicit split
-  between serial transport ownership and shell semantics
+  fixed service routing, bounded reply shaping, compact four-byte command
+  encoding, and one explicit split between serial transport ownership and
+  shell semantics
 - `src/kv_service.mc`: bounded key-value service state, one fixed key slot,
   one fixed value slot, and one explicit stateful service owner admitted by
   the Phase 141 slice

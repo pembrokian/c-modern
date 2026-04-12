@@ -3,35 +3,60 @@ Phase 142 -- Serial Shell Command Routing
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
 Continue from the Phase 141 scope freeze by turning the landed serial-ingress
 path into one bounded user-facing shell route over the real kernel artifact.
 
-This document records the intended Phase 142 slice.
-It defines one shell-owned command-routing step that should make the system
-meaningfully usable by a human instead of only auditable by a proof harness.
+This document records the landed Phase 142 slice.
+It defines one shell-owned command-routing step over the real kernel artifact
+using the existing bounded four-byte transport rather than a widened serial,
+IPC, or compiler surface.
 It does not claim a general shell runtime, scripting, dynamic command
-registration, or service discovery.
+registration, wider payloads, or service discovery.
+
+Phase result
+------------
+Phase 142 is complete as one bounded serial shell command-routing step over the real kernel artifact.
+
+The landed repository slice now includes:
+
+- one concrete `bootstrap_services/06_shell.mc` owner for bounded shell-route
+  execution over the existing four-byte payload
+- one concrete compact command encoding rooted in the fixed Phase 141 shell
+  vocabulary:
+  - `ECxy -> echo <text>`
+  - `LAx! -> log append <text>`
+  - `LT!! -> log tail`
+  - `KSkv -> kv set <key> <value>`
+  - `KGk! -> kv get <key>`
+- one explicit malformed-command reply path that stays owned by
+  `shell_service`
+- one explicit final reply observation that stays owned by
+  `serial_service`
+- one focused Phase 142 audit and one focused freestanding regression over the
+  same shell-owned routing boundary
+
+It does not claim a wider serial payload, a generic shell framework, dynamic discovery, or compiler expansion.
 
 Repository status note
 ----------------------
 - Phase 140 already proved one fixed serial-ingress graph through existing
   service owners.
-- Phase 141 should freeze the next graph around a distinct shell owner plus
-  echo, log, and key-value service targets.
-- The next honest move is therefore to route bounded commands through that
+- Phase 141 already froze the shell-owned graph and service set.
+- The next honest move was therefore to route bounded commands through that
   graph rather than to widen state or failure semantics first.
 
 Problem being solved
 --------------------
-- The current serial path proves service composition, but it does not yet give
-  a human one fixed shell vocabulary that can drive the system naturally.
+- The Phase 141 scope freeze named the target shell vocabulary, but the
+  running kernel artifact still treated it as a frozen boundary rather than as
+  routed behavior.
 - Without one shell-owned command-routing step, later log and key-value work
   would remain transport- or test-shaped rather than user-facing.
-- The repository therefore needs one bounded shell route that parses a fixed
+- The repository therefore needed one bounded shell route that parses a fixed
   command set and dispatches to fixed services while keeping transport and
   routing owners separate.
 
@@ -42,27 +67,33 @@ Core rule
   routing policy.
 - Peer services own their own request interpretation and reply facts.
 - Keep the command language intentionally small and deterministic.
+- Keep the existing four-byte payload boundary explicit in this phase.
 - Do not add a generic REPL framework, stream vocabulary, or command plugin
   model.
 
 Chosen command route
 --------------------
-Chosen route: yes.
+Chosen route: landed.
 
-The Phase 142 route should be:
+The landed Phase 142 route is:
 
 1. UART ingress publishes one bounded frame to `serial_service`.
 2. `serial_service` validates the frame and forwards one bounded shell payload
    to `shell_service`.
-3. `shell_service` parses one of the admitted commands:
-   - `echo <text>`
-   - `log append <text>`
-   - `log tail`
-   - `kv set <key> <value>`
-   - `kv get <key>`
+3. `shell_service` parses one of the admitted compact shell frames:
+  - `ECxy -> echo <text>`
+  - `LAx! -> log append <text>`
+  - `LT!! -> log tail`
+  - `KSkv -> kv set <key> <value>`
+  - `KGk! -> kv get <key>`
 4. `shell_service` routes to the fixed target service and returns one bounded
    reply payload back through `serial_service`.
 5. `serial_service` emits one explicit final reply observation.
+
+The compact encoding is deliberate.
+Phase 142 keeps the serial and IPC payload width fixed at four bytes and maps
+the admitted shell vocabulary onto that existing transport rather than
+reopening the payload model or compiler-owned surfaces in the same phase.
 
 Why this is the right next step
 -------------------------------
@@ -82,8 +113,8 @@ The owning implementation surfaces for this phase are:
      prior composition-only route
 
 2. `kernel/src/bootstrap_services/06_shell.mc`
-   - introduce one bounded shell-service execution owner for command parsing
-     and fixed service dispatch
+   - introduce one bounded shell-route execution owner for command parsing,
+     fixed service dispatch, and serial-owned final reply observation wiring
 
 3. `kernel/src/bootstrap_services/00_types.mc`
    - add only the smallest command, reply, and shell-observation structures
@@ -122,7 +153,7 @@ The owning implementation surfaces for this phase are:
 
 Chosen slice for this phase
 ---------------------------
-Targeted boundary shape:
+Landed boundary shape:
 
 1. one additive `serial_service` to `shell_service` handoff
 2. one bounded shell parser over one fixed command vocabulary
@@ -130,19 +161,21 @@ Targeted boundary shape:
 4. one explicit malformed-command path
 5. one reply path back through the transport owner
 
-Suggested execution order
--------------------------
-1. Freeze the command vocabulary in docs and types.
-2. Add the shell-service owner and its fixed endpoint wiring.
-3. Route validated serial ingress to the shell owner.
-4. Implement bounded command parsing and one explicit malformed-command path.
-5. Wire the fixed dispatch routes to echo, log, and key-value owners.
-6. Record explicit reply observations through `serial_service`.
-7. Add the Phase 142 audit, regression, and projected MIR golden.
+Execution summary
+-----------------
+1. Keep the Phase 141 shell vocabulary but encode it compactly over the
+  existing four-byte transport.
+2. Add one bounded shell-route execution owner in `bootstrap_services`.
+3. Route six bounded commands through the real kernel proof path: echo,
+  log append, log tail, kv set, kv get, and one malformed command.
+4. Record the final reply through `serial_service` rather than hiding it in a
+  shell-only observation.
+5. Publish one Phase 142 audit, one projected MIR golden, and aligned docs
+  recording that payload width and compiler surfaces stayed closed.
 
 Preferred proof points
 ----------------------
-1. One human-entered bounded command can drive each admitted service path.
+1. One bounded compact command can drive each admitted service path.
 2. One malformed command is rejected explicitly by the shell owner.
 3. The kernel does not become a command interpreter or routing framework.
 4. Route ownership remains in shell and service code rather than in generic
@@ -160,10 +193,22 @@ Exit criteria
   routing boundary across build, run, docs, and MIR
 - compiler and low-level toolchain surfaces remain unchanged in this phase
 
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 142 slice
+- the repository now has one compact shell command route over the real kernel
+  artifact for echo, log append, log tail, kv set, kv get, and one malformed
+  command path
+- `serial_service` still owns framing and final reply observation while
+  `shell_service` owns parsing, command classification, and fixed routing
+- the serial and IPC payload width remains fixed at four bytes and compiler,
+  sema, MIR, backend, ABI, target, and `hal` surfaces remain closed
+
 Non-goals
 ---------
 - scripting, loops, variables, pipelines, or a general shell language
 - dynamic command registration or dynamic service discovery
+- widening serial or IPC payloads beyond the current bounded four-byte shape
 - unbounded input handling or terminal editing features
 - persistence guarantees for log or key-value state in this phase
 - reopening sema, MIR, backend, ABI, target, or `hal`

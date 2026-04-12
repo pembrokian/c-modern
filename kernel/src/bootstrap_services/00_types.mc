@@ -6,6 +6,8 @@ import init
 import lifecycle
 import mmu
 import log_service
+import kv_service
+import shell_service
 import serial_service
 import state
 import syscall
@@ -319,6 +321,16 @@ struct SerialServiceExecutionResult {
 struct Phase140SerialIngressCompositionResult {
     serial_state: SerialServiceExecutionState
     composition_state: CompositionServiceExecutionState
+    succeeded: u32
+}
+
+struct Phase142ShellCommandRouteResult {
+    serial_state: serial_service.SerialServiceState
+    shell_state: shell_service.ShellServiceState
+    log_state: log_service.LogServiceState
+    echo_state: echo_service.EchoServiceState
+    kv_state: kv_service.KvServiceState
+    routing: shell_service.ShellRoutingObservation
     succeeded: u32
 }
 

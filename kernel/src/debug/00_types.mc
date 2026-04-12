@@ -653,3 +653,41 @@ struct Phase141InteractiveServiceSystemScopeFreezeAudit {
     general_shell_framework_visible: u32
     compiler_reopening_visible: u32
 }
+
+struct Phase142SerialShellCommandRoutingAudit {
+    phase141: Phase141InteractiveServiceSystemScopeFreezeAudit
+    serial_service_pid: u32
+    shell_service_pid: u32
+    kv_service_pid: u32
+    serial_forward_endpoint_id: u32
+    serial_forward_status: syscall.SyscallStatus
+    serial_forward_count: usize
+    serial_final_reply_status: syscall.SyscallStatus
+    serial_final_reply_len: usize
+    serial_final_reply_byte0: u8
+    serial_final_reply_count: usize
+    echo_route: shell_service.ShellRoutingObservation
+    log_append_route: shell_service.ShellRoutingObservation
+    log_tail_route: shell_service.ShellRoutingObservation
+    kv_set_route: shell_service.ShellRoutingObservation
+    kv_get_route: shell_service.ShellRoutingObservation
+    invalid_route: shell_service.ShellRoutingObservation
+    compact_command_encoding_visible: u32
+    malformed_command_visible: u32
+    general_shell_framework_visible: u32
+    payload_width_reopened_visible: u32
+    compiler_reopening_visible: u32
+}
+
+struct Phase143LongLivedLogServiceAudit {
+    phase142: Phase142SerialShellCommandRoutingAudit
+    log_service_pid: u32
+    shell_service_pid: u32
+    overflow_append_route: shell_service.ShellRoutingObservation
+    tail_route: shell_service.ShellRoutingObservation
+    retention: log_service.LogRetentionObservation
+    bounded_retention_visible: u32
+    explicit_overwrite_policy_visible: u32
+    durable_persistence_visible: u32
+    compiler_reopening_visible: u32
+}

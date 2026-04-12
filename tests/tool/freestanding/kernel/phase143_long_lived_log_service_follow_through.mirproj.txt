@@ -1,0 +1,4 @@
+  TypeDecl kind=struct name=debug.Phase143LongLivedLogServiceAudit
+  Function name=bootstrap_audit.build_phase143_long_lived_log_service_audit returns=[debug.Phase143LongLivedLogServiceAudit]
+  Function name=log_service.observe_retention returns=[log_service.LogRetentionObservation]
+  Function name=debug.validate_phase143_long_lived_log_service returns=[bool]

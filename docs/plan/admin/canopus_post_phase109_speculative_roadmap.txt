@@ -69,9 +69,11 @@ Repository numbering note
 - Phase 140 is occupied by the concrete serial-ingress composed service graph.
 - Phase 141 is occupied by the concrete interactive service system scope
   freeze with a shell owner and a bounded key-value owner.
+- Phase 142 is occupied by the concrete serial shell command-routing step.
+- Phase 143 is occupied by the concrete long-lived log-service follow-through.
 - Proposed compiler planning still reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
-- The next speculative Canopus continuation therefore starts at Phase 142.
+- The next speculative Canopus continuation therefore starts at Phase 144.
 
 Repository status note
 ----------------------
@@ -115,7 +117,7 @@ Core rule
 
 System-building rule
 --------------------
-Use this sanity check on every proposed Phase 141 through Phase 145 change:
+Use this sanity check on every proposed Phase 143 through Phase 145 change:
 
 - making one small interactive service system more usable, more stateful, or
   more restart-tolerant while preserving explicit ownership: admissible
@@ -205,10 +207,7 @@ Why this band comes next:
   to real usage pressure.
 
 Phase 142 -- Serial Shell Command Routing
-- Exit criterion: one bounded serial shell can parse a fixed command set,
-  route requests to at least echo, log, and key-value service paths, and
-  return explicit replies over the real kernel artifact without introducing a
-  generic shell framework.
+- Phase 142 is now concrete as one bounded serial shell command-routing step using a compact four-byte command encoding for the admitted echo, log, and key-value vocabulary while keeping payload width, compiler, broker, and framework surfaces closed in this phase.
 
 Preferred proof points:
 - at least one malformed command path is handled explicitly
@@ -234,9 +233,7 @@ Why this band matters:
   expose.
 
 Phase 143 -- Long-Lived Log Service Follow-Through
-- Exit criterion: one bounded log service retains explicit state across
-  multiple shell-driven requests and supports at least one bounded query or
-  inspection path without turning into a general persistence layer.
+- Phase 143 is now concrete as one bounded long-lived log-service follow-through with bounded in-memory retention, one service-owned `log tail` reply path, one explicit overwrite-on-full consequence, and compiler, persistence, and payload-width surfaces kept closed.
 
 Phase 144 -- Stateful Key-Value Service Follow-Through
 - Exit criterion: one bounded key-value service retains explicit state across

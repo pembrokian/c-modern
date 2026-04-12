@@ -3,7 +3,7 @@ Phase 143 -- Long-Lived Log Service Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -11,28 +11,47 @@ Continue from the bounded shell path by making `log_service` retain real state
 across multiple requests instead of behaving only as a transactional proof
 endpoint.
 
-This document records the intended Phase 143 slice.
+This document records the landed Phase 143 slice.
 It defines one bounded long-lived log owner over the real shell-driven system.
 It does not claim durable persistence, a filesystem, an indexing engine, or a
 general observability stack.
 
+Phase result
+------------
+Phase 143 is complete as one bounded long-lived log-service follow-through over the real kernel artifact.
+
+The landed repository slice now includes:
+
+- one concrete retained-log owner in `kernel/src/log_service.mc`
+- one bounded in-memory ordered log across multiple shell-driven append
+  requests
+- one bounded `log tail` reply path owned by the log service rather than by
+  shell-local reply synthesis
+- one explicit overwrite-on-full policy that stays bounded, in-memory, and
+  service-owned
+- one focused Phase 143 audit and one focused freestanding regression over the
+  same retained-log boundary
+
+It does not claim durable persistence, a filesystem, an indexing engine, or compiler expansion.
+
 Repository status note
 ----------------------
-- Phase 142 should make the serial path human-usable through a distinct shell
-  owner.
-- Once that path exists, the strongest next pressure is state that survives
+- Phase 142 already made the serial path human-usable through a distinct shell
+  owner and fixed compact command routing.
+- Once that path landed, the strongest next pressure was state that survives
   across repeated use rather than another transport or parsing expansion.
-- `log_service` is the narrowest real stateful owner already present in the
-  repository, so it is the right first place to make repeated use matter.
+- `log_service` was already the narrowest real stateful owner in the
+  repository, so it became the right first place to make repeated use matter.
 
 Problem being solved
 --------------------
-- The repository already has a real log service path, but it is still too easy
-  for that path to remain handshake-shaped rather than meaningfully stateful.
-- Without one long-lived log phase, the shell can route commands but the
-  system still will not prove that one service can carry evolving state across
-  time.
-- The repository therefore needs one bounded in-memory retained-log path with
+- The repository already had a real log service path, but it was still too
+  easy for that path to remain handshake-shaped rather than meaningfully
+  stateful.
+- Without one long-lived log phase, the shell could route commands but the
+  system still would not prove that one service can carry evolving state
+  across time.
+- The repository therefore needed one bounded in-memory retained-log path with
   one query surface that a human can use repeatedly without rebooting.
 
 Core rule
@@ -48,17 +67,17 @@ Core rule
 
 Chosen retained-log shape
 -------------------------
-Chosen shape: yes.
+Chosen shape: landed.
 
-The Phase 143 log service should:
+The landed Phase 143 log service now:
 
-1. accept repeated `log append <text>` requests from the shell path
+1. accepts repeated `log append <text>` requests from the shell path
 2. retain a bounded in-memory ordered log across multiple requests
-3. answer one bounded `log tail` or equivalent query from retained state
-4. expose bounded truncation or overwrite behavior only through explicit
-   service-owned policy when the retained log is full
-5. publish one explicit observation showing that multiple requests contributed
-   to one retained log state
+3. answers one bounded `log tail` query from retained state
+4. exposes bounded overwrite behavior only through explicit service-owned
+   policy when the retained log is full
+5. publishes one explicit observation showing that multiple requests
+   contributed to one retained log state
 
 Why this is the right next step
 -------------------------------
@@ -81,7 +100,7 @@ The owning implementation surfaces for this phase are:
      facts needed to represent the long-lived log boundary
 
 3. `kernel/src/log_service.mc`
-   - own append, retention, overflow consequence, and query reply semantics
+   - own append, retention, overwrite consequence, and query reply semantics
 
 4. `kernel/src/bootstrap_services/06_shell.mc` and `kernel/src/shell_service.mc`
    - route `log append` and `log tail` explicitly without absorbing log
@@ -92,7 +111,7 @@ The owning implementation surfaces for this phase are:
 
 6. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
    - add one audit path exposing retained-log growth, bounded query replies,
-     and overflow consequence as explicit observations
+     and overwrite consequence as explicit observations
 
 7. `kernel/src/main.mc`
    - keep boot wiring explicit while the log owner gains long-lived state
@@ -103,7 +122,7 @@ The owning implementation surfaces for this phase are:
 
 Chosen slice for this phase
 ---------------------------
-Targeted boundary shape:
+Landed boundary shape:
 
 1. one additive retained-log state inside the existing log owner
 2. one shell-driven append path that mutates retained state across requests
@@ -111,14 +130,17 @@ Targeted boundary shape:
 4. one explicit bounded-full consequence owned by the log service
 5. one audit proving that state survived across more than one request
 
-Suggested execution order
--------------------------
-1. Freeze the retained-log boundary in docs: bounded in-memory state only.
-2. Extend log-service state and reply structures.
-3. Route shell `log append` requests into the retained-log path.
-4. Route shell `log tail` requests into one bounded query path.
-5. Expose one explicit bounded-full or overwrite consequence.
-6. Add the Phase 143 audit, regression, and projected MIR golden.
+Execution summary
+-----------------
+1. Keep the Phase 142 compact shell route and four-byte payload unchanged.
+2. Extend `log_service` with one bounded four-byte retained log and one
+   explicit overwrite-on-full consequence.
+3. Route shell `log append` and `log tail` through service-owned retained-log
+   semantics rather than shell-owned reply synthesis.
+4. Preserve the prior one-append Phase 142 tail reply while making later tail
+   replies reflect retained history.
+5. Add one Phase 143 audit, one projected MIR golden, and aligned docs over
+   the retained-log boundary.
 
 Preferred proof points
 ----------------------
@@ -138,6 +160,17 @@ Exit criteria
 - the Phase 143 audit and focused regression prove the same retained-log
   boundary across build, run, docs, and MIR
 - compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 143 slice
+- `log_service` now retains one bounded in-memory ordered log across multiple
+  shell-driven requests and answers one bounded `log tail` query from that
+  retained state
+- overwrite-on-full stays explicit and auditable inside the log-service owner
+  rather than being hidden in shell or transport helpers
+- the serial and IPC payload width remains fixed at four bytes and compiler,
+  sema, MIR, backend, ABI, target, and `hal` surfaces remain closed
 
 Non-goals
 ---------

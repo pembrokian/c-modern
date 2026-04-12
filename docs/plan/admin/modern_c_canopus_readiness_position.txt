@@ -14,6 +14,8 @@ Record one maintained repository position after Phase 136 published one bounded 
 Record one maintained repository position after Phase 137 published one bounded optional completion-backed follow-through over that same slice.
 Record one maintained repository position after Phase 140 published one bounded serial-ingress composed service graph over that same slice.
 Record one maintained repository position after Phase 141 published one bounded interactive service system scope freeze over that same slice.
+Record one maintained repository position after Phase 142 published one bounded serial shell command-routing step over that same slice.
+Record one maintained repository position after Phase 143 published one bounded long-lived log-service follow-through over that same slice.
 
 This note answers four questions that now matter:
 
@@ -53,6 +55,8 @@ This position statement is meant to stay aligned with:
 - `docs/plan/active/phase137_optional_dma_or_equivalent_follow_through.txt`
 - `docs/plan/active/phase140_serial_ingress_composed_service_graph.txt`
 - `docs/plan/active/phase141_interactive_service_system_scope_freeze.txt`
+- `docs/plan/active/phase142_serial_shell_command_routing.txt`
+- `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
 - `docs/plan/phase121_kernel_image_contract_hardening.txt`
 - `docs/plan/phase122_target_surface_audit.txt`
@@ -132,6 +136,12 @@ Current repository truth
 - The landed Phase 141 interactive service system scope freeze also belongs to
   that same admitted slice rather than to a broader shell framework, dynamic
   discovery model, persistence layer, or reopened compiler wave.
+- The landed Phase 142 serial shell command-routing step also belongs to that
+  same admitted slice rather than to a broader shell framework, wider payload
+  model, dynamic discovery model, or reopened compiler wave.
+- The landed Phase 143 long-lived log-service follow-through also belongs to
+  that same admitted slice rather than to a broader persistence layer,
+  filesystem, observability framework, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -216,6 +226,8 @@ device demonstration.
 The repository now also includes a landed Phase 140 serial-ingress composed service graph that keeps the new forward edge and aggregate-reply interpretation inside service owners, adds no compiler-facing surface, and expands the running-system slice by one honest device-facing-to-composed-service route rather than by another init-only composition restatement.
 
 The repository now also includes a landed Phase 141 interactive service system scope freeze that keeps serial framing in `serial_service`, keeps command ownership in one concrete `shell_service` owner, keeps bounded state in one concrete `kv_service` owner, adds no compiler-facing surface, and expands the running-system slice by one honest shell-owned boundary rather than by another transport-only or roadmap-only restatement.
+
+The repository now also includes a landed Phase 142 serial shell command routing step that keeps framing and final reply observation in `serial_service`, keeps command parsing and fixed routing in `shell_service`, keeps the serial and IPC payload width fixed at four bytes through a compact command encoding, adds no compiler-facing surface, and expands the running-system slice by one honest user-facing shell route rather than by another freeze-only restatement.
 
 Kernel maturity and quality
 ---------------------------

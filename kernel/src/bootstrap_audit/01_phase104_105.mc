@@ -132,11 +132,13 @@ func validate_state_hardening_contracts(audit: StateHardeningAudit) bool {
     append3: state.BootLogAppendResult = state.append_record(append2.log, state.BootStage.UserEntryReady, audit.arch_actor, 4)
     append4: state.BootLogAppendResult = state.append_record(append3.log, state.BootStage.MarkerEmitted, audit.arch_actor, 5)
     append5: state.BootLogAppendResult = state.append_record(append4.log, state.BootStage.Halted, audit.arch_actor, 6)
-    overflow: state.BootLogAppendResult = state.append_record(append5.log, state.BootStage.Halted, audit.arch_actor, 7)
+    append6: state.BootLogAppendResult = state.append_record(append5.log, state.BootStage.Halted, audit.arch_actor, 7)
+    append7: state.BootLogAppendResult = state.append_record(append6.log, state.BootStage.Halted, audit.arch_actor, 8)
+    overflow: state.BootLogAppendResult = state.append_record(append7.log, state.BootStage.Halted, audit.arch_actor, 9)
     if overflow.appended != 0 {
         return false
     }
-    return overflow.log.count == 6
+    return overflow.log.count == 8
 }
 
 func validate_syscall_contract_hardening(audit: SyscallHardeningAudit) bool {
@@ -352,7 +354,7 @@ func validate_phase105_log_service_handshake(audit: LogServicePhaseAudit) bool {
     if audit.handshake.endpoint_id != audit.init_endpoint_id {
         return false
     }
-    if log_service.tag_score(audit.handshake.tag) != 4 {
+    if log_service.tag_score(audit.handshake.tag) != 16 {
         return false
     }
     if audit.handshake.request_len != 1 {

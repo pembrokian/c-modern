@@ -46,6 +46,8 @@ files = [
 	"src/debug/11_phase137.mc",
 	"src/debug/12_phase140.mc",
 	"src/debug/13_phase141.mc",
+	"src/debug/14_phase142.mc",
+	"src/debug/15_phase143.mc",
 ]
 
 [targets.kernel.module_sets.bootstrap_audit]
@@ -64,6 +66,7 @@ files = [
 	"src/bootstrap_services/03_transfer.mc",
 	"src/bootstrap_services/04_composition.mc",
 	"src/bootstrap_services/05_serial.mc",
+	"src/bootstrap_services/06_shell.mc",
 ]
 
 [targets.kernel.runtime]

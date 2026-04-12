@@ -50,6 +50,8 @@ Structure
   - `phase137_optional_dma_or_equivalent_follow_through.cpp`: real-kernel bounded optional completion-backed UART receive follow-through audit.
   - `phase140_serial_ingress_composed_service_graph.cpp`: real-kernel bounded serial-ingress composed service-graph audit.
   - `phase141_interactive_service_system_scope_freeze.cpp`: real-kernel bounded shell-owner and key-value-owner scope-freeze audit.
+  - `phase142_serial_shell_command_routing.cpp`: real-kernel bounded serial shell command-routing audit.
+  - `phase143_long_lived_log_service_follow_through.cpp`: real-kernel bounded long-lived log-service follow-through audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 
