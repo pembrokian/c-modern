@@ -1,0 +1,240 @@
+Phase 134 -- Minimal Device-Service Handoff
+===========================================
+
+Status
+------
+COMPLETE
+
+Purpose
+-------
+Continue from the planned Phase 133 message-lifetime step by forcing the
+running-system slice to survive contact with one real device path rather than
+another proof-only kernel exercise.
+
+This document is an execution plan for Phase 134.
+It defines one bounded UART-backed device handoff that must land as concrete
+interrupt, device-register, IPC, init, and service behavior before it is
+admitted as a debug audit or regression.
+It does not claim a driver model, a reusable device layer, a generic event
+bus, or a compiler wave.
+
+Repository status note
+----------------------
+- The current kernel artifact already has explicit interrupt ownership, IPC
+  ownership, service ownership, backpressure planning, and message-lifetime
+  planning, but it still does not carry one honest hardware-facing device
+  path into user space.
+- The current interrupt owner in `kernel/src/interrupt.mc` is still centered
+  on the timer wake path. That is enough to prove interrupt entry discipline,
+  but not enough to prove that a real device-facing interrupt can cross the
+  kernel boundary without growing kernel policy.
+- The repository already has bounded user-space service owners and bounded
+  bootstrap service wiring. The next honest pressure is to make one concrete
+  serial ingress path real over the same artifact.
+
+Problem being solved
+--------------------
+- The repository still lacks one real interrupt-to-service path over a device
+  with concrete bytes, concrete registers, and concrete failure edges.
+- Without this step, later buffer, device-failure, or DMA work would be able
+  to hide behind timer proofs and synthetic IPC paths instead of stressing the
+  running system the repository actually claims.
+- The repository therefore needs one deliberately narrow, deliberately ugly,
+  end-to-end path: one UART receive interrupt, one byte read from one device
+  register, one message send to one service endpoint, and one bounded service
+  that records or publishes the byte.
+
+Core rule
+---------
+- Choose exactly one concrete device for this band: UART receive.
+- Keep the kernel dumb: interrupt entry, register read, message packaging,
+  endpoint send, and explicit failure observation only.
+- Keep device-specific truth local to one narrow owner. Do not introduce
+  `DeviceManager`, `DriverInterface`, generic device events, or a reusable
+  driver framework.
+- Debug audits, MIR projections, and freestanding regressions are acceptance
+  artifacts only. They do not count as the implementation.
+- Keep compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
+  If the active bring-up target needs one narrow register constant, IRQ vector
+  constant, or minimal arch glue for UART receive, keep that work target-local
+  and refuse any broader `hal` expansion.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 134 change:
+
+- reading one concrete device register and turning it into one bounded IPC
+  message: admissible
+- naming a reusable device abstraction because another device might need it
+  later: wrong layer
+
+Do not optimize this path before it is true. No batching, no flow-control
+framework, no broker, no configurable device registry.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 134 execution plan that chooses UART receive as the
+   concrete device path for this band
+2. one additive UART owner that can acknowledge one receive interrupt, read
+   one byte from one concrete register path, and publish one bounded ingress
+   observation
+3. one additive interrupt-dispatch path that recognizes one UART receive
+   vector without turning interrupt dispatch into a generic device framework
+4. one fixed init-owned serial-service bootstrap path with one fixed endpoint
+   and one fixed publication story
+5. one real serial service owner that receives the message and records,
+   prints, or otherwise publishes the received byte without teaching the
+   kernel UART policy
+6. one debug-owned Phase 134 audit and focused regression over the landed
+   device-to-service path
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase now because the next honest stress is
+not broader IPC design. It is whether one real interrupt-facing device can be
+admitted without pulling routing, parsing, or retry policy into the kernel.
+
+What this phase should try to prove
+-----------------------------------
+- one UART receive interrupt can become one bounded IPC message over the real
+  kernel artifact
+- the kernel can stay at the level of register read plus message send without
+  learning higher-level serial policy
+- one bounded service owner can consume device-origin bytes without a new
+  kernel-side broker or driver layer
+- the running-system claim expands because the repository landed a concrete
+  hardware-facing path rather than another proof-only publication step
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/interrupt.mc`
+   - add one explicit UART receive dispatch kind and one explicit accepted
+     vector path
+   - keep the shape additive and narrow
+   - do not add a general device interrupt taxonomy
+
+2. `kernel/src/uart.mc`
+   - preferred shape: one new narrow owner for UART receive register access,
+     acknowledge behavior, and one-byte ingress observation
+   - keep the owner concrete to the chosen UART path
+   - if the current target needs register constants or one small arch bridge,
+     keep that bridge local to this owner rather than creating shared device
+     infrastructure
+
+3. `kernel/src/ipc/02_runtime.mc` and `kernel/src/ipc/03_failure.mc`
+   - add only the smallest honest send-side behavior or observation needed so
+     an interrupt-origin byte can become one service message visibly
+   - keep IPC descriptive and owner-local
+
+4. `kernel/src/bootstrap_services/00_types.mc` and
+   `kernel/src/bootstrap_services/05_serial.mc`
+   - add one fixed init-owned serial-service bootstrap record and helper path
+   - keep publication fixed and explicit rather than dynamic
+
+5. `kernel/src/serial_service.mc`
+   - add one real bounded service owner that receives UART-origin messages
+   - preferred behavior: append to a bounded observation buffer or forward to
+     an already-landed log path
+   - do not parse line discipline, shell semantics, or terminal policy here
+
+6. `kernel/src/debug/08_phase134.mc`
+   - validate that the landed path is interrupt -> UART owner -> IPC ->
+     serial-service owner
+   - keep the audit descriptive; it must not substitute for implementation
+
+7. `kernel/src/main.mc`
+   - wire the chosen UART receive path through boot, interrupt delivery,
+     service startup, and proof-marker advance
+   - advance the kernel proof marker to 134 only after the audit succeeds
+
+Deliverables
+------------
+- one canonical Phase 134 execution plan in `docs/plan/active/`
+- one narrow UART receive owner in the kernel source tree
+- one additive interrupt-dispatch slice for the UART receive path
+- one fixed init-owned serial-service bootstrap helper
+- one real serial service owner in the running-system artifact
+- one debug-owned Phase 134 audit over the landed behavior
+- one focused freestanding regression plus projected MIR golden for the Phase
+  134 boundary
+- refreshed supporting docs only after the code shape is settled
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 134 boundary in docs: one UART receive path, no driver
+   framework.
+2. Add the narrow UART owner and the additive interrupt-dispatch path.
+3. Wire the fixed serial-service bootstrap and publication path.
+4. Land the real serial service owner and drive one interrupt-origin message
+   across the boundary.
+5. Add the Phase 134 debug audit over the landed path.
+6. Advance the kernel proof marker to 134 only after the end-to-end path is
+   real.
+7. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One accepted UART receive interrupt is observed distinctly from the timer
+   wake path.
+2. One byte is read from the UART owner and packaged into one bounded message.
+3. One serial service receives that byte through IPC and records it.
+4. One kernel audit proves the kernel did not parse, batch, or route beyond
+   the explicit handoff.
+5. One projected MIR proof shows the real artifact carries the Phase 134 path.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 134 marker
+- one concrete UART receive path exists as real code, not as a timer-backed
+  simulation or proof-only note
+- interrupt dispatch, UART register access, IPC send, and serial-service
+  receive are all present in the landed artifact
+- the Phase 134 debug audit validates the landed handoff over the real kernel
+  artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 134 boundary
+- the compiler and low-level toolchain surfaces remain unchanged except for
+  any unavoidable target-local UART constants or IRQ glue
+
+Completion note
+---------------
+Phase 134 is complete as one bounded UART receive device-service handoff.
+
+The landed kernel artifact now carries one explicit UART receive interrupt,
+one bounded UART owner, one bounded interrupt-origin IPC publish path, and
+one fixed serial-service receive-and-exit path.
+The implementation keeps device truth local to the UART and serial-service
+owners, keeps interrupt dispatch additive, and keeps compiler, sema, MIR,
+backend, ABI, target, and `hal` surfaces closed.
+
+Landed implementation summary:
+
+- `kernel/src/interrupt.mc` admits one explicit UART receive dispatch kind and
+  vector path without turning interrupt dispatch into a reusable device layer
+- `kernel/src/uart.mc` owns one narrow UART receive register and ingress
+  observation path
+- `kernel/src/ipc/02_runtime.mc` and `kernel/src/ipc/03_failure.mc` carry one
+  bounded interrupt-origin byte publish observation
+- `kernel/src/bootstrap_services/05_serial.mc` and
+  `kernel/src/serial_service.mc` carry one fixed init-owned serial-service
+  bootstrap and receive path
+- `kernel/src/debug/08_phase134.mc` validates the landed interrupt -> UART ->
+  IPC -> serial-service handoff over the real kernel artifact
+- `kernel/src/main.mc` advances the kernel proof marker to 134 only after that
+  audit succeeds
+
+Non-goals
+---------
+- a reusable driver interface or device framework
+- batching, flow control, terminal discipline, or line editing
+- dynamic service discovery or a broader namespace story
+- a generic event bus for hardware-origin messages
+- reopening sema, MIR, backend, ABI, target, or `hal` beyond one unavoidable
+  target-local UART hook
+- claiming device support from tests alone without landing the device path

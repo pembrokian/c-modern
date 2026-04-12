@@ -115,6 +115,23 @@ struct RuntimeReceiveTransition {
     endpoint_closed: u32
 }
 
+struct RuntimePublishObservation {
+    endpoint_id: u32
+    source_pid: u32
+    payload_len: usize
+    payload0: u8
+    queued: u32
+    queue_full: u32
+    endpoint_valid: u32
+    endpoint_closed: u32
+}
+
+struct RuntimePublishResult {
+    endpoints: EndpointTable
+    wake: EndpointWake
+    observation: RuntimePublishObservation
+}
+
 struct EndpointWakeTransition {
     endpoints: EndpointTable
     wake: EndpointWake
@@ -180,6 +197,10 @@ func zero_wakes() [4]EndpointWake {
 
 func empty_wake_list() EndpointWakeList {
     return EndpointWakeList{ count: 0, wakes: zero_wakes() }
+}
+
+func empty_runtime_publish_observation() RuntimePublishObservation {
+    return RuntimePublishObservation{ endpoint_id: 0, source_pid: 0, payload_len: 0, payload0: 0, queued: 0, queue_full: 0, endpoint_valid: 0, endpoint_closed: 0 }
 }
 
 func append_wake(list: EndpointWakeList, wake: EndpointWake) EndpointWakeList {

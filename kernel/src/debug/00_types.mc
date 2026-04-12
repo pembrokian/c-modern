@@ -390,3 +390,32 @@ struct Phase133MessageLifetimeAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase134MinimalDeviceServiceHandoffAudit {
+    phase131: Phase131FanOutCompositionAudit
+    interrupt_vector: u32
+    interrupt_source_actor: u32
+    interrupt_kind: interrupt.InterruptDispatchKind
+    dispatch_handled: u32
+    uart_service_endpoint_id: u32
+    uart_ack_count: u32
+    uart_ingress_count: u32
+    uart_received_byte: u8
+    published_endpoint_id: u32
+    published_source_pid: u32
+    published_payload_len: usize
+    published_payload_byte0: u8
+    published_queued: u32
+    published_queue_full: u32
+    published_endpoint_valid: u32
+    published_endpoint_closed: u32
+    serial_service_pid: u32
+    serial_receive_status: syscall.SyscallStatus
+    serial_wait_status: syscall.SyscallStatus
+    serial_received_byte: u8
+    serial_ingress_count: usize
+    kernel_policy_visible: u32
+    driver_framework_visible: u32
+    generic_event_bus_visible: u32
+    compiler_reopening_visible: u32
+}
+

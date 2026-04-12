@@ -112,12 +112,15 @@ void RunFreestandingKernelPhase132BackpressureAndBlocking(const std::filesystem:
 void RunFreestandingKernelPhase133MessageLifetimeAndReuse(const std::filesystem::path& source_root,
                                                           const std::filesystem::path& binary_root,
                                                           const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase134MinimalDeviceServiceHandoff(const std::filesystem::path& source_root,
+                                                              const std::filesystem::path& binary_root,
+                                                              const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
 
-const std::array<KernelTestCase, 32> kKernelTestCases = {{
+const std::array<KernelTestCase, 33> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
@@ -150,6 +153,7 @@ const std::array<KernelTestCase, 32> kKernelTestCases = {{
     {"phase131_fan_in_or_fan_out_composition", 5, &RunFreestandingKernelPhase131FanInOrFanOutComposition},
     {"phase132_backpressure_and_blocking", 5, &RunFreestandingKernelPhase132BackpressureAndBlocking},
     {"phase133_message_lifetime_and_reuse", 5, &RunFreestandingKernelPhase133MessageLifetimeAndReuse},
+    {"phase134_minimal_device_service_handoff", 5, &RunFreestandingKernelPhase134MinimalDeviceServiceHandoff},
 }};
 
 void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,

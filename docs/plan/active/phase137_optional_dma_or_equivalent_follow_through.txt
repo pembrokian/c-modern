@@ -1,0 +1,210 @@
+Phase 137 -- Optional DMA-Or-Equivalent Follow-Through
+======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 136 containment step only if the Phase 134
+through Phase 136 UART path lands cleanly and the active target exposes one
+real completion-backed buffer path worth admitting.
+
+This document is an execution plan for Phase 137.
+It defines one bounded completion-backed transfer phase that must land as
+concrete buffer-ownership, interrupt-completion, and service-consume behavior
+before it is admitted as a debug audit or regression.
+It does not claim a DMA subsystem, a general device-memory manager,
+scatter/gather support, or a broader I/O stack.
+
+Repository status note
+----------------------
+- Phase 137 is intentionally conditional. It is not the reward for finishing
+  Phase 136.
+- The repository should only take this step if the landed UART path already
+  feels mechanically honest, boring, and bounded under happy-path, ownership,
+  and failure pressure.
+- If the chosen UART target or adjacent concrete device path does not expose a
+  real completion-backed transfer mechanism, the honest answer is to stop at
+  Phase 136 and record the deferral rather than fake DMA in software.
+
+Problem being solved
+--------------------
+- The repository may eventually need one proof that completion-backed device
+  transfer still keeps ownership explicit and still avoids kernel policy
+  growth.
+- That proof is only honest if it uses a real completion path exposed by the
+  active bring-up target.
+- Without a strict gate here, the repository could easily drift into building
+  a device-memory framework or a synthetic DMA simulator that proves nothing.
+
+Core rule
+---------
+- Take this phase only if the active target provides one real completion-
+  backed buffer path.
+- Keep the shape brutally narrow: one active receive buffer, one completion
+  interrupt, one ownership transfer or explicit retirement, one consuming
+  service.
+- Do not create `DmaManager`, `IoStack`, reusable descriptor frameworks, or a
+  general device-memory model.
+- If the phase cannot be landed with one concrete device and one concrete
+  service, do not start it.
+- Debug audits, MIR projections, and freestanding regressions are acceptance
+  artifacts only.
+
+Planning gate for this phase
+----------------------------
+Start this phase only if all of the following are true:
+
+1. the Phase 134 UART handoff is landed as real code
+2. the Phase 135 ownership story is landed as real runtime state
+3. the Phase 136 unhappy paths are landed and bounded
+4. the active target exposes one real completion-backed receive mechanism
+5. the repository can keep the new work inside one narrow owner set without
+   creating framework vocabulary
+
+If any gate fails, leave this phase unimplemented and publish the deferral.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 137 execution plan that names the start gate and keeps
+   the phase optional
+2. one additive completion-backed receive-buffer owner for the chosen UART or
+   equivalent concrete device path
+3. one additive interrupt-completion path that distinguishes transfer
+   completion from byte-at-a-time receive without becoming a generic device
+   completion framework
+4. one explicit ownership-transfer or retirement story between the completion
+   buffer and the consuming service
+5. one debug-owned Phase 137 audit and focused regression over the landed
+   completion-backed transfer path
+
+Chosen outcome
+--------------
+Chosen outcome: conditional.
+
+The repository should take this phase only if a real completion-backed buffer
+mechanism is present on the active target. If not, the honest output of this
+phase is a documented deferral, not a synthetic implementation.
+
+What this phase should try to prove
+-----------------------------------
+- one completion-backed receive buffer can become visible to the service with
+  explicit ownership or retirement truth
+- one completion interrupt can remain a narrow mechanism rather than the seed
+  of a generic completion framework
+- the kernel can stay at the level of completion observation, ownership handoff,
+  and explicit failure reporting without growing into device-memory policy
+- the running-system claim expands only if the repository lands a real
+  completion-backed path over the active target
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/uart.mc`
+   - preferred shape: extend the concrete UART owner with one bounded
+     completion-backed receive buffer record and one explicit active-buffer
+     state
+   - keep the owner concrete to the chosen target
+   - do not split into a general `dma/` subtree unless a real landed second
+     device forces that later
+
+2. `kernel/src/interrupt.mc`
+   - add only the smallest additive completion-dispatch truth needed for the
+     chosen device path
+   - keep completion handling concrete and non-reusable
+
+3. `kernel/src/ipc/00_types.mc` and `kernel/src/ipc/02_runtime.mc`
+   - publish the minimal notification or transfer path needed for the service
+     to consume the completed buffer honestly
+   - do not widen into a generic shared-memory or descriptor transport model
+
+4. `kernel/src/address_space.mc`
+   - touch only if the active target requires one explicit mapping or buffer
+     publication fact for the completion-backed path
+   - keep any mapping truth narrow and device-local
+
+5. `kernel/src/capability/02_ops.mc` and `kernel/src/capability/03_validation.mc`
+   - touch only if the chosen ownership-transfer story needs one temporary
+     explicit capability to name the completed buffer
+   - do not widen into a general buffer-capability system
+
+6. `kernel/src/serial_service.mc`
+   - consume the completed buffer and explicitly retire, return, or release it
+   - keep service policy local and bounded
+
+7. `kernel/src/debug/11_phase137.mc`
+   - validate the completion-backed ownership story over the landed artifact
+   - keep the audit strict about deferral if the real target path is absent
+
+8. `kernel/src/main.mc`
+   - drive one real completion-backed path and advance the proof marker to 137
+     only after the audit succeeds
+
+Deliverables
+------------
+- one canonical Phase 137 execution plan in `docs/plan/active/`
+- one additive completion-backed receive-buffer slice only if the start gate
+  is satisfied
+- one additive completion interrupt path for the chosen concrete device
+- one explicit ownership-transfer or retirement slice for the completed
+  buffer
+- one debug-owned Phase 137 audit over the landed completion-backed behavior
+- one focused freestanding regression plus projected MIR golden for the Phase
+  137 boundary if the phase is taken
+- otherwise, one explicit published deferral and no synthetic DMA substitute
+
+Suggested execution order
+-------------------------
+1. Re-check the start gate and stop immediately if the target lacks a real
+   completion-backed path.
+2. Freeze the Phase 137 boundary in docs: one buffer, one completion, no DMA
+   framework.
+3. Extend the concrete UART owner with one active completion-backed buffer.
+4. Add the minimal completion interrupt and service-consume path.
+5. Land the explicit ownership-transfer or retirement behavior.
+6. Add the Phase 137 debug audit over the landed path.
+7. Advance the kernel proof marker to 137 only after the completion-backed
+   path is real.
+8. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One completion-backed receive buffer is filled through a real target path.
+2. One completion interrupt distinguishes the path from byte-at-a-time
+   receive.
+3. One service consumes the completed buffer with explicit ownership or
+   retirement semantics.
+4. One audit proves the kernel did not widen into a DMA or device-memory
+   framework.
+5. One projected MIR proof shows the landed completion-backed path if the
+   phase is taken.
+
+Exit criteria
+-------------
+- the phase starts only if the documented start gate is satisfied
+- if started, the real kernel artifact builds and runs to a Phase 137 marker
+- one real completion-backed transfer path exists in landed code over the
+  active target
+- completion, ownership, and consume behavior remain explicit and bounded
+  without creating a broader device-memory framework
+- the Phase 137 debug audit validates the landed boundary over the real kernel
+  artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 137 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- a general DMA subsystem or descriptor framework
+- shared-memory transport infrastructure for arbitrary devices
+- scatter/gather, throughput tuning, or performance work
+- synthetic DMA emulation when the real target lacks the mechanism
+- reopening sema, MIR, backend, ABI, target, or `hal` beyond one unavoidable
+  concrete device hook
+- claiming completion-backed transfer support from tests alone without the
+  landed target path

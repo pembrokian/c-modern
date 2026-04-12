@@ -84,3 +84,7 @@ func close_runtime_endpoints_for_owner(table: EndpointTable, owner_pid: u32) End
 
     return EndpointOwnerCloseTransition{ endpoints: endpoints, wakes: wakes, aborted_messages: aborted_messages, closed_count: closed_count }
 }
+
+func runtime_publish_succeeded(observation: RuntimePublishObservation) bool {
+    return observation.queued == 1 && observation.endpoint_valid == 1 && observation.queue_full == 0 && observation.endpoint_closed == 0
+}

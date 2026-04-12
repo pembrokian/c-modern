@@ -1,0 +1,192 @@
+Phase 136 -- Device Failure Containment Probe
+=============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 135 ownership step by breaking the UART path
+on purpose and proving that the resulting damage stays local to the device
+edge and the consuming service instead of turning into kernel policy growth.
+
+This document is an execution plan for Phase 136.
+It defines one bounded device-failure phase that must land as concrete UART,
+interrupt, IPC-failure, lifecycle, and service behavior before it is admitted
+as a debug audit or regression.
+It does not claim recovery supervision, retry frameworks, flow-control
+policy, or a broader fault-management subsystem.
+
+Repository status note
+----------------------
+- Phase 134 and Phase 135 are expected to make the UART receive path real and
+  make its byte ownership explicit.
+- The next honest question is not whether the happy path works. It is whether
+  the system stays structurally honest when the path misbehaves.
+- If the repository avoids this by keeping failure synthetic or by teaching
+  the kernel to absorb the pain with new policy, the device band has already
+  drifted off purpose.
+
+Problem being solved
+--------------------
+- Real device work becomes meaningful only after the repository answers what
+  happens when the service dies, when queues fill, when interrupts arrive too
+  quickly, or when the device presents unusable bytes.
+- The repository needs one explicit failure story in which the kernel can
+  observe, drop, wake, and report, but not restart services, parse protocols,
+  or invent hidden buffering policy.
+- Without this step, Phase 137 would risk layering completion machinery on top
+  of an unreal failure model.
+
+Core rule
+---------
+- Failure containment belongs at the device edge and the consuming service,
+  not in global kernel policy.
+- The kernel may detect send failure, queue pressure, overrun, peer death,
+  and explicit device-error observations. It must not become a supervisor,
+  retry engine, or protocol parser.
+- Dropping work is acceptable when the boundary makes the drop explicit.
+- Debug audits, MIR projections, and freestanding regressions are acceptance
+  artifacts only.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 136 change:
+
+- exposing why the UART-origin message could not be delivered: admissible
+- deciding how software should recover from that condition: wrong layer
+
+The correct kernel answer may be `drop`, `wake`, `fail`, or `report`. It is
+not `retry forever`, `restart the service`, or `buffer until memory runs out`.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 136 execution plan that defines failure containment as
+   local observation plus bounded consequence rather than as recovery policy
+2. one additive UART error-observation slice for receive overrun, explicit
+   device-invalid state, or bounded dropped-frame counting
+3. one additive IPC-failure path that makes queue-full, peer-death, or
+   endpoint-unavailable truth visible to the UART ingress path
+4. one real serial-service failure path plus one real malformed-input path
+   over the running-system artifact
+5. one debug-owned Phase 136 audit and focused regression over the landed
+   containment behavior
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because the strongest device-boundary
+claim is not that one UART byte can be delivered. It is that the same path
+fails without forcing the kernel to become a recovery framework.
+
+What this phase should try to prove
+-----------------------------------
+- one dead or unavailable serial service causes explicit send failure or drop
+  behavior rather than hidden buffering or kernel-side restart
+- one queue-pressure or interrupt-storm path remains explicit and bounded
+  rather than widening into flow-control policy
+- one malformed or unusable byte path is passed through to the service or
+  dropped at the narrowest honest device boundary without protocol parsing in
+  the kernel
+- the running-system claim expands because the repository now describes real
+  failure containment on the device path instead of only the happy path
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/uart.mc`
+   - add explicit device-side error and drop observations needed for one real
+     receive-failure path
+   - preferred shape: bounded counters, sticky error flags, or one explicit
+     last-failure observation
+   - do not add policy-owned buffering or recovery logic
+
+2. `kernel/src/interrupt.mc`
+   - keep UART receive interrupt handling explicit under repeated pressure
+   - publish only the smallest additive observation needed to distinguish the
+     device-failure path from the happy path
+
+3. `kernel/src/ipc/03_failure.mc` and `kernel/src/ipc/04_validation.mc`
+   - expose queue-full, peer-death, and send-failure truth needed by the UART
+     ingress path
+   - validate the resulting failure boundary directly
+
+4. `kernel/src/lifecycle.mc` and `kernel/src/sched.mc`
+   - wire only the smallest additive wake or fail follow-through needed when
+     service death or blocked peers intersect the device path
+   - keep scheduler ownership descriptive and additive rather than rewritten
+
+5. `kernel/src/serial_service.mc`
+   - add one explicit crash, exit, or malformed-input consume path so the
+     failure probe uses real service behavior rather than a fixture harness
+   - keep protocol treatment local to the service
+
+6. `kernel/src/debug/10_phase136.mc`
+   - validate that failure consequences stay bounded and local to the landed
+     device path
+   - ensure the audit does not normalize hidden recovery semantics
+
+7. `kernel/src/main.mc`
+   - drive one bounded unhappy-path sequence and advance the proof marker to
+     136 only after the failure-containment audit succeeds
+
+Deliverables
+------------
+- one canonical Phase 136 execution plan in `docs/plan/active/`
+- one additive UART error-observation and drop slice
+- one additive IPC failure path for the UART-origin message flow
+- one real serial-service unhappy-path implementation slice
+- one debug-owned Phase 136 audit over the landed containment behavior
+- one focused freestanding regression plus projected MIR golden for the Phase
+  136 boundary
+- refreshed supporting docs only after the code shape is settled
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 136 boundary in docs: bounded failure observation, no
+   recovery framework.
+2. Add the UART-side error and drop observations.
+3. Land the smallest IPC failure visibility needed by the UART ingress path.
+4. Drive one real serial-service unhappy path and one real queue-pressure or
+   peer-loss path.
+5. Wire any minimal lifecycle or scheduler follow-through those paths need.
+6. Add the Phase 136 debug audit over the landed failure behavior.
+7. Advance the kernel proof marker to 136 only after the unhappy path is real.
+8. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One service-death path causes explicit send failure or bounded drop.
+2. One queue-full or interrupt-storm path remains bounded and visible.
+3. One malformed or unusable byte path does not force protocol parsing into
+   the kernel.
+4. One audit proves the kernel did not widen into restart, retry, or flow
+   control policy.
+5. One projected MIR proof shows the artifact carries the landed unhappy path.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 136 marker
+- the UART device path exposes at least one real unhappy path as landed code
+- failure consequences remain explicit, bounded, and local rather than
+  widening into kernel-owned recovery policy
+- the Phase 136 debug audit validates the landed containment behavior over the
+  real kernel artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 136 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- kernel-side restart, supervision, or retry frameworks
+- unbounded buffering or implicit flow-control policy
+- protocol parsing in the kernel for malformed device data
+- a general fault-management subsystem
+- reopening sema, MIR, backend, ABI, target, or `hal`
+- claiming failure containment from tests alone without landing unhappy-path
+  runtime behavior

@@ -12,10 +12,12 @@ import lifecycle
 import log_service
 import mmu
 import sched
+import serial_service
 import state
 import syscall
 import timer
 import transfer_service
+import uart
 
 const ARCH_ACTOR: u32 = 0
 const BOOT_PID: u32 = 1
@@ -54,16 +56,19 @@ const PHASE130_MARKER: i32 = 130
 const PHASE130_MARKER_DETAIL: u32 = 130
 const PHASE131_MARKER: i32 = 131
 const PHASE131_MARKER_DETAIL: u32 = 131
-const PHASE132_MARKER: i32 = 132
-const PHASE132_MARKER_DETAIL: u32 = 132
-const PHASE133_MARKER: i32 = 133
-const PHASE133_MARKER_DETAIL: u32 = 133
+const PHASE134_MARKER: i32 = 134
+const PHASE134_MARKER_DETAIL: u32 = 134
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
 const COMPOSITION_SERVICE_DIRECTORY_KEY: u32 = 4
+const SERIAL_SERVICE_DIRECTORY_KEY: u32 = 5
 const COMPOSITION_ECHO_ENDPOINT_ID: u32 = 3
 const COMPOSITION_LOG_ENDPOINT_ID: u32 = 4
+const SERIAL_SERVICE_ENDPOINT_ID: u32 = TRANSFER_ENDPOINT_ID
+const UART_RECEIVE_VECTOR: u32 = 33
+const UART_SOURCE_ACTOR: u32 = 134
+const UART_RECEIVE_BYTE: u8 = 85
 const PHASE124_INTERMEDIARY_PID: u32 = 4
 const PHASE124_FINAL_HOLDER_PID: u32 = 5
 const PHASE124_CONTROL_HANDLE_SLOT: u32 = 1
@@ -87,6 +92,7 @@ var WAIT_TABLES: [3]capability.WaitTable
 var ENDPOINTS: ipc.EndpointTable
 var INTERRUPTS: interrupt.InterruptController
 var LAST_INTERRUPT_KIND: interrupt.InterruptDispatchKind
+var UART_DEVICE: uart.UartDevice
 var INIT_TRANSLATION_ROOT: mmu.TranslationRoot
 var CHILD_TRANSLATION_ROOT: mmu.TranslationRoot
 var SYSCALL_GATE: syscall.SyscallGate
@@ -132,6 +138,15 @@ var TRANSFER_SERVICE_GRANT_OBSERVATION: syscall.ReceiveObservation
 var TRANSFER_SERVICE_EMIT_OBSERVATION: syscall.ReceiveObservation
 var TRANSFER_SERVICE_TRANSFER: transfer_service.TransferObservation
 var TRANSFER_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
+var SERIAL_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
+var SERIAL_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
+var SERIAL_SERVICE_USER_FRAME: address_space.UserEntryFrame
+var SERIAL_SERVICE_STATE: serial_service.SerialServiceState
+var SERIAL_SERVICE_SPAWN_OBSERVATION: syscall.SpawnObservation
+var SERIAL_SERVICE_RECEIVE_OBSERVATION: syscall.ReceiveObservation
+var SERIAL_SERVICE_INGRESS: serial_service.SerialIngressObservation
+var SERIAL_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
+var UART_INGRESS: uart.UartIngressObservation
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -151,6 +166,7 @@ func reset_kernel_state() {
     ENDPOINTS = ipc.empty_table()
     INTERRUPTS = interrupt.reset_controller()
     LAST_INTERRUPT_KIND = interrupt.InterruptDispatchKind.None
+    UART_DEVICE = uart.empty_device()
     INIT_TRANSLATION_ROOT = mmu.empty_translation_root()
     CHILD_TRANSLATION_ROOT = mmu.empty_translation_root()
     SYSCALL_GATE = syscall.gate_closed()
@@ -196,6 +212,15 @@ func reset_kernel_state() {
     TRANSFER_SERVICE_EMIT_OBSERVATION = syscall.empty_receive_observation()
     TRANSFER_SERVICE_TRANSFER = transfer_service.TransferObservation{ service_pid: 0, client_pid: 0, control_endpoint_id: 0, transferred_endpoint_id: 0, transferred_rights: 0, tag: transfer_service.CapabilityTransferTag.None, grant_len: 0, grant_byte0: 0, grant_byte1: 0, grant_byte2: 0, grant_byte3: 0, emit_len: 0, emit_byte0: 0, emit_byte1: 0, emit_byte2: 0, emit_byte3: 0, grant_count: 0, emit_count: 0 }
     TRANSFER_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
+    SERIAL_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
+    SERIAL_SERVICE_ADDRESS_SPACE = address_space.empty_space()
+    SERIAL_SERVICE_USER_FRAME = address_space.empty_frame()
+    SERIAL_SERVICE_STATE = serial_service.service_state(0, 0)
+    SERIAL_SERVICE_SPAWN_OBSERVATION = syscall.empty_spawn_observation()
+    SERIAL_SERVICE_RECEIVE_OBSERVATION = syscall.empty_receive_observation()
+    SERIAL_SERVICE_INGRESS = serial_service.empty_ingress_observation()
+    SERIAL_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
+    UART_INGRESS = uart.empty_ingress_observation()
     bootstrap_proofs.reset_late_phase_proofs()
 }
 
@@ -234,6 +259,7 @@ func seed_kernel_owners() {
     WAIT_TABLES = capability.zero_wait_tables()
     ENDPOINTS = ipc.empty_table()
     INTERRUPTS = interrupt.unmask_timer(INTERRUPTS, 32)
+    INTERRUPTS = interrupt.unmask_uart_receive(INTERRUPTS, UART_RECEIVE_VECTOR)
     SYSCALL_GATE = syscall.gate_closed()
 }
 
@@ -1215,6 +1241,33 @@ func build_composition_service_config() bootstrap_services.CompositionServiceCon
     return bootstrap_services.composition_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
 }
 
+func build_serial_service_config() bootstrap_services.SerialServiceConfig {
+    return bootstrap_services.serial_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, SERIAL_SERVICE_ENDPOINT_ID, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
+}
+
+func build_serial_service_execution_state() bootstrap_services.SerialServiceExecutionState {
+    return bootstrap_services.SerialServiceExecutionState{ program_capability: SERIAL_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: SERIAL_SERVICE_ADDRESS_SPACE, child_user_frame: SERIAL_SERVICE_USER_FRAME, service_state: SERIAL_SERVICE_STATE, spawn_observation: SERIAL_SERVICE_SPAWN_OBSERVATION, receive_observation: SERIAL_SERVICE_RECEIVE_OBSERVATION, ingress: SERIAL_SERVICE_INGRESS, wait_observation: SERIAL_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
+}
+
+func install_serial_service_execution_state(next_state: bootstrap_services.SerialServiceExecutionState) {
+    SERIAL_SERVICE_PROGRAM_CAPABILITY = next_state.program_capability
+    SYSCALL_GATE = next_state.gate
+    PROCESS_SLOTS = next_state.process_slots
+    TASK_SLOTS = next_state.task_slots
+    HANDLE_TABLES[1] = next_state.init_handle_table
+    HANDLE_TABLES[2] = next_state.child_handle_table
+    WAIT_TABLES[1] = next_state.wait_table
+    ENDPOINTS = next_state.endpoints
+    SERIAL_SERVICE_ADDRESS_SPACE = next_state.child_address_space
+    SERIAL_SERVICE_USER_FRAME = next_state.child_user_frame
+    SERIAL_SERVICE_STATE = next_state.service_state
+    SERIAL_SERVICE_SPAWN_OBSERVATION = next_state.spawn_observation
+    SERIAL_SERVICE_RECEIVE_OBSERVATION = next_state.receive_observation
+    SERIAL_SERVICE_INGRESS = next_state.ingress
+    SERIAL_SERVICE_WAIT_OBSERVATION = next_state.wait_observation
+    READY_QUEUE = next_state.ready_queue
+}
+
 func build_late_phase_proof_context() bootstrap_proofs.LatePhaseProofContext {
     return bootstrap_proofs.LatePhaseProofContext{ init_pid: INIT_PID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, log_service_directory_key: LOG_SERVICE_DIRECTORY_KEY, echo_service_directory_key: ECHO_SERVICE_DIRECTORY_KEY, composition_service_directory_key: COMPOSITION_SERVICE_DIRECTORY_KEY, phase124_intermediary_pid: PHASE124_INTERMEDIARY_PID, phase124_final_holder_pid: PHASE124_FINAL_HOLDER_PID, phase124_control_handle_slot: PHASE124_CONTROL_HANDLE_SLOT, phase124_intermediary_receive_handle_slot: PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT, phase124_final_receive_handle_slot: PHASE124_FINAL_RECEIVE_HANDLE_SLOT }
 }
@@ -1245,172 +1298,6 @@ func execute_phase118_invalidated_source_send_probe() bool {
 
 func build_phase108_program_cap_contract(init_pid: u32, log_config: bootstrap_services.LogServiceConfig, echo_config: bootstrap_services.EchoServiceConfig, transfer_config: bootstrap_services.TransferServiceConfig, bootstrap_program_capability: capability.CapabilitySlot, log_service_program_capability: capability.CapabilitySlot, echo_service_program_capability: capability.CapabilitySlot, transfer_service_program_capability: capability.CapabilitySlot, log_service_spawn: syscall.SpawnObservation, echo_service_spawn: syscall.SpawnObservation, transfer_service_spawn: syscall.SpawnObservation, log_service_wait: syscall.WaitObservation, echo_service_wait: syscall.WaitObservation, transfer_service_wait: syscall.WaitObservation) debug.Phase108ProgramCapContract {
     return bootstrap_proofs.build_phase108_program_cap_contract(init_pid, log_config, echo_config, transfer_config, bootstrap_program_capability, log_service_program_capability, echo_service_program_capability, transfer_service_program_capability, log_service_spawn, echo_service_spawn, transfer_service_spawn, log_service_wait, echo_service_wait, transfer_service_wait)
-}
-
-func build_phase132_backpressure_audit(phase131_audit: debug.Phase131FanOutCompositionAudit) debug.Phase132BackpressureAudit {
-    local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    local_endpoints: ipc.EndpointTable = ipc.install_endpoint(ipc.empty_table(), INIT_PID, INIT_ENDPOINT_ID)
-    local_task_slots: [3]state.TaskSlot = state.zero_task_slots()
-    local_task_slots[1] = state.user_task_slot(INIT_TID, INIT_PID, INIT_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
-    local_task_slots[2] = state.user_task_slot(CHILD_TID, CHILD_PID, CHILD_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
-    local_ready_queue: state.ReadyQueue = state.empty_queue()
-    sender_table: capability.HandleTable = capability.install_endpoint_handle(capability.handle_table_for_owner(INIT_PID), 1, INIT_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-    receiver_table: capability.HandleTable = capability.install_endpoint_handle(capability.handle_table_for_owner(CHILD_PID), 1, INIT_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-
-    payload_a: [4]u8 = ipc.zero_payload()
-    payload_a[0] = 65
-    fill_a: syscall.BackpressureSendResult = syscall.perform_send_with_backpressure(local_gate, sender_table, local_endpoints, local_task_slots, local_ready_queue, INIT_PID, 1, syscall.build_send_request(1, 1, payload_a))
-    local_gate = fill_a.gate
-    sender_table = fill_a.handle_table
-    local_endpoints = fill_a.endpoints
-    local_task_slots = fill_a.task_slots
-    local_ready_queue = fill_a.ready_queue
-
-    payload_b: [4]u8 = ipc.zero_payload()
-    payload_b[0] = 66
-    fill_b: syscall.BackpressureSendResult = syscall.perform_send_with_backpressure(local_gate, sender_table, local_endpoints, local_task_slots, local_ready_queue, INIT_PID, 1, syscall.build_send_request(1, 1, payload_b))
-    local_gate = fill_b.gate
-    sender_table = fill_b.handle_table
-    local_endpoints = fill_b.endpoints
-    local_task_slots = fill_b.task_slots
-    local_ready_queue = fill_b.ready_queue
-
-    payload_c: [4]u8 = ipc.zero_payload()
-    payload_c[0] = 67
-    blocked_send: syscall.BackpressureSendResult = syscall.perform_send_with_backpressure(local_gate, sender_table, local_endpoints, local_task_slots, local_ready_queue, INIT_PID, 1, syscall.build_send_request(1, 1, payload_c))
-    blocked_send_queue_depth: usize = blocked_send.endpoints.slots[0].queued_messages
-    blocked_send_waiter_task_slot: u32 = blocked_send.endpoints.slots[0].blocked_sender.task_slot
-    local_gate = blocked_send.gate
-    local_endpoints = blocked_send.endpoints
-    local_task_slots = blocked_send.task_slots
-    local_ready_queue = blocked_send.ready_queue
-
-    sender_wake: syscall.BackpressureReceiveResult = syscall.perform_receive_with_backpressure(local_gate, receiver_table, local_endpoints, local_task_slots, local_ready_queue, 2, syscall.build_receive_request(1))
-    sender_wake_queue_depth: usize = sender_wake.endpoints.slots[0].queued_messages
-    sender_wake_waiter_task_slot: u32 = sender_wake.endpoints.slots[0].blocked_sender.task_slot
-    sender_wake_ready_count: usize = sender_wake.ready_queue.count
-    sender_wake_task_state: state.TaskState = state.task_slot_at(sender_wake.task_slots, 1).state
-    local_gate = sender_wake.gate
-    receiver_table = sender_wake.handle_table
-    local_endpoints = sender_wake.endpoints
-    local_task_slots = sender_wake.task_slots
-    local_ready_queue = state.empty_queue()
-
-    drain_receive: syscall.BackpressureReceiveResult = syscall.perform_receive_with_backpressure(local_gate, receiver_table, local_endpoints, local_task_slots, local_ready_queue, 2, syscall.build_receive_request(1))
-    local_gate = drain_receive.gate
-    receiver_table = drain_receive.handle_table
-    local_endpoints = drain_receive.endpoints
-    local_task_slots = drain_receive.task_slots
-    local_ready_queue = state.empty_queue()
-
-    blocked_receive: syscall.BackpressureReceiveResult = syscall.perform_receive_with_backpressure(local_gate, receiver_table, local_endpoints, local_task_slots, local_ready_queue, 2, syscall.build_receive_request(1))
-    blocked_receive_queue_depth: usize = blocked_receive.endpoints.slots[0].queued_messages
-    blocked_receive_waiter_task_slot: u32 = blocked_receive.endpoints.slots[0].blocked_receiver.task_slot
-    local_gate = blocked_receive.gate
-    local_endpoints = blocked_receive.endpoints
-    local_task_slots = blocked_receive.task_slots
-    local_ready_queue = blocked_receive.ready_queue
-
-    payload_d: [4]u8 = ipc.zero_payload()
-    payload_d[0] = 68
-    receiver_wake: syscall.BackpressureSendResult = syscall.perform_send_with_backpressure(local_gate, sender_table, local_endpoints, local_task_slots, local_ready_queue, INIT_PID, 1, syscall.build_send_request(1, 1, payload_d))
-    receiver_wake_queue_depth: usize = receiver_wake.endpoints.slots[0].queued_messages
-    receiver_wake_waiter_task_slot: u32 = receiver_wake.endpoints.slots[0].blocked_receiver.task_slot
-    receiver_wake_ready_count: usize = receiver_wake.ready_queue.count
-    receiver_wake_task_state: state.TaskState = state.task_slot_at(receiver_wake.task_slots, 2).state
-
-    return debug.Phase132BackpressureAudit{ phase131: phase131_audit, endpoint_id: INIT_ENDPOINT_ID, sender_pid: INIT_PID, receiver_pid: CHILD_PID, sender_tid: INIT_TID, receiver_tid: CHILD_TID, sender_task_slot: 1, receiver_task_slot: 2, blocked_send_status: blocked_send.status, blocked_send_reason: blocked_send.block_reason, blocked_send_task_state: state.task_slot_at(blocked_send.task_slots, 1).state, blocked_send_queue_depth: blocked_send_queue_depth, blocked_send_waiter_task_slot: blocked_send_waiter_task_slot, sender_wake_status: sender_wake.status, sender_wake_task_state: sender_wake_task_state, sender_wake_reason: sender_wake.wake_reason, sender_wake_task_id: sender_wake.wake_task_id, sender_wake_ready_count: sender_wake_ready_count, sender_wake_queue_depth: sender_wake_queue_depth, sender_wake_waiter_task_slot: sender_wake_waiter_task_slot, blocked_receive_status: blocked_receive.status, blocked_receive_reason: blocked_receive.block_reason, blocked_receive_task_state: state.task_slot_at(blocked_receive.task_slots, 2).state, blocked_receive_queue_depth: blocked_receive_queue_depth, blocked_receive_waiter_task_slot: blocked_receive_waiter_task_slot, receiver_wake_status: receiver_wake.status, receiver_wake_task_state: receiver_wake_task_state, receiver_wake_reason: receiver_wake.wake_reason, receiver_wake_task_id: receiver_wake.wake_task_id, receiver_wake_ready_count: receiver_wake_ready_count, receiver_wake_queue_depth: receiver_wake_queue_depth, receiver_wake_waiter_task_slot: receiver_wake_waiter_task_slot, kernel_policy_visible: 0, compiler_reopening_visible: 0 }
-}
-
-func build_phase133_message_lifetime_audit(phase132_audit: debug.Phase132BackpressureAudit) debug.Phase133MessageLifetimeAudit {
-    local_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    local_endpoints: ipc.EndpointTable = ipc.install_endpoint(ipc.empty_table(), INIT_PID, INIT_ENDPOINT_ID)
-    sender_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    sender_table = capability.install_endpoint_handle(sender_table, 1, INIT_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-    sender_table = capability.install_endpoint_handle(sender_table, 2, TRANSFER_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-    receiver_table: capability.HandleTable = capability.install_endpoint_handle(capability.handle_table_for_owner(CHILD_PID), 1, INIT_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-
-    first_payload: [4]u8 = ipc.zero_payload()
-    first_payload[0] = 84
-    first_send: syscall.SendResult = syscall.perform_send(local_gate, sender_table, local_endpoints, INIT_PID, syscall.build_transfer_send_request(1, 1, first_payload, 2))
-    source_handle_live_after_first_send: u32 = 0
-    if capability.find_endpoint_for_handle(first_send.handle_table, 2) != 0 {
-        source_handle_live_after_first_send = 1
-    }
-    first_receive: syscall.ReceiveResult = syscall.perform_receive(first_send.gate, receiver_table, first_send.endpoints, syscall.build_transfer_receive_request(1, 3))
-    first_retired_slot_state: ipc.MessageState = first_receive.endpoints.slots[0].messages[0].state
-    first_retired_slot_payload0: u8 = first_receive.endpoints.slots[0].messages[0].payload[0]
-    first_received_handle_endpoint_id: u32 = capability.find_endpoint_for_handle(first_receive.handle_table, 3)
-
-    second_payload: [4]u8 = ipc.zero_payload()
-    second_payload[0] = 82
-    second_send: syscall.SendResult = syscall.perform_send(first_receive.gate, first_send.handle_table, first_receive.endpoints, INIT_PID, syscall.build_send_request(1, 1, second_payload))
-    second_receive: syscall.ReceiveResult = syscall.perform_receive(second_send.gate, first_receive.handle_table, second_send.endpoints, syscall.build_receive_request(1))
-    second_retired_slot_state: ipc.MessageState = second_receive.endpoints.slots[0].messages[0].state
-    second_retired_slot_payload0: u8 = second_receive.endpoints.slots[0].messages[0].payload[0]
-
-    abort_transfer_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    abort_transfer_endpoints: ipc.EndpointTable = ipc.install_endpoint(ipc.empty_table(), INIT_PID, INIT_ENDPOINT_ID)
-    abort_transfer_sender_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    abort_transfer_sender_table = capability.install_endpoint_handle(abort_transfer_sender_table, 1, INIT_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-    abort_transfer_sender_table = capability.install_endpoint_handle(abort_transfer_sender_table, 2, TRANSFER_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-    abort_transfer_payload: [4]u8 = ipc.zero_payload()
-    abort_transfer_payload[0] = 83
-    abort_transfer_send: syscall.SendResult = syscall.perform_send(abort_transfer_gate, abort_transfer_sender_table, abort_transfer_endpoints, INIT_PID, syscall.build_transfer_send_request(1, 1, abort_transfer_payload, 2))
-    abort_transfer_source_handle_live_after_send: u32 = 0
-    if capability.find_endpoint_for_handle(abort_transfer_send.handle_table, 2) != 0 {
-        abort_transfer_source_handle_live_after_send = 1
-    }
-    abort_transfer_closed: ipc.EndpointCloseTransition = ipc.close_runtime_endpoint(abort_transfer_send.endpoints, INIT_ENDPOINT_ID)
-    abort_transfer_scrubbed: ipc.KernelMessage = abort_transfer_closed.endpoints.slots[0].messages[0]
-
-    close_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    close_endpoints: ipc.EndpointTable = ipc.install_endpoint(ipc.empty_table(), INIT_PID, INIT_ENDPOINT_ID)
-    close_sender_table: capability.HandleTable = capability.install_endpoint_handle(capability.handle_table_for_owner(INIT_PID), 1, INIT_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-    close_receiver_table: capability.HandleTable = capability.install_endpoint_handle(capability.handle_table_for_owner(CHILD_PID), 1, INIT_ENDPOINT_ID, capability.RIGHTS_ENDPOINT_ALL)
-    close_task_slots: [3]state.TaskSlot = state.zero_task_slots()
-    close_task_slots[1] = state.user_task_slot(INIT_TID, INIT_PID, INIT_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
-    close_task_slots[2] = state.user_task_slot(CHILD_TID, CHILD_PID, CHILD_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
-    close_ready_queue: state.ReadyQueue = state.empty_queue()
-    close_fill_a_payload: [4]u8 = ipc.zero_payload()
-    close_fill_a_payload[0] = 65
-    close_fill_a: syscall.BackpressureSendResult = syscall.perform_send_with_backpressure(close_gate, close_sender_table, close_endpoints, close_task_slots, close_ready_queue, INIT_PID, 1, syscall.build_send_request(1, 1, close_fill_a_payload))
-    close_fill_b_payload: [4]u8 = ipc.zero_payload()
-    close_fill_b_payload[0] = 66
-    close_fill_b: syscall.BackpressureSendResult = syscall.perform_send_with_backpressure(close_fill_a.gate, close_fill_a.handle_table, close_fill_a.endpoints, close_fill_a.task_slots, close_fill_a.ready_queue, INIT_PID, 1, syscall.build_send_request(1, 1, close_fill_b_payload))
-    close_block_payload: [4]u8 = ipc.zero_payload()
-    close_block_payload[0] = 67
-    close_blocked_send: syscall.BackpressureSendResult = syscall.perform_send_with_backpressure(close_fill_b.gate, close_fill_b.handle_table, close_fill_b.endpoints, close_fill_b.task_slots, close_fill_b.ready_queue, INIT_PID, 1, syscall.build_send_request(1, 1, close_block_payload))
-    closed: ipc.EndpointCloseTransition = ipc.close_runtime_endpoint(close_blocked_send.endpoints, INIT_ENDPOINT_ID)
-    close_wake: ipc.EndpointWake = closed.wakes.wakes[0]
-    close_apply: syscall.EndpointWakeApplyResult = syscall.apply_endpoint_wake(close_blocked_send.task_slots, close_blocked_send.ready_queue, close_wake)
-    closed_send_payload: [4]u8 = ipc.zero_payload()
-    closed_send_payload[0] = 68
-    closed_send: syscall.BackpressureSendResult = syscall.perform_send_with_backpressure(close_blocked_send.gate, close_blocked_send.handle_table, closed.endpoints, close_apply.task_slots, close_apply.ready_queue, INIT_PID, 1, syscall.build_send_request(1, 1, closed_send_payload))
-    closed_receive: syscall.BackpressureReceiveResult = syscall.perform_receive_with_backpressure(close_blocked_send.gate, close_receiver_table, closed.endpoints, close_apply.task_slots, close_apply.ready_queue, 2, syscall.build_receive_request(1))
-
-    owner_death_gate: syscall.SyscallGate = syscall.open_gate(syscall.gate_closed())
-    owner_death_table: ipc.EndpointTable = ipc.install_endpoint(ipc.empty_table(), INIT_PID, 90)
-    owner_death_table = ipc.install_endpoint(owner_death_table, INIT_PID, 91)
-    owner_death_sender_table: capability.HandleTable = capability.handle_table_for_owner(INIT_PID)
-    owner_death_sender_table = capability.install_endpoint_handle(owner_death_sender_table, 1, 90, capability.RIGHTS_ENDPOINT_ALL)
-    owner_death_sender_table = capability.install_endpoint_handle(owner_death_sender_table, 2, 91, capability.RIGHTS_ENDPOINT_ALL)
-    owner_death_payload: [4]u8 = ipc.zero_payload()
-    owner_death_payload[0] = 79
-    owner_death_send: syscall.SendResult = syscall.perform_send(owner_death_gate, owner_death_sender_table, owner_death_table, INIT_PID, syscall.build_transfer_send_request(1, 1, owner_death_payload, 2))
-    owner_death_transfer_source_handle_live_after_send: u32 = 0
-    if capability.find_endpoint_for_handle(owner_death_send.handle_table, 2) != 0 {
-        owner_death_transfer_source_handle_live_after_send = 1
-    }
-    owner_death_waiting: ipc.EndpointTable = ipc.register_runtime_blocked_receiver(owner_death_send.endpoints, 91, 2, CHILD_TID)
-    owner_death_closed: ipc.EndpointOwnerCloseTransition = ipc.close_runtime_endpoints_for_owner(owner_death_waiting, INIT_PID)
-    owner_death_scrubbed: ipc.KernelMessage = owner_death_closed.endpoints.slots[0].messages[0]
-    owner_death_wake_reason: ipc.EndpointWakeReason = ipc.EndpointWakeReason.None
-    if owner_death_closed.wakes.count != 0 {
-        owner_death_wake_reason = owner_death_closed.wakes.wakes[0].wake_reason
-    }
-
-    return debug.Phase133MessageLifetimeAudit{ phase132: phase132_audit, endpoint_id: INIT_ENDPOINT_ID, attached_endpoint_id: TRANSFER_ENDPOINT_ID, first_send_status: first_send.status, source_handle_live_after_first_send: source_handle_live_after_first_send, first_receive_status: first_receive.observation.status, first_receive_byte0: first_receive.observation.payload[0], first_receive_handle_slot: first_receive.observation.received_handle_slot, first_receive_handle_count: first_receive.observation.received_handle_count, first_received_handle_endpoint_id: first_received_handle_endpoint_id, first_retired_slot_state: first_retired_slot_state, first_retired_slot_payload0: first_retired_slot_payload0, second_send_status: second_send.status, second_receive_status: second_receive.observation.status, second_receive_byte0: second_receive.observation.payload[0], second_retired_slot_state: second_retired_slot_state, second_retired_slot_payload0: second_retired_slot_payload0, abort_transfer_send_status: abort_transfer_send.status, abort_transfer_source_handle_live_after_send: abort_transfer_source_handle_live_after_send, abort_transfer_aborted_messages: abort_transfer_closed.aborted_messages, abort_transfer_scrubbed_state: abort_transfer_scrubbed.state, abort_transfer_scrubbed_payload0: abort_transfer_scrubbed.payload[0], abort_transfer_scrubbed_attached_count: abort_transfer_scrubbed.attached_count, abort_transfer_scrubbed_attached_endpoint_id: abort_transfer_scrubbed.attached_endpoint_id, abort_transfer_scrubbed_source_handle_slot: abort_transfer_scrubbed.attached_source_handle_slot, close_blocked_send_status: close_blocked_send.status, close_blocked_send_state: state.task_slot_at(close_blocked_send.task_slots, 1).state, close_aborted_messages: closed.aborted_messages, close_wake_count: closed.wakes.count, close_wake_reason: close_wake.wake_reason, close_wake_task_id: close_wake.task_id, close_ready_count: close_apply.ready_queue.count, close_task_state: state.task_slot_at(close_apply.task_slots, 1).state, closed_send_status: closed_send.status, closed_receive_status: closed_receive.status, owner_death_closed_count: owner_death_closed.closed_count, owner_death_aborted_messages: owner_death_closed.aborted_messages, owner_death_wake_count: owner_death_closed.wakes.count, owner_death_wake_reason: owner_death_wake_reason, owner_death_transfer_source_handle_live_after_send: owner_death_transfer_source_handle_live_after_send, owner_death_transfer_scrubbed_state: owner_death_scrubbed.state, owner_death_transfer_scrubbed_payload0: owner_death_scrubbed.payload[0], owner_death_transfer_scrubbed_attached_count: owner_death_scrubbed.attached_count, owner_death_transfer_scrubbed_attached_endpoint_id: owner_death_scrubbed.attached_endpoint_id, owner_death_transfer_scrubbed_source_handle_slot: owner_death_scrubbed.attached_source_handle_slot, kernel_policy_visible: 0, compiler_reopening_visible: 0 }
 }
 
 func execute_spawn_child_process() bool {
@@ -1790,50 +1677,80 @@ func bootstrap_main() i32 {
     if !debug.validate_phase131_fan_out_composition(phase131_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 73
     }
-    phase132_audit: debug.Phase132BackpressureAudit = build_phase132_backpressure_audit(phase131_audit)
-    if !debug.validate_phase132_backpressure_and_blocking(phase132_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+
+    serial_config: bootstrap_services.SerialServiceConfig = build_serial_service_config()
+    serial_state: bootstrap_services.SerialServiceExecutionState = bootstrap_services.seed_serial_service_program_capability(serial_config, build_serial_service_execution_state())
+    install_serial_service_execution_state(serial_state)
+    if !capability.is_program_capability(SERIAL_SERVICE_PROGRAM_CAPABILITY) {
         return 74
     }
-    if !debug.validate_phase133_message_lifetime_and_reuse(build_phase133_message_lifetime_audit(phase132_audit), scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    serial_spawn: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.spawn_serial_service(serial_config, build_serial_service_execution_state())
+    install_serial_service_execution_state(serial_spawn.state)
+    if serial_spawn.succeeded == 0 {
         return 75
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, PHASE133_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
+    UART_DEVICE = uart.configure_receive(UART_DEVICE, UART_RECEIVE_VECTOR, serial_config.serial_endpoint_id)
+    UART_DEVICE = uart.stage_receive_byte(UART_DEVICE, UART_RECEIVE_BYTE)
+    uart_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
+    uart_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(uart_entry)
+    INTERRUPTS = uart_dispatch.controller
+    LAST_INTERRUPT_KIND = uart_dispatch.kind
+    uart_result: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, uart_entry, uart_dispatch, ENDPOINTS, BOOT_PID)
+    UART_DEVICE = uart_result.device
+    ENDPOINTS = uart_result.endpoints
+    UART_INGRESS = uart_result.observation
+    if uart_result.handled == 0 {
         return 76
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    if !ipc.runtime_publish_succeeded(UART_INGRESS.publish) {
         return 77
     }
-    if BOOT_LOG.count != 5 {
+    serial_receive: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.execute_serial_service_receive_and_exit(serial_config, build_serial_service_execution_state())
+    install_serial_service_execution_state(serial_receive.state)
+    if serial_receive.succeeded == 0 {
         return 78
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    phase134_audit: debug.Phase134MinimalDeviceServiceHandoffAudit = debug.Phase134MinimalDeviceServiceHandoffAudit{ phase131: phase131_audit, interrupt_vector: UART_INGRESS.interrupt_vector, interrupt_source_actor: UART_INGRESS.source_actor, interrupt_kind: LAST_INTERRUPT_KIND, dispatch_handled: uart_dispatch.handled, uart_service_endpoint_id: UART_INGRESS.service_endpoint_id, uart_ack_count: UART_INGRESS.ack_count, uart_ingress_count: UART_INGRESS.ingress_count, uart_received_byte: UART_INGRESS.received_byte, published_endpoint_id: UART_INGRESS.publish.endpoint_id, published_source_pid: UART_INGRESS.publish.source_pid, published_payload_len: UART_INGRESS.publish.payload_len, published_payload_byte0: UART_INGRESS.publish.payload0, published_queued: UART_INGRESS.publish.queued, published_queue_full: UART_INGRESS.publish.queue_full, published_endpoint_valid: UART_INGRESS.publish.endpoint_valid, published_endpoint_closed: UART_INGRESS.publish.endpoint_closed, serial_service_pid: SERIAL_SERVICE_INGRESS.service_pid, serial_receive_status: SERIAL_SERVICE_RECEIVE_OBSERVATION.status, serial_wait_status: SERIAL_SERVICE_WAIT_OBSERVATION.status, serial_received_byte: SERIAL_SERVICE_INGRESS.received_byte, serial_ingress_count: SERIAL_SERVICE_INGRESS.ingress_count, kernel_policy_visible: 0, driver_framework_visible: 0, generic_event_bus_visible: 0, compiler_reopening_visible: 0 }
+    if !debug.validate_phase134_minimal_device_service_handoff(phase134_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 79
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE134_MARKER_DETAIL)
+    if BOOT_MARKER_EMITTED != 1 {
         return 80
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 81
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if BOOT_LOG.count != 5 {
         return 82
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 83
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE133_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 84
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 85
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 86
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 87
     }
-    return PHASE133_MARKER
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE134_MARKER_DETAIL {
+        return 88
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 89
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 90
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 91
+    }
+    return PHASE134_MARKER
 }

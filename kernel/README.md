@@ -6,15 +6,12 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 134 has moved the repository-owned kernel artifact beyond the landed
+  Phase 133 message lifetime and reuse audit into one bounded UART receive
+  device-service handoff.
 - Phase 131 has moved the repository-owned kernel artifact beyond the landed
   Phase 130 explicit restart or replacement step into one bounded fan-out
   composition probe.
-- Phase 132 has moved the repository-owned kernel artifact beyond the landed
-  Phase 131 fan-out composition step into one bounded backpressure and
-  blocking audit.
-- Phase 133 has moved the repository-owned kernel artifact beyond the landed
-  Phase 132 backpressure step into one bounded message lifetime and reuse
-  audit.
 - Phase 130 has moved the repository-owned kernel artifact beyond the landed
   Phase 129 partial failure propagation step into one bounded explicit
   restart or replacement probe.
@@ -68,9 +65,10 @@ Current status
   step, one bounded invalidation and rejection audit step, and one bounded
   authority lifetime classification step, one bounded service death
   observation step, one bounded partial failure propagation step, and one
-  bounded explicit restart or replacement probe, and one bounded fan-out
-  composition probe, one bounded backpressure and blocking audit, and one
-  bounded message lifetime and reuse audit.
+  bounded explicit restart or replacement probe, one bounded fan-out
+  composition probe, one bounded backpressure and blocking audit, one bounded
+  message lifetime and reuse audit, and one bounded UART receive device-service
+  handoff.
 
 Current files
 -------------
@@ -87,9 +85,7 @@ Current files
   and rejection audit step, one bounded authority lifetime classification
   step, one bounded service death observation step, one bounded partial
   failure propagation step, one bounded explicit restart or replacement
-  probe, one bounded fan-out composition probe, one bounded backpressure and
-  blocking audit, one bounded message lifetime and reuse audit, and thin root
-  orchestration
+  probe, one bounded fan-out composition probe, and thin root orchestration
   across the owned scheduler, lifecycle, bootstrap helper, and debug audit
   modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
@@ -99,9 +95,9 @@ Current files
   used by the root proof module
 - `src/bootstrap_services/`: one logical `bootstrap_services` module split
   through `module_sets.bootstrap_services`, owning extracted bounded log,
-  echo, transfer, and composition service execution flows plus explicit
-  service config and state packaging used by the root proof module and the
-  aggregate late-phase running-system audits
+  echo, transfer, composition, and serial service execution flows plus
+  explicit service config and state packaging used by the root proof module
+  and the aggregate late-phase running-system audits
 - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn,
   wait, sleep, and wake follow-through
 - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for
@@ -118,16 +114,19 @@ Current files
   target-surface audit, Phase 123 next-plateau audit, Phase 124
   delegation-chain stress audit, Phase 125 invalidation and rejection audit,
   Phase 126 authority lifetime classification audit, Phase 128 service death
-  observation audit, Phase 129 partial failure propagation audit, and Phase
-  130 explicit restart or replacement audit, Phase 131 fan-out
-  composition audit, Phase 132 backpressure and blocking audit, and Phase 133
-  message lifetime and reuse audit
+  observation audit, Phase 129 partial failure propagation audit, Phase 130
+  explicit restart or replacement audit, Phase 131 fan-out composition audit,
+  and Phase 134 minimal device-service handoff audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
   reply payload, and final exchange observation records
+- `src/serial_service.mc`: bounded serial-service protocol state and one fixed
+  UART-origin ingress observation path
 - `src/transfer_service.mc`: bounded transfer-service grant state, emitted
   payload construction, and final transfer observation records
+- `src/uart.mc`: bounded UART receive device owner, ingress observations, and
+  interrupt-origin byte publish helpers
 - `src/state.mc`: kernel-owned descriptor, slot, queue, and boot-log records
 - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame
   records
@@ -141,14 +140,14 @@ Current files
   handle-move helpers
 - `src/ipc/`: one logical `ipc` module split through `module_sets.ipc`,
   owning bounded endpoint table, queued-message ring, attached-handle message
-  state, endpoint-close failure cleanup, and IPC-owned runtime queue helpers
-  for the landed syscall slice
+  state plus ipc-owned runtime queue helpers for the landed syscall slice and
+  the bounded interrupt-origin publish path
 - `src/interrupt.mc`: bounded interrupt controller, architecture-entry
   records, and generic dispatch classification for the landed timer-backed
-  wake path
+  wake path plus the bounded UART receive path
 - `src/syscall.mc`: bounded syscall gate, byte-plus-capability request,
-  spawn-and-wait request, and thin observation state over capability, ipc,
-  address-space, and lifecycle owners
+  spawn-and-wait request, and thin observation state over capability,
+  endpoint, address-space, and lifecycle owners
 - `src/init.mc`: bounded boot-bundled init image descriptor plus explicit init
   bootstrap-capability handoff records
 
@@ -211,8 +210,9 @@ Phase boundary
   stress step plus one bounded invalidation and rejection audit step plus one
   bounded authority lifetime classification step plus one bounded service
   death observation step plus one bounded partial failure propagation step
-  publishing that same admitted slice without widening into a broader service
-  framework or supervision policy.
+  plus one bounded UART receive device-service handoff publishing that same
+  admitted slice without widening into a broader service framework,
+  supervision policy, or reusable driver layer.
 - It does not yet claim general loading, dynamic service discovery,
   namespace policy, kill semantics, or a general running init-owned service
   framework.

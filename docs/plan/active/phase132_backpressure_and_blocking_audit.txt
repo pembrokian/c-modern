@@ -3,18 +3,18 @@ Phase 132 -- Backpressure And Blocking Audit
 
 Status
 ------
-IMPLEMENTED
+PLANNED
 
 Purpose
 -------
-Continue from the completed Phase 131 composition step by making queue pressure,
+Continue from the planned Phase 131 composition step by making queue pressure,
 blocking, and wakeup behavior real kernel-owned mechanism rather than a thin
 audit over return codes that never mutate scheduler-visible state.
 
-This document is both the Phase 132 execution note and its closeout.
-It defines one bounded backpressure phase that lands as concrete endpoint,
-state, lifecycle, scheduler-visible wake, and syscall behavior before it is
-admitted as a debug audit or regression.
+This document is an execution plan for Phase 132.
+It defines one bounded backpressure phase that must land as concrete endpoint,
+state, lifecycle, scheduler, and syscall behavior before it is admitted as a
+debug audit or regression.
 It does not claim fairness guarantees, dynamic queue sizing, throughput work,
 or a broader scheduler rewrite.
 
@@ -23,14 +23,12 @@ Repository status note
 - The current endpoint runtime already reports queue-full and queue-empty
   conditions, but today that answer is mostly observational.
 - The current task-state model in `kernel/src/state.mc` has `BlockedOnTimer`
-  but Phase 132 now adds explicit endpoint-send and endpoint-receive blocking
-  states.
-- The landed slice adds one additive ipc waiter model, one additive
-  queue-state wake path, and one additive backpressure syscall path so the
-  real kernel artifact carries one honest sender-block and one honest
-  receiver-block follow-through.
-- The landed slice keeps queue pressure fixed-size and explicit: no hidden
-  buffering, no queue growth, and no scheduler-policy rewrite.
+  but no explicit endpoint-send or endpoint-receive blocking state.
+- The current scheduler and lifecycle slices therefore do not yet own one
+  honest block-to-wake follow-through for IPC pressure.
+- If the repository tries to stage Phase 132 through fixtures alone, it will
+  only prove that helper functions can return `WouldBlock`, not that the real
+  kernel artifact carries bounded backpressure honestly.
 
 Problem being solved
 --------------------
@@ -52,7 +50,7 @@ Core rule
   just a new validation helper or new expected output file.
 - Debug audits, MIR projections, and tool regressions are acceptance artifacts
   only.
-- Keep the compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
+- Keep compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
 
 Planning rule for this band
 ---------------------------
@@ -90,8 +88,8 @@ The repository should take this phase because one honest composed topology is
 not yet enough. The next real pressure is whether the same model remains
 correct when bounded queues fill or empty and tasks must block visibly.
 
-What this phase proves
-----------------------
+What this phase should try to prove
+-----------------------------------
 - one bounded sender can block on queue pressure through an explicit task-state
   transition
 - one bounded receiver can block on queue emptiness through an explicit
@@ -103,25 +101,6 @@ What this phase proves
 - the running-system claim expands because the kernel now carries real IPC
   pressure semantics rather than only reporting `WouldBlock`
 
-Implemented slice
------------------
-- extended `kernel/src/state.mc` with explicit endpoint-send and endpoint-
-  receive blocked task states plus additive ready-queue append support
-- extended `kernel/src/lifecycle.mc` with owner-local blocking helpers for
-  endpoint send and endpoint receive pressure
-- extended `kernel/src/ipc/` with one bounded waiter model, one additive
-  wake record, and one explicit queue-state wake helper path
-- added additive `syscall.perform_send_with_backpressure(...)` and
-  `syscall.perform_receive_with_backpressure(...)` paths that make queue
-  pressure a real task-state and ready-queue transition without rewriting the
-  earlier phase callers
-- split the debug owner with one new `kernel/src/debug/06_phase132.mc`
-  validator plus one new `debug.Phase132BackpressureAudit` record
-- wired `kernel/src/main.mc` through one bounded sender-block and one bounded
-  receiver-block probe before the kernel marker advances to 132
-- added one focused freestanding regression plus one projected MIR golden for
-  the landed Phase 132 boundary
-
 Required implementation surfaces
 --------------------------------
 The owning implementation surfaces for this phase are:
@@ -132,17 +111,17 @@ The owning implementation surfaces for this phase are:
      states rather than reusing timer blocking as a generic bucket
    - add any additive ready or wake helpers needed for the new transitions
 
-2. `kernel/src/ipc/00_types.mc`
+2. `kernel/src/endpoint/00_types.mc`
    - add bounded waiter or pending-operation state owned by endpoint runtime
    - keep the state fixed-size and explicit
    - do not add dynamic queues or unbounded pending lists
 
-3. `kernel/src/ipc/01_queue.mc`, `kernel/src/ipc/02_runtime.mc`, and `kernel/src/ipc/03_failure.mc`
+3. `kernel/src/endpoint/01_queue.mc` and `kernel/src/endpoint/02_runtime.mc`
    - implement queue-pressure transitions, waiter registration, and wake
      emission on the smallest honest slice
    - ensure endpoint close or peer death can wake blocked paths explicitly
 
-4. `kernel/src/ipc/04_validation.mc`
+4. `kernel/src/endpoint/03_validation.mc`
    - validate the new endpoint block and wake invariants directly
    - keep validation local to endpoint truth, not service policy
 
@@ -178,9 +157,7 @@ Deliverables
 - one debug-owned Phase 132 audit over the real artifact
 - one focused freestanding regression plus projected MIR golden for the Phase
   132 boundary
-- refreshed roadmap, position, kernel README, repository map, decision log,
-  and backlog wording that keep the implementation and the no-compiler-growth
-  decision aligned
+- refreshed supporting docs only after the code shape is settled
 
 Suggested execution order
 -------------------------
@@ -229,16 +206,3 @@ Non-goals
 - a scheduler rewrite outside the new explicit IPC states
 - reopening sema, MIR, backend, ABI, target, or `hal`
 - claiming IPC pressure support from tests alone without landed state changes
-
-Closeout statement
-------------------
-Phase 132 is complete as one bounded backpressure and blocking audit.
-The repository now carries one honest queue-pressure follow-through over the
-real kernel artifact: one bounded sender blocks on a full endpoint queue,
-one bounded receiver blocks on an empty endpoint queue, and one later queue-
-state change wakes each blocked task back to ready through explicit endpoint,
-lifecycle, and syscall owners rather than through hidden buffering or a
-scheduler-policy rewrite. The kernel still does not claim fairness,
-throughput policy, or a broader blocking framework, and the compiler stays
-closed because this phase needed owner-local IPC pressure truth, not new
-language or backend machinery.

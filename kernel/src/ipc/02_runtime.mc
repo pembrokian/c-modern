@@ -94,3 +94,18 @@ func attempt_runtime_receive(table: EndpointTable, endpoint_id: u32) RuntimeRece
     wake_transition: EndpointWakeTransition = take_blocked_sender(updated_endpoints, lookup.endpoint_index, EndpointWakeReason.QueueSpaceAvailable)
     return RuntimeReceiveTransition{ endpoints: wake_transition.endpoints, endpoint_id: endpoint_id, message: message, wake: wake_transition.wake, available: 1, queue_empty: 0, endpoint_valid: 1, endpoint_closed: 0 }
 }
+
+func observe_runtime_publish(endpoint_id: u32, source_pid: u32, payload_len: usize, payload: [4]u8, transition: RuntimeSendTransition) RuntimePublishObservation {
+    payload0: u8 = 0
+    if payload_len != 0 {
+        payload0 = payload[0]
+    }
+    return RuntimePublishObservation{ endpoint_id: endpoint_id, source_pid: source_pid, payload_len: payload_len, payload0: payload0, queued: transition.queued, queue_full: transition.queue_full, endpoint_valid: transition.endpoint_valid, endpoint_closed: transition.endpoint_closed }
+}
+
+func publish_runtime_byte(table: EndpointTable, endpoint_id: u32, source_pid: u32, message_id: u32, payload0: u8) RuntimePublishResult {
+    payload: [4]u8 = zero_payload()
+    payload[0] = payload0
+    transition: RuntimeSendTransition = attempt_runtime_send(table, endpoint_id, byte_message(message_id, source_pid, endpoint_id, 1, payload))
+    return RuntimePublishResult{ endpoints: transition.endpoints, wake: transition.wake, observation: observe_runtime_publish(endpoint_id, source_pid, 1, payload, transition) }
+}

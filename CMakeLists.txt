@@ -181,6 +181,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase131_fan_in_or_fan_out_composition.cpp
     tests/tool/freestanding/kernel/phase132_backpressure_and_blocking.cpp
     tests/tool/freestanding/kernel/phase133_message_lifetime_and_reuse.cpp
+    tests/tool/freestanding/kernel/phase134_minimal_device_service_handoff.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -290,6 +291,7 @@ set(MC_FREESTANDING_KERNEL_CASES
     phase131_fan_in_or_fan_out_composition
     phase132_backpressure_and_blocking
     phase133_message_lifetime_and_reuse
+    phase134_minimal_device_service_handoff
 )
 
 foreach(kernel_case IN LISTS MC_FREESTANDING_KERNEL_CASES)

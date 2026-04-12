@@ -6,6 +6,7 @@ import init
 import lifecycle
 import mmu
 import log_service
+import serial_service
 import state
 import syscall
 import transfer_service
@@ -45,6 +46,11 @@ const COMPOSITION_SERVICE_REQUEST_BYTE0: u8 = 69
 const COMPOSITION_SERVICE_REQUEST_BYTE1: u8 = 67
 const COMPOSITION_SERVICE_EXIT_CODE: i32 = 55
 const COMPOSITION_SERVICE_EDGE_COUNT: u8 = 2
+const SERIAL_SERVICE_PROGRAM_SLOT: u32 = 7
+const SERIAL_SERVICE_PROGRAM_OBJECT_ID: u32 = 6
+const SERIAL_SERVICE_WAIT_HANDLE_SLOT: u32 = 2
+const SERIAL_SERVICE_ENDPOINT_HANDLE_SLOT: u32 = 1
+const SERIAL_SERVICE_EXIT_CODE: i32 = 56
 
 struct LogServiceConfig {
     init_pid: u32
@@ -259,6 +265,45 @@ struct CompositionServiceExecutionResult {
     succeeded: u32
 }
 
+struct SerialServiceConfig {
+    init_pid: u32
+    child_pid: u32
+    child_tid: u32
+    child_asid: u32
+    serial_endpoint_id: u32
+    child_translation_root: mmu.TranslationRoot
+    wait_handle_slot: u32
+    endpoint_handle_slot: u32
+    exit_code: i32
+    program_slot: u32
+    program_object_id: u32
+}
+
+struct SerialServiceExecutionState {
+    program_capability: capability.CapabilitySlot
+    gate: syscall.SyscallGate
+    process_slots: [3]state.ProcessSlot
+    task_slots: [3]state.TaskSlot
+    init_handle_table: capability.HandleTable
+    child_handle_table: capability.HandleTable
+    wait_table: capability.WaitTable
+    endpoints: ipc.EndpointTable
+    init_image: init.InitImage
+    child_address_space: address_space.AddressSpace
+    child_user_frame: address_space.UserEntryFrame
+    service_state: serial_service.SerialServiceState
+    spawn_observation: syscall.SpawnObservation
+    receive_observation: syscall.ReceiveObservation
+    ingress: serial_service.SerialIngressObservation
+    wait_observation: syscall.WaitObservation
+    ready_queue: state.ReadyQueue
+}
+
+struct SerialServiceExecutionResult {
+    state: SerialServiceExecutionState
+    succeeded: u32
+}
+
 func log_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_translation_root: mmu.TranslationRoot) LogServiceConfig {
     return LogServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: LOG_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: LOG_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte: LOG_SERVICE_REQUEST_BYTE, exit_code: LOG_SERVICE_EXIT_CODE, program_slot: LOG_SERVICE_PROGRAM_SLOT, program_object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
 }
@@ -297,4 +342,16 @@ func empty_composition_service_execution_state() CompositionServiceExecutionStat
 
 func composition_service_result(state: CompositionServiceExecutionState, succeeded: u32) CompositionServiceExecutionResult {
     return CompositionServiceExecutionResult{ state: state, succeeded: succeeded }
+}
+
+func serial_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, serial_endpoint_id: u32, child_translation_root: mmu.TranslationRoot) SerialServiceConfig {
+    return SerialServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, serial_endpoint_id: serial_endpoint_id, child_translation_root: child_translation_root, wait_handle_slot: SERIAL_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: SERIAL_SERVICE_ENDPOINT_HANDLE_SLOT, exit_code: SERIAL_SERVICE_EXIT_CODE, program_slot: SERIAL_SERVICE_PROGRAM_SLOT, program_object_id: SERIAL_SERVICE_PROGRAM_OBJECT_ID }
+}
+
+func empty_serial_service_execution_state() SerialServiceExecutionState {
+    return SerialServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: serial_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), ingress: serial_service.empty_ingress_observation(), wait_observation: syscall.empty_wait_observation(), ready_queue: state.empty_queue() }
+}
+
+func serial_service_result(state: SerialServiceExecutionState, succeeded: u32) SerialServiceExecutionResult {
+    return SerialServiceExecutionResult{ state: state, succeeded: succeeded }
 }

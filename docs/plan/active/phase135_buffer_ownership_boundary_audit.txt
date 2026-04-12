@@ -1,0 +1,195 @@
+Phase 135 -- Buffer Ownership Boundary Audit
+============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 134 UART handoff by making byte ownership
+explicit once the device path stops being a one-byte demonstration and starts
+moving bounded receive frames.
+
+This document is an execution plan for Phase 135.
+It defines one bounded UART receive-buffer phase that must land as concrete
+buffer-state, copy-boundary, IPC-payload, and service-consume behavior before
+it is admitted as a debug audit or regression.
+It does not claim a general buffer pool, shared ring buffers, zero-copy, or a
+device-independent memory subsystem.
+
+Repository status note
+----------------------
+- Phase 134 is expected to prove one honest byte-at-a-time interrupt handoff,
+  but that is only the first contact point.
+- Once the repository widens from one byte to one bounded receive frame, the
+  next honest question is no longer interrupt routing. It is ownership.
+- If the repository answers Phase 135 with abstractions, hidden reuse pools,
+  or framework vocabulary, it will hide the truth instead of forcing it.
+
+Problem being solved
+--------------------
+- A real serial path quickly stops being interesting if it can only describe
+  ownership at the level of one immediate byte.
+- The repository needs one explicit story for who owns receive bytes while
+  they live in a kernel staging buffer, when those bytes become message
+  payload, and when the service becomes the only owner of the consumed copy.
+- Without this step, later device-failure and completion-backed transfer work
+  would be able to rely on ambient aliasing or accidental slot reuse.
+
+Core rule
+---------
+- Make ownership explicit at every boundary.
+- Choose the boring design on purpose for this phase: copy semantics.
+- The kernel may own a bounded UART receive frame, copy it into one bounded
+  IPC payload, and retire its staging bytes deterministically. It must not
+  retain hidden shared ownership after the message is published.
+- Do not introduce shared ring buffers, general buffer pools, or a reusable
+  device-buffer abstraction. DMA-like transfer pressure belongs later.
+- Debug audits, MIR projections, and freestanding regressions are acceptance
+  artifacts only.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 135 change:
+
+- naming the one owner of the bytes before and after copy: admissible
+- inventing a reusable pool because another device may want buffers later:
+  wrong layer
+
+If the phase cannot state who owns the bytes before copy, during copy, and
+after copy in one short paragraph, the implementation is drifting.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 135 execution plan that freezes copy semantics as the
+   explicit ownership baseline for UART receive frames
+2. one additive UART staging-buffer model that can hold one bounded receive
+   frame and retire it deterministically after publish
+3. one additive IPC payload path that carries a bounded copied receive frame
+   without hidden aliases back into the UART owner
+4. one real serial-service consume path that proves the service owns the only
+   live copy after delivery
+5. one debug-owned Phase 135 audit and focused regression over the landed
+   ownership story
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because the next honest device-boundary
+pressure is not generic performance work. It is whether the system can name
+exactly one owner of the bytes at every step once the UART path becomes more
+than a one-byte toy.
+
+What this phase should try to prove
+-----------------------------------
+- one bounded UART receive frame has an explicit owner before publish, during
+  publish, and after service delivery
+- the kernel staging buffer is retired or scrubbed deterministically after the
+  copy boundary
+- repeated receive frames do not depend on hidden shared ownership or stale
+  data in the staging area
+- the running-system claim expands because the repository now describes real
+  buffer ownership instead of implying it through fixture assumptions
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/uart.mc`
+   - extend the Phase 134 one-byte path to one bounded receive-frame staging
+     record
+   - keep the frame fixed-size and local to the UART owner
+   - add deterministic retire or scrub behavior after publish
+
+2. `kernel/src/ipc/00_types.mc`, `kernel/src/ipc/01_queue.mc`, and
+   `kernel/src/ipc/02_runtime.mc`
+   - add only the smallest payload-surface widening needed to carry one
+     bounded copied receive frame
+   - keep the payload mechanical and explicit
+   - do not widen into a general buffer transport model
+
+3. `kernel/src/ipc/04_validation.mc`
+   - validate the copy boundary and repeated receive delivery directly
+   - keep validation local to payload ownership truth
+
+4. `kernel/src/serial_service.mc`
+   - consume one bounded receive frame and publish an observation that proves
+     the service owns the live copy
+   - preferred shape: append bytes into a bounded service-owned log or parse
+     buffer without any kernel-visible alias
+
+5. `kernel/src/bootstrap_services/05_serial.mc`
+   - keep the serial-service configuration fixed and honest for the widened
+     frame path
+   - do not introduce configurable device-buffer policy
+
+6. `kernel/src/debug/09_phase135.mc`
+   - validate the owner transitions across UART staging, IPC payload, and
+     serial-service consumption
+   - ensure the audit describes the copy semantics explicitly
+
+7. `kernel/src/main.mc`
+   - drive one real multi-byte receive path and advance the proof marker to
+     135 only after the ownership audit succeeds
+
+Deliverables
+------------
+- one canonical Phase 135 execution plan in `docs/plan/active/`
+- one additive UART staging-buffer and retirement implementation slice
+- one additive IPC payload slice for bounded copied receive frames
+- one real serial-service consume path for multi-byte receive
+- one debug-owned Phase 135 audit over the landed ownership boundary
+- one focused freestanding regression plus projected MIR golden for the Phase
+  135 boundary
+- refreshed supporting docs only after the code shape is settled
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 135 boundary in docs: explicit copy semantics, no general
+   buffer system.
+2. Extend the UART owner with one bounded receive-frame staging record.
+3. Widen IPC payload surfaces only enough to carry that frame.
+4. Land the real serial-service consume path for multi-byte receive.
+5. Add deterministic staging-buffer retirement or scrub behavior.
+6. Add the Phase 135 debug audit over the landed owner transitions.
+7. Advance the kernel proof marker to 135 only after repeated frame delivery
+   and retirement are real.
+8. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One UART receive frame is staged under explicit kernel ownership.
+2. One publish path copies that frame into one IPC payload without leaving a
+   live alias back into the UART owner.
+3. One service consumes the frame and becomes the only owner of the live
+   bytes.
+4. One repeated receive path proves staging data is scrubbed or retired before
+   reuse.
+5. One projected MIR proof shows the artifact carries the explicit ownership
+   transitions.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 135 marker
+- UART receive-frame staging and retirement exist as real runtime behavior
+- the copy boundary is explicit and mechanically auditable across UART, IPC,
+  and serial-service owners
+- the Phase 135 debug audit validates the landed ownership story over the
+  real kernel artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 135 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- zero-copy receive or performance work
+- shared ring buffers or kernel-managed reuse pools
+- a generic buffer or memory-management subsystem
+- device-independent payload abstractions
+- reopening sema, MIR, backend, ABI, target, or `hal`
+- claiming ownership clarity from tests alone without landing the runtime
+  state transitions
