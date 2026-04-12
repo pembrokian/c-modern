@@ -4,6 +4,7 @@ import debug
 import echo_service
 import ipc
 import init
+import kv_service
 import log_service
 import mmu
 import shell_service
@@ -524,6 +525,29 @@ struct Phase144StatefulKeyValueServiceFollowThroughAuditInputs {
     missing_key_visible: u32
     explicit_overwrite_visible: u32
     fixed_write_log_visible: u32
+    durable_persistence_visible: u32
+    compiler_reopening_visible: u32
+}
+
+struct Phase145ServiceRestartFailureAndUsagePressureAuditInputs {
+    phase144: debug.Phase144StatefulKeyValueServiceFollowThroughAudit
+    kv_service_pid: u32
+    shell_service_pid: u32
+    log_service_pid: u32
+    init_policy_owner_pid: u32
+    pre_failure_set_route: shell_service.ShellRoutingObservation
+    pre_failure_get_route: shell_service.ShellRoutingObservation
+    failed_get_route: shell_service.ShellRoutingObservation
+    restarted_get_route: shell_service.ShellRoutingObservation
+    pre_failure_retention: kv_service.KvRetentionObservation
+    post_restart_retention: kv_service.KvRetentionObservation
+    restart: init.ServiceRestartObservation
+    event_log_retention: log_service.LogRetentionObservation
+    shell_failure_visible: u32
+    init_restart_visible: u32
+    post_restart_state_reset_visible: u32
+    manual_retry_visible: u32
+    kernel_supervision_visible: u32
     durable_persistence_visible: u32
     compiler_reopening_visible: u32
 }

@@ -42,6 +42,16 @@ struct BootstrapHandoffObservation {
     ambient_root_visible: u32
 }
 
+struct ServiceRestartObservation {
+    owner_pid: u32
+    service_key: u32
+    previous_service_pid: u32
+    replacement_service_pid: u32
+    shared_control_endpoint_id: u32
+    restart_count: usize
+    retained_boot_wiring_visible: u32
+}
+
 func empty_bootstrap_capability_set() BootstrapCapabilitySet {
     return BootstrapCapabilitySet{ owner_pid: 0, endpoint_handle_slot: 0, endpoint_handle_count: 0, program_capability_count: 0, program_capability: capability.empty_slot(), wait_handle_count: 0, ambient_root_visible: 0 }
 }
@@ -65,4 +75,8 @@ func install_bootstrap_capability_set(owner_pid: u32, endpoint_handle_slot: u32,
 func observe_bootstrap_handoff(set: BootstrapCapabilitySet) BootstrapHandoffObservation {
     authority_count: usize = set.endpoint_handle_count + set.program_capability_count + set.wait_handle_count
     return BootstrapHandoffObservation{ owner_pid: set.owner_pid, authority_count: authority_count, endpoint_handle_slot: set.endpoint_handle_slot, program_capability_slot: set.program_capability.slot_id, program_object_id: set.program_capability.object_id, ambient_root_visible: set.ambient_root_visible }
+}
+
+func observe_service_restart(owner_pid: u32, service_key: u32, previous_service_pid: u32, replacement_service_pid: u32, shared_control_endpoint_id: u32, restart_count: usize, retained_boot_wiring_visible: u32) ServiceRestartObservation {
+    return ServiceRestartObservation{ owner_pid: owner_pid, service_key: service_key, previous_service_pid: previous_service_pid, replacement_service_pid: replacement_service_pid, shared_control_endpoint_id: shared_control_endpoint_id, restart_count: restart_count, retained_boot_wiring_visible: retained_boot_wiring_visible }
 }

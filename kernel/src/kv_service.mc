@@ -3,6 +3,8 @@ import ipc
 const RETAINED_KV_CAPACITY: usize = 4
 const KV_LOG_INSERT_BYTE: u8 = 83
 const KV_LOG_OVERWRITE_BYTE: u8 = 79
+const KV_LOG_FAILURE_BYTE: u8 = 70
+const KV_LOG_RESTART_BYTE: u8 = 82
 
 enum KvMessageTag {
     None,
@@ -13,6 +15,7 @@ enum KvMessageTag {
 struct KvServiceState {
     owner_pid: u32
     endpoint_handle_slot: u32
+    available: u32
     last_tag: KvMessageTag
     handled_request_count: usize
     key_count: usize
@@ -25,13 +28,16 @@ struct KvServiceState {
     get_count: usize
     overwrite_count: usize
     missing_count: usize
+    unavailable_count: usize
     table_full_count: usize
     retained_count: usize
     last_found: u32
     overwrote_last_request: u32
     missing_last_request: u32
+    unavailable_last_request: u32
     table_full_last_request: u32
     pending_log_write: u32
+    pending_failure_log: u32
     logged_write_count: usize
     last_logged_byte: u8
     retained_keys: [4]u8
@@ -55,6 +61,7 @@ struct KvRetentionObservation {
     client_pid: u32
     endpoint_id: u32
     tag: KvMessageTag
+    available: u32
     request_count: usize
     key_count: usize
     value_count: usize
@@ -62,6 +69,7 @@ struct KvRetentionObservation {
     get_count: usize
     overwrite_count: usize
     missing_count: usize
+    unavailable_count: usize
     table_full_count: usize
     retained_count: usize
     key_byte: u8
@@ -69,6 +77,7 @@ struct KvRetentionObservation {
     found: u32
     overwrote_last_request: u32
     missing_last_request: u32
+    unavailable_last_request: u32
     table_full_last_request: u32
     logged_write_count: usize
     last_logged_byte: u8
@@ -83,7 +92,19 @@ struct KvRetentionObservation {
 }
 
 func service_state(owner_pid: u32, endpoint_handle_slot: u32) KvServiceState {
-    return KvServiceState{ owner_pid: owner_pid, endpoint_handle_slot: endpoint_handle_slot, last_tag: KvMessageTag.None, handled_request_count: 0, key_count: 0, value_count: 0, last_client_pid: 0, last_endpoint_id: 0, last_key_byte: 0, last_value_byte: 0, set_count: 0, get_count: 0, overwrite_count: 0, missing_count: 0, table_full_count: 0, retained_count: 0, last_found: 0, overwrote_last_request: 0, missing_last_request: 0, table_full_last_request: 0, pending_log_write: 0, logged_write_count: 0, last_logged_byte: 0, retained_keys: ipc.zero_payload(), retained_values: ipc.zero_payload() }
+    return KvServiceState{ owner_pid: owner_pid, endpoint_handle_slot: endpoint_handle_slot, available: 1, last_tag: KvMessageTag.None, handled_request_count: 0, key_count: 0, value_count: 0, last_client_pid: 0, last_endpoint_id: 0, last_key_byte: 0, last_value_byte: 0, set_count: 0, get_count: 0, overwrite_count: 0, missing_count: 0, unavailable_count: 0, table_full_count: 0, retained_count: 0, last_found: 0, overwrote_last_request: 0, missing_last_request: 0, unavailable_last_request: 0, table_full_last_request: 0, pending_log_write: 0, pending_failure_log: 0, logged_write_count: 0, last_logged_byte: 0, retained_keys: ipc.zero_payload(), retained_values: ipc.zero_payload() }
+}
+
+func record_unavailable(state: KvServiceState, client_pid: u32, endpoint_id: u32, tag: KvMessageTag, key_byte: u8, value_byte: u8) KvServiceState {
+    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, available: 0, last_tag: tag, handled_request_count: state.handled_request_count, key_count: state.key_count, value_count: state.value_count, last_client_pid: client_pid, last_endpoint_id: endpoint_id, last_key_byte: key_byte, last_value_byte: value_byte, set_count: state.set_count, get_count: state.get_count, overwrite_count: state.overwrite_count, missing_count: state.missing_count, unavailable_count: state.unavailable_count + 1, table_full_count: state.table_full_count, retained_count: state.retained_count, last_found: 0, overwrote_last_request: 0, missing_last_request: 0, unavailable_last_request: 1, table_full_last_request: 0, pending_log_write: 0, pending_failure_log: 1, logged_write_count: state.logged_write_count, last_logged_byte: state.last_logged_byte, retained_keys: state.retained_keys, retained_values: state.retained_values }
+}
+
+func mark_unavailable(state: KvServiceState) KvServiceState {
+    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, available: 0, last_tag: state.last_tag, handled_request_count: state.handled_request_count, key_count: state.key_count, value_count: state.value_count, last_client_pid: state.last_client_pid, last_endpoint_id: state.last_endpoint_id, last_key_byte: state.last_key_byte, last_value_byte: state.last_value_byte, set_count: state.set_count, get_count: state.get_count, overwrite_count: state.overwrite_count, missing_count: state.missing_count, unavailable_count: state.unavailable_count, table_full_count: state.table_full_count, retained_count: state.retained_count, last_found: state.last_found, overwrote_last_request: state.overwrote_last_request, missing_last_request: state.missing_last_request, unavailable_last_request: 0, table_full_last_request: state.table_full_last_request, pending_log_write: 0, pending_failure_log: 0, logged_write_count: state.logged_write_count, last_logged_byte: state.last_logged_byte, retained_keys: state.retained_keys, retained_values: state.retained_values }
+}
+
+func restart_service(state: KvServiceState) KvServiceState {
+    return service_state(state.owner_pid, state.endpoint_handle_slot)
 }
 
 func retained_slot_for(keys: [4]u8, retained_count: usize, key_byte: u8) usize {
@@ -159,6 +180,9 @@ func retained_value_at(values: [4]u8, slot: usize) u8 {
 }
 
 func record_set(state: KvServiceState, client_pid: u32, endpoint_id: u32, key_byte: u8, value_byte: u8) KvServiceState {
+    if state.available == 0 {
+        return record_unavailable(state, client_pid, endpoint_id, KvMessageTag.Set, key_byte, value_byte)
+    }
     slot: usize = retained_slot_for(state.retained_keys, state.retained_count, key_byte)
     next_keys: [4]u8 = state.retained_keys
     next_values: [4]u8 = state.retained_values
@@ -187,10 +211,13 @@ func record_set(state: KvServiceState, client_pid: u32, endpoint_id: u32, key_by
         }
     }
 
-    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, last_tag: KvMessageTag.Set, handled_request_count: state.handled_request_count + 1, key_count: state.key_count + 1, value_count: state.value_count + 1, last_client_pid: client_pid, last_endpoint_id: endpoint_id, last_key_byte: key_byte, last_value_byte: value_byte, set_count: state.set_count + 1, get_count: state.get_count, overwrite_count: overwrite_count, missing_count: state.missing_count, table_full_count: table_full_count, retained_count: retained_count, last_found: 1, overwrote_last_request: overwrote_last_request, missing_last_request: 0, table_full_last_request: table_full_last_request, pending_log_write: pending_log_write, logged_write_count: state.logged_write_count, last_logged_byte: last_logged_byte, retained_keys: next_keys, retained_values: next_values }
+    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, available: 1, last_tag: KvMessageTag.Set, handled_request_count: state.handled_request_count + 1, key_count: state.key_count + 1, value_count: state.value_count + 1, last_client_pid: client_pid, last_endpoint_id: endpoint_id, last_key_byte: key_byte, last_value_byte: value_byte, set_count: state.set_count + 1, get_count: state.get_count, overwrite_count: overwrite_count, missing_count: state.missing_count, unavailable_count: state.unavailable_count, table_full_count: table_full_count, retained_count: retained_count, last_found: 1, overwrote_last_request: overwrote_last_request, missing_last_request: 0, unavailable_last_request: 0, table_full_last_request: table_full_last_request, pending_log_write: pending_log_write, pending_failure_log: 0, logged_write_count: state.logged_write_count, last_logged_byte: last_logged_byte, retained_keys: next_keys, retained_values: next_values }
 }
 
 func record_get(state: KvServiceState, client_pid: u32, endpoint_id: u32, key_byte: u8) KvServiceState {
+    if state.available == 0 {
+        return record_unavailable(state, client_pid, endpoint_id, KvMessageTag.Get, key_byte, 0)
+    }
     slot: usize = retained_slot_for(state.retained_keys, state.retained_count, key_byte)
     found: u32 = 0
     value_byte: u8 = 0
@@ -203,10 +230,13 @@ func record_get(state: KvServiceState, client_pid: u32, endpoint_id: u32, key_by
         missing_count = missing_count + 1
         missing_last_request = 1
     }
-    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, last_tag: KvMessageTag.Get, handled_request_count: state.handled_request_count + 1, key_count: state.key_count + 1, value_count: state.value_count, last_client_pid: client_pid, last_endpoint_id: endpoint_id, last_key_byte: key_byte, last_value_byte: value_byte, set_count: state.set_count, get_count: state.get_count + 1, overwrite_count: state.overwrite_count, missing_count: missing_count, table_full_count: state.table_full_count, retained_count: state.retained_count, last_found: found, overwrote_last_request: 0, missing_last_request: missing_last_request, table_full_last_request: 0, pending_log_write: 0, logged_write_count: state.logged_write_count, last_logged_byte: state.last_logged_byte, retained_keys: state.retained_keys, retained_values: state.retained_values }
+    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, available: 1, last_tag: KvMessageTag.Get, handled_request_count: state.handled_request_count + 1, key_count: state.key_count + 1, value_count: state.value_count, last_client_pid: client_pid, last_endpoint_id: endpoint_id, last_key_byte: key_byte, last_value_byte: value_byte, set_count: state.set_count, get_count: state.get_count + 1, overwrite_count: state.overwrite_count, missing_count: missing_count, unavailable_count: state.unavailable_count, table_full_count: state.table_full_count, retained_count: state.retained_count, last_found: found, overwrote_last_request: 0, missing_last_request: missing_last_request, unavailable_last_request: 0, table_full_last_request: 0, pending_log_write: 0, pending_failure_log: 0, logged_write_count: state.logged_write_count, last_logged_byte: state.last_logged_byte, retained_keys: state.retained_keys, retained_values: state.retained_values }
 }
 
 func reply_payload(state: KvServiceState) [4]u8 {
+    if state.unavailable_last_request != 0 {
+        return unavailable_reply_payload(state)
+    }
     payload: [4]u8 = ipc.zero_payload()
     payload[0] = state.last_key_byte
     payload[1] = state.last_value_byte
@@ -228,12 +258,20 @@ func reply_payload(state: KvServiceState) [4]u8 {
     return payload
 }
 
+func unavailable_reply_payload(state: KvServiceState) [4]u8 {
+    payload: [4]u8 = ipc.zero_payload()
+    payload[0] = state.last_key_byte
+    payload[1] = state.last_value_byte
+    payload[3] = 2
+    return payload
+}
+
 func observe_exchange(state: KvServiceState) KvExchangeObservation {
     return KvExchangeObservation{ service_pid: state.owner_pid, client_pid: state.last_client_pid, endpoint_id: state.last_endpoint_id, tag: state.last_tag, key_byte: state.last_key_byte, value_byte: state.last_value_byte, request_count: state.handled_request_count, key_count: state.key_count, value_count: state.value_count }
 }
 
 func observe_retention(state: KvServiceState) KvRetentionObservation {
-    return KvRetentionObservation{ service_pid: state.owner_pid, client_pid: state.last_client_pid, endpoint_id: state.last_endpoint_id, tag: state.last_tag, request_count: state.handled_request_count, key_count: state.key_count, value_count: state.value_count, set_count: state.set_count, get_count: state.get_count, overwrite_count: state.overwrite_count, missing_count: state.missing_count, table_full_count: state.table_full_count, retained_count: state.retained_count, key_byte: state.last_key_byte, value_byte: state.last_value_byte, found: state.last_found, overwrote_last_request: state.overwrote_last_request, missing_last_request: state.missing_last_request, table_full_last_request: state.table_full_last_request, logged_write_count: state.logged_write_count, last_logged_byte: state.last_logged_byte, retained_key0: state.retained_keys[0], retained_key1: state.retained_keys[1], retained_key2: state.retained_keys[2], retained_key3: state.retained_keys[3], retained_value0: state.retained_values[0], retained_value1: state.retained_values[1], retained_value2: state.retained_values[2], retained_value3: state.retained_values[3] }
+    return KvRetentionObservation{ service_pid: state.owner_pid, client_pid: state.last_client_pid, endpoint_id: state.last_endpoint_id, tag: state.last_tag, available: state.available, request_count: state.handled_request_count, key_count: state.key_count, value_count: state.value_count, set_count: state.set_count, get_count: state.get_count, overwrite_count: state.overwrite_count, missing_count: state.missing_count, unavailable_count: state.unavailable_count, table_full_count: state.table_full_count, retained_count: state.retained_count, key_byte: state.last_key_byte, value_byte: state.last_value_byte, found: state.last_found, overwrote_last_request: state.overwrote_last_request, missing_last_request: state.missing_last_request, unavailable_last_request: state.unavailable_last_request, table_full_last_request: state.table_full_last_request, logged_write_count: state.logged_write_count, last_logged_byte: state.last_logged_byte, retained_key0: state.retained_keys[0], retained_key1: state.retained_keys[1], retained_key2: state.retained_keys[2], retained_key3: state.retained_keys[3], retained_value0: state.retained_values[0], retained_value1: state.retained_values[1], retained_value2: state.retained_values[2], retained_value3: state.retained_values[3] }
 }
 
 func should_append_log_write(state: KvServiceState) bool {
@@ -245,7 +283,27 @@ func log_write_byte(state: KvServiceState) u8 {
 }
 
 func confirm_log_append(state: KvServiceState) KvServiceState {
-    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, last_tag: state.last_tag, handled_request_count: state.handled_request_count, key_count: state.key_count, value_count: state.value_count, last_client_pid: state.last_client_pid, last_endpoint_id: state.last_endpoint_id, last_key_byte: state.last_key_byte, last_value_byte: state.last_value_byte, set_count: state.set_count, get_count: state.get_count, overwrite_count: state.overwrite_count, missing_count: state.missing_count, table_full_count: state.table_full_count, retained_count: state.retained_count, last_found: state.last_found, overwrote_last_request: state.overwrote_last_request, missing_last_request: state.missing_last_request, table_full_last_request: state.table_full_last_request, pending_log_write: 0, logged_write_count: state.logged_write_count + 1, last_logged_byte: state.last_logged_byte, retained_keys: state.retained_keys, retained_values: state.retained_values }
+    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, available: state.available, last_tag: state.last_tag, handled_request_count: state.handled_request_count, key_count: state.key_count, value_count: state.value_count, last_client_pid: state.last_client_pid, last_endpoint_id: state.last_endpoint_id, last_key_byte: state.last_key_byte, last_value_byte: state.last_value_byte, set_count: state.set_count, get_count: state.get_count, overwrite_count: state.overwrite_count, missing_count: state.missing_count, unavailable_count: state.unavailable_count, table_full_count: state.table_full_count, retained_count: state.retained_count, last_found: state.last_found, overwrote_last_request: state.overwrote_last_request, missing_last_request: state.missing_last_request, unavailable_last_request: state.unavailable_last_request, table_full_last_request: state.table_full_last_request, pending_log_write: 0, pending_failure_log: state.pending_failure_log, logged_write_count: state.logged_write_count + 1, last_logged_byte: state.last_logged_byte, retained_keys: state.retained_keys, retained_values: state.retained_values }
+}
+
+func should_append_failure_log(state: KvServiceState) bool {
+    return state.pending_failure_log != 0
+}
+
+func confirm_failure_log(state: KvServiceState) KvServiceState {
+    return KvServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, available: state.available, last_tag: state.last_tag, handled_request_count: state.handled_request_count, key_count: state.key_count, value_count: state.value_count, last_client_pid: state.last_client_pid, last_endpoint_id: state.last_endpoint_id, last_key_byte: state.last_key_byte, last_value_byte: state.last_value_byte, set_count: state.set_count, get_count: state.get_count, overwrite_count: state.overwrite_count, missing_count: state.missing_count, unavailable_count: state.unavailable_count, table_full_count: state.table_full_count, retained_count: state.retained_count, last_found: state.last_found, overwrote_last_request: state.overwrote_last_request, missing_last_request: state.missing_last_request, unavailable_last_request: state.unavailable_last_request, table_full_last_request: state.table_full_last_request, pending_log_write: state.pending_log_write, pending_failure_log: 0, logged_write_count: state.logged_write_count, last_logged_byte: state.last_logged_byte, retained_keys: state.retained_keys, retained_values: state.retained_values }
+}
+
+func failure_log_byte() u8 {
+    return KV_LOG_FAILURE_BYTE
+}
+
+func restart_log_byte() u8 {
+    return KV_LOG_RESTART_BYTE
+}
+
+func request_unavailable(state: KvServiceState) bool {
+    return state.unavailable_last_request != 0
 }
 
 func tag_score(tag: KvMessageTag) i32 {

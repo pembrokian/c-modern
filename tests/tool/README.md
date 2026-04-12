@@ -59,7 +59,8 @@ Current structure
       `kernel/phase141_interactive_service_system_scope_freeze.cpp`, and
       `kernel/phase142_serial_shell_command_routing.cpp`, and
       `kernel/phase143_long_lived_log_service_follow_through.cpp`, and
-      `kernel/phase144_stateful_key_value_service_follow_through.cpp`: one kernel proof per file.
+      `kernel/phase144_stateful_key_value_service_follow_through.cpp`, and
+      `kernel/phase145_service_restart_failure_and_usage_pressure_audit.cpp`: one kernel proof per file.
   - late ownership-hardening kernel audits also keep adjacent `.mirproj.txt`
     files for projected MIR golden expectations.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-

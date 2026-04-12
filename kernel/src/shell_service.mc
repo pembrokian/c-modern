@@ -154,9 +154,17 @@ func reply_payload(state: ShellServiceState, echo_state: echo_service.EchoServic
         payload = log_service.reply_payload(log_state)
         return payload
     case ShellCommandTag.KvSet:
+        if kv_service.request_unavailable(kv_state) {
+            payload = kv_service.unavailable_reply_payload(kv_state)
+            return payload
+        }
         payload = kv_service.reply_payload(kv_state)
         return payload
     case ShellCommandTag.KvGet:
+        if kv_service.request_unavailable(kv_state) {
+            payload = kv_service.unavailable_reply_payload(kv_state)
+            return payload
+        }
         payload = kv_service.reply_payload(kv_state)
         return payload
     default:

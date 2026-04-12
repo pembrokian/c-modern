@@ -3,7 +3,7 @@ Phase 145 -- Service Restart, Failure, And Usage Pressure Audit
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -11,11 +11,25 @@ Continue from the landed shell, log, and key-value system slices by applying
 real failure, restart, and repeated-use pressure to a user-meaningful system
 rather than to a synthetic proof graph alone.
 
-This document records the intended Phase 145 slice.
+This document records the landed Phase 145 slice.
 It defines one bounded failure-and-restart audit over the interactive-service
 system.
 It does not claim a kernel supervisor, durable recovery, transparent state
 preservation, or a broader reliability framework.
+
+Phase result
+------------
+Phase 145 is complete as one bounded service restart, failure, and usage pressure audit over the real kernel artifact.
+
+The landed repository slice now includes:
+
+- one explicit shell-visible key-value unavailable consequence when `kv_service` is lost
+- one explicit init-owned fixed-wiring restart of `kv_service` without a kernel supervisor
+- one explicit post-restart empty-state truth through a retried `kv get` path
+- one fixed failure-and-restart observation path into `log_service`
+- one focused Phase 145 audit and one focused freestanding regression over the same bounded restart-and-usage boundary
+
+manual retry remains a user-space-visible awkwardness after restart.
 
 Repository status note
 ----------------------
@@ -52,7 +66,7 @@ Core rule
 
 Chosen audit scenario
 ---------------------
-Chosen scenario: yes.
+Chosen scenario: landed.
 
 The Phase 145 audit should target `kv_service` first.
 
@@ -113,7 +127,7 @@ The owning implementation surfaces for this phase are:
 
 Chosen slice for this phase
 ---------------------------
-Targeted boundary shape:
+Landed boundary shape:
 
 1. one bounded shell-driven successful key-value workflow
 2. one bounded key-value service loss path
@@ -122,19 +136,14 @@ Targeted boundary shape:
 5. one explicit post-restart truth classification, including visible state
    reset if persistence is still deferred
 
-Suggested execution order
--------------------------
-1. Freeze the bounded failure workflow in docs: no kernel supervisor, one
-   stateful service target, explicit post-restart truth.
-2. Add shell-visible failure classification for missing or dead key-value
-   service interactions.
-3. Wire one explicit restart or replacement path through init.
-4. Re-run one bounded key-value workflow after restart.
-5. Record whether state reset or recovery occurred, and keep that truth
-   explicit.
-6. Add the Phase 145 audit, regression, and projected MIR golden.
-7. Record any exposed pain points as either user-space design work or a
-   specific owner gap for a later phase.
+Execution summary
+-----------------
+1. Keep the Phase 142 compact shell route and Phase 144 key-value request shape unchanged.
+2. Extend `kv_service` with one explicit unavailable consequence instead of hiding service loss behind transport ambiguity.
+3. Keep shell-visible failure reporting in the shell-owned reply path while preserving fixed routing ownership.
+4. Route one fixed failure observation and one fixed restart observation into `log_service`.
+5. Use one explicit init-owned fixed-wiring restart and make the post-restart empty-state truth visible through the retried shell path.
+6. Add one Phase 145 audit, one projected MIR golden, and aligned docs over the bounded restart-and-usage boundary.
 
 Preferred proof points
 ----------------------
@@ -159,6 +168,14 @@ Exit criteria
   restart boundary across build, run, docs, and MIR
 - any newly exposed awkwardness is classified as user-space work or one
   concrete owner gap rather than hidden inside broader framework growth
+
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 145 slice
+- the shell path now reports one explicit key-value unavailable consequence instead of blurring service loss into transport failure
+- init now owns one fixed-wiring restart of `kv_service` without widening into supervision or a recovery framework
+- the post-restart truth is now explicit: the restarted key-value service comes back empty, and the retried `kv get` makes that reset visible
+- manual retry remains a user-space-visible awkwardness after restart rather than being hidden inside the kernel or the shell owner
 
 Non-goals
 ---------

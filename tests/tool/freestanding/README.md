@@ -53,6 +53,7 @@ Structure
   - `phase142_serial_shell_command_routing.cpp`: real-kernel bounded serial shell command-routing audit.
   - `phase143_long_lived_log_service_follow_through.cpp`: real-kernel bounded long-lived log-service follow-through audit.
   - `phase144_stateful_key_value_service_follow_through.cpp`: real-kernel bounded stateful key-value service follow-through audit.
+  - `phase145_service_restart_failure_and_usage_pressure_audit.cpp`: real-kernel bounded service restart, failure, and usage pressure audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

@@ -265,10 +265,7 @@ Why this band comes last:
   losing one actually affects useful behavior rather than only a proof graph.
 
 Phase 145 -- Service Restart, Failure, And Usage Pressure Audit
-- Exit criterion: one bounded interactive system can survive at least one
-  explicit service loss and one explicit restart or replacement path while
-  making the user-visible consequences, remaining awkwardness, and any newly
-  exposed kernel or language gaps explicit.
+- Phase 145 is now concrete as one bounded service restart, failure, and usage pressure audit with one explicit shell-visible key-value unavailable consequence, one init-owned fixed-wiring restart, one explicit post-restart empty-state truth, and compiler, supervision, and durability surfaces kept closed.
 
 Preferred proof points:
 - one service disappears during a real shell-driven workflow

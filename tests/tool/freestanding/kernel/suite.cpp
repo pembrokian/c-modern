@@ -139,12 +139,15 @@ void RunFreestandingKernelPhase143LongLivedLogServiceFollowThrough(const std::fi
 void RunFreestandingKernelPhase144StatefulKeyValueServiceFollowThrough(const std::filesystem::path& source_root,
                                                                        const std::filesystem::path& binary_root,
                                                                        const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase145ServiceRestartFailureAndUsagePressureAudit(const std::filesystem::path& source_root,
+                                                                             const std::filesystem::path& binary_root,
+                                                                             const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
 
-const std::array<KernelTestCase, 41> kKernelTestCases = {{
+const std::array<KernelTestCase, 42> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
@@ -186,6 +189,7 @@ const std::array<KernelTestCase, 41> kKernelTestCases = {{
     {"phase142_serial_shell_command_routing", 5, &RunFreestandingKernelPhase142SerialShellCommandRouting},
     {"phase143_long_lived_log_service_follow_through", 5, &RunFreestandingKernelPhase143LongLivedLogServiceFollowThrough},
     {"phase144_stateful_key_value_service_follow_through", 5, &RunFreestandingKernelPhase144StatefulKeyValueServiceFollowThrough},
+    {"phase145_service_restart_failure_and_usage_pressure_audit", 5, &RunFreestandingKernelPhase145ServiceRestartFailureAndUsagePressureAudit},
 }};
 
 void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,
