@@ -3,7 +3,7 @@ Phase 136 -- Device Failure Containment Probe
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -180,6 +180,32 @@ Exit criteria
 - the focused regression proves build, run, docs, and MIR all expose the same
   Phase 136 boundary
 - the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Completion note
+---------------
+Phase 136 is complete as one bounded device failure containment probe.
+
+The landed kernel artifact now carries one service-local malformed-input path,
+one bounded UART queue-full drop observation, one explicit serial-service close
+path that aborts two queued frames, and one post-close endpoint-closed UART
+drop without widening into retry policy, service supervision, protocol parsing
+in the kernel, or a broader fault-management subsystem.
+
+Landed implementation summary:
+
+- `kernel/src/uart.mc` now records bounded queue-full, endpoint-closed, and
+  endpoint-unavailable drop observations while still retiring staged frames
+  deterministically.
+- `kernel/src/serial_service.mc` keeps malformed-byte treatment local to the
+  service by classifying one invalid byte and refusing to widen that into
+  kernel-side parsing.
+- `kernel/src/bootstrap_services/05_serial.mc` now carries one explicit
+  serial-service close path that closes the endpoint, reports bounded aborted
+  queued frames, and leaves wait follow-through explicit.
+- `kernel/src/debug/10_phase136.mc` validates the landed malformed-input,
+  queue-pressure, and endpoint-closed containment behavior.
+- `kernel/src/main.mc` advances the kernel proof marker to 136 only after that
+  containment audit succeeds over the real kernel artifact.
 
 Non-goals
 ---------

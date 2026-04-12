@@ -9,6 +9,8 @@ Current status
 - Phase 135 has moved the repository-owned kernel artifact beyond the landed
   Phase 134 minimal device-service handoff into one bounded UART receive-frame
   ownership boundary audit.
+- Phase 136 has moved the repository-owned kernel artifact beyond the landed
+  Phase 135 ownership step into one bounded device failure containment probe.
 - Phase 134 has moved the repository-owned kernel artifact beyond the landed
   Phase 133 message lifetime and reuse audit into one bounded UART receive
   device-service handoff.
@@ -71,7 +73,8 @@ Current status
   bounded explicit restart or replacement probe, one bounded fan-out
   composition probe, one bounded backpressure and blocking audit, one bounded
   message lifetime and reuse audit, one bounded UART receive device-service
-  handoff, and one bounded UART receive-frame ownership boundary audit.
+  handoff, one bounded UART receive-frame ownership boundary audit, and one
+  bounded device failure containment probe.
 
 Current files
 -------------
@@ -88,9 +91,9 @@ Current files
   and rejection audit step, one bounded authority lifetime classification
   step, one bounded service death observation step, one bounded partial
   failure propagation step, one bounded explicit restart or replacement
-  probe, one bounded fan-out composition probe, and thin root orchestration
-  across the owned scheduler, lifecycle, bootstrap helper, and debug audit
-  modules
+  probe, one bounded fan-out composition probe, one bounded device failure
+  containment probe, and thin root orchestration across the owned scheduler,
+  lifecycle, bootstrap helper, and debug audit modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
   `module_sets.bootstrap_audit`, owning the extracted Phase 104 contract
   hardening helpers, bounded service validation helpers, Phase 108-129 audit
@@ -119,18 +122,20 @@ Current files
   Phase 126 authority lifetime classification audit, Phase 128 service death
   observation audit, Phase 129 partial failure propagation audit, Phase 130
   explicit restart or replacement audit, Phase 131 fan-out composition audit,
-  Phase 134 minimal device-service handoff audit, and Phase 135 buffer
-  ownership boundary audit
+  Phase 134 minimal device-service handoff audit, Phase 135 buffer ownership
+  boundary audit, and Phase 136 device failure containment audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
   reply payload, and final exchange observation records
-- `src/serial_service.mc`: bounded serial-service protocol state and one
-  service-owned copied receive-frame log
+- `src/serial_service.mc`: bounded serial-service protocol state, one
+  service-owned copied receive-frame log, and one service-local malformed-input
+  classification path
 - `src/transfer_service.mc`: bounded transfer-service grant state, emitted
   payload construction, and final transfer observation records
 - `src/uart.mc`: bounded UART receive-frame staging owner, copied publish
-  observations, and deterministic staging-retirement helpers
+  observations, deterministic staging-retirement helpers, and bounded
+  queue-full or endpoint-closed drop observations
 - `src/state.mc`: kernel-owned descriptor, slot, queue, and boot-log records
 - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame
   records
@@ -215,9 +220,10 @@ Phase boundary
   bounded authority lifetime classification step plus one bounded service
   death observation step plus one bounded partial failure propagation step
   plus one bounded UART receive device-service handoff plus one bounded UART
-  receive-frame ownership boundary audit publishing that same admitted slice
-  without widening into a broader service framework, supervision policy,
-  reusable driver layer, or general buffer subsystem.
+  receive-frame ownership boundary audit plus one bounded device failure
+  containment probe publishing that same admitted slice without widening into a
+  broader service framework, supervision policy, retry framework, or general
+  fault-management subsystem.
 - It does not yet claim general loading, dynamic service discovery,
   namespace policy, kill semantics, or a general running init-owned service
   framework.

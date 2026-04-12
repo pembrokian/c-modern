@@ -52,7 +52,8 @@ Current structure
       `kernel/phase132_backpressure_and_blocking.cpp`, and
       `kernel/phase133_message_lifetime_and_reuse.cpp`, and
       `kernel/phase134_minimal_device_service_handoff.cpp`, and
-      `kernel/phase135_buffer_ownership_boundary_audit.cpp`: one kernel proof per file.
+      `kernel/phase135_buffer_ownership_boundary_audit.cpp`, and
+      `kernel/phase136_device_failure_containment_probe.cpp`: one kernel proof per file.
   - late ownership-hardening kernel audits also keep adjacent `.mirproj.txt`
     files for projected MIR golden expectations.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-

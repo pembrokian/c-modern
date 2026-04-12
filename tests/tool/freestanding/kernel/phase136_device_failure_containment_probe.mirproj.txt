@@ -1,0 +1,5 @@
+  TypeDecl kind=struct name=debug.Phase136DeviceFailureContainmentAudit
+  Function name=uart.handle_receive_interrupt returns=[uart.UartInterruptResult]
+  Function name=serial_service.record_ingress returns=[serial_service.SerialServiceState]
+  Function name=bootstrap_services.close_serial_service_after_failure returns=[bootstrap_services.SerialServiceExecutionResult]
+  Function name=debug.validate_phase136_device_failure_containment returns=[bool]

@@ -10,6 +10,7 @@ Purpose
 Record one maintained repository position after Phase 133 published one bounded message lifetime and reuse audit over the landed running kernel slice.
 Record one maintained repository position after Phase 134 published one bounded minimal device-service handoff over that same slice.
 Record one maintained repository position after Phase 135 published one bounded buffer ownership boundary audit over that same slice.
+Record one maintained repository position after Phase 136 published one bounded device failure containment probe over that same slice.
 
 This note answers four questions that now matter:
 
@@ -45,6 +46,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/active/phase133_message_lifetime_and_reuse_audit.txt`
 - `docs/plan/active/phase134_minimal_device_service_handoff.txt`
 - `docs/plan/active/phase135_buffer_ownership_boundary_audit.txt`
+- `docs/plan/active/phase136_device_failure_containment_probe.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
 - `docs/plan/phase121_kernel_image_contract_hardening.txt`
 - `docs/plan/phase122_target_surface_audit.txt`
@@ -112,6 +114,9 @@ Current repository truth
 - The landed Phase 135 buffer ownership boundary audit also belongs to that
   same admitted slice rather than to a broader buffer pool, zero-copy device
   path, or reopened compiler wave.
+- The landed Phase 136 device failure containment probe also belongs to that
+  same admitted slice rather than to a broader supervision, retry,
+  fault-management, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -139,7 +144,7 @@ It means:
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
-Phase 96 through Phase 135 are now concrete as one first real kernel wave,
+Phase 96 through Phase 136 are now concrete as one first real kernel wave,
 one ownership and hardware-boundary clarification wave, one first bounded
 running-system and plateau freeze wave, and two first post-plateau
 authority-lifecycle stress steps plus one explicit lifetime-classification
@@ -148,7 +153,8 @@ partial-failure propagation step plus one explicit restart-or-replacement
 probe plus one explicit fan-out composition probe plus one explicit
 backpressure and blocking audit plus one explicit message lifetime and reuse
 audit plus one explicit minimal device-service handoff plus one explicit
-buffer ownership boundary audit.
+buffer ownership boundary audit plus one explicit device failure containment
+probe.
 That is meaningful implementation progress, but it is still an early system
 plateau rather than architectural completion.
 
@@ -182,6 +188,13 @@ audit that keeps one UART-owned staging frame, one copied IPC payload, and one
 serial-service-owned consumed log explicit under repeated delivery, adds no
 compiler-facing surface, and expands the running-system slice by one honest
 ownership boundary rather than by another fixture-only byte assumption.
+
+The repository now also includes a landed Phase 136 device failure containment
+probe that keeps malformed-byte classification inside the serial service, keeps
+queue-full and endpoint-closed consequences explicit inside UART and IPC
+owners, adds no compiler-facing surface, and expands the running-system slice
+by one honest unhappy-path statement rather than by another happy-path-only
+device demonstration.
 
 Kernel maturity and quality
 ---------------------------

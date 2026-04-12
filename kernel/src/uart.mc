@@ -3,6 +3,13 @@ import ipc
 
 const UART_MESSAGE_ID_BASE: u32 = 134
 
+enum UartFailureKind {
+    None,
+    QueueFull,
+    EndpointClosed,
+    EndpointUnavailable,
+}
+
 struct UartDevice {
     receive_vector: u32
     service_endpoint_id: u32
@@ -12,6 +19,11 @@ struct UartDevice {
     ack_count: u32
     ingress_count: u32
     retire_count: u32
+    dropped_count: u32
+    queue_full_drop_count: u32
+    endpoint_closed_drop_count: u32
+    endpoint_invalid_drop_count: u32
+    last_failure: UartFailureKind
     last_vector: u32
     last_source_actor: u32
     last_published_payload_len: usize
@@ -40,6 +52,11 @@ struct UartIngressObservation {
     ack_count: u32
     ingress_count: u32
     retire_count: u32
+    dropped_count: u32
+    queue_full_drop_count: u32
+    endpoint_closed_drop_count: u32
+    endpoint_invalid_drop_count: u32
+    failure_kind: UartFailureKind
     publish: ipc.RuntimePublishObservation
 }
 
@@ -52,15 +69,15 @@ struct UartInterruptResult {
 
 func empty_device() UartDevice {
     payload: [4]u8 = ipc.zero_payload()
-    return UartDevice{ receive_vector: 0, service_endpoint_id: 0, staged_payload_len: 0, staged_payload: payload, staging_ready: 0, ack_count: 0, ingress_count: 0, retire_count: 0, last_vector: 0, last_source_actor: 0, last_published_payload_len: 0, last_published_payload: payload }
+    return UartDevice{ receive_vector: 0, service_endpoint_id: 0, staged_payload_len: 0, staged_payload: payload, staging_ready: 0, ack_count: 0, ingress_count: 0, retire_count: 0, dropped_count: 0, queue_full_drop_count: 0, endpoint_closed_drop_count: 0, endpoint_invalid_drop_count: 0, last_failure: UartFailureKind.None, last_vector: 0, last_source_actor: 0, last_published_payload_len: 0, last_published_payload: payload }
 }
 
 func configure_receive(device: UartDevice, receive_vector: u32, service_endpoint_id: u32) UartDevice {
-    return UartDevice{ receive_vector: receive_vector, service_endpoint_id: service_endpoint_id, staged_payload_len: device.staged_payload_len, staged_payload: device.staged_payload, staging_ready: device.staging_ready, ack_count: device.ack_count, ingress_count: device.ingress_count, retire_count: device.retire_count, last_vector: device.last_vector, last_source_actor: device.last_source_actor, last_published_payload_len: device.last_published_payload_len, last_published_payload: device.last_published_payload }
+    return UartDevice{ receive_vector: receive_vector, service_endpoint_id: service_endpoint_id, staged_payload_len: device.staged_payload_len, staged_payload: device.staged_payload, staging_ready: device.staging_ready, ack_count: device.ack_count, ingress_count: device.ingress_count, retire_count: device.retire_count, dropped_count: device.dropped_count, queue_full_drop_count: device.queue_full_drop_count, endpoint_closed_drop_count: device.endpoint_closed_drop_count, endpoint_invalid_drop_count: device.endpoint_invalid_drop_count, last_failure: device.last_failure, last_vector: device.last_vector, last_source_actor: device.last_source_actor, last_published_payload_len: device.last_published_payload_len, last_published_payload: device.last_published_payload }
 }
 
 func stage_receive_frame(device: UartDevice, payload_len: usize, payload: [4]u8) UartDevice {
-    return UartDevice{ receive_vector: device.receive_vector, service_endpoint_id: device.service_endpoint_id, staged_payload_len: payload_len, staged_payload: payload, staging_ready: 1, ack_count: device.ack_count, ingress_count: device.ingress_count, retire_count: device.retire_count, last_vector: device.last_vector, last_source_actor: device.last_source_actor, last_published_payload_len: device.last_published_payload_len, last_published_payload: device.last_published_payload }
+    return UartDevice{ receive_vector: device.receive_vector, service_endpoint_id: device.service_endpoint_id, staged_payload_len: payload_len, staged_payload: payload, staging_ready: 1, ack_count: device.ack_count, ingress_count: device.ingress_count, retire_count: device.retire_count, dropped_count: device.dropped_count, queue_full_drop_count: device.queue_full_drop_count, endpoint_closed_drop_count: device.endpoint_closed_drop_count, endpoint_invalid_drop_count: device.endpoint_invalid_drop_count, last_failure: device.last_failure, last_vector: device.last_vector, last_source_actor: device.last_source_actor, last_published_payload_len: device.last_published_payload_len, last_published_payload: device.last_published_payload }
 }
 
 func stage_receive_byte(device: UartDevice, received_byte: u8) UartDevice {
@@ -70,7 +87,36 @@ func stage_receive_byte(device: UartDevice, received_byte: u8) UartDevice {
 }
 
 func empty_ingress_observation() UartIngressObservation {
-    return UartIngressObservation{ interrupt_vector: 0, source_actor: 0, service_endpoint_id: 0, staged_payload_len: 0, staged_payload0: 0, staged_payload1: 0, staged_payload2: 0, staged_payload3: 0, published_payload_len: 0, published_payload0: 0, published_payload1: 0, published_payload2: 0, published_payload3: 0, retired_payload_len: 0, retired_payload0: 0, retired_payload1: 0, retired_payload2: 0, retired_payload3: 0, ack_count: 0, ingress_count: 0, retire_count: 0, publish: ipc.empty_runtime_publish_observation() }
+    return UartIngressObservation{ interrupt_vector: 0, source_actor: 0, service_endpoint_id: 0, staged_payload_len: 0, staged_payload0: 0, staged_payload1: 0, staged_payload2: 0, staged_payload3: 0, published_payload_len: 0, published_payload0: 0, published_payload1: 0, published_payload2: 0, published_payload3: 0, retired_payload_len: 0, retired_payload0: 0, retired_payload1: 0, retired_payload2: 0, retired_payload3: 0, ack_count: 0, ingress_count: 0, retire_count: 0, dropped_count: 0, queue_full_drop_count: 0, endpoint_closed_drop_count: 0, endpoint_invalid_drop_count: 0, failure_kind: UartFailureKind.None, publish: ipc.empty_runtime_publish_observation() }
+}
+
+func failure_kind_score(kind: UartFailureKind) i32 {
+    switch kind {
+    case UartFailureKind.None:
+        return 1
+    case UartFailureKind.QueueFull:
+        return 2
+    case UartFailureKind.EndpointClosed:
+        return 4
+    case UartFailureKind.EndpointUnavailable:
+        return 8
+    default:
+        return 0
+    }
+    return 0
+}
+
+func publish_failure_kind(observation: ipc.RuntimePublishObservation) UartFailureKind {
+    if observation.queue_full != 0 {
+        return UartFailureKind.QueueFull
+    }
+    if observation.endpoint_closed != 0 {
+        return UartFailureKind.EndpointClosed
+    }
+    if observation.endpoint_valid == 0 {
+        return UartFailureKind.EndpointUnavailable
+    }
+    return UartFailureKind.None
 }
 
 func handle_receive_interrupt(device: UartDevice, entry: interrupt.InterruptEntry, dispatch: interrupt.InterruptDispatchResult, endpoints: ipc.EndpointTable, kernel_pid: u32) UartInterruptResult {
@@ -82,6 +128,23 @@ func handle_receive_interrupt(device: UartDevice, entry: interrupt.InterruptEntr
     }
     publish: ipc.RuntimePublishResult = ipc.publish_runtime_frame(endpoints, device.service_endpoint_id, kernel_pid, UART_MESSAGE_ID_BASE + device.ingress_count, device.staged_payload_len, device.staged_payload)
     retired_payload: [4]u8 = ipc.zero_payload()
-    next_device: UartDevice = UartDevice{ receive_vector: device.receive_vector, service_endpoint_id: device.service_endpoint_id, staged_payload_len: 0, staged_payload: retired_payload, staging_ready: 0, ack_count: device.ack_count + 1, ingress_count: device.ingress_count + 1, retire_count: device.retire_count + 1, last_vector: entry.frame.vector, last_source_actor: entry.frame.source_actor, last_published_payload_len: device.staged_payload_len, last_published_payload: device.staged_payload }
-    return UartInterruptResult{ device: next_device, endpoints: publish.endpoints, observation: UartIngressObservation{ interrupt_vector: entry.frame.vector, source_actor: entry.frame.source_actor, service_endpoint_id: device.service_endpoint_id, staged_payload_len: device.staged_payload_len, staged_payload0: device.staged_payload[0], staged_payload1: device.staged_payload[1], staged_payload2: device.staged_payload[2], staged_payload3: device.staged_payload[3], published_payload_len: next_device.last_published_payload_len, published_payload0: next_device.last_published_payload[0], published_payload1: next_device.last_published_payload[1], published_payload2: next_device.last_published_payload[2], published_payload3: next_device.last_published_payload[3], retired_payload_len: next_device.staged_payload_len, retired_payload0: next_device.staged_payload[0], retired_payload1: next_device.staged_payload[1], retired_payload2: next_device.staged_payload[2], retired_payload3: next_device.staged_payload[3], ack_count: next_device.ack_count, ingress_count: next_device.ingress_count, retire_count: next_device.retire_count, publish: publish.observation }, handled: 1 }
+    failure_kind: UartFailureKind = publish_failure_kind(publish.observation)
+    dropped_count: u32 = device.dropped_count
+    queue_full_drop_count: u32 = device.queue_full_drop_count
+    endpoint_closed_drop_count: u32 = device.endpoint_closed_drop_count
+    endpoint_invalid_drop_count: u32 = device.endpoint_invalid_drop_count
+    if failure_kind_score(failure_kind) != 1 {
+        dropped_count = dropped_count + 1
+        if failure_kind_score(failure_kind) == 2 {
+            queue_full_drop_count = queue_full_drop_count + 1
+        }
+        if failure_kind_score(failure_kind) == 4 {
+            endpoint_closed_drop_count = endpoint_closed_drop_count + 1
+        }
+        if failure_kind_score(failure_kind) == 8 {
+            endpoint_invalid_drop_count = endpoint_invalid_drop_count + 1
+        }
+    }
+    next_device: UartDevice = UartDevice{ receive_vector: device.receive_vector, service_endpoint_id: device.service_endpoint_id, staged_payload_len: 0, staged_payload: retired_payload, staging_ready: 0, ack_count: device.ack_count + 1, ingress_count: device.ingress_count + 1, retire_count: device.retire_count + 1, dropped_count: dropped_count, queue_full_drop_count: queue_full_drop_count, endpoint_closed_drop_count: endpoint_closed_drop_count, endpoint_invalid_drop_count: endpoint_invalid_drop_count, last_failure: failure_kind, last_vector: entry.frame.vector, last_source_actor: entry.frame.source_actor, last_published_payload_len: device.staged_payload_len, last_published_payload: device.staged_payload }
+    return UartInterruptResult{ device: next_device, endpoints: publish.endpoints, observation: UartIngressObservation{ interrupt_vector: entry.frame.vector, source_actor: entry.frame.source_actor, service_endpoint_id: device.service_endpoint_id, staged_payload_len: device.staged_payload_len, staged_payload0: device.staged_payload[0], staged_payload1: device.staged_payload[1], staged_payload2: device.staged_payload[2], staged_payload3: device.staged_payload[3], published_payload_len: next_device.last_published_payload_len, published_payload0: next_device.last_published_payload[0], published_payload1: next_device.last_published_payload[1], published_payload2: next_device.last_published_payload[2], published_payload3: next_device.last_published_payload[3], retired_payload_len: next_device.staged_payload_len, retired_payload0: next_device.staged_payload[0], retired_payload1: next_device.staged_payload[1], retired_payload2: next_device.staged_payload[2], retired_payload3: next_device.staged_payload[3], ack_count: next_device.ack_count, ingress_count: next_device.ingress_count, retire_count: next_device.retire_count, dropped_count: next_device.dropped_count, queue_full_drop_count: next_device.queue_full_drop_count, endpoint_closed_drop_count: next_device.endpoint_closed_drop_count, endpoint_invalid_drop_count: next_device.endpoint_invalid_drop_count, failure_kind: next_device.last_failure, publish: publish.observation }, handled: 1 }
 }

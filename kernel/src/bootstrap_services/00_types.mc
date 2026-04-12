@@ -279,6 +279,13 @@ struct SerialServiceConfig {
     program_object_id: u32
 }
 
+struct SerialServiceFailureObservation {
+    endpoint_id: u32
+    closed: u32
+    aborted_messages: usize
+    wake_count: usize
+}
+
 struct SerialServiceExecutionState {
     program_capability: capability.CapabilitySlot
     gate: syscall.SyscallGate
@@ -295,6 +302,7 @@ struct SerialServiceExecutionState {
     spawn_observation: syscall.SpawnObservation
     receive_observation: syscall.ReceiveObservation
     ingress: serial_service.SerialIngressObservation
+    failure_observation: SerialServiceFailureObservation
     wait_observation: syscall.WaitObservation
     ready_queue: state.ReadyQueue
 }
@@ -348,8 +356,12 @@ func serial_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_
     return SerialServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, serial_endpoint_id: serial_endpoint_id, child_translation_root: child_translation_root, wait_handle_slot: SERIAL_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: SERIAL_SERVICE_ENDPOINT_HANDLE_SLOT, exit_code: SERIAL_SERVICE_EXIT_CODE, program_slot: SERIAL_SERVICE_PROGRAM_SLOT, program_object_id: SERIAL_SERVICE_PROGRAM_OBJECT_ID }
 }
 
+func empty_serial_service_failure_observation() SerialServiceFailureObservation {
+    return SerialServiceFailureObservation{ endpoint_id: 0, closed: 0, aborted_messages: 0, wake_count: 0 }
+}
+
 func empty_serial_service_execution_state() SerialServiceExecutionState {
-    return SerialServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: serial_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), ingress: serial_service.empty_ingress_observation(), wait_observation: syscall.empty_wait_observation(), ready_queue: state.empty_queue() }
+    return SerialServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: serial_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), ingress: serial_service.empty_ingress_observation(), failure_observation: empty_serial_service_failure_observation(), wait_observation: syscall.empty_wait_observation(), ready_queue: state.empty_queue() }
 }
 
 func serial_service_result(state: SerialServiceExecutionState, succeeded: u32) SerialServiceExecutionResult {

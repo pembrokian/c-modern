@@ -4,10 +4,12 @@ import echo_service
 import init
 import interrupt
 import log_service
+import serial_service
 import state
 import syscall
 import timer
 import transfer_service
+import uart
 
 struct Phase108ProgramCapContract {
     init_pid: u32
@@ -481,5 +483,55 @@ struct Phase135BufferOwnershipAudit {
     driver_framework_visible: u32
     generic_buffer_pool_visible: u32
     zero_copy_visible: u32
+    compiler_reopening_visible: u32
+}
+
+struct Phase136DeviceFailureContainmentAudit {
+    phase131: Phase131FanOutCompositionAudit
+    uart_service_endpoint_id: u32
+    malformed_interrupt_kind: interrupt.InterruptDispatchKind
+    malformed_dispatch_handled: u32
+    malformed_published_queued: u32
+    malformed_published_queue_full: u32
+    malformed_published_endpoint_valid: u32
+    malformed_published_endpoint_closed: u32
+    malformed_serial_service_pid: u32
+    malformed_serial_tag: serial_service.SerialMessageTag
+    malformed_receive_status: syscall.SyscallStatus
+    malformed_payload_len: usize
+    malformed_received_byte: u8
+    malformed_ingress_count: usize
+    malformed_service_malformed_count: usize
+    malformed_log_len: usize
+    malformed_total_consumed_bytes: usize
+    queue_one_published_queued: u32
+    queue_two_published_queued: u32
+    queue_full_dispatch_handled: u32
+    queue_full_published_queued: u32
+    queue_full_published_queue_full: u32
+    queue_full_published_endpoint_valid: u32
+    queue_full_published_endpoint_closed: u32
+    queue_full_drop_count: u32
+    queue_full_failure_kind: uart.UartFailureKind
+    uart_ack_count_after_queue_full: u32
+    uart_ingress_count_after_queue_full: u32
+    uart_retire_count_after_queue_full: u32
+    close_endpoint_id: u32
+    close_closed: u32
+    close_aborted_messages: usize
+    close_wake_count: usize
+    close_wait_status: syscall.SyscallStatus
+    closed_dispatch_handled: u32
+    closed_published_queued: u32
+    closed_published_queue_full: u32
+    closed_published_endpoint_valid: u32
+    closed_published_endpoint_closed: u32
+    closed_drop_count: u32
+    closed_endpoint_closed_drop_count: u32
+    closed_failure_kind: uart.UartFailureKind
+    kernel_policy_visible: u32
+    driver_framework_visible: u32
+    retry_framework_visible: u32
+    protocol_parsing_in_kernel_visible: u32
     compiler_reopening_visible: u32
 }
