@@ -1,5 +1,6 @@
 #include <array>
 #include <filesystem>
+#include <string>
 #include <string_view>
 
 #include "tests/support/process_utils.h"
@@ -148,10 +149,79 @@ void RunFreestandingKernelPhase146ServiceShapeConsolidation(const std::filesyste
 void RunFreestandingKernelPhase147IpcShapeAuditUnderRealUsage(const std::filesystem::path& source_root,
                                                               const std::filesystem::path& binary_root,
                                                               const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard1(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard2(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard3(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard4(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard5(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard6(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard7(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard8(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelShard9(const std::filesystem::path& source_root,
+                                 const std::filesystem::path& binary_root,
+                                 const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
+
+void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,
+                                   const std::filesystem::path& binary_root,
+                                   const std::filesystem::path& mc_path,
+                                   int shard);
+
+void RunFreestandingKernelShardDispatch(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path,
+                                        int shard) {
+    switch (shard) {
+    case 1:
+        RunFreestandingKernelShard1(source_root, binary_root, mc_path);
+        return;
+    case 2:
+        RunFreestandingKernelShard2(source_root, binary_root, mc_path);
+        return;
+    case 3:
+        RunFreestandingKernelShard3(source_root, binary_root, mc_path);
+        return;
+    case 4:
+        RunFreestandingKernelShard4(source_root, binary_root, mc_path);
+        return;
+    case 5:
+        RunFreestandingKernelShard5(source_root, binary_root, mc_path);
+        return;
+    case 6:
+        RunFreestandingKernelShard6(source_root, binary_root, mc_path);
+        return;
+    case 7:
+        RunFreestandingKernelShard7(source_root, binary_root, mc_path);
+        return;
+    case 8:
+        RunFreestandingKernelShard8(source_root, binary_root, mc_path);
+        return;
+    case 9:
+        RunFreestandingKernelShard9(source_root, binary_root, mc_path);
+        return;
+    default:
+        Fail("unknown freestanding kernel shard selector: " + std::to_string(shard));
+    }
+}
 
 const std::array<KernelTestCase, 44> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
@@ -227,7 +297,13 @@ void RunFreestandingKernelToolSuiteShard(const std::filesystem::path& source_roo
                                          const std::filesystem::path& binary_root,
                                          const std::filesystem::path& mc_path,
                                          int shard) {
-    RunFreestandingKernelRegistry(source_root, binary_root, mc_path, shard);
+    if (shard == 0) {
+        for (int selected_shard = 1; selected_shard <= 9; ++selected_shard) {
+            RunFreestandingKernelShardDispatch(source_root, binary_root, mc_path, selected_shard);
+        }
+        return;
+    }
+    RunFreestandingKernelShardDispatch(source_root, binary_root, mc_path, shard);
 }
 
 void RunFreestandingKernelToolSuiteCase(const std::filesystem::path& source_root,
@@ -299,6 +375,36 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
                                     const std::filesystem::path& mc_path) {
     RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 0);
+}
+
+void RunFreestandingKernelMetadataSuite(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path) {
+    (void)binary_root;
+    (void)mc_path;
+
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
+    const std::filesystem::path phase_doc_path = ResolvePlanDocPath(source_root,
+                                                                    "phase109_first_running_canopus_kernel_slice_audit.txt");
+
+    const std::string phase_doc = mc::test_support::ReadFile(phase_doc_path);
+    mc::test_support::ExpectOutputContains(phase_doc,
+                                           "Phase 109 -- First Running Canopus Kernel Slice Audit",
+                                           "phase109 plan note should exist in canonical phase-doc style");
+    mc::test_support::ExpectOutputContains(phase_doc,
+                                           "explicit boot entry, first user entry, endpoint-and-handle object",
+                                           "phase109 plan note should publish the admitted running-kernel slice explicitly");
+    mc::test_support::ExpectOutputContains(phase_doc,
+                                           "Phase 109 is complete as a first running Canopus kernel slice audit.",
+                                           "phase109 plan note should close out the running-kernel support statement explicitly");
+
+    const std::string repo_map = mc::test_support::ReadFile(common_paths.repo_map_path);
+    mc::test_support::ExpectOutputContains(repo_map,
+                                           "tests/tool/freestanding/kernel/shard2.cpp",
+                                           "repository map should route the phase109 follow-through through shard2 ownership");
+    mc::test_support::ExpectOutputContains(repo_map,
+                                           "phases 107-111",
+                                           "repository map should describe shard-based kernel ownership instead of one phase file per proof");
 }
 
 }  // namespace tool_tests

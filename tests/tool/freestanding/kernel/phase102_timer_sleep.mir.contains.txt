@@ -1,0 +1,13 @@
+TypeDecl kind=struct name=syscall.SleepRequest
+TypeDecl kind=struct name=syscall.SleepObservation
+VarGlobal names=[SLEEP_OBSERVATION] type=syscall.SleepObservation
+VarGlobal names=[TIMER_WAKE_OBSERVATION] type=timer.TimerWakeObservation
+VarGlobal names=[TIMER_STATE] type=timer.TimerState
+Function name=execute_program_cap_spawn_and_wait returns=[bool]
+Function name=validate_program_cap_spawn_and_wait returns=[bool]
+Function name=syscall.perform_sleep returns=[syscall.SleepResult]
+Function name=timer.arm_sleep returns=[timer.TimerState]
+Function name=timer.wake_fired_sleepers returns=[timer.TimerWakeResult]
+store_target target=TIMER_STATE target_kind=global target_name=TIMER_STATE
+aggregate_init %v
+variant_match

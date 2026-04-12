@@ -123,16 +123,18 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
     - `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
     - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
-    - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator
-    - `tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp`, `phase86_task_lifecycle.cpp`, `phase87_static_data.cpp`, `phase88_build_integration.cpp`, `phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase103_init_bootstrap_handoff.cpp`, `phase105_real_log_service_handshake.cpp`, `phase106_real_echo_service_request_reply.cpp`, `phase107_real_user_to_user_capability_transfer.cpp`, `phase108_kernel_image_program_cap_audit.cpp`, `phase109_first_running_kernel_slice_audit.cpp`, `phase110_kernel_ownership_split_audit.cpp`, `phase111_scheduler_lifecycle_ownership_clarification.cpp`, `phase112_syscall_boundary_thinness_audit.cpp`, `phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`, `phase114_address_space_and_mmu_ownership_split.cpp`, `phase115_timer_ownership_hardening.cpp`, `phase116_mmu_activation_barrier_follow_through.cpp`, `phase117_init_orchestrated_multi_service_bring_up.cpp`, `phase118_request_reply_and_delegation_follow_through.cpp`, `phase119_namespace_pressure_audit.cpp`, `phase120_running_system_support_statement.cpp`, `phase121_kernel_image_contract_hardening.cpp`, `phase122_target_surface_audit.cpp`, `phase123_next_plateau_audit.cpp`, `phase124_delegation_chain_stress.cpp`, `phase125_invalidation_and_rejection_audit.cpp`, `phase126_authority_lifetime_classification.cpp`, `phase128_service_death_observation.cpp`, `phase129_partial_failure_propagation.cpp`, `phase130_explicit_restart_or_replacement.cpp`, `phase131_fan_in_or_fan_out_composition.cpp`, `phase132_backpressure_and_blocking.cpp`, `phase133_message_lifetime_and_reuse.cpp`, `phase134_minimal_device_service_handoff.cpp`, `phase135_buffer_ownership_boundary_audit.cpp`, `phase136_device_failure_containment_probe.cpp`, `phase137_optional_dma_or_equivalent_follow_through.cpp`, and `phase140_serial_ingress_composed_service_graph.cpp`: one kernel proof per file
-    - `tests/tool/freestanding/kernel/phase141_interactive_service_system_scope_freeze.cpp`: one kernel proof owner for the bounded shell-owner and key-value-owner scope freeze
-    - `tests/tool/freestanding/kernel/phase142_serial_shell_command_routing.cpp`: one kernel proof owner for the bounded serial-shell command-routing step
-    - `tests/tool/freestanding/kernel/phase143_long_lived_log_service_follow_through.cpp`: one kernel proof owner for the bounded retained-log follow-through step
-    - `tests/tool/freestanding/kernel/phase144_stateful_key_value_service_follow_through.cpp`: one kernel proof owner for the bounded stateful key-value follow-through step
-    - `tests/tool/freestanding/kernel/phase145_service_restart_failure_and_usage_pressure_audit.cpp`: one kernel proof owner for the bounded service restart, failure, and usage-pressure step
-    - `tests/tool/freestanding/kernel/phase146_service_shape_consolidation.cpp`: one kernel proof owner for the bounded service-shape consolidation step
-    - `tests/tool/freestanding/kernel/phase147_ipc_shape_audit_under_real_usage.cpp`: one kernel proof owner for the bounded IPC-shape audit under repeated real usage
-    - late ownership-hardening kernel audits now keep one `.cpp` proof owner plus one adjacent `.mirproj.txt` projected MIR golden; the `.cpp` owns behavior and publication checks while the `.mirproj.txt` owns the expected MIR projection
+    - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator, shard registry, and kernel metadata/doc checks
+    - `tests/tool/freestanding/kernel/shard1.cpp`: shard-owned early freestanding kernel bring-up proofs for phases 85-88 plus a single-build runtime shard for phases 105-106
+    - `tests/tool/freestanding/kernel/shard2.cpp`: single-build runtime shard for phases 107-111, including the image/program-cap relink proof
+    - `tests/tool/freestanding/kernel/shard3.cpp`: single-build runtime shard for phases 112-116
+    - `tests/tool/freestanding/kernel/shard4.cpp`: single-build runtime shard for phases 117-121
+    - `tests/tool/freestanding/kernel/shard5.cpp`: single-build runtime shard for phases 122-126
+    - `tests/tool/freestanding/kernel/shard6.cpp`: single-build runtime shard for phases 128-132
+    - `tests/tool/freestanding/kernel/shard7.cpp`: single-build runtime shard for phases 133-137
+    - `tests/tool/freestanding/kernel/shard8.cpp`: single-build runtime shard for phases 140-142
+    - `tests/tool/freestanding/kernel/shard9.cpp`: single-build runtime shard for phases 143-147
+    - `tests/tool/freestanding/kernel/phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase99_syscall_byte_ipc.cpp`, `phase100_capability_transfer.cpp`, `phase102_timer_sleep.cpp`, `phase103_init_bootstrap_handoff.cpp`, and `phase104_kernel_critique_hardening.cpp`: earlier narrow proof owners that still stand alone outside the late shard layout
+    - late ownership-hardening kernel audits now keep shard-owned behavior checks plus adjacent `.mirproj.txt` projected MIR goldens; publication and phase-note checks live in the separate kernel metadata/doc suite
     - `tests/tool/tool_suite_common.cpp`: `ExpectMirFirstMatchProjectionFile` is the shared helper for those projected MIR goldens
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
@@ -196,4 +198,4 @@ Focused grouped-suite checks that are often enough for tool or workflow work:
 - `ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure`
 - `ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure`
 - `ctest --test-dir build/debug -R mc_tool_real_project_unit --output-on-failure`
-- `ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_case_.*|system)_unit' -j8 --output-on-failure`
+- `ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_(docs|shard[1-9])|system)_unit' -j8 --output-on-failure`

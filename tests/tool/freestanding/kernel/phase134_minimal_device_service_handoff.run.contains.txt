@@ -1,0 +1,1 @@
+PASS phase134_minimal_device_service_handoff

@@ -4,6 +4,7 @@
 #include <sstream>
 #include <vector>
 
+#include "compiler/support/target.h"
 #include "tests/support/process_utils.h"
 
 namespace mc::tool_tests {
@@ -48,6 +49,11 @@ FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::files
     };
 }
 
+std::filesystem::path ResolveFreestandingKernelGoldenPath(const std::filesystem::path& source_root,
+                                                          std::string_view file_name) {
+    return source_root / "tests" / "tool" / "freestanding" / "kernel" / std::string(file_name);
+}
+
 std::filesystem::path ResolveCanopusRoadmapPath(const std::filesystem::path& source_root,
                                                 int phase_number) {
     const std::filesystem::path admin_root = source_root / "docs" / "plan" / "admin";
@@ -69,6 +75,84 @@ void MaybeCleanBuildDir(const std::filesystem::path& build_dir) {
         return;
     }
     std::filesystem::remove_all(build_dir);
+}
+
+FreestandingKernelRunArtifacts BuildAndRunFreestandingKernelTarget(const std::filesystem::path& mc_path,
+                                                                  const std::filesystem::path& project_path,
+                                                                  const std::filesystem::path& main_source_path,
+                                                                  const std::filesystem::path& build_dir,
+                                                                  std::string_view output_stem,
+                                                                  const std::string& build_context,
+                                                                  const std::string& run_context) {
+    MaybeCleanBuildDir(build_dir);
+
+    const std::string output_stem_text(output_stem);
+    const auto [build_outcome, build_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                  "build",
+                                                                  "--project",
+                                                                  project_path.generic_string(),
+                                                                  "--target",
+                                                                  "kernel",
+                                                                  "--build-dir",
+                                                                  build_dir.generic_string(),
+                                                                  "--dump-mir"},
+                                                                 build_dir / (output_stem_text + "_build_output.txt"),
+                                                                 build_context);
+    if (!build_outcome.exited || build_outcome.exit_code != 0) {
+        Fail(build_context + " should succeed:\n" + build_output);
+    }
+
+    const auto build_targets = mc::support::ComputeBuildArtifactTargets(main_source_path, build_dir);
+    const auto dump_targets = mc::support::ComputeDumpTargets(main_source_path, build_dir);
+    const auto [run_outcome, run_output] = RunCommandCapture({build_targets.executable.generic_string()},
+                                                             build_dir / (output_stem_text + "_run_output.txt"),
+                                                             run_context);
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail(run_context + " should succeed:\n" + run_output);
+    }
+
+    return {
+        .build_dir = build_dir,
+        .build_targets = build_targets,
+        .dump_targets = dump_targets,
+        .run_output = run_output,
+    };
+}
+
+void CompileBootstrapCObjectAndExpectSuccess(const std::filesystem::path& source_path,
+                                             const std::filesystem::path& object_path,
+                                             const std::filesystem::path& output_path,
+                                             const std::string& context) {
+    const auto [outcome, output] = RunCommandCapture({"xcrun",
+                                                      "clang",
+                                                      "-target",
+                                                      std::string(mc::kBootstrapTriple),
+                                                      "-c",
+                                                      source_path.generic_string(),
+                                                      "-o",
+                                                      object_path.generic_string()},
+                                                     output_path,
+                                                     context);
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail(context + " should pass:\n" + output);
+    }
+}
+
+void LinkBootstrapObjectsAndExpectSuccess(const std::vector<std::filesystem::path>& object_paths,
+                                          const std::filesystem::path& executable_path,
+                                          const std::filesystem::path& output_path,
+                                          const std::string& context) {
+    std::vector<std::string> args{"xcrun", "clang", "-target", std::string(mc::kBootstrapTriple)};
+    for (const auto& object_path : object_paths) {
+        args.push_back(object_path.generic_string());
+    }
+    args.push_back("-o");
+    args.push_back(executable_path.generic_string());
+
+    const auto [outcome, output] = RunCommandCapture(args, output_path, context);
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail(context + " should succeed:\n" + output);
+    }
 }
 
 std::filesystem::path ResolvePlanDocPath(const std::filesystem::path& source_root,
@@ -420,6 +504,16 @@ void ExpectMirFirstMatchProjection(std::string_view mir_text,
                                    std::initializer_list<std::string_view> selectors,
                                    std::string_view expected_projection,
                                    const std::string& context) {
+    ExpectMirFirstMatchProjectionSpan(mir_text,
+                                      std::span<const std::string_view>(selectors.begin(), selectors.size()),
+                                      expected_projection,
+                                      context);
+}
+
+void ExpectMirFirstMatchProjectionSpan(std::string_view mir_text,
+                                       std::span<const std::string_view> selectors,
+                                       std::string_view expected_projection,
+                                       const std::string& context) {
     const auto lines = SplitLines(mir_text);
 
     std::string actual_projection;
@@ -450,14 +544,72 @@ void ExpectMirFirstMatchProjection(std::string_view mir_text,
     }
 }
 
+void ExpectTextContainsLines(std::string_view actual_text,
+                             std::string_view expected_lines,
+                             const std::string& context) {
+    for (auto expected_line : SplitLines(expected_lines)) {
+        if (!expected_line.empty() && expected_line.back() == '\r') {
+            expected_line.pop_back();
+        }
+        if (expected_line.empty()) {
+            continue;
+        }
+        if (actual_text.find(expected_line) == std::string::npos) {
+            Fail(context + " missing expected text line: " + expected_line);
+        }
+    }
+}
+
+void ExpectTextContainsLinesFile(std::string_view actual_text,
+                                 const std::filesystem::path& expected_lines_path,
+                                 const std::string& context) {
+    ExpectTextContainsLines(actual_text,
+                            ReadFile(expected_lines_path),
+                            context + " golden=" + expected_lines_path.generic_string());
+}
+
 void ExpectMirFirstMatchProjectionFile(std::string_view mir_text,
                                        std::initializer_list<std::string_view> selectors,
                                        const std::filesystem::path& expected_projection_path,
                                        const std::string& context) {
-    ExpectMirFirstMatchProjection(mir_text,
-                                  selectors,
-                                  ReadFile(expected_projection_path),
-                                  context + " golden=" + expected_projection_path.generic_string());
+    ExpectMirFirstMatchProjectionFileSpan(mir_text,
+                                          std::span<const std::string_view>(selectors.begin(), selectors.size()),
+                                          expected_projection_path,
+                                          context);
+}
+
+void ExpectMirFirstMatchProjectionFileSpan(std::string_view mir_text,
+                                           std::span<const std::string_view> selectors,
+                                           const std::filesystem::path& expected_projection_path,
+                                           const std::string& context) {
+    ExpectMirFirstMatchProjectionSpan(mir_text,
+                                      selectors,
+                                      ReadFile(expected_projection_path),
+                                      context + " golden=" + expected_projection_path.generic_string());
+}
+
+void ExpectFreestandingKernelPhaseFromArtifacts(const std::filesystem::path& source_root,
+                                                const std::filesystem::path& object_dir,
+                                                std::string_view run_output,
+                                                std::string_view mir_text,
+                                                const FreestandingKernelPhaseCheck& phase_check) {
+    const std::string label(phase_check.label);
+    ExpectTextContainsLinesFile(run_output,
+                                ResolveFreestandingKernelGoldenPath(source_root,
+                                                                    phase_check.expected_run_lines_file),
+                                label + " run");
+
+    for (const auto object_name : phase_check.required_object_files) {
+        if (!std::filesystem::exists(object_dir / std::string(object_name))) {
+            Fail(label + " missing required object artifact: " + std::string(object_name));
+        }
+    }
+
+    ExpectMirFirstMatchProjectionFileSpan(mir_text,
+                                          phase_check.mir_selectors,
+                                          ResolveFreestandingKernelGoldenPath(source_root,
+                                                                              phase_check.expected_mir_projection_file),
+                                          label + " MIR");
 }
 
 }  // namespace mc::tool_tests

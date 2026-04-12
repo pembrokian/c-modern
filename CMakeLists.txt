@@ -149,50 +149,15 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/tool_freestanding_tests.cpp
     tests/tool/tool_suite_common.cpp
     tests/tool/freestanding/bootstrap/suite.cpp
-    tests/tool/freestanding/kernel/phase85_endpoint_queue.cpp
-    tests/tool/freestanding/kernel/phase86_task_lifecycle.cpp
-    tests/tool/freestanding/kernel/phase87_static_data.cpp
-    tests/tool/freestanding/kernel/phase88_build_integration.cpp
-    tests/tool/freestanding/kernel/phase105_real_log_service_handshake.cpp
-    tests/tool/freestanding/kernel/phase106_real_echo_service_request_reply.cpp
-    tests/tool/freestanding/kernel/phase107_real_user_to_user_capability_transfer.cpp
-    tests/tool/freestanding/kernel/phase108_kernel_image_program_cap_audit.cpp
-    tests/tool/freestanding/kernel/phase109_first_running_kernel_slice_audit.cpp
-    tests/tool/freestanding/kernel/phase110_kernel_ownership_split_audit.cpp
-    tests/tool/freestanding/kernel/phase111_scheduler_lifecycle_ownership_clarification.cpp
-    tests/tool/freestanding/kernel/phase112_syscall_boundary_thinness_audit.cpp
-    tests/tool/freestanding/kernel/phase113_interrupt_entry_and_generic_dispatch_boundary.cpp
-    tests/tool/freestanding/kernel/phase114_address_space_and_mmu_ownership_split.cpp
-    tests/tool/freestanding/kernel/phase115_timer_ownership_hardening.cpp
-    tests/tool/freestanding/kernel/phase116_mmu_activation_barrier_follow_through.cpp
-    tests/tool/freestanding/kernel/phase117_init_orchestrated_multi_service_bring_up.cpp
-    tests/tool/freestanding/kernel/phase118_request_reply_and_delegation_follow_through.cpp
-    tests/tool/freestanding/kernel/phase119_namespace_pressure_audit.cpp
-    tests/tool/freestanding/kernel/phase120_running_system_support_statement.cpp
-    tests/tool/freestanding/kernel/phase121_kernel_image_contract_hardening.cpp
-    tests/tool/freestanding/kernel/phase122_target_surface_audit.cpp
-    tests/tool/freestanding/kernel/phase123_next_plateau_audit.cpp
-    tests/tool/freestanding/kernel/phase124_delegation_chain_stress.cpp
-    tests/tool/freestanding/kernel/phase125_invalidation_and_rejection_audit.cpp
-    tests/tool/freestanding/kernel/phase126_authority_lifetime_classification.cpp
-    tests/tool/freestanding/kernel/phase128_service_death_observation.cpp
-    tests/tool/freestanding/kernel/phase129_partial_failure_propagation.cpp
-    tests/tool/freestanding/kernel/phase130_explicit_restart_or_replacement.cpp
-    tests/tool/freestanding/kernel/phase131_fan_in_or_fan_out_composition.cpp
-    tests/tool/freestanding/kernel/phase132_backpressure_and_blocking.cpp
-    tests/tool/freestanding/kernel/phase133_message_lifetime_and_reuse.cpp
-    tests/tool/freestanding/kernel/phase134_minimal_device_service_handoff.cpp
-    tests/tool/freestanding/kernel/phase135_buffer_ownership_boundary_audit.cpp
-    tests/tool/freestanding/kernel/phase136_device_failure_containment_probe.cpp
-    tests/tool/freestanding/kernel/phase137_optional_dma_or_equivalent_follow_through.cpp
-    tests/tool/freestanding/kernel/phase140_serial_ingress_composed_service_graph.cpp
-    tests/tool/freestanding/kernel/phase141_interactive_service_system_scope_freeze.cpp
-    tests/tool/freestanding/kernel/phase142_serial_shell_command_routing.cpp
-    tests/tool/freestanding/kernel/phase143_long_lived_log_service_follow_through.cpp
-    tests/tool/freestanding/kernel/phase144_stateful_key_value_service_follow_through.cpp
-    tests/tool/freestanding/kernel/phase145_service_restart_failure_and_usage_pressure_audit.cpp
-    tests/tool/freestanding/kernel/phase146_service_shape_consolidation.cpp
-    tests/tool/freestanding/kernel/phase147_ipc_shape_audit_under_real_usage.cpp
+    tests/tool/freestanding/kernel/shard1.cpp
+    tests/tool/freestanding/kernel/shard2.cpp
+    tests/tool/freestanding/kernel/shard3.cpp
+    tests/tool/freestanding/kernel/shard4.cpp
+    tests/tool/freestanding/kernel/shard5.cpp
+    tests/tool/freestanding/kernel/shard6.cpp
+    tests/tool/freestanding/kernel/shard7.cpp
+    tests/tool/freestanding/kernel/shard8.cpp
+    tests/tool/freestanding/kernel/shard9.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -272,58 +237,7 @@ add_test(NAME mc_tool_freestanding_kernel_shard6_unit COMMAND mc_tool_freestandi
 add_test(NAME mc_tool_freestanding_kernel_shard7_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-7)
 add_test(NAME mc_tool_freestanding_kernel_shard8_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-8)
 add_test(NAME mc_tool_freestanding_kernel_shard9_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-9)
-
-set(MC_FREESTANDING_KERNEL_CASES
-    phase85_endpoint_queue
-    phase86_task_lifecycle
-    phase87_static_data
-    phase88_build_integration
-    phase105_real_log_service_handshake
-    phase106_real_echo_service_request_reply
-    phase107_real_user_to_user_capability_transfer
-    phase108_kernel_image_program_cap_audit
-    phase109_first_running_kernel_slice_audit
-    phase110_kernel_ownership_split_audit
-    phase111_scheduler_lifecycle_ownership_clarification
-    phase112_syscall_boundary_thinness_audit
-    phase113_interrupt_entry_and_generic_dispatch_boundary
-    phase114_address_space_and_mmu_ownership_split
-    phase115_timer_ownership_hardening
-    phase116_mmu_activation_barrier_follow_through
-    phase117_init_orchestrated_multi_service_bring_up
-    phase118_request_reply_and_delegation_follow_through
-    phase119_namespace_pressure_audit
-    phase120_running_system_support_statement
-    phase121_kernel_image_contract_hardening
-    phase122_target_surface_audit
-    phase123_next_plateau_audit
-    phase124_delegation_chain_stress
-    phase125_invalidation_and_rejection_audit
-    phase126_authority_lifetime_classification
-    phase128_service_death_observation
-    phase129_partial_failure_propagation
-    phase130_explicit_restart_or_replacement
-    phase131_fan_in_or_fan_out_composition
-    phase132_backpressure_and_blocking
-    phase133_message_lifetime_and_reuse
-    phase134_minimal_device_service_handoff
-    phase135_buffer_ownership_boundary_audit
-    phase136_device_failure_containment_probe
-    phase137_optional_dma_or_equivalent_follow_through
-    phase140_serial_ingress_composed_service_graph
-    phase141_interactive_service_system_scope_freeze
-    phase142_serial_shell_command_routing
-    phase143_long_lived_log_service_follow_through
-    phase144_stateful_key_value_service_follow_through
-    phase145_service_restart_failure_and_usage_pressure_audit
-    phase146_service_shape_consolidation
-    phase147_ipc_shape_audit_under_real_usage
-)
-
-foreach(kernel_case IN LISTS MC_FREESTANDING_KERNEL_CASES)
-    add_test(NAME mc_tool_freestanding_kernel_case_${kernel_case}_unit
-             COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-case:${kernel_case})
-endforeach()
+add_test(NAME mc_tool_freestanding_kernel_docs_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-docs)
 
 add_test(NAME mc_tool_freestanding_system_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} system)
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})

@@ -1,0 +1,12 @@
+TypeDecl kind=struct name=init.BootstrapCapabilitySet
+TypeDecl kind=struct name=init.BootstrapHandoffObservation
+VarGlobal names=[INIT_BOOTSTRAP_CAPS] type=init.BootstrapCapabilitySet
+VarGlobal names=[INIT_BOOTSTRAP_HANDOFF] type=init.BootstrapHandoffObservation
+Function name=handoff_init_bootstrap_capability_set returns=[bool]
+Function name=validate_init_bootstrap_capability_handoff returns=[bool]
+Function name=init.install_bootstrap_capability_set returns=[init.BootstrapCapabilitySet]
+Function name=init.observe_bootstrap_handoff returns=[init.BootstrapHandoffObservation]
+store_target target=INIT_BOOTSTRAP_CAPS target_kind=global target_name=INIT_BOOTSTRAP_CAPS
+store_target target=INIT_BOOTSTRAP_HANDOFF target_kind=global target_name=INIT_BOOTSTRAP_HANDOFF
+aggregate_init %v
+variant_match

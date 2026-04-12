@@ -1,0 +1,5 @@
+PASS phase107_real_user_to_user_capability_transfer
+PASS phase108_kernel_image_program_cap_audit
+PASS phase109_first_running_kernel_slice_audit
+PASS phase110_kernel_ownership_split_audit
+PASS phase111_scheduler_lifecycle_ownership_clarification

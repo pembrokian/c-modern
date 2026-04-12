@@ -45,46 +45,10 @@ void RunFreestandingKernelPhase100CapabilityTransfer(const std::filesystem::path
              run_output);
     }
 
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=syscall.SendRequest",
-                         "phase100 merged MIR should preserve the widened send-request type");
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=syscall.ReceiveObservation",
-                         "phase100 merged MIR should preserve the widened receive-observation type");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[ATTACHED_RECEIVE_OBSERVATION] type=syscall.ReceiveObservation",
-                         "phase100 merged MIR should retain the attached-handle receive observation global");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[TRANSFERRED_HANDLE_USE_OBSERVATION] type=syscall.ReceiveObservation",
-                         "phase100 merged MIR should retain the transferred-handle follow-through observation global");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=execute_capability_carrying_ipc_transfer returns=[bool]",
-                         "phase100 merged MIR should keep explicit capability-carrying IPC execution in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=seed_transfer_endpoint_handle returns=[bool]",
-                         "phase100 merged MIR should keep explicit transferable-endpoint seeding in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=capability.remove_handle returns=[capability.HandleTable]",
-                         "phase100 merged MIR should keep sender-side handle removal inside the capability helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=syscall.build_transfer_send_request returns=[syscall.SendRequest]",
-                         "phase100 merged MIR should keep attached-handle send construction inside the syscall helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=syscall.build_transfer_receive_request returns=[syscall.ReceiveRequest]",
-                         "phase100 merged MIR should keep attached-handle receive construction inside the syscall helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=HANDLE_TABLES target_kind=global target_name=HANDLE_TABLES",
-                         "phase100 merged MIR should lower handle-table updates as global targets during transfer send and receive");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=ATTACHED_RECEIVE_OBSERVATION target_kind=global target_name=ATTACHED_RECEIVE_OBSERVATION",
-                         "phase100 merged MIR should lower attached-handle observations as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "aggregate_init %v",
-                         "phase100 merged MIR should use aggregate initialization for transfer requests and observations");
-    ExpectOutputContains(kernel_mir,
-                         "variant_match",
-                         "phase100 merged MIR should lower attached-handle status classification through ordinary enum matching");
+    ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
+                                ResolveFreestandingKernelGoldenPath(source_root,
+                                                                    "phase100_capability_transfer.mir.contains.txt"),
+                                "phase100 merged MIR should preserve the capability-transfer proof slice");
 }
 
 }  // namespace mc::tool_tests

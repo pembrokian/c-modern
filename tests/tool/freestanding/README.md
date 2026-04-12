@@ -48,22 +48,15 @@ Structure
   - `phase135_buffer_ownership_boundary_audit.cpp`: real-kernel bounded UART receive-frame ownership-boundary audit.
   - `phase136_device_failure_containment_probe.cpp`: real-kernel bounded UART device-failure containment audit.
   - `phase137_optional_dma_or_equivalent_follow_through.cpp`: real-kernel bounded optional completion-backed UART receive follow-through audit.
-  - `phase140_serial_ingress_composed_service_graph.cpp`: real-kernel bounded serial-ingress composed service-graph audit.
-  - `phase141_interactive_service_system_scope_freeze.cpp`: real-kernel bounded shell-owner and key-value-owner scope-freeze audit.
-  - `phase142_serial_shell_command_routing.cpp`: real-kernel bounded serial shell command-routing audit.
-  - `phase143_long_lived_log_service_follow_through.cpp`: real-kernel bounded long-lived log-service follow-through audit.
-  - `phase144_stateful_key_value_service_follow_through.cpp`: real-kernel bounded stateful key-value service follow-through audit.
-  - `phase145_service_restart_failure_and_usage_pressure_audit.cpp`: real-kernel bounded service restart, failure, and usage pressure audit.
-  - `phase146_service_shape_consolidation.cpp`: real-kernel bounded service-shape consolidation audit.
-  - `phase147_ipc_shape_audit_under_real_usage.cpp`: real-kernel bounded IPC-shape audit under repeated real usage.
+  - `shard8.cpp`: real-kernel bounded serial-ingress, shell-scope, and shell-command-routing runtime shard for phases 140-142.
+  - `shard9.cpp`: real-kernel bounded retained-log, stateful key-value, restart-pressure, service-shape, and IPC-shape runtime shard for phases 143-147.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 
 Late kernel audit pattern
 
-- For ownership-hardening kernel audits, keep one proof owner `.cpp` per phase.
-- Split those phase owners into three local slices when practical:
-  behavior, publication, and MIR structure.
+- For ownership-hardening kernel audits, keep one shard owner `.cpp` per late runtime slice plus adjacent `.mirproj.txt` files for projected MIR expectations.
+- Keep phase-note, roadmap, and repo-map assertions in the separate kernel metadata/doc suite rather than in the runtime shard itself.
 - Keep behavior assertions in C++ over the built artifact and emitted objects.
 - Keep publication assertions in C++ over the phase note, README, repo map,
   and other intentionally published status files.

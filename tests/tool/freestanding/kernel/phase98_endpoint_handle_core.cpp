@@ -45,46 +45,10 @@ void RunFreestandingKernelPhase98EndpointHandleCore(const std::filesystem::path&
              run_output);
     }
 
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=capability.HandleTable",
-                         "phase98 merged MIR should preserve the imported handle-table type");
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=endpoint.KernelMessage",
-                         "phase98 merged MIR should preserve the imported kernel-message type");
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=endpoint.EndpointSlot",
-                         "phase98 merged MIR should preserve the imported endpoint-slot type");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[HANDLE_TABLES] type=[2]capability.HandleTable",
-                         "phase98 merged MIR should retain the mutable per-process handle tables global");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[DELIVERED_MESSAGE] type=endpoint.KernelMessage",
-                         "phase98 merged MIR should retain the delivered-message global");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=bootstrap_endpoint_handle_core",
-                         "phase98 merged MIR should keep explicit endpoint and handle-core construction in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=endpoint.install_endpoint returns=[endpoint.EndpointTable]",
-                         "phase98 merged MIR should keep endpoint installation inside the endpoint helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=capability.install_endpoint_handle returns=[capability.HandleTable]",
-                         "phase98 merged MIR should keep handle installation inside the capability helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=HANDLE_TABLES target_kind=global target_name=HANDLE_TABLES",
-                         "phase98 merged MIR should lower handle-table writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=ENDPOINTS target_kind=global target_name=ENDPOINTS",
-                         "phase98 merged MIR should lower endpoint-table writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=DELIVERED_MESSAGE target_kind=global target_name=DELIVERED_MESSAGE",
-                         "phase98 merged MIR should lower delivered-message writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "aggregate_init %v",
-                         "phase98 merged MIR should use aggregate initialization for handle-table and message records");
-    ExpectOutputContains(kernel_mir,
-                         "variant_match",
-                         "phase98 merged MIR should lower endpoint and handle classification through ordinary enum matching");
+    ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
+                                ResolveFreestandingKernelGoldenPath(source_root,
+                                                                    "phase98_endpoint_handle_core.mir.contains.txt"),
+                                "phase98 merged MIR should preserve the endpoint-handle-core proof slice");
 }
 
 }  // namespace mc::tool_tests

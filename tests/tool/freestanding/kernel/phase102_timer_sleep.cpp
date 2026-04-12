@@ -45,46 +45,10 @@ void RunFreestandingKernelPhase102TimerSleep(const std::filesystem::path& source
              run_output);
     }
 
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=syscall.SleepRequest",
-                         "phase102 merged MIR should preserve the imported sleep-request type");
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=syscall.SleepObservation",
-                         "phase102 merged MIR should preserve the imported sleep-observation type");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[SLEEP_OBSERVATION] type=syscall.SleepObservation",
-                         "phase102 merged MIR should retain the sleep observation global");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[TIMER_WAKE_OBSERVATION] type=timer.TimerWakeObservation",
-                         "phase102 merged MIR should retain the timer wake observation global");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[TIMER_STATE] type=timer.TimerState",
-                         "phase102 merged MIR should retain the timer state global");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=execute_program_cap_spawn_and_wait returns=[bool]",
-                         "phase102 merged MIR should keep timer-backed child execution in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=validate_program_cap_spawn_and_wait returns=[bool]",
-                         "phase102 merged MIR should keep timer-backed validation in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=syscall.perform_sleep returns=[syscall.SleepResult]",
-                         "phase102 merged MIR should keep sleep observation inside the syscall helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=timer.arm_sleep returns=[timer.TimerState]",
-                         "phase102 merged MIR should keep timer arming inside the timer helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=timer.wake_fired_sleepers returns=[timer.TimerWakeResult]",
-                         "phase102 merged MIR should keep timer wake delivery inside the timer helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=TIMER_STATE target_kind=global target_name=TIMER_STATE",
-                         "phase102 merged MIR should lower timer-state updates as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "aggregate_init %v",
-                         "phase102 merged MIR should use aggregate initialization for sleep and wake records");
-    ExpectOutputContains(kernel_mir,
-                         "variant_match",
-                         "phase102 merged MIR should lower sleep and wake status classification through ordinary enum matching");
+    ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
+                                ResolveFreestandingKernelGoldenPath(source_root,
+                                                                    "phase102_timer_sleep.mir.contains.txt"),
+                                "phase102 merged MIR should preserve the timer-sleep proof slice");
 }
 
 }  // namespace mc::tool_tests

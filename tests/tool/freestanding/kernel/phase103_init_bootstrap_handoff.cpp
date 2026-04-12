@@ -45,43 +45,10 @@ void RunFreestandingKernelPhase103InitBootstrapHandoff(const std::filesystem::pa
              run_output);
     }
 
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=init.BootstrapCapabilitySet",
-                         "phase103 merged MIR should preserve the imported bootstrap-capability-set type");
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=init.BootstrapHandoffObservation",
-                         "phase103 merged MIR should preserve the imported bootstrap-handoff observation type");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[INIT_BOOTSTRAP_CAPS] type=init.BootstrapCapabilitySet",
-                         "phase103 merged MIR should retain the init bootstrap capability-set global");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[INIT_BOOTSTRAP_HANDOFF] type=init.BootstrapHandoffObservation",
-                         "phase103 merged MIR should retain the init bootstrap-handoff observation global");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=handoff_init_bootstrap_capability_set returns=[bool]",
-                         "phase103 merged MIR should keep explicit bootstrap-cap handoff in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=validate_init_bootstrap_capability_handoff returns=[bool]",
-                         "phase103 merged MIR should keep bootstrap-cap validation in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=init.install_bootstrap_capability_set returns=[init.BootstrapCapabilitySet]",
-                         "phase103 merged MIR should keep bootstrap-cap installation inside the init helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=init.observe_bootstrap_handoff returns=[init.BootstrapHandoffObservation]",
-                         "phase103 merged MIR should keep handoff observation construction inside the init helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=INIT_BOOTSTRAP_CAPS target_kind=global target_name=INIT_BOOTSTRAP_CAPS",
-                         "phase103 merged MIR should lower bootstrap-capability-set writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=INIT_BOOTSTRAP_HANDOFF target_kind=global target_name=INIT_BOOTSTRAP_HANDOFF",
-                         "phase103 merged MIR should lower bootstrap-handoff writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "aggregate_init %v",
-                         "phase103 merged MIR should use aggregate initialization for bootstrap handoff records");
-    ExpectOutputContains(kernel_mir,
-                         "variant_match",
-                         "phase103 merged MIR should lower bootstrap program-cap classification through ordinary enum matching");
+    ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
+                                ResolveFreestandingKernelGoldenPath(source_root,
+                                                                    "phase103_init_bootstrap_handoff.mir.contains.txt"),
+                                "phase103 merged MIR should preserve the init-bootstrap-handoff proof slice");
 }
 
 }  // namespace mc::tool_tests

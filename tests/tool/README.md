@@ -55,14 +55,9 @@ Current structure
       `kernel/phase135_buffer_ownership_boundary_audit.cpp`, and
       `kernel/phase136_device_failure_containment_probe.cpp`, and
       `kernel/phase137_optional_dma_or_equivalent_follow_through.cpp`, and
-      `kernel/phase140_serial_ingress_composed_service_graph.cpp`, and
-      `kernel/phase141_interactive_service_system_scope_freeze.cpp`, and
-      `kernel/phase142_serial_shell_command_routing.cpp`, and
-      `kernel/phase143_long_lived_log_service_follow_through.cpp`, and
-      `kernel/phase144_stateful_key_value_service_follow_through.cpp`, and
-      `kernel/phase145_service_restart_failure_and_usage_pressure_audit.cpp`, and
-      `kernel/phase146_service_shape_consolidation.cpp`, and
-      `kernel/phase147_ipc_shape_audit_under_real_usage.cpp`: one kernel proof per file.
+      `kernel/shard4.cpp`, `kernel/shard5.cpp`, `kernel/shard6.cpp`,
+      `kernel/shard7.cpp`, `kernel/shard8.cpp`, and `kernel/shard9.cpp`:
+      shard-owned late kernel runtime proofs with one build/run per shard.
   - late ownership-hardening kernel audits also keep adjacent `.mirproj.txt`
     files for projected MIR golden expectations.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-
@@ -83,9 +78,8 @@ Layout rule
 Validation rule
 
 - During focused iteration, run the narrowest owning tool test target.
-- For freestanding or Canopus-facing changes, prefer the narrowest owning freestanding slice first: `mc_tool_freestanding_bootstrap_unit`, the owning per-case kernel proof `mc_tool_freestanding_kernel_case_<name>_unit`, or `mc_tool_freestanding_system_unit`.
-- For targeted kernel timing or one-proof debugging, run the freestanding test binary directly with a case selector such as `build/debug/bin/mc_tool_freestanding_tests /Users/ro/dev/c_modern /Users/ro/dev/c_modern/build/debug 'kernel-case:phase85_endpoint_queue'`.
-  The equivalent CTest entrypoint is `mc_tool_freestanding_kernel_case_phase85_endpoint_queue_unit`.
-  first.
+- For freestanding or Canopus-facing changes, prefer the narrowest owning freestanding slice first: `mc_tool_freestanding_bootstrap_unit`, the owning kernel shard unit such as `mc_tool_freestanding_kernel_shard2_unit`, `mc_tool_freestanding_kernel_docs_unit` for phase-note and repo-map checks, or `mc_tool_freestanding_system_unit`.
+- For targeted kernel timing or one-proof debugging, run the freestanding test binary directly with a shard selector such as `build/debug/bin/mc_tool_freestanding_tests /Users/ro/dev/c_modern /Users/ro/dev/c_modern/build/debug kernel-2`.
+  The direct case selector `kernel-case:<name>` still exists for local debugging, but shard CTests are the canonical runtime surface.
 - For cross-cutting driver or build changes, rerun the broader tool suite set
   before closing the change.

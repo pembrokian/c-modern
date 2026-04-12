@@ -45,46 +45,10 @@ void RunFreestandingKernelPhase99SyscallByteIpc(const std::filesystem::path& sou
              run_output);
     }
 
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=syscall.SendRequest",
-                         "phase99 merged MIR should preserve the imported send-request type");
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=syscall.ReceiveObservation",
-                         "phase99 merged MIR should preserve the imported receive-observation type");
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=syscall.SendResult",
-                         "phase99 merged MIR should preserve the imported send-result type");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[RECEIVE_OBSERVATION] type=syscall.ReceiveObservation",
-                         "phase99 merged MIR should retain the syscall receive-observation global");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[SYSCALL_GATE] type=syscall.SyscallGate",
-                         "phase99 merged MIR should retain the widened syscall-gate global");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=execute_syscall_byte_ipc returns=[bool]",
-                         "phase99 merged MIR should keep explicit syscall-byte-ipc execution in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=syscall.perform_send returns=[syscall.SendResult]",
-                         "phase99 merged MIR should keep byte-only send inside the syscall helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=syscall.perform_receive returns=[syscall.ReceiveResult]",
-                         "phase99 merged MIR should keep byte-only receive inside the syscall helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=SYSCALL_GATE target_kind=global target_name=SYSCALL_GATE",
-                         "phase99 merged MIR should lower syscall-gate writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=RECEIVE_OBSERVATION target_kind=global target_name=RECEIVE_OBSERVATION",
-                         "phase99 merged MIR should lower receive-observation writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=ENDPOINTS target_kind=global target_name=ENDPOINTS",
-                         "phase99 merged MIR should lower endpoint-table writes as global targets during syscall send and receive");
-    ExpectOutputContains(kernel_mir,
-                         "aggregate_init %v",
-                         "phase99 merged MIR should use aggregate initialization for syscall requests and observations");
-    ExpectOutputContains(kernel_mir,
-                         "variant_match",
-                         "phase99 merged MIR should lower syscall status classification through ordinary enum matching");
+    ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
+                                ResolveFreestandingKernelGoldenPath(source_root,
+                                                                    "phase99_syscall_byte_ipc.mir.contains.txt"),
+                                "phase99 merged MIR should preserve the syscall-byte-ipc proof slice");
 }
 
 }  // namespace mc::tool_tests

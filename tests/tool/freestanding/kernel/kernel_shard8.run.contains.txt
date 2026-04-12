@@ -1,0 +1,3 @@
+PASS phase140_serial_ingress_composed_service_graph
+PASS phase141_interactive_service_system_scope_freeze
+PASS phase142_serial_shell_command_routing

@@ -45,46 +45,10 @@ void RunFreestandingKernelPhase97UserEntryProof(const std::filesystem::path& sou
              run_output);
     }
 
-    const std::string kernel_mir = ReadFile(dump_targets.mir);
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=address_space.AddressSpace",
-                         "phase97 merged MIR should preserve the imported address-space type");
-    ExpectOutputContains(kernel_mir,
-                         "TypeDecl kind=struct name=address_space.UserEntryFrame",
-                         "phase97 merged MIR should preserve the imported user-entry frame type");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[ADDRESS_SPACE] type=address_space.AddressSpace",
-                         "phase97 merged MIR should retain the mutable address-space global");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[USER_FRAME] type=address_space.UserEntryFrame",
-                         "phase97 merged MIR should retain the mutable user-entry frame global");
-    ExpectOutputContains(kernel_mir,
-                         "VarGlobal names=[INIT_PROGRAM_CAPABILITY] type=capability.CapabilitySlot",
-                         "phase97 merged MIR should retain the mutable init-program capability global");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=construct_first_user_address_space",
-                         "phase97 merged MIR should keep explicit first-user address-space construction in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=transfer_to_first_user_entry returns=[bool]",
-                         "phase97 merged MIR should keep explicit first-user transfer in the root proof module");
-    ExpectOutputContains(kernel_mir,
-                         "Function name=address_space.bootstrap_space returns=[address_space.AddressSpace]",
-                         "phase97 merged MIR should keep address-space shaping inside an ordinary helper boundary");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=ADDRESS_SPACE target_kind=global target_name=ADDRESS_SPACE",
-                         "phase97 merged MIR should lower address-space writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=USER_FRAME target_kind=global target_name=USER_FRAME",
-                         "phase97 merged MIR should lower user-entry frame writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "store_target target=INIT_PROGRAM_CAPABILITY target_kind=global target_name=INIT_PROGRAM_CAPABILITY",
-                         "phase97 merged MIR should lower init-program capability writes as global targets");
-    ExpectOutputContains(kernel_mir,
-                         "aggregate_init %v",
-                         "phase97 merged MIR should use aggregate initialization for the address-space and entry-state records");
-    ExpectOutputContains(kernel_mir,
-                         "variant_match",
-                         "phase97 merged MIR should lower address-space and state classification through ordinary enum matching");
+    ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
+                                ResolveFreestandingKernelGoldenPath(source_root,
+                                                                    "phase97_user_entry.mir.contains.txt"),
+                                "phase97 merged MIR should preserve the user-entry proof slice");
 }
 
 }  // namespace mc::tool_tests

@@ -1,0 +1,5 @@
+PASS phase117_init_orchestrated_multi_service_bring_up
+PASS phase118_request_reply_and_delegation_follow_through
+PASS phase119_namespace_pressure_audit
+PASS phase120_running_system_support_statement
+PASS phase121_kernel_image_contract_hardening

@@ -1,0 +1,13 @@
+TypeDecl kind=struct name=capability.HandleTable
+TypeDecl kind=struct name=endpoint.KernelMessage
+TypeDecl kind=struct name=endpoint.EndpointSlot
+VarGlobal names=[HANDLE_TABLES] type=[2]capability.HandleTable
+VarGlobal names=[DELIVERED_MESSAGE] type=endpoint.KernelMessage
+Function name=bootstrap_endpoint_handle_core
+Function name=endpoint.install_endpoint returns=[endpoint.EndpointTable]
+Function name=capability.install_endpoint_handle returns=[capability.HandleTable]
+store_target target=HANDLE_TABLES target_kind=global target_name=HANDLE_TABLES
+store_target target=ENDPOINTS target_kind=global target_name=ENDPOINTS
+store_target target=DELIVERED_MESSAGE target_kind=global target_name=DELIVERED_MESSAGE
+aggregate_init %v
+variant_match

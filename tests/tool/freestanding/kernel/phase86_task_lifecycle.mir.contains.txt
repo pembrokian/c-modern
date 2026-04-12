@@ -1,0 +1,5 @@
+TypeDecl kind=enum name=TaskState
+TypeDecl kind=struct name=Task
+TypeDecl kind=struct name=Kernel
+aggregate_init %v
+Function name=state_score returns=[i32]

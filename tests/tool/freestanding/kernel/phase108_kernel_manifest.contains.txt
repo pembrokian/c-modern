@@ -1,0 +1,6 @@
+kind = "exe"
+package = "kernel"
+root = "src/main.mc"
+env = "freestanding"
+target = "arm64-apple-darwin25.4.0"
+startup = "bootstrap_main"

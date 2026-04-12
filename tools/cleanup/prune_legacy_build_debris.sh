@@ -79,9 +79,6 @@ is_preserved_entry() {
     .cmake|CMakeCache.txt|CMakeFiles|CTestTestfile.cmake|Makefile|Testing|cmake_install.cmake|compile_commands.json|audit|bin|build|cmake-debug|codegen|debug|dumps|dumps_audit|lib|mci|probes|release|tmp|tool)
       return 0
       ;;
-    *manual*|*probe*|*repro*|*check*)
-      return 0
-      ;;
   esac
   return 1
 }
@@ -138,7 +135,7 @@ prune_legacy_named_entries() {
     fi
 
     case "$name" in
-      phase*|stage*|tmp_*)
+      phase*|stage*|tmp_*|kernel_*)
         remove_path "$path"
         ;;
     esac
