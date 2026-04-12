@@ -120,6 +120,9 @@ struct RuntimePublishObservation {
     source_pid: u32
     payload_len: usize
     payload0: u8
+    payload1: u8
+    payload2: u8
+    payload3: u8
     queued: u32
     queue_full: u32
     endpoint_valid: u32
@@ -200,7 +203,7 @@ func empty_wake_list() EndpointWakeList {
 }
 
 func empty_runtime_publish_observation() RuntimePublishObservation {
-    return RuntimePublishObservation{ endpoint_id: 0, source_pid: 0, payload_len: 0, payload0: 0, queued: 0, queue_full: 0, endpoint_valid: 0, endpoint_closed: 0 }
+    return RuntimePublishObservation{ endpoint_id: 0, source_pid: 0, payload_len: 0, payload0: 0, payload1: 0, payload2: 0, payload3: 0, queued: 0, queue_full: 0, endpoint_valid: 0, endpoint_closed: 0 }
 }
 
 func append_wake(list: EndpointWakeList, wake: EndpointWake) EndpointWakeList {

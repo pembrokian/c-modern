@@ -7,7 +7,7 @@ PLANNED
 
 Purpose
 -------
-Continue from the planned Phase 135 ownership step by breaking the UART path
+Continue from the landed Phase 135 ownership step by breaking the UART path
 on purpose and proving that the resulting damage stays local to the device
 edge and the consuming service instead of turning into kernel policy growth.
 
@@ -20,8 +20,8 @@ policy, or a broader fault-management subsystem.
 
 Repository status note
 ----------------------
-- Phase 134 and Phase 135 are expected to make the UART receive path real and
-  make its byte ownership explicit.
+- Phase 134 and Phase 135 now make the UART receive path real and make its
+  copied frame ownership explicit.
 - The next honest question is not whether the happy path works. It is whether
   the system stays structurally honest when the path misbehaves.
 - If the repository avoids this by keeping failure synthetic or by teaching

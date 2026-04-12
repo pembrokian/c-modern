@@ -45,6 +45,7 @@ Structure
   - `phase132_backpressure_and_blocking.cpp`: real-kernel bounded backpressure and blocking audit.
   - `phase133_message_lifetime_and_reuse.cpp`: real-kernel bounded message lifetime, reuse, and close-path audit.
   - `phase134_minimal_device_service_handoff.cpp`: real-kernel bounded UART receive device-service handoff audit.
+  - `phase135_buffer_ownership_boundary_audit.cpp`: real-kernel bounded UART receive-frame ownership-boundary audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

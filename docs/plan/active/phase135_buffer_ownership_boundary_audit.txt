@@ -3,7 +3,7 @@ Phase 135 -- Buffer Ownership Boundary Audit
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -183,6 +183,33 @@ Exit criteria
 - the focused regression proves build, run, docs, and MIR all expose the same
   Phase 135 boundary
 - the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Completion note
+---------------
+Phase 135 is complete as one bounded buffer ownership boundary audit.
+
+The landed kernel artifact now carries one explicit UART-owned staged receive
+frame, one copied IPC publish path, deterministic staging scrub-after-publish,
+and one serial-service-owned consumed log over repeated two-byte delivery.
+The implementation keeps copy semantics explicit, keeps compiler, sema, MIR,
+backend, ABI, target, and `hal` surfaces closed, and stops short of shared
+ring buffers, general buffer pools, zero-copy transport, or a wider device-
+memory subsystem.
+
+Landed implementation summary:
+
+- `kernel/src/uart.mc` owns one fixed four-byte staging frame, copied publish,
+  and deterministic retirement.
+- `kernel/src/ipc/00_types.mc`, `kernel/src/ipc/02_runtime.mc`, and
+  `kernel/src/ipc/04_validation.mc` carry one bounded copied frame publish plus
+  one direct copy-boundary validation.
+- `kernel/src/bootstrap_services/05_serial.mc` and
+  `kernel/src/serial_service.mc` carry one repeated receive path plus one
+  service-owned consumed log.
+- `kernel/src/debug/09_phase135.mc` validates the landed UART -> IPC ->
+  serial-service ownership boundary over repeated delivery.
+- `kernel/src/main.mc` advances the kernel proof marker to 135 only after that
+  audit succeeds
 
 Non-goals
 ---------

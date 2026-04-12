@@ -58,6 +58,8 @@ const PHASE131_MARKER: i32 = 131
 const PHASE131_MARKER_DETAIL: u32 = 131
 const PHASE134_MARKER: i32 = 134
 const PHASE134_MARKER_DETAIL: u32 = 134
+const PHASE135_MARKER: i32 = 135
+const PHASE135_MARKER_DETAIL: u32 = 135
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
@@ -68,7 +70,10 @@ const COMPOSITION_LOG_ENDPOINT_ID: u32 = 4
 const SERIAL_SERVICE_ENDPOINT_ID: u32 = TRANSFER_ENDPOINT_ID
 const UART_RECEIVE_VECTOR: u32 = 33
 const UART_SOURCE_ACTOR: u32 = 134
-const UART_RECEIVE_BYTE: u8 = 85
+const UART_FRAME_ONE_BYTE0: u8 = 70
+const UART_FRAME_ONE_BYTE1: u8 = 82
+const UART_FRAME_TWO_BYTE0: u8 = 65
+const UART_FRAME_TWO_BYTE1: u8 = 77
 const PHASE124_INTERMEDIARY_PID: u32 = 4
 const PHASE124_FINAL_HOLDER_PID: u32 = 5
 const PHASE124_CONTROL_HANDLE_SLOT: u32 = 1
@@ -1689,68 +1694,96 @@ func bootstrap_main() i32 {
     if serial_spawn.succeeded == 0 {
         return 75
     }
-    UART_DEVICE = uart.configure_receive(UART_DEVICE, UART_RECEIVE_VECTOR, serial_config.serial_endpoint_id)
-    UART_DEVICE = uart.stage_receive_byte(UART_DEVICE, UART_RECEIVE_BYTE)
-    uart_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
-    uart_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(uart_entry)
-    INTERRUPTS = uart_dispatch.controller
-    LAST_INTERRUPT_KIND = uart_dispatch.kind
-    uart_result: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, uart_entry, uart_dispatch, ENDPOINTS, BOOT_PID)
-    UART_DEVICE = uart_result.device
-    ENDPOINTS = uart_result.endpoints
-    UART_INGRESS = uart_result.observation
-    if uart_result.handled == 0 {
+    if !ipc.validate_runtime_frame_copy_boundary() {
         return 76
     }
-    if !ipc.runtime_publish_succeeded(UART_INGRESS.publish) {
+    UART_DEVICE = uart.configure_receive(UART_DEVICE, UART_RECEIVE_VECTOR, serial_config.serial_endpoint_id)
+    first_uart_payload: [4]u8 = ipc.zero_payload()
+    first_uart_payload[0] = UART_FRAME_ONE_BYTE0
+    first_uart_payload[1] = UART_FRAME_ONE_BYTE1
+    UART_DEVICE = uart.stage_receive_frame(UART_DEVICE, 2, first_uart_payload)
+    first_uart_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
+    first_uart_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(first_uart_entry)
+    INTERRUPTS = first_uart_dispatch.controller
+    LAST_INTERRUPT_KIND = first_uart_dispatch.kind
+    first_uart_result: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, first_uart_entry, first_uart_dispatch, ENDPOINTS, BOOT_PID)
+    UART_DEVICE = first_uart_result.device
+    ENDPOINTS = first_uart_result.endpoints
+    if first_uart_result.handled == 0 {
+        return 76
+    }
+    if !ipc.runtime_publish_succeeded(first_uart_result.observation.publish) {
         return 77
     }
-    serial_receive: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.execute_serial_service_receive_and_exit(serial_config, build_serial_service_execution_state())
-    install_serial_service_execution_state(serial_receive.state)
-    if serial_receive.succeeded == 0 {
+    serial_first_receive: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.execute_serial_service_receive(serial_config, build_serial_service_execution_state())
+    install_serial_service_execution_state(serial_first_receive.state)
+    if serial_first_receive.succeeded == 0 {
         return 78
     }
-    phase134_audit: debug.Phase134MinimalDeviceServiceHandoffAudit = debug.Phase134MinimalDeviceServiceHandoffAudit{ phase131: phase131_audit, interrupt_vector: UART_INGRESS.interrupt_vector, interrupt_source_actor: UART_INGRESS.source_actor, interrupt_kind: LAST_INTERRUPT_KIND, dispatch_handled: uart_dispatch.handled, uart_service_endpoint_id: UART_INGRESS.service_endpoint_id, uart_ack_count: UART_INGRESS.ack_count, uart_ingress_count: UART_INGRESS.ingress_count, uart_received_byte: UART_INGRESS.received_byte, published_endpoint_id: UART_INGRESS.publish.endpoint_id, published_source_pid: UART_INGRESS.publish.source_pid, published_payload_len: UART_INGRESS.publish.payload_len, published_payload_byte0: UART_INGRESS.publish.payload0, published_queued: UART_INGRESS.publish.queued, published_queue_full: UART_INGRESS.publish.queue_full, published_endpoint_valid: UART_INGRESS.publish.endpoint_valid, published_endpoint_closed: UART_INGRESS.publish.endpoint_closed, serial_service_pid: SERIAL_SERVICE_INGRESS.service_pid, serial_receive_status: SERIAL_SERVICE_RECEIVE_OBSERVATION.status, serial_wait_status: SERIAL_SERVICE_WAIT_OBSERVATION.status, serial_received_byte: SERIAL_SERVICE_INGRESS.received_byte, serial_ingress_count: SERIAL_SERVICE_INGRESS.ingress_count, kernel_policy_visible: 0, driver_framework_visible: 0, generic_event_bus_visible: 0, compiler_reopening_visible: 0 }
-    if !debug.validate_phase134_minimal_device_service_handoff(phase134_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+    second_uart_payload: [4]u8 = ipc.zero_payload()
+    second_uart_payload[0] = UART_FRAME_TWO_BYTE0
+    second_uart_payload[1] = UART_FRAME_TWO_BYTE1
+    UART_DEVICE = uart.stage_receive_frame(UART_DEVICE, 2, second_uart_payload)
+    second_uart_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
+    second_uart_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(second_uart_entry)
+    INTERRUPTS = second_uart_dispatch.controller
+    LAST_INTERRUPT_KIND = second_uart_dispatch.kind
+    second_uart_result: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, second_uart_entry, second_uart_dispatch, ENDPOINTS, BOOT_PID)
+    UART_DEVICE = second_uart_result.device
+    ENDPOINTS = second_uart_result.endpoints
+    UART_INGRESS = second_uart_result.observation
+    if second_uart_result.handled == 0 {
         return 79
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, PHASE134_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
+    if !ipc.runtime_publish_succeeded(second_uart_result.observation.publish) {
         return 80
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    serial_second_receive: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.execute_serial_service_receive_and_exit(serial_config, build_serial_service_execution_state())
+    install_serial_service_execution_state(serial_second_receive.state)
+    if serial_second_receive.succeeded == 0 {
         return 81
     }
-    if BOOT_LOG.count != 5 {
+    phase135_audit: debug.Phase135BufferOwnershipAudit = debug.Phase135BufferOwnershipAudit{ phase131: phase131_audit, interrupt_vector: first_uart_result.observation.interrupt_vector, interrupt_source_actor: first_uart_result.observation.source_actor, interrupt_kind: LAST_INTERRUPT_KIND, first_dispatch_handled: first_uart_dispatch.handled, second_dispatch_handled: second_uart_dispatch.handled, uart_service_endpoint_id: first_uart_result.observation.service_endpoint_id, first_uart_ack_count: first_uart_result.observation.ack_count, first_uart_ingress_count: first_uart_result.observation.ingress_count, first_uart_retire_count: first_uart_result.observation.retire_count, first_staged_payload_len: first_uart_result.observation.staged_payload_len, first_staged_payload_byte0: first_uart_result.observation.staged_payload0, first_staged_payload_byte1: first_uart_result.observation.staged_payload1, first_published_endpoint_id: first_uart_result.observation.publish.endpoint_id, first_published_source_pid: first_uart_result.observation.publish.source_pid, first_published_payload_len: first_uart_result.observation.publish.payload_len, first_published_payload_byte0: first_uart_result.observation.publish.payload0, first_published_payload_byte1: first_uart_result.observation.publish.payload1, first_published_queued: first_uart_result.observation.publish.queued, first_published_queue_full: first_uart_result.observation.publish.queue_full, first_published_endpoint_valid: first_uart_result.observation.publish.endpoint_valid, first_published_endpoint_closed: first_uart_result.observation.publish.endpoint_closed, first_retired_payload_len: first_uart_result.observation.retired_payload_len, first_retired_payload_byte0: first_uart_result.observation.retired_payload0, first_retired_payload_byte1: first_uart_result.observation.retired_payload1, second_uart_ack_count: second_uart_result.observation.ack_count, second_uart_ingress_count: second_uart_result.observation.ingress_count, second_uart_retire_count: second_uart_result.observation.retire_count, second_staged_payload_len: second_uart_result.observation.staged_payload_len, second_staged_payload_byte0: second_uart_result.observation.staged_payload0, second_staged_payload_byte1: second_uart_result.observation.staged_payload1, second_published_endpoint_id: second_uart_result.observation.publish.endpoint_id, second_published_source_pid: second_uart_result.observation.publish.source_pid, second_published_payload_len: second_uart_result.observation.publish.payload_len, second_published_payload_byte0: second_uart_result.observation.publish.payload0, second_published_payload_byte1: second_uart_result.observation.publish.payload1, second_published_queued: second_uart_result.observation.publish.queued, second_published_queue_full: second_uart_result.observation.publish.queue_full, second_published_endpoint_valid: second_uart_result.observation.publish.endpoint_valid, second_published_endpoint_closed: second_uart_result.observation.publish.endpoint_closed, second_retired_payload_len: second_uart_result.observation.retired_payload_len, second_retired_payload_byte0: second_uart_result.observation.retired_payload0, second_retired_payload_byte1: second_uart_result.observation.retired_payload1, serial_service_pid: SERIAL_SERVICE_INGRESS.service_pid, serial_source_pid: SERIAL_SERVICE_INGRESS.source_pid, serial_endpoint_id: SERIAL_SERVICE_INGRESS.endpoint_id, serial_receive_status: SERIAL_SERVICE_RECEIVE_OBSERVATION.status, serial_wait_status: SERIAL_SERVICE_WAIT_OBSERVATION.status, serial_last_payload_len: SERIAL_SERVICE_INGRESS.payload_len, serial_last_received_byte: SERIAL_SERVICE_INGRESS.received_byte, serial_ingress_count: SERIAL_SERVICE_INGRESS.ingress_count, serial_log_len: SERIAL_SERVICE_INGRESS.log_len, serial_total_consumed_bytes: SERIAL_SERVICE_INGRESS.total_consumed_bytes, serial_log_byte0: SERIAL_SERVICE_INGRESS.log_byte0, serial_log_byte1: SERIAL_SERVICE_INGRESS.log_byte1, serial_log_byte2: SERIAL_SERVICE_INGRESS.log_byte2, serial_log_byte3: SERIAL_SERVICE_INGRESS.log_byte3, kernel_policy_visible: 0, driver_framework_visible: 0, generic_buffer_pool_visible: 0, zero_copy_visible: 0, compiler_reopening_visible: 0 }
+    if !debug.validate_phase135_buffer_ownership_boundary(phase135_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 82
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE135_MARKER_DETAIL)
+    if BOOT_MARKER_EMITTED != 1 {
         return 83
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 84
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if BOOT_LOG.count != 5 {
         return 85
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 86
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 87
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE134_MARKER_DETAIL {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 88
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 89
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 90
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE135_MARKER_DETAIL {
         return 91
     }
-    return PHASE134_MARKER
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 92
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 93
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 94
+    }
+    return PHASE135_MARKER
 }

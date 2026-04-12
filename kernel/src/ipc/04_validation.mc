@@ -119,3 +119,57 @@ func validate_syscall_ipc_boundary() bool {
     }
     return true
 }
+
+func validate_runtime_frame_copy_boundary() bool {
+    table: EndpointTable = install_endpoint(empty_table(), 7, 19)
+
+    first_payload: [4]u8 = zero_payload()
+    first_payload[0] = 70
+    first_payload[1] = 82
+    first_publish: RuntimePublishResult = publish_runtime_frame(table, 19, 7, 21, 2, first_payload)
+    if !runtime_publish_succeeded(first_publish.observation) {
+        return false
+    }
+    if first_publish.observation.payload_len != 2 {
+        return false
+    }
+    if first_publish.observation.payload0 != 70 || first_publish.observation.payload1 != 82 {
+        return false
+    }
+    first_receive: RuntimeReceiveResult = receive_runtime_message(first_publish.endpoints, 19)
+    if first_receive.available == 0 {
+        return false
+    }
+    if first_receive.message.len != 2 {
+        return false
+    }
+    if first_receive.message.payload[0] != 70 || first_receive.message.payload[1] != 82 {
+        return false
+    }
+
+    second_payload: [4]u8 = zero_payload()
+    second_payload[0] = 65
+    second_payload[1] = 77
+    second_publish: RuntimePublishResult = publish_runtime_frame(first_receive.endpoints, 19, 7, 22, 2, second_payload)
+    if !runtime_publish_succeeded(second_publish.observation) {
+        return false
+    }
+    if second_publish.observation.payload_len != 2 {
+        return false
+    }
+    if second_publish.observation.payload0 != 65 || second_publish.observation.payload1 != 77 {
+        return false
+    }
+    second_receive: RuntimeReceiveResult = receive_runtime_message(second_publish.endpoints, 19)
+    if second_receive.available == 0 {
+        return false
+    }
+    if second_receive.message.len != 2 {
+        return false
+    }
+    if second_receive.message.payload[0] != 65 || second_receive.message.payload[1] != 77 {
+        return false
+    }
+    empty_receive: RuntimeReceiveResult = receive_runtime_message(second_receive.endpoints, 19)
+    return empty_receive.queue_empty == 1
+}

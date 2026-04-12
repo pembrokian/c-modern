@@ -27,17 +27,24 @@ func spawn_serial_service(config: SerialServiceConfig, execution: SerialServiceE
 }
 
 func execute_serial_service_receive_and_exit(config: SerialServiceConfig, execution: SerialServiceExecutionState) SerialServiceExecutionResult {
+    received: SerialServiceExecutionResult = execute_serial_service_receive(config, execution)
+    if received.succeeded == 0 {
+        return received
+    }
+    next_state: SerialServiceExecutionState = simulate_serial_service_exit(config, received.state)
+    wait_result: syscall.WaitResult = syscall.perform_wait(next_state.gate, next_state.process_slots, next_state.task_slots, next_state.wait_table, syscall.build_wait_request(config.wait_handle_slot))
+    next_state = SerialServiceExecutionState{ program_capability: next_state.program_capability, gate: wait_result.gate, process_slots: wait_result.process_slots, task_slots: wait_result.task_slots, init_handle_table: next_state.init_handle_table, child_handle_table: capability.empty_handle_table(), wait_table: wait_result.wait_table, endpoints: next_state.endpoints, init_image: next_state.init_image, child_address_space: next_state.child_address_space, child_user_frame: next_state.child_user_frame, service_state: next_state.service_state, spawn_observation: next_state.spawn_observation, receive_observation: next_state.receive_observation, ingress: next_state.ingress, wait_observation: wait_result.observation, ready_queue: state.empty_queue() }
+    if syscall.status_score(next_state.wait_observation.status) != 2 {
+        return serial_service_result(next_state, 0)
+    }
+    return serial_service_result(next_state, 1)
+}
+
+func execute_serial_service_receive(config: SerialServiceConfig, execution: SerialServiceExecutionState) SerialServiceExecutionResult {
     service_receive: syscall.ReceiveResult = syscall.perform_receive(execution.gate, execution.child_handle_table, execution.endpoints, syscall.build_receive_request(config.endpoint_handle_slot))
     updated_service_state: serial_service.SerialServiceState = serial_service.record_ingress(execution.service_state, service_receive.observation)
     next_state: SerialServiceExecutionState = SerialServiceExecutionState{ program_capability: execution.program_capability, gate: service_receive.gate, process_slots: execution.process_slots, task_slots: execution.task_slots, init_handle_table: execution.init_handle_table, child_handle_table: service_receive.handle_table, wait_table: execution.wait_table, endpoints: service_receive.endpoints, init_image: execution.init_image, child_address_space: execution.child_address_space, child_user_frame: execution.child_user_frame, service_state: updated_service_state, spawn_observation: execution.spawn_observation, receive_observation: service_receive.observation, ingress: serial_service.observe_ingress(updated_service_state), wait_observation: execution.wait_observation, ready_queue: execution.ready_queue }
     if syscall.status_score(next_state.receive_observation.status) != 2 {
-        return serial_service_result(next_state, 0)
-    }
-
-    next_state = simulate_serial_service_exit(config, next_state)
-    wait_result: syscall.WaitResult = syscall.perform_wait(next_state.gate, next_state.process_slots, next_state.task_slots, next_state.wait_table, syscall.build_wait_request(config.wait_handle_slot))
-    next_state = SerialServiceExecutionState{ program_capability: next_state.program_capability, gate: wait_result.gate, process_slots: wait_result.process_slots, task_slots: wait_result.task_slots, init_handle_table: next_state.init_handle_table, child_handle_table: capability.empty_handle_table(), wait_table: wait_result.wait_table, endpoints: next_state.endpoints, init_image: next_state.init_image, child_address_space: next_state.child_address_space, child_user_frame: next_state.child_user_frame, service_state: next_state.service_state, spawn_observation: next_state.spawn_observation, receive_observation: next_state.receive_observation, ingress: next_state.ingress, wait_observation: wait_result.observation, ready_queue: state.empty_queue() }
-    if syscall.status_score(next_state.wait_observation.status) != 2 {
         return serial_service_result(next_state, 0)
     }
     return serial_service_result(next_state, 1)

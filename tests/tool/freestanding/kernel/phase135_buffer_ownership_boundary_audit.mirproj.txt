@@ -1,0 +1,5 @@
+  TypeDecl kind=struct name=debug.Phase135BufferOwnershipAudit
+  Function name=ipc.publish_runtime_frame returns=[ipc.RuntimePublishResult]
+  Function name=uart.stage_receive_frame returns=[uart.UartDevice]
+  Function name=bootstrap_services.execute_serial_service_receive returns=[bootstrap_services.SerialServiceExecutionResult]
+  Function name=debug.validate_phase135_buffer_ownership_boundary returns=[bool]

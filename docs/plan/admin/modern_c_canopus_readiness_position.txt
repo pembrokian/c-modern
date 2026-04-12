@@ -9,6 +9,7 @@ Purpose
 -------
 Record one maintained repository position after Phase 133 published one bounded message lifetime and reuse audit over the landed running kernel slice.
 Record one maintained repository position after Phase 134 published one bounded minimal device-service handoff over that same slice.
+Record one maintained repository position after Phase 135 published one bounded buffer ownership boundary audit over that same slice.
 
 This note answers four questions that now matter:
 
@@ -43,6 +44,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/active/phase132_backpressure_and_blocking_audit.txt`
 - `docs/plan/active/phase133_message_lifetime_and_reuse_audit.txt`
 - `docs/plan/active/phase134_minimal_device_service_handoff.txt`
+- `docs/plan/active/phase135_buffer_ownership_boundary_audit.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
 - `docs/plan/phase121_kernel_image_contract_hardening.txt`
 - `docs/plan/phase122_target_surface_audit.txt`
@@ -88,8 +90,9 @@ Current repository truth
   one landed Phase 129 partial failure propagation step, one landed Phase 130
   explicit restart or replacement probe, one landed Phase 131 fan-out
   composition probe, one landed Phase 132 backpressure and blocking audit,
-  one landed Phase 133 message lifetime and reuse audit, and one landed Phase
-  134 minimal device-service handoff over that same admitted slice.
+  one landed Phase 133 message lifetime and reuse audit, one landed Phase 134
+  minimal device-service handoff, and one landed Phase 135 buffer ownership
+  boundary audit over that same admitted slice.
 - The landed Phase 124 delegation-chain stress step, the landed Phase 125 invalidation and rejection audit step, the landed Phase 126 authority lifetime classification step, the landed Phase 128 service death observation step, and the landed Phase 129 partial failure propagation step all belong to that same admitted slice rather than to a broader authority or failure framework.
 - The landed Phase 130 explicit restart or replacement probe also belongs to
   that same admitted slice rather than to a broader supervision or recovery
@@ -106,6 +109,9 @@ Current repository truth
 - The landed Phase 134 minimal device-service handoff also belongs to that
   same admitted slice rather than to a broader driver framework, generic
   device-event layer, or reopened compiler wave.
+- The landed Phase 135 buffer ownership boundary audit also belongs to that
+  same admitted slice rather than to a broader buffer pool, zero-copy device
+  path, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -133,7 +139,7 @@ It means:
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
-Phase 96 through Phase 134 are now concrete as one first real kernel wave,
+Phase 96 through Phase 135 are now concrete as one first real kernel wave,
 one ownership and hardware-boundary clarification wave, one first bounded
 running-system and plateau freeze wave, and two first post-plateau
 authority-lifecycle stress steps plus one explicit lifetime-classification
@@ -141,7 +147,8 @@ step and one explicit service-death observation step plus one explicit
 partial-failure propagation step plus one explicit restart-or-replacement
 probe plus one explicit fan-out composition probe plus one explicit
 backpressure and blocking audit plus one explicit message lifetime and reuse
-audit plus one explicit minimal device-service handoff.
+audit plus one explicit minimal device-service handoff plus one explicit
+buffer ownership boundary audit.
 That is meaningful implementation progress, but it is still an early system
 plateau rather than architectural completion.
 
@@ -169,6 +176,12 @@ interrupt-origin IPC publish, and one fixed serial-service receive path in
 target-local and service-local owners, adds no compiler-facing surface, and
 expands the running-system slice by one honest device-facing boundary rather
 than by another proof-only timer-backed exercise.
+
+The repository now also includes a landed Phase 135 buffer ownership boundary
+audit that keeps one UART-owned staging frame, one copied IPC payload, and one
+serial-service-owned consumed log explicit under repeated delivery, adds no
+compiler-facing surface, and expands the running-system slice by one honest
+ownership boundary rather than by another fixture-only byte assumption.
 
 Kernel maturity and quality
 ---------------------------

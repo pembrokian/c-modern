@@ -41,6 +41,7 @@ files = [
 	"src/debug/06_phase132.mc",
 	"src/debug/07_phase133.mc",
 	"src/debug/08_phase134.mc",
+	"src/debug/09_phase135.mc",
 ]
 
 [targets.kernel.module_sets.bootstrap_audit]

@@ -115,12 +115,15 @@ void RunFreestandingKernelPhase133MessageLifetimeAndReuse(const std::filesystem:
 void RunFreestandingKernelPhase134MinimalDeviceServiceHandoff(const std::filesystem::path& source_root,
                                                               const std::filesystem::path& binary_root,
                                                               const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase135BufferOwnershipBoundaryAudit(const std::filesystem::path& source_root,
+                                                               const std::filesystem::path& binary_root,
+                                                               const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
 
-const std::array<KernelTestCase, 33> kKernelTestCases = {{
+const std::array<KernelTestCase, 34> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
@@ -154,6 +157,7 @@ const std::array<KernelTestCase, 33> kKernelTestCases = {{
     {"phase132_backpressure_and_blocking", 5, &RunFreestandingKernelPhase132BackpressureAndBlocking},
     {"phase133_message_lifetime_and_reuse", 5, &RunFreestandingKernelPhase133MessageLifetimeAndReuse},
     {"phase134_minimal_device_service_handoff", 5, &RunFreestandingKernelPhase134MinimalDeviceServiceHandoff},
+    {"phase135_buffer_ownership_boundary_audit", 5, &RunFreestandingKernelPhase135BufferOwnershipBoundaryAudit},
 }};
 
 void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,

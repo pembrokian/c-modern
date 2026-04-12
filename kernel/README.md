@@ -6,6 +6,9 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 135 has moved the repository-owned kernel artifact beyond the landed
+  Phase 134 minimal device-service handoff into one bounded UART receive-frame
+  ownership boundary audit.
 - Phase 134 has moved the repository-owned kernel artifact beyond the landed
   Phase 133 message lifetime and reuse audit into one bounded UART receive
   device-service handoff.
@@ -67,8 +70,8 @@ Current status
   observation step, one bounded partial failure propagation step, and one
   bounded explicit restart or replacement probe, one bounded fan-out
   composition probe, one bounded backpressure and blocking audit, one bounded
-  message lifetime and reuse audit, and one bounded UART receive device-service
-  handoff.
+  message lifetime and reuse audit, one bounded UART receive device-service
+  handoff, and one bounded UART receive-frame ownership boundary audit.
 
 Current files
 -------------
@@ -116,17 +119,18 @@ Current files
   Phase 126 authority lifetime classification audit, Phase 128 service death
   observation audit, Phase 129 partial failure propagation audit, Phase 130
   explicit restart or replacement audit, Phase 131 fan-out composition audit,
-  and Phase 134 minimal device-service handoff audit
+  Phase 134 minimal device-service handoff audit, and Phase 135 buffer
+  ownership boundary audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
   reply payload, and final exchange observation records
-- `src/serial_service.mc`: bounded serial-service protocol state and one fixed
-  UART-origin ingress observation path
+- `src/serial_service.mc`: bounded serial-service protocol state and one
+  service-owned copied receive-frame log
 - `src/transfer_service.mc`: bounded transfer-service grant state, emitted
   payload construction, and final transfer observation records
-- `src/uart.mc`: bounded UART receive device owner, ingress observations, and
-  interrupt-origin byte publish helpers
+- `src/uart.mc`: bounded UART receive-frame staging owner, copied publish
+  observations, and deterministic staging-retirement helpers
 - `src/state.mc`: kernel-owned descriptor, slot, queue, and boot-log records
 - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame
   records
@@ -210,9 +214,10 @@ Phase boundary
   stress step plus one bounded invalidation and rejection audit step plus one
   bounded authority lifetime classification step plus one bounded service
   death observation step plus one bounded partial failure propagation step
-  plus one bounded UART receive device-service handoff publishing that same
-  admitted slice without widening into a broader service framework,
-  supervision policy, or reusable driver layer.
+  plus one bounded UART receive device-service handoff plus one bounded UART
+  receive-frame ownership boundary audit publishing that same admitted slice
+  without widening into a broader service framework, supervision policy,
+  reusable driver layer, or general buffer subsystem.
 - It does not yet claim general loading, dynamic service discovery,
   namespace policy, kill semantics, or a general running init-owned service
   framework.
