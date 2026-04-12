@@ -1,4 +1,4 @@
-Phase 124 Through Phase 137 -- Speculative Post-Phase-123 Canopus Roadmap
+Phase 124 Through Phase 140 -- Speculative Post-Phase-123 Canopus Roadmap
 =========================================================================
 
 Status
@@ -323,10 +323,10 @@ Guardrail for this band:
 
 Band E - Rebuild Only If Earlier Stress Exposes A Distorted Owner
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phase 138 should remain conditional.
+Phase 139 should remain conditional.
 It is not an automatic culmination of the roadmap.
 
-Phase 138 -- Optional subsystem rebuild
+Phase 139 -- Optional subsystem rebuild
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Goal:
 - re-implement one already-landed subsystem using the newer structure and
@@ -346,11 +346,42 @@ Why this band is conditional:
   distortion in an already-landed owner.
 - if no such distortion appears, the right answer is to skip this entirely.
 
-Phase 137 -- Conditional Subsystem Rebuild
+Phase 139 -- Conditional Subsystem Rebuild
 - Exit criterion: one already-landed subsystem is re-implemented only because
   the earlier stress phases proved that the replacement fits the ownership
   model with fewer exceptions or hacks, not because the roadmap demanded a
   rebuild for its own sake.
+
+Repository follow-through note
+------------------------------
+- Later landed stress phases through Phase 138 did not expose repeated owner
+  distortion strong enough to justify a rebuild, so the repository explicitly
+  deferred Phase 139 instead of treating it as automatic.
+- The next honest follow-through after that deferral is one richer composed
+  service graph over the landed UART, serial-service, and composition owners.
+
+Phase 140 -- Serial-Ingress Composed Service Graph
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Goal:
+- prove that one real device-facing service can feed one second bounded
+  composition owner while keeping routing policy visible in service owners
+  rather than in the kernel.
+
+Suggested scope:
+- one UART-backed serial ingress path
+- one bounded serial-service validation and forwarded request path
+- one bounded composition-service echo-plus-log fan-out reused from the landed
+  Phase 131 owner
+- one bounded aggregate reply observed back in serial-service
+
+Exit criteria:
+- one fixed serial-ingress -> composition-service -> echo-plus-log graph runs
+  over the real kernel artifact
+- the kernel still does not become a broker, router, or service-graph manager
+- the graph stays fixed, bounded, and mechanically auditable
+
+Non-goal:
+- dynamic routing, namespace growth, or a general service framework
 
 Cross-cutting constraints
 -------------------------

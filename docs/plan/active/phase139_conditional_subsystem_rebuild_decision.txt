@@ -1,0 +1,166 @@
+Phase 139 -- Conditional Subsystem Rebuild Decision
+==================================================
+
+Status
+------
+DEFERRED
+
+Purpose
+-------
+Decide whether the repository should spend the next Canopus step on a
+subsystem rebuild after the landed Phase 131 through Phase 138 stress and
+follow-through wave.
+
+This document records the explicit decision for Phase 139.
+It exists because the speculative roadmap made any rebuild conditional rather
+than automatic, and the repository now has enough real kernel evidence to make
+ that call directly.
+It does not authorize a rewrite merely because the roadmap number advanced.
+
+Repository status note
+----------------------
+- The repository now has one landed bounded fan-out composition proof, one
+  landed backpressure and blocking audit, one landed message-lifetime and
+  reuse audit, one landed UART device-service handoff, one landed UART buffer
+  ownership audit, one landed device-failure containment probe, one landed
+  completion-backed UART follow-through, and one landed compiler-known fatal
+  primitive.
+- Those phases materially widened the real kernel slice, but they did so by
+  extending existing owners with additive bounded behavior rather than by
+  proving that one owner had become structurally dishonest.
+- The rebuild gate therefore has to be evaluated against real repeated owner
+  distortion, not against roadmap momentum.
+
+Problem being solved
+--------------------
+- The speculative roadmap reserved Phase 139 for an optional subsystem rebuild
+  only if earlier stress phases exposed repeated distortion in one landed
+  owner.
+- Without an explicit decision note, the repository could drift into a
+  rewrite simply because IPC, scheduler, capability, and device work have all
+  become richer than they were when the roadmap was drafted.
+- The repository therefore needs one published answer on whether the evidence
+  now justifies a rebuild or whether the honest next step is another bounded
+  stress discriminator.
+
+Core rule
+---------
+- Do not rebuild a subsystem because a roadmap once reserved a number for it.
+- Rebuild only when repeated real-kernel pressure shows one owner is carrying
+  duplicated policy, blurred responsibilities, or exception-heavy glue that
+  no longer fits the ownership model cleanly.
+- Evidence must come from landed running-system slices, not from taste,
+  aesthetics, or anticipated future scale.
+- If no such evidence exists, the right decision is an explicit deferral.
+
+Evaluation summary
+------------------
+IPC
+- IPC is the strongest long-term rebuild candidate because recent phases have
+  added queue pressure, wake truth, slot retirement, close-or-death cleanup,
+  interrupt-origin publish, and completion-backed publish around the same
+  owner family.
+- Even so, the landed phases still read as additive owner-local follow-through
+  rather than as repeated duplication or policy leakage that the current IPC
+  owner cannot carry honestly.
+- The current evidence therefore supports continued pressure-testing, not an
+  IPC rewrite yet.
+
+Scheduler and lifecycle
+- Phase 132 hardened blocked-task and wake-to-ready truth without forcing a
+  broader scheduler redesign.
+- No later landed phase has shown the scheduler or lifecycle owners absorbing
+  queue policy, recovery policy, or broker behavior that clearly belongs
+  elsewhere.
+- The current evidence therefore does not justify a scheduler or lifecycle
+  rebuild.
+
+Capability handling
+- Phase 124 through Phase 126 and the later failure and composition steps kept
+  authority, invalidation, transfer, and replacement explicit without showing
+  ambient leakage or a repeated capability-owner distortion.
+- Capability handling remains narrow, explicit, and bounded enough for the
+  current running-system slice.
+- The current evidence therefore does not justify a capability-handling
+  rebuild.
+
+Chosen outcome
+--------------
+Chosen outcome: no.
+
+Phase 139 is explicitly deferred.
+
+The repository should not spend this milestone on a subsystem rebuild because
+the landed stress phases still support the current ownership cuts. The next
+honest move is another bounded stress phase that can discriminate whether IPC
+or another owner is starting to accumulate duplicated nontrivial policy.
+
+What this decision means
+------------------------
+- keep the current `ipc`, `sched`, `lifecycle`, `capability`, `uart`, and
+  `bootstrap_services` owners intact for now
+- treat IPC as the owner most worth watching, but not yet the owner to
+  rewrite
+- choose the next phase so it deepens real composed service pressure rather
+  than revisiting structure speculatively
+- reopen the rebuild question only if the next real consumer shows duplicated
+  queue, wake, retirement, routing, or authority policy that no longer fits
+  inside one bounded owner
+
+Deliverables
+------------
+- one canonical Phase 139 decision note in `docs/plan/active/`
+- one explicit published deferral of subsystem rebuild work
+- one explicit pointer to the next bounded stress step rather than a rewrite
+- refreshed roadmap, decision log, and backlog wording that keep the deferral
+  visible
+
+Exit criteria
+-------------
+- the repository has one published Phase 139 decision note
+- the note evaluates IPC, scheduler or lifecycle, and capability handling
+  against the rebuild gate
+- the outcome is explicit: no subsystem rebuild is authorized by current
+  evidence
+- the next phase direction is named as another bounded stress discriminator
+  rather than a cleanup rewrite
+
+Deferral statement
+------------------
+Phase 139 is deferred.
+
+The repository does not currently have evidence that IPC, scheduler or
+lifecycle, or capability handling has become structurally dishonest enough to
+justify a rebuild. The recent wave widened the real kernel slice by adding one
+bounded composition owner, one bounded backpressure step, one bounded message-
+lifetime step, one bounded UART service path, one bounded UART failure step,
+one bounded completion-backed receive step, and one bounded fatal primitive,
+but those results still read as additive owner-local truths rather than as a
+distorted subsystem.
+
+The next honest move is therefore another richer composed service graph over
+the real kernel artifact, not a speculative rewrite.
+
+Revisit trigger
+---------------
+Reopen the rebuild question only when a later landed phase shows all of the
+following:
+
+1. at least two real consumers need the same policy beyond the current owner
+2. additive changes start duplicating nontrivial queue, wake, routing,
+   retirement, or authority logic
+3. the distortion is localized enough that one replacement owner would reduce
+   exceptions rather than widen the system
+4. the rebuild can be described as one narrower fit to the ownership model,
+   not as general cleanup
+
+Non-goals
+---------
+- rewriting IPC preemptively because it is the most obvious future candidate
+- widening scheduler policy, fairness work, or lifecycle policy as part of a
+  speculative cleanup
+- widening capability handling into a broader revocation or lifetime
+  framework
+- using a rebuild as a proxy for broader platform ambition
+- reopening sema, MIR, backend, ABI, target, or `hal` without a concrete new
+  owner gap

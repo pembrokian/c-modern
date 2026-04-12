@@ -1,0 +1,207 @@
+Phase 140 -- Serial-Ingress Composed Service Graph
+=================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the deferred Phase 139 rebuild decision by adding one richer
+composed service graph over the landed UART, serial-service, and composition
+owners instead of rewriting an existing subsystem.
+
+This document is an execution plan for Phase 140.
+It defines one bounded serial-ingress composition step that must land as real
+service-owned forwarding, real service-owned aggregation, and real auditable
+reply truth before it is admitted as another stress proof.
+It does not claim a broker framework, a dynamic service graph, a streaming
+router, or a broader namespace model.
+
+Repository status note
+----------------------
+- Phase 131 already proved one init-driven composition owner can fan one
+  request out to echo and log and return one bounded aggregate reply.
+- Phase 134 through Phase 137 then proved that one real UART ingress path can
+  deliver bounded serial-service input, survive bounded unhappy paths, and
+  carry one completion-backed receive follow-through.
+- The next honest pressure is not to rewrite IPC, scheduler, or capability
+  handling. It is to prove that deeper service-to-service composition still
+  fits the current ownership model once one real device-facing service feeds a
+  second composed service owner.
+
+Problem being solved
+--------------------
+- The repository still lacks one honest proof that a device-facing service can
+  hand bounded work to a second bounded composition owner instead of stopping
+  at direct local consumption.
+- Without that proof, the current composition story remains init-driven and
+  the current device story remains single-service, which leaves the next IPC
+  pressure point underexercised.
+- The repository therefore needs one richer but still fixed service graph that
+  crosses a real device-facing owner, a second service owner, and the already
+  landed echo and log peers without turning the kernel into a broker.
+
+Core rule
+---------
+- Keep graph policy in service and init owners, not in the kernel.
+- Keep the route fixed and explicit: one serial-ingress service forwards one
+  bounded request to one composition service, which drives one bounded echo
+  lane and one bounded log lane, then returns one bounded aggregate result.
+- Do not add dynamic routing, service discovery, stream multiplexing,
+  buffering frameworks, or a general message-bus vocabulary.
+- Extend existing owners only where the new graph proves a real local gap.
+- Keep compiler, sema, MIR, backend, ABI, target, and `hal` surfaces closed.
+
+Chosen graph
+------------
+Chosen graph: yes.
+
+The Phase 140 graph should be:
+
+1. UART completion-backed or byte-backed ingress publishes one bounded frame
+   to the landed serial-service endpoint.
+2. `serial_service` validates one bounded frame and derives one bounded
+   forwarded request payload.
+3. `serial_service` sends that forwarded request to the landed composition
+   service over one fixed composition endpoint.
+4. `composition_service` performs the landed echo-plus-log fan-out and returns
+   one bounded aggregate reply.
+5. `serial_service` records one final local observation from that aggregate
+   reply and exits or idles cleanly.
+
+This creates one deeper but still fixed graph:
+
+UART -> serial_service -> composition_service -> { echo_service, log_service }
+
+Why this is the right next step
+-------------------------------
+- It reuses only real owners already present in the repository.
+- It pressures IPC composition more directly than another init-owned one-hop
+  proof would.
+- It creates one second concrete consumer of composed routing without yet
+  authorizing a broker or rewrite.
+- It gives the repository a better discriminator for whether IPC is merely
+  growing or actually starting to duplicate nontrivial policy.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `kernel/src/bootstrap_services/05_serial.mc`
+   - extend the bounded serial-service execution path so it can forward one
+     validated request to one fixed composition-service endpoint
+   - keep forwarding local to the serial-service owner rather than moving
+     route policy into the kernel
+
+2. `kernel/src/bootstrap_services/04_composition.mc`
+   - reuse the landed bounded echo-plus-log fan-out path
+   - touch only where one additive service-to-service caller path or one
+     additive reply-shaping fact is needed
+
+3. `kernel/src/bootstrap_services/00_types.mc`
+   - add only the smallest config, observation, or execution-state fields
+     needed to represent the forwarded composition edge explicitly
+   - keep the new graph fixed and named rather than generic
+
+4. `kernel/src/serial_service.mc`
+   - record one bounded forwarded-request and aggregate-reply observation
+   - keep validation, malformed-input handling, and final local interpretation
+     service-owned
+
+5. `kernel/src/ipc/`
+   - touch only if one additive endpoint or queue fact is required for the
+     extra service-to-service hop
+   - do not widen into a broker, router, subscription, or stream model
+
+6. `kernel/src/capability/`
+   - touch only if the new fixed composition edge needs one additional handle
+     installation or one additive bounded transfer helper
+   - do not widen into a graph-management or authority-discovery framework
+
+7. `kernel/src/main.mc`
+   - boot the richer graph over the real kernel artifact and advance the proof
+     marker only after the new service-owned route is real
+   - keep root orchestration thin and explicit
+
+8. `kernel/src/debug/`
+   - add one debug-owned Phase 140 audit validating that routing policy stayed
+     with service owners and that the graph remained fixed and bounded
+
+9. `kernel/src/bootstrap_audit/`
+   - add one bounded audit-builder path exposing the new forwarded edge and
+     aggregate reply as explicit observations
+
+10. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 140 regression plus one projected MIR golden over
+     the landed graph
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 140 execution plan that names serial-ingress
+   composition as the chosen next stress discriminator after the Phase 139
+   rebuild deferral
+2. one additive serial-service forwarding path to one fixed composition
+   endpoint
+3. one additive composition-service receive path from a service-owned caller
+   rather than only from init
+4. one bounded aggregate reply path back into the serial-service owner
+5. one debug-owned Phase 140 audit and focused regression over the landed
+   graph
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 140 boundary in docs: one fixed serial-ingress graph, no
+   broker, no dynamic namespace, no service framework.
+2. Extend serial-service execution state and observations so one validated
+   frame can drive one forwarded request.
+3. Install one fixed composition-service handle or endpoint path for the
+   serial-service owner.
+4. Reuse the landed composition fan-out path for one service-owned caller.
+5. Record one bounded aggregate-reply observation back in the serial-service
+   owner.
+6. Add the Phase 140 debug audit over the landed graph.
+7. Advance the kernel proof marker to 140 only after the graph is real over
+   the kernel artifact.
+8. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One real UART-backed serial ingress becomes one forwarded request into the
+   composition-service owner.
+2. One composition-service execution still performs only the bounded echo and
+   log fan-out already admitted.
+3. One aggregate reply returns to serial-service and is recorded as explicit
+   service-owned state.
+4. One audit proves the kernel did not become a broker, router, or service-
+   graph manager.
+5. One projected MIR proof shows the landed service-owned forwarding and
+   aggregate-reply path.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 140 marker
+- one UART-backed serial ingress now drives one service-to-service forwarded
+  request into the composition-service owner
+- one bounded aggregate reply returns to serial-service with explicit local
+  observation
+- the graph remains fixed, bounded, and mechanically auditable without
+  turning the kernel into a broker or widening namespace policy
+- the Phase 140 debug audit validates the landed graph over the real kernel
+  artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 140 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- a general broker, router, or service-graph subsystem
+- dynamic service discovery or dynamic namespace growth
+- streaming protocols, unbounded buffering, or backpressure redesign beyond
+  the already landed bounded IPC semantics
+- rewriting IPC, scheduler, lifecycle, or capability owners as part of this
+  phase
+- reopening sema, MIR, backend, ABI, target, or `hal`
+- claiming richer composition from tests alone without the landed kernel path
