@@ -55,14 +55,14 @@ Structure
 
 Late kernel audit pattern
 
-- For ownership-hardening kernel audits, keep one shard owner `.cpp` per late runtime slice plus adjacent `.mirproj.txt` files for projected MIR expectations.
+- For ownership-hardening kernel audits, keep one shard owner `.cpp` per late runtime slice plus checked-in goldens under `kernel/goldens/` for projected MIR, runtime, and contract expectations.
 - Keep phase-note, roadmap, and repo-map assertions in the separate kernel metadata/doc suite rather than in the runtime shard itself.
 - Keep behavior assertions in C++ over the built artifact and emitted objects.
 - Keep publication assertions in C++ over the phase note, README, repo map,
   and other intentionally published status files.
-- Keep MIR structure assertions as projected goldens in adjacent
-  `.mirproj.txt` files rather than embedding long expected MIR snippets in the
-  `.cpp` file.
+- Keep MIR structure assertions as projected goldens in
+  `kernel/goldens/mir/*.mirproj.txt` rather than embedding long expected MIR
+  snippets in the `.cpp` file.
 - Use `ExpectMirFirstMatchProjectionFile` from `tests/tool/tool_suite_common.*`
   to compare those projected MIR goldens against the merged dump.
 

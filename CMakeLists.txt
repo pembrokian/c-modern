@@ -149,6 +149,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/tool_freestanding_tests.cpp
     tests/tool/tool_suite_common.cpp
     tests/tool/freestanding/bootstrap/suite.cpp
+    tests/tool/freestanding/kernel/artifacts.cpp
     tests/tool/freestanding/kernel/shard1.cpp
     tests/tool/freestanding/kernel/shard2.cpp
     tests/tool/freestanding/kernel/shard3.cpp
@@ -238,6 +239,7 @@ add_test(NAME mc_tool_freestanding_kernel_shard7_unit COMMAND mc_tool_freestandi
 add_test(NAME mc_tool_freestanding_kernel_shard8_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-8)
 add_test(NAME mc_tool_freestanding_kernel_shard9_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-9)
 add_test(NAME mc_tool_freestanding_kernel_docs_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-docs)
+add_test(NAME mc_tool_freestanding_kernel_artifacts_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-artifacts)
 
 add_test(NAME mc_tool_freestanding_system_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} system)
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})

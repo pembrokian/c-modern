@@ -1,3 +1,4 @@
+#include <array>
 #include <filesystem>
 #include <string>
 
@@ -16,57 +17,47 @@ using mc::test_support::WriteFile;
 
 namespace {
 
-void ExpectPhase105BehaviorSlice(std::string_view run_output,
-                                 const std::filesystem::path& expected_lines_path) {
-    ExpectTextContainsLinesFile(run_output,
-                                expected_lines_path,
-                                "phase105 freestanding kernel log-service handshake run should preserve the landed phase105 slice");
-}
+constexpr std::array<std::string_view, 0> kNoRequiredObjectFiles{};
 
-void ExpectPhase105MirSlice(const std::filesystem::path& mir_path,
-                            const std::filesystem::path& expected_projection_path) {
-    const std::string kernel_mir = ReadFile(mir_path);
-    ExpectMirFirstMatchProjectionFile(
-        kernel_mir,
-        {
-            "Function name=validate_phase104_contract_hardening returns=[bool]",
-            "TypeDecl kind=struct name=log_service.LogServiceState",
-            "TypeDecl kind=struct name=log_service.LogHandshakeObservation",
-            "Function name=execute_phase105_log_service_handshake returns=[bool]",
-            "Function name=log_service.record_open_request returns=[log_service.LogServiceState]",
-            "Function name=log_service.observe_handshake returns=[log_service.LogHandshakeObservation]",
-            "Function name=log_service.ack_payload returns=[[4]u8]",
-            "Function name=validate_phase105_log_service_handshake returns=[bool]",
-        },
-        expected_projection_path,
-        "phase105 merged MIR should preserve the log-service projection");
-}
+constexpr std::array<std::string_view, 8> kPhase105MirSelectors{ {
+    "Function name=validate_phase104_contract_hardening returns=[bool]",
+    "TypeDecl kind=struct name=log_service.LogServiceState",
+    "TypeDecl kind=struct name=log_service.LogHandshakeObservation",
+    "Function name=execute_phase105_log_service_handshake returns=[bool]",
+    "Function name=log_service.record_open_request returns=[log_service.LogServiceState]",
+    "Function name=log_service.observe_handshake returns=[log_service.LogHandshakeObservation]",
+    "Function name=log_service.ack_payload returns=[[4]u8]",
+    "Function name=validate_phase105_log_service_handshake returns=[bool]",
+} };
 
-void ExpectPhase106BehaviorSlice(std::string_view run_output,
-                                 const std::filesystem::path& expected_lines_path) {
-    ExpectTextContainsLinesFile(run_output,
-                                expected_lines_path,
-                                "phase106 freestanding kernel echo-service request-reply run should preserve the landed phase106 slice");
-}
+constexpr std::array<std::string_view, 8> kPhase106MirSelectors{ {
+    "Function name=validate_phase105_log_service_handshake returns=[bool]",
+    "TypeDecl kind=struct name=echo_service.EchoServiceState",
+    "TypeDecl kind=struct name=echo_service.EchoExchangeObservation",
+    "Function name=execute_phase106_echo_service_request_reply returns=[bool]",
+    "Function name=echo_service.record_request returns=[echo_service.EchoServiceState]",
+    "Function name=echo_service.reply_payload returns=[[4]u8]",
+    "Function name=echo_service.observe_exchange returns=[echo_service.EchoExchangeObservation]",
+    "Function name=validate_phase106_echo_service_request_reply returns=[bool]",
+} };
 
-void ExpectPhase106MirSlice(const std::filesystem::path& mir_path,
-                            const std::filesystem::path& expected_projection_path) {
-    const std::string kernel_mir = ReadFile(mir_path);
-    ExpectMirFirstMatchProjectionFile(
-        kernel_mir,
-        {
-            "Function name=validate_phase105_log_service_handshake returns=[bool]",
-            "TypeDecl kind=struct name=echo_service.EchoServiceState",
-            "TypeDecl kind=struct name=echo_service.EchoExchangeObservation",
-            "Function name=execute_phase106_echo_service_request_reply returns=[bool]",
-            "Function name=echo_service.record_request returns=[echo_service.EchoServiceState]",
-            "Function name=echo_service.reply_payload returns=[[4]u8]",
-            "Function name=echo_service.observe_exchange returns=[echo_service.EchoExchangeObservation]",
-            "Function name=validate_phase106_echo_service_request_reply returns=[bool]",
-        },
-        expected_projection_path,
-        "phase106 merged MIR should preserve the echo-service projection");
-}
+const FreestandingKernelPhaseCheck kPhase105Check{
+    .label = "phase105 freestanding kernel log-service handshake",
+    .expected_run_lines_file = "phase105_real_log_service_handshake.run.contains.txt",
+    .required_object_files = kNoRequiredObjectFiles,
+    .mir_selectors = kPhase105MirSelectors,
+    .expected_mir_projection_file = "phase105_real_log_service_handshake.mirproj.txt",
+};
+
+const FreestandingKernelPhaseCheck kPhase106Check{
+    .label = "phase106 freestanding kernel echo-service request-reply",
+    .expected_run_lines_file = "phase106_real_echo_service_request_reply.run.contains.txt",
+    .required_object_files = kNoRequiredObjectFiles,
+    .mir_selectors = kPhase106MirSelectors,
+    .expected_mir_projection_file = "phase106_real_echo_service_request_reply.mirproj.txt",
+};
+
+const std::array<FreestandingKernelPhaseCheck, 2> kShard1PhaseChecks{ {kPhase105Check, kPhase106Check} };
 
 }  // namespace
 
@@ -870,15 +861,6 @@ void RunFreestandingKernelPhase88BuildIntegrationAudit(const std::filesystem::pa
                                        "phase88 freestanding kernel build integration build");
 
     const auto build_targets = mc::support::ComputeBuildArtifactTargets(project_root / "src/main.mc", build_dir);
-    const std::filesystem::path runtime_object =
-        build_targets.object.parent_path() /
-        (build_targets.object.stem().generic_string() + ".freestanding.bootstrap_main.runtime.o");
-    if (!std::filesystem::exists(build_targets.object)) {
-        Fail("phase88 freestanding kernel build integration build should emit an entry object artifact");
-    }
-    if (!std::filesystem::exists(runtime_object)) {
-        Fail("phase88 freestanding kernel build integration build should emit a freestanding runtime object artifact");
-    }
     if (!std::filesystem::exists(build_targets.executable)) {
         Fail("phase88 freestanding kernel build integration build should emit an executable artifact");
     }
@@ -891,40 +873,12 @@ void RunFreestandingKernelPhase88BuildIntegrationAudit(const std::filesystem::pa
              driver_run_output);
     }
 
-    WriteFile(project_root / "target/phase88_manual_support.c",
-              "int phase88_kernel_delta(void) {\n"
-              "    return 9;\n"
-              "}\n");
-    const std::filesystem::path manual_support_object = project_root / "target/phase88_manual_support.o";
-    CompileBootstrapCObjectAndExpectSuccess(project_root / "target/phase88_manual_support.c",
-                                            manual_support_object,
-                                            project_root / "target/phase88_manual_support_compile_output.txt",
-                                            "phase88 manual support object compile");
-
-    const std::filesystem::path manual_executable = build_dir / "bin" / "phase88_manual_kernel";
-    LinkBootstrapObjectsAndExpectSuccess({build_targets.object, manual_support_object, runtime_object},
-                                         manual_executable,
-                                         build_dir / "phase88_manual_link_output.txt",
-                                         "phase88 manual freestanding kernel link");
-
-    const auto [manual_run_outcome, manual_run_output] = RunCommandCapture({manual_executable.generic_string()},
-                                                                           build_dir / "phase88_manual_link_run_output.txt",
-                                                                           "phase88 manual freestanding kernel run");
-    if (!manual_run_outcome.exited || manual_run_outcome.exit_code != 89) {
-        Fail("phase88 manual freestanding kernel run should exit with the relinked proof marker:\n" +
-             manual_run_output);
-    }
-
 }
 
 void RunFreestandingKernelPhase105RealLogServiceHandshake(const std::filesystem::path& source_root,
                                                           const std::filesystem::path& binary_root,
                                                           const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const auto run_lines_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase105_real_log_service_handshake.run.contains.txt");
-    const auto mir_projection_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                         "phase105_real_log_service_handshake.mirproj.txt");
     const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
                                                                common_paths.project_path,
                                                                common_paths.main_source_path,
@@ -932,18 +886,18 @@ void RunFreestandingKernelPhase105RealLogServiceHandshake(const std::filesystem:
                                                                "kernel_phase105_log_service",
                                                                "freestanding kernel phase105 log-service handshake build",
                                                                "freestanding kernel phase105 log-service handshake run");
-    ExpectPhase105BehaviorSlice(artifacts.run_output, run_lines_path);
-    ExpectPhase105MirSlice(artifacts.dump_targets.mir, mir_projection_path);
+    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
+    ExpectFreestandingKernelPhaseFromArtifacts(source_root,
+                                               artifacts.build_targets.object.parent_path(),
+                                               artifacts.run_output,
+                                               kernel_mir,
+                                               kPhase105Check);
 }
 
 void RunFreestandingKernelPhase106RealEchoServiceRequestReply(const std::filesystem::path& source_root,
                                                               const std::filesystem::path& binary_root,
                                                               const std::filesystem::path& mc_path) {
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const auto run_lines_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase106_real_echo_service_request_reply.run.contains.txt");
-    const auto mir_projection_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                         "phase106_real_echo_service_request_reply.mirproj.txt");
     const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
                                                                common_paths.project_path,
                                                                common_paths.main_source_path,
@@ -951,8 +905,12 @@ void RunFreestandingKernelPhase106RealEchoServiceRequestReply(const std::filesys
                                                                "kernel_phase106_echo_service",
                                                                "freestanding kernel phase106 echo-service request-reply build",
                                                                "freestanding kernel phase106 echo-service request-reply run");
-    ExpectPhase106BehaviorSlice(artifacts.run_output, run_lines_path);
-    ExpectPhase106MirSlice(artifacts.dump_targets.mir, mir_projection_path);
+    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
+    ExpectFreestandingKernelPhaseFromArtifacts(source_root,
+                                               artifacts.build_targets.object.parent_path(),
+                                               artifacts.run_output,
+                                               kernel_mir,
+                                               kPhase106Check);
 }
 
 void RunFreestandingKernelShard1(const std::filesystem::path& source_root,
@@ -975,12 +933,14 @@ void RunFreestandingKernelShard1(const std::filesystem::path& source_root,
                                 ResolveFreestandingKernelGoldenPath(source_root,
                                                                     "kernel_shard1.run.contains.txt"),
                                 "shard1 freestanding kernel run should preserve the landed shard1 runtime slices");
-    ExpectPhase105MirSlice(artifacts.dump_targets.mir,
-                           ResolveFreestandingKernelGoldenPath(source_root,
-                                                               "phase105_real_log_service_handshake.mirproj.txt"));
-    ExpectPhase106MirSlice(artifacts.dump_targets.mir,
-                           ResolveFreestandingKernelGoldenPath(source_root,
-                                                               "phase106_real_echo_service_request_reply.mirproj.txt"));
+    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
+    for (const auto& phase_check : kShard1PhaseChecks) {
+        ExpectFreestandingKernelPhaseFromArtifacts(source_root,
+                                                   artifacts.build_targets.object.parent_path(),
+                                                   artifacts.run_output,
+                                                   kernel_mir,
+                                                   phase_check);
+    }
 }
 
 }  // namespace mc::tool_tests

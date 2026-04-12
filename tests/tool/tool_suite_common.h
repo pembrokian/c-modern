@@ -69,6 +69,16 @@ void LinkBootstrapObjectsAndExpectSuccess(const std::vector<std::filesystem::pat
                                           const std::filesystem::path& output_path,
                                           const std::string& context);
 
+std::vector<std::filesystem::path> CollectBootstrapObjectFiles(const std::filesystem::path& object_dir);
+
+std::string LinkBootstrapObjectsAndRunExpectExitCode(const std::vector<std::filesystem::path>& object_paths,
+                                                     const std::filesystem::path& executable_path,
+                                                     const std::filesystem::path& link_output_path,
+                                                     const std::filesystem::path& run_output_path,
+                                                     int expected_exit_code,
+                                                     const std::string& link_context,
+                                                     const std::string& run_context);
+
 std::filesystem::path ResolvePlanDocPath(const std::filesystem::path& source_root,
                                          std::string_view file_name);
 
@@ -214,30 +224,14 @@ void RunFreestandingKernelMetadataSuite(const std::filesystem::path& source_root
                                         const std::filesystem::path& binary_root,
                                         const std::filesystem::path& mc_path);
 
+void RunFreestandingKernelArtifactSuite(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path);
+
 void RunFreestandingKernelToolSuiteCase(const std::filesystem::path& source_root,
                                         const std::filesystem::path& binary_root,
                                         const std::filesystem::path& mc_path,
                                         std::string_view case_name);
-
-void RunFreestandingKernelToolSuiteShard1(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path);
-
-void RunFreestandingKernelToolSuiteShard2(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path);
-
-void RunFreestandingKernelToolSuiteShard3(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path);
-
-void RunFreestandingKernelToolSuiteShard4(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path);
-
-void RunFreestandingKernelToolSuiteShard5(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path);
 
 void RunFreestandingSystemToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,

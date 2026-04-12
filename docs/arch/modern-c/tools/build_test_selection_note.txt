@@ -1,0 +1,125 @@
+Modern C - Ownership-Based Build And Test Selection Note
+
+Purpose
+
+This note records the intended next step for smarter local validation in the
+repository: keep ordinary CMake incremental rebuilds, but make test selection
+explicitly ownership-based so small changes do not force unrelated local test
+runs.
+
+Current state
+
+- `cmake --build build/debug -j4` is already incremental for compiled sources
+- local friction now comes more from test selection than from compilation
+- repository tests are increasingly organized around explicit ownership slices:
+  parser, sema, MIR, codegen, tool workflow, tool build-state, tool
+  real-project, freestanding bootstrap, freestanding kernel shards,
+  freestanding kernel docs, freestanding kernel artifacts, and freestanding
+  system
+
+Design position
+
+- do not start with content-addressed remote caching or a Bazel-like graph
+- start with an explicit changed-path to owning-CTest mapping
+- keep the mapping conservative and reviewable
+- prefer broad fallback over hidden false negatives
+
+Why this is the right first step
+
+- the repository already has named CTest slices with semantic ownership
+- recent freestanding cleanup made kernel ownership narrower and more stable
+- explicit ownership mapping matches the test design principles better than a
+  heuristic or opaque cache
+- local users mostly need a faster answer to "what should I rerun now?"
+
+Canonical first tool
+
+- `tools/select_tests.py`
+
+Behavior
+
+- discover changed paths from an explicit path list or, by default, from the
+  current branch merge-base against `origin/main`, `main`, `origin/master`, or
+  `master`
+- include untracked files in that changed-path set
+- map changed paths to owning CTest targets
+- print the selected targets and the reason each target was selected
+- optionally run an incremental build and the selected tests
+- optionally skip selected tests whose owned inputs fingerprint matches the
+  last successful local cached run
+
+Important rule
+
+- the selector is a local iteration helper, not a release gate by itself
+- broad gates still matter before landing non-trivial changes
+
+Ownership mapping guidance
+
+- syntax-layer compiler changes should route to parser, sema, MIR, and narrow
+  codegen validation
+- driver and support-layer changes should route to the grouped tool suites
+- freestanding kernel shard owners and shard-owned goldens should route to the
+  owning shard CTest
+- freestanding kernel publication and repo-map changes should route to the
+  kernel docs suite
+- freestanding kernel relink-contract files should route to the kernel
+  artifacts suite
+- unknown executable-path changes should fall back conservatively rather than
+  silently selecting nothing
+
+Examples
+
+- changing `tests/tool/freestanding/kernel/shard2.cpp` should select
+  `mc_tool_freestanding_kernel_shard2_unit`
+- changing `tests/tool/freestanding/kernel/goldens/run/kernel_shard7.run.contains.txt`
+  should select `mc_tool_freestanding_kernel_shard7_unit`
+- changing `docs/agent/prompts/repo_map.md` should select
+  `mc_tool_freestanding_kernel_docs_unit`
+- changing `compiler/driver/` should select the grouped tool suites
+
+Freestanding kernel maintenance checklist
+
+When a new freestanding kernel phase lands, the selector should not be the
+first file you touch.
+
+Normal order:
+
+- update the owning shard or standalone proof owner under
+  `tests/tool/freestanding/kernel/`
+- add or update the owned goldens under
+  `tests/tool/freestanding/kernel/goldens/{mir,run,contracts}/`
+- update `tests/tool/freestanding/kernel/suite.cpp` if the phase needs a new
+  direct `kernel-case:` selector entry
+- update `tools/select_tests.py` only if the new phase changes shard
+  ownership, adds a new shard, or adds a new suite surface such as docs or
+  artifacts
+
+Current remaining manual touchpoints for new freestanding kernel phases:
+
+- `tests/tool/freestanding/kernel/shardN.cpp`: owning runtime or proof logic
+- `tests/tool/freestanding/kernel/goldens/...`: owned MIR, run, or contract
+  goldens
+- `tests/tool/freestanding/kernel/suite.cpp`: direct case registry for
+  `kernel-case:`
+- `tools/select_tests.py`: shard-phase ownership metadata when shard ranges or
+  shard count change
+- `CMakeLists.txt`: only when a new shard CTest, docs/artifact suite, or other
+  new top-level test surface is introduced
+
+Current bounded cache model
+
+- the selector may keep a local cache file under the active build tree
+- cache entries are per CTest target and record the last successful owned-input
+  fingerprint
+- cache misses or unknown ownership should rerun tests rather than guessing
+
+Non-goal:
+
+- a fully general graph engine with hidden dependency discovery
+
+Bottom line
+
+- use CMake for incremental compilation
+- use explicit ownership mapping for selective local test execution
+- use per-target owned-input fingerprints only as a conservative local rerun
+  skip, not as a replacement for broader gates

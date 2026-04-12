@@ -2,8 +2,10 @@ BUILD_DIR ?= build/debug
 CONFIG ?= Debug
 MC ?= $(BUILD_DIR)/bin/mc
 CTEST_JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+SELECT_TESTS_PY ?= $(shell if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' python3; fi)
+SELECT_TESTS_ARGS ?= --build --run --cache
 
-.PHONY: build test first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate freestanding-support-audit release-snapshot-prep clean-legacy-build-debris format dump-paths clean
+.PHONY: build test select-tests first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate freestanding-support-audit release-snapshot-prep clean-legacy-build-debris format dump-paths clean
 
 build:
 	cmake -S . -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE="$(CONFIG)"
@@ -11,6 +13,9 @@ build:
 
 test: build
 	ctest --test-dir "$(BUILD_DIR)" -j"$(CTEST_JOBS)" --output-on-failure
+
+select-tests:
+	"$(SELECT_TESTS_PY)" tools/select_tests.py --source-root . --build-dir "$(BUILD_DIR)" $(SELECT_TESTS_ARGS)
 
 first-use-smoke: build
 	ctest --test-dir "$(BUILD_DIR)" -R '^mc_first_use_smoke$$' --output-on-failure

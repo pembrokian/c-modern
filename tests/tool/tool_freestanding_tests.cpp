@@ -53,6 +53,10 @@ void RunSelectedFreestandingSuite(std::string_view suite,
 		mc::tool_tests::RunFreestandingKernelMetadataSuite(source_root, suite_root, mc_path);
 		return;
 	}
+	if (suite == "kernel-artifacts") {
+		mc::tool_tests::RunFreestandingKernelArtifactSuite(source_root, suite_root, mc_path);
+		return;
+	}
 	int kernel_shard = 0;
 	if (ParseKernelShardSelector(suite, kernel_shard)) {
 		mc::tool_tests::RunFreestandingKernelToolSuiteShard(source_root, suite_root, mc_path, kernel_shard);

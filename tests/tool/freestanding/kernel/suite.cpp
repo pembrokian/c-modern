@@ -10,6 +10,7 @@ namespace mc {
 namespace tool_tests {
 
 using KernelTestFn = void(const std::filesystem::path&, const std::filesystem::path&, const std::filesystem::path&);
+using KernelShardFn = KernelTestFn;
 
 struct KernelTestCase {
     std::string_view name;
@@ -181,46 +182,29 @@ namespace {
 
 using mc::test_support::Fail;
 
-void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,
-                                   const std::filesystem::path& binary_root,
-                                   const std::filesystem::path& mc_path,
-                                   int shard);
+constexpr int kFirstKernelShard = 1;
+constexpr int kLastKernelShard = 9;
+
+const std::array<KernelShardFn*, kLastKernelShard> kKernelShardFns = {{
+    &RunFreestandingKernelShard1,
+    &RunFreestandingKernelShard2,
+    &RunFreestandingKernelShard3,
+    &RunFreestandingKernelShard4,
+    &RunFreestandingKernelShard5,
+    &RunFreestandingKernelShard6,
+    &RunFreestandingKernelShard7,
+    &RunFreestandingKernelShard8,
+    &RunFreestandingKernelShard9,
+}};
 
 void RunFreestandingKernelShardDispatch(const std::filesystem::path& source_root,
                                         const std::filesystem::path& binary_root,
                                         const std::filesystem::path& mc_path,
                                         int shard) {
-    switch (shard) {
-    case 1:
-        RunFreestandingKernelShard1(source_root, binary_root, mc_path);
-        return;
-    case 2:
-        RunFreestandingKernelShard2(source_root, binary_root, mc_path);
-        return;
-    case 3:
-        RunFreestandingKernelShard3(source_root, binary_root, mc_path);
-        return;
-    case 4:
-        RunFreestandingKernelShard4(source_root, binary_root, mc_path);
-        return;
-    case 5:
-        RunFreestandingKernelShard5(source_root, binary_root, mc_path);
-        return;
-    case 6:
-        RunFreestandingKernelShard6(source_root, binary_root, mc_path);
-        return;
-    case 7:
-        RunFreestandingKernelShard7(source_root, binary_root, mc_path);
-        return;
-    case 8:
-        RunFreestandingKernelShard8(source_root, binary_root, mc_path);
-        return;
-    case 9:
-        RunFreestandingKernelShard9(source_root, binary_root, mc_path);
-        return;
-    default:
+    if (shard < kFirstKernelShard || shard > kLastKernelShard) {
         Fail("unknown freestanding kernel shard selector: " + std::to_string(shard));
     }
+    kKernelShardFns[static_cast<std::size_t>(shard - kFirstKernelShard)](source_root, binary_root, mc_path);
 }
 
 const std::array<KernelTestCase, 44> kKernelTestCases = {{
@@ -270,18 +254,6 @@ const std::array<KernelTestCase, 44> kKernelTestCases = {{
     {"phase147_ipc_shape_audit_under_real_usage", 9, &RunFreestandingKernelPhase147IpcShapeAuditUnderRealUsage},
 }};
 
-void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,
-                                   const std::filesystem::path& binary_root,
-                                   const std::filesystem::path& mc_path,
-                                   int shard) {
-    for (const auto& test_case : kKernelTestCases) {
-        if (shard != 0 && test_case.shard != shard) {
-            continue;
-        }
-        test_case.fn(source_root, binary_root, mc_path);
-    }
-}
-
 const KernelTestCase* FindKernelTestCase(std::string_view case_name) {
     for (const auto& test_case : kKernelTestCases) {
         if (test_case.name == case_name) {
@@ -298,7 +270,7 @@ void RunFreestandingKernelToolSuiteShard(const std::filesystem::path& source_roo
                                          const std::filesystem::path& mc_path,
                                          int shard) {
     if (shard == 0) {
-        for (int selected_shard = 1; selected_shard <= 9; ++selected_shard) {
+        for (int selected_shard = kFirstKernelShard; selected_shard <= kLastKernelShard; ++selected_shard) {
             RunFreestandingKernelShardDispatch(source_root, binary_root, mc_path, selected_shard);
         }
         return;
@@ -317,64 +289,11 @@ void RunFreestandingKernelToolSuiteCase(const std::filesystem::path& source_root
     test_case->fn(source_root, binary_root, mc_path);
 }
 
-void RunFreestandingKernelToolSuiteShard1(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 1);
-}
-
-void RunFreestandingKernelToolSuiteShard2(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 2);
-}
-
-void RunFreestandingKernelToolSuiteShard3(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 3);
-}
-
-void RunFreestandingKernelToolSuiteShard4(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 4);
-}
-
-void RunFreestandingKernelToolSuiteShard5(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 5);
-}
-
-void RunFreestandingKernelToolSuiteShard6(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 6);
-}
-
-void RunFreestandingKernelToolSuiteShard7(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 7);
-}
-
-void RunFreestandingKernelToolSuiteShard8(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 8);
-}
-
-void RunFreestandingKernelToolSuiteShard9(const std::filesystem::path& source_root,
-                                          const std::filesystem::path& binary_root,
-                                          const std::filesystem::path& mc_path) {
-    RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 9);
-}
-
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
                                     const std::filesystem::path& mc_path) {
     RunFreestandingKernelToolSuiteShard(source_root, binary_root, mc_path, 0);
+    RunFreestandingKernelArtifactSuite(source_root, binary_root, mc_path);
 }
 
 void RunFreestandingKernelMetadataSuite(const std::filesystem::path& source_root,

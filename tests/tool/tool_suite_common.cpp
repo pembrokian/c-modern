@@ -1,5 +1,6 @@
 #include "tests/tool/tool_suite_common.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <sstream>
 #include <vector>
@@ -51,7 +52,21 @@ FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::files
 
 std::filesystem::path ResolveFreestandingKernelGoldenPath(const std::filesystem::path& source_root,
                                                           std::string_view file_name) {
-    return source_root / "tests" / "tool" / "freestanding" / "kernel" / std::string(file_name);
+    const std::filesystem::path kernel_root = source_root / "tests" / "tool" / "freestanding" / "kernel";
+    const std::filesystem::path direct_path = kernel_root / std::string(file_name);
+    if (file_name.find('/') != std::string_view::npos || std::filesystem::exists(direct_path)) {
+        return direct_path;
+    }
+    if (file_name.ends_with(".mirproj.txt") || file_name.ends_with(".mir.contains.txt")) {
+        return kernel_root / "goldens" / "mir" / std::string(file_name);
+    }
+    if (file_name.ends_with(".run.contains.txt")) {
+        return kernel_root / "goldens" / "run" / std::string(file_name);
+    }
+    if (file_name.ends_with(".contains.txt")) {
+        return kernel_root / "goldens" / "contracts" / std::string(file_name);
+    }
+    return direct_path;
 }
 
 std::filesystem::path ResolveCanopusRoadmapPath(const std::filesystem::path& source_root,
@@ -153,6 +168,35 @@ void LinkBootstrapObjectsAndExpectSuccess(const std::vector<std::filesystem::pat
     if (!outcome.exited || outcome.exit_code != 0) {
         Fail(context + " should succeed:\n" + output);
     }
+}
+
+std::vector<std::filesystem::path> CollectBootstrapObjectFiles(const std::filesystem::path& object_dir) {
+    std::vector<std::filesystem::path> object_paths;
+    for (const auto& entry : std::filesystem::directory_iterator(object_dir)) {
+        if (entry.path().extension() == ".o") {
+            object_paths.push_back(entry.path());
+        }
+    }
+    std::sort(object_paths.begin(), object_paths.end());
+    return object_paths;
+}
+
+std::string LinkBootstrapObjectsAndRunExpectExitCode(const std::vector<std::filesystem::path>& object_paths,
+                                                     const std::filesystem::path& executable_path,
+                                                     const std::filesystem::path& link_output_path,
+                                                     const std::filesystem::path& run_output_path,
+                                                     int expected_exit_code,
+                                                     const std::string& link_context,
+                                                     const std::string& run_context) {
+    LinkBootstrapObjectsAndExpectSuccess(object_paths, executable_path, link_output_path, link_context);
+
+    const auto [run_outcome, run_output] = RunCommandCapture({executable_path.generic_string()},
+                                                             run_output_path,
+                                                             run_context);
+    if (!run_outcome.exited || run_outcome.exit_code != expected_exit_code) {
+        Fail(run_context + " should exit with code " + std::to_string(expected_exit_code) + ":\n" + run_output);
+    }
+    return run_output;
 }
 
 std::filesystem::path ResolvePlanDocPath(const std::filesystem::path& source_root,

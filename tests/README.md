@@ -77,7 +77,9 @@ The active grouped tool CTest targets use semantic names:
 - `mc_tool_build_state_unit`
 - `mc_tool_real_project_unit`
 - `mc_tool_freestanding_bootstrap_unit`
-- `mc_tool_freestanding_kernel_case_<name>_unit`
+- `mc_tool_freestanding_kernel_shard1_unit` through `mc_tool_freestanding_kernel_shard9_unit`
+- `mc_tool_freestanding_kernel_docs_unit`
+- `mc_tool_freestanding_kernel_artifacts_unit`
 - `mc_tool_freestanding_system_unit`
 
 When those grouped tool suites generate disposable outputs, they now root them
@@ -107,3 +109,14 @@ POSIX-like development environment.
 No extra CMake host gating is currently applied because the admitted bootstrap
 host remains POSIX-like. If that host matrix broadens, these suites should be
 the first place to add explicit gating rather than implying wider portability.
+
+# Local Selection Helper
+
+For local iteration, `tools/select_tests.py` can map changed paths to the
+owning CTest targets and optionally run an incremental build plus only that
+selected test subset. By default it compares the working tree against the
+current branch merge-base with `main` or `master`, and it also supports an
+optional per-target fingerprint cache for repeated local reruns.
+
+The repository also exposes `make select-tests` as the low-friction wrapper
+for this workflow.
