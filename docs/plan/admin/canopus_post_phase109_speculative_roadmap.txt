@@ -236,10 +236,7 @@ Phase 143 -- Long-Lived Log Service Follow-Through
 - Phase 143 is now concrete as one bounded long-lived log-service follow-through with bounded in-memory retention, one service-owned `log tail` reply path, one explicit overwrite-on-full consequence, and compiler, persistence, and payload-width surfaces kept closed.
 
 Phase 144 -- Stateful Key-Value Service Follow-Through
-- Exit criterion: one bounded key-value service retains explicit state across
-  multiple shell-driven requests, supports at least set or get or overwrite
-  behavior, and composes with the shell path and at least one second service
-  path without widening into a general storage subsystem.
+- Phase 144 is now concrete as one bounded stateful key-value service follow-through with bounded in-memory retained entries, one explicit missing-key reply, one explicit overwrite contract, one fixed key-value-write observation into `log_service`, and compiler, persistence, and middleware surfaces kept closed.
 
 Band D - Make Real Failure And Restart Hurt The System
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

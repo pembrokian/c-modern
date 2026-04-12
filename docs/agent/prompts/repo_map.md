@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 143 long-lived log-service follow-through target
+- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 144 stateful key-value service follow-through target
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Canopus source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
@@ -35,6 +35,7 @@ This file is a fast orientation map for agents working in this repository.
   - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for spawn, timer block, wake-to-ready, exit, and waited-child release follow-through
   - `src/debug/`: one logical `debug` module split through `module_sets.debug`, owning Phase 108 image/program-cap audit, Phase 109 first-running-kernel-slice audit, Phase 110 ownership-split audit, Phase 111 lifecycle-ownership audit, Phase 112 syscall-boundary audit, Phase 113 interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115 timer-ownership audit, Phase 116 MMU activation-barrier audit, Phase 117 init-orchestrated multi-service audit, Phase 118 delegated request-reply audit, Phase 119 namespace-pressure audit, Phase 120 running-system support audit, Phase 121 kernel image-contract hardening audit, Phase 122 target-surface audit, Phase 123 next-plateau audit, Phase 124 delegation-chain stress audit, Phase 125 invalidation and rejection audit, Phase 126 authority lifetime classification audit, Phase 128 service-death observation audit, Phase 129 partial-failure propagation audit, Phase 134 minimal device-service handoff audit, Phase 135 buffer ownership boundary audit, Phase 136 device failure containment audit, Phase 137 optional completion-backed follow-through audit, Phase 140 serial-ingress composed service-graph audit, Phase 141 interactive-service scope-freeze audit, Phase 142 serial shell command-routing audit, and Phase 143 long-lived log-service audit
   - `src/log_service.mc`: bounded log-service protocol state, retained in-memory log state, explicit overwrite-on-full policy, acknowledgment payload, retained-log observation records, and handshake observation records
+  - `src/kv_service.mc`: bounded key-value-service retained table state, explicit missing-key and overwrite consequences, fixed key-value-write log markers, and retained-state observation records
   - `src/echo_service.mc`: bounded echo-service protocol state, request-derived reply payload, and exchange observation records
   - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
   - `src/serial_service.mc`: bounded serial-service ingress state plus one service-owned copied receive-frame log, one fixed forwarded composition request observation, one aggregate-reply observation, and one service-local malformed-input classification path
@@ -126,6 +127,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/freestanding/kernel/phase141_interactive_service_system_scope_freeze.cpp`: one kernel proof owner for the bounded shell-owner and key-value-owner scope freeze
     - `tests/tool/freestanding/kernel/phase142_serial_shell_command_routing.cpp`: one kernel proof owner for the bounded serial-shell command-routing step
     - `tests/tool/freestanding/kernel/phase143_long_lived_log_service_follow_through.cpp`: one kernel proof owner for the bounded retained-log follow-through step
+    - `tests/tool/freestanding/kernel/phase144_stateful_key_value_service_follow_through.cpp`: one kernel proof owner for the bounded stateful key-value follow-through step
     - late ownership-hardening kernel audits now keep one `.cpp` proof owner plus one adjacent `.mirproj.txt` projected MIR golden; the `.cpp` owns behavior and publication checks while the `.mirproj.txt` owns the expected MIR projection
     - `tests/tool/tool_suite_common.cpp`: `ExpectMirFirstMatchProjectionFile` is the shared helper for those projected MIR goldens
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation

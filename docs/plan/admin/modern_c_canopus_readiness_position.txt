@@ -16,6 +16,7 @@ Record one maintained repository position after Phase 140 published one bounded 
 Record one maintained repository position after Phase 141 published one bounded interactive service system scope freeze over that same slice.
 Record one maintained repository position after Phase 142 published one bounded serial shell command-routing step over that same slice.
 Record one maintained repository position after Phase 143 published one bounded long-lived log-service follow-through over that same slice.
+Record one maintained repository position after Phase 144 published one bounded stateful key-value service follow-through over that same slice.
 
 This note answers four questions that now matter:
 
@@ -57,6 +58,7 @@ This position statement is meant to stay aligned with:
 - `docs/plan/active/phase141_interactive_service_system_scope_freeze.txt`
 - `docs/plan/active/phase142_serial_shell_command_routing.txt`
 - `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
 - `docs/plan/phase120_running_system_support_statement.txt`
 - `docs/plan/phase121_kernel_image_contract_hardening.txt`
 - `docs/plan/phase122_target_surface_audit.txt`
@@ -142,6 +144,9 @@ Current repository truth
 - The landed Phase 143 long-lived log-service follow-through also belongs to
   that same admitted slice rather than to a broader persistence layer,
   filesystem, observability framework, or reopened compiler wave.
+- The landed Phase 144 stateful key-value service follow-through also belongs to
+  that same admitted slice rather than to a broader storage layer, database
+  abstraction, middleware framework, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation

@@ -52,6 +52,7 @@ Structure
   - `phase141_interactive_service_system_scope_freeze.cpp`: real-kernel bounded shell-owner and key-value-owner scope-freeze audit.
   - `phase142_serial_shell_command_routing.cpp`: real-kernel bounded serial shell command-routing audit.
   - `phase143_long_lived_log_service_follow_through.cpp`: real-kernel bounded long-lived log-service follow-through audit.
+  - `phase144_stateful_key_value_service_follow_through.cpp`: real-kernel bounded stateful key-value service follow-through audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

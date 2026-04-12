@@ -691,3 +691,23 @@ struct Phase143LongLivedLogServiceAudit {
     durable_persistence_visible: u32
     compiler_reopening_visible: u32
 }
+
+struct Phase144StatefulKeyValueServiceFollowThroughAudit {
+    phase143: Phase143LongLivedLogServiceAudit
+    kv_service_pid: u32
+    shell_service_pid: u32
+    log_service_pid: u32
+    missing_get_route: shell_service.ShellRoutingObservation
+    initial_set_route: shell_service.ShellRoutingObservation
+    hit_get_route: shell_service.ShellRoutingObservation
+    overwrite_set_route: shell_service.ShellRoutingObservation
+    overwrite_get_route: shell_service.ShellRoutingObservation
+    kv_retention: kv_service.KvRetentionObservation
+    write_log_retention: log_service.LogRetentionObservation
+    bounded_retention_visible: u32
+    missing_key_visible: u32
+    explicit_overwrite_visible: u32
+    fixed_write_log_visible: u32
+    durable_persistence_visible: u32
+    compiler_reopening_visible: u32
+}

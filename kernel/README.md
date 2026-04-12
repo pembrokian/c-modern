@@ -10,6 +10,8 @@ Current status
 - Phase 142 therefore now publishes one bounded serial shell command-routing step.
 - Phase 143 has moved the repository-owned kernel artifact beyond the landed Phase 142 shell command-routing step into one bounded long-lived log-service follow-through.
 - Phase 143 therefore now publishes one bounded long-lived log-service follow-through.
+- Phase 144 has moved the repository-owned kernel artifact beyond the landed Phase 143 long-lived log-service step into one bounded stateful key-value service follow-through.
+- Phase 144 therefore now publishes one bounded stateful key-value service follow-through.
 - Phase 141 has moved the repository-owned kernel artifact beyond the landed Phase 140 composed-graph step into one bounded interactive service system scope freeze with a concrete shell owner and a concrete key-value owner.
 - Phase 141 therefore now publishes one bounded interactive service system scope freeze.
 
@@ -155,9 +157,9 @@ Current files
   fixed service routing, bounded reply shaping, compact four-byte command
   encoding, and one explicit split between serial transport ownership and
   shell semantics
-- `src/kv_service.mc`: bounded key-value service state, one fixed key slot,
-  one fixed value slot, and one explicit stateful service owner admitted by
-  the Phase 141 slice
+- `src/kv_service.mc`: bounded key-value service retained table state,
+  explicit missing-key and overwrite consequences, fixed key-value-write log
+  markers, and one explicit stateful service owner carried through the Phase 144 slice
 - `src/transfer_service.mc`: bounded transfer-service grant state, emitted
   payload construction, and final transfer observation records
 - `src/uart.mc`: bounded UART receive-frame staging owner, bounded optional

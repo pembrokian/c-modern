@@ -3,7 +3,7 @@ Phase 144 -- Stateful Key-Value Service Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -11,15 +11,30 @@ Continue from the long-lived log follow-through by admitting one bounded
 stateful key-value service that can be used directly from the shell path and
 through one fixed two-service interaction.
 
-This document records the intended Phase 144 slice.
+This document records the landed Phase 144 slice.
 It defines one bounded in-memory key-value owner for the interactive-service
 system.
 It does not claim a storage subsystem, a database abstraction layer, durable
 recovery, or general service middleware.
 
+Phase result
+------------
+Phase 144 is complete as one bounded stateful key-value service follow-through over the real kernel artifact.
+
+The landed repository slice now includes:
+
+- one concrete retained key-value owner in `kernel/src/kv_service.mc`
+- one bounded in-memory key-value table across multiple shell-driven requests
+- one explicit missing-key reply path owned by the key-value service rather than by shell-local synthesis
+- one explicit overwrite contract owned by the key-value service
+- one fixed key-value-write observation path into `log_service`
+- one focused Phase 144 audit and one focused freestanding regression over the same bounded key-value boundary
+
+It does not claim a storage subsystem, a database abstraction layer, durable recovery, or general service middleware.
+
 Repository status note
 ----------------------
-- Phase 143 should prove that one existing service owner can retain state
+- Phase 143 now proves that one existing service owner can retain state
   across repeated shell-driven requests.
 - The next honest pressure is a second, richer stateful owner where request
   shape, lookup semantics, overwrite behavior, and service-to-service use are
@@ -51,12 +66,12 @@ Core rule
 
 Chosen key-value shape
 ----------------------
-Chosen shape: yes.
+Chosen shape: landed.
 
-The Phase 144 key-value service should:
+The landed Phase 144 key-value service now:
 
-1. accept shell-routed `kv set <key> <value>` requests
-2. accept shell-routed `kv get <key>` requests
+1. accepts shell-routed `kv set <key> <value>` requests
+2. accepts shell-routed `kv get <key>` requests
 3. retain bounded in-memory entries across multiple requests
 4. define explicit overwrite and missing-key replies
 5. drive one fixed second-service interaction, preferably one bounded log
@@ -106,7 +121,7 @@ The owning implementation surfaces for this phase are:
 
 Chosen slice for this phase
 ---------------------------
-Targeted boundary shape:
+Landed boundary shape:
 
 1. one new bounded key-value owner with retained explicit in-memory state
 2. one shell-driven set path
@@ -114,14 +129,13 @@ Targeted boundary shape:
 4. one explicit missing-key and overwrite contract
 5. one fixed key-value to log interaction proving a useful two-service path
 
-Suggested execution order
--------------------------
-1. Freeze the bounded key-value contract in docs and types.
-2. Introduce the key-value owner and explicit boot wiring.
-3. Route shell `kv set` and `kv get` requests into that owner.
-4. Implement retained-state, missing-key, and overwrite behavior.
-5. Add one fixed write-observation path into `log_service`.
-6. Add the Phase 144 audit, regression, and projected MIR golden.
+Execution summary
+-----------------
+1. Keep the Phase 142 compact shell route and four-byte payload unchanged.
+2. Extend `kv_service` with one bounded retained table and explicit missing-key and overwrite state.
+3. Preserve the existing `kv set` and `kv get` reply bytes for the already-landed single-key shell cases while widening the kv reply contract internally to make miss and overwrite status explicit.
+4. Route one fixed key-value-write observation into `log_service` using explicit service-owned markers rather than a middleware layer.
+5. Add one Phase 144 audit, one projected MIR golden, and aligned docs over the bounded key-value boundary.
 
 Preferred proof points
 ----------------------
@@ -142,6 +156,13 @@ Exit criteria
 - the Phase 144 audit and focused regression prove the same key-value boundary
   across build, run, docs, and MIR
 - compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 144 slice
+- `kv_service` now retains one bounded in-memory key-value table across repeated shell-driven requests and answers `kv get` from retained state rather than from last-request echo state
+- missing-key and overwrite behavior now stay explicit and auditable inside the key-value-service owner rather than being inferred from shell helpers
+- one fixed key-value-write observation now flows into `log_service` without widening into persistence, middleware, storage, or compiler work
 
 Non-goals
 ---------

@@ -74,6 +74,8 @@ const PHASE142_MARKER: i32 = 142
 const PHASE142_MARKER_DETAIL: u32 = 142
 const PHASE143_MARKER: i32 = 143
 const PHASE143_MARKER_DETAIL: u32 = 143
+const PHASE144_MARKER: i32 = 144
+const PHASE144_MARKER_DETAIL: u32 = 144
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
@@ -2014,73 +2016,125 @@ func bootstrap_main() i32 {
         return 99
     }
 
+    phase144_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
+    phase144_shell_state: shell_service.ShellServiceState = shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID)
+    phase144_log_state: log_service.LogServiceState = log_service.service_state(LOG_SERVICE_STATE.owner_pid, LOG_SERVICE_STATE.endpoint_handle_slot)
+    phase144_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
+    phase144_kv_state: kv_service.KvServiceState = kv_service.service_state(PHASE141_KV_PID, 1)
+
+    phase144_missing_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
+    phase144_serial_state = phase144_missing_get.serial_state
+    phase144_shell_state = phase144_missing_get.shell_state
+    phase144_log_state = phase144_missing_get.log_state
+    phase144_echo_state = phase144_missing_get.echo_state
+    phase144_kv_state = phase144_missing_get.kv_state
+
+    phase144_initial_set: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_SET_BYTE1, 75, 86))
+    phase144_serial_state = phase144_initial_set.serial_state
+    phase144_shell_state = phase144_initial_set.shell_state
+    phase144_log_state = phase144_initial_set.log_state
+    phase144_echo_state = phase144_initial_set.echo_state
+    phase144_kv_state = phase144_initial_set.kv_state
+
+    phase144_hit_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
+    phase144_serial_state = phase144_hit_get.serial_state
+    phase144_shell_state = phase144_hit_get.shell_state
+    phase144_log_state = phase144_hit_get.log_state
+    phase144_echo_state = phase144_hit_get.echo_state
+    phase144_kv_state = phase144_hit_get.kv_state
+
+    phase144_overwrite_set: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_SET_BYTE1, 75, 87))
+    phase144_serial_state = phase144_overwrite_set.serial_state
+    phase144_shell_state = phase144_overwrite_set.shell_state
+    phase144_log_state = phase144_overwrite_set.log_state
+    phase144_echo_state = phase144_overwrite_set.echo_state
+    phase144_kv_state = phase144_overwrite_set.kv_state
+
+    phase144_overwrite_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
+    phase144_kv_state = phase144_overwrite_get.kv_state
+    phase144_log_state = phase144_overwrite_set.log_state
+    phase144_audit: debug.Phase144StatefulKeyValueServiceFollowThroughAudit = bootstrap_audit.build_phase144_stateful_key_value_service_follow_through_audit(bootstrap_audit.Phase144StatefulKeyValueServiceFollowThroughAuditInputs{ phase143: phase143_audit, kv_service_pid: phase144_kv_state.owner_pid, shell_service_pid: phase144_overwrite_get.shell_state.owner_pid, log_service_pid: phase144_log_state.owner_pid, missing_get_route: phase144_missing_get.routing, initial_set_route: phase144_initial_set.routing, hit_get_route: phase144_hit_get.routing, overwrite_set_route: phase144_overwrite_set.routing, overwrite_get_route: phase144_overwrite_get.routing, kv_retention: kv_service.observe_retention(phase144_kv_state), write_log_retention: log_service.observe_retention(phase144_log_state), bounded_retention_visible: 1, missing_key_visible: 1, explicit_overwrite_visible: 1, fixed_write_log_visible: 1, durable_persistence_visible: 0, compiler_reopening_visible: 0 })
+    if !debug.validate_phase144_stateful_key_value_service_follow_through(phase144_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return 100
+    }
+
     BOOT_MARKER_EMITTED = 1
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE140_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE141_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE142_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE143_MARKER_DETAIL)
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE144_MARKER_DETAIL)
     if BOOT_MARKER_EMITTED != 1 {
-        return 100
-    }
-    if BOOT_LOG_APPEND_FAILED != 0 {
         return 101
     }
-    if BOOT_LOG.count != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 102
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG.count != 9 {
         return 103
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 104
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 105
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 106
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 107
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE140_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 108
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 5)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE140_MARKER_DETAIL {
         return 109
     }
-    if state.log_actor_at(BOOT_LOG, 5) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 5)) != 16 {
         return 110
     }
-    if state.log_detail_at(BOOT_LOG, 5) != PHASE141_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 5) != ARCH_ACTOR {
         return 111
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 6)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 5) != PHASE141_MARKER_DETAIL {
         return 112
     }
-    if state.log_actor_at(BOOT_LOG, 6) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 6)) != 16 {
         return 113
     }
-    if state.log_detail_at(BOOT_LOG, 6) != PHASE142_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 6) != ARCH_ACTOR {
         return 114
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 7)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 6) != PHASE142_MARKER_DETAIL {
         return 115
     }
-    if state.log_actor_at(BOOT_LOG, 7) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 7)) != 16 {
         return 116
     }
-    if state.log_detail_at(BOOT_LOG, 7) != PHASE143_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 7) != ARCH_ACTOR {
         return 117
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_detail_at(BOOT_LOG, 7) != PHASE143_MARKER_DETAIL {
         return 118
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 8)) != 16 {
         return 119
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 8) != ARCH_ACTOR {
         return 120
     }
-    return PHASE143_MARKER
+    if state.log_detail_at(BOOT_LOG, 8) != PHASE144_MARKER_DETAIL {
+        return 121
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 122
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 123
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 124
+    }
+    return PHASE144_MARKER
 }

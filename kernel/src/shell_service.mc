@@ -186,6 +186,10 @@ func selected_endpoint_id(state: ShellServiceState) u32 {
 
 func reply_len_for_tag(tag: ShellCommandTag) usize {
     switch tag {
+    case ShellCommandTag.KvSet:
+        return 4
+    case ShellCommandTag.KvGet:
+        return 4
     case ShellCommandTag.Invalid:
         return 1
     default:
