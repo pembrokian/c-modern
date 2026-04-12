@@ -1,0 +1,411 @@
+Phase 146 Through Phase 150 -- Speculative Post-Phase-145 Canopus Roadmap
+=========================================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the completed Phase 145 service
+restart, failure, and usage-pressure audit over the current interactive
+service-system slice.
+
+This document is intentionally forward-looking and tentative.
+It does not replace `docs/plan/plan.txt`.
+It does not replace the concrete Phase 141 through Phase 145 execution and
+closeout notes.
+It gives one plausible ordering for the next Canopus wave if the repository
+keeps following the same evidence-first rules used so far:
+
+- one repeatability question at a time
+- one user-space friction point or owner gap at a time
+- one explicit exit criterion per phase
+- no broader platform claim before one small system can be rebuilt more
+  cleanly from what the repository learned
+
+Relationship to companion notes
+-------------------------------
+This roadmap is meant to stay aligned with:
+
+- `docs/plan/admin/canopus_post_phase109_speculative_roadmap.txt`
+- `docs/plan/admin/modern_c_canopus_readiness_position.txt`
+- `docs/plan/active/phase141_interactive_service_system_scope_freeze.txt`
+- `docs/plan/active/phase142_serial_shell_command_routing.txt`
+- `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+- `docs/plan/canopus_running_system_support_statement.txt`
+- `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
+- `docs/arch/canopus/canopus_lite_v0.txt`
+- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_sys_interface_v0.txt`
+- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+
+If those notes define the current admitted slice, the landed interactive
+system wave, and the current repository position, this roadmap suggests one
+practical next wave after the repository proved that one small system is both
+usable and honestly awkward under restart pressure.
+
+Repository numbering note
+-------------------------
+- Phase 81 through Phase 95 are occupied by the concrete freestanding bring-up
+  and support-freeze wave.
+- Phase 96 through Phase 123 are occupied by the concrete first kernel,
+  ownership-hardening, hardware-boundary, running-system, and plateau-freeze
+  wave.
+- Phase 124 through Phase 126 are occupied by the concrete authority-lifetime
+  stress wave.
+- Phase 128 through Phase 130 are occupied by the concrete failure-semantics
+  wave.
+- Phase 131 through Phase 137 are occupied by the concrete IPC, UART, and
+  device-boundary wave.
+- Phase 138 is occupied by the concrete fatal primitive admission.
+- Phase 139 is occupied by the concrete conditional subsystem rebuild decision
+  and explicit deferral.
+- Phase 140 is occupied by the concrete serial-ingress composed service graph.
+- Phase 141 through Phase 145 are occupied by the concrete interactive system
+  wave: scope freeze, shell routing, retained log state, retained key-value
+  state, and one bounded restart-and-usage audit.
+- Proposed compiler planning still reserves Phase 127 for
+  `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
+- The next speculative Canopus continuation therefore starts at Phase 146.
+
+Repository status note
+----------------------
+- The repository can now honestly claim one bounded running Canopus kernel and
+  one bounded interactive service system with explicit authority, bounded
+  failure, bounded IPC composition, bounded UART ingress, one shell-owned
+  command path, one retained log owner, one retained key-value owner, and one
+  explicit init-owned restart path over the real kernel artifact.
+- That result matters because it moves the repository past abstract model
+  viability and into one small system that can be used repeatedly and can fail
+  in a user-visible way.
+- The strongest next question is no longer whether one more service can be
+  added. It is whether the repository now understands how to build this kind
+  of system cleanly, repeatedly, and without smuggling framework behavior back
+  into the kernel or into ad hoc helpers.
+- The risk on one side is staying in one-off proof mode and never extracting a
+  reusable service shape from the landed shell, log, and key-value work.
+- The risk on the other side is jumping straight to filesystem, networking,
+  scheduling richness, or other platform breadth and hiding structural flaws
+  under complexity before the current system pattern is honest.
+
+What this roadmap is trying to answer
+-------------------------------------
+- What should come after the completed Phase 145 restart-and-usage audit if
+  the next goal is not more services but a repeatable way to build systems in
+  Canopus?
+- Which next phases should classify message-shape, authority, restart, and
+  composition friction before any broader subsystem ambition?
+- How should the repository shift from "one small system is usable" to "one
+  small system can be rebuilt more naturally the second time"?
+
+Core rule
+---------
+- Treat the next wave primarily as system-pattern extraction, not as service
+  accretion.
+- Reuse the landed shell-plus-log-plus-key-value system as the evidence source
+  rather than widening immediately to a second larger subsystem.
+- Keep policy in init and service owners. Kernel changes remain justified only
+  when repeated real usage exposes a concrete owner gap.
+- Keep the Modern C core, ABI, target, runtime, and `hal` surfaces closed
+  unless the repeated system-building work proves one specific owner
+  deficiency.
+- Prefer repeated use, repeated rebuild, and explicit friction classification
+  over feature count.
+
+Repeatability rule
+------------------
+Use this sanity check on every proposed Phase 146 through Phase 150 change:
+
+- helps rebuild the same small system more clearly, more explicitly, or with
+  less user-space awkwardness while preserving ownership: admissible
+- adds another service, discovery layer, broker, persistence framework, or
+  orchestration layer before the current system shape is extracted: wrong phase
+- widens to filesystem, networking, broader scheduling policy, or platform
+  breadth before the current service pattern is stable: wrong phase
+
+Kernel invariants
+-----------------
+These invariants apply across all phases in this roadmap:
+
+- no subsystem may require knowledge of another subsystem's internal state in
+  order to perform its normal owned behavior
+- all cross-subsystem interaction must pass through explicit interfaces,
+  ownership-visible helpers, or dependency-visible boundaries
+- no new syscall, namespace hook, discovery hook, or reliability hook should
+  be added without an explicit argument that the current owner is insufficient
+- no phase in this wave should turn the kernel into a broker, shell runtime,
+  restart supervisor, persistence layer, or policy engine
+- no larger platform surface should be admitted until the repository can show
+  that one small system has a stable shape that survives a clean rebuild
+
+Chosen next direction
+---------------------
+The most practical next step is to turn the landed interactive-service slice
+into a repeatable system pattern.
+
+Chosen wave shape:
+
+1. extract the common service structure from shell, log, and key-value owners
+2. re-audit IPC under real repeated command and reply traffic rather than only
+   under synthetic composition pressure
+3. re-audit authority ergonomics under repeated service reuse rather than only
+   under correctness pressure
+4. formalize restartable-service contracts as an explicit user-space pattern
+   rather than as a one-off audit result
+5. rebuild the same small system cleanly using only the surviving lessons
+
+The target is not a service framework.
+The target is one repeatable way to build a small Canopus system without
+hiding ownership or failure under convenience abstractions.
+
+Friction classification rule
+---------------------------
+When a later phase exposes awkwardness, classify it immediately:
+
+- Category A - service design issue: fix in user space and keep the kernel
+  unchanged
+- Category B - missing small helper: admit one narrow library or helper only
+  if repeated service code proves it is stable and ownership-visible
+- Category C - kernel boundary gap: reopen the kernel only if the current
+  owner is clearly insufficient under repeated real usage
+- Category D - language ergonomics gap: reopen language or compiler work only
+  after repetition proves the pain is structural rather than incidental
+
+Primary friction fronts to watch
+--------------------------------
+These are the strongest likely post-Phase-145 signals:
+
+- message shape friction in shell-to-service and service-to-service request or
+  reply paths
+- command syntax versus service semantics bleed between shell and service
+  owners
+- state-mutation clarity for retained log and key-value behavior over time
+- ownership fatigue in repeated request, reply, and buffer construction paths
+- awkward cross-service composition glue between shell, log, and key-value
+- restart-semantics ambiguity around retry, idempotency, and visible reset
+  truth
+- addressing or identity awkwardness across fixed restarts without widening to
+  discovery
+- inconsistent reply shape between human-readable and structured service-owned
+  answers
+- backpressure or hidden queue pressure becoming user-visible under repeated
+  use
+- the general "this works but it is annoying" signal, which should be treated
+  as design evidence rather than as noise
+
+Roadmap bands
+-------------
+
+Band A - Extract The Minimal Service Shape
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The first move should be to determine whether shell, log, and key-value now
+share a stable structural pattern or whether the repository is still relying
+on phase-local ad hoc designs.
+
+Likely themes:
+- lifecycle shape such as init, serve, fail, and restart consequences
+- message-role shape such as request or reply and observation paths
+- authority possession and transfer shape
+- fixed separation between shell syntax ownership and service semantic
+  ownership
+
+Why this band comes first:
+- after Phase 145, the repository has enough real usage truth to extract a
+  pattern, and failing to do so now risks normalizing accidental complexity.
+
+Phase 146 -- Service Shape Consolidation
+- Exit criterion: the repository can publish one explicit Phase 146 note that
+  classifies the common structural shape shared by shell, log, and key-value
+  owners, identifies where they intentionally differ, and records which parts
+  belong to user-space convention rather than to kernel or language surfaces.
+
+Preferred proof points:
+- one canonical service-shape description exists and is grounded in the landed
+  shell, log, and key-value implementations
+- at least one ad hoc difference is either justified as service-local or
+  rejected as accidental complexity
+- the shell syntax owner versus service semantic owner boundary is stated
+  clearly rather than implied
+
+Band B - Re-Audit IPC Under Real Usage
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Once the service shape is described, the repository should revisit IPC from
+the perspective of repeated human-meaningful use rather than from synthetic
+stress alone.
+
+Likely themes:
+- awkward request or reply construction
+- mismatched request and reply shapes across services
+- unnecessary copy or glue pressure
+- compact command encoding pressure revealed by repeated use
+
+Why this band comes next:
+- message-shape friction is likely to be the first structural limit exposed by
+  the landed interactive system.
+
+Phase 147 -- IPC Shape Audit Under Real Usage
+- Exit criterion: the repository can show whether the current shell-plus-log-
+  plus-key-value message vocabulary remains sufficient under repeated real
+  usage, and if not, can justify at most one narrow helper or vocabulary
+  adjustment without widening into dynamic typing, a bus, or a framework.
+
+Preferred proof points:
+- at least one concrete awkward request or reply path is classified honestly
+- any admitted helper remains ownership-visible and service-local rather than
+  transport-magical
+- the repository either confirms the current IPC shape is sufficient or names
+  one tightly bounded reason it is not
+
+Band C - Re-Audit Authority Ergonomics Under Reuse
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Correct authority transfer has already been proved. The next question is
+whether explicit authority remains comfortable when service code is written,
+read, and repeated by humans over time.
+
+Likely themes:
+- authority passing fatigue
+- overscoping pressure in helper paths
+- reply construction and ownership handoff repetition
+- small helper versus broader language-pressure classification
+
+Why this band comes after IPC shape:
+- it is easier to judge authority ergonomics once the message shapes they move
+  through are already clearer.
+
+Phase 148 -- Authority Ergonomics Under Reuse
+- Exit criterion: the repository can classify the repeated authority-handling
+  friction in the landed small system as either acceptable explicitness, one
+  narrow helper opportunity, or one concrete kernel or language owner gap,
+  without introducing shared-state shortcuts or ambient authority.
+
+Preferred proof points:
+- at least one repeated authority-handling path is measured against the Phase
+  145 system rather than against a synthetic micro-example
+- any admitted convenience remains explicit about ownership transfer and scope
+- the repository can name what is merely verbose versus what is structurally
+  awkward
+
+Band D - Formalize Restartable Service Contracts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phase 145 proved one bounded restart path. The next move should be to turn
+that one-off truth into an explicit user-space service contract rather than to
+leave restart semantics implicit or phase-local.
+
+Likely themes:
+- what callers may assume after service death
+- what post-restart state truth must remain visible
+- retry, idempotency, and explicit reset classification
+- fixed restart wiring versus broader rebinding pressure
+
+Why this band matters:
+- restart ambiguity is the most likely reliability fault line in a small
+  stateful system, and it should be clarified before any broader subsystem is
+  allowed to depend on the current service pattern.
+
+Phase 149 -- Restart Semantics As A First-Class Pattern
+- Exit criterion: the repository can publish one explicit contract for what a
+  restartable service means in the admitted Canopus slice, including caller
+  obligations, visible state truth after restart, and the boundary between
+  init-owned restart policy and service-owned meaning, without introducing a
+  kernel supervisor or hidden retry semantics.
+
+Preferred proof points:
+- one restartable-service contract is stated in terms of observable behavior
+  rather than implementation accident
+- the repository names at least one idempotency or retry assumption that must
+  remain explicit
+- the fixed-wiring restart result from Phase 145 is preserved as evidence, not
+  abstracted away
+
+Band E - Rebuild One System Cleanly
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The last move in this wave should be to test whether the extracted pattern is
+real by rebuilding the same small system with the surviving lessons and with
+less ad hoc scaffolding.
+
+Likely themes:
+- remove experimental glue that no longer survives the earlier audits
+- keep only the stable service pattern, helper, and contract decisions
+- compare the rebuilt system against the first version for clarity and owner
+  honesty
+
+Why this band comes last:
+- a clean rebuild is the strongest discriminator between a real pattern and a
+  one-off pile of locally correct fixes.
+
+Phase 150 -- One System, Rebuilt Cleanly
+- Exit criterion: the repository can rebuild the same bounded shell-plus-log-
+  plus-key-value system using the lessons from Phase 146 through Phase 149,
+  and the second version is demonstrably simpler in ownership story, service
+  shape, or restart explanation than the first version.
+
+Preferred proof points:
+- the rebuilt system removes at least one earlier ad hoc pattern rather than
+  merely rearranging it
+- the rebuilt system preserves the admitted bounded behavior while improving
+  explanation or structure
+- if the second version is not simpler, the repository records that as a model
+  problem rather than hiding it behind more features
+
+What should naturally emerge from this wave
+-------------------------------------------
+If the repository follows this roadmap honestly, the next useful results
+should be concrete evidence about:
+
+- whether Canopus now has one canonical service pattern rather than a set of
+  phase-local service implementations
+- whether the current IPC shape remains stable under repeated real usage or
+  needs one narrow helper boundary
+- whether restart semantics are explicit enough for later subsystem work to
+  rely on without hidden policy
+- whether any language, library, or kernel ergonomics work is justified by
+  repeated implementation pain rather than by taste
+- whether the system can be built twice with the second version being simpler
+  than the first
+
+Likely ordering bias
+--------------------
+If the repository keeps following the same discipline, the safest order is:
+
+1. extract the service pattern before widening service scope
+2. revisit IPC only through real repeated usage of the existing small system
+3. revisit authority ergonomics only after message-shape truth is clearer
+4. formalize restartable-service contracts before allowing broader subsystem
+   dependence on the current pattern
+5. rebuild the same system cleanly before considering filesystem, networking,
+   richer scheduling, or any broader platform wave
+
+That ordering keeps the repository from confusing one-off implementation
+success with a real system-building method.
+
+Non-goals
+---------
+- treating this roadmap as a committed execution plan
+- adding more services merely to increase surface area
+- widening into filesystem, networking, richer timer or scheduling policy, or
+  multicore work during this wave
+- introducing dynamic discovery, a broker, a message bus, or a general shell
+  or service framework
+- turning the kernel into a supervisor, persistence layer, or policy engine
+- reopening the Modern C core before repeated system-building work proves a
+  concrete owner gap
+- claiming broader platform maturity from one cleaned-up small system
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- The readiness and support statements remain the canonical statement of
+  present truth.
+- Phase 141 through Phase 145 now form the historical bridge from stressed
+  service composition to one small usable interactive system.
+- The next honest question is not whether the repository can add another
+  service. It is whether it now knows how to build the same kind of system
+  better on the second pass.
+- If this wave exposes a real kernel, language, ABI, or toolchain owner gap,
+  reopen only the narrowest owning layer at that proof boundary.

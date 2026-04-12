@@ -1,0 +1,206 @@
+Phase 150 -- One System, Rebuilt Cleanly
+========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 149 restart-contract step by rebuilding the
+same bounded shell, log, and key-value system using only the surviving
+lessons from Phase 146 through Phase 149 and measuring whether the second
+version is simpler than the first.
+
+This document is an execution plan for Phase 150.
+It defines one bounded clean-rebuild phase that must land as a clearer system
+shape over the real kernel artifact before the repository widens into broader
+subsystem work.
+It does not claim a new platform wave, more services, or a general framework
+layer.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Earlier phases in this wave should extract service shape, classify IPC and
+  authority ergonomics, and formalize restart truth.
+- Those results only become a convincing system-building method if the same
+  small system can be rebuilt more clearly on a second pass.
+- The repository therefore needs one explicit rebuild discriminator before it
+  widens into filesystem, networking, scheduling richness, or any broader
+  platform ambition.
+
+Problem being solved
+--------------------
+- A series of locally correct patches is not the same as a repeatable system
+  pattern.
+- Without one clean-rebuild phase, later growth could assume the previous
+  audits produced a reusable method when they may only have produced a
+  successful one-off system.
+- The repository therefore needs one bounded phase that removes ad hoc glue,
+  rebuilds the same system using the surviving lessons, and records honestly
+  whether the second version is simpler.
+
+Core rule
+---------
+- Rebuild the same system, not a bigger one.
+- Phase success is measured by improved clarity of ownership story, service
+  shape, or restart explanation, not by feature count.
+- If the rebuilt system is not simpler, record that as a model problem rather
+  than hiding it behind more work.
+- Debug audits, MIR projections, and tool regressions are acceptance artifacts
+  only.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless the earlier phases already proved one concrete owner
+  gap.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 150 change:
+
+- removing ad hoc structure while preserving the admitted shell, log, key-
+  value, and restart behavior: admissible
+- using the rebuild as an excuse to add new services or widen platform scope:
+  wrong layer
+
+Do not answer complexity by changing the problem. Keep the phase bounded to a
+clean second pass over the same small system and an honest comparison against
+the first version.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 150 execution note that defines the clean-rebuild
+   target for the landed shell-plus-log-plus-key-value system
+2. one explicit comparison between the first version and the rebuilt version
+   in terms of ownership clarity, service shape, and restart explanation
+3. one rebuild that removes at least one earlier ad hoc pattern rather than
+   merely relocating it
+4. one audit-owned Phase 150 proof that the rebuilt system preserves the
+   admitted bounded behavior
+5. one explicit conclusion about whether the second version is actually
+   simpler
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because a clean rebuild is the strongest
+available discriminator between a real pattern and a one-off success.
+
+What this phase should try to prove
+-----------------------------------
+- the shell, log, and key-value system can be rebuilt using the surviving
+  lessons from the earlier post-145 phases
+- at least one earlier ad hoc pattern can be removed without losing the
+  admitted bounded behavior
+- the rebuilt system is simpler in a way the repository can state explicitly
+- if the rebuilt system is not simpler, the repository can record that truth
+  honestly before widening scope
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase150_one_system_rebuilt_cleanly.txt`
+   - publish the canonical Phase 150 execution note
+
+2. `kernel/src/shell_service.mc`
+   - participate in the clean rebuild of shell-owned command and reply logic
+
+3. `kernel/src/log_service.mc`
+   - participate in the clean rebuild of retained-state and service-owned
+     reply logic
+
+4. `kernel/src/kv_service.mc`
+   - participate in the clean rebuild of retained-state and restart-related
+     explicit state truth
+
+5. `kernel/src/serial_service.mc`
+   - preserve the transport boundary while shedding any no-longer-necessary
+     glue exposed by earlier phases
+
+6. `kernel/src/init.mc` and `kernel/src/main.mc`
+   - remain the owners of thin boot wiring and explicit restart policy through
+     the rebuild
+
+7. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that compares the rebuilt system against the admitted
+     bounded behavior claims
+
+8. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 150 regression plus one projected MIR golden over
+     the rebuilt-system boundary
+
+9. supporting docs under `docs/plan/` and `docs/agent/`
+   - refresh only after the rebuilt system shape is stable and the comparison
+     outcome is explicit
+
+Deliverables
+------------
+- one canonical Phase 150 execution plan in `docs/plan/active/`
+- one rebuilt shell-plus-log-plus-key-value system over the same bounded
+  behavior envelope
+- one explicit comparison statement between the first and second versions
+- one debug-owned Phase 150 audit over the rebuilt artifact
+- one focused freestanding regression plus projected MIR golden for the Phase
+  150 boundary
+- refreshed supporting docs only after the rebuilt system and comparison are
+  stable
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 150 boundary in docs: same system, cleaner rebuild, no
+   new platform wave.
+2. Identify the ad hoc patterns the earlier phases judged unstable.
+3. Rebuild the shell, log, key-value, and restart paths using only the
+   surviving lessons from Phase 146 through Phase 149.
+4. Compare the rebuilt system against the first version explicitly.
+5. Add the Phase 150 audit over the rebuilt behavior.
+6. Advance the kernel proof marker to 150 only after the rebuilt system and
+   the comparison statement agree.
+7. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One earlier ad hoc pattern is removed rather than merely renamed.
+2. The rebuilt system preserves the admitted bounded shell, log, key-value,
+   and restart behavior.
+3. One explicit comparison shows the second version is simpler, or records
+   clearly that it is not.
+4. One projected MIR proof shows the rebuilt artifact still carries the same
+   bounded system envelope.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 150 marker
+- the repository publishes one explicit rebuilt-system comparison between the
+  first and second versions
+- the rebuilt system preserves the admitted bounded behavior while removing at
+  least one earlier ad hoc pattern
+- one audit validates the rebuilt-system boundary over the real kernel
+  artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 150 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding new services, platform breadth, or broader policy surfaces
+- using the rebuild to hide unresolved complexity under a framework layer
+- broad filesystem, networking, or scheduling work during this phase
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal` without a
+  concrete earlier-phase owner gap

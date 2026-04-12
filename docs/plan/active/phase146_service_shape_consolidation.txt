@@ -1,0 +1,211 @@
+Phase 146 -- Service Shape Consolidation
+========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the completed Phase 145 restart, failure, and usage-pressure
+audit by extracting the minimal common service shape from the landed shell,
+log, and key-value owners before the repository widens into more service
+surfaces.
+
+This document is an execution plan for Phase 146.
+It defines one bounded service-shape phase that must land as explicit
+service-owned structure and audit truth before it is treated as a stable
+Canopus pattern.
+It does not claim a service framework, a generic runtime, dynamic discovery,
+or a broader platform expansion.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/admin/modern_c_canopus_readiness_position.txt`
+- `docs/plan/active/phase141_interactive_service_system_scope_freeze.txt`
+- `docs/plan/active/phase142_serial_shell_command_routing.txt`
+- `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 141 through Phase 145 now prove one bounded interactive system with
+  concrete shell, log, and key-value owners over the real kernel artifact.
+- The repository can now observe repeated command handling, retained state,
+  and one restart path, but it does not yet publish one explicit statement of
+  what makes those service owners structurally similar.
+- If the repository widens into more services now, it risks normalizing
+  phase-local ad hoc structure instead of extracting one honest pattern from
+  the first usable system.
+
+Problem being solved
+--------------------
+- The landed shell, log, and key-value services now carry enough real system
+  truth to compare lifecycle, request or reply shape, failure exposure, and
+  authority use directly.
+- Without one explicit consolidation pass, later work could confuse
+  accidental local differences with necessary service boundaries.
+- The repository therefore needs one bounded phase that classifies common
+  service shape, records where owners intentionally differ, and keeps that
+  result in user-space convention rather than in a hidden framework layer.
+
+Core rule
+---------
+- Extract a pattern; do not invent a framework.
+- Service shape belongs first to service owners and their explicit boot or
+  wiring context, not to the kernel as a new generic subsystem.
+- Phase completion requires one explicit published service-shape statement and
+  one audit path grounded in the landed service implementations.
+- Debug audits, MIR projections, and tool regressions are acceptance artifacts
+  only.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 146 change:
+
+- classifying lifecycle, request, reply, authority, and restart shape shared
+  by the landed services: admissible
+- adding generic service registration, inheritance, macros, or framework
+  machinery before the pattern is proved: wrong layer
+
+Do not answer structural repetition by introducing a runtime service model.
+Keep the phase bounded to explicit shape extraction and the smallest service-
+local cleanup justified by that extraction.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 146 execution note that defines the minimal service
+   shape observed in `shell_service`, `log_service`, and `kv_service`
+2. one explicit classification of lifecycle stages such as init, serve,
+   failure exposure, and restart consequence
+3. one explicit classification of request or reply boundaries, including the
+   split between shell syntax ownership and service semantic ownership
+4. one explicit classification of authority possession and transfer shape in
+   the landed small system
+5. one audit-owned Phase 146 proof that the published pattern matches the
+   real service tree rather than prose alone
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because it now has enough real service
+truth to extract a pattern, and failing to do so would make later growth less
+honest.
+
+What this phase should try to prove
+-----------------------------------
+- the shell, log, and key-value owners share one identifiable minimal service
+  shape rather than only a family resemblance
+- at least one current difference is classified as intentional rather than
+  accidental
+- the shell transport-syntax boundary versus service semantic boundary is
+  described explicitly
+- the resulting pattern can remain a user-space convention without a new
+  kernel or runtime abstraction
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+   - keep the post-145 roadmap aligned with the concrete Phase 146 execution
+     boundary
+
+2. `docs/plan/active/phase146_service_shape_consolidation.txt`
+   - publish the canonical Phase 146 execution note
+
+3. `kernel/src/shell_service.mc`
+   - serve as the primary shell-owner reference for command parsing, routing,
+     and shell-visible failure reporting
+
+4. `kernel/src/log_service.mc`
+   - serve as the retained-log reference for stateful request handling,
+     service-owned reply shape, and bounded observation behavior
+
+5. `kernel/src/kv_service.mc`
+   - serve as the retained key-value reference for stateful request handling,
+     explicit unavailable behavior, and post-restart state truth
+
+6. `kernel/src/serial_service.mc`
+   - keep the transport boundary visible so shell syntax ownership is not
+     accidentally folded back into serial framing
+
+7. `kernel/src/init.mc` and `kernel/src/main.mc`
+   - expose the current boot and wiring responsibilities that bound the
+     service shape without turning boot code into a framework owner
+
+8. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that checks the published service-shape claims against
+     the landed service implementations
+
+9. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 146 regression plus one projected MIR golden over
+     the extracted service-shape boundary
+
+Deliverables
+------------
+- one canonical Phase 146 execution plan in `docs/plan/active/`
+- one explicit published service-shape statement grounded in shell, log, and
+  key-value owners
+- one smallest-necessary cleanup slice if the extracted pattern exposes
+  accidental structural drift
+- one debug-owned Phase 146 audit over the landed service tree
+- one focused freestanding regression plus projected MIR golden for the Phase
+  146 boundary
+- refreshed supporting docs only after the service-shape statement is stable
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 146 boundary in docs: pattern extraction, no service
+   framework, no broader platform widening.
+2. Classify the current shell, log, and key-value service shape directly in
+   the landed source tree.
+3. Record which differences are intentional and which are accidental.
+4. Apply only the smallest structural cleanup needed to keep the extracted
+   pattern honest.
+5. Add the Phase 146 audit over the real service tree.
+6. Advance the kernel proof marker to 146 only after the published pattern
+   and the code-owned audit agree.
+7. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One canonical description of the minimal service shape matches all three
+   landed service owners.
+2. One explicit shell-syntax versus service-semantics boundary is preserved.
+3. One intentionally different service-local behavior is justified rather than
+   normalized accidentally.
+4. One projected MIR proof shows the real artifact still carries the same
+   bounded service owners and wiring.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 146 marker
+- the repository publishes one explicit minimal service-shape statement for
+  the landed shell, log, and key-value owners
+- intentional versus accidental service-structure differences are classified
+  explicitly
+- one audit validates the published service-shape claims over the real kernel
+  artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 146 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- a generic service runtime, framework, or registration mechanism
+- dynamic discovery, broker, or orchestration layers
+- broader storage, networking, scheduling, or platform growth
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`
+- claiming a reusable service pattern from prose alone without a landed audit

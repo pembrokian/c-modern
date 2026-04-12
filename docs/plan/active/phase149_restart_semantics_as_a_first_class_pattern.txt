@@ -1,0 +1,199 @@
+Phase 149 -- Restart Semantics As A First-Class Pattern
+=======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 148 authority-ergonomics step by turning the
+landed Phase 145 restart result into one explicit restartable-service
+contract rather than leaving restart semantics as a one-off audit outcome.
+
+This document is an execution plan for Phase 149.
+It defines one bounded restart-contract phase that must land as explicit
+caller-visible and init-owned service truth before later subsystem work is
+allowed to depend on the current small-system pattern.
+It does not claim a kernel supervisor, durable recovery, transparent retry,
+or a broader reliability framework.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/phase128_service_death_observation.txt`
+- `docs/plan/phase129_partial_failure_propagation.txt`
+- `docs/plan/phase130_explicit_restart_or_replacement_probe.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Earlier phases already proved bounded service death, partial failure, and
+  one explicit replacement path.
+- Phase 145 then applied that truth to one user-meaningful key-value service
+  and exposed manual retry and post-restart empty-state truth explicitly.
+- The repository therefore already has restart evidence, but it does not yet
+  publish one general statement about what a restartable service means in the
+  admitted Canopus slice.
+
+Problem being solved
+--------------------
+- Later subsystem work cannot depend on the current service pattern safely if
+  restart meaning remains implicit or phase-local.
+- Without one explicit restart contract, future work could blur caller
+  obligations, idempotency assumptions, and post-restart truth into ad hoc
+  retry behavior or hidden policy.
+- The repository therefore needs one bounded phase that names the observable
+  contract of service death and rebirth while keeping restart policy explicit
+  in init and service owners.
+
+Core rule
+---------
+- Formalize restart semantics; do not hide them.
+- Restart policy remains explicit in init and service owners. The kernel may
+  expose loss and replacement, but it must not absorb supervision,
+  transparent recovery, or retry policy.
+- Phase completion requires one real artifact path that demonstrates the
+  published restartable-service contract.
+- Debug audits, MIR projections, and tool regressions are acceptance artifacts
+  only.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 149 change:
+
+- making caller-visible failure, retry obligation, and post-restart state
+  truth explicit: admissible
+- hiding those consequences behind automatic rebinding, transparent retry, or
+  kernel-owned recovery: wrong layer
+
+Do not answer restart ambiguity by widening into a reliability subsystem. Keep
+the phase bounded to one explicit restartable-service contract and the
+smallest real workflow needed to demonstrate it.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 149 execution note that defines the restartable-
+   service contract for the admitted Canopus slice
+2. one explicit statement of caller obligations after service death or
+   restart, including retry and reset-state consequences
+3. one explicit statement of what restart policy remains init-owned rather
+   than service-owned or kernel-owned
+4. one real repeated workflow that demonstrates the published restart contract
+5. one audit-owned Phase 149 proof that the contract matches the real
+   artifact rather than retrospective interpretation
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because restart ambiguity is the most
+likely reliability fault line in the current small stateful system.
+
+What this phase should try to prove
+-----------------------------------
+- the admitted slice can describe restartable-service behavior in observable
+  terms instead of in implementation accidents
+- caller-visible retry, idempotency, and reset-state assumptions remain
+  explicit
+- fixed-wiring restart remains evidence, not a hidden generalized mechanism
+- later subsystem work would be able to depend on the published restart truth
+  without inventing hidden policy
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+   - publish the canonical Phase 149 execution note
+
+2. `kernel/src/init.mc` and `kernel/src/main.mc`
+   - remain the primary owners for explicit restart wiring and boot-time or
+     replacement-time policy that the phase must classify clearly
+
+3. `kernel/src/kv_service.mc`
+   - remain the reference restartable service for explicit unavailable,
+     restart, and reset-state truth
+
+4. `kernel/src/shell_service.mc`
+   - remain the primary owner for shell-visible failure reporting and retry
+     consequence visibility
+
+5. `kernel/src/log_service.mc`
+   - remain the observation owner for one fixed failure and restart record
+     path without widening into a reliability framework
+
+6. `kernel/src/lifecycle.mc`, `kernel/src/capability/`, and `kernel/src/ipc/`
+   - touch only where one additive observation or contract hook is required to
+     keep service death and replacement consequences explicit
+
+7. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that exercises the published restartable-service
+     contract over the real artifact
+
+8. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 149 regression plus one projected MIR golden over
+     the published restart-contract boundary
+
+Deliverables
+------------
+- one canonical Phase 149 execution plan in `docs/plan/active/`
+- one explicit restartable-service contract for the admitted Canopus slice
+- one real repeated workflow demonstrating the contract over the artifact
+- one debug-owned Phase 149 audit over the published restart truth
+- one focused freestanding regression plus projected MIR golden for the Phase
+  149 boundary
+- refreshed supporting docs only after the restart contract is stable
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 149 boundary in docs: explicit restart contract, no
+   supervision, no transparent retry.
+2. Classify the current Phase 145 restart path into caller obligations,
+   service-owned meaning, and init-owned policy.
+3. Land only the smallest additive observations needed to keep that contract
+   explicit in code.
+4. Drive one repeated restartable-service workflow over the real artifact.
+5. Add the Phase 149 audit over the landed restart truth.
+6. Advance the kernel proof marker to 149 only after the published contract
+   and the code-owned audit agree.
+7. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One caller-visible workflow demonstrates the published restart contract.
+2. One explicit post-restart state truth remains visible rather than hidden.
+3. One retry or idempotency assumption is named explicitly.
+4. One projected MIR proof shows the artifact still carries the bounded
+   restart path the phase claims.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 149 marker
+- the repository publishes one explicit restartable-service contract for the
+  admitted Canopus slice
+- caller-visible retry and post-restart state truth remain explicit
+- one audit validates the published restart contract over the real kernel
+  artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 149 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- kernel supervision or automatic recovery policy
+- transparent rebinding or hidden retry semantics
+- durable persistence guarantees across restart
+- broader reliability or orchestration frameworks
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

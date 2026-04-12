@@ -1,0 +1,207 @@
+Phase 147 -- IPC Shape Audit Under Real Usage
+=============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 146 service-shape consolidation step by
+revisiting request, reply, and payload shape under repeated real usage of the
+landed shell, log, and key-value system rather than under synthetic
+composition pressure alone.
+
+This document is an execution plan for Phase 147.
+It defines one bounded IPC-shape phase that must land as explicit message-
+vocabulary and helper truth over the real interactive system before it is
+treated as a stable communication pattern.
+It does not claim dynamic typing, a message bus, a general serialization
+layer, or a broad transport rewrite.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase142_serial_shell_command_routing.txt`
+- `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Earlier phases already proved bounded IPC composition, backpressure,
+  message-lifetime truth, and one compact four-byte shell route.
+- The current small system is now useful enough to reveal whether request and
+  reply shapes feel natural under repeated command traffic rather than only
+  under one-off proofs.
+- The repository therefore no longer needs another abstract IPC stress phase
+  first. It needs one usage-grounded audit of whether the current message
+  vocabulary remains sufficient or exposes one narrow helper opportunity.
+
+Problem being solved
+--------------------
+- Real shell usage can reveal awkward request construction, mismatched reply
+  shapes, and glue code pressure that synthetic IPC composition did not need
+  to address.
+- Without one explicit audit, later growth could answer that awkwardness by
+  reaching too quickly for dynamic message formats, wider frameworks, or a bus
+  abstraction.
+- The repository therefore needs one bounded phase that classifies current
+  IPC-shape friction honestly and admits at most one ownership-visible helper
+  or vocabulary adjustment if the real system proves it necessary.
+
+Core rule
+---------
+- Audit message shape under real use; do not widen transport casually.
+- Request and reply shape remain owned by services and shell-visible routes,
+  not by a new generic messaging framework.
+- Phase completion requires one real running-system path that demonstrates the
+  judged message-shape result.
+- Debug audits, MIR projections, and tool regressions are acceptance artifacts
+  only.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 147 change:
+
+- clarifying request or reply construction, composition, or observation over
+  the landed small system: admissible
+- introducing dynamic payloads, generic buses, or transport-owned semantics:
+  wrong layer
+
+Do not answer message-shape awkwardness by hiding it behind generic dispatch.
+Keep the phase bounded to one usage-grounded IPC-shape conclusion and the
+smallest supporting change that conclusion requires.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 147 execution note that defines the judged IPC-shape
+   boundary for the landed shell, log, and key-value system
+2. one repeated real command sequence that exercises shell-to-service and one
+   service-to-service observation path
+3. one explicit classification of request construction friction, reply-shape
+   friction, and any compact-encoding pressure revealed by repeated use
+4. at most one narrow helper or vocabulary adjustment if the current shape is
+   proved insufficient
+5. one audit-owned Phase 147 proof that the judged IPC shape matches the real
+   artifact rather than a design preference
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because message-shape friction is the
+most likely first structural limit exposed by the landed interactive system.
+
+What this phase should try to prove
+-----------------------------------
+- the current request and reply shapes are either sufficient under repeated
+  use or insufficient for one tightly bounded reason
+- any admitted helper remains ownership-visible and service-local rather than
+  transport-magical
+- shell command encoding pressure is classified explicitly instead of being
+  allowed to drift into an unbounded shell redesign
+- service-to-service observation remains explicit even if request or reply
+  shapes are adjusted slightly
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+   - publish the canonical Phase 147 execution note
+
+2. `kernel/src/bootstrap_services/00_types.mc`
+   - carry the smallest named command, request, or observation-shape changes
+     needed for the judged IPC boundary
+
+3. `kernel/src/serial_service.mc`
+   - preserve framing ownership while exposing any additive compact-command
+     observations needed for the Phase 147 audit
+
+4. `kernel/src/shell_service.mc`
+   - remain the primary owner for shell command shaping, fixed routing, and
+     shell-visible reply assembly
+
+5. `kernel/src/log_service.mc`
+   - remain a reference owner for service-owned reply shape and observation
+     paths under repeated usage
+
+6. `kernel/src/kv_service.mc`
+   - remain a reference owner for request construction, overwrite behavior,
+     and explicit unavailable or reset replies under repeated usage
+
+7. `kernel/src/ipc/`, `kernel/src/endpoint/`, and `kernel/src/syscall.mc`
+   - touch only where one additive observation or helper boundary is required
+     to keep the judged IPC shape explicit
+
+8. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that exercises the judged request and reply shapes
+     over a real repeated command workflow
+
+9. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 147 regression plus one projected MIR golden over
+     the judged IPC-shape boundary
+
+Deliverables
+------------
+- one canonical Phase 147 execution plan in `docs/plan/active/`
+- one explicit IPC-shape judgment for the landed interactive system
+- zero or one narrow helper or vocabulary adjustment justified by repeated use
+- one debug-owned Phase 147 audit over the real request and reply paths
+- one focused freestanding regression plus projected MIR golden for the Phase
+  147 boundary
+- refreshed supporting docs only after the IPC-shape judgment is stable
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 147 boundary in docs: usage-grounded IPC audit, no bus,
+   no dynamic typing, no broad transport rewrite.
+2. Exercise repeated shell-to-log and shell-to-key-value paths over the real
+   artifact and record concrete awkwardness.
+3. Decide whether the current vocabulary is sufficient or whether one narrow
+   helper or adjustment is justified.
+4. Land only the smallest judged IPC-shape change needed.
+5. Add the Phase 147 audit over the real repeated workflow.
+6. Advance the kernel proof marker to 147 only after the judged IPC shape is
+   explicit in code and docs.
+7. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One repeated shell workflow exercises both retained-state services through
+   the judged request and reply shapes.
+2. One concrete awkward request or reply path is classified honestly.
+3. Any admitted helper remains explicit about ownership and route boundaries.
+4. One projected MIR proof shows the artifact still carries the bounded IPC
+   shape the phase claims.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 147 marker
+- the repository publishes one explicit judgment about the sufficiency of the
+  current shell-plus-log-plus-key-value IPC shape
+- any admitted helper or vocabulary adjustment remains narrow,
+  ownership-visible, and service-local
+- one audit validates the judged request and reply boundary over the real
+  kernel artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 147 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- dynamic message typing or generic serialization
+- a message bus, broker, or general communication framework
+- hidden transport widening detached from the real system pressure
+- broader shell redesign, discovery, or platform growth
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

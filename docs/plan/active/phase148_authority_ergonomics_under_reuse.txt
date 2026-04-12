@@ -1,0 +1,203 @@
+Phase 148 -- Authority Ergonomics Under Reuse
+=============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 147 IPC-shape audit by classifying whether
+explicit authority remains comfortable under repeated use of the landed small
+system rather than merely correct under bounded proofs.
+
+This document is an execution plan for Phase 148.
+It defines one bounded authority-ergonomics phase that must land as explicit
+reuse evidence and owner classification before it is used to justify any
+helper, kernel, or language change.
+It does not claim shared-state shortcuts, ambient authority, hidden borrowing,
+or a broader authority-management framework.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/phase124_delegation_chain_stress.txt`
+- `docs/plan/phase125_invalidation_and_rejection_audit.txt`
+- `docs/plan/phase126_authority_lifetime_classification.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Earlier phases already proved explicit authority transfer, invalidation,
+  and lifetime classification under bounded stress.
+- The current interactive system now exposes repeated real command handling,
+  retained state, and restart pressure, which is where authority discomfort is
+  most likely to become visible to implementers.
+- The repository therefore needs one usage-grounded authority phase before it
+  can justify convenience work honestly.
+
+Problem being solved
+--------------------
+- Correct authority handling can still be too repetitive, too verbose, or too
+  cognitively awkward when service code is written repeatedly.
+- Without one explicit ergonomics pass, later work could answer that friction
+  by smuggling ambient shortcuts, overscoped helpers, or premature language
+  changes into the system.
+- The repository therefore needs one bounded phase that classifies authority
+  fatigue as acceptable explicitness, one narrow helper opportunity, or one
+  concrete owner gap.
+
+Core rule
+---------
+- Preserve explicit authority even while judging comfort.
+- Authority ergonomics remain subordinate to explicit ownership, transfer, and
+  invalidation truth already proved in earlier phases.
+- Phase completion requires one repeated real service path where authority-
+  handling friction is observed directly rather than inferred abstractly.
+- Debug audits, MIR projections, and tool regressions are acceptance artifacts
+  only.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless repeated real usage proves one specific owner gap.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 148 change:
+
+- reducing repeated ceremony while preserving explicit transfer and scope:
+  admissible
+- hiding authority ownership, widening scopes silently, or introducing shared
+  mutable shortcuts: wrong layer
+
+Do not answer authority fatigue by weakening ownership truth. Keep the phase
+bounded to classification plus at most one narrow explicit helper if repeated
+use proves it stable.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 148 execution note that defines the judged authority-
+   ergonomics boundary for the landed small system
+2. one repeated real service path that exercises authority passing, retained
+   state access, and restart-related handoff pressure
+3. one explicit classification of what is merely verbose, what is genuinely
+   awkward, and what would require a different owner
+4. at most one narrow explicit helper if repeated usage proves it both stable
+   and ownership-visible
+5. one audit-owned Phase 148 proof that the judged ergonomics claims match
+   the real artifact rather than taste
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The repository should take this phase because explicit authority is only a
+usable system rule if repeated service work still feels honest and practical.
+
+What this phase should try to prove
+-----------------------------------
+- repeated authority-handling paths in the landed small system can be judged
+  directly against real code and real usage pressure
+- any admitted helper remains explicit about possession, transfer, and scope
+- overscoping pressure is classified honestly instead of normalized
+- any language or kernel pressure is proven structural rather than merely
+  stylistic
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
+   - publish the canonical Phase 148 execution note
+
+2. `kernel/src/shell_service.mc`
+   - remain a reference owner for repeated command routing and any authority-
+     bearing request construction that users can feel directly
+
+3. `kernel/src/log_service.mc`
+   - remain a reference owner for repeated service-owned observation and reply
+     paths under explicit authority use
+
+4. `kernel/src/kv_service.mc`
+   - remain a reference owner for retained-state operations and restart-
+     related explicit unavailable or reset behavior
+
+5. `kernel/src/capability/`
+   - remain the primary owner for explicit authority possession, transfer,
+     invalidation, and validation truth touched by this phase
+
+6. `kernel/src/lifecycle.mc`, `kernel/src/init.mc`, and `kernel/src/main.mc`
+   - expose the existing retained-owner and restart-owned handoff paths whose
+     ergonomics the phase is meant to judge
+
+7. one smallest-necessary helper surface under `kernel/src/` if justified
+   - preferred shape: one explicit service-local or capability-local helper,
+     not a general framework layer
+
+8. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that exercises repeated authority-bearing workflows
+     over the real artifact
+
+9. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 148 regression plus one projected MIR golden over
+     the judged authority-ergonomics boundary
+
+Deliverables
+------------
+- one canonical Phase 148 execution plan in `docs/plan/active/`
+- one explicit authority-ergonomics judgment for the landed small system
+- zero or one narrow explicit helper justified by repeated reuse
+- one debug-owned Phase 148 audit over repeated authority-bearing workflows
+- one focused freestanding regression plus projected MIR golden for the Phase
+  148 boundary
+- refreshed supporting docs only after the ergonomics judgment is stable
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 148 boundary in docs: ergonomics audit, no ambient
+   shortcuts, no premature language expansion.
+2. Identify one repeated authority-bearing workflow in the landed shell-plus-
+   log-plus-key-value system.
+3. Classify where the current authority story is acceptable, merely verbose,
+   or structurally awkward.
+4. Land at most one narrow explicit helper if repeated usage proves it
+   warranted.
+5. Add the Phase 148 audit over the real repeated workflow.
+6. Advance the kernel proof marker to 148 only after the judged ergonomics
+   boundary is explicit in code and docs.
+7. Add the focused freestanding regression and projected MIR golden.
+
+Preferred proof points
+----------------------
+1. One repeated real workflow exercises authority transfer more than once.
+2. One overscoping risk is classified explicitly and kept visible.
+3. Any admitted helper preserves explicit ownership and transfer truth.
+4. One projected MIR proof shows the artifact still carries the same explicit
+   authority boundaries the phase claims.
+
+Exit criteria
+-------------
+- the real kernel artifact builds and runs to a Phase 148 marker
+- the repository publishes one explicit authority-ergonomics judgment for the
+  landed small system
+- any admitted helper remains narrow, explicit, and ownership-visible
+- one audit validates the judged authority-bearing workflow over the real
+  kernel artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 148 boundary
+- the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- ambient authority or hidden borrowing shortcuts
+- shared mutable state used to bypass explicit ownership
+- broad language redesign before repeated use proves it necessary
+- broader supervision, framework, or discovery work
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal` without a
+  concrete repeated-use owner gap
