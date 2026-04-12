@@ -340,3 +340,53 @@ struct Phase132BackpressureAudit {
     compiler_reopening_visible: u32
 }
 
+struct Phase133MessageLifetimeAudit {
+    phase132: Phase132BackpressureAudit
+    endpoint_id: u32
+    attached_endpoint_id: u32
+    first_send_status: syscall.SyscallStatus
+    source_handle_live_after_first_send: u32
+    first_receive_status: syscall.SyscallStatus
+    first_receive_byte0: u8
+    first_receive_handle_slot: u32
+    first_receive_handle_count: usize
+    first_received_handle_endpoint_id: u32
+    first_retired_slot_state: ipc.MessageState
+    first_retired_slot_payload0: u8
+    second_send_status: syscall.SyscallStatus
+    second_receive_status: syscall.SyscallStatus
+    second_receive_byte0: u8
+    second_retired_slot_state: ipc.MessageState
+    second_retired_slot_payload0: u8
+    abort_transfer_send_status: syscall.SyscallStatus
+    abort_transfer_source_handle_live_after_send: u32
+    abort_transfer_aborted_messages: usize
+    abort_transfer_scrubbed_state: ipc.MessageState
+    abort_transfer_scrubbed_payload0: u8
+    abort_transfer_scrubbed_attached_count: usize
+    abort_transfer_scrubbed_attached_endpoint_id: u32
+    abort_transfer_scrubbed_source_handle_slot: u32
+    close_blocked_send_status: syscall.SyscallStatus
+    close_blocked_send_state: state.TaskState
+    close_aborted_messages: usize
+    close_wake_count: usize
+    close_wake_reason: ipc.EndpointWakeReason
+    close_wake_task_id: u32
+    close_ready_count: usize
+    close_task_state: state.TaskState
+    closed_send_status: syscall.SyscallStatus
+    closed_receive_status: syscall.SyscallStatus
+    owner_death_closed_count: usize
+    owner_death_aborted_messages: usize
+    owner_death_wake_count: usize
+    owner_death_wake_reason: ipc.EndpointWakeReason
+    owner_death_transfer_source_handle_live_after_send: u32
+    owner_death_transfer_scrubbed_state: ipc.MessageState
+    owner_death_transfer_scrubbed_payload0: u8
+    owner_death_transfer_scrubbed_attached_count: usize
+    owner_death_transfer_scrubbed_attached_endpoint_id: u32
+    owner_death_transfer_scrubbed_source_handle_slot: u32
+    kernel_policy_visible: u32
+    compiler_reopening_visible: u32
+}
+

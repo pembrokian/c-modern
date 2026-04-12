@@ -315,6 +315,22 @@ func apply_endpoint_wake(task_slots: [3]state.TaskSlot, ready_queue: state.Ready
     return EndpointWakeApplyResult{ task_slots: transition.task_slots, ready_queue: state.append_ready_queue(ready_queue, transition.task_id), wake_task_id: transition.task_id, wake_reason: wake.wake_reason }
 }
 
+func closed_send_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: ipc.EndpointTable, sender_pid: u32, payload_len: usize, attached_handle_count: usize, endpoint_id: u32) SendResult {
+    return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Closed, 0, 0), handle_table, endpoints, SyscallStatus.Closed, BlockReason.None, send_observation(SyscallStatus.Closed, BlockReason.None, endpoint_id, sender_pid, payload_len, attached_handle_count))
+}
+
+func closed_receive_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: ipc.EndpointTable, endpoint_id: u32) ReceiveResult {
+    return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Closed, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.Closed, BlockReason.None, endpoint_id, 0, 0, 0, 0, ipc.zero_payload()))
+}
+
+func closed_backpressure_send_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: ipc.EndpointTable, task_slots: [3]state.TaskSlot, ready_queue: state.ReadyQueue, sender_pid: u32, payload_len: usize, attached_handle_count: usize, endpoint_id: u32) BackpressureSendResult {
+    return backpressure_send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Closed, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.Closed, BlockReason.None, send_observation(SyscallStatus.Closed, BlockReason.None, endpoint_id, sender_pid, payload_len, attached_handle_count), 0, ipc.EndpointWakeReason.None)
+}
+
+func closed_backpressure_receive_result(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: ipc.EndpointTable, task_slots: [3]state.TaskSlot, ready_queue: state.ReadyQueue, endpoint_id: u32) BackpressureReceiveResult {
+    return backpressure_receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Closed, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.Closed, BlockReason.None, receive_observation(SyscallStatus.Closed, BlockReason.None, endpoint_id, 0, 0, 0, 0, ipc.zero_payload()), 0, ipc.EndpointWakeReason.None)
+}
+
 func update_gate(gate: SyscallGate, id: SyscallId, status: SyscallStatus, send_delta: u32, receive_delta: u32) SyscallGate {
     return SyscallGate{ open: gate.open, last_id: id, last_status: status, send_count: gate.send_count + send_delta, receive_count: gate.receive_count + receive_delta }
 }
@@ -368,7 +384,7 @@ func perform_sleep(gate: SyscallGate, task_slots: [3]state.TaskSlot, timer_state
 
 func perform_send(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: ipc.EndpointTable, sender_pid: u32, request: SendRequest) SendResult {
     if gate.open == 0 {
-        return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Closed, 0, 0), handle_table, endpoints, SyscallStatus.Closed, BlockReason.None, send_observation(SyscallStatus.Closed, BlockReason.None, 0, sender_pid, request.payload_len, request.attached_handle_count))
+        return closed_send_result(gate, handle_table, endpoints, sender_pid, request.payload_len, request.attached_handle_count, 0)
     }
     resolved_handle: capability.EndpointHandleResolution = capability.resolve_send_endpoint_handle(handle_table, request.handle_slot)
     if resolved_handle.valid == 0 {
@@ -387,9 +403,12 @@ func perform_send(gate: SyscallGate, handle_table: capability.HandleTable, endpo
     }
     message_id: u32 = gate.send_count + FIRST_RUNTIME_MESSAGE_ID
     message: ipc.KernelMessage = ipc.build_runtime_message(message_id, sender_pid, resolved_handle.endpoint_id, request.payload_len, request.payload, attached.attached_count, attached.attached_endpoint_id, attached.attached_rights, attached.attached_source_handle_slot)
-    sent: ipc.RuntimeSendResult = ipc.enqueue_runtime_message(endpoints, resolved_handle.endpoint_id, message)
+    sent: ipc.RuntimeSendTransition = ipc.attempt_runtime_send(endpoints, resolved_handle.endpoint_id, message)
     if sent.endpoint_valid == 0 {
         return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidEndpoint, 0, 0), handle_table, endpoints, SyscallStatus.InvalidEndpoint, BlockReason.None, send_observation(SyscallStatus.InvalidEndpoint, BlockReason.None, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count))
+    }
+    if sent.endpoint_closed != 0 {
+        return closed_send_result(gate, handle_table, sent.endpoints, sender_pid, request.payload_len, request.attached_handle_count, resolved_handle.endpoint_id)
     }
     if sent.queue_full != 0 {
         return send_result(update_gate(gate, SyscallId.Send, SyscallStatus.WouldBlock, 0, 0), handle_table, endpoints, SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull, send_observation(SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count))
@@ -399,15 +418,18 @@ func perform_send(gate: SyscallGate, handle_table: capability.HandleTable, endpo
 
 func perform_receive(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: ipc.EndpointTable, request: ReceiveRequest) ReceiveResult {
     if gate.open == 0 {
-        return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Closed, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.Closed, BlockReason.None, 0, 0, 0, 0, 0, ipc.zero_payload()))
+        return closed_receive_result(gate, handle_table, endpoints, 0)
     }
     resolved_handle: capability.EndpointHandleResolution = capability.resolve_receive_endpoint_handle(handle_table, request.handle_slot)
     if resolved_handle.valid == 0 {
         return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, 0, 0, 0, 0, ipc.zero_payload()))
     }
-    received: ipc.RuntimeReceiveResult = ipc.receive_runtime_message(endpoints, resolved_handle.endpoint_id)
+    received: ipc.RuntimeReceiveTransition = ipc.attempt_runtime_receive(endpoints, resolved_handle.endpoint_id)
     if received.endpoint_valid == 0 {
         return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidEndpoint, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.InvalidEndpoint, BlockReason.None, resolved_handle.endpoint_id, 0, 0, 0, 0, ipc.zero_payload()))
+    }
+    if received.endpoint_closed != 0 {
+        return closed_receive_result(gate, handle_table, received.endpoints, resolved_handle.endpoint_id)
     }
     if received.queue_empty != 0 {
         return receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.WouldBlock, 0, 0), handle_table, endpoints, receive_observation(SyscallStatus.WouldBlock, BlockReason.EndpointQueueEmpty, resolved_handle.endpoint_id, 0, 0, 0, 0, ipc.zero_payload()))
@@ -422,7 +444,7 @@ func perform_receive(gate: SyscallGate, handle_table: capability.HandleTable, en
 
 func perform_send_with_backpressure(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: ipc.EndpointTable, task_slots: [3]state.TaskSlot, ready_queue: state.ReadyQueue, sender_pid: u32, sender_task_slot: u32, request: SendRequest) BackpressureSendResult {
     if gate.open == 0 {
-        return backpressure_send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Closed, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.Closed, BlockReason.None, send_observation(SyscallStatus.Closed, BlockReason.None, 0, sender_pid, request.payload_len, request.attached_handle_count), 0, ipc.EndpointWakeReason.None)
+        return closed_backpressure_send_result(gate, handle_table, endpoints, task_slots, ready_queue, sender_pid, request.payload_len, request.attached_handle_count, 0)
     }
     if sender_task_slot >= 3 {
         return backpressure_send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.InvalidHandle, BlockReason.None, send_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, sender_pid, request.payload_len, request.attached_handle_count), 0, ipc.EndpointWakeReason.None)
@@ -445,9 +467,12 @@ func perform_send_with_backpressure(gate: SyscallGate, handle_table: capability.
     }
     message_id: u32 = gate.send_count + FIRST_RUNTIME_MESSAGE_ID
     message: ipc.KernelMessage = ipc.build_runtime_message(message_id, sender_pid, resolved_handle.endpoint_id, request.payload_len, request.payload, attached.attached_count, attached.attached_endpoint_id, attached.attached_rights, attached.attached_source_handle_slot)
-    sent: ipc.RuntimeSendResult = ipc.enqueue_runtime_message(endpoints, resolved_handle.endpoint_id, message)
+    sent: ipc.RuntimeSendTransition = ipc.attempt_runtime_send(endpoints, resolved_handle.endpoint_id, message)
     if sent.endpoint_valid == 0 {
         return backpressure_send_result(update_gate(gate, SyscallId.Send, SyscallStatus.InvalidEndpoint, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.InvalidEndpoint, BlockReason.None, send_observation(SyscallStatus.InvalidEndpoint, BlockReason.None, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count), 0, ipc.EndpointWakeReason.None)
+    }
+    if sent.endpoint_closed != 0 {
+        return closed_backpressure_send_result(gate, handle_table, sent.endpoints, task_slots, ready_queue, sender_pid, request.payload_len, request.attached_handle_count, resolved_handle.endpoint_id)
     }
     if sent.queue_full != 0 {
         if !state.can_block_task(selected_task) {
@@ -457,14 +482,13 @@ func perform_send_with_backpressure(gate: SyscallGate, handle_table: capability.
         blocked: lifecycle.TaskTransition = lifecycle.block_task_on_endpoint_send(task_slots, sender_task_slot)
         return backpressure_send_result(update_gate(gate, SyscallId.Send, SyscallStatus.WouldBlock, 0, 0), handle_table, blocked_endpoints, blocked.task_slots, ready_queue, SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull, send_observation(SyscallStatus.WouldBlock, BlockReason.EndpointQueueFull, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count), 0, ipc.EndpointWakeReason.None)
     }
-    wake_transition: ipc.EndpointWakeTransition = ipc.wake_runtime_blocked_receiver(sent.endpoints, resolved_handle.endpoint_id, ipc.EndpointWakeReason.MessageAvailable)
-    wake_apply: EndpointWakeApplyResult = apply_endpoint_wake(task_slots, ready_queue, wake_transition.wake)
-    return backpressure_send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Ok, 1, 0), updated_handle_table, wake_transition.endpoints, wake_apply.task_slots, wake_apply.ready_queue, SyscallStatus.Ok, BlockReason.None, send_observation(SyscallStatus.Ok, BlockReason.None, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count), wake_apply.wake_task_id, wake_apply.wake_reason)
+    wake_apply: EndpointWakeApplyResult = apply_endpoint_wake(task_slots, ready_queue, sent.wake)
+    return backpressure_send_result(update_gate(gate, SyscallId.Send, SyscallStatus.Ok, 1, 0), updated_handle_table, sent.endpoints, wake_apply.task_slots, wake_apply.ready_queue, SyscallStatus.Ok, BlockReason.None, send_observation(SyscallStatus.Ok, BlockReason.None, resolved_handle.endpoint_id, sender_pid, request.payload_len, request.attached_handle_count), wake_apply.wake_task_id, wake_apply.wake_reason)
 }
 
 func perform_receive_with_backpressure(gate: SyscallGate, handle_table: capability.HandleTable, endpoints: ipc.EndpointTable, task_slots: [3]state.TaskSlot, ready_queue: state.ReadyQueue, receiver_task_slot: u32, request: ReceiveRequest) BackpressureReceiveResult {
     if gate.open == 0 {
-        return backpressure_receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Closed, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.Closed, BlockReason.None, receive_observation(SyscallStatus.Closed, BlockReason.None, 0, 0, 0, 0, 0, ipc.zero_payload()), 0, ipc.EndpointWakeReason.None)
+        return closed_backpressure_receive_result(gate, handle_table, endpoints, task_slots, ready_queue, 0)
     }
     if receiver_task_slot >= 3 {
         return backpressure_receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.InvalidHandle, BlockReason.None, receive_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, 0, 0, 0, 0, ipc.zero_payload()), 0, ipc.EndpointWakeReason.None)
@@ -474,9 +498,12 @@ func perform_receive_with_backpressure(gate: SyscallGate, handle_table: capabili
     if resolved_handle.valid == 0 {
         return backpressure_receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.InvalidHandle, BlockReason.None, receive_observation(SyscallStatus.InvalidHandle, BlockReason.None, 0, 0, 0, 0, 0, ipc.zero_payload()), 0, ipc.EndpointWakeReason.None)
     }
-    received: ipc.RuntimeReceiveResult = ipc.receive_runtime_message(endpoints, resolved_handle.endpoint_id)
+    received: ipc.RuntimeReceiveTransition = ipc.attempt_runtime_receive(endpoints, resolved_handle.endpoint_id)
     if received.endpoint_valid == 0 {
         return backpressure_receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidEndpoint, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.InvalidEndpoint, BlockReason.None, receive_observation(SyscallStatus.InvalidEndpoint, BlockReason.None, resolved_handle.endpoint_id, 0, 0, 0, 0, ipc.zero_payload()), 0, ipc.EndpointWakeReason.None)
+    }
+    if received.endpoint_closed != 0 {
+        return closed_backpressure_receive_result(gate, handle_table, received.endpoints, task_slots, ready_queue, resolved_handle.endpoint_id)
     }
     if received.queue_empty != 0 {
         if !state.can_block_task(selected_task) {
@@ -490,10 +517,9 @@ func perform_receive_with_backpressure(gate: SyscallGate, handle_table: capabili
     if install.valid == 0 {
         return backpressure_receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.InvalidHandle, 0, 0), handle_table, endpoints, task_slots, ready_queue, SyscallStatus.InvalidHandle, BlockReason.None, receive_observation(SyscallStatus.InvalidHandle, BlockReason.None, resolved_handle.endpoint_id, 0, 0, 0, 0, ipc.zero_payload()), 0, ipc.EndpointWakeReason.None)
     }
-    wake_transition: ipc.EndpointWakeTransition = ipc.wake_runtime_blocked_sender(received.endpoints, resolved_handle.endpoint_id, ipc.EndpointWakeReason.QueueSpaceAvailable)
-    wake_apply: EndpointWakeApplyResult = apply_endpoint_wake(task_slots, ready_queue, wake_transition.wake)
+    wake_apply: EndpointWakeApplyResult = apply_endpoint_wake(task_slots, ready_queue, received.wake)
     observation: ReceiveObservation = receive_observation(SyscallStatus.Ok, BlockReason.None, received.message.endpoint_id, received.message.source_pid, received.message.len, install.received_handle_slot, install.received_handle_count, received.message.payload)
-    return backpressure_receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Ok, 0, 1), install.handle_table, wake_transition.endpoints, wake_apply.task_slots, wake_apply.ready_queue, SyscallStatus.Ok, BlockReason.None, observation, wake_apply.wake_task_id, wake_apply.wake_reason)
+    return backpressure_receive_result(update_gate(gate, SyscallId.Receive, SyscallStatus.Ok, 0, 1), install.handle_table, received.endpoints, wake_apply.task_slots, wake_apply.ready_queue, SyscallStatus.Ok, BlockReason.None, observation, wake_apply.wake_task_id, wake_apply.wake_reason)
 }
 
 func perform_spawn(gate: SyscallGate, program_capability: capability.CapabilitySlot, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, wait_table: capability.WaitTable, child_image: init.InitImage, request: SpawnRequest, child_pid: u32, child_tid: u32, child_asid: u32, child_translation_root: mmu.TranslationRoot) SpawnResult {

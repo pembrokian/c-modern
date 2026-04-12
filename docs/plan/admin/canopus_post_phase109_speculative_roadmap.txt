@@ -78,6 +78,8 @@ Repository numbering note
   replacement probe.
 - Phase 132 is occupied by the concrete bounded backpressure and blocking
   audit.
+- Phase 133 is occupied by the concrete bounded message lifetime and reuse
+  audit.
 - Proposed compiler planning now reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
 - The next speculative Canopus continuation therefore starts at Phase 131.
@@ -92,6 +94,9 @@ Repository numbering note
 - Phase 132 is now concrete as one bounded backpressure and blocking audit
   over the landed fan-out composition path plus one real sender-block and one
   real receiver-block follow-through.
+- Phase 133 is now concrete as one bounded message lifetime and reuse audit
+  over the landed backpressure path plus one repeated slot-reuse proof and one
+  direct close-or-death abort follow-through.
 
 Repository status note
 ----------------------

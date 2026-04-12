@@ -3,7 +3,7 @@ Phase 133 -- Message Lifetime And Reuse Audit
 
 Status
 ------
-PLANNED
+IMPLEMENTED
 
 Purpose
 -------
@@ -11,25 +11,28 @@ Continue from the completed Phase 132 backpressure step by making message-slot,
 payload, and attached-handle lifetime explicit enough that bounded queue reuse
 remains mechanically auditable under deeper IPC composition.
 
-This document is an execution plan for Phase 133.
-It defines one bounded message-lifetime phase that must land as explicit
-endpoint and capability behavior before it is admitted as a debug audit or
-regression.
+This document is both the Phase 133 execution note and its closeout.
+It defines one bounded message-lifetime phase that lands as explicit ipc and
+capability behavior before it is admitted as a debug audit or regression.
 It does not claim a general memory manager, garbage collection, zero-copy
 messaging, or a broader capability rewrite.
 
 Repository status note
 ----------------------
-- The current endpoint model already has `Empty`, `Queued`, and `Delivered`
+- The current ipc model already has `Empty`, `Queued`, and `Delivered`
   message states, and queue consumption clears the head slot back to an empty
   record.
 - The current capability model already invalidates transferred handles in
   bounded cases, but the running-system slice does not yet publish one broader
   statement about message-slot retirement and safe reuse under deeper
   composition pressure.
-- If the repository stops at Phase 131 or Phase 132, deeper IPC composition
-  could still rely on accidental slot clearing or stale attached-handle state
-  rather than on explicit lifetime rules.
+- The landed slice now adds one explicit repeated-slot reuse path plus one
+  direct endpoint-close or owner-death abort path so deeper IPC composition no
+  longer relies on accidental slot clearing or stale queued state.
+- The landed slice now also proves that a transferred attached handle stays
+  invalidated at the source even when the queued transfer is aborted before
+  delivery, and that both direct close and owner-death cleanup scrub the queued
+  attached metadata back to an empty slot.
 
 Problem being solved
 --------------------
@@ -90,18 +93,49 @@ The repository should take this phase because deeper IPC composition is only
 honest if the system can explain when a message stops being live and why a
 queue slot becomes safe to reuse.
 
-What this phase should try to prove
------------------------------------
+What this phase proves
+----------------------
 - one message queue slot is reused only after the previous message is fully
   retired
 - payload bytes and attached metadata are scrubbed or reset deterministically
   before reuse
-- attached-handle transfer truth remains explicit across delivery and consume
-  boundaries
+- attached-handle transfer truth remains explicit across both successful
+  delivery and both direct-close and owner-death abort boundaries
 - repeated messaging over one endpoint path does not depend on stale message
   state or ambient aliasing
 - the running-system claim expands because message lifetime is now described
   by code-owned invariants rather than by fixture assumptions
+
+Implemented slice
+-----------------
+- refined `kernel/src/ipc/00_types.mc` so the message-state model admits one
+  explicit `Aborted` state for close-or-death cleanup
+- kept deterministic queue-slot retirement in `kernel/src/ipc/01_queue.mc`
+  and proved that reused slots scrub back to empty payload state before reuse
+- extended `kernel/src/ipc/02_runtime.mc` so repeated send and receive plus
+  direct close-aware transitions are published as ipc-owned runtime helpers
+- kept direct endpoint-close and owner-death cleanup in
+  `kernel/src/ipc/03_failure.mc`, scrubbing queued messages and waking blocked
+  senders or receivers with explicit `EndpointClosed` truth
+- thinned `kernel/src/syscall.mc` so the backpressure send and receive paths
+  consume ipc-owned runtime transitions rather than open-coding queue and wake
+  mechanics locally
+- added one new `debug.Phase133MessageLifetimeAudit` record plus one new
+  `kernel/src/debug/07_phase133.mc` validator over slot reuse, attached-handle
+  retirement, queued-transfer abort scrubbing, and close-or-death abort
+  behavior
+- wired `kernel/src/main.mc` through one repeated-message path and one direct
+  close-or-death path before the kernel marker advances to 133
+- added one focused freestanding regression plus one projected MIR golden for
+  the landed Phase 133 boundary
+
+Endpoint close boundary
+-----------------------
+- Keep endpoint close as an `ipc`-owned internal action for now.
+- Do not add a syscall-facing close surface in this phase.
+- Reopen that boundary only when a real user-space consumer needs explicit
+  close semantics that cannot be expressed through the landed `ipc`
+  close-or-death cleanup path.
 
 Required implementation surfaces
 --------------------------------
@@ -153,14 +187,15 @@ The owning implementation surfaces for this phase are:
 
 Deliverables
 ------------
-- one canonical Phase 133 execution plan in `docs/plan/active/`
+- one canonical Phase 133 execution note in `docs/plan/active/`
 - one additive endpoint lifetime and slot-reuse implementation slice
 - one additive capability lifetime slice for attached-handle retirement
 - one real repeated-message path over the running-system artifact
 - one debug-owned Phase 133 audit over the landed implementation
 - one focused freestanding regression plus projected MIR golden for the Phase
   133 boundary
-- refreshed supporting docs only after the code shape is settled
+- refreshed roadmap, readiness position, kernel README, repository map,
+  decision log, backlog, and test listings after the code shape settled
 
 Suggested execution order
 -------------------------
@@ -183,8 +218,11 @@ Preferred proof points
    reuse.
 3. One attached-handle transfer proof shows the source handle is no longer
    live after transfer and the receiver-side installation remains explicit.
-4. One projected MIR proof shows the runtime artifact carries the new message
-   lifetime logic and audit.
+4. One attached-handle abort proof shows that direct close and owner death both
+  scrub queued attached metadata while leaving the sender-side invalidation
+  truth in place.
+5. One projected MIR proof shows the runtime artifact carries the new message
+  lifetime logic and audit.
 
 Exit criteria
 -------------
@@ -208,3 +246,14 @@ Non-goals
 - reopening sema, MIR, backend, ABI, target, or `hal`
 - claiming message-lifetime support from tests alone without landed runtime
   state changes
+
+Closeout statement
+------------------
+Phase 133 is complete as one bounded message lifetime and reuse audit.
+The repository now carries one honest repeated-message follow-through over the
+real kernel artifact: one queue slot retires and scrubs before reuse, one
+attached handle remains explicit across both delivery and both close and
+owner-death abort, and one later endpoint close or owner death aborts queued
+state and wakes blocked work through ipc-owned cleanup rather than through
+fixture assumptions, hidden retention, a syscall-visible close policy, or a
+broader memory-management framework.
