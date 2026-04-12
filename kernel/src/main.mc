@@ -64,6 +64,8 @@ const PHASE136_MARKER: i32 = 136
 const PHASE136_MARKER_DETAIL: u32 = 136
 const PHASE137_MARKER: i32 = 137
 const PHASE137_MARKER_DETAIL: u32 = 137
+const PHASE140_MARKER: i32 = 140
+const PHASE140_MARKER_DETAIL: u32 = 140
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
@@ -1271,7 +1273,7 @@ func build_serial_service_config() bootstrap_services.SerialServiceConfig {
 }
 
 func build_serial_service_execution_state() bootstrap_services.SerialServiceExecutionState {
-    return bootstrap_services.SerialServiceExecutionState{ program_capability: SERIAL_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: SERIAL_SERVICE_ADDRESS_SPACE, child_user_frame: SERIAL_SERVICE_USER_FRAME, service_state: SERIAL_SERVICE_STATE, spawn_observation: SERIAL_SERVICE_SPAWN_OBSERVATION, receive_observation: SERIAL_SERVICE_RECEIVE_OBSERVATION, ingress: SERIAL_SERVICE_INGRESS, failure_observation: SERIAL_SERVICE_FAILURE_OBSERVATION, wait_observation: SERIAL_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
+    return bootstrap_services.SerialServiceExecutionState{ program_capability: SERIAL_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: SERIAL_SERVICE_ADDRESS_SPACE, child_user_frame: SERIAL_SERVICE_USER_FRAME, service_state: SERIAL_SERVICE_STATE, spawn_observation: SERIAL_SERVICE_SPAWN_OBSERVATION, receive_observation: SERIAL_SERVICE_RECEIVE_OBSERVATION, ingress: SERIAL_SERVICE_INGRESS, composition: serial_service.observe_composition(SERIAL_SERVICE_STATE), failure_observation: SERIAL_SERVICE_FAILURE_OBSERVATION, wait_observation: SERIAL_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
 }
 
 func install_serial_service_execution_state(next_state: bootstrap_services.SerialServiceExecutionState) {
@@ -1855,43 +1857,58 @@ func bootstrap_main() i32 {
     if !debug.validate_phase137_optional_dma_or_equivalent_follow_through(phase137_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 94
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, PHASE137_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
+
+    phase140_serial_config: bootstrap_services.SerialServiceConfig = bootstrap_services.serial_service_composition_config(BOOT_PID, INIT_PID, INIT_TID, INIT_ASID, SERIAL_SERVICE_ENDPOINT_ID, INIT_ENDPOINT_ID, mmu.bootstrap_translation_root(INIT_ASID, INIT_ROOT_PAGE_TABLE))
+    phase140_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
+    phase140_serial_execution: bootstrap_services.SerialServiceExecutionState = bootstrap_services.SerialServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.open_gate(syscall.gate_closed()), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.handle_table_for_owner(INIT_PID), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: INIT_IMAGE, child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: phase140_serial_state, spawn_observation: syscall.empty_spawn_observation(), receive_observation: SERIAL_SERVICE_RECEIVE_OBSERVATION, ingress: serial_service.observe_ingress(phase140_serial_state), composition: serial_service.observe_composition(phase140_serial_state), failure_observation: bootstrap_services.empty_serial_service_failure_observation(), wait_observation: syscall.empty_wait_observation(), ready_queue: state.empty_queue() }
+    phase140_composition_config: bootstrap_services.CompositionServiceConfig = bootstrap_services.composition_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, phase140_serial_config.composition_handle_slot, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
+    phase140_composition_execution: bootstrap_services.CompositionServiceExecutionState = bootstrap_services.empty_composition_service_execution_state()
+    phase140_composition_execution = bootstrap_services.CompositionServiceExecutionState{ program_capability: phase140_composition_execution.program_capability, gate: phase140_composition_execution.gate, process_slots: phase140_composition_execution.process_slots, task_slots: phase140_composition_execution.task_slots, init_handle_table: phase140_composition_execution.init_handle_table, child_handle_table: capability.handle_table_for_owner(CHILD_PID), wait_table: phase140_composition_execution.wait_table, endpoints: phase140_composition_execution.endpoints, init_image: INIT_IMAGE, child_address_space: phase140_composition_execution.child_address_space, child_user_frame: phase140_composition_execution.child_user_frame, echo_peer_state: phase140_composition_execution.echo_peer_state, log_peer_state: phase140_composition_execution.log_peer_state, spawn_observation: phase140_composition_execution.spawn_observation, request_receive_observation: phase140_composition_execution.request_receive_observation, echo_fanout_observation: phase140_composition_execution.echo_fanout_observation, echo_peer_receive_observation: phase140_composition_execution.echo_peer_receive_observation, echo_reply_send_observation: phase140_composition_execution.echo_reply_send_observation, echo_reply_observation: phase140_composition_execution.echo_reply_observation, log_fanout_observation: phase140_composition_execution.log_fanout_observation, log_peer_receive_observation: phase140_composition_execution.log_peer_receive_observation, log_ack_send_observation: phase140_composition_execution.log_ack_send_observation, log_ack_observation: phase140_composition_execution.log_ack_observation, aggregate_reply_send_observation: phase140_composition_execution.aggregate_reply_send_observation, aggregate_reply_observation: phase140_composition_execution.aggregate_reply_observation, wait_observation: phase140_composition_execution.wait_observation, observation: phase140_composition_execution.observation, ready_queue: phase140_composition_execution.ready_queue }
+    phase140_result: bootstrap_services.Phase140SerialIngressCompositionResult = bootstrap_services.execute_phase140_serial_ingress_composed_service_graph(phase140_serial_config, phase140_composition_config, phase140_serial_execution, phase140_composition_execution)
+    if phase140_result.succeeded == 0 {
         return 95
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    phase140_audit: debug.Phase140SerialIngressComposedServiceGraphAudit = bootstrap_audit.build_phase140_serial_ingress_composed_service_graph_audit(bootstrap_audit.Phase140SerialIngressComposedServiceGraphAuditInputs{ phase137: phase137_audit, serial_service_pid: phase140_result.serial_state.composition.service_pid, composition_service_pid: phase140_result.composition_state.observation.service_pid, serial_forward_endpoint_id: phase140_result.serial_state.composition.forward_endpoint_id, serial_forward_status: phase140_result.serial_state.composition.forward_status, serial_forward_request_len: phase140_result.serial_state.composition.forwarded_request_len, serial_forward_request_byte0: phase140_result.serial_state.composition.forwarded_request_byte0, serial_forward_request_byte1: phase140_result.serial_state.composition.forwarded_request_byte1, serial_forward_count: phase140_result.serial_state.composition.forwarded_request_count, composition_request_receive_status: phase140_result.composition_state.request_receive_observation.status, composition_request_source_pid: phase140_result.composition_state.request_receive_observation.source_pid, composition_request_len: phase140_result.composition_state.observation.request_len, composition_request_byte0: phase140_result.composition_state.observation.request_byte0, composition_request_byte1: phase140_result.composition_state.observation.request_byte1, composition_control_endpoint_id: phase140_composition_config.control_endpoint_id, composition_echo_endpoint_id: phase140_composition_config.echo_endpoint_id, composition_log_endpoint_id: phase140_composition_config.log_endpoint_id, composition_echo_fanout_status: phase140_result.composition_state.echo_fanout_observation.status, composition_echo_fanout_endpoint_id: phase140_result.composition_state.echo_fanout_observation.endpoint_id, composition_log_fanout_status: phase140_result.composition_state.log_fanout_observation.status, composition_log_fanout_endpoint_id: phase140_result.composition_state.log_fanout_observation.endpoint_id, composition_aggregate_reply_status: phase140_result.composition_state.aggregate_reply_observation.status, composition_outbound_edge_count: phase140_result.composition_state.observation.outbound_edge_count, composition_aggregate_reply_count: phase140_result.composition_state.observation.aggregate_reply_count, serial_aggregate_reply_status: phase140_result.serial_state.composition.aggregate_reply_status, serial_aggregate_reply_len: phase140_result.serial_state.composition.aggregate_reply_len, serial_aggregate_reply_byte0: phase140_result.serial_state.composition.aggregate_reply_byte0, serial_aggregate_reply_byte1: phase140_result.serial_state.composition.aggregate_reply_byte1, serial_aggregate_reply_byte2: phase140_result.serial_state.composition.aggregate_reply_byte2, serial_aggregate_reply_byte3: phase140_result.serial_state.composition.aggregate_reply_byte3, serial_aggregate_reply_count: phase140_result.serial_state.composition.aggregate_reply_count, kernel_broker_visible: 0, dynamic_routing_visible: 0, general_service_graph_visible: 0, compiler_reopening_visible: 0 })
+    if !debug.validate_phase140_serial_ingress_composed_service_graph(phase140_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 96
     }
-    if BOOT_LOG.count != 5 {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE140_MARKER_DETAIL)
+    if BOOT_MARKER_EMITTED != 1 {
         return 97
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 98
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 99
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 100
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 101
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 102
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE137_MARKER_DETAIL {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 103
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 104
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE140_MARKER_DETAIL {
         return 105
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if PROCESS_SLOTS[1].pid != INIT_PID {
         return 106
     }
-    return PHASE137_MARKER
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 107
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 108
+    }
+    return PHASE140_MARKER
 }

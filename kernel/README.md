@@ -10,6 +10,10 @@ Current status
   Phase 136 containment step into one bounded optional completion-backed UART
   receive follow-through.
 - Phase 137 therefore now publishes one bounded optional completion-backed UART receive follow-through.
+- Phase 140 has moved the repository-owned kernel artifact beyond the landed
+  Phase 137 completion-backed step into one bounded serial-ingress composed
+  service graph.
+- Phase 140 therefore now publishes one bounded serial-ingress composed service graph.
 - Phase 135 has moved the repository-owned kernel artifact beyond the landed
   Phase 134 minimal device-service handoff into one bounded UART receive-frame
   ownership boundary audit.
@@ -79,7 +83,7 @@ Current status
   message lifetime and reuse audit, one bounded UART receive device-service
   handoff, one bounded UART receive-frame ownership boundary audit, and one
   bounded device failure containment probe, and one bounded optional
-  completion-backed UART receive follow-through.
+  completion-backed UART receive follow-through, and one bounded serial-ingress composed service graph.
 
 Current files
 -------------
@@ -97,7 +101,7 @@ Current files
   step, one bounded service death observation step, one bounded partial
   failure propagation step, one bounded explicit restart or replacement
   probe, one bounded fan-out composition probe, one bounded device failure
-  containment probe, and thin root orchestration across the owned scheduler,
+  containment probe, one bounded serial-ingress composed service graph, and thin root orchestration across the owned scheduler,
   lifecycle, bootstrap helper, and debug audit modules
 - `src/bootstrap_audit/`: one logical `bootstrap_audit` module split through
   `module_sets.bootstrap_audit`, owning the extracted Phase 104 contract
@@ -129,14 +133,15 @@ Current files
   explicit restart or replacement audit, Phase 131 fan-out composition audit,
   Phase 134 minimal device-service handoff audit, Phase 135 buffer ownership
   boundary audit, Phase 136 device failure containment audit, and Phase 137
-  optional completion-backed follow-through audit
+  optional completion-backed follow-through audit, and Phase 140 serial-ingress composed service-graph audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
   reply payload, and final exchange observation records
 - `src/serial_service.mc`: bounded serial-service protocol state, one
-  service-owned copied receive-frame log, and one service-local malformed-input
-  classification path
+  service-owned copied receive-frame log, one fixed forwarded composition
+  request observation, one aggregate-reply observation, and one service-local
+  malformed-input classification path
 - `src/transfer_service.mc`: bounded transfer-service grant state, emitted
   payload construction, and final transfer observation records
 - `src/uart.mc`: bounded UART receive-frame staging owner, bounded optional
@@ -229,7 +234,7 @@ Phase boundary
   death observation step plus one bounded partial failure propagation step
   plus one bounded UART receive device-service handoff plus one bounded UART
   receive-frame ownership boundary audit plus one bounded device failure
-  containment probe publishing that same admitted slice without widening into a
+  containment probe plus one bounded serial-ingress composed service graph publishing that same admitted slice without widening into a
   broader service framework, supervision policy, retry framework, or general
   fault-management subsystem.
 - It does not yet claim general loading, dynamic service discovery,

@@ -578,3 +578,41 @@ struct Phase137OptionalDmaOrEquivalentAudit {
     descriptor_framework_visible: u32
     compiler_reopening_visible: u32
 }
+
+struct Phase140SerialIngressComposedServiceGraphAudit {
+    phase137: Phase137OptionalDmaOrEquivalentAudit
+    serial_service_pid: u32
+    composition_service_pid: u32
+    serial_forward_endpoint_id: u32
+    serial_forward_status: syscall.SyscallStatus
+    serial_forward_request_len: usize
+    serial_forward_request_byte0: u8
+    serial_forward_request_byte1: u8
+    serial_forward_count: usize
+    composition_request_receive_status: syscall.SyscallStatus
+    composition_request_source_pid: u32
+    composition_request_len: usize
+    composition_request_byte0: u8
+    composition_request_byte1: u8
+    composition_control_endpoint_id: u32
+    composition_echo_endpoint_id: u32
+    composition_log_endpoint_id: u32
+    composition_echo_fanout_status: syscall.SyscallStatus
+    composition_echo_fanout_endpoint_id: u32
+    composition_log_fanout_status: syscall.SyscallStatus
+    composition_log_fanout_endpoint_id: u32
+    composition_aggregate_reply_status: syscall.SyscallStatus
+    composition_outbound_edge_count: usize
+    composition_aggregate_reply_count: usize
+    serial_aggregate_reply_status: syscall.SyscallStatus
+    serial_aggregate_reply_len: usize
+    serial_aggregate_reply_byte0: u8
+    serial_aggregate_reply_byte1: u8
+    serial_aggregate_reply_byte2: u8
+    serial_aggregate_reply_byte3: u8
+    serial_aggregate_reply_count: usize
+    kernel_broker_visible: u32
+    dynamic_routing_visible: u32
+    general_service_graph_visible: u32
+    compiler_reopening_visible: u32
+}

@@ -3,7 +3,7 @@ Phase 140 -- Serial-Ingress Composed Service Graph
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -11,12 +11,14 @@ Continue from the deferred Phase 139 rebuild decision by adding one richer
 composed service graph over the landed UART, serial-service, and composition
 owners instead of rewriting an existing subsystem.
 
-This document is an execution plan for Phase 140.
-It defines one bounded serial-ingress composition step that must land as real
+This document records the completed Phase 140 slice.
+It defines one bounded serial-ingress composition step that landed as real
 service-owned forwarding, real service-owned aggregation, and real auditable
-reply truth before it is admitted as another stress proof.
+reply truth.
 It does not claim a broker framework, a dynamic service graph, a streaming
 router, or a broader namespace model.
+
+Phase 140 is complete as one bounded serial-ingress composed service graph.
 
 Repository status note
 ----------------------
@@ -194,6 +196,17 @@ Exit criteria
 - the focused regression proves build, run, docs, and MIR all expose the same
   Phase 140 boundary
 - the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Completed result
+----------------
+- the real kernel artifact now runs to a Phase 140 marker
+- one landed serial-service-owned forward sends one bounded request into the
+   fixed composition-service endpoint and records one bounded aggregate reply
+- the landed graph is exactly:
+
+   UART -> serial_service -> composition_service -> { echo_service, log_service }
+
+- It does not claim a broker, dynamic routing, or a general service-graph subsystem.
 
 Non-goals
 ---------

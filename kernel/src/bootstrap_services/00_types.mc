@@ -50,6 +50,7 @@ const SERIAL_SERVICE_PROGRAM_SLOT: u32 = 7
 const SERIAL_SERVICE_PROGRAM_OBJECT_ID: u32 = 6
 const SERIAL_SERVICE_WAIT_HANDLE_SLOT: u32 = 2
 const SERIAL_SERVICE_ENDPOINT_HANDLE_SLOT: u32 = 1
+const SERIAL_SERVICE_COMPOSITION_HANDLE_SLOT: u32 = 2
 const SERIAL_SERVICE_EXIT_CODE: i32 = 56
 
 struct LogServiceConfig {
@@ -271,9 +272,11 @@ struct SerialServiceConfig {
     child_tid: u32
     child_asid: u32
     serial_endpoint_id: u32
+    composition_endpoint_id: u32
     child_translation_root: mmu.TranslationRoot
     wait_handle_slot: u32
     endpoint_handle_slot: u32
+    composition_handle_slot: u32
     exit_code: i32
     program_slot: u32
     program_object_id: u32
@@ -302,6 +305,7 @@ struct SerialServiceExecutionState {
     spawn_observation: syscall.SpawnObservation
     receive_observation: syscall.ReceiveObservation
     ingress: serial_service.SerialIngressObservation
+    composition: serial_service.SerialCompositionObservation
     failure_observation: SerialServiceFailureObservation
     wait_observation: syscall.WaitObservation
     ready_queue: state.ReadyQueue
@@ -309,6 +313,12 @@ struct SerialServiceExecutionState {
 
 struct SerialServiceExecutionResult {
     state: SerialServiceExecutionState
+    succeeded: u32
+}
+
+struct Phase140SerialIngressCompositionResult {
+    serial_state: SerialServiceExecutionState
+    composition_state: CompositionServiceExecutionState
     succeeded: u32
 }
 
@@ -353,7 +363,11 @@ func composition_service_result(state: CompositionServiceExecutionState, succeed
 }
 
 func serial_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, serial_endpoint_id: u32, child_translation_root: mmu.TranslationRoot) SerialServiceConfig {
-    return SerialServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, serial_endpoint_id: serial_endpoint_id, child_translation_root: child_translation_root, wait_handle_slot: SERIAL_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: SERIAL_SERVICE_ENDPOINT_HANDLE_SLOT, exit_code: SERIAL_SERVICE_EXIT_CODE, program_slot: SERIAL_SERVICE_PROGRAM_SLOT, program_object_id: SERIAL_SERVICE_PROGRAM_OBJECT_ID }
+    return SerialServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, serial_endpoint_id: serial_endpoint_id, composition_endpoint_id: 0, child_translation_root: child_translation_root, wait_handle_slot: SERIAL_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: SERIAL_SERVICE_ENDPOINT_HANDLE_SLOT, composition_handle_slot: 0, exit_code: SERIAL_SERVICE_EXIT_CODE, program_slot: SERIAL_SERVICE_PROGRAM_SLOT, program_object_id: SERIAL_SERVICE_PROGRAM_OBJECT_ID }
+}
+
+func serial_service_composition_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, serial_endpoint_id: u32, composition_endpoint_id: u32, child_translation_root: mmu.TranslationRoot) SerialServiceConfig {
+    return SerialServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, serial_endpoint_id: serial_endpoint_id, composition_endpoint_id: composition_endpoint_id, child_translation_root: child_translation_root, wait_handle_slot: SERIAL_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: SERIAL_SERVICE_ENDPOINT_HANDLE_SLOT, composition_handle_slot: SERIAL_SERVICE_COMPOSITION_HANDLE_SLOT, exit_code: SERIAL_SERVICE_EXIT_CODE, program_slot: SERIAL_SERVICE_PROGRAM_SLOT, program_object_id: SERIAL_SERVICE_PROGRAM_OBJECT_ID }
 }
 
 func empty_serial_service_failure_observation() SerialServiceFailureObservation {
@@ -361,9 +375,13 @@ func empty_serial_service_failure_observation() SerialServiceFailureObservation 
 }
 
 func empty_serial_service_execution_state() SerialServiceExecutionState {
-    return SerialServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: serial_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), ingress: serial_service.empty_ingress_observation(), failure_observation: empty_serial_service_failure_observation(), wait_observation: syscall.empty_wait_observation(), ready_queue: state.empty_queue() }
+    return SerialServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: serial_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), ingress: serial_service.empty_ingress_observation(), composition: serial_service.empty_composition_observation(), failure_observation: empty_serial_service_failure_observation(), wait_observation: syscall.empty_wait_observation(), ready_queue: state.empty_queue() }
 }
 
 func serial_service_result(state: SerialServiceExecutionState, succeeded: u32) SerialServiceExecutionResult {
     return SerialServiceExecutionResult{ state: state, succeeded: succeeded }
+}
+
+func phase140_serial_ingress_composition_result(serial_state: SerialServiceExecutionState, composition_state: CompositionServiceExecutionState, succeeded: u32) Phase140SerialIngressCompositionResult {
+    return Phase140SerialIngressCompositionResult{ serial_state: serial_state, composition_state: composition_state, succeeded: succeeded }
 }

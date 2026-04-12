@@ -88,6 +88,8 @@ Repository numbering note
   probe.
 - Phase 137 is occupied by the concrete bounded optional completion-backed
   follow-through.
+- Phase 140 is occupied by the concrete bounded serial-ingress composed
+  service graph.
 - Proposed compiler planning now reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
 - The next speculative Canopus continuation therefore starts at Phase 138.
@@ -120,6 +122,8 @@ Repository numbering note
   over the landed device-failure boundary plus one active completion-backed
   receive buffer, one completion interrupt classification path, and one explicit
   service consume-and-retire path.
+- Phase 140 is now concrete as one bounded serial-ingress composed service graph
+  over the landed UART, serial-service, and composition owners.
 
 Repository status note
 ----------------------
