@@ -61,6 +61,8 @@ KERNEL_SHARD_PHASES = {
 }
 KERNEL_ARTIFACT_TEST = "mc_tool_freestanding_kernel_artifacts_unit"
 KERNEL_DOCS_TEST = "mc_tool_freestanding_kernel_docs_unit"
+KERNEL_MANIFEST_ROOT = PurePosixPath("tests/tool/freestanding/kernel/goldens/manifests")
+KERNEL_RUNTIME_ROOT = PurePosixPath("tests/tool/freestanding/kernel/runtime")
 
 
 def kernel_shard_test_name(shard: int) -> str:
@@ -197,9 +199,48 @@ def kernel_shard_for_phase(phase: int) -> str | None:
     return None
 
 
+def kernel_manifest_path_for_shard(shard: int, source_root: Path) -> Path:
+    return source_root / KERNEL_MANIFEST_ROOT / f"shard{shard}.phase_checks.txt"
+
+
+def parse_kernel_manifest_goldens(manifest_path: Path) -> list[str]:
+    goldens: list[str] = []
+    if not manifest_path.exists():
+        return goldens
+
+    for raw_line in manifest_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("run="):
+            goldens.append(f"tests/tool/freestanding/kernel/goldens/run/{line.split('=', 1)[1]}")
+            continue
+        if line.startswith("mir="):
+            goldens.append(f"tests/tool/freestanding/kernel/goldens/mir/{line.split('=', 1)[1]}")
+            continue
+    return goldens
+
+
+def manifest_backed_shard_for_kernel_golden(filename: str, source_root: Path) -> str | None:
+    for shard in sorted(KERNEL_SHARD_PHASES):
+        manifest_path = kernel_manifest_path_for_shard(shard, source_root)
+        if not manifest_path.exists():
+            continue
+        golden_paths = parse_kernel_manifest_goldens(manifest_path)
+        if any(PurePosixPath(path).name == filename for path in golden_paths):
+            return kernel_shard_test_name(shard)
+    return None
+
+
 def classify_kernel_path(path: str) -> tuple[list[str], str] | None:
     if path in KERNEL_DOC_PATHS:
         return ([KERNEL_DOCS_TEST], "kernel documentation ownership")
+
+    runtime_match = re.match(r"tests/tool/freestanding/kernel/runtime/phase(\d+)[^/]*/", path)
+    if runtime_match:
+        shard_test = kernel_shard_for_phase(int(runtime_match.group(1)))
+        if shard_test is not None:
+            return ([shard_test], f"kernel runtime phase {runtime_match.group(1)} ownership")
 
     if path.startswith("tests/tool/freestanding/kernel/shard") and path.endswith(".cpp"):
         shard_digit = path.removesuffix(".cpp").split("shard")[-1]
@@ -208,6 +249,10 @@ def classify_kernel_path(path: str) -> tuple[list[str], str] | None:
 
     if path.startswith("tests/tool/freestanding/kernel/goldens/"):
         filename = path.rsplit("/", 1)[-1]
+        manifest_match = re.match(r"shard(\d+)\.phase_checks\.txt", filename)
+        if manifest_match:
+            return ([kernel_shard_test_name(int(manifest_match.group(1)))],
+                    f"kernel shard {manifest_match.group(1)} manifest ownership")
         if filename.startswith("kernel_shard") and filename.endswith(".run.contains.txt"):
             shard_digit = filename.split("kernel_shard", 1)[1].split(".", 1)[0]
             if shard_digit.isdigit():
@@ -216,6 +261,9 @@ def classify_kernel_path(path: str) -> tuple[list[str], str] | None:
             return ([KERNEL_ARTIFACT_TEST], "phase108 manual relink golden ownership")
         if filename == "phase108_kernel_manifest.contains.txt":
             return ([kernel_shard_test_name(2)], "phase108 manifest golden ownership")
+        manifest_shard_test = manifest_backed_shard_for_kernel_golden(filename, Path.cwd())
+        if manifest_shard_test is not None:
+            return ([manifest_shard_test], f"manifest-backed kernel golden ownership for {filename}")
         match = re.match(r"phase(\d+)_", filename)
         if match:
             shard_test = kernel_shard_for_phase(int(match.group(1)))
@@ -306,6 +354,19 @@ def iter_owned_files(source_root: Path, relative_paths: Iterable[str]) -> list[P
 
 def kernel_golden_inputs_for_shard(shard: int, source_root: Path) -> list[str]:
     inputs = [f"tests/tool/freestanding/kernel/goldens/run/kernel_shard{shard}.run.contains.txt"]
+    manifest_path = kernel_manifest_path_for_shard(shard, source_root)
+    if manifest_path.exists():
+        inputs.append(PurePosixPath(manifest_path.relative_to(source_root)).as_posix())
+        inputs.extend(parse_kernel_manifest_goldens(manifest_path))
+    runtime_root = source_root / KERNEL_RUNTIME_ROOT
+    if runtime_root.exists():
+        for phase in KERNEL_SHARD_PHASES.get(shard, ()):
+            for phase_dir in sorted(runtime_root.glob(f"phase{phase}_*")):
+                if not phase_dir.is_dir():
+                    continue
+                for child in sorted(phase_dir.rglob("*")):
+                    if child.is_file():
+                        inputs.append(PurePosixPath(child.relative_to(source_root)).as_posix())
     for phase in KERNEL_SHARD_PHASES.get(shard, ()): 
         for subdir in ("mir", "run", "contracts"):
             base = source_root / "tests" / "tool" / "freestanding" / "kernel" / "goldens" / subdir
@@ -313,7 +374,7 @@ def kernel_golden_inputs_for_shard(shard: int, source_root: Path) -> list[str]:
                 continue
             for child in sorted(base.glob(f"phase{phase}_*")):
                 inputs.append(PurePosixPath(child.relative_to(source_root)).as_posix())
-    return inputs
+    return sorted(set(inputs))
 
 
 def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:

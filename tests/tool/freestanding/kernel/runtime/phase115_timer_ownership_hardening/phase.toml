@@ -1,0 +1,15 @@
+label = "phase115_timer_ownership_hardening"
+phase = 115
+shard = 3
+project = "kernel/build.toml"
+target = "kernel"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_mode = "projection"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_timer.mc.o"]
+selectors = [
+  "TypeDecl kind=struct name=timer.TimerInterruptDelivery",
+  "Function name=timer.deliver_interrupt_tick returns=[timer.TimerInterruptDelivery]",
+  "Function name=timer.validate_interrupt_delivery_boundary returns=[bool]",
+  "Function name=debug.validate_phase115_timer_ownership_hardening returns=[bool]",
+]

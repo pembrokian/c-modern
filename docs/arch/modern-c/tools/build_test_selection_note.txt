@@ -87,7 +87,7 @@ Normal order:
 - update the owning shard or standalone proof owner under
   `tests/tool/freestanding/kernel/`
 - add or update the owned goldens under
-  `tests/tool/freestanding/kernel/goldens/{mir,run,contracts}/`
+  `tests/tool/freestanding/kernel/goldens/{mir,run,contracts,manifests}/`
 - update `tests/tool/freestanding/kernel/suite.cpp` if the phase needs a new
   direct `kernel-case:` selector entry
 - update `tools/select_tests.py` only if the new phase changes shard
@@ -97,8 +97,8 @@ Normal order:
 Current remaining manual touchpoints for new freestanding kernel phases:
 
 - `tests/tool/freestanding/kernel/shardN.cpp`: owning runtime or proof logic
-- `tests/tool/freestanding/kernel/goldens/...`: owned MIR, run, or contract
-  goldens
+- `tests/tool/freestanding/kernel/goldens/...`: owned MIR, run, contract, or
+  manifest-backed phase-descriptor goldens
 - `tests/tool/freestanding/kernel/suite.cpp`: direct case registry for
   `kernel-case:`
 - `tools/select_tests.py`: shard-phase ownership metadata when shard ranges or

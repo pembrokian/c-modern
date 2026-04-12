@@ -41,10 +41,32 @@ struct FreestandingKernelPhaseCheck {
     std::string_view expected_mir_projection_file;
 };
 
+struct FreestandingKernelRuntimePhaseDescriptor {
+    int phase = 0;
+    int shard = 0;
+    std::string project;
+    std::string target;
+    std::string mir_mode;
+    std::string label;
+    std::string expected_run_lines_file;
+    std::vector<std::string> required_object_file_storage;
+    std::vector<std::string_view> required_object_files;
+    std::vector<std::string> mir_selector_storage;
+    std::vector<std::string_view> mir_selectors;
+    std::string expected_mir_projection_file;
+
+    void RefreshViews();
+    FreestandingKernelPhaseCheck View() const;
+};
+
 FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::filesystem::path& source_root);
 
 std::filesystem::path ResolveFreestandingKernelGoldenPath(const std::filesystem::path& source_root,
                                                           std::string_view file_name);
+
+std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadFreestandingKernelRuntimePhaseDescriptors(
+    const std::filesystem::path& source_root,
+    int shard);
 
 std::filesystem::path ResolveCanopusRoadmapPath(const std::filesystem::path& source_root,
                                                 int phase_number);

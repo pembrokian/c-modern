@@ -1,0 +1,15 @@
+label = "phase114_address_space_and_mmu_ownership_split"
+phase = 114
+shard = 3
+project = "kernel/build.toml"
+target = "kernel"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_mode = "projection"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_mmu.mc.o"]
+selectors = [
+  "TypeDecl kind=struct name=mmu.TranslationRoot",
+  "Function name=mmu.bootstrap_translation_root returns=[mmu.TranslationRoot]",
+  "Function name=mmu.validate_address_space_mmu_boundary returns=[bool]",
+  "Function name=debug.validate_phase114_address_space_and_mmu_ownership_split returns=[bool]",
+]

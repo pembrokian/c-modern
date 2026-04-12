@@ -1,0 +1,16 @@
+label = "phase116_mmu_activation_barrier_follow_through"
+phase = 116
+shard = 3
+project = "kernel/build.toml"
+target = "kernel"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_mode = "projection"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_mmu.mc.o", "_Users_ro_dev_c_modern_stdlib_hal.mc.o"]
+selectors = [
+  "TypeDecl kind=struct name=mmu.ActivationBarrierObservation",
+  "Function name=hal.memory_barrier extern=c",
+  "Function name=mmu.activate_with_barrier returns=[mmu.ActivationBarrierObservation]",
+  "Function name=mmu.validate_activation_barrier_boundary returns=[bool]",
+  "Function name=debug.validate_phase116_mmu_activation_barrier_follow_through returns=[bool]",
+]

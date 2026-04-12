@@ -1,0 +1,16 @@
+label = "phase111_scheduler_lifecycle_ownership_clarification"
+phase = 111
+shard = 2
+project = "kernel/build.toml"
+target = "kernel"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_mode = "projection"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_lifecycle.mc.o"]
+selectors = [
+  "Function name=lifecycle.install_spawned_child returns=[lifecycle.SpawnInstallResult]",
+  "Function name=lifecycle.block_task_on_timer returns=[lifecycle.TaskTransition]",
+  "Function name=lifecycle.ready_task returns=[lifecycle.TaskTransition]",
+  "Function name=lifecycle.validate_task_transition_contracts returns=[bool]",
+  "Function name=debug.validate_phase111_scheduler_and_lifecycle_ownership returns=[bool]",
+]

@@ -1,0 +1,5 @@
+  TypeDecl kind=struct name=mmu.ActivationBarrierObservation
+  Function name=hal.memory_barrier extern=c
+  Function name=mmu.activate_with_barrier returns=[mmu.ActivationBarrierObservation]
+  Function name=mmu.validate_activation_barrier_boundary returns=[bool]
+  Function name=debug.validate_phase116_mmu_activation_barrier_follow_through returns=[bool]

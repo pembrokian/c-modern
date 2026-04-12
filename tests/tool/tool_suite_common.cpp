@@ -1,7 +1,9 @@
 #include "tests/tool/tool_suite_common.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
+#include <optional>
 #include <sstream>
 #include <vector>
 
@@ -16,6 +18,8 @@ using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
 
 namespace {
+
+constexpr std::string_view kKernelRuntimeRootRelativePath = "runtime";
 
 std::string NormalizeProjectionText(std::string_view text) {
     std::string normalized(text);
@@ -35,7 +39,109 @@ std::vector<std::string> SplitLines(std::string_view text) {
     return lines;
 }
 
+std::string TrimCopy(std::string_view text) {
+    std::size_t start = 0;
+    while (start < text.size() && std::isspace(static_cast<unsigned char>(text[start])) != 0) {
+        ++start;
+    }
+    std::size_t end = text.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
+        --end;
+    }
+    return std::string(text.substr(start, end - start));
+}
+
+std::optional<std::string> ParseQuotedSetting(std::string_view line, std::string_view key) {
+    const std::string prefix = std::string(key) + " = \"";
+    if (!line.starts_with(prefix) || line.size() < prefix.size() + 1 || line.back() != '"') {
+        return std::nullopt;
+    }
+    return std::string(line.substr(prefix.size(), line.size() - prefix.size() - 1));
+}
+
+std::optional<int> ParseIntSetting(std::string_view line, std::string_view key) {
+    const std::string prefix = std::string(key) + " = ";
+    if (!line.starts_with(prefix)) {
+        return std::nullopt;
+    }
+    return std::stoi(std::string(line.substr(prefix.size())));
+}
+
+std::optional<std::string> ParseArrayEntry(std::string_view line) {
+    std::string trimmed = TrimCopy(line);
+    if (trimmed == "]") {
+        return std::nullopt;
+    }
+    if (!trimmed.empty() && trimmed.back() == ',') {
+        trimmed.pop_back();
+    }
+    if (trimmed.size() < 2 || trimmed.front() != '"' || trimmed.back() != '"') {
+        Fail("runtime phase directory contains an invalid array entry: " + trimmed);
+    }
+    return trimmed.substr(1, trimmed.size() - 2);
+}
+
+std::vector<std::string> ParseInlineQuotedArray(std::string_view line, std::string_view key) {
+    const std::string prefix = std::string(key) + " = [";
+    if (!line.starts_with(prefix) || line.back() != ']') {
+        Fail("runtime phase directory contains an invalid inline array for key: " + std::string(key));
+    }
+    std::string_view inner = line.substr(prefix.size(), line.size() - prefix.size() - 1);
+    std::vector<std::string> values;
+    while (!inner.empty()) {
+        while (!inner.empty() && (inner.front() == ' ' || inner.front() == ',')) {
+            inner.remove_prefix(1);
+        }
+        if (inner.empty()) {
+            break;
+        }
+        if (inner.front() != '"') {
+            Fail("runtime phase directory inline array should contain quoted strings for key: " + std::string(key));
+        }
+        inner.remove_prefix(1);
+        const std::size_t end_quote = inner.find('"');
+        if (end_quote == std::string_view::npos) {
+            Fail("runtime phase directory inline array is missing a closing quote for key: " + std::string(key));
+        }
+        values.emplace_back(inner.substr(0, end_quote));
+        inner.remove_prefix(end_quote + 1);
+    }
+    return values;
+}
+
+void ValidateFreestandingKernelRuntimePhaseDescriptor(const FreestandingKernelRuntimePhaseDescriptor& phase_check,
+                                                      const std::filesystem::path& phase_toml_path,
+                                                      int shard) {
+    if (phase_check.phase == 0 || phase_check.shard != shard || phase_check.project != "kernel/build.toml" ||
+        phase_check.target != "kernel" || phase_check.mir_mode != "projection" || phase_check.label.empty() ||
+        phase_check.expected_run_lines_file.empty() || phase_check.expected_mir_projection_file.empty() ||
+        phase_check.mir_selector_storage.empty()) {
+        Fail("runtime phase directory missing or invalid required fields: " + phase_toml_path.generic_string());
+    }
+}
+
 }  // namespace
+
+void FreestandingKernelRuntimePhaseDescriptor::RefreshViews() {
+    required_object_files.clear();
+    for (const auto& object_name : required_object_file_storage) {
+        required_object_files.push_back(object_name);
+    }
+    mir_selectors.clear();
+    for (const auto& selector : mir_selector_storage) {
+        mir_selectors.push_back(selector);
+    }
+}
+
+FreestandingKernelPhaseCheck FreestandingKernelRuntimePhaseDescriptor::View() const {
+    return {
+        .label = label,
+        .expected_run_lines_file = expected_run_lines_file,
+        .required_object_files = required_object_files,
+        .mir_selectors = mir_selectors,
+        .expected_mir_projection_file = expected_mir_projection_file,
+    };
+}
 
 FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::filesystem::path& source_root) {
     return {
@@ -67,6 +173,112 @@ std::filesystem::path ResolveFreestandingKernelGoldenPath(const std::filesystem:
         return kernel_root / "goldens" / "contracts" / std::string(file_name);
     }
     return direct_path;
+}
+
+std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadFreestandingKernelRuntimePhaseDescriptors(
+    const std::filesystem::path& source_root,
+    int shard) {
+    const std::filesystem::path runtime_root = ResolveFreestandingKernelGoldenPath(source_root,
+                                                                                   kKernelRuntimeRootRelativePath);
+    std::vector<FreestandingKernelRuntimePhaseDescriptor> phase_checks;
+    if (!std::filesystem::exists(runtime_root)) {
+        return phase_checks;
+    }
+
+    std::vector<std::filesystem::path> phase_dirs;
+    for (const auto& entry : std::filesystem::directory_iterator(runtime_root)) {
+        if (entry.is_directory()) {
+            phase_dirs.push_back(entry.path());
+        }
+    }
+    std::sort(phase_dirs.begin(), phase_dirs.end());
+
+    enum class ArrayMode {
+        none,
+        selectors,
+    };
+
+    for (const auto& phase_dir : phase_dirs) {
+        const std::filesystem::path phase_toml_path = phase_dir / "phase.toml";
+        if (!std::filesystem::exists(phase_toml_path)) {
+            continue;
+        }
+
+        FreestandingKernelRuntimePhaseDescriptor current;
+        ArrayMode array_mode = ArrayMode::none;
+        std::istringstream stream(ReadFile(phase_toml_path));
+        std::string raw_line;
+        while (std::getline(stream, raw_line)) {
+            const std::string line = TrimCopy(raw_line);
+            if (line.empty() || line.starts_with('#')) {
+                continue;
+            }
+            if (array_mode == ArrayMode::selectors) {
+                if (line == "]") {
+                    array_mode = ArrayMode::none;
+                    continue;
+                }
+                current.mir_selector_storage.push_back(*ParseArrayEntry(line));
+                continue;
+            }
+            if (const auto value = ParseQuotedSetting(line, "label")) {
+                current.label = *value;
+                continue;
+            }
+            if (const auto value = ParseIntSetting(line, "phase")) {
+                current.phase = *value;
+                continue;
+            }
+            if (const auto value = ParseIntSetting(line, "shard")) {
+                current.shard = *value;
+                continue;
+            }
+            if (const auto value = ParseQuotedSetting(line, "project")) {
+                current.project = *value;
+                continue;
+            }
+            if (const auto value = ParseQuotedSetting(line, "target")) {
+                current.target = *value;
+                continue;
+            }
+            if (const auto value = ParseQuotedSetting(line, "run_golden")) {
+                current.expected_run_lines_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
+                                                   phase_dir.filename() / *value)
+                                                      .generic_string();
+                continue;
+            }
+            if (const auto value = ParseQuotedSetting(line, "mir_golden")) {
+                current.expected_mir_projection_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
+                                                        phase_dir.filename() / *value)
+                                                           .generic_string();
+                continue;
+            }
+            if (const auto value = ParseQuotedSetting(line, "mir_mode")) {
+                current.mir_mode = *value;
+                continue;
+            }
+            if (line.starts_with("required_objects = [")) {
+                current.required_object_file_storage = ParseInlineQuotedArray(line, "required_objects");
+                continue;
+            }
+            if (line == "selectors = [") {
+                array_mode = ArrayMode::selectors;
+                continue;
+            }
+            Fail("runtime phase directory contains an unknown directive: " + line);
+        }
+        if (array_mode != ArrayMode::none) {
+            Fail("runtime phase directory has an unterminated selectors array: " + phase_toml_path.generic_string());
+        }
+        if (current.shard != shard) {
+            continue;
+        }
+        current.RefreshViews();
+        ValidateFreestandingKernelRuntimePhaseDescriptor(current, phase_toml_path, shard);
+        phase_checks.push_back(std::move(current));
+    }
+
+    return phase_checks;
 }
 
 std::filesystem::path ResolveCanopusRoadmapPath(const std::filesystem::path& source_root,

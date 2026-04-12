@@ -134,7 +134,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/freestanding/kernel/shard8.cpp`: single-build runtime shard for phases 140-142
     - `tests/tool/freestanding/kernel/shard9.cpp`: single-build runtime shard for phases 143-147
     - `tests/tool/freestanding/kernel/phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase99_syscall_byte_ipc.cpp`, `phase100_capability_transfer.cpp`, `phase102_timer_sleep.cpp`, `phase103_init_bootstrap_handoff.cpp`, and `phase104_kernel_critique_hardening.cpp`: earlier narrow proof owners that still stand alone outside the late shard layout
-    - late ownership-hardening kernel audits now keep shard-owned behavior checks plus checked-in kernel goldens under `tests/tool/freestanding/kernel/goldens/{mir,run,contracts}/`; publication and phase-note checks live in the separate kernel metadata/doc suite
+    - late ownership-hardening kernel audits now keep shard-owned behavior checks plus checked-in kernel goldens under `tests/tool/freestanding/kernel/goldens/{mir,run,contracts,manifests}/`; publication and phase-note checks live in the separate kernel metadata/doc suite
     - `tests/tool/tool_suite_common.cpp`: `ExpectMirFirstMatchProjectionFile` is the shared helper for those projected MIR goldens
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family

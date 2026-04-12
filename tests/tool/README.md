@@ -59,7 +59,8 @@ Current structure
       `kernel/shard7.cpp`, `kernel/shard8.cpp`, and `kernel/shard9.cpp`:
       shard-owned late kernel runtime proofs with one build/run per shard.
   - late ownership-hardening kernel audits keep checked-in kernel goldens under
-    `kernel/goldens/mir/`, `kernel/goldens/run/`, and `kernel/goldens/contracts/`.
+    `kernel/goldens/mir/`, `kernel/goldens/run/`, `kernel/goldens/contracts/`,
+    and `kernel/goldens/manifests/`.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-
     system coverage.
 - `tool_suite_tests.cpp` and `phase7_tool_tests.cpp`: compatibility runners

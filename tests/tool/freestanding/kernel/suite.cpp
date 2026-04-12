@@ -36,36 +36,6 @@ void RunFreestandingKernelPhase105RealLogServiceHandshake(const std::filesystem:
 void RunFreestandingKernelPhase106RealEchoServiceRequestReply(const std::filesystem::path& source_root,
                                                               const std::filesystem::path& binary_root,
                                                               const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(const std::filesystem::path& source_root,
-                                                                   const std::filesystem::path& binary_root,
-                                                                   const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesystem::path& source_root,
-                                                             const std::filesystem::path& binary_root,
-                                                             const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase109FirstRunningKernelSliceAudit(const std::filesystem::path& source_root,
-                                                               const std::filesystem::path& binary_root,
-                                                               const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesystem::path& source_root,
-                                                            const std::filesystem::path& binary_root,
-                                                            const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const std::filesystem::path& source_root,
-                                                                          const std::filesystem::path& binary_root,
-                                                                          const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit(const std::filesystem::path& source_root,
-                                                              const std::filesystem::path& binary_root,
-                                                              const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary(const std::filesystem::path& source_root,
-                                                                           const std::filesystem::path& binary_root,
-                                                                           const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit(const std::filesystem::path& source_root,
-                                                                   const std::filesystem::path& binary_root,
-                                                                   const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase115TimerOwnershipHardening(const std::filesystem::path& source_root,
-                                                          const std::filesystem::path& binary_root,
-                                                          const std::filesystem::path& mc_path);
-void RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough(const std::filesystem::path& source_root,
-                                                                    const std::filesystem::path& binary_root,
-                                                                    const std::filesystem::path& mc_path);
 void RunFreestandingKernelPhase117InitOrchestratedMultiServiceBringUp(const std::filesystem::path& source_root,
                                                                       const std::filesystem::path& binary_root,
                                                                       const std::filesystem::path& mc_path);
@@ -177,6 +147,14 @@ void RunFreestandingKernelShard8(const std::filesystem::path& source_root,
 void RunFreestandingKernelShard9(const std::filesystem::path& source_root,
                                  const std::filesystem::path& binary_root,
                                  const std::filesystem::path& mc_path);
+bool TryRunFreestandingKernelShard2Case(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path,
+                                        std::string_view case_name);
+bool TryRunFreestandingKernelShard3Case(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path,
+                                        std::string_view case_name);
 
 namespace {
 
@@ -207,23 +185,13 @@ void RunFreestandingKernelShardDispatch(const std::filesystem::path& source_root
     kKernelShardFns[static_cast<std::size_t>(shard - kFirstKernelShard)](source_root, binary_root, mc_path);
 }
 
-const std::array<KernelTestCase, 44> kKernelTestCases = {{
+const std::array<KernelTestCase, 34> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
     {"phase88_build_integration", 1, &RunFreestandingKernelPhase88BuildIntegrationAudit},
     {"phase105_real_log_service_handshake", 1, &RunFreestandingKernelPhase105RealLogServiceHandshake},
     {"phase106_real_echo_service_request_reply", 1, &RunFreestandingKernelPhase106RealEchoServiceRequestReply},
-    {"phase107_real_user_to_user_capability_transfer", 2, &RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer},
-    {"phase108_kernel_image_program_cap_audit", 2, &RunFreestandingKernelPhase108KernelImageProgramCapAudit},
-    {"phase109_first_running_kernel_slice_audit", 2, &RunFreestandingKernelPhase109FirstRunningKernelSliceAudit},
-    {"phase110_kernel_ownership_split_audit", 2, &RunFreestandingKernelPhase110KernelOwnershipSplitAudit},
-    {"phase111_scheduler_lifecycle_ownership_clarification", 2, &RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification},
-    {"phase112_syscall_boundary_thinness_audit", 3, &RunFreestandingKernelPhase112SyscallBoundaryThinnessAudit},
-    {"phase113_interrupt_entry_and_generic_dispatch_boundary", 3, &RunFreestandingKernelPhase113InterruptEntryAndGenericDispatchBoundary},
-    {"phase114_address_space_and_mmu_ownership_split", 3, &RunFreestandingKernelPhase114AddressSpaceAndMmuOwnershipSplit},
-    {"phase115_timer_ownership_hardening", 3, &RunFreestandingKernelPhase115TimerOwnershipHardening},
-    {"phase116_mmu_activation_barrier_follow_through", 3, &RunFreestandingKernelPhase116MmuActivationBarrierFollowThrough},
     {"phase117_init_orchestrated_multi_service_bring_up", 4, &RunFreestandingKernelPhase117InitOrchestratedMultiServiceBringUp},
     {"phase118_request_reply_and_delegation_follow_through", 4, &RunFreestandingKernelPhase118RequestReplyAndDelegationFollowThrough},
     {"phase119_namespace_pressure_audit", 4, &RunFreestandingKernelPhase119NamespacePressureAudit},
@@ -283,10 +251,17 @@ void RunFreestandingKernelToolSuiteCase(const std::filesystem::path& source_root
                                         const std::filesystem::path& mc_path,
                                         std::string_view case_name) {
     const KernelTestCase* test_case = FindKernelTestCase(case_name);
-    if (test_case == nullptr) {
-        Fail("unknown freestanding kernel case selector: " + std::string(case_name));
+    if (test_case != nullptr) {
+        test_case->fn(source_root, binary_root, mc_path);
+        return;
     }
-    test_case->fn(source_root, binary_root, mc_path);
+    if (TryRunFreestandingKernelShard2Case(source_root, binary_root, mc_path, case_name)) {
+        return;
+    }
+    if (TryRunFreestandingKernelShard3Case(source_root, binary_root, mc_path, case_name)) {
+        return;
+    }
+    Fail("unknown freestanding kernel case selector: " + std::string(case_name));
 }
 
 void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,

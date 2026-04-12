@@ -1,0 +1,5 @@
+  Function name=lifecycle.install_spawned_child returns=[lifecycle.SpawnInstallResult]
+  Function name=lifecycle.block_task_on_timer returns=[lifecycle.TaskTransition]
+  Function name=lifecycle.ready_task returns=[lifecycle.TaskTransition]
+  Function name=lifecycle.validate_task_transition_contracts returns=[bool]
+  Function name=debug.validate_phase111_scheduler_and_lifecycle_ownership returns=[bool]

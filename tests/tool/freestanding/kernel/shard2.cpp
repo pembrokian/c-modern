@@ -2,7 +2,6 @@
 #include <filesystem>
 #include <string>
 
-#include "compiler/support/dump_paths.h"
 #include "tests/support/process_utils.h"
 #include "tests/tool/tool_suite_common.h"
 
@@ -15,112 +14,76 @@ using mc::test_support::RunCommandCapture;
 
 namespace {
 
-constexpr std::array<std::string_view, 0> kNoRequiredObjectFiles{};
+constexpr std::string_view kRunContainsSuffix = ".run.contains.txt";
 
-constexpr std::array<std::string_view, 8> kPhase107MirSelectors{ {
-    "Function name=validate_phase106_echo_service_request_reply returns=[bool]",
-    "TypeDecl kind=struct name=transfer_service.TransferServiceState",
-    "TypeDecl kind=struct name=transfer_service.TransferObservation",
-    "Function name=execute_phase107_user_to_user_capability_transfer returns=[bool]",
-    "Function name=transfer_service.record_grant returns=[transfer_service.TransferServiceState]",
-    "Function name=transfer_service.emit_payload returns=[[4]u8]",
-    "Function name=transfer_service.observe_transfer returns=[transfer_service.TransferObservation]",
-    "Function name=validate_phase107_user_to_user_capability_transfer returns=[bool]",
-} };
-
-constexpr std::array<std::string_view, 1> kPhase108RequiredObjectFiles{ {
-    "_Users_ro_dev_c_modern_kernel_src_address_space.mc.o",
-} };
-
-constexpr std::array<std::string_view, 10> kPhase108MirSelectors{ {
-    "Function name=validate_phase107_user_to_user_capability_transfer returns=[bool]",
-    "VarGlobal names=[INIT_PROGRAM_CAPABILITY] type=capability.CapabilitySlot",
-    "VarGlobal names=[LOG_SERVICE_PROGRAM_CAPABILITY] type=capability.CapabilitySlot",
-    "VarGlobal names=[ECHO_SERVICE_PROGRAM_CAPABILITY] type=capability.CapabilitySlot",
-    "VarGlobal names=[TRANSFER_SERVICE_PROGRAM_CAPABILITY] type=capability.CapabilitySlot",
-    "Function name=build_phase108_program_cap_contract returns=[debug.Phase108ProgramCapContract]",
-    "Function name=bootstrap_services.seed_log_service_program_capability returns=[bootstrap_services.LogServiceExecutionState]",
-    "Function name=bootstrap_services.seed_echo_service_program_capability returns=[bootstrap_services.EchoServiceExecutionState]",
-    "Function name=bootstrap_services.seed_transfer_service_program_capability returns=[bootstrap_services.TransferServiceExecutionState]",
-    "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
-} };
-
-constexpr std::array<std::string_view, 2> kPhase109MirSelectors{ {
-    "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
-    "Function name=debug.validate_phase109_first_running_kernel_slice returns=[bool]",
-} };
-
-constexpr std::array<std::string_view, 2> kPhase110RequiredObjectFiles{ {
-    "kernel__debug.o",
-    "_Users_ro_dev_c_modern_kernel_src_sched.mc.o",
-} };
-
-constexpr std::array<std::string_view, 4> kPhase110MirSelectors{ {
-    "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
-    "Function name=debug.validate_phase109_first_running_kernel_slice returns=[bool]",
-    "Function name=debug.validate_phase110_kernel_ownership_split returns=[bool]",
-    "Function name=sched.validate_program_cap_spawn_and_wait returns=[bool]",
-} };
-
-constexpr std::array<std::string_view, 1> kPhase111RequiredObjectFiles{ {
-    "_Users_ro_dev_c_modern_kernel_src_lifecycle.mc.o",
-} };
-
-constexpr std::array<std::string_view, 5> kPhase111MirSelectors{ {
-    "Function name=lifecycle.install_spawned_child returns=[lifecycle.SpawnInstallResult]",
-    "Function name=lifecycle.block_task_on_timer returns=[lifecycle.TaskTransition]",
-    "Function name=lifecycle.ready_task returns=[lifecycle.TaskTransition]",
-    "Function name=lifecycle.validate_task_transition_contracts returns=[bool]",
-    "Function name=debug.validate_phase111_scheduler_and_lifecycle_ownership returns=[bool]",
-} };
-
-const FreestandingKernelPhaseCheck kPhase107Check{
-    .label = "phase107 freestanding kernel user-to-user capability transfer",
-    .expected_run_lines_file = "phase107_real_user_to_user_capability_transfer.run.contains.txt",
-    .required_object_files = kNoRequiredObjectFiles,
-    .mir_selectors = kPhase107MirSelectors,
-    .expected_mir_projection_file = "phase107_real_user_to_user_capability_transfer.mirproj.txt",
+struct Shard2PhaseRunSpec {
+    std::string_view expected_run_lines_file;
+    std::string_view output_stem;
+    const char* build_context;
+    const char* run_context;
+    bool expect_phase108_manifest_slice = false;
 };
 
-const FreestandingKernelPhaseCheck kPhase108Check{
-    .label = "phase108 freestanding kernel image-and-program-cap audit",
-    .expected_run_lines_file = "phase108_kernel_image_program_cap_audit.run.contains.txt",
-    .required_object_files = kPhase108RequiredObjectFiles,
-    .mir_selectors = kPhase108MirSelectors,
-    .expected_mir_projection_file = "phase108_kernel_image_program_cap_audit.mirproj.txt",
-};
+constexpr std::array<Shard2PhaseRunSpec, 5> kShard2PhaseRunSpecs{{
+    {
+        .expected_run_lines_file = "phase107_real_user_to_user_capability_transfer.run.contains.txt",
+        .output_stem = "kernel_phase107_user_transfer",
+        .build_context = "freestanding kernel phase107 user-to-user capability transfer build",
+        .run_context = "freestanding kernel phase107 user-to-user capability transfer run",
+    },
+    {
+        .expected_run_lines_file = "phase108_kernel_image_program_cap_audit.run.contains.txt",
+        .output_stem = "kernel_phase108_image_program_cap",
+        .build_context = "freestanding kernel phase108 image-and-program-cap audit build",
+        .run_context = "freestanding kernel phase108 image-and-program-cap audit run",
+        .expect_phase108_manifest_slice = true,
+    },
+    {
+        .expected_run_lines_file = "phase109_first_running_kernel_slice_audit.run.contains.txt",
+        .output_stem = "kernel_phase109_running_slice",
+        .build_context = "freestanding kernel phase109 running-slice audit build",
+        .run_context = "freestanding kernel phase109 running-slice audit run",
+    },
+    {
+        .expected_run_lines_file = "phase110_kernel_ownership_split_audit.run.contains.txt",
+        .output_stem = "kernel_phase110_ownership_split",
+        .build_context = "freestanding kernel phase110 ownership-split audit build",
+        .run_context = "freestanding kernel phase110 ownership-split audit run",
+    },
+    {
+        .expected_run_lines_file = "phase111_scheduler_lifecycle_ownership_clarification.run.contains.txt",
+        .output_stem = "kernel_phase111_lifecycle_ownership",
+        .build_context = "freestanding kernel phase111 lifecycle-ownership audit build",
+        .run_context = "freestanding kernel phase111 lifecycle-ownership audit run",
+    },
+}};
 
-const FreestandingKernelPhaseCheck kPhase109Check{
-    .label = "phase109 freestanding kernel running-slice audit",
-    .expected_run_lines_file = "phase109_first_running_kernel_slice_audit.run.contains.txt",
-    .required_object_files = kNoRequiredObjectFiles,
-    .mir_selectors = kPhase109MirSelectors,
-    .expected_mir_projection_file = "phase109_first_running_kernel_slice_audit.mirproj.txt",
-};
+bool RunFileMatchesCaseName(std::string_view expected_run_lines_file, std::string_view case_name) {
+    if (!expected_run_lines_file.ends_with(kRunContainsSuffix)) {
+        return false;
+    }
+    return expected_run_lines_file.substr(0, expected_run_lines_file.size() - kRunContainsSuffix.size()) == case_name;
+}
 
-const FreestandingKernelPhaseCheck kPhase110Check{
-    .label = "phase110 freestanding kernel ownership-split audit",
-    .expected_run_lines_file = "phase110_kernel_ownership_split_audit.run.contains.txt",
-    .required_object_files = kPhase110RequiredObjectFiles,
-    .mir_selectors = kPhase110MirSelectors,
-    .expected_mir_projection_file = "phase110_kernel_ownership_split_audit.mirproj.txt",
-};
+const Shard2PhaseRunSpec* FindShard2RunSpec(std::string_view case_name) {
+    for (const auto& run_spec : kShard2PhaseRunSpecs) {
+        if (RunFileMatchesCaseName(run_spec.expected_run_lines_file, case_name)) {
+            return &run_spec;
+        }
+    }
+    return nullptr;
+}
 
-const FreestandingKernelPhaseCheck kPhase111Check{
-    .label = "phase111 freestanding kernel lifecycle-ownership audit",
-    .expected_run_lines_file = "phase111_scheduler_lifecycle_ownership_clarification.run.contains.txt",
-    .required_object_files = kPhase111RequiredObjectFiles,
-    .mir_selectors = kPhase111MirSelectors,
-    .expected_mir_projection_file = "phase111_scheduler_lifecycle_ownership_clarification.mirproj.txt",
-};
-
-const std::array<FreestandingKernelPhaseCheck, 5> kShard2PhaseChecks{ {
-    kPhase107Check,
-    kPhase108Check,
-    kPhase109Check,
-    kPhase110Check,
-    kPhase111Check,
-} };
+const FreestandingKernelRuntimePhaseDescriptor& FindShard2PhaseCheck(
+    const std::vector<FreestandingKernelRuntimePhaseDescriptor>& phase_checks,
+                                                 std::string_view expected_run_lines_file) {
+    for (const auto& phase_check : phase_checks) {
+        if (phase_check.expected_run_lines_file == expected_run_lines_file) {
+            return phase_check;
+        }
+    }
+    Fail("missing shard2 runtime phase entry for run golden: " + std::string(expected_run_lines_file));
+}
 
 void ExpectPhase108ManifestSlice(const std::filesystem::path& manifest_path,
                                  const std::filesystem::path& expected_lines_path) {
@@ -129,122 +92,88 @@ void ExpectPhase108ManifestSlice(const std::filesystem::path& manifest_path,
                                 "phase108 kernel manifest should preserve the executable-owned target contract");
 }
 
+void RunShard2Phase(const std::filesystem::path& source_root,
+                    const std::filesystem::path& binary_root,
+                    const std::filesystem::path& mc_path,
+                    const Shard2PhaseRunSpec& run_spec) {
+    const auto phase_checks = LoadFreestandingKernelRuntimePhaseDescriptors(source_root, 2);
+    const auto& phase_check = FindShard2PhaseCheck(phase_checks, run_spec.expected_run_lines_file);
+    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
+
+    if (run_spec.expect_phase108_manifest_slice) {
+        const std::filesystem::path manifest_lines_path = ResolveFreestandingKernelGoldenPath(source_root,
+                                                                                              "phase108_kernel_manifest.contains.txt");
+        ExpectPhase108ManifestSlice(common_paths.project_path, manifest_lines_path);
+    }
+
+    const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
+                                                               common_paths.project_path,
+                                                               common_paths.main_source_path,
+                                                               binary_root / "kernel_build",
+                                                               run_spec.output_stem,
+                                                               run_spec.build_context,
+                                                               run_spec.run_context);
+    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
+    ExpectFreestandingKernelPhaseFromArtifacts(source_root,
+                                               artifacts.build_targets.object.parent_path(),
+                                               artifacts.run_output,
+                                               kernel_mir,
+                                               phase_check.View());
+}
+
 }  // namespace
 
 void RunFreestandingKernelPhase107RealUserToUserCapabilityTransfer(const std::filesystem::path& source_root,
                                                                    const std::filesystem::path& binary_root,
                                                                    const std::filesystem::path& mc_path) {
-    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
-                                                               common_paths.project_path,
-                                                               common_paths.main_source_path,
-                                                               binary_root / "kernel_build",
-                                                               "kernel_phase107_user_transfer",
-                                                               "freestanding kernel phase107 user-to-user capability transfer build",
-                                                               "freestanding kernel phase107 user-to-user capability transfer run");
-    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
-    ExpectFreestandingKernelPhaseFromArtifacts(source_root,
-                                               artifacts.build_targets.object.parent_path(),
-                                               artifacts.run_output,
-                                               kernel_mir,
-                                               kPhase107Check);
+    RunShard2Phase(source_root, binary_root, mc_path, kShard2PhaseRunSpecs[0]);
 }
 
 void RunFreestandingKernelPhase108KernelImageProgramCapAudit(const std::filesystem::path& source_root,
                                                              const std::filesystem::path& binary_root,
                                                              const std::filesystem::path& mc_path) {
-    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const std::filesystem::path manifest_lines_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                       "phase108_kernel_manifest.contains.txt");
-    const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
-                                                               common_paths.project_path,
-                                                               common_paths.main_source_path,
-                                                               binary_root / "kernel_build",
-                                                               "kernel_phase108_image_program_cap",
-                                                               "freestanding kernel phase108 image-and-program-cap audit build",
-                                                               "freestanding kernel phase108 image-and-program-cap audit run");
-    ExpectPhase108ManifestSlice(common_paths.project_path, manifest_lines_path);
-    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
-    ExpectFreestandingKernelPhaseFromArtifacts(source_root,
-                                               artifacts.build_targets.object.parent_path(),
-                                               artifacts.run_output,
-                                               kernel_mir,
-                                               kPhase108Check);
+    RunShard2Phase(source_root, binary_root, mc_path, kShard2PhaseRunSpecs[1]);
 }
 
 void RunFreestandingKernelPhase109FirstRunningKernelSliceAudit(const std::filesystem::path& source_root,
                                                                const std::filesystem::path& binary_root,
                                                                const std::filesystem::path& mc_path) {
-    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
-                                                               common_paths.project_path,
-                                                               common_paths.main_source_path,
-                                                               binary_root / "kernel_build",
-                                                               "kernel_phase109_running_slice",
-                                                               "freestanding kernel phase109 running-slice audit build",
-                                                               "freestanding kernel phase109 running-slice audit run");
-    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
-    ExpectFreestandingKernelPhaseFromArtifacts(source_root,
-                                               artifacts.build_targets.object.parent_path(),
-                                               artifacts.run_output,
-                                               kernel_mir,
-                                               kPhase109Check);
+    RunShard2Phase(source_root, binary_root, mc_path, kShard2PhaseRunSpecs[2]);
 }
 
 void RunFreestandingKernelPhase110KernelOwnershipSplitAudit(const std::filesystem::path& source_root,
                                                             const std::filesystem::path& binary_root,
                                                             const std::filesystem::path& mc_path) {
-    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
-                                                               common_paths.project_path,
-                                                               common_paths.main_source_path,
-                                                               binary_root / "kernel_build",
-                                                               "kernel_phase110_ownership_split",
-                                                               "freestanding kernel phase110 ownership-split audit build",
-                                                               "freestanding kernel phase110 ownership-split audit run");
-    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
-    ExpectFreestandingKernelPhaseFromArtifacts(source_root,
-                                               artifacts.build_targets.object.parent_path(),
-                                               artifacts.run_output,
-                                               kernel_mir,
-                                               kPhase110Check);
+    RunShard2Phase(source_root, binary_root, mc_path, kShard2PhaseRunSpecs[3]);
 }
 
 void RunFreestandingKernelPhase111SchedulerLifecycleOwnershipClarification(const std::filesystem::path& source_root,
                                                                            const std::filesystem::path& binary_root,
                                                                            const std::filesystem::path& mc_path) {
-    const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
-    const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
-                                                               common_paths.project_path,
-                                                               common_paths.main_source_path,
-                                                               binary_root / "kernel_build",
-                                                               "kernel_phase111_lifecycle_ownership",
-                                                               "freestanding kernel phase111 lifecycle-ownership audit build",
-                                                               "freestanding kernel phase111 lifecycle-ownership audit run");
-    const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
-    ExpectFreestandingKernelPhaseFromArtifacts(source_root,
-                                               artifacts.build_targets.object.parent_path(),
-                                               artifacts.run_output,
-                                               kernel_mir,
-                                               kPhase111Check);
+    RunShard2Phase(source_root, binary_root, mc_path, kShard2PhaseRunSpecs[4]);
+}
+
+bool TryRunFreestandingKernelShard2Case(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path,
+                                        std::string_view case_name) {
+    const Shard2PhaseRunSpec* run_spec = FindShard2RunSpec(case_name);
+    if (run_spec == nullptr) {
+        return false;
+    }
+    RunShard2Phase(source_root, binary_root, mc_path, *run_spec);
+    return true;
 }
 
 void RunFreestandingKernelShard2(const std::filesystem::path& source_root,
                                  const std::filesystem::path& binary_root,
                                  const std::filesystem::path& mc_path) {
+    const auto phase_checks = LoadFreestandingKernelRuntimePhaseDescriptors(source_root, 2);
     const auto common_paths = MakeFreestandingKernelCommonPaths(source_root);
     const std::filesystem::path shard_run_lines_path = ResolveFreestandingKernelGoldenPath(source_root,
                                                                         "kernel_shard2.run.contains.txt");
     const std::filesystem::path manifest_lines_path = ResolveFreestandingKernelGoldenPath(source_root,
                                                                        "phase108_kernel_manifest.contains.txt");
-    const std::filesystem::path phase107_projection_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                            "phase107_real_user_to_user_capability_transfer.mirproj.txt");
-    const std::filesystem::path phase108_projection_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                            "phase108_kernel_image_program_cap_audit.mirproj.txt");
-    const std::filesystem::path phase109_projection_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                            "phase109_first_running_kernel_slice_audit.mirproj.txt");
-    const std::filesystem::path manual_run_lines_path = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                         "phase108_manual_kernel_image.run.contains.txt");
     const auto artifacts = BuildAndRunFreestandingKernelTarget(mc_path,
                                                                common_paths.project_path,
                                                                common_paths.main_source_path,
@@ -258,12 +187,12 @@ void RunFreestandingKernelShard2(const std::filesystem::path& source_root,
                                 "shard2 freestanding kernel run should preserve the landed shard2 slices");
     ExpectPhase108ManifestSlice(common_paths.project_path, manifest_lines_path);
     const std::string kernel_mir = ReadFile(artifacts.dump_targets.mir);
-    for (const auto& phase_check : kShard2PhaseChecks) {
+    for (const auto& phase_check : phase_checks) {
         ExpectFreestandingKernelPhaseFromArtifacts(source_root,
                                                    artifacts.build_targets.object.parent_path(),
                                                    artifacts.run_output,
                                                    kernel_mir,
-                                                   phase_check);
+                                                   phase_check.View());
     }
 }
 

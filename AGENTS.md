@@ -88,7 +88,7 @@ Active grouped regression layout:
 - `tests/tool/freestanding/kernel/shard8.cpp`: single-build runtime shard for phases 140-142
 - `tests/tool/freestanding/kernel/shard9.cpp`: single-build runtime shard for phases 143-147
 - `tests/tool/freestanding/kernel/phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof
-- late freestanding kernel audits keep shard-owned runtime checks plus `tests/tool/freestanding/kernel/goldens/{mir,run,contracts}/...` checked-in goldens when the merged MIR already carries the relevant ownership and routed-call facts; publication and phase-note checks live in the separate kernel metadata/doc suite
+- late freestanding kernel audits keep shard-owned runtime checks plus `tests/tool/freestanding/kernel/goldens/{mir,run,contracts,manifests}/...` checked-in goldens when the merged MIR already carries the relevant ownership and routed-call facts; publication and phase-note checks live in the separate kernel metadata/doc suite
 - local changed-path selection now lives in `tools/select_tests.py` and the `make select-tests` wrapper; use that for narrow local iteration before wider gates
 - when adding a new freestanding kernel phase, update the owning shard `.cpp` plus its goldens first, then update `tests/tool/freestanding/kernel/suite.cpp` if the phase needs a direct `kernel-case:` entry, and only update `tools/select_tests.py` if the new phase changes shard ownership, adds a new shard, or adds a new non-shard suite surface such as docs or artifacts
 - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation

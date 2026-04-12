@@ -1,0 +1,13 @@
+label = "phase109_first_running_kernel_slice_audit"
+phase = 109
+shard = 2
+project = "kernel/build.toml"
+target = "kernel"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_mode = "projection"
+required_objects = []
+selectors = [
+  "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",
+  "Function name=debug.validate_phase109_first_running_kernel_slice returns=[bool]",
+]

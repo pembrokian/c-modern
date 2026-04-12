@@ -1,0 +1,4 @@
+  TypeDecl kind=struct name=timer.TimerInterruptDelivery
+  Function name=timer.deliver_interrupt_tick returns=[timer.TimerInterruptDelivery]
+  Function name=timer.validate_interrupt_delivery_boundary returns=[bool]
+  Function name=debug.validate_phase115_timer_ownership_hardening returns=[bool]

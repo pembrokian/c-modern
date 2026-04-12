@@ -1,0 +1,15 @@
+label = "phase113_interrupt_entry_and_generic_dispatch_boundary"
+phase = 113
+shard = 3
+project = "kernel/build.toml"
+target = "kernel"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_mode = "projection"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_interrupt.mc.o"]
+selectors = [
+  "Function name=interrupt.arch_enter_interrupt returns=[interrupt.InterruptEntry]",
+  "Function name=interrupt.dispatch_interrupt returns=[interrupt.InterruptDispatchResult]",
+  "Function name=interrupt.validate_interrupt_entry_and_dispatch_boundary returns=[bool]",
+  "Function name=debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary returns=[bool]",
+]
