@@ -1,0 +1,5 @@
+  TypeDecl kind=struct name=debug.Phase137OptionalDmaOrEquivalentAudit
+  Function name=uart.handle_receive_completion_interrupt returns=[uart.UartCompletionInterruptResult]
+  Function name=interrupt.dispatch_interrupt returns=[interrupt.InterruptDispatchResult]
+  Function name=serial_service.record_ingress returns=[serial_service.SerialServiceState]
+  Function name=debug.validate_phase137_optional_dma_or_equivalent_follow_through returns=[bool]

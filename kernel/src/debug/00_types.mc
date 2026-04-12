@@ -535,3 +535,46 @@ struct Phase136DeviceFailureContainmentAudit {
     protocol_parsing_in_kernel_visible: u32
     compiler_reopening_visible: u32
 }
+
+struct Phase137OptionalDmaOrEquivalentAudit {
+    phase136: Phase136DeviceFailureContainmentAudit
+    completion_interrupt_kind: interrupt.InterruptDispatchKind
+    completion_dispatch_handled: u32
+    completion_endpoint_id: u32
+    completion_staged_payload_len: usize
+    completion_staged_payload0: u8
+    completion_staged_payload1: u8
+    completion_staged_payload2: u8
+    completion_staged_payload3: u8
+    completion_published_payload_len: usize
+    completion_published_payload0: u8
+    completion_published_payload1: u8
+    completion_published_payload2: u8
+    completion_published_payload3: u8
+    completion_retired_payload_len: usize
+    completion_retired_payload0: u8
+    completion_retired_payload1: u8
+    completion_retired_payload2: u8
+    completion_retired_payload3: u8
+    completion_publish_queued: u32
+    completion_publish_queue_full: u32
+    completion_publish_endpoint_valid: u32
+    completion_publish_endpoint_closed: u32
+    completion_ingress_count: u32
+    completion_retire_count: u32
+    serial_service_pid: u32
+    serial_receive_status: syscall.SyscallStatus
+    serial_tag: serial_service.SerialMessageTag
+    serial_payload_len: usize
+    serial_received_byte: u8
+    serial_ingress_count: usize
+    serial_log_len: usize
+    serial_total_consumed_bytes: usize
+    serial_log_byte0: u8
+    serial_log_byte1: u8
+    serial_log_byte2: u8
+    serial_log_byte3: u8
+    dma_manager_visible: u32
+    descriptor_framework_visible: u32
+    compiler_reopening_visible: u32
+}

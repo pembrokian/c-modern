@@ -121,12 +121,15 @@ void RunFreestandingKernelPhase135BufferOwnershipBoundaryAudit(const std::filesy
 void RunFreestandingKernelPhase136DeviceFailureContainmentProbe(const std::filesystem::path& source_root,
                                                                 const std::filesystem::path& binary_root,
                                                                 const std::filesystem::path& mc_path);
+void RunFreestandingKernelPhase137OptionalDmaOrEquivalentFollowThrough(const std::filesystem::path& source_root,
+                                                                       const std::filesystem::path& binary_root,
+                                                                       const std::filesystem::path& mc_path);
 
 namespace {
 
 using mc::test_support::Fail;
 
-const std::array<KernelTestCase, 35> kKernelTestCases = {{
+const std::array<KernelTestCase, 36> kKernelTestCases = {{
     {"phase85_endpoint_queue", 1, &RunFreestandingKernelPhase85EndpointQueueSmoke},
     {"phase86_task_lifecycle", 1, &RunFreestandingKernelPhase86TaskLifecycleProof},
     {"phase87_static_data", 1, &RunFreestandingKernelPhase87StaticDataProof},
@@ -162,6 +165,7 @@ const std::array<KernelTestCase, 35> kKernelTestCases = {{
     {"phase134_minimal_device_service_handoff", 5, &RunFreestandingKernelPhase134MinimalDeviceServiceHandoff},
     {"phase135_buffer_ownership_boundary_audit", 5, &RunFreestandingKernelPhase135BufferOwnershipBoundaryAudit},
     {"phase136_device_failure_containment_probe", 5, &RunFreestandingKernelPhase136DeviceFailureContainmentProbe},
+    {"phase137_optional_dma_or_equivalent_follow_through", 5, &RunFreestandingKernelPhase137OptionalDmaOrEquivalentFollowThrough},
 }};
 
 void RunFreestandingKernelRegistry(const std::filesystem::path& source_root,

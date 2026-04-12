@@ -6,6 +6,10 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 137 has moved the repository-owned kernel artifact beyond the landed
+  Phase 136 containment step into one bounded optional completion-backed UART
+  receive follow-through.
+- Phase 137 therefore now publishes one bounded optional completion-backed UART receive follow-through.
 - Phase 135 has moved the repository-owned kernel artifact beyond the landed
   Phase 134 minimal device-service handoff into one bounded UART receive-frame
   ownership boundary audit.
@@ -74,7 +78,8 @@ Current status
   composition probe, one bounded backpressure and blocking audit, one bounded
   message lifetime and reuse audit, one bounded UART receive device-service
   handoff, one bounded UART receive-frame ownership boundary audit, and one
-  bounded device failure containment probe.
+  bounded device failure containment probe, and one bounded optional
+  completion-backed UART receive follow-through.
 
 Current files
 -------------
@@ -123,7 +128,8 @@ Current files
   observation audit, Phase 129 partial failure propagation audit, Phase 130
   explicit restart or replacement audit, Phase 131 fan-out composition audit,
   Phase 134 minimal device-service handoff audit, Phase 135 buffer ownership
-  boundary audit, and Phase 136 device failure containment audit
+  boundary audit, Phase 136 device failure containment audit, and Phase 137
+  optional completion-backed follow-through audit
 - `src/log_service.mc`: bounded log-service protocol state, acknowledgment
   payload, and final handshake observation records
 - `src/echo_service.mc`: bounded echo-service protocol state, request-derived
@@ -133,9 +139,10 @@ Current files
   classification path
 - `src/transfer_service.mc`: bounded transfer-service grant state, emitted
   payload construction, and final transfer observation records
-- `src/uart.mc`: bounded UART receive-frame staging owner, copied publish
-  observations, deterministic staging-retirement helpers, and bounded
-  queue-full or endpoint-closed drop observations
+- `src/uart.mc`: bounded UART receive-frame staging owner, bounded optional
+  completion-backed receive buffer owner, copied publish observations,
+  deterministic staging-retirement helpers, and bounded queue-full or
+  endpoint-closed drop observations
 - `src/state.mc`: kernel-owned descriptor, slot, queue, and boot-log records
 - `src/address_space.mc`: bounded address-space, mapping, and user-entry-frame
   records
@@ -153,7 +160,8 @@ Current files
   the bounded interrupt-origin publish path
 - `src/interrupt.mc`: bounded interrupt controller, architecture-entry
   records, and generic dispatch classification for the landed timer-backed
-  wake path plus the bounded UART receive path
+  wake path plus the bounded UART receive path and bounded UART completion
+  path
 - `src/syscall.mc`: bounded syscall gate, byte-plus-capability request,
   spawn-and-wait request, and thin observation state over capability,
   endpoint, address-space, and lifecycle owners

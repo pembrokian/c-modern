@@ -184,6 +184,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/freestanding/kernel/phase134_minimal_device_service_handoff.cpp
     tests/tool/freestanding/kernel/phase135_buffer_ownership_boundary_audit.cpp
     tests/tool/freestanding/kernel/phase136_device_failure_containment_probe.cpp
+    tests/tool/freestanding/kernel/phase137_optional_dma_or_equivalent_follow_through.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -296,6 +297,7 @@ set(MC_FREESTANDING_KERNEL_CASES
     phase134_minimal_device_service_handoff
     phase135_buffer_ownership_boundary_audit
     phase136_device_failure_containment_probe
+    phase137_optional_dma_or_equivalent_follow_through
 )
 
 foreach(kernel_case IN LISTS MC_FREESTANDING_KERNEL_CASES)

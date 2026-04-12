@@ -62,6 +62,8 @@ const PHASE135_MARKER: i32 = 135
 const PHASE135_MARKER_DETAIL: u32 = 135
 const PHASE136_MARKER: i32 = 136
 const PHASE136_MARKER_DETAIL: u32 = 136
+const PHASE137_MARKER: i32 = 137
+const PHASE137_MARKER_DETAIL: u32 = 137
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
@@ -71,6 +73,7 @@ const COMPOSITION_ECHO_ENDPOINT_ID: u32 = 3
 const COMPOSITION_LOG_ENDPOINT_ID: u32 = 4
 const SERIAL_SERVICE_ENDPOINT_ID: u32 = TRANSFER_ENDPOINT_ID
 const UART_RECEIVE_VECTOR: u32 = 33
+const UART_COMPLETION_VECTOR: u32 = 34
 const UART_SOURCE_ACTOR: u32 = 134
 const UART_FRAME_ONE_BYTE0: u8 = 70
 const UART_FRAME_ONE_BYTE1: u8 = 82
@@ -84,6 +87,10 @@ const UART_QUEUE_FRAME_THREE_BYTE0: u8 = 81
 const UART_QUEUE_FRAME_THREE_BYTE1: u8 = 51
 const UART_CLOSED_FRAME_BYTE0: u8 = 68
 const UART_CLOSED_FRAME_BYTE1: u8 = 69
+const UART_COMPLETION_FRAME_BYTE0: u8 = 68
+const UART_COMPLETION_FRAME_BYTE1: u8 = 77
+const UART_COMPLETION_FRAME_BYTE2: u8 = 65
+const UART_COMPLETION_FRAME_BYTE3: u8 = 33
 const PHASE124_INTERMEDIARY_PID: u32 = 4
 const PHASE124_FINAL_HOLDER_PID: u32 = 5
 const PHASE124_CONTROL_HANDLE_SLOT: u32 = 1
@@ -277,6 +284,7 @@ func seed_kernel_owners() {
     ENDPOINTS = ipc.empty_table()
     INTERRUPTS = interrupt.unmask_timer(INTERRUPTS, 32)
     INTERRUPTS = interrupt.unmask_uart_receive(INTERRUPTS, UART_RECEIVE_VECTOR)
+    INTERRUPTS = interrupt.unmask_uart_completion(INTERRUPTS, UART_COMPLETION_VECTOR)
     SYSCALL_GATE = syscall.gate_closed()
 }
 
@@ -1810,43 +1818,80 @@ func bootstrap_main() i32 {
     if !debug.validate_phase136_device_failure_containment(phase136_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 89
     }
-    BOOT_MARKER_EMITTED = 1
-    record_boot_stage(state.BootStage.MarkerEmitted, PHASE136_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
+    respawn_serial_state: bootstrap_services.SerialServiceExecutionState = bootstrap_services.seed_serial_service_program_capability(serial_config, build_serial_service_execution_state())
+    install_serial_service_execution_state(respawn_serial_state)
+    serial_respawn: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.spawn_serial_service(serial_config, build_serial_service_execution_state())
+    install_serial_service_execution_state(serial_respawn.state)
+    if serial_respawn.succeeded == 0 {
         return 90
     }
-    if BOOT_LOG_APPEND_FAILED != 0 {
+    UART_DEVICE = uart.configure_receive(UART_DEVICE, UART_RECEIVE_VECTOR, serial_config.serial_endpoint_id)
+    UART_DEVICE = uart.configure_receive_completion(UART_DEVICE, UART_COMPLETION_VECTOR)
+    completion_payload: [4]u8 = ipc.zero_payload()
+    completion_payload[0] = UART_COMPLETION_FRAME_BYTE0
+    completion_payload[1] = UART_COMPLETION_FRAME_BYTE1
+    completion_payload[2] = UART_COMPLETION_FRAME_BYTE2
+    completion_payload[3] = UART_COMPLETION_FRAME_BYTE3
+    UART_DEVICE = uart.stage_receive_completion_frame(UART_DEVICE, 4, completion_payload)
+    completion_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_COMPLETION_VECTOR, UART_SOURCE_ACTOR)
+    completion_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(completion_entry)
+    INTERRUPTS = completion_dispatch.controller
+    LAST_INTERRUPT_KIND = completion_dispatch.kind
+    completion_result: uart.UartCompletionInterruptResult = uart.handle_receive_completion_interrupt(UART_DEVICE, completion_entry, completion_dispatch, ENDPOINTS, BOOT_PID)
+    UART_DEVICE = completion_result.device
+    ENDPOINTS = completion_result.endpoints
+    if completion_result.handled == 0 {
         return 91
     }
-    if BOOT_LOG.count != 5 {
+    if !ipc.runtime_publish_succeeded(completion_result.observation.publish) {
         return 92
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    serial_completion_receive: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.execute_serial_service_receive(serial_config, build_serial_service_execution_state())
+    install_serial_service_execution_state(serial_completion_receive.state)
+    if serial_completion_receive.succeeded == 0 {
         return 93
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    phase137_audit: debug.Phase137OptionalDmaOrEquivalentAudit = debug.Phase137OptionalDmaOrEquivalentAudit{ phase136: phase136_audit, completion_interrupt_kind: completion_dispatch.kind, completion_dispatch_handled: completion_dispatch.handled, completion_endpoint_id: completion_result.observation.service_endpoint_id, completion_staged_payload_len: completion_result.observation.staged_payload_len, completion_staged_payload0: completion_result.observation.staged_payload0, completion_staged_payload1: completion_result.observation.staged_payload1, completion_staged_payload2: completion_result.observation.staged_payload2, completion_staged_payload3: completion_result.observation.staged_payload3, completion_published_payload_len: completion_result.observation.published_payload_len, completion_published_payload0: completion_result.observation.published_payload0, completion_published_payload1: completion_result.observation.published_payload1, completion_published_payload2: completion_result.observation.published_payload2, completion_published_payload3: completion_result.observation.published_payload3, completion_retired_payload_len: completion_result.observation.retired_payload_len, completion_retired_payload0: completion_result.observation.retired_payload0, completion_retired_payload1: completion_result.observation.retired_payload1, completion_retired_payload2: completion_result.observation.retired_payload2, completion_retired_payload3: completion_result.observation.retired_payload3, completion_publish_queued: completion_result.observation.publish.queued, completion_publish_queue_full: completion_result.observation.publish.queue_full, completion_publish_endpoint_valid: completion_result.observation.publish.endpoint_valid, completion_publish_endpoint_closed: completion_result.observation.publish.endpoint_closed, completion_ingress_count: completion_result.observation.completion_ingress_count, completion_retire_count: completion_result.observation.completion_retire_count, serial_service_pid: SERIAL_SERVICE_INGRESS.service_pid, serial_receive_status: SERIAL_SERVICE_RECEIVE_OBSERVATION.status, serial_tag: SERIAL_SERVICE_INGRESS.tag, serial_payload_len: SERIAL_SERVICE_INGRESS.payload_len, serial_received_byte: SERIAL_SERVICE_INGRESS.received_byte, serial_ingress_count: SERIAL_SERVICE_INGRESS.ingress_count, serial_log_len: SERIAL_SERVICE_INGRESS.log_len, serial_total_consumed_bytes: SERIAL_SERVICE_INGRESS.total_consumed_bytes, serial_log_byte0: SERIAL_SERVICE_INGRESS.log_byte0, serial_log_byte1: SERIAL_SERVICE_INGRESS.log_byte1, serial_log_byte2: SERIAL_SERVICE_INGRESS.log_byte2, serial_log_byte3: SERIAL_SERVICE_INGRESS.log_byte3, dma_manager_visible: 0, descriptor_framework_visible: 0, compiler_reopening_visible: 0 }
+    if !debug.validate_phase137_optional_dma_or_equivalent_follow_through(phase137_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
         return 94
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    BOOT_MARKER_EMITTED = 1
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE137_MARKER_DETAIL)
+    if BOOT_MARKER_EMITTED != 1 {
         return 95
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 96
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if BOOT_LOG.count != 5 {
         return 97
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE136_MARKER_DETAIL {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 98
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 99
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 100
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 101
     }
-    return PHASE136_MARKER
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+        return 102
+    }
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE137_MARKER_DETAIL {
+        return 103
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 104
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 105
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 106
+    }
+    return PHASE137_MARKER
 }

@@ -86,9 +86,11 @@ Repository numbering note
   audit.
 - Phase 136 is occupied by the concrete bounded device failure containment
   probe.
+- Phase 137 is occupied by the concrete bounded optional completion-backed
+  follow-through.
 - Proposed compiler planning now reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
-- The next speculative Canopus continuation therefore starts at Phase 136.
+- The next speculative Canopus continuation therefore starts at Phase 138.
 - Phase 128 is now concrete as one service death observation step over the
   landed log-service wait observation path.
 - Phase 129 is now concrete as one partial failure propagation step over the
@@ -114,6 +116,10 @@ Repository numbering note
   the landed ownership boundary plus one service-local malformed-byte
   classification, one bounded queue-full drop, and one explicit endpoint-closed
   service-death consequence.
+- Phase 137 is now concrete as one bounded optional completion-backed follow-through
+  over the landed device-failure boundary plus one active completion-backed
+  receive buffer, one completion interrupt classification path, and one explicit
+  service consume-and-retire path.
 
 Repository status note
 ----------------------

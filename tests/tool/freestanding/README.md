@@ -47,6 +47,7 @@ Structure
   - `phase134_minimal_device_service_handoff.cpp`: real-kernel bounded UART receive device-service handoff audit.
   - `phase135_buffer_ownership_boundary_audit.cpp`: real-kernel bounded UART receive-frame ownership-boundary audit.
   - `phase136_device_failure_containment_probe.cpp`: real-kernel bounded UART device-failure containment audit.
+  - `phase137_optional_dma_or_equivalent_follow_through.cpp`: real-kernel bounded optional completion-backed UART receive follow-through audit.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 

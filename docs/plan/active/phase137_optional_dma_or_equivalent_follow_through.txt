@@ -3,7 +3,7 @@ Phase 137 -- Optional DMA-Or-Equivalent Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -20,14 +20,13 @@ scatter/gather support, or a broader I/O stack.
 
 Repository status note
 ----------------------
-- Phase 137 is intentionally conditional. It is not the reward for finishing
-  Phase 136.
-- The repository should only take this step if the landed UART path already
-  feels mechanically honest, boring, and bounded under happy-path, ownership,
-  and failure pressure.
-- If the chosen UART target or adjacent concrete device path does not expose a
-  real completion-backed transfer mechanism, the honest answer is to stop at
-  Phase 136 and record the deferral rather than fake DMA in software.
+- Phase 137 was intentionally conditional and was only taken after the landed
+  Phase 136 UART path stayed mechanically honest and bounded under happy-path,
+  ownership, and failure pressure.
+- The landed slice keeps one real completion-backed receive path without
+  widening into reusable DMA vocabulary.
+- This step remains a bounded follow-through over the same UART and serial-
+  service owners rather than a broader device-memory framework claim.
 
 Problem being solved
 --------------------
@@ -84,11 +83,11 @@ Targeted boundary shape:
 
 Chosen outcome
 --------------
-Chosen outcome: conditional.
+Chosen outcome: yes.
 
-The repository should take this phase only if a real completion-backed buffer
-mechanism is present on the active target. If not, the honest output of this
-phase is a documented deferral, not a synthetic implementation.
+The repository took this phase as one bounded completion-backed receive path
+over the landed UART and serial-service owners, with explicit retire semantics
+and no synthetic DMA framework.
 
 What this phase should try to prove
 -----------------------------------
@@ -197,6 +196,20 @@ Exit criteria
 - the focused regression proves build, run, docs, and MIR all expose the same
   Phase 137 boundary
 - the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Completion note
+---------------
+Phase 137 is complete as one bounded completion-backed UART receive follow-through.
+
+The landed kernel artifact now carries one active completion-backed receive
+buffer, one completion interrupt classification path distinct from byte-at-a-
+time receive, one explicit publish-and-retire handoff into the serial service,
+and one debug-owned Phase 137 audit without widening into `DmaManager`,
+descriptor frameworks, generalized device-memory policy, or compiler-surface
+expansion.
+
+This phase lands one active completion-backed receive buffer as an explicit
+owner-local runtime fact.
 
 Non-goals
 ---------

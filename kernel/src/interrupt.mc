@@ -7,11 +7,13 @@ enum InterruptDispatchKind {
     None,
     TimerWake,
     UartReceive,
+    UartReceiveCompletion,
 }
 
 struct InterruptController {
     timer_vector: u32
     uart_receive_vector: u32
+    uart_completion_vector: u32
     state: InterruptState
     last_vector: u32
     last_source_actor: u32
@@ -37,15 +39,19 @@ struct InterruptDispatchResult {
 }
 
 func reset_controller() InterruptController {
-    return InterruptController{ timer_vector: 0, uart_receive_vector: 0, state: InterruptState.Masked, last_vector: 0, last_source_actor: 0, entry_count: 0, dispatch_count: 0 }
+    return InterruptController{ timer_vector: 0, uart_receive_vector: 0, uart_completion_vector: 0, state: InterruptState.Masked, last_vector: 0, last_source_actor: 0, entry_count: 0, dispatch_count: 0 }
 }
 
 func unmask_timer(controller: InterruptController, vector: u32) InterruptController {
-    return InterruptController{ timer_vector: vector, uart_receive_vector: controller.uart_receive_vector, state: InterruptState.Quiescent, last_vector: controller.last_vector, last_source_actor: controller.last_source_actor, entry_count: controller.entry_count, dispatch_count: controller.dispatch_count }
+    return InterruptController{ timer_vector: vector, uart_receive_vector: controller.uart_receive_vector, uart_completion_vector: controller.uart_completion_vector, state: InterruptState.Quiescent, last_vector: controller.last_vector, last_source_actor: controller.last_source_actor, entry_count: controller.entry_count, dispatch_count: controller.dispatch_count }
 }
 
 func unmask_uart_receive(controller: InterruptController, vector: u32) InterruptController {
-    return InterruptController{ timer_vector: controller.timer_vector, uart_receive_vector: vector, state: InterruptState.Quiescent, last_vector: controller.last_vector, last_source_actor: controller.last_source_actor, entry_count: controller.entry_count, dispatch_count: controller.dispatch_count }
+    return InterruptController{ timer_vector: controller.timer_vector, uart_receive_vector: vector, uart_completion_vector: controller.uart_completion_vector, state: InterruptState.Quiescent, last_vector: controller.last_vector, last_source_actor: controller.last_source_actor, entry_count: controller.entry_count, dispatch_count: controller.dispatch_count }
+}
+
+func unmask_uart_completion(controller: InterruptController, vector: u32) InterruptController {
+    return InterruptController{ timer_vector: controller.timer_vector, uart_receive_vector: controller.uart_receive_vector, uart_completion_vector: vector, state: InterruptState.Quiescent, last_vector: controller.last_vector, last_source_actor: controller.last_source_actor, entry_count: controller.entry_count, dispatch_count: controller.dispatch_count }
 }
 
 func dispatch_kind_score(kind: InterruptDispatchKind) i32 {
@@ -56,6 +62,8 @@ func dispatch_kind_score(kind: InterruptDispatchKind) i32 {
         return 2
     case InterruptDispatchKind.UartReceive:
         return 4
+    case InterruptDispatchKind.UartReceiveCompletion:
+        return 8
     default:
         return 0
     }
@@ -64,10 +72,10 @@ func dispatch_kind_score(kind: InterruptDispatchKind) i32 {
 
 func arch_enter_interrupt(controller: InterruptController, vector: u32, source_actor: u32) InterruptEntry {
     accepted: u32 = 0
-    if state_score(controller.state) == 2 && (vector == controller.timer_vector || vector == controller.uart_receive_vector) {
+    if state_score(controller.state) == 2 && (vector == controller.timer_vector || vector == controller.uart_receive_vector || vector == controller.uart_completion_vector) {
         accepted = 1
     }
-    next_controller: InterruptController = InterruptController{ timer_vector: controller.timer_vector, uart_receive_vector: controller.uart_receive_vector, state: controller.state, last_vector: vector, last_source_actor: source_actor, entry_count: controller.entry_count + 1, dispatch_count: controller.dispatch_count }
+    next_controller: InterruptController = InterruptController{ timer_vector: controller.timer_vector, uart_receive_vector: controller.uart_receive_vector, uart_completion_vector: controller.uart_completion_vector, state: controller.state, last_vector: vector, last_source_actor: source_actor, entry_count: controller.entry_count + 1, dispatch_count: controller.dispatch_count }
     return InterruptEntry{ controller: next_controller, frame: InterruptFrame{ vector: vector, source_actor: source_actor }, accepted: accepted }
 }
 
@@ -75,12 +83,15 @@ func dispatch_interrupt(entry: InterruptEntry) InterruptDispatchResult {
     if entry.accepted == 0 {
         return InterruptDispatchResult{ controller: entry.controller, kind: InterruptDispatchKind.None, handled: 0 }
     }
-    next_controller: InterruptController = InterruptController{ timer_vector: entry.controller.timer_vector, uart_receive_vector: entry.controller.uart_receive_vector, state: entry.controller.state, last_vector: entry.frame.vector, last_source_actor: entry.frame.source_actor, entry_count: entry.controller.entry_count, dispatch_count: entry.controller.dispatch_count + 1 }
+    next_controller: InterruptController = InterruptController{ timer_vector: entry.controller.timer_vector, uart_receive_vector: entry.controller.uart_receive_vector, uart_completion_vector: entry.controller.uart_completion_vector, state: entry.controller.state, last_vector: entry.frame.vector, last_source_actor: entry.frame.source_actor, entry_count: entry.controller.entry_count, dispatch_count: entry.controller.dispatch_count + 1 }
     if entry.frame.vector == entry.controller.timer_vector {
         return InterruptDispatchResult{ controller: next_controller, kind: InterruptDispatchKind.TimerWake, handled: 1 }
     }
     if entry.frame.vector == entry.controller.uart_receive_vector {
         return InterruptDispatchResult{ controller: next_controller, kind: InterruptDispatchKind.UartReceive, handled: 1 }
+    }
+    if entry.frame.vector == entry.controller.uart_completion_vector {
+        return InterruptDispatchResult{ controller: next_controller, kind: InterruptDispatchKind.UartReceiveCompletion, handled: 1 }
     }
     return InterruptDispatchResult{ controller: next_controller, kind: InterruptDispatchKind.None, handled: 0 }
 }
