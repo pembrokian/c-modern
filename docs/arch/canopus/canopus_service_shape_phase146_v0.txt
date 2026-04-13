@@ -25,6 +25,9 @@ This document should stay aligned with:
 - `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
 - `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
 - `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
 - `docs/plan/decision_log.txt`
 - `docs/plan/backlog.txt`
 - `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
@@ -263,6 +266,10 @@ The following remain intentionally open for later phases:
 - request identity and replay handling
 - restart guarantees across ambiguous completion boundaries
 - cross-service composition friction under repeated use
+
+Phase 149 later turns the currently admitted restart path into one explicit
+caller-visible contract, but it still does not introduce request identity,
+deduplication, transparent retry, or a supervisor model.
 
 Intentional differences
 -----------------------

@@ -622,6 +622,29 @@ struct Phase148AuthorityErgonomicsAuditInputs {
     compiler_reopening_visible: u32
 }
 
+struct Phase149RestartSemanticsFirstClassPatternAuditInputs {
+    phase148: debug.Phase148AuthorityErgonomicsAudit
+    shell_service_pid: u32
+    kv_service_pid: u32
+    log_service_pid: u32
+    init_policy_owner_pid: u32
+    pre_failure_get_route: shell_service.ShellRoutingObservation
+    failed_get_route: shell_service.ShellRoutingObservation
+    restarted_get_route: shell_service.ShellRoutingObservation
+    post_restart_retention: kv_service.KvRetentionObservation
+    restart: init.ServiceRestartObservation
+    event_log_retention: log_service.LogRetentionObservation
+    caller_retry_obligation_visible: u32
+    retry_reissues_same_request_visible: u32
+    request_identity_not_tracked_visible: u32
+    post_restart_reset_state_visible: u32
+    init_owned_restart_policy_visible: u32
+    transparent_retry_visible: u32
+    kernel_supervision_visible: u32
+    durable_recovery_visible: u32
+    compiler_reopening_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize
