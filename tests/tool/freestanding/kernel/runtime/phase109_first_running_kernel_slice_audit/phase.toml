@@ -3,9 +3,12 @@ phase = 109
 shard = 2
 project = "kernel/build.toml"
 target = "kernel"
+output_stem = "kernel_phase109_running_slice"
+build_context = "freestanding kernel phase109 running-slice audit build"
+run_context = "freestanding kernel phase109 running-slice audit run"
 run_golden = "expected_run.contains.txt"
 mir_golden = "expected_mir_projection.txt"
-mir_mode = "projection"
+mir_contract = "first-match-projection-v1"
 required_objects = []
 selectors = [
   "Function name=debug.validate_phase108_kernel_image_and_program_cap_contracts returns=[bool]",

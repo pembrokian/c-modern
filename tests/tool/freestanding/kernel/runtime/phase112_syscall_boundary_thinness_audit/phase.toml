@@ -3,9 +3,12 @@ phase = 112
 shard = 3
 project = "kernel/build.toml"
 target = "kernel"
+output_stem = "kernel_phase112_syscall_boundary"
+build_context = "freestanding kernel phase112 syscall-boundary audit build"
+run_context = "freestanding kernel phase112 syscall-boundary audit run"
 run_golden = "expected_run.contains.txt"
 mir_golden = "expected_mir_projection.txt"
-mir_mode = "projection"
+mir_contract = "first-match-projection-v1"
 required_objects = ["kernel__capability.o", "kernel__ipc.o", "_Users_ro_dev_c_modern_kernel_src_address_space.mc.o"]
 selectors = [
   "Function name=address_space.build_child_bootstrap_context returns=[address_space.SpawnBootstrap]",

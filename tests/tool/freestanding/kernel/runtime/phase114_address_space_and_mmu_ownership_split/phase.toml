@@ -3,9 +3,12 @@ phase = 114
 shard = 3
 project = "kernel/build.toml"
 target = "kernel"
+output_stem = "kernel_phase114_address_space_mmu"
+build_context = "freestanding kernel phase114 address-space/mmu build"
+run_context = "freestanding kernel phase114 address-space/mmu run"
 run_golden = "expected_run.contains.txt"
 mir_golden = "expected_mir_projection.txt"
-mir_mode = "projection"
+mir_contract = "first-match-projection-v1"
 required_objects = ["_Users_ro_dev_c_modern_kernel_src_mmu.mc.o"]
 selectors = [
   "TypeDecl kind=struct name=mmu.TranslationRoot",

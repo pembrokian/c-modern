@@ -1,0 +1,17 @@
+label = "phase117_init_orchestrated_multi_service_bring_up"
+phase = 117
+shard = 4
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase117_multi_service"
+build_context = "freestanding kernel phase117 multi-service build"
+run_context = "freestanding kernel phase117 multi-service run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["kernel__bootstrap_services.o", "_Users_ro_dev_c_modern_kernel_src_log_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_echo_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_transfer_service.mc.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase117MultiServiceBringUpAudit",
+  "Function name=bootstrap_audit.build_phase117_multi_service_bring_up_audit returns=[debug.Phase117MultiServiceBringUpAudit]",
+  "Function name=debug.validate_phase117_init_orchestrated_multi_service_bring_up returns=[bool]",
+]

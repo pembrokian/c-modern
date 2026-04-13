@@ -1,0 +1,4 @@
+  TypeDecl kind=struct name=debug.Phase133MessageLifetimeAudit
+  Function name=ipc.close_runtime_endpoint returns=[ipc.EndpointCloseTransition]
+  Function name=ipc.close_runtime_endpoints_for_owner returns=[ipc.EndpointOwnerCloseTransition]
+  Function name=debug.validate_phase133_message_lifetime_and_reuse returns=[bool]

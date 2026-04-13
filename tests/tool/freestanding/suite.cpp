@@ -12,6 +12,9 @@ void RunFreestandingToolSuite(const std::filesystem::path& source_root,
 
     RunFreestandingBootstrapToolSuite(source_root, suite_root, mc_path);
     RunFreestandingKernelToolSuite(source_root, suite_root, mc_path);
+    RunFreestandingKernelSyntheticSuite(source_root, suite_root, mc_path);
+    RunFreestandingKernelMetadataSuite(source_root, suite_root, mc_path);
+    RunFreestandingKernelArtifactSuite(source_root, suite_root, mc_path);
     RunFreestandingSystemToolSuite(source_root, suite_root, mc_path);
 }
 

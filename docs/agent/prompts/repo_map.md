@@ -123,18 +123,13 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
     - `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
     - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
-    - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator, shard registry, and kernel metadata/doc checks
-    - `tests/tool/freestanding/kernel/shard1.cpp`: shard-owned early freestanding kernel bring-up proofs for phases 85-88 plus a single-build runtime shard for phases 105-106
-    - `tests/tool/freestanding/kernel/shard2.cpp`: single-build runtime shard for phases 107-111, including the image/program-cap relink proof
-    - `tests/tool/freestanding/kernel/shard3.cpp`: single-build runtime shard for phases 112-116
-    - `tests/tool/freestanding/kernel/shard4.cpp`: single-build runtime shard for phases 117-121
-    - `tests/tool/freestanding/kernel/shard5.cpp`: single-build runtime shard for phases 122-126
-    - `tests/tool/freestanding/kernel/shard6.cpp`: single-build runtime shard for phases 128-132
-    - `tests/tool/freestanding/kernel/shard7.cpp`: single-build runtime shard for phases 133-137
-    - `tests/tool/freestanding/kernel/shard8.cpp`: single-build runtime shard for phases 140-142
-    - `tests/tool/freestanding/kernel/shard9.cpp`: single-build runtime shard for phases 143-147
-    - `tests/tool/freestanding/kernel/phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase99_syscall_byte_ipc.cpp`, `phase100_capability_transfer.cpp`, `phase102_timer_sleep.cpp`, `phase103_init_bootstrap_handoff.cpp`, and `phase104_kernel_critique_hardening.cpp`: earlier narrow proof owners that still stand alone outside the late shard layout
-    - late ownership-hardening kernel audits now keep shard-owned behavior checks plus checked-in kernel goldens under `tests/tool/freestanding/kernel/goldens/{mir,run,contracts,manifests}/`; publication and phase-note checks live in the separate kernel metadata/doc suite
+    - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator for the descriptor-driven runtime surface plus the separate synthetic phases85-88 surface
+    - `tests/tool/freestanding/kernel/runtime/`: descriptor-owned kernel runtime proofs, one phase directory per runtime case
+    - `tests/tool/freestanding/kernel/docs/`: descriptor-owned kernel documentation audits
+    - `tests/tool/freestanding/kernel/artifact_specs/`: descriptor-owned kernel artifact audits
+    - `tests/tool/freestanding/kernel/synthetic/suite.cpp`: standalone synthetic kernel proofs for phases 85-88
+    - `tests/tool/freestanding/kernel/phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase99_syscall_byte_ipc.cpp`, `phase100_capability_transfer.cpp`, `phase102_timer_sleep.cpp`, `phase103_init_bootstrap_handoff.cpp`, and `phase104_kernel_critique_hardening.cpp`: earlier narrow proof owners that still stand alone, with owned MIR goldens under `tests/tool/freestanding/kernel/runtime/legacy_goldens/`
+    - late ownership-hardening kernel audits now keep checked-in expectations adjacent to their owning surfaces under `tests/tool/freestanding/kernel/runtime/`, `tests/tool/freestanding/kernel/synthetic/`, and `tests/tool/freestanding/kernel/artifact_specs/`; runtime, synthetic, docs, and artifact validation all run through top-level surfaces rather than shard targets
     - `tests/tool/tool_suite_common.cpp`: `ExpectMirFirstMatchProjectionFile` is the shared helper for those projected MIR goldens
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
@@ -191,7 +186,7 @@ This file is a fast orientation map for agents working in this repository.
 2. Check whether the request is about bootstrap behavior or full plan completion.
 3. Change the smallest correct layer.
 4. Update the narrowest relevant fixtures.
-5. Run `cmake --build build/debug -j4 && ctest --test-dir build/debug --output-on-failure` when behavior changes.
+5. Run `cmake --build build/debug -j4 && ctest --test-dir build/debug --output-on-failure` when behavior changes, or use `ctest --test-dir build/debug -j4 --output-on-failure` for an explicit parallel full-suite pass.
 
 Focused grouped-suite checks that are often enough for tool or workflow work:
 

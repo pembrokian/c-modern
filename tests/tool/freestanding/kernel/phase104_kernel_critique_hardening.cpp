@@ -47,7 +47,7 @@ void RunFreestandingKernelPhase104CritiqueHardening(const std::filesystem::path&
 
     ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
                                 ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase104_kernel_critique_hardening.mir.contains.txt"),
+                                                                    "runtime/legacy_goldens/phase104_kernel_critique_hardening.mir.contains.txt"),
                                 "phase104 merged MIR should preserve the critique-hardening proof slice");
 }
 

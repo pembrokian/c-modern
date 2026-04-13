@@ -1,0 +1,4 @@
+label = "phase108_kernel_manifest"
+kind = "file_contains"
+source_file = "kernel/build.toml"
+run_golden = "expected.contains.txt"

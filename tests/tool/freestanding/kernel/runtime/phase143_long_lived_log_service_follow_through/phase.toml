@@ -1,0 +1,18 @@
+label = "phase143_long_lived_log_service_follow_through"
+phase = 143
+shard = 9
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase143_long_lived_log_service"
+build_context = "freestanding kernel phase143 long-lived log service build"
+run_context = "freestanding kernel phase143 long-lived log service run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_log_service.mc.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase143LongLivedLogServiceAudit",
+  "Function name=bootstrap_audit.build_phase143_long_lived_log_service_audit returns=[debug.Phase143LongLivedLogServiceAudit]",
+  "Function name=log_service.observe_retention returns=[log_service.LogRetentionObservation]",
+  "Function name=debug.validate_phase143_long_lived_log_service returns=[bool]",
+]

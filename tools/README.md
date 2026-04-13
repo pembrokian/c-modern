@@ -9,11 +9,11 @@ Current helpers
 Convenience entrypoint
 
 - `make select-tests`: wrapper around `tools/select_tests.py`.
-	- default behavior uses `SELECT_TESTS_ARGS=--build --run --cache`
-	- override arguments when needed, for example:
-		`make select-tests SELECT_TESTS_ARGS='--changed tests/tool/freestanding/kernel/shard2.cpp --changed docs/agent/prompts/repo_map.md --run --cache'`
+  - default behavior uses `SELECT_TESTS_ARGS=--build --run --cache`
+  - override arguments when needed, for example:
+    `make select-tests SELECT_TESTS_ARGS='--changed tests/tool/freestanding/kernel/runtime/phase109_first_running_kernel_slice_audit/phase.toml --changed docs/agent/prompts/repo_map.md --run --cache'`
 
 Freestanding kernel maintenance note
 
-- adding a new kernel phase normally means updating the owning shard or standalone proof file, adding its goldens, and updating `tests/tool/freestanding/kernel/suite.cpp` only if a new direct `kernel-case:` selector is needed
-- update `tools/select_tests.py` only when shard ownership changes, a new shard is added, or a new non-shard suite surface is introduced
+- adding a new runtime kernel phase normally means updating its descriptor directory under `tests/tool/freestanding/kernel/runtime/phase.../`, adding its goldens, and touching `tests/tool/freestanding/kernel/synthetic/` only for the separate synthetic phases85-88 surface
+- update `tools/select_tests.py` only when top-level kernel surface ownership changes or a new surface is introduced

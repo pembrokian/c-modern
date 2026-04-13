@@ -10,64 +10,42 @@ Structure
   input, and narrow `hal` proof coverage.
 - `kernel/`: kernel-owned freestanding proofs.
   - `suite.cpp`: kernel proof orchestrator.
-  - `phase85_endpoint_queue.cpp`: endpoint queue proof.
-  - `phase86_task_lifecycle.cpp`: task lifecycle proof.
-  - `phase87_static_data.cpp`: kernel static-data proof.
-  - `phase88_build_integration.cpp`: emitted-object and relink proof.
+    The `kernel-runtime`, `kernel-docs`, and `kernel-artifacts` top-level
+    surfaces now load their owned checks from descriptor directories under
+    `kernel/runtime/...`, `kernel/docs/...`, and
+    `kernel/artifact_specs/...`.
   - `phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof.
   - `phase98_endpoint_handle_core.cpp`: real-kernel endpoint-and-handle-core proof.
-  - `phase105_real_log_service_handshake.cpp`: real-kernel log-service handshake proof.
-  - `phase106_real_echo_service_request_reply.cpp`: real-kernel echo-service request-reply proof.
-  - `phase107_real_user_to_user_capability_transfer.cpp`: real-kernel user-to-user capability transfer proof.
-  - `phase108_kernel_image_program_cap_audit.cpp`: real-kernel image-input and program-cap audit.
-  - `phase109_first_running_kernel_slice_audit.cpp`: real-kernel first-running-kernel-slice support audit.
-  - `phase110_kernel_ownership_split_audit.cpp`: real-kernel ownership split audit.
-  - `phase111_scheduler_lifecycle_ownership_clarification.cpp`: real-kernel scheduler and lifecycle ownership clarification audit.
-  - `phase112_syscall_boundary_thinness_audit.cpp`: real-kernel syscall boundary thinness audit.
-  - `phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`: real-kernel interrupt-entry and generic-dispatch boundary audit.
-  - `phase114_address_space_and_mmu_ownership_split.cpp`: real-kernel address-space and MMU ownership split audit.
-  - `phase115_timer_ownership_hardening.cpp`: real-kernel timer ownership hardening audit.
-  - `phase116_mmu_activation_barrier_follow_through.cpp`: real-kernel MMU activation barrier follow-through audit.
-  - `phase117_init_orchestrated_multi_service_bring_up.cpp`: real-kernel init-orchestrated multi-service bring-up audit.
-  - `phase118_request_reply_and_delegation_follow_through.cpp`: real-kernel delegated request-reply and source-invalidation audit.
-  - `phase119_namespace_pressure_audit.cpp`: real-kernel fixed service-directory and namespace-pressure audit.
-  - `phase120_running_system_support_statement.cpp`: real-kernel running-system support-statement audit.
-  - `phase121_kernel_image_contract_hardening.cpp`: real-kernel image-contract hardening audit.
-  - `phase122_target_surface_audit.cpp`: real-kernel target-surface audit.
-  - `phase123_next_plateau_audit.cpp`: real-kernel next-plateau audit.
-  - `phase124_delegation_chain_stress.cpp`: real-kernel delegation-chain stress audit.
-  - `phase125_invalidation_and_rejection_audit.cpp`: real-kernel invalidation and rejection audit.
-  - `phase126_authority_lifetime_classification.cpp`: real-kernel authority lifetime classification audit.
-  - `phase128_service_death_observation.cpp`: real-kernel service-death observation audit.
-  - `phase129_partial_failure_propagation.cpp`: real-kernel partial-failure propagation audit.
-  - `phase130_explicit_restart_or_replacement.cpp`: real-kernel explicit restart-or-replacement audit.
-  - `phase131_fan_in_or_fan_out_composition.cpp`: real-kernel bounded fan-out composition audit.
-  - `phase132_backpressure_and_blocking.cpp`: real-kernel bounded backpressure and blocking audit.
-  - `phase133_message_lifetime_and_reuse.cpp`: real-kernel bounded message lifetime, reuse, and close-path audit.
-  - `phase134_minimal_device_service_handoff.cpp`: real-kernel bounded UART receive device-service handoff audit.
-  - `phase135_buffer_ownership_boundary_audit.cpp`: real-kernel bounded UART receive-frame ownership-boundary audit.
-  - `phase136_device_failure_containment_probe.cpp`: real-kernel bounded UART device-failure containment audit.
-  - `phase137_optional_dma_or_equivalent_follow_through.cpp`: real-kernel bounded optional completion-backed UART receive follow-through audit.
-  - `shard8.cpp`: real-kernel bounded serial-ingress, shell-scope, and shell-command-routing runtime shard for phases 140-142.
-  - `shard9.cpp`: real-kernel bounded retained-log, stateful key-value, restart-pressure, service-shape, and IPC-shape runtime shard for phases 143-147.
+  - `phase99_syscall_byte_ipc.cpp` through `phase104_kernel_critique_hardening.cpp`: earlier focused real-kernel proof files that still stand alone, with owned MIR goldens under `runtime/legacy_goldens/`.
+  - `synthetic/suite.cpp`: standalone synthetic proof owner for phases85-88.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 
 Late kernel audit pattern
 
-- For ownership-hardening kernel audits, keep one shard owner `.cpp` per late runtime slice plus checked-in goldens under `kernel/goldens/` for projected MIR, runtime, contract, and shard-manifest expectations.
-- Keep phase-note, roadmap, and repo-map assertions in the separate kernel metadata/doc suite rather than in the runtime shard itself.
-- Keep behavior assertions in C++ over the built artifact and emitted objects.
-- Keep publication assertions in C++ over the phase note, README, repo map,
-  and other intentionally published status files.
-- Keep MIR structure assertions as projected goldens in
-  `kernel/goldens/mir/*.mirproj.txt` rather than embedding long expected MIR
-  snippets in the `.cpp` file.
-- When a shard's per-phase descriptor data becomes repetitive, prefer a
-  checked-in manifest under `kernel/goldens/manifests/` over another large
+- For ownership-hardening kernel audits, keep checked-in per-phase descriptors under `kernel/runtime/phase.../` with adjacent run and projected MIR expectations, keep the earlier standalone runtime MIR goldens under `kernel/runtime/legacy_goldens/`, and keep artifact expectations adjacent to `kernel/artifact_specs/.../artifact.toml`.
+- Treat shard1 phases85-88 as a separate synthetic-project proof surface rather
+  than part of the shared runtime descriptor contract. They write standalone
+  projects and, in phase88, own an explicit relink proof.
+- Keep phase-note, roadmap, and repo-map assertions in the separate kernel docs surface, with one descriptor directory per audit under `kernel/docs/...`, rather than in the runtime shard itself.
+- Keep behavior assertions over built artifacts and emitted objects in the separate kernel artifacts surface, with one descriptor directory per audit under `kernel/artifact_specs/...`.
+- Keep publication assertions descriptor-owned over the phase note, README,
+  repo map, and other intentionally published status files.
+- Keep MIR structure assertions as projected goldens adjacent to their owning
+  runtime phase descriptor or under `kernel/runtime/legacy_goldens/` for the
+  earlier standalone proofs, rather than embedding long expected MIR snippets
+  in the `.cpp` file.
+- When a phase's descriptor data becomes repetitive, prefer another checked-in
+  `kernel/runtime/phase.../phase.toml` directory over another large
   static C++ table.
+- Runtime-folder kernel phases now own execution metadata in `phase.toml`
+  (`output_stem`, `build_context`, and `run_context`) in addition to run and
+  MIR golden references.
+- Runtime-folder kernel phases now also declare the explicit MIR contract
+  `mir_contract = "first-match-projection-v1"` in `phase.toml`.
 - Use `ExpectMirFirstMatchProjectionFile` from `tests/tool/tool_suite_common.*`
-  to compare those projected MIR goldens against the merged dump.
+  as the current implementation of that contract when comparing projected MIR
+  goldens against the merged dump.
 
 Rule of thumb
 

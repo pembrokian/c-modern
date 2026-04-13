@@ -150,15 +150,7 @@ add_executable(mc_tool_freestanding_tests
     tests/tool/tool_suite_common.cpp
     tests/tool/freestanding/bootstrap/suite.cpp
     tests/tool/freestanding/kernel/artifacts.cpp
-    tests/tool/freestanding/kernel/shard1.cpp
-    tests/tool/freestanding/kernel/shard2.cpp
-    tests/tool/freestanding/kernel/shard3.cpp
-    tests/tool/freestanding/kernel/shard4.cpp
-    tests/tool/freestanding/kernel/shard5.cpp
-    tests/tool/freestanding/kernel/shard6.cpp
-    tests/tool/freestanding/kernel/shard7.cpp
-    tests/tool/freestanding/kernel/shard8.cpp
-    tests/tool/freestanding/kernel/shard9.cpp
+    tests/tool/freestanding/kernel/synthetic/suite.cpp
     tests/tool/freestanding/kernel/suite.cpp
     tests/tool/freestanding/system/suite.cpp
     tests/tool/freestanding/suite.cpp
@@ -229,15 +221,10 @@ add_test(NAME mc_tool_workflow_unit COMMAND mc_tool_workflow_tests ${CMAKE_CURRE
 add_test(NAME mc_tool_build_state_unit COMMAND mc_tool_build_state_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_tool_real_project_unit COMMAND mc_tool_real_project_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_tool_freestanding_bootstrap_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} bootstrap)
-add_test(NAME mc_tool_freestanding_kernel_shard1_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-1)
-add_test(NAME mc_tool_freestanding_kernel_shard2_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-2)
-add_test(NAME mc_tool_freestanding_kernel_shard3_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-3)
-add_test(NAME mc_tool_freestanding_kernel_shard4_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-4)
-add_test(NAME mc_tool_freestanding_kernel_shard5_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-5)
-add_test(NAME mc_tool_freestanding_kernel_shard6_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-6)
-add_test(NAME mc_tool_freestanding_kernel_shard7_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-7)
-add_test(NAME mc_tool_freestanding_kernel_shard8_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-8)
-add_test(NAME mc_tool_freestanding_kernel_shard9_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-9)
+
+# Primary freestanding kernel surfaces.
+add_test(NAME mc_tool_freestanding_kernel_runtime_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-runtime)
+add_test(NAME mc_tool_freestanding_kernel_synthetic_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-synthetic)
 add_test(NAME mc_tool_freestanding_kernel_docs_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-docs)
 add_test(NAME mc_tool_freestanding_kernel_artifacts_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-artifacts)
 

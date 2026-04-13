@@ -1,0 +1,1 @@
+PASS phase121_kernel_image_contract_hardening

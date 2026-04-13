@@ -1,0 +1,4 @@
+  TypeDecl kind=struct name=debug.Phase144StatefulKeyValueServiceFollowThroughAudit
+  Function name=bootstrap_audit.build_phase144_stateful_key_value_service_follow_through_audit returns=[debug.Phase144StatefulKeyValueServiceFollowThroughAudit]
+  Function name=bootstrap_services.execute_phase144_stateful_key_value_shell_command returns=[bootstrap_services.Phase142ShellCommandRouteResult]
+  Function name=debug.validate_phase144_stateful_key_value_service_follow_through returns=[bool]

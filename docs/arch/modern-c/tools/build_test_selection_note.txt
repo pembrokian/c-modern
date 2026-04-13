@@ -13,9 +13,11 @@ Current state
 - local friction now comes more from test selection than from compilation
 - repository tests are increasingly organized around explicit ownership slices:
   parser, sema, MIR, codegen, tool workflow, tool build-state, tool
-  real-project, freestanding bootstrap, freestanding kernel shards,
+  real-project, freestanding bootstrap, freestanding kernel runtime,
   freestanding kernel docs, freestanding kernel artifacts, and freestanding
   system
+- any retained freestanding kernel shard CTests are legacy implementation
+  details, not part of the normal local selection contract
 
 Design position
 
@@ -58,8 +60,10 @@ Ownership mapping guidance
 - syntax-layer compiler changes should route to parser, sema, MIR, and narrow
   codegen validation
 - driver and support-layer changes should route to the grouped tool suites
-- freestanding kernel shard owners and shard-owned goldens should route to the
-  owning shard CTest
+- freestanding kernel runtime owners and runtime-folder goldens should route to
+  the top-level kernel runtime CTest
+- shard CTests should not appear in normal ownership results; kernel routing
+  should stay at the runtime/docs/artifacts surface level
 - freestanding kernel publication and repo-map changes should route to the
   kernel docs suite
 - freestanding kernel relink-contract files should route to the kernel
@@ -69,10 +73,10 @@ Ownership mapping guidance
 
 Examples
 
-- changing `tests/tool/freestanding/kernel/shard2.cpp` should select
-  `mc_tool_freestanding_kernel_shard2_unit`
-- changing `tests/tool/freestanding/kernel/goldens/run/kernel_shard7.run.contains.txt`
-  should select `mc_tool_freestanding_kernel_shard7_unit`
+- changing `tests/tool/freestanding/kernel/synthetic/` should select
+  `mc_tool_freestanding_kernel_synthetic_unit`
+- changing `tests/tool/freestanding/kernel/runtime/phase109_first_running_kernel_slice_audit/expected_run.contains.txt`
+  should select `mc_tool_freestanding_kernel_runtime_unit`
 - changing `docs/agent/prompts/repo_map.md` should select
   `mc_tool_freestanding_kernel_docs_unit`
 - changing `compiler/driver/` should select the grouped tool suites
@@ -84,27 +88,31 @@ first file you touch.
 
 Normal order:
 
-- update the owning shard or standalone proof owner under
+- update the owning kernel proof or standalone proof owner under
   `tests/tool/freestanding/kernel/`
-- add or update the owned goldens under
-  `tests/tool/freestanding/kernel/goldens/{mir,run,contracts,manifests}/`
-- update `tests/tool/freestanding/kernel/suite.cpp` if the phase needs a new
-  direct `kernel-case:` selector entry
-- update `tools/select_tests.py` only if the new phase changes shard
-  ownership, adds a new shard, or adds a new suite surface such as docs or
+- add or update the owned expectations under
+  `tests/tool/freestanding/kernel/runtime/phase.../`,
+  `tests/tool/freestanding/kernel/runtime/legacy_goldens/`, or
+  `tests/tool/freestanding/kernel/artifact_specs/.../`
+- update `tests/tool/freestanding/kernel/synthetic/` only when the synthetic
+  phases85-88 surface changes
+- update `tools/select_tests.py` only if the new phase changes top-level
+  surface ownership or adds a new surface such as synthetic, docs, or
   artifacts
 
 Current remaining manual touchpoints for new freestanding kernel phases:
 
-- `tests/tool/freestanding/kernel/shardN.cpp`: owning runtime or proof logic
-- `tests/tool/freestanding/kernel/goldens/...`: owned MIR, run, contract, or
-  manifest-backed phase-descriptor goldens
-- `tests/tool/freestanding/kernel/suite.cpp`: direct case registry for
-  `kernel-case:`
-- `tools/select_tests.py`: shard-phase ownership metadata when shard ranges or
-  shard count change
-- `CMakeLists.txt`: only when a new shard CTest, docs/artifact suite, or other
-  new top-level test surface is introduced
+- `tests/tool/freestanding/kernel/synthetic/`: synthetic phases85-88 proof logic
+- `tests/tool/freestanding/kernel/runtime/phase...`: owned per-phase runtime
+  descriptors and adjacent run/MIR expectations
+- `tests/tool/freestanding/kernel/runtime/legacy_goldens/`: owned MIR
+  expectations for the earlier standalone runtime proofs
+- `tests/tool/freestanding/kernel/artifact_specs/.../`: owned artifact
+  expectations adjacent to each artifact descriptor
+- `tests/tool/freestanding/kernel/suite.cpp`: top-level runtime and synthetic
+  surface orchestration
+- `tools/select_tests.py`: kernel surface ownership metadata
+- `CMakeLists.txt`: only when a new kernel surface is introduced
 
 Current bounded cache model
 

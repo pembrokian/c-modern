@@ -47,7 +47,7 @@ void RunFreestandingKernelPhase102TimerSleep(const std::filesystem::path& source
 
     ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
                                 ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase102_timer_sleep.mir.contains.txt"),
+                                                                    "runtime/legacy_goldens/phase102_timer_sleep.mir.contains.txt"),
                                 "phase102 merged MIR should preserve the timer-sleep proof slice");
 }
 

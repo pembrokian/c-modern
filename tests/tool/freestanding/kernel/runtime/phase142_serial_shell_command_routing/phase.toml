@@ -1,0 +1,18 @@
+label = "phase142_serial_shell_command_routing"
+phase = 142
+shard = 8
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase142_serial_shell_command_routing"
+build_context = "freestanding kernel phase142 serial shell command routing build"
+run_context = "freestanding kernel phase142 serial shell command routing run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_shell_service.mc.o", "kernel__bootstrap_services.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase142SerialShellCommandRoutingAudit",
+  "Function name=bootstrap_audit.build_phase142_serial_shell_command_routing_audit returns=[debug.Phase142SerialShellCommandRoutingAudit]",
+  "Function name=bootstrap_services.execute_phase142_shell_command returns=[bootstrap_services.Phase142ShellCommandRouteResult]",
+  "Function name=debug.validate_phase142_serial_shell_command_routing returns=[bool]",
+]

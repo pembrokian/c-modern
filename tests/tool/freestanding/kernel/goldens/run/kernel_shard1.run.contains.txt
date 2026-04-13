@@ -1,2 +1,0 @@
-PASS phase105_real_log_service_handshake
-PASS phase106_real_echo_service_request_reply

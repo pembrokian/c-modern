@@ -47,7 +47,7 @@ void RunFreestandingKernelPhase103InitBootstrapHandoff(const std::filesystem::pa
 
     ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
                                 ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase103_init_bootstrap_handoff.mir.contains.txt"),
+                                                                    "runtime/legacy_goldens/phase103_init_bootstrap_handoff.mir.contains.txt"),
                                 "phase103 merged MIR should preserve the init-bootstrap-handoff proof slice");
 }
 

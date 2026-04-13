@@ -1,0 +1,17 @@
+label = "phase128_service_death_observation"
+phase = 128
+shard = 6
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase128_service_death"
+build_context = "freestanding kernel phase128 service-death build"
+run_context = "freestanding kernel phase128 service-death run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["kernel__bootstrap_audit.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase128ServiceDeathObservationAudit",
+  "Function name=bootstrap_audit.build_phase128_service_death_observation_audit returns=[debug.Phase128ServiceDeathObservationAudit]",
+  "Function name=debug.validate_phase128_service_death_observation returns=[bool]",
+]

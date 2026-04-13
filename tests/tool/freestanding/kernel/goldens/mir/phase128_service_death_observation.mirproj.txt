@@ -1,3 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase128ServiceDeathObservationAudit
-  Function name=bootstrap_audit.build_phase128_service_death_observation_audit returns=[debug.Phase128ServiceDeathObservationAudit]
-  Function name=debug.validate_phase128_service_death_observation returns=[bool]

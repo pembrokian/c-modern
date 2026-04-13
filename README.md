@@ -170,6 +170,7 @@ make check FILE=tests/cases/hello.mc
 cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/debug
 ctest --test-dir build/debug --output-on-failure
+ctest --test-dir build/debug -j4 --output-on-failure
 ctest --test-dir build/debug -R 'mc_tool_|mc_codegen_executable_(stdlib|project)_unit' --output-on-failure
 build/debug/mc check tests/cases/hello.mc --dump-ast --emit-dump-paths
 build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/probes/smoke_return_zero --dump-backend

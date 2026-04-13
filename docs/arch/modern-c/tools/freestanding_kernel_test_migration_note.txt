@@ -1,513 +1,289 @@
-Modern C - Freestanding Kernel Test Architecture Migration Note
+Modern C - Freestanding Kernel Test Architecture Contract
 
 Purpose
 
-This note turns the current freestanding kernel test-architecture discussion
-into one concrete repository-local migration sketch.
+This document records the current repository contract for freestanding kernel
+tests.
 
-It answers a specific question:
+It is no longer a migration sketch. It describes the active public surfaces,
+the supported local selectors, the ownership model for expectations, and the
+remaining gaps that are still intentionally outside the fully descriptor-only
+runtime shape.
 
-- if the freestanding kernel runtime proofs were redesigned from a blank sheet,
-  what would actually stop the repository from using a much smaller,
-  filesystem-driven test model?
+Current contract
 
-This note does not claim that such a migration is already accepted.
-It records the smallest honest path from the current repository shape toward a
-cleaner design, and it names the contracts that would need replacement rather
-than hand-waving them away.
+The freestanding kernel test architecture now has four public top-level
+surfaces:
 
-Current repository position
+- runtime
+- synthetic
+- docs
+- artifacts
 
-The current freestanding kernel runtime surface already moved partway toward a
-data-driven model, but it is not yet a pure filesystem registry.
+These map directly to the canonical CTest targets:
 
-Current key facts:
+- `mc_tool_freestanding_kernel_runtime_unit`
+- `mc_tool_freestanding_kernel_synthetic_unit`
+- `mc_tool_freestanding_kernel_docs_unit`
+- `mc_tool_freestanding_kernel_artifacts_unit`
 
-- runtime proofs are executed as black-box process tests through the built
-  `mc` executable and the produced kernel executable
-- shard CTests are currently the canonical runtime validation surface
-- direct per-phase selectors still exist for local debugging
-- some runtime proofs already load phase descriptors from manifest text rather
-  than hardcoding every expectation directly in C++
-- runtime validation is not only run-output checking; it also includes
-  object-artifact existence checks and projected MIR checks
-- freestanding kernel publication and relink-contract checks already live in
-  separate docs and artifacts suites rather than inside the runtime shards
+Those four surfaces are the public contract. Shard-based targets, shard-based
+selectors, and shard-owned source files are no longer part of the active
+freestanding kernel interface.
 
-The current architecture is therefore not best described as "heavy in-process
-C++ testing".
-It is better described as "black-box execution with a compiled C++ registry,
-selector layer, and artifact-aware assertion helpers".
+Selector contract
 
-What the clean-sheet proposal gets right
+The supported freestanding kernel selectors are intentionally small and
+explicit:
 
-The proposed minimalist direction correctly identifies real friction in the
-current repository:
+- `kernel-runtime`
+- `kernel-runtime:<label>`
+- `kernel-synthetic`
+- `kernel-synthetic:<label>`
+- `kernel-docs`
+- `kernel-artifacts`
 
-- adding a new kernel phase still requires touching too many registry points
-- shard naming leaks execution partitioning into source ownership
-- some expectations are still encoded indirectly through C++ entrypoints
-  instead of being discoverable from adjacent files
-- local contributors cannot add a new runtime proof by creating only a new
-  directory with expectations and phase metadata
+Related top-level freestanding selectors that remain valid because they are
+separate surfaces, not compatibility shims:
 
-These are real costs, not merely aesthetic preferences.
+- `bootstrap`
+- `system`
+- `all`
 
-What currently prevents the fully minimalist design
+Decision: no broader compatibility layer is preserved.
 
-The repository is not blocked by a technical inability to run tests from a
-filesystem tree.
-It is blocked by four deliberate current contracts.
+That means:
 
-1. Shard CTests are part of the local and CI contract
+- no shard selectors
+- no `kernel-case:` aliases
+- no wildcard selector contract beyond the exact label-based selectors above
+- no compatibility affordances that describe historical shard ownership rather
+  than current surface ownership
 
-- the repository currently names freestanding kernel shard targets explicitly
-- changed-path selection routes kernel files and goldens to owning shard CTests
-- local iteration guidance tells contributors to run the owning shard first
+Local narrow runs should use the label selectors directly. Broader local runs
+should use the top-level surface selectors.
 
-Today, shards are not only a performance detail.
-They are also part of:
+Surface ownership
 
-- local debugging workflow
-- changed-path ownership mapping
-- stable CTest target naming
-- CI granularity
+Runtime surface
 
-Any redesign that removes shards must replace those capabilities explicitly.
+- phases105 through 147 are descriptor-driven under
+  `tests/tool/freestanding/kernel/runtime/phase.../`
+- each runtime phase directory owns:
+  - `phase.toml`
+  - adjacent run expectations
+  - adjacent MIR projection expectations
+- runtime descriptor loading and runtime-case lookup live in
+  `tests/tool/tool_suite_common.*`
 
-2. Full-output literal diff is not yet the real MIR contract
+Synthetic surface
 
-- run output is already close to pure golden matching
-- MIR validation still relies on stable projected slices instead of full-text
-  equality
+- phases85 through 88 live permanently under
+  `tests/tool/freestanding/kernel/synthetic/`
+- they remain separate because they generate standalone proof projects rather
+  than validating the shared `kernel/build.toml` runtime path
+- they are selected through `kernel-synthetic` and
+  `kernel-synthetic:<label>` only
 
-This is not accidental.
-The repository currently uses projected MIR checks because the whole MIR dump
-is not yet treated as the canonical stable contract for these proofs.
+Docs surface
 
-If the repository wants pure diff-based runtime proofing, the right next step
-is not "rewrite the runner in shell".
-The right next step is:
+- publication and documentation assertions live under
+  `tests/tool/freestanding/kernel/docs/...`
+- each docs audit owns its descriptor and checked text expectations in that
+  surface
 
-- add a compiler-owned stable MIR dump surface, or
-- add a compiler-owned stable projection mode that replaces test-owned
-  selector logic
+Artifacts surface
 
-Without that step, a shell-script runner would still need custom filtering
-logic, just written in a different language.
+- relink and artifact assertions live under
+  `tests/tool/freestanding/kernel/artifact_specs/...`
+- each artifact audit owns its descriptor and adjacent checked expectations in
+  that surface
 
-3. The kernel test surface is not one thing
+Legacy standalone runtime proofs
 
-The current freestanding kernel area already contains three distinct kinds of
-checks:
+The remaining early runtime proofs for phases97 through 104 still live as
+compiled standalone C++ proof files:
 
-- runtime shard proofs
-- publication or documentation checks
-- artifact or relink-contract checks
-
-Those surfaces have different ownership and different input sets.
-
-A pure "one phase directory equals one whole test" model fits the runtime
-proofs well.
-It fits the documentation and artifact suites less well.
-
-Any migration therefore needs to keep these surfaces separate:
-
-- runtime phase proofs can become filesystem-driven
-- docs checks should remain a separate publication suite
-- relink and artifact contract checks should remain a separate artifact suite
-
-4. The repository has a conservative explicit-selection philosophy
-
-The repository already has a documented architecture note for ownership-based
-local test selection.
-That note intentionally prefers explicit, reviewable changed-path mapping over
-hidden dependency discovery or opaque scheduling.
-
-This matters because a minimalist runner often drifts toward a different
-philosophy:
-
-- implicit discovery
-- dynamic work stealing
-- hidden grouping
-- little or no explicit ownership map
-
-That is not automatically wrong, but it is a real design change.
-The repository would need to choose that change deliberately.
-
-Recommended migration path: hybrid first
-
-The best near-term path is not a shell-script replacement.
-It is a hybrid migration that preserves the existing outer workflow while
-making the runtime proof description filesystem-driven.
-
-Hybrid target state
-
-- keep CTest target names stable for now
-- keep `tools/select_tests.py` as the local changed-path selector
-- keep separate runtime, docs, and artifacts kernel suites
-- replace per-phase C++ registry entries with runtime discovery of adjacent
-  phase descriptors
-- keep a direct local selector for one phase directory or one phase label
-- keep shard-level CTests, but define shard membership from manifest metadata
-  rather than hardcoded phase arrays in C++
-
-In that model, the compiled test binary becomes a thin orchestrator rather
-than a registry owner.
-
-Concrete hybrid shape
-
-One possible runtime layout:
-
-```text
-tests/tool/freestanding/kernel/runtime/
-  phase107_real_user_to_user_capability_transfer/
-    phase.toml
-    expected_run.contains.txt
-    expected_mir_projection.txt
-  phase108_kernel_image_program_cap_audit/
-    phase.toml
-    expected_run.contains.txt
-    expected_mir_projection.txt
-```
+- `tests/tool/freestanding/kernel/phase97_user_entry.cpp`
+- `tests/tool/freestanding/kernel/phase98_endpoint_handle_core.cpp`
+- `tests/tool/freestanding/kernel/phase99_syscall_byte_ipc.cpp`
+- `tests/tool/freestanding/kernel/phase100_capability_transfer.cpp`
+- `tests/tool/freestanding/kernel/phase102_timer_sleep.cpp`
+- `tests/tool/freestanding/kernel/phase103_init_bootstrap_handoff.cpp`
+- `tests/tool/freestanding/kernel/phase104_kernel_critique_hardening.cpp`
 
-Example `phase.toml` shape:
+Their owned MIR expectations now live under
+`tests/tool/freestanding/kernel/runtime/legacy_goldens/`.
 
-```text
-label = "phase107_real_user_to_user_capability_transfer"
-phase = 107
-shard = 2
-project = "kernel/build.toml"
-target = "kernel"
-run_golden = "expected_run.contains.txt"
-mir_golden = "expected_mir_projection.txt"
-mir_mode = "projection"
-required_objects = ["main.o", "ipc.o"]
-selectors = [
-  "func @shell_service_handle",
-  "func @kv_service_handle",
-]
-```
+These files are part of the runtime surface. They are not a separate public
+surface and they do not justify any extra selector vocabulary.
 
-What stays compiled in this hybrid model:
+Expectation ownership
 
-- build-and-run helper logic
-- stable failure reporting
-- docs suite
-- artifacts suite
-- outer shard selector entrypoints
+The repository now uses surface-owned expectation placement:
 
-What disappears from compiled code:
+- runtime phase expectations live adjacent to each descriptor under
+  `tests/tool/freestanding/kernel/runtime/phase.../`
+- earlier standalone runtime MIR expectations live under
+  `tests/tool/freestanding/kernel/runtime/legacy_goldens/`
+- synthetic expectations live under
+  `tests/tool/freestanding/kernel/synthetic/`
+- artifact expectations live adjacent to each artifact descriptor under
+  `tests/tool/freestanding/kernel/artifact_specs/.../`
+- docs expectations live adjacent to each docs descriptor under
+  `tests/tool/freestanding/kernel/docs/.../`
 
-- hardcoded per-phase registry arrays
-- one function declaration per runtime phase in `suite.cpp`
-- shard-owned handwritten manifest parsers duplicated across shard files
-- manual routing from case name to function pointer for runtime-only proofs
+The old shared `tests/tool/freestanding/kernel/goldens/` tree is retired and
+is not part of the active ownership model.
 
-Why this is the right first step
+MIR contract
 
-- it removes the highest-friction registry work first
-- it preserves current CTest names and current local workflow
-- it does not require a same-day redesign of `tools/select_tests.py`
-- it keeps docs and artifact checks where they already belong
-- it lets the repository prove whether filesystem-driven runtime discovery is
-  actually simpler before also rewriting the outer orchestration layer
+The freestanding kernel runtime MIR contract is explicit and stable:
 
-Current implementation status
+- `mir_contract = "first-match-projection-v1"`
 
-- the first thing trialled locally was a shard-manifest experiment under
-  `tests/tool/freestanding/kernel/goldens/manifests/`
-- that experiment proved that descriptor data could move out of static C++
-  tables, but it was not yet the preferred hybrid target shape
-- shard2 now also has a real per-phase-folder hybrid trial under
-  `tests/tool/freestanding/kernel/runtime/phase107_...` through
-  `phase111_...`
-- that folder-based shard2 trial is the closer match for the intended hybrid
-  direction because each phase now owns adjacent `phase.toml`, run, and MIR
-  expectation files
+Each runtime descriptor owns:
 
-Concrete hybrid implementation plan
+- `selectors = [...]`
+- `mir_golden = ...`
 
-1. Introduce one shared runtime phase-descriptor format
+Literal full-MIR diffs are intentionally out of scope until the compiler
+publishes a stable full-text MIR contract.
 
-- one manifest format for label, shard, goldens, required objects, and MIR
-  validation mode
-- one shared loader in the freestanding tool helper layer
+Changed-path selection
 
-2. Move one existing shard to descriptor-driven discovery
+`tools/select_tests.py` is part of the repository contract.
 
-- shard2 is the best first candidate because it already reads a manifest-like
-  data file
-- convert shard2 from ad hoc manifest parsing plus per-phase functions to a
-  generic descriptor runner
+It routes kernel-related changes by top-level surface ownership:
 
-3. Preserve current CTest target names
+- runtime
+- synthetic
+- docs
+- artifacts
 
-- keep `mc_tool_freestanding_kernel_shardN_unit`
-- each shard CTest loads all descriptors whose `shard = N`
+The selector intentionally stays explicit and reviewable. The repository is
+not using opaque dependency discovery or hidden grouping for local ownership
+selection.
 
-4. Preserve direct local debugging selectors
+Current remaining gaps
 
-- keep a selector such as `kernel-case:<label>` or switch to
-  `kernel-phase:<label>`
-- resolve the label from descriptors at runtime instead of from a compiled
-  array
+The remaining gap is not shard cleanup or selector cleanup. Those are done.
 
-5. Update `tools/select_tests.py` only at the boundary
+The remaining architectural gaps are:
 
-- route runtime phase directories and their adjacent goldens to the owning
-  shard based on descriptor metadata or a small generated ownership table
-- keep docs and artifact routing unchanged
+- phases97 through 104 are still compiled standalone runtime proofs rather than
+  per-phase descriptor directories
+- runtime is therefore not yet a pure "add one directory, add one phase"
+  filesystem-only model across all runtime proofs
+- docs and artifacts remain separate surfaces by design rather than being
+  collapsed into one generic runtime tree
 
-6. Only after that, decide whether shard CTests still earn their keep
+These are intentional current boundaries, not accidental leftovers.
 
-- if the hybrid model removes most friction, stop there
-- if shard naming is still the main remaining cost, then move to the fuller
-  clean-sheet design
+Contributor workflow
 
-Near-term execution order from the current state
+When adding or updating a freestanding kernel test, use this order:
 
-1. Finish the shard2 proof properly
+1. Decide which top-level surface owns the behavior.
+2. Update the owned descriptor or proof file in that surface.
+3. Update the owned expectations adjacent to that surface.
+4. Update `tools/select_tests.py` only if surface ownership changes.
 
-- keep the per-phase folder layout as the preferred hybrid direction
-- keep validation at `mc_tool_freestanding_kernel_shard2_unit`
-- treat the older shard-manifest experiment as prior exploration, not as the
-  target layout to replicate blindly
+Normal ownership rules:
 
-2. Decide whether manifest parsing should remain shard-local
+- add new shared-runtime phases under `kernel/runtime/phase.../`
+- update `kernel/synthetic/` only for phases85 through 88
+- update `kernel/docs/...` only for publication and documentation audits
+- update `kernel/artifact_specs/...` only for artifact and relink contracts
+- update `runtime/legacy_goldens/` only when touching the earlier standalone
+  runtime proof files for phases97 through 104
 
-- if only shard2 uses the folder-based phase descriptor format, keep the loader
-  local
-- if a second shard adopts the same folder format, move the parser and
-  descriptor type into shared freestanding tool support immediately
+Validation
 
-3. Convert exactly one more late shard
+Focused validation commands:
 
-- choose a shard with multiple repetitive phase descriptors
-- do not change `tools/select_tests.py` yet unless shard ownership changes
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build/debug -R 'mc_tool_freestanding_kernel_(runtime|synthetic|docs|artifacts)_unit' --output-on-failure`
 
-4. Only after two shards, decide whether `suite.cpp` registry pressure is real
+Useful local selector examples:
 
-- if direct `kernel-case:` maintenance is now the main remaining manual touch
-  point, replace the compiled case registry with descriptor-driven lookup
-- otherwise leave the case registry alone until it becomes the actual bottleneck
+- `mc_tool_freestanding_tests <source-root> <binary-root> kernel-runtime`
+- `mc_tool_freestanding_tests <source-root> <binary-root> kernel-runtime:phase109_first_running_kernel_slice_audit`
+- `mc_tool_freestanding_tests <source-root> <binary-root> kernel-synthetic`
+- `mc_tool_freestanding_tests <source-root> <binary-root> kernel-synthetic:phase85_endpoint_queue`
 
-5. Only after the second shard, evaluate selector unification
+Summary
 
-- decide whether `tools/select_tests.py` should derive shard ownership from the
-  same manifest data
-- keep the current explicit selector mapping unless duplicated ownership data
-  becomes real maintenance pain
+The active contract is now straightforward:
+
+- four public kernel surfaces
+- explicit narrow selector vocabulary
+- no preserved shard compatibility layer
+- surface-owned expectations
+- explicit descriptor-owned MIR projection contract
+
+The only substantial remaining runtime gap is that phases97 through 104 are
+still standalone compiled proofs rather than descriptor directories.
+
+2. Runtime proof discovery moved out of handwritten per-phase tables
+
+- the first late-runtime conversion point landed as a folder-based phase
+  descriptor layout
+- phases105 through 147 now use the runtime-folder descriptor layout
+- the former shard1 runtime phases105 and 106 also use the runtime-folder
+  descriptor path
+
+3. Stable outer workflow stayed in place during the hybrid migration
+
+- `kernel-runtime:<label>` is now the direct local runtime selector
+- `kernel-synthetic:<label>` now owns the separate synthetic proof selector
+
+4. Changed-path routing now follows top-level surfaces
+
+- `tools/select_tests.py` routes by surface ownership boundaries
+- runtime phase directories, synthetic proofs, docs descriptors, and artifact
+  descriptors now map directly to their top-level surfaces
+
+5. Registry pressure was reduced and the shard runtime layer was removed
+
+- runtime-folder cases now resolve through descriptor-driven lookup rather than
+  a broad compiled per-phase table
+- phase108 manifest and phase114 plan-note checks now live on the descriptor-
+  driven artifact and docs surfaces
+- the synthetic surface keeps only the standalone-project proofs for phases85
+  through 88 as a separate surface
+- the old shard2 through shard9 source files and shard-named run goldens were
+  removed without changing the active public interface
+
+Historical near-term execution order
+
+The steps below are now effectively completed for the hybrid migration and are
+retained only as a record of how the repository moved from the earlier shard2
+experiment to the current runtime-folder layout.
 
 Focused validation commands for this sequence
 
 - `cmake --build build/debug -j4`
-- `ctest --test-dir build/debug -R mc_tool_freestanding_kernel_shard2_unit --output-on-failure`
-- after a second shard conversion, run both owning shard targets before any
-  broader tool gate
+- `ctest --test-dir build/debug -R mc_tool_freestanding_kernel_runtime_unit --output-on-failure`
+- `ctest --test-dir build/debug -R 'mc_tool_freestanding_kernel_(runtime|synthetic|docs|artifacts)_unit' --output-on-failure`
 
-Full clean-sheet design
+Future simplification
 
-If the repository chooses to go all the way, the clean-sheet model should be
-designed as follows.
+If the repository continues simplifying the runtime surface, the next step is
+not selector work and not shard cleanup. Those are complete.
 
-Clean-sheet target state
+The next simplification target is phases97 through 104.
 
-- runtime kernel proofs are discovered entirely from the filesystem
-- adding a new runtime phase means adding one directory with a descriptor and
-  goldens
-- the runner is generic and does not know phase names ahead of time
-- parallelism is handled by the runner or by CTest scheduling, not encoded in
-  source file names
-- runtime proof assertions are primarily literal diffs against stable outputs
-- docs and artifact suites remain separate top-level test surfaces
+If those proofs are ever moved into descriptor-owned runtime directories, the
+resulting architecture would be:
 
-One honest clean-sheet layout
+- one runtime surface where every runtime proof is directory-owned
+- one synthetic surface for phases85 through 88
+- one docs surface
+- one artifacts surface
 
-```text
-tests/tool/freestanding/kernel/
-  runtime/
-    phase107_real_user_to_user_capability_transfer/
-      phase.toml
-      expected_run.txt
-      expected_mir.txt
-    phase108_kernel_image_program_cap_audit/
-      phase.toml
-      expected_run.txt
-      expected_mir.txt
-  docs/
-    repo_map.contains.txt
-    publication_checks.toml
-  artifacts/
-    phase108_manual_kernel_image/
-      artifact.toml
-      expected_run.txt
-```
+That would remove the only remaining runtime-specific exception in the current
+contract.
 
-One honest runner model
-
-- one generic runtime runner scans `runtime/`
-- one generic docs runner scans `docs/`
-- one generic artifact runner scans `artifacts/`
-- each descriptor is one test unit
-- execution order is lexical by default
-- optional parallel execution is explicit and bounded
-
-The clean-sheet design should not blindly force exact diff for every surface.
-It should instead separate the contract kinds honestly:
-
-- exact diff when full text is the contract
-- stable substring matching when wording is intentionally looser
-- explicit artifact-exists checks when file presence is the contract
-- stable structured diff when MIR requires a compiler-owned canonicalized form
-
-That still matches the minimalist philosophy better than today, because the
-contract type lives in the descriptor data rather than in handwritten phase
-functions.
-
-Required repo changes for the full clean-sheet model
-
-1. Replace shard CTests with a different stable top-level naming scheme
-
-Possible replacements:
-
-- one `mc_tool_freestanding_kernel_runtime_unit`
-- one `mc_tool_freestanding_kernel_docs_unit`
-- one `mc_tool_freestanding_kernel_artifacts_unit`
-
-Optional local selectors:
-
-- `kernel-runtime:<label>`
-- `kernel-runtime:phase107_*`
-
-2. Redesign `tools/select_tests.py`
-
-It would need to stop routing by shard and instead route by surface:
-
-- runtime kernel suite
-- docs suite
-- artifacts suite
-
-If local narrow runs still matter, the selector would also need an optional
-second output:
-
-- the owning top-level CTest target, and
-- the narrowed descriptor labels to pass through to the runtime runner
-
-3. Decide on the MIR contract explicitly
-
-The repository must choose one of these:
-
-- keep projection semantics, but make them descriptor-owned and generic
-- add compiler-supported stable full MIR output and diff that literally
-
-This decision is the biggest technical prerequisite for a true clean-sheet
-runtime design.
-
-4. Move execution partitioning out of source file names
-
-If runtime parallelism still needs throttling, use one of:
-
-- CTest parallel scheduling on one runtime suite
-- runner-level worker count with explicit `--jobs`
-- descriptor metadata for cost classes, without naming source files after
-  shards
-
-5. Re-document contributor workflow
-
-The current documented maintenance model assumes:
-
-- shard ownership
-- shard-owned goldens
-- optional direct `kernel-case:` selectors
-
-That documentation would need a deliberate rewrite.
-
-Gap analysis: current repo versus clean-sheet target
-
-Gap 1: Registry ownership still exists in code
-
-Current state:
-
-- runtime phases still appear in a compiled registry and selector layer
-
-Needed change:
-
-- runtime phase labels and metadata move to adjacent descriptor files
-
-Gap 2: Execution partitioning is still source-visible
-
-Current state:
-
-- shard identity appears in file names, CTest names, and ownership metadata
-
-Needed change:
-
-- partitioning becomes runner scheduling or disappears entirely
-
-Gap 3: MIR checks are only partially descriptor-friendly
-
-Current state:
-
-- MIR projections rely on helper logic plus selectors
-
-Needed change:
-
-- compiler-owned stable output mode, or
-- generic descriptor-owned projection mode
-
-Gap 4: Local changed-path selection assumes explicit owners
-
-Current state:
-
-- the selector maps changed files to named CTest owners conservatively
-
-Needed change:
-
-- either keep that explicit mapping at the top-level suite boundary, or
-- generate ownership metadata from descriptors in a reviewable way
-
-Gap 5: Non-runtime kernel checks do not fit the same directory model cleanly
-
-Current state:
-
-- docs and artifact checks are separate surfaces already
-
-Needed change:
-
-- keep them separate in the new architecture instead of pretending every
-  kernel-related check is one runtime phase directory
-
-Decision recommendation
-
-The repository should not jump directly from today's shard-owned compiled
-registry to a shell-script-only runtime model.
-
-Recommended decision:
-
-- accept a hybrid migration for runtime proofs first
-- keep docs and artifact suites as separate surfaces
-- keep current CTest names during the first migration wave
-- only remove shards after the repository proves that descriptor-driven
-  runtime discovery plus current selection tooling still gives good local
-  iteration behavior
-
-This gives most of the simplicity gain with much less risk.
-
-Short version
-
-The clean-sheet design is viable.
-What stops the repository from switching immediately is not technical
-difficulty.
-It is that the current framework still owns four real contracts:
-
-- shard-based local and CI ownership
-- MIR projection rather than stable full MIR diff
-- separate docs and artifact suites outside runtime proofs
-- conservative explicit changed-path selection
-
-The simplest honest path is:
-
-- make runtime proofs descriptor-driven first
-- keep current outer CTest and selector workflow for now
-- then decide whether the remaining shard layer still justifies itself
+Until that happens, the current architecture described above is the repository
+contract.

@@ -1,4 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase142SerialShellCommandRoutingAudit
-  Function name=bootstrap_audit.build_phase142_serial_shell_command_routing_audit returns=[debug.Phase142SerialShellCommandRoutingAudit]
-  Function name=bootstrap_services.execute_phase142_shell_command returns=[bootstrap_services.Phase142ShellCommandRouteResult]
-  Function name=debug.validate_phase142_serial_shell_command_routing returns=[bool]

@@ -1,0 +1,8 @@
+label = "phase109_plan_note"
+source = "docs/plan/archive/phase109_first_running_canopus_kernel_slice_audit.txt"
+context = "phase109 plan note descriptor audit"
+contains = [
+  "Phase 109 -- First Running Canopus Kernel Slice Audit",
+  "explicit boot entry, first user entry, endpoint-and-handle object",
+  "Phase 109 is complete as a first running Canopus kernel slice audit.",
+]

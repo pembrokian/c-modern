@@ -3,9 +3,12 @@ phase = 107
 shard = 2
 project = "kernel/build.toml"
 target = "kernel"
+output_stem = "kernel_phase107_user_transfer"
+build_context = "freestanding kernel phase107 user-to-user capability transfer build"
+run_context = "freestanding kernel phase107 user-to-user capability transfer run"
 run_golden = "expected_run.contains.txt"
 mir_golden = "expected_mir_projection.txt"
-mir_mode = "projection"
+mir_contract = "first-match-projection-v1"
 required_objects = []
 selectors = [
   "Function name=validate_phase106_echo_service_request_reply returns=[bool]",

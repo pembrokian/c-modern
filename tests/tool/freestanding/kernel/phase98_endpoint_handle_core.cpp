@@ -47,7 +47,7 @@ void RunFreestandingKernelPhase98EndpointHandleCore(const std::filesystem::path&
 
     ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
                                 ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase98_endpoint_handle_core.mir.contains.txt"),
+                                                                    "runtime/legacy_goldens/phase98_endpoint_handle_core.mir.contains.txt"),
                                 "phase98 merged MIR should preserve the endpoint-handle-core proof slice");
 }
 

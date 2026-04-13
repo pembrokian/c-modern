@@ -48,32 +48,20 @@ SMOKE_AND_AUDIT_TESTS = [
 
 DEFAULT_BASE_CANDIDATES = ["origin/main", "main", "origin/master", "master"]
 CACHE_VERSION = 1
-KERNEL_SHARD_PHASES = {
-    1: (85, 86, 87, 105, 106),
-    2: (107, 108, 109, 110, 111),
-    3: (112, 113, 114, 115, 116),
-    4: (117, 118, 119, 120, 121),
-    5: (122, 123, 124, 125, 126),
-    6: (128, 129, 130, 131, 132),
-    7: (133, 134, 135, 136, 137),
-    8: (140, 141, 142),
-    9: (143, 144, 145, 146, 147),
-}
 KERNEL_ARTIFACT_TEST = "mc_tool_freestanding_kernel_artifacts_unit"
 KERNEL_DOCS_TEST = "mc_tool_freestanding_kernel_docs_unit"
-KERNEL_MANIFEST_ROOT = PurePosixPath("tests/tool/freestanding/kernel/goldens/manifests")
-KERNEL_RUNTIME_ROOT = PurePosixPath("tests/tool/freestanding/kernel/runtime")
+KERNEL_RUNTIME_TEST = "mc_tool_freestanding_kernel_runtime_unit"
+KERNEL_SYNTHETIC_TEST = "mc_tool_freestanding_kernel_synthetic_unit"
 
 
-def kernel_shard_test_name(shard: int) -> str:
-    return f"mc_tool_freestanding_kernel_shard{shard}_unit"
-
-
-ALL_KERNEL_TESTS = [
-    *(kernel_shard_test_name(shard) for shard in sorted(KERNEL_SHARD_PHASES)),
-    KERNEL_ARTIFACT_TEST,
+ALL_KERNEL_SURFACE_TESTS = [
+    KERNEL_RUNTIME_TEST,
+    KERNEL_SYNTHETIC_TEST,
     KERNEL_DOCS_TEST,
+    KERNEL_ARTIFACT_TEST,
 ]
+
+ALL_KERNEL_TESTS = list(ALL_KERNEL_SURFACE_TESTS)
 
 ALL_FREESTANDING_TESTS = [
     "mc_tool_freestanding_bootstrap_unit",
@@ -115,7 +103,7 @@ RULES = [
     Rule(("tests/tool/freestanding/bootstrap/",), ("mc_tool_freestanding_bootstrap_unit",), "freestanding bootstrap ownership"),
     Rule(("tests/tool/freestanding/system/",), ("mc_tool_freestanding_system_unit",), "freestanding system ownership"),
     Rule(("tests/tool/freestanding/kernel/artifacts.cpp",), ("mc_tool_freestanding_kernel_artifacts_unit",), "kernel artifact suite ownership"),
-    Rule(("tests/tool/freestanding/kernel/suite.cpp",), tuple(ALL_KERNEL_TESTS), "kernel suite registry ownership"),
+    Rule(("tests/tool/freestanding/kernel/suite.cpp",), tuple(ALL_KERNEL_SURFACE_TESTS), "kernel surface ownership"),
     Rule(("tests/tool/tool_freestanding_tests.cpp",), tuple(ALL_FREESTANDING_TESTS), "freestanding suite driver ownership"),
     Rule(("tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h"), tuple(ALL_TOOL_TESTS), "shared tool helper ownership"),
     Rule(("compiler/lex/", "compiler/parse/", "compiler/ast/"), tuple(CORE_COMPILER_TESTS), "frontend syntax-layer ownership"),
@@ -191,91 +179,30 @@ def resolve_base_ref(source_root: Path, requested_base_ref: str) -> str:
             return merge_base
     return "HEAD"
 
-
-def kernel_shard_for_phase(phase: int) -> str | None:
-    for shard, phases in KERNEL_SHARD_PHASES.items():
-        if phase in phases:
-            return kernel_shard_test_name(shard)
-    return None
-
-
-def kernel_manifest_path_for_shard(shard: int, source_root: Path) -> Path:
-    return source_root / KERNEL_MANIFEST_ROOT / f"shard{shard}.phase_checks.txt"
-
-
-def parse_kernel_manifest_goldens(manifest_path: Path) -> list[str]:
-    goldens: list[str] = []
-    if not manifest_path.exists():
-        return goldens
-
-    for raw_line in manifest_path.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("run="):
-            goldens.append(f"tests/tool/freestanding/kernel/goldens/run/{line.split('=', 1)[1]}")
-            continue
-        if line.startswith("mir="):
-            goldens.append(f"tests/tool/freestanding/kernel/goldens/mir/{line.split('=', 1)[1]}")
-            continue
-    return goldens
-
-
-def manifest_backed_shard_for_kernel_golden(filename: str, source_root: Path) -> str | None:
-    for shard in sorted(KERNEL_SHARD_PHASES):
-        manifest_path = kernel_manifest_path_for_shard(shard, source_root)
-        if not manifest_path.exists():
-            continue
-        golden_paths = parse_kernel_manifest_goldens(manifest_path)
-        if any(PurePosixPath(path).name == filename for path in golden_paths):
-            return kernel_shard_test_name(shard)
-    return None
-
-
 def classify_kernel_path(path: str) -> tuple[list[str], str] | None:
     if path in KERNEL_DOC_PATHS:
         return ([KERNEL_DOCS_TEST], "kernel documentation ownership")
 
-    runtime_match = re.match(r"tests/tool/freestanding/kernel/runtime/phase(\d+)[^/]*/", path)
-    if runtime_match:
-        shard_test = kernel_shard_for_phase(int(runtime_match.group(1)))
-        if shard_test is not None:
-            return ([shard_test], f"kernel runtime phase {runtime_match.group(1)} ownership")
+    if path.startswith("tests/tool/freestanding/kernel/runtime/"):
+        return ([KERNEL_RUNTIME_TEST], "kernel runtime surface ownership")
 
-    if path.startswith("tests/tool/freestanding/kernel/shard") and path.endswith(".cpp"):
-        shard_digit = path.removesuffix(".cpp").split("shard")[-1]
-        if shard_digit.isdigit():
-            return ([kernel_shard_test_name(int(shard_digit))], f"kernel shard {shard_digit} owner")
+    if re.match(r"tests/tool/freestanding/kernel/phase\d+_[^/]+\.cpp$", path):
+        return ([KERNEL_RUNTIME_TEST], "kernel standalone runtime proof ownership")
 
-    if path.startswith("tests/tool/freestanding/kernel/goldens/"):
-        filename = path.rsplit("/", 1)[-1]
-        manifest_match = re.match(r"shard(\d+)\.phase_checks\.txt", filename)
-        if manifest_match:
-            return ([kernel_shard_test_name(int(manifest_match.group(1)))],
-                    f"kernel shard {manifest_match.group(1)} manifest ownership")
-        if filename.startswith("kernel_shard") and filename.endswith(".run.contains.txt"):
-            shard_digit = filename.split("kernel_shard", 1)[1].split(".", 1)[0]
-            if shard_digit.isdigit():
-                return ([kernel_shard_test_name(int(shard_digit))], f"kernel shard {shard_digit} golden ownership")
-        if filename == "phase108_manual_kernel_image.run.contains.txt":
-            return ([KERNEL_ARTIFACT_TEST], "phase108 manual relink golden ownership")
-        if filename == "phase108_kernel_manifest.contains.txt":
-            return ([kernel_shard_test_name(2)], "phase108 manifest golden ownership")
-        manifest_shard_test = manifest_backed_shard_for_kernel_golden(filename, Path.cwd())
-        if manifest_shard_test is not None:
-            return ([manifest_shard_test], f"manifest-backed kernel golden ownership for {filename}")
-        match = re.match(r"phase(\d+)_", filename)
-        if match:
-            shard_test = kernel_shard_for_phase(int(match.group(1)))
-            if shard_test is not None:
-                return ([shard_test], f"phase {match.group(1)} kernel golden ownership")
-        return (ALL_KERNEL_TESTS, "unclassified kernel golden fallback")
+    if path.startswith("tests/tool/freestanding/kernel/synthetic/"):
+        return ([KERNEL_SYNTHETIC_TEST], "kernel synthetic surface ownership")
+
+    if path.startswith("tests/tool/freestanding/kernel/docs/"):
+        return ([KERNEL_DOCS_TEST], "kernel docs descriptor ownership")
+
+    if path.startswith("tests/tool/freestanding/kernel/artifact_specs/"):
+        return ([KERNEL_ARTIFACT_TEST], "kernel artifact descriptor ownership")
 
     if path.startswith("kernel/"):
-        return ([*ALL_KERNEL_TESTS, "mc_tool_freestanding_system_unit"], "kernel ownership")
+        return ([KERNEL_RUNTIME_TEST, KERNEL_ARTIFACT_TEST, "mc_tool_freestanding_system_unit"], "kernel ownership")
 
     if path.startswith("stdlib/"):
-        return ([*ALL_KERNEL_TESTS,
+        return ([*ALL_KERNEL_SURFACE_TESTS,
                  "mc_tool_freestanding_system_unit",
                  "mc_codegen_executable_stdlib_unit",
                  "mc_check_stdlib_import_smoke"],
@@ -352,31 +279,6 @@ def iter_owned_files(source_root: Path, relative_paths: Iterable[str]) -> list[P
     return sorted(owned_files)
 
 
-def kernel_golden_inputs_for_shard(shard: int, source_root: Path) -> list[str]:
-    inputs = [f"tests/tool/freestanding/kernel/goldens/run/kernel_shard{shard}.run.contains.txt"]
-    manifest_path = kernel_manifest_path_for_shard(shard, source_root)
-    if manifest_path.exists():
-        inputs.append(PurePosixPath(manifest_path.relative_to(source_root)).as_posix())
-        inputs.extend(parse_kernel_manifest_goldens(manifest_path))
-    runtime_root = source_root / KERNEL_RUNTIME_ROOT
-    if runtime_root.exists():
-        for phase in KERNEL_SHARD_PHASES.get(shard, ()):
-            for phase_dir in sorted(runtime_root.glob(f"phase{phase}_*")):
-                if not phase_dir.is_dir():
-                    continue
-                for child in sorted(phase_dir.rglob("*")):
-                    if child.is_file():
-                        inputs.append(PurePosixPath(child.relative_to(source_root)).as_posix())
-    for phase in KERNEL_SHARD_PHASES.get(shard, ()): 
-        for subdir in ("mir", "run", "contracts"):
-            base = source_root / "tests" / "tool" / "freestanding" / "kernel" / "goldens" / subdir
-            if not base.exists():
-                continue
-            for child in sorted(base.glob(f"phase{phase}_*")):
-                inputs.append(PurePosixPath(child.relative_to(source_root)).as_posix())
-    return sorted(set(inputs))
-
-
 def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
     common_tool_inputs = [
         "tests/tool/tool_freestanding_tests.cpp",
@@ -388,21 +290,6 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "mci/",
         "tests/support/",
     ]
-
-    if test_name.startswith("mc_tool_freestanding_kernel_shard"):
-        shard_text = test_name.split("kernel_shard", 1)[1].split("_unit", 1)[0]
-        if shard_text.isdigit():
-            shard = int(shard_text)
-            inputs = [
-                f"tests/tool/freestanding/kernel/shard{shard}.cpp",
-                "tests/tool/freestanding/kernel/suite.cpp",
-                *common_tool_inputs,
-                "runtime/freestanding/",
-                "kernel/",
-                "stdlib/",
-            ]
-            inputs.extend(kernel_golden_inputs_for_shard(shard, source_root))
-            return iter_owned_files(source_root, inputs)
 
     explicit_inputs = {
         "mc_parser_fixture_unit": ["tests/parser/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "tests/support/"],
@@ -418,8 +305,24 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "mc_tool_build_state_unit": ["tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
         "mc_tool_real_project_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/", "tests/support/"],
         "mc_tool_freestanding_bootstrap_unit": ["tests/tool/freestanding/bootstrap/", *common_tool_inputs, "runtime/freestanding/", "stdlib/"],
-        KERNEL_DOCS_TEST: ["AGENTS.md", "docs/agent/prompts/repo_map.md", "tests/tool/README.md", "tests/tool/freestanding/README.md", "kernel/README.md", "tests/tool/freestanding/kernel/suite.cpp"],
-        KERNEL_ARTIFACT_TEST: ["tests/tool/freestanding/kernel/artifacts.cpp", *common_tool_inputs, "runtime/freestanding/", "kernel/", "stdlib/", "tests/tool/freestanding/kernel/goldens/run/phase108_manual_kernel_image.run.contains.txt"],
+        KERNEL_RUNTIME_TEST: [
+            "tests/tool/freestanding/kernel/suite.cpp",
+            "tests/tool/freestanding/kernel/runtime/",
+            "tests/tool/freestanding/kernel/phase97_user_entry.cpp",
+            "tests/tool/freestanding/kernel/phase98_endpoint_handle_core.cpp",
+            "tests/tool/freestanding/kernel/phase99_syscall_byte_ipc.cpp",
+            "tests/tool/freestanding/kernel/phase100_capability_transfer.cpp",
+            "tests/tool/freestanding/kernel/phase102_timer_sleep.cpp",
+            "tests/tool/freestanding/kernel/phase103_init_bootstrap_handoff.cpp",
+            "tests/tool/freestanding/kernel/phase104_kernel_critique_hardening.cpp",
+            *common_tool_inputs,
+            "runtime/freestanding/",
+            "kernel/",
+            "stdlib/",
+        ],
+        KERNEL_SYNTHETIC_TEST: ["tests/tool/freestanding/kernel/synthetic/", "tests/tool/freestanding/kernel/suite.cpp", *common_tool_inputs, "runtime/freestanding/", "stdlib/"],
+        KERNEL_DOCS_TEST: ["AGENTS.md", "docs/agent/prompts/repo_map.md", "tests/tool/README.md", "tests/tool/freestanding/README.md", "kernel/README.md", "tests/tool/freestanding/kernel/suite.cpp", "tests/tool/freestanding/kernel/docs/"],
+        KERNEL_ARTIFACT_TEST: ["tests/tool/freestanding/kernel/artifacts.cpp", "tests/tool/freestanding/kernel/artifact_specs/", *common_tool_inputs, "runtime/freestanding/", "kernel/", "stdlib/"],
         "mc_tool_freestanding_system_unit": ["tests/tool/freestanding/system/", *common_tool_inputs, "runtime/freestanding/", "kernel/", "stdlib/"],
         "mc_help_smoke": ["compiler/driver/", "compiler/support/", "README.md"],
         "mc_check_smoke": ["tests/cases/", "compiler/driver/", "compiler/support/", "compiler/parse/", "compiler/sema/", "compiler/mir/"],

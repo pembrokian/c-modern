@@ -1,0 +1,18 @@
+label = "phase145_service_restart_failure_and_usage_pressure_audit"
+phase = 145
+shard = 9
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase145_service_restart_failure_and_usage_pressure"
+build_context = "freestanding kernel phase145 service restart failure and usage pressure build"
+run_context = "freestanding kernel phase145 service restart failure and usage pressure run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_kv_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_init.mc.o", "kernel__bootstrap_services.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase145ServiceRestartFailureAndUsagePressureAudit",
+  "Function name=bootstrap_audit.build_phase145_service_restart_failure_and_usage_pressure_audit returns=[debug.Phase145ServiceRestartFailureAndUsagePressureAudit]",
+  "Function name=bootstrap_services.execute_phase145_service_restart_shell_command returns=[bootstrap_services.Phase142ShellCommandRouteResult]",
+  "Function name=debug.validate_phase145_service_restart_failure_and_usage_pressure returns=[bool]",
+]

@@ -1,0 +1,4 @@
+  TypeDecl kind=struct name=debug.Phase140SerialIngressComposedServiceGraphAudit
+  Function name=bootstrap_audit.build_phase140_serial_ingress_composed_service_graph_audit returns=[debug.Phase140SerialIngressComposedServiceGraphAudit]
+  Function name=bootstrap_services.execute_phase140_serial_ingress_composed_service_graph returns=[bootstrap_services.Phase140SerialIngressCompositionResult]
+  Function name=debug.validate_phase140_serial_ingress_composed_service_graph returns=[bool]

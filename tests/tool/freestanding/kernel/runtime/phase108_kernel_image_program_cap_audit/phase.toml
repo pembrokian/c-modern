@@ -3,9 +3,12 @@ phase = 108
 shard = 2
 project = "kernel/build.toml"
 target = "kernel"
+output_stem = "kernel_phase108_image_program_cap"
+build_context = "freestanding kernel phase108 image-and-program-cap audit build"
+run_context = "freestanding kernel phase108 image-and-program-cap audit run"
 run_golden = "expected_run.contains.txt"
 mir_golden = "expected_mir_projection.txt"
-mir_mode = "projection"
+mir_contract = "first-match-projection-v1"
 required_objects = ["_Users_ro_dev_c_modern_kernel_src_address_space.mc.o"]
 selectors = [
   "Function name=validate_phase107_user_to_user_capability_transfer returns=[bool]",

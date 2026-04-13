@@ -47,7 +47,7 @@ void RunFreestandingKernelPhase99SyscallByteIpc(const std::filesystem::path& sou
 
     ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
                                 ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase99_syscall_byte_ipc.mir.contains.txt"),
+                                                                    "runtime/legacy_goldens/phase99_syscall_byte_ipc.mir.contains.txt"),
                                 "phase99 merged MIR should preserve the syscall-byte-ipc proof slice");
 }
 

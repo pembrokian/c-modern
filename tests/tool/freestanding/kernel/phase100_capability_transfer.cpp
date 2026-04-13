@@ -47,7 +47,7 @@ void RunFreestandingKernelPhase100CapabilityTransfer(const std::filesystem::path
 
     ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
                                 ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase100_capability_transfer.mir.contains.txt"),
+                                                                    "runtime/legacy_goldens/phase100_capability_transfer.mir.contains.txt"),
                                 "phase100 merged MIR should preserve the capability-transfer proof slice");
 }
 

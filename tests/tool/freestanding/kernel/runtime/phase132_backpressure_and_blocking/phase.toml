@@ -1,0 +1,18 @@
+label = "phase132_backpressure_and_blocking"
+phase = 132
+shard = 6
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase132_backpressure"
+build_context = "freestanding kernel phase132 backpressure and blocking build"
+run_context = "freestanding kernel phase132 backpressure and blocking run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = []
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase132BackpressureAudit",
+  "Function name=syscall.perform_send_with_backpressure returns=[syscall.BackpressureSendResult]",
+  "Function name=syscall.perform_receive_with_backpressure returns=[syscall.BackpressureReceiveResult]",
+  "Function name=debug.validate_phase132_backpressure_and_blocking returns=[bool]",
+]

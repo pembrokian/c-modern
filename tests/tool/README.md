@@ -20,47 +20,30 @@ Current structure
   - `bootstrap/suite.cpp`: early freestanding bootstrap and narrow `hal`
     proof coverage.
   - `kernel/suite.cpp`: kernel freestanding orchestrator.
-  - `kernel/phase85_endpoint_queue.cpp`, `kernel/phase86_task_lifecycle.cpp`,
-    `kernel/phase87_static_data.cpp`, `kernel/phase88_build_integration.cpp`,
-    `kernel/phase97_user_entry.cpp`, `kernel/phase98_endpoint_handle_core.cpp`,
-    `kernel/phase105_real_log_service_handshake.cpp`,
-    `kernel/phase106_real_echo_service_request_reply.cpp`,
-    `kernel/phase107_real_user_to_user_capability_transfer.cpp`,
-    `kernel/phase108_kernel_image_program_cap_audit.cpp`,
-    `kernel/phase109_first_running_kernel_slice_audit.cpp`,
-      `kernel/phase110_kernel_ownership_split_audit.cpp`,
-      `kernel/phase111_scheduler_lifecycle_ownership_clarification.cpp`,
-      `kernel/phase112_syscall_boundary_thinness_audit.cpp`,
-      `kernel/phase113_interrupt_entry_and_generic_dispatch_boundary.cpp`,
-      `kernel/phase114_address_space_and_mmu_ownership_split.cpp`,
-      `kernel/phase115_timer_ownership_hardening.cpp`,
-      `kernel/phase116_mmu_activation_barrier_follow_through.cpp`,
-      `kernel/phase117_init_orchestrated_multi_service_bring_up.cpp`,
-      `kernel/phase118_request_reply_and_delegation_follow_through.cpp`,
-      `kernel/phase119_namespace_pressure_audit.cpp`,
-      `kernel/phase120_running_system_support_statement.cpp`,
-      `kernel/phase121_kernel_image_contract_hardening.cpp`,
-      `kernel/phase122_target_surface_audit.cpp`,
-      `kernel/phase123_next_plateau_audit.cpp`,
-      `kernel/phase124_delegation_chain_stress.cpp`, and
-      `kernel/phase125_invalidation_and_rejection_audit.cpp`, and
-      `kernel/phase126_authority_lifetime_classification.cpp`,
-      `kernel/phase128_service_death_observation.cpp`, and
-      `kernel/phase129_partial_failure_propagation.cpp`, and
-      `kernel/phase130_explicit_restart_or_replacement.cpp`, and
-      `kernel/phase131_fan_in_or_fan_out_composition.cpp`, and
-      `kernel/phase132_backpressure_and_blocking.cpp`, and
-      `kernel/phase133_message_lifetime_and_reuse.cpp`, and
-      `kernel/phase134_minimal_device_service_handoff.cpp`, and
-      `kernel/phase135_buffer_ownership_boundary_audit.cpp`, and
-      `kernel/phase136_device_failure_containment_probe.cpp`, and
-      `kernel/phase137_optional_dma_or_equivalent_follow_through.cpp`, and
-      `kernel/shard4.cpp`, `kernel/shard5.cpp`, `kernel/shard6.cpp`,
-      `kernel/shard7.cpp`, `kernel/shard8.cpp`, and `kernel/shard9.cpp`:
-      shard-owned late kernel runtime proofs with one build/run per shard.
+    The top-level `kernel-docs` surface now discovers documentation audits from
+    `kernel/docs/*/audit.toml`.
+    The top-level `kernel-artifacts` surface now discovers artifact audits from
+    `kernel/artifact_specs/*/artifact.toml`.
+    The top-level `kernel-runtime` surface now discovers runtime proofs from
+    `kernel/runtime/phase.../phase.toml` without shard dispatch.
+    The top-level `kernel-synthetic` surface owns the standalone phases85-88
+    proofs.
+  - `kernel/phase97_user_entry.cpp` through
+    `kernel/phase104_kernel_critique_hardening.cpp`: earlier focused
+    freestanding kernel proof files that still stand alone, with owned MIR
+    goldens under `kernel/runtime/legacy_goldens/`.
+  - `kernel/synthetic/suite.cpp`: early synthetic standalone-project proof owner for
+    phases85-88.
   - late ownership-hardening kernel audits keep checked-in kernel goldens under
-    `kernel/goldens/mir/`, `kernel/goldens/run/`, `kernel/goldens/contracts/`,
-    and `kernel/goldens/manifests/`.
+    `kernel/runtime/phase.../` for per-phase descriptors plus adjacent run/MIR
+    expectations, with earlier standalone runtime MIR goldens under
+    `kernel/runtime/legacy_goldens/` and artifact expectations under
+    `kernel/artifact_specs/.../` when needed.
+  - kernel documentation audits now live beside their descriptor files under
+    `kernel/docs/...` instead of as a handwritten assertion list.
+  - kernel artifact audits now live beside their descriptor files and support
+    files under `kernel/artifact_specs/...` instead of as a handwritten
+    assertion list.
   - `system/suite.cpp`: init, user-space policy, timer wake, and integrated-
     system coverage.
 - `tool_suite_tests.cpp` and `phase7_tool_tests.cpp`: compatibility runners
@@ -79,8 +62,9 @@ Layout rule
 Validation rule
 
 - During focused iteration, run the narrowest owning tool test target.
-- For freestanding or Canopus-facing changes, prefer the narrowest owning freestanding slice first: `mc_tool_freestanding_bootstrap_unit`, the owning kernel shard unit such as `mc_tool_freestanding_kernel_shard2_unit`, `mc_tool_freestanding_kernel_docs_unit` for phase-note and repo-map checks, or `mc_tool_freestanding_system_unit`.
-- For targeted kernel timing or one-proof debugging, run the freestanding test binary directly with a shard selector such as `build/debug/bin/mc_tool_freestanding_tests /Users/ro/dev/c_modern /Users/ro/dev/c_modern/build/debug kernel-2`.
-  The direct case selector `kernel-case:<name>` still exists for local debugging, but shard CTests are the canonical runtime surface.
+- For freestanding or Canopus-facing changes, prefer the narrowest owning freestanding surface first: `mc_tool_freestanding_bootstrap_unit`, `mc_tool_freestanding_kernel_runtime_unit`, `mc_tool_freestanding_kernel_synthetic_unit`, `mc_tool_freestanding_kernel_docs_unit`, `mc_tool_freestanding_kernel_artifacts_unit`, or `mc_tool_freestanding_system_unit`.
+- The top-level runtime/synthetic/docs/artifacts targets are the freestanding kernel workflow surfaces.
+- For targeted kernel debugging, prefer the top-level direct runtime selector such as `build/debug/bin/mc_tool_freestanding_tests /Users/ro/dev/c_modern /Users/ro/dev/c_modern/build/debug kernel-runtime:phase106_real_echo_service_request_reply`.
+  For standalone synthetic proofs, use `kernel-synthetic:<label>`.
 - For cross-cutting driver or build changes, rerun the broader tool suite set
   before closing the change.

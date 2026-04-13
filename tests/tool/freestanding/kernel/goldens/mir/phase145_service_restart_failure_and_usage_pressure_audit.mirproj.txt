@@ -1,4 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase145ServiceRestartFailureAndUsagePressureAudit
-  Function name=bootstrap_audit.build_phase145_service_restart_failure_and_usage_pressure_audit returns=[debug.Phase145ServiceRestartFailureAndUsagePressureAudit]
-  Function name=bootstrap_services.execute_phase145_service_restart_shell_command returns=[bootstrap_services.Phase142ShellCommandRouteResult]
-  Function name=debug.validate_phase145_service_restart_failure_and_usage_pressure returns=[bool]

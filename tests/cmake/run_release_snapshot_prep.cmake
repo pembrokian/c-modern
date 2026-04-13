@@ -2,6 +2,20 @@ if(NOT DEFINED SOURCE_ROOT OR NOT DEFINED BINARY_DIR)
   message(FATAL_ERROR "SOURCE_ROOT and BINARY_DIR must be defined")
 endif()
 
+function(resolve_plan_doc out_var file_name)
+  foreach(candidate
+      "${SOURCE_ROOT}/docs/plan/${file_name}"
+      "${SOURCE_ROOT}/docs/plan/active/${file_name}"
+      "${SOURCE_ROOT}/docs/plan/archive/${file_name}")
+    if(EXISTS "${candidate}")
+      set(${out_var} "${candidate}" PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+
+  message(FATAL_ERROR "could not locate plan document: ${file_name}")
+endfunction()
+
 set(HELPER "${SOURCE_ROOT}/tools/release/prepare_v0_2_snapshot.sh")
 set(REPORT_PATH "${BINARY_DIR}/release/v0.2-snapshot.txt")
 
@@ -31,7 +45,8 @@ endif()
 file(READ "${REPORT_PATH}" REPORT_CONTENT)
 file(READ "${SOURCE_ROOT}/README.md" README_CONTENT)
 file(READ "${SOURCE_ROOT}/docs/plan/release_hardening_hosted_slice.txt" RELEASE_NOTE_CONTENT)
-file(READ "${SOURCE_ROOT}/docs/plan/phase80_release_snapshot_preparation.txt" PHASE80_CONTENT)
+resolve_plan_doc(PHASE80_PATH "phase80_release_snapshot_preparation.txt")
+file(READ "${PHASE80_PATH}" PHASE80_CONTENT)
 
 require_contains("helper stdout" "${helper_stdout}" "Release snapshot candidate commit:")
 require_contains("helper stdout" "${helper_stdout}" "git -C")

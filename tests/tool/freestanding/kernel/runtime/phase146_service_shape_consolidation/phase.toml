@@ -1,0 +1,18 @@
+label = "phase146_service_shape_consolidation"
+phase = 146
+shard = 9
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase146_service_shape_consolidation"
+build_context = "freestanding kernel phase146 service shape consolidation build"
+run_context = "freestanding kernel phase146 service shape consolidation run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_shell_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_log_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_kv_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_serial_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_init.mc.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase146ServiceShapeConsolidationAudit",
+  "Function name=bootstrap_audit.build_phase146_service_shape_consolidation_audit returns=[debug.Phase146ServiceShapeConsolidationAudit]",
+  "Function name=serial_service.observe_composition returns=[serial_service.SerialCompositionObservation]",
+  "Function name=debug.validate_phase146_service_shape_consolidation returns=[bool]",
+]

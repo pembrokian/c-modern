@@ -1,4 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase146ServiceShapeConsolidationAudit
-  Function name=bootstrap_audit.build_phase146_service_shape_consolidation_audit returns=[debug.Phase146ServiceShapeConsolidationAudit]
-  Function name=serial_service.observe_composition returns=[serial_service.SerialCompositionObservation]
-  Function name=debug.validate_phase146_service_shape_consolidation returns=[bool]

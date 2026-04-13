@@ -1,0 +1,18 @@
+label = "phase144_stateful_key_value_service_follow_through"
+phase = 144
+shard = 9
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase144_stateful_key_value_service"
+build_context = "freestanding kernel phase144 stateful key-value service build"
+run_context = "freestanding kernel phase144 stateful key-value service run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_kv_service.mc.o", "kernel__bootstrap_services.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase144StatefulKeyValueServiceFollowThroughAudit",
+  "Function name=bootstrap_audit.build_phase144_stateful_key_value_service_follow_through_audit returns=[debug.Phase144StatefulKeyValueServiceFollowThroughAudit]",
+  "Function name=bootstrap_services.execute_phase144_stateful_key_value_shell_command returns=[bootstrap_services.Phase142ShellCommandRouteResult]",
+  "Function name=debug.validate_phase144_stateful_key_value_service_follow_through returns=[bool]",
+]

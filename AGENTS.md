@@ -43,6 +43,12 @@ cmake --build build/debug -j4
 ctest --test-dir build/debug --output-on-failure
 ```
 
+Explicit parallel full-suite path:
+
+```sh
+ctest --test-dir build/debug -j4 --output-on-failure
+```
+
 Useful focused commands:
 
 ```sh
@@ -77,20 +83,12 @@ Active grouped regression layout:
 - `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
 - `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
 - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
-- `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding grouped orchestrator, shard registry, and kernel metadata/doc checks
-- `tests/tool/freestanding/kernel/shard1.cpp`: shard-owned early freestanding kernel proofs for phases 85-88 plus a single-build runtime shard for phases 105-106
-- `tests/tool/freestanding/kernel/shard2.cpp`: single-build runtime shard for phases 107-111, including the kernel-image relink proof
-- `tests/tool/freestanding/kernel/shard3.cpp`: single-build runtime shard for phases 112-116
-- `tests/tool/freestanding/kernel/shard4.cpp`: single-build runtime shard for phases 117-121
-- `tests/tool/freestanding/kernel/shard5.cpp`: single-build runtime shard for phases 122-126
-- `tests/tool/freestanding/kernel/shard6.cpp`: single-build runtime shard for phases 128-132
-- `tests/tool/freestanding/kernel/shard7.cpp`: single-build runtime shard for phases 133-137
-- `tests/tool/freestanding/kernel/shard8.cpp`: single-build runtime shard for phases 140-142
-- `tests/tool/freestanding/kernel/shard9.cpp`: single-build runtime shard for phases 143-147
+- `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding grouped orchestrator for the descriptor-driven runtime surface plus the separate synthetic phases85-88 surface
+- `tests/tool/freestanding/kernel/synthetic/suite.cpp`: standalone synthetic kernel proofs for phases 85-88
 - `tests/tool/freestanding/kernel/phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof
-- late freestanding kernel audits keep shard-owned runtime checks plus `tests/tool/freestanding/kernel/goldens/{mir,run,contracts,manifests}/...` checked-in goldens when the merged MIR already carries the relevant ownership and routed-call facts; publication and phase-note checks live in the separate kernel metadata/doc suite
+- late freestanding kernel audits keep descriptor-owned runtime checks under `tests/tool/freestanding/kernel/runtime/phase.../`, earlier standalone runtime MIR goldens under `tests/tool/freestanding/kernel/runtime/legacy_goldens/`, and artifact expectations under `tests/tool/freestanding/kernel/artifact_specs/...`; synthetic, publication, and artifact checks live on their separate top-level surfaces
 - local changed-path selection now lives in `tools/select_tests.py` and the `make select-tests` wrapper; use that for narrow local iteration before wider gates
-- when adding a new freestanding kernel phase, update the owning shard `.cpp` plus its goldens first, then update `tests/tool/freestanding/kernel/suite.cpp` if the phase needs a direct `kernel-case:` entry, and only update `tools/select_tests.py` if the new phase changes shard ownership, adds a new shard, or adds a new non-shard suite surface such as docs or artifacts
+- when adding a new freestanding kernel phase, update the owned runtime descriptor directory plus its goldens first, update `tests/tool/freestanding/kernel/synthetic/` only for the separate synthetic phases85-88 surface, and update `tools/select_tests.py` only if the new phase changes top-level surface ownership or adds a new surface such as synthetic, docs, or artifacts
 - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
 - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`: compatibility runners only, not the active implementation owners
 - `tests/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation

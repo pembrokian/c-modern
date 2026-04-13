@@ -1,4 +1,3 @@
-#include <charconv>
 #include <filesystem>
 #include <string_view>
 
@@ -7,26 +6,23 @@
 
 namespace {
 
-bool ParseKernelShardSelector(std::string_view suite, int& shard) {
-	constexpr std::string_view prefix = "kernel-";
-	if (!suite.starts_with(prefix)) {
-		return false;
+bool ParseKernelRuntimeSelector(std::string_view suite, std::string_view& selector_label) {
+	constexpr std::string_view runtime_prefix = "kernel-runtime:";
+	if (suite.starts_with(runtime_prefix)) {
+		selector_label = suite.substr(runtime_prefix.size());
+		return !selector_label.empty();
 	}
-
-	const std::string_view shard_text = suite.substr(prefix.size());
-	const char* begin = shard_text.data();
-	const char* end = begin + shard_text.size();
-	return std::from_chars(begin, end, shard).ec == std::errc{} && begin != end;
+	return false;
 }
 
-bool ParseKernelCaseSelector(std::string_view suite, std::string_view& case_name) {
-	constexpr std::string_view prefix = "kernel-case:";
+bool ParseKernelSyntheticSelector(std::string_view suite, std::string_view& selector_label) {
+	constexpr std::string_view prefix = "kernel-synthetic:";
 	if (!suite.starts_with(prefix)) {
 		return false;
 	}
 
-	case_name = suite.substr(prefix.size());
-	return !case_name.empty();
+	selector_label = suite.substr(prefix.size());
+	return !selector_label.empty();
 }
 
 void RunSelectedFreestandingSuite(std::string_view suite,
@@ -45,8 +41,12 @@ void RunSelectedFreestandingSuite(std::string_view suite,
 		mc::tool_tests::RunFreestandingBootstrapToolSuite(source_root, suite_root, mc_path);
 		return;
 	}
-	if (suite == "kernel") {
+	if (suite == "kernel-runtime") {
 		mc::tool_tests::RunFreestandingKernelToolSuite(source_root, suite_root, mc_path);
+		return;
+	}
+	if (suite == "kernel-synthetic") {
+		mc::tool_tests::RunFreestandingKernelSyntheticSuite(source_root, suite_root, mc_path);
 		return;
 	}
 	if (suite == "kernel-docs") {
@@ -57,14 +57,13 @@ void RunSelectedFreestandingSuite(std::string_view suite,
 		mc::tool_tests::RunFreestandingKernelArtifactSuite(source_root, suite_root, mc_path);
 		return;
 	}
-	int kernel_shard = 0;
-	if (ParseKernelShardSelector(suite, kernel_shard)) {
-		mc::tool_tests::RunFreestandingKernelToolSuiteShard(source_root, suite_root, mc_path, kernel_shard);
+	std::string_view selector_label;
+	if (ParseKernelRuntimeSelector(suite, selector_label)) {
+		mc::tool_tests::RunFreestandingKernelRuntimePhaseCase(source_root, suite_root, mc_path, selector_label, "kernel-runtime");
 		return;
 	}
-	std::string_view kernel_case_name;
-	if (ParseKernelCaseSelector(suite, kernel_case_name)) {
-		mc::tool_tests::RunFreestandingKernelToolSuiteCase(source_root, suite_root, mc_path, kernel_case_name);
+	if (ParseKernelSyntheticSelector(suite, selector_label)) {
+		mc::tool_tests::RunFreestandingKernelSyntheticSuiteCase(source_root, suite_root, mc_path, selector_label);
 		return;
 	}
 	if (suite == "system") {
@@ -72,14 +71,17 @@ void RunSelectedFreestandingSuite(std::string_view suite,
 		return;
 	}
 
-	mc::test_support::Fail("unknown freestanding suite selector: " + std::string(suite));
+	mc::test_support::Fail("unknown freestanding suite selector: " + std::string(suite) +
+					  " (supported kernel selectors: kernel-runtime, kernel-runtime:<label>, kernel-synthetic, kernel-synthetic:<label>, kernel-docs, kernel-artifacts)");
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
 	if (argc != 3 && argc != 4) {
-		mc::test_support::Fail("expected source root, binary root, and optional freestanding suite selector");
+		mc::test_support::Fail(
+			"expected source root, binary root, and optional freestanding suite selector "
+			"(for example: kernel-runtime, kernel-runtime:<label>, kernel-synthetic, kernel-synthetic:<label>, kernel-docs, kernel-artifacts)");
 	}
 
 	const std::filesystem::path source_root = argv[1];

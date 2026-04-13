@@ -1,0 +1,19 @@
+label = "phase135_buffer_ownership_boundary_audit"
+phase = 135
+shard = 7
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase135_buffer_ownership_boundary"
+build_context = "freestanding kernel phase135 buffer ownership boundary build"
+run_context = "freestanding kernel phase135 buffer ownership boundary run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_uart.mc.o", "_Users_ro_dev_c_modern_kernel_src_serial_service.mc.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase135BufferOwnershipAudit",
+  "Function name=ipc.publish_runtime_frame returns=[ipc.RuntimePublishResult]",
+  "Function name=uart.stage_receive_frame returns=[uart.UartDevice]",
+  "Function name=bootstrap_services.execute_serial_service_receive returns=[bootstrap_services.SerialServiceExecutionResult]",
+  "Function name=debug.validate_phase135_buffer_ownership_boundary returns=[bool]",
+]

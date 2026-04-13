@@ -38,7 +38,8 @@ struct FreestandingKernelPhaseCheck {
     std::string_view expected_run_lines_file;
     std::span<const std::string_view> required_object_files;
     std::span<const std::string_view> mir_selectors;
-    std::string_view expected_mir_projection_file;
+    std::string_view expected_mir_contract_file;
+    std::string_view mir_contract;
 };
 
 struct FreestandingKernelRuntimePhaseDescriptor {
@@ -46,17 +47,43 @@ struct FreestandingKernelRuntimePhaseDescriptor {
     int shard = 0;
     std::string project;
     std::string target;
-    std::string mir_mode;
+    std::string output_stem;
+    std::string build_context;
+    std::string run_context;
+    std::string mir_contract;
     std::string label;
     std::string expected_run_lines_file;
     std::vector<std::string> required_object_file_storage;
     std::vector<std::string_view> required_object_files;
     std::vector<std::string> mir_selector_storage;
     std::vector<std::string_view> mir_selectors;
-    std::string expected_mir_projection_file;
+    std::string expected_mir_contract_file;
 
     void RefreshViews();
     FreestandingKernelPhaseCheck View() const;
+};
+
+struct FreestandingKernelTextAuditDescriptor {
+    std::string label;
+    std::string source_file;
+    std::string context;
+    std::vector<std::string> expected_contains;
+};
+
+struct FreestandingKernelArtifactAuditDescriptor {
+    std::filesystem::path descriptor_dir;
+    std::string label;
+    std::string kind;
+    std::string project_name;
+    std::string output_stem;
+    std::string build_context;
+    std::string run_context;
+    std::string expected_run_lines_file;
+    std::string source_file;
+    std::string main_source_file;
+    std::string driver_support_source_file;
+    std::string manual_support_source_file;
+    int expected_exit_code = 0;
 };
 
 FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::filesystem::path& source_root);
@@ -67,6 +94,42 @@ std::filesystem::path ResolveFreestandingKernelGoldenPath(const std::filesystem:
 std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadFreestandingKernelRuntimePhaseDescriptors(
     const std::filesystem::path& source_root,
     int shard);
+
+std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadAllFreestandingKernelRuntimePhaseDescriptors(
+    const std::filesystem::path& source_root);
+
+std::vector<FreestandingKernelTextAuditDescriptor> LoadFreestandingKernelTextAuditDescriptors(
+    const std::filesystem::path& source_root,
+    std::string_view relative_root,
+    std::string_view descriptor_file_name);
+
+std::vector<FreestandingKernelArtifactAuditDescriptor> LoadFreestandingKernelArtifactAuditDescriptors(
+    const std::filesystem::path& source_root);
+
+bool FreestandingKernelCaseNameMatchesExpectedRunFile(std::string_view expected_run_lines_file,
+                                                      std::string_view case_name);
+
+const FreestandingKernelRuntimePhaseDescriptor& RequireFreestandingKernelRuntimePhaseDescriptor(
+    const std::vector<FreestandingKernelRuntimePhaseDescriptor>& phase_checks,
+    std::string_view expected_run_lines_file,
+    std::string_view context_label);
+
+const FreestandingKernelRuntimePhaseDescriptor* FindFreestandingKernelRuntimePhaseDescriptorForCase(
+    std::span<const FreestandingKernelRuntimePhaseDescriptor> phase_checks,
+    std::string_view case_name);
+
+void RunFreestandingKernelRuntimePhaseCase(const std::filesystem::path& source_root,
+                                           const std::filesystem::path& binary_root,
+                                           const std::filesystem::path& mc_path,
+                                           int shard,
+                                           std::string_view case_name,
+                                           std::string_view context_label);
+
+void RunFreestandingKernelRuntimePhaseCase(const std::filesystem::path& source_root,
+                                           const std::filesystem::path& binary_root,
+                                           const std::filesystem::path& mc_path,
+                                           std::string_view case_name,
+                                           std::string_view context_label);
 
 std::filesystem::path ResolveCanopusRoadmapPath(const std::filesystem::path& source_root,
                                                 int phase_number);
@@ -237,10 +300,9 @@ void RunFreestandingKernelToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
                                     const std::filesystem::path& mc_path);
 
-void RunFreestandingKernelToolSuiteShard(const std::filesystem::path& source_root,
+void RunFreestandingKernelSyntheticSuite(const std::filesystem::path& source_root,
                                          const std::filesystem::path& binary_root,
-                                         const std::filesystem::path& mc_path,
-                                         int shard);
+                                         const std::filesystem::path& mc_path);
 
 void RunFreestandingKernelMetadataSuite(const std::filesystem::path& source_root,
                                         const std::filesystem::path& binary_root,
@@ -250,10 +312,10 @@ void RunFreestandingKernelArtifactSuite(const std::filesystem::path& source_root
                                         const std::filesystem::path& binary_root,
                                         const std::filesystem::path& mc_path);
 
-void RunFreestandingKernelToolSuiteCase(const std::filesystem::path& source_root,
-                                        const std::filesystem::path& binary_root,
-                                        const std::filesystem::path& mc_path,
-                                        std::string_view case_name);
+void RunFreestandingKernelSyntheticSuiteCase(const std::filesystem::path& source_root,
+                                             const std::filesystem::path& binary_root,
+                                             const std::filesystem::path& mc_path,
+                                             std::string_view case_name);
 
 void RunFreestandingSystemToolSuite(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,

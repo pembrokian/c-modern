@@ -1,0 +1,19 @@
+label = "phase134_minimal_device_service_handoff"
+phase = 134
+shard = 7
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase134_minimal_device_service_handoff"
+build_context = "freestanding kernel phase134 minimal device-service handoff build"
+run_context = "freestanding kernel phase134 minimal device-service handoff run"
+run_golden = "expected_run.contains.txt"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_uart.mc.o", "_Users_ro_dev_c_modern_kernel_src_serial_service.mc.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase134MinimalDeviceServiceHandoffAudit",
+  "Function name=ipc.publish_runtime_byte returns=[ipc.RuntimePublishResult]",
+  "Function name=uart.handle_receive_interrupt returns=[uart.UartInterruptResult]",
+  "Function name=bootstrap_services.execute_serial_service_receive_and_exit returns=[bootstrap_services.SerialServiceExecutionResult]",
+  "Function name=debug.validate_phase134_minimal_device_service_handoff returns=[bool]",
+]

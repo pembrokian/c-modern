@@ -47,7 +47,7 @@ void RunFreestandingKernelPhase97UserEntryProof(const std::filesystem::path& sou
 
     ExpectTextContainsLinesFile(ReadFile(dump_targets.mir),
                                 ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    "phase97_user_entry.mir.contains.txt"),
+                                                                    "runtime/legacy_goldens/phase97_user_entry.mir.contains.txt"),
                                 "phase97 merged MIR should preserve the user-entry proof slice");
 }
 

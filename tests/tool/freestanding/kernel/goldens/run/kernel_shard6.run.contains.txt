@@ -1,5 +1,0 @@
-PASS phase128_service_death_observation
-PASS phase129_partial_failure_propagation
-PASS phase130_explicit_restart_or_replacement
-PASS phase131_fan_in_or_fan_out_composition
-PASS phase132_backpressure_and_blocking

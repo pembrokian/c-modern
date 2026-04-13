@@ -2,6 +2,20 @@ if(NOT DEFINED MC OR NOT DEFINED SOURCE_ROOT OR NOT DEFINED BINARY_DIR)
   message(FATAL_ERROR "MC, SOURCE_ROOT, and BINARY_DIR must be defined")
 endif()
 
+function(resolve_plan_doc out_var file_name)
+  foreach(candidate
+      "${SOURCE_ROOT}/docs/plan/${file_name}"
+      "${SOURCE_ROOT}/docs/plan/active/${file_name}"
+      "${SOURCE_ROOT}/docs/plan/archive/${file_name}")
+    if(EXISTS "${candidate}")
+      set(${out_var} "${candidate}" PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+
+  message(FATAL_ERROR "could not locate plan document: ${file_name}")
+endfunction()
+
 function(run_phase_script label)
   set(options)
   set(oneValueArgs SCRIPT)
@@ -31,7 +45,8 @@ run_phase_script(
 
 file(READ "${SOURCE_ROOT}/README.md" README_CONTENT)
 file(READ "${SOURCE_ROOT}/docs/plan/release_hardening_hosted_slice.txt" RELEASE_NOTE_CONTENT)
-file(READ "${SOURCE_ROOT}/docs/plan/phase79_v0_2_gate.txt" PHASE79_CONTENT)
+resolve_plan_doc(PHASE79_PATH "phase79_v0_2_gate.txt")
+file(READ "${PHASE79_PATH}" PHASE79_CONTENT)
 
 function(require_contains label content needle)
   string(FIND "${content}" "${needle}" found_index)
