@@ -1,0 +1,166 @@
+Phase 153 -- Service Composition Shape Audit
+============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 152 controlled-variation step by measuring
+whether the current services compose honestly through explicit owner-local
+glue or are starting to accumulate framework-like translation pressure.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded composition-audit phase over the admitted interactive
+service slice and its chosen Phase 152 variation.
+It does not claim a broker, orchestration framework, dynamic routing, or a
+general service platform.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
+- `docs/plan/active/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository now has one extracted service shape and one planned
+  stability-under-variation discriminator.
+- The next likely failure mode is not raw correctness. It is glue growth:
+  repeated adapters, translation helpers, or implicit conventions that begin
+  to act like a hidden framework.
+- If that pressure is not classified now, later work could mistake
+  composition pain for permission to add orchestration machinery.
+
+Problem being solved
+--------------------
+- Cross-service composition is valuable only if it remains explicit about who
+  owns request interpretation, reply construction, and failure visibility.
+- Without one bounded composition audit, the repository could widen into more
+  service graph complexity before deciding whether explicit composition is
+  still the honest model.
+- The repository therefore needs one explicit Phase 153 note that measures
+  whether the current system can compose without glue explosion and, if not,
+  names the smallest honest composition primitive candidate.
+
+Core rule
+---------
+- Audit composition pressure; do not answer it with a framework by default.
+- If composition remains explicit and understandable, keep it explicit.
+- If composition does not remain honest, admit at most one tightly bounded
+  primitive and only after concrete glue repetition is shown.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless repeated composition pressure proves one narrow owner
+  gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 153 execution note defining the composition-audit
+   boundary
+2. one explicit inventory of the current cross-service glue paths over the
+   admitted system and its chosen variation
+3. one classification of whether each repeated adapter or translation path is
+   owner-local, accidental, or evidence for one minimal primitive
+4. one audit-owned proof over at least one awkward composition path
+5. one explicit conclusion stating whether explicit composition remains the
+   honest model
+
+Why this is the right next step
+-------------------------------
+- It tests the extracted pattern under deeper structural pressure without
+  adding broader platform scope.
+- It forces the repository to distinguish honest explicit glue from hidden
+  framework creep.
+- It creates a cleaner handoff into identity and temporal work by making the
+  composition boundary visible first.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase153_service_composition_shape_audit.txt`
+   - publish the canonical Phase 153 execution note
+
+2. `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
+   - provide the variation context used to judge composition honesty
+
+3. `kernel/src/bootstrap_services/`
+   - remain the primary owner-local composition surface and the first place to
+     detect glue growth
+
+4. `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`,
+   `kernel/src/kv_service.mc`, and any Phase 152 variation owner
+   - expose the current request, reply, and service-to-service composition
+     seams directly
+
+5. `kernel/src/init.mc` and `kernel/src/main.mc`
+   - keep boot wiring explicit and prevent orchestration pressure from being
+     hidden at the root
+
+6. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that classifies repeated glue and rejects hidden
+     conventions
+
+7. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 153 regression plus one projected MIR golden over
+     the admitted composition boundary
+
+Deliverables
+------------
+- one canonical Phase 153 execution note in `docs/plan/active/`
+- one explicit inventory of cross-service glue paths
+- one classification of composition pressure and one conclusion about whether
+  explicit composition remains sufficient
+- one audit-owned Phase 153 proof over at least one awkward composition path
+- one focused freestanding regression plus projected MIR golden for the Phase
+  153 boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 153 rule in docs: composition audit, no framework wave.
+2. Enumerate the current cross-service glue paths over the landed and varied
+   system.
+3. Classify which paths are honest owner-local glue and which are repeated
+   enough to count as structural pressure.
+4. If necessary, test one minimal primitive candidate against the explicit
+   no-hidden-generalization rule.
+5. Add the audit and projected MIR proof over the chosen composition
+   boundary.
+6. Advance the kernel proof marker to 153 only after docs, audit, and tests
+   agree on the same composition conclusion.
+
+Preferred proof points
+----------------------
+1. The repository can point to concrete repeated glue rather than vague
+   discomfort.
+2. Explicit composition is either affirmed as the honest model or rejected
+   for one narrow and stated reason.
+3. No broker, orchestration framework, or hidden routing layer appears.
+4. One projected MIR proof shows the composition boundary remains explicit in
+   the real artifact.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 153 note defining the
+  composition-audit boundary
+- the real kernel artifact builds and runs to a Phase 153 marker
+- at least one awkward composition path is audited concretely
+- the repository publishes one explicit conclusion about whether explicit
+  composition remains sufficient or one minimal primitive is justified
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 153 boundary
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding a broker, router, orchestration framework, or service mesh
+- widening the command surface just to create more composition cases
+- hiding repeated glue behind implicit conventions or callback tables
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

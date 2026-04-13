@@ -1,0 +1,157 @@
+Phase 158 -- Cross-Service Failure Semantics Consistency
+========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 157 long-lived coherence audit by checking
+whether the admitted services expose failure, loss, retry, and reset truth in
+ways that remain understandable and consistent across service boundaries.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded cross-service failure-semantics phase over the current
+service system.
+It does not claim a recovery framework, kernel-owned retry policy, or service
+supervision platform.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/active/phase157_long_lived_system_coherence_audit.txt`
+- `docs/plan/active/phase159_observability_as_a_system_property.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has one bounded restart contract and a sequence of
+  service-local failure truths.
+- That does not yet prove that a user can understand what happened when
+  different services fail under the same small system.
+- The next honest risk is a system where each service is locally correct but
+  failure remains inconsistent and difficult to reason about across service
+  boundaries.
+
+Problem being solved
+--------------------
+- Failure becomes a first-class system property only when users can tell what
+  was lost, what can be retried, and what was reset without guessing.
+- Without one bounded cross-service failure phase, later scope could grow on
+  top of inconsistent error and retry meaning.
+- The repository therefore needs one explicit Phase 158 note that compares
+  visible failure contracts across admitted services and classifies where they
+  are aligned or divergent.
+
+Core rule
+---------
+- Compare visible failure semantics across services; do not normalize mismatch
+  with a hidden framework.
+- If services differ intentionally, state why.
+- If services differ accidentally, record the inconsistency directly.
+- Keep retry, loss, and reset meaning user-visible and owner-local.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless repeated cross-service mismatch proves one narrow
+  owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 158 execution note defining the cross-service failure
+   comparison boundary
+2. one explicit comparison of failure, loss, retry, and reset semantics over
+   the admitted service set
+3. one classification of which differences are intentional and which are not
+4. one audit-owned proof over at least one cross-service failure mismatch or
+   alignment case
+5. one explicit conclusion ruling out recovery-framework growth in this phase
+
+Why this is the right next step
+-------------------------------
+- It converts system-level failure understanding into concrete evidence before
+  later expansion depends on it.
+- It tests whether the current model is understandable under failure without
+  inventing a supervisor.
+- It prepares the later observability phase by first deciding what failure
+  truth the system must actually explain.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase158_cross_service_failure_semantics_consistency.txt`
+   - publish the canonical Phase 158 execution note
+
+2. `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`,
+   `kernel/src/kv_service.mc`, and any admitted Phase 152 variation owner
+   - expose the failure, retry, and reset consequences that the phase must
+     compare
+
+3. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
+   - keep restart and orchestration policy explicit while cross-service
+     failure meaning is audited
+
+4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path over at least one cross-service failure comparison
+
+5. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 158 regression plus one projected MIR golden over
+     the cross-service failure boundary
+
+Deliverables
+------------
+- one canonical Phase 158 execution note in `docs/plan/active/`
+- one explicit comparison of visible failure semantics across the admitted
+  service set
+- one classification of intentional versus accidental failure-contract
+  differences
+- one audit-owned Phase 158 proof over at least one cross-service failure
+  case
+- one focused freestanding regression plus projected MIR golden for the Phase
+  158 boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 158 rule in docs: compare failure meaning, no recovery
+   framework wave.
+2. Enumerate the visible failure, retry, and reset consequences already
+   exposed by the admitted services.
+3. Compare them directly and classify intentional versus accidental
+   differences.
+4. Add one audit path over the most useful mismatch or alignment case.
+5. Advance the kernel proof marker to 158 only after docs, audit, and tests
+   agree on the same cross-service failure boundary.
+
+Preferred proof points
+----------------------
+1. The repository can show what was lost and what can be retried without
+   guessing.
+2. At least one cross-service failure difference is classified concretely.
+3. No hidden retry framework or kernel-owned recovery policy appears.
+4. One projected MIR proof shows the same bounded failure comparison in the
+   real artifact.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 158 note defining the
+  cross-service failure comparison boundary
+- the real kernel artifact builds and runs to a Phase 158 marker
+- visible failure semantics are compared across the admitted service set
+- at least one intentional or accidental difference is classified explicitly
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 158 boundary
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding a recovery framework, supervisor, or automatic retry layer
+- widening into durable failure logging or persistence platforms
+- turning error reporting into a general policy subsystem
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

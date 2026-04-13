@@ -1,0 +1,153 @@
+Phase 154 -- Service Identity And Addressing Semantics
+======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 153 composition audit by making the current
+service identity and addressing rules explicit across fixed wiring and fixed
+restart behavior, before the repository widens into discovery or dynamic
+binding work.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded identity-and-addressing clarification phase over the
+admitted service system.
+It does not claim dynamic discovery, a registry, dynamic rebinding, remote
+IPC, or a namespace platform.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/active/phase153_service_composition_shape_audit.txt`
+- `docs/plan/active/phase155_temporal_semantics_and_backpressure_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already relies on fixed service wiring, explicit handles, and
+  one bounded restart model.
+- That is enough to build and rebuild the current system, but not enough to
+  leave service identity and address meaning implicit.
+- If identity semantics remain folklore, later restart, multi-client, and
+  temporal work will lack a stable reference model.
+
+Problem being solved
+--------------------
+- The repository needs an explicit answer to what it means to refer to a
+  service across time in the current model.
+- Without one bounded identity phase, later work could accidentally mix
+  positional wiring, capability possession, and service naming into an
+  unstable informal contract.
+- The repository therefore needs one explicit Phase 154 note that states what
+  remains stable across fixed restart, what must be reacquired, and which
+  identity assumptions are part of the admitted model.
+
+Core rule
+---------
+- Clarify the current model; do not widen it.
+- Identity semantics must be written in terms of the existing fixed-wiring and
+  explicit-authority model rather than by importing discovery machinery.
+- If a current identity assumption is relied upon, name it explicitly.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless the clarification proves one narrow owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 154 execution note defining the current identity and
+   addressing model
+2. one explicit statement of which service references are positional,
+   capability-derived, shell-routed, or otherwise fixed by the admitted system
+3. one explicit statement of what survives restart and what does not
+4. one audit-owned proof over at least one identity or addressing awkwardness
+5. one explicit conclusion ruling out discovery or registry work in this
+   phase
+
+Why this is the right next step
+-------------------------------
+- It converts one implicit dependency of the current system into an auditable
+  contract.
+- It sharpens the later temporal, multi-client, and failure-semantics phases
+  by giving them explicit service-reference meaning.
+- It prevents later pressure from being misdiagnosed as a discovery problem
+  before the fixed model is even named.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase154_service_identity_and_addressing_semantics.txt`
+   - publish the canonical Phase 154 execution note
+
+2. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
+   - expose the fixed-wiring paths and root-owned boot assumptions that define
+     the current service-reference model
+
+3. `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`,
+   `kernel/src/kv_service.mc`, and any admitted Phase 152 variation owner
+   - expose the service-local identity and addressing expectations that the
+     phase must classify
+
+4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that checks identity or addressing claims against the
+     real fixed-wiring implementation
+
+5. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 154 regression plus one projected MIR golden over
+     the identity-and-addressing boundary
+
+Deliverables
+------------
+- one canonical Phase 154 execution note in `docs/plan/active/`
+- one explicit current-model statement for service identity and addressing
+- one audit-owned Phase 154 proof over at least one identity or restart-time
+  addressing awkwardness
+- one focused freestanding regression plus projected MIR golden for the Phase
+  154 boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 154 rule in docs: clarify fixed identity, no discovery
+   wave.
+2. Enumerate the identity assumptions already relied on by boot wiring,
+   shell routing, and explicit handle flow.
+3. Classify what remains stable across restart and what must be reacquired.
+4. Add one audit path over the most ambiguous current identity edge.
+5. Advance the kernel proof marker to 154 only after docs, audit, and tests
+   agree on the same current-model contract.
+
+Preferred proof points
+----------------------
+1. The repository names at least one previously implicit identity assumption
+   explicitly.
+2. Restart-time stability versus reacquisition is stated clearly.
+3. Discovery, registry, and rebinding work remain ruled out in this phase.
+4. One projected MIR proof shows the fixed-wiring identity model remains
+   explicit in the real artifact.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 154 note defining the admitted
+  identity and addressing model
+- the real kernel artifact builds and runs to a Phase 154 marker
+- the phase states what survives restart and what must be reacquired
+- one audit validates at least one identity or addressing claim over the real
+  kernel artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 154 boundary
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding discovery, service registries, or dynamic rebinding
+- widening into network identity, remote addressing, or distributed naming
+- turning the shell into a namespace authority or policy engine
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

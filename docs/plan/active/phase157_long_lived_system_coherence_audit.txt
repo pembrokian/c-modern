@@ -1,0 +1,158 @@
+Phase 157 -- Long-Lived System Coherence Audit
+==============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 156 multi-client interaction audit by
+measuring whether the admitted service meanings remain coherent over longer
+running use rather than only across one restart or one short interaction
+window.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded long-lived coherence phase over the current fixed
+service model.
+It does not claim persistence expansion, a service supervisor, or lifecycle
+framework growth.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/active/phase156_multi_client_interaction_audit.txt`
+- `docs/plan/active/phase158_cross_service_failure_semantics_consistency.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already proves one bounded restart contract and plans to
+  expose interleaving pressure.
+- That still does not answer whether the system stays semantically coherent
+  after many interactions, repeated state changes, or repeated observation.
+- The next honest risk is a system that can restart correctly but drifts into
+  confusing long-lived behavior.
+
+Problem being solved
+--------------------
+- Long-lived use can expose semantic drift that short proof paths do not:
+  stale logs, misleading observation, state accumulation surprises, or
+  restart meaning that changes after many interactions.
+- Without one bounded coherence phase, later platform decisions could be made
+  on top of a system whose long-running meaning is still unstable.
+- The repository therefore needs one explicit Phase 157 note that defines one
+  long-lived interaction slice and audits whether system meaning remains
+  coherent over time.
+
+Core rule
+---------
+- Audit semantic coherence over time; do not answer it by adding new
+  persistence or supervision layers.
+- If long-lived use reveals drift, record the drift directly rather than
+  hiding it behind more instrumentation.
+- Keep long-lived coherence framed in user-visible terms, not only internal
+  counters or implementation detail.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless long-lived pressure proves one narrow owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 157 execution note defining the long-lived coherence
+   boundary
+2. one bounded long-lived interaction slice over admitted service state,
+   observation, and restart meaning
+3. one explicit classification of whether logs, retained state, and restart
+   consequences remain coherent over time
+4. one audit-owned proof over the chosen long-lived scenario
+5. one explicit conclusion ruling out persistence or supervision growth in
+   this phase
+
+Why this is the right next step
+-------------------------------
+- It turns a subtle systems risk into concrete evidence before broader scope
+  makes it harder to isolate.
+- It tests whether the current model can remain meaningful over time, not
+  only whether it can pass a short scenario.
+- It prepares the next failure-semantics phase by making steady-state meaning
+  explicit first.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase157_long_lived_system_coherence_audit.txt`
+   - publish the canonical Phase 157 execution note
+
+2. `kernel/src/log_service.mc`, `kernel/src/kv_service.mc`,
+   `kernel/src/shell_service.mc`, and any admitted Phase 152 variation owner
+   - expose the retained-state and observation boundaries that the phase must
+     audit over longer-running use
+
+3. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
+   - keep orchestration, restart, and long-lived scenario wiring explicit
+
+4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path over the chosen long-lived interaction slice
+
+5. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 157 regression plus one projected MIR golden over
+     the long-lived coherence boundary
+
+Deliverables
+------------
+- one canonical Phase 157 execution note in `docs/plan/active/`
+- one bounded long-lived interaction slice over admitted service state and
+  observation
+- one explicit classification of whether system meaning remains coherent over
+  time
+- one audit-owned Phase 157 proof over the chosen long-lived scenario
+- one focused freestanding regression plus projected MIR golden for the Phase
+  157 boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 157 rule in docs: long-lived coherence, no persistence
+   wave.
+2. Choose one bounded long-lived interaction slice that exercises retained
+   state, observation, and restart meaning.
+3. Implement only the owner-local wiring required for that scenario.
+4. Audit whether the resulting system meaning stays coherent after repeated
+   interaction.
+5. Advance the kernel proof marker to 157 only after docs, audit, and tests
+   agree on the same long-lived boundary.
+
+Preferred proof points
+----------------------
+1. The repository can point to one concrete long-lived interaction slice.
+2. System meaning over time is described in user-visible terms.
+3. Any semantic drift is recorded directly rather than hidden behind more
+   machinery.
+4. One projected MIR proof shows the same bounded long-lived scenario in the
+   real artifact.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 157 note defining the chosen
+  long-lived interaction slice
+- the real kernel artifact builds and runs to a Phase 157 marker
+- at least one long-lived scenario is audited concretely over retained state
+  and observation
+- the phase publishes one explicit conclusion about whether system meaning
+  remains coherent over time
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 157 boundary
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding persistence, durability, or recovery frameworks
+- adding a service supervisor or lifecycle platform
+- widening into general metrics collection or observability platforms
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

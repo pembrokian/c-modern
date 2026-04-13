@@ -1,0 +1,181 @@
+Phase 152 -- Pattern Stability Under One Controlled Variation
+=============================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the completed Phase 151 main-file simplification by testing
+whether the extracted shell-plus-log-plus-key-value system pattern survives
+one small controlled variation before the repository widens into broader
+subsystem work.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded variation phase over the landed interactive-service
+slice.
+It does not claim a new platform wave, a service framework, dynamic
+discovery, a broker, or immediate filesystem, networking, or scheduling
+growth.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/active/phase150_one_system_rebuilt_cleanly.txt`
+- `docs/plan/active/phase151_complete_main_simplification.txt`
+- `docs/plan/active/phase153_service_composition_shape_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 146 through Phase 151 extracted one honest service shape, audited IPC
+  and authority reuse, formalized restart truth, rebuilt the same system more
+  cleanly, and reduced `kernel/src/main.mc` to a thin orchestrator.
+- That result is necessary but not sufficient. It proves one small system can
+  be built twice more cleanly; it does not yet prove the extracted pattern is
+  stable when the system is slightly different.
+- The next honest risk is treating a cleaned-up special case as a general
+  system model.
+
+Problem being solved
+--------------------
+- A repeatable pattern is only convincing if it survives one small,
+  intentional difference.
+- Without a bounded variation phase, later work could widen into more
+  services or more platform scope without proving whether the current pattern
+  generalizes at all.
+- The repository therefore needs one explicit Phase 152 note that admits one
+  controlled variation, states why that variation is the smallest useful
+  discriminator, and classifies the first pattern break honestly if one
+  appears.
+
+Core rule
+---------
+- Vary one thing, not many.
+- The chosen variation must be small enough that any new awkwardness remains
+  attributable to one concrete difference rather than to simultaneous system
+  growth.
+- No hidden generalization: if this phase admits a helper, the helper must
+  remove concrete duplication without hiding ownership, failure, or policy.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless the variation proves one narrow owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 152 execution note defining the allowed controlled
+   variation envelope
+2. one explicit statement of why the chosen variation is the smallest useful
+   discriminator of pattern stability
+3. one implementation slice that introduces exactly one variation axis over
+   the landed shell-plus-log-plus-key-value system
+4. one audit-owned proof that classifies what parts of the extracted pattern
+   survive unchanged and what parts become newly awkward
+5. one explicit outcome statement that names whether the current pattern
+   generalizes, partially generalizes, or fails under the chosen difference
+
+Why this is the right next step
+-------------------------------
+- It preserves the discipline of the earlier extraction wave by forcing one
+  evidence-bearing difference instead of speculative breadth.
+- It creates a falsifiable check for whether the current service pattern is
+  real or only locally tidy.
+- It gives later composition, identity, and temporal phases a stable baseline
+  for comparing new awkwardness.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
+   - publish the canonical Phase 152 execution note
+
+2. `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+   - keep the speculative roadmap aligned with the concrete Phase 152
+     discriminator
+
+3. `kernel/src/bootstrap_services/`
+   - host the smallest owner-local workflow changes required by the chosen
+     variation without turning the rebuild helpers into a framework
+
+4. `kernel/src/serial_service.mc`, `kernel/src/shell_service.mc`,
+   `kernel/src/log_service.mc`, and `kernel/src/kv_service.mc`
+   - remain the primary reference owners for deciding which parts of the
+     extracted pattern survive unchanged
+
+5. one additional owner-local service or workflow surface only if the chosen
+   variation requires it
+   - keep any new owner explicit and bounded to the selected variation axis
+
+6. `kernel/src/init.mc` and `kernel/src/main.mc`
+   - keep boot wiring and orchestration explicit while the variation remains
+     small and attributable
+
+7. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path that names the surviving pattern elements and the
+     first exposed awkwardness without hiding it behind abstraction
+
+8. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 152 regression plus one projected MIR golden over
+     the chosen variation boundary
+
+Deliverables
+------------
+- one canonical Phase 152 execution note in `docs/plan/active/`
+- one explicit chosen-variation statement and rationale
+- one bounded implementation slice introducing exactly one variation axis
+- one audit-owned Phase 152 proof over the chosen variation
+- one focused freestanding regression plus projected MIR golden for the Phase
+  152 boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 152 rule in docs: one small variation, no breadth wave.
+2. Choose the variation axis and write down why it is the smallest useful
+   discriminator.
+3. Implement only the owner-local changes required by that one variation.
+4. Audit which parts of the extracted service pattern survive unchanged.
+5. Record the first new awkwardness explicitly rather than normalizing it.
+6. Advance the kernel proof marker to 152 only after docs, audit, and tests
+   agree on the same variation boundary.
+
+Preferred proof points
+----------------------
+1. The repository can point to one precise variation and explain why it is
+   sufficient.
+2. The current service pattern either survives or fails in a way that is
+   explicit and attributable.
+3. Any admitted helper remains owner-local and does not behave like a hidden
+   framework.
+4. One projected MIR proof shows the real artifact still exposes one bounded
+   variation rather than an accidental expansion wave.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 152 note choosing one
+  controlled variation and ruling out breadth-driven growth
+- the real kernel artifact builds and runs to a Phase 152 marker
+- the implementation introduces exactly one variation axis over the landed
+  small system
+- one audit names which extracted pattern elements survive and which new
+  awkwardness appears
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 152 boundary
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding several new services at once
+- using Phase 152 as a pretext for a broker, registry, framework, or runtime
+  layer
+- widening into filesystem, networking, broader scheduling, or multicore work
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

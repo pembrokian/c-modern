@@ -1,0 +1,159 @@
+Phase 155 -- Temporal Semantics And Backpressure Audit
+======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 154 identity clarification by making the
+current ordering, delay, queue-pressure, and user-visible backpressure truth
+explicit before the repository widens into scheduling or async abstractions.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded temporal-semantics audit over the admitted service
+system.
+It does not claim a scheduler rewrite, an async framework, dynamic queue
+growth, or broader timing policy.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase132_backpressure_and_blocking_audit.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/active/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/active/phase156_multi_client_interaction_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Earlier IPC and restart work already exposed hints of repeated queue and
+  ordering pressure, but only within the first small interactive system.
+- The extracted pattern is not stable enough for broader use until the
+  repository can say which temporal behaviors are guaranteed and which are
+  merely accidental current behavior.
+- The next honest risk is allowing ordering and delay semantics to remain
+  informal until they break under pressure.
+
+Problem being solved
+--------------------
+- Services now have enough real interaction for ordering, reply timing, and
+  queue pressure to become user-visible concerns.
+- Without one bounded temporal phase, later multi-client or fairness pressure
+  could reopen the model before the current system has even stated its time
+  truth.
+- The repository therefore needs one explicit Phase 155 note that names the
+  current ordering guarantees, delayed-reply consequences, and visible
+  backpressure behavior without turning time pressure into a scheduler project.
+
+Core rule
+---------
+- Make temporal truth explicit; do not solve it with a framework by default.
+- If behavior is only accidental today, the phase must say so.
+- Queue pressure and ordering consequences should remain owner-local and
+  user-visible rather than hidden behind retries or buffering policy.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless temporal pressure proves one narrow owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 155 execution note defining the temporal-semantics and
+   backpressure-audit boundary
+2. one explicit classification of current ordering guarantees versus
+   accidental present behavior
+3. one explicit statement of how visible queue pressure or delay appears to a
+   caller in the admitted system
+4. one audit-owned proof over at least one slow-path, queued-path, or delayed
+   reply scenario
+5. one explicit conclusion that rules out a scheduler or async expansion in
+   this phase
+
+Why this is the right next step
+-------------------------------
+- It turns a common systems failure source into an auditable contract before
+  later pressure makes it harder to isolate.
+- It preserves the evidence-first method by classifying current truth before
+  designing new policy.
+- It gives the later multi-client phase a stable baseline for judging
+  interleaving and fairness pressure.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase155_temporal_semantics_and_backpressure_audit.txt`
+   - publish the canonical Phase 155 execution note
+
+2. `kernel/src/serial_service.mc`, `kernel/src/shell_service.mc`,
+   `kernel/src/log_service.mc`, `kernel/src/kv_service.mc`, and any admitted
+   Phase 152 variation owner
+   - expose the user-visible timing, reply, and queue-pressure boundaries that
+     the phase must classify
+
+3. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
+   - preserve explicit orchestration and restart policy while time-related
+     truth is audited
+
+4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path over a bounded delayed or backpressured scenario
+
+5. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 155 regression plus one projected MIR golden over
+     the temporal-semantics boundary
+
+Deliverables
+------------
+- one canonical Phase 155 execution note in `docs/plan/active/`
+- one explicit current-model statement of ordering, delay, and visible
+  backpressure truth
+- one audit-owned Phase 155 proof over at least one slow-path or queued-path
+  scenario
+- one focused freestanding regression plus projected MIR golden for the Phase
+  155 boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 155 rule in docs: temporal truth first, no scheduling
+   wave.
+2. Enumerate the current ordering assumptions already relied upon by the
+   admitted service system.
+3. Classify which of those assumptions are guarantees and which are merely
+   current behavior.
+4. Add one bounded delayed or backpressured scenario and audit the visible
+   consequence.
+5. Advance the kernel proof marker to 155 only after docs, audit, and tests
+   agree on the same time and queue-pressure statement.
+
+Preferred proof points
+----------------------
+1. The repository publishes at least one explicit ordering guarantee or
+   explicit non-guarantee.
+2. Visible queue pressure or delay is described in caller-visible terms.
+3. No scheduler rewrite, fairness policy, or async framework appears.
+4. One projected MIR proof shows the same bounded temporal contract in the
+   real artifact.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 155 note defining current
+  temporal and backpressure truth
+- the real kernel artifact builds and runs to a Phase 155 marker
+- at least one delayed or backpressured scenario is audited concretely
+- the phase distinguishes guaranteed ordering from accidental current
+  behavior
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 155 boundary
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding a scheduler rewrite, priority model, or fairness framework
+- adding automatic retries, hidden buffering, or dynamic queue growth
+- widening into broader timing APIs or async language features
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

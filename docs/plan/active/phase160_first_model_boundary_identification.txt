@@ -1,0 +1,169 @@
+Phase 160 -- First Model Boundary Identification
+================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 159 observability step by naming the first
+repeated problem that the current service model cannot solve cleanly without
+new rules, and by classifying the narrowest possible expansion axis without
+admitting it yet.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded model-boundary phase over the accumulated evidence from
+Phase 152 through Phase 159.
+It does not claim immediate filesystem, networking, scheduler, discovery, or
+capability-model expansion.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
+- `docs/plan/active/phase153_service_composition_shape_audit.txt`
+- `docs/plan/active/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/active/phase155_temporal_semantics_and_backpressure_audit.txt`
+- `docs/plan/active/phase156_multi_client_interaction_audit.txt`
+- `docs/plan/active/phase157_long_lived_system_coherence_audit.txt`
+- `docs/plan/active/phase158_cross_service_failure_semantics_consistency.txt`
+- `docs/plan/active/phase159_observability_as_a_system_property.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- By this point the repository should have accumulated evidence across
+  controlled variation, composition, identity, temporal pressure,
+  multi-client interaction, long-lived coherence, failure consistency, and
+  observability.
+- That evidence should be enough to identify at least one repeated place
+  where the current model becomes strained.
+- The next honest risk is treating that strain as an excuse for immediate
+  breadth instead of first naming the boundary clearly.
+
+Problem being solved
+--------------------
+- A model boundary is useful only if it is named before the repository tries
+  to fix it.
+- Without one explicit boundary-identification phase, later expansion could
+  remain speculative and under-justified.
+- The repository therefore needs one explicit Phase 160 note that states the
+  first repeated model failure, explains why it cannot be handled cleanly
+  inside the current rules, and identifies the narrowest possible next
+  expansion axis without admitting it yet.
+
+Core rule
+---------
+- Name the boundary before widening the model.
+- The phase must point to repeated evidence, not to taste or ambition.
+- The phase may classify one likely next expansion axis, but it must not
+  implement that expansion.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless the accumulated evidence has already proved a narrow
+  owning-layer deficiency.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 160 execution note defining the boundary-identification
+   method
+2. one explicit synthesis of the repeated pressure observed in Phase 152
+   through Phase 159
+3. one explicit statement of the first repeated problem the current model does
+   not solve cleanly
+4. one classification of the narrowest plausible next expansion axis,
+   recorded but not yet admitted
+5. one audit-owned proof that the stated boundary is grounded in real repeated
+   evidence rather than speculation
+
+Why this is the right next step
+-------------------------------
+- It converts the roadmap from speculative breadth to evidence-backed next
+  moves.
+- It preserves the repository's discipline by requiring one honest "no" or
+  "not yet" before any bigger subsystem is considered.
+- It gives any later filesystem, networking, scheduling, or authority work a
+  concrete justification rooted in repeated use.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase160_first_model_boundary_identification.txt`
+   - publish the canonical Phase 160 execution note
+
+2. `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+   - keep the speculative roadmap aligned with the evidence-backed boundary
+     conclusion
+
+3. `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
+   through `docs/plan/active/phase159_observability_as_a_system_property.txt`
+   - provide the evidence base used to justify the identified boundary
+
+4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one synthesis-oriented audit path that proves the named boundary is
+     visible in the real artifact and not only in prose
+
+5. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 160 regression or aggregation proof plus one
+     projected MIR golden over the named model boundary
+
+Deliverables
+------------
+- one canonical Phase 160 execution note in `docs/plan/active/`
+- one explicit synthesis of repeated pressure across Phase 152 through Phase
+  159
+- one named first model boundary grounded in repeated evidence
+- one classification of the narrowest plausible next expansion axis without
+  admitting it
+- one audit-owned Phase 160 proof plus one focused freestanding regression or
+  aggregation proof over the named boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 160 rule in docs: name the boundary before expanding the
+   model.
+2. Re-read the evidence from Phase 152 through Phase 159 and extract the
+   repeated pressure points.
+3. Identify the first repeated problem that the current rules do not solve
+   cleanly.
+4. Classify the narrowest plausible next expansion axis, but do not admit it
+   yet.
+5. Add one synthesis audit proving the named boundary is visible in the real
+   artifact.
+6. Advance the kernel proof marker to 160 only after docs, audit, and tests
+   agree on the same named boundary.
+
+Preferred proof points
+----------------------
+1. The repository can point to repeated evidence rather than one anecdote.
+2. The named model boundary is stated before any fix is admitted.
+3. The next expansion axis is narrow, explicit, and still deferred.
+4. One projected MIR or aggregation proof shows the named boundary is rooted
+   in the real artifact.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 160 note naming the first model
+  boundary from repeated post-151 pressure
+- the real kernel artifact builds and runs to a Phase 160 marker or an agreed
+  synthesis proof equivalent
+- the phase identifies one repeated problem the current model does not solve
+  cleanly
+- the phase classifies one narrow next expansion axis without implementing it
+- the focused regression or aggregation proof shows build, run, docs, and MIR
+  all expose the same Phase 160 boundary conclusion
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- immediately implementing filesystem, networking, scheduling, discovery, or
+  capability-model expansion
+- treating one-off discomfort as sufficient evidence for a new subsystem
+- hiding the lack of evidence behind architectural ambition
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

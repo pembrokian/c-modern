@@ -1,0 +1,152 @@
+Phase 156 -- Multi-Client Interaction Audit
+===========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 155 temporal audit by exposing the admitted
+service system to one bounded multi-client interaction slice so the
+repository can identify which assumptions fail first under interleaving.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded multi-client pressure phase over the current fixed
+service model.
+It does not claim SMP, threads, a scheduler expansion, or a fairness
+framework.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase155_temporal_semantics_and_backpressure_audit.txt`
+- `docs/plan/active/phase157_long_lived_system_coherence_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The current system was extracted and rebuilt around one bounded shell-owned
+  command flow.
+- That is enough to prove usability and repeatability, but not enough to say
+  whether the model survives multiple independent actors.
+- The next honest risk is that reply routing, hidden global state, or
+  ordering assumptions remain invisible until much later platform work.
+
+Problem being solved
+--------------------
+- A small system may be correct and still fail immediately once two clients
+  interact with the same service path.
+- Without one bounded multi-client phase, later pressure could conflate basic
+  interleaving problems with broader scheduling or platform concerns.
+- The repository therefore needs one explicit Phase 156 note that introduces
+  one multi-client interaction slice and classifies the first assumption that
+  breaks under interleaving.
+
+Core rule
+---------
+- Expose multi-client reality without widening into concurrency-platform
+  ambition.
+- The phase should reveal ordering, reply-routing, and state-sharing
+  assumptions, not solve every fairness question.
+- Any newly exposed global state or reply ambiguity must be named explicitly.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless multi-client pressure proves one narrow owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 156 execution note defining the multi-client audit
+   boundary
+2. one bounded interaction slice with two independent clients sharing at
+   least one admitted service path
+3. one explicit classification of reply routing, hidden-global-state, and
+   ordering assumptions exposed by interleaving
+4. one audit-owned proof over the chosen multi-client scenario
+5. one explicit conclusion ruling out broader scheduler expansion in this
+   phase
+
+Why this is the right next step
+-------------------------------
+- It reveals whether the current model is only comfortable when mentally
+  treated as one client at a time.
+- It converts interleaving pressure into concrete evidence rather than
+  speculative scheduling work.
+- It creates a stable base for the later long-lived and failure-consistency
+  phases.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase156_multi_client_interaction_audit.txt`
+   - publish the canonical Phase 156 execution note
+
+2. `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`,
+   `kernel/src/kv_service.mc`, and any admitted Phase 152 variation owner
+   - expose the shared service paths that multi-client interleaving must
+     classify
+
+3. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
+   - keep the multi-client proof wiring explicit and owner-local
+
+4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - add one audit path over the chosen interleaving scenario
+
+5. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 156 regression plus one projected MIR golden over
+     the multi-client interaction boundary
+
+Deliverables
+------------
+- one canonical Phase 156 execution note in `docs/plan/active/`
+- one bounded two-client interaction slice over at least one shared service
+  path
+- one explicit classification of the first interleaving assumptions exposed
+- one audit-owned Phase 156 proof over the chosen multi-client scenario
+- one focused freestanding regression plus projected MIR golden for the Phase
+  156 boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 156 rule in docs: multi-client pressure, no scheduler
+   wave.
+2. Choose one shared service path and define the smallest useful two-client
+   scenario.
+3. Implement only the owner-local wiring needed for that bounded scenario.
+4. Audit the first exposed reply-routing, hidden-state, or ordering
+   assumption.
+5. Advance the kernel proof marker to 156 only after docs, audit, and tests
+   agree on the same multi-client boundary.
+
+Preferred proof points
+----------------------
+1. Two independent clients can exercise one shared service path.
+2. The repository can name the first assumption that fails under
+   interleaving.
+3. No scheduler expansion, thread model, or fairness framework appears.
+4. One projected MIR proof shows the bounded multi-client scenario remains
+   explicit in the real artifact.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 156 note defining the chosen
+  multi-client scenario
+- the real kernel artifact builds and runs to a Phase 156 marker
+- at least one shared service path is exercised by two independent clients
+- one audit classifies the first interleaving assumption exposed by the real
+  artifact
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 156 boundary
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding SMP, threads, preemption, or a fairness framework
+- widening into general scheduling policy or service prioritization
+- introducing a hidden client coordinator or reply broker
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`

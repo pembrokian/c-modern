@@ -1,0 +1,155 @@
+Phase 159 -- Observability As A System Property
+===============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue from the planned Phase 158 failure-semantics comparison by defining
+the smallest truthful observation surface the admitted system needs in order
+to explain itself without growing into a logging or instrumentation platform.
+
+This document is a repository execution plan, not a closeout note.
+It defines one bounded observability phase over the current service model.
+It does not claim a telemetry stack, logging framework, tracing platform, or
+cross-cutting debug substrate.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/active/phase157_long_lived_system_coherence_audit.txt`
+- `docs/plan/active/phase158_cross_service_failure_semantics_consistency.txt`
+- `docs/plan/active/phase160_first_model_boundary_identification.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has one bounded retained-log owner and a planned
+  sequence of coherence and failure-semantics audits.
+- That still does not answer whether the system can explain itself truthfully
+  without relying on internal knowledge or debug-print sprawl.
+- The next honest risk is turning observation pressure into a hidden platform
+  instead of clarifying the minimum system-visible truth needed for debugging
+  and use.
+
+Problem being solved
+--------------------
+- Observability is a system property only if users can inspect the right
+  state and consequences without having to know internal implementation
+  folklore.
+- Without one bounded observability phase, later debugging pressure could
+  create instrumentation sprawl and hide the real model boundary.
+- The repository therefore needs one explicit Phase 159 note that names the
+  smallest truthful observation surface and rejects broader platform drift.
+
+Core rule
+---------
+- Make observation truthful and minimal.
+- If a signal is only implementation detail, do not elevate it into a system
+  contract.
+- If a debugging need is real, satisfy it with the narrowest owner-visible
+  observation surface that preserves ownership and failure truth.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless observability pressure proves one narrow owner gap.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 159 execution note defining the observability boundary
+2. one explicit statement of the minimum user-meaningful observation surface
+   required by the admitted system
+3. one classification of which current signals are system truth and which are
+   implementation detail only
+4. one audit-owned proof over at least one debugging or inspection workflow
+5. one explicit conclusion ruling out instrumentation-platform growth in this
+   phase
+
+Why this is the right next step
+-------------------------------
+- It keeps debugging pressure from silently becoming a platform project.
+- It tests whether the current model can explain itself honestly with minimal
+  observation.
+- It prepares the Phase 160 boundary-identification step by clarifying what
+  the system can and cannot make visible cleanly.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase159_observability_as_a_system_property.txt`
+   - publish the canonical Phase 159 execution note
+
+2. `kernel/src/log_service.mc`
+   - remain the primary retained observation owner and the first place to
+     distinguish system-visible truth from instrumentation sprawl
+
+3. `kernel/src/shell_service.mc`, `kernel/src/kv_service.mc`, and any admitted
+   Phase 152 variation owner
+   - expose the observation needs that remain user-meaningful across the
+     admitted service system
+
+4. `kernel/src/debug/`, `kernel/src/bootstrap_audit/`, and owner-local debug
+   helpers
+   - add one audit path over a bounded debugging or inspection workflow while
+     rejecting cross-cutting framework drift
+
+5. `tests/tool/freestanding/kernel/`
+   - add one focused Phase 159 regression plus one projected MIR golden over
+     the observability boundary
+
+Deliverables
+------------
+- one canonical Phase 159 execution note in `docs/plan/active/`
+- one explicit minimum observation-surface statement for the admitted system
+- one classification of system-visible truth versus implementation detail
+- one audit-owned Phase 159 proof over at least one debugging or inspection
+  workflow
+- one focused freestanding regression plus projected MIR golden for the Phase
+  159 boundary
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 159 rule in docs: truthful observation, no telemetry
+   wave.
+2. Enumerate the debugging and inspection needs exposed by earlier phases.
+3. Classify which current signals are user-meaningful system truth and which
+   are internal detail only.
+4. Add one bounded debugging or inspection workflow audit.
+5. Advance the kernel proof marker to 159 only after docs, audit, and tests
+   agree on the same minimal observation surface.
+
+Preferred proof points
+----------------------
+1. The repository can support at least one useful debugging workflow without
+   internal folklore.
+2. The minimum observation surface remains explicit and bounded.
+3. No telemetry platform, logging framework, or debug-print sprawl appears.
+4. One projected MIR proof shows the same bounded observation contract in the
+   real artifact.
+
+Exit criteria
+-------------
+- the repository publishes one explicit Phase 159 note defining the minimum
+  observation surface
+- the real kernel artifact builds and runs to a Phase 159 marker
+- at least one debugging or inspection workflow is audited concretely
+- the phase distinguishes system-visible truth from implementation detail
+- the focused regression proves build, run, docs, and MIR all expose the same
+  Phase 159 boundary
+- compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Non-goals
+---------
+- adding a telemetry platform, tracing substrate, or cross-cutting logging
+  framework
+- turning debug helpers into a service platform or policy engine
+- widening into persistence, metrics infrastructure, or hosted observability
+  tooling
+- reopening sema, MIR, backend, ABI, target, runtime, or `hal`
