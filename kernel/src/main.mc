@@ -82,6 +82,8 @@ const PHASE146_MARKER: i32 = 146
 const PHASE146_MARKER_DETAIL: u32 = 146
 const PHASE147_MARKER: i32 = 147
 const PHASE147_MARKER_DETAIL: u32 = 147
+const PHASE148_MARKER: i32 = 148
+const PHASE148_MARKER_DETAIL: u32 = 148
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
@@ -2160,6 +2162,11 @@ func bootstrap_main() i32 {
         return 103
     }
 
+    phase148_audit: debug.Phase148AuthorityErgonomicsAudit = bootstrap_audit.build_phase148_authority_ergonomics_audit(bootstrap_audit.Phase148AuthorityErgonomicsAuditInputs{ phase147: phase147_audit, serial_endpoint_handle_slot: phase147_repeated_kv_get.serial_state.endpoint_handle_slot, shell_endpoint_handle_slot: phase147_repeated_kv_get.shell_state.endpoint_handle_slot, log_endpoint_handle_slot: phase147_log_state.endpoint_handle_slot, kv_endpoint_handle_slot: phase147_kv_state.endpoint_handle_slot, explicit_slot_authority_visible: 1, retained_state_authority_local_visible: 1, restart_handoff_explicit_visible: 1, repeated_authority_ceremony_stable_visible: 1, narrow_capability_helper_visible: 1, overscoped_helper_visible: 0, ambient_authority_visible: 0, compiler_reopening_visible: 0 })
+    if !debug.validate_phase148_authority_ergonomics_under_reuse(phase148_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
+        return 104
+    }
+
     BOOT_MARKER_EMITTED = 1
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE140_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE141_MARKER_DETAIL)
@@ -2169,104 +2176,114 @@ func bootstrap_main() i32 {
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE145_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE146_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE147_MARKER_DETAIL)
+    record_boot_stage(state.BootStage.MarkerEmitted, PHASE148_MARKER_DETAIL)
     if BOOT_MARKER_EMITTED != 1 {
-        return 104
-    }
-    if BOOT_LOG_APPEND_FAILED != 0 {
         return 105
     }
-    if BOOT_LOG.count != 12 {
+    if BOOT_LOG_APPEND_FAILED != 0 {
         return 106
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
+    if BOOT_LOG.count != 13 {
         return 107
     }
-    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 3)) != 8 {
         return 108
     }
-    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 3) != ARCH_ACTOR {
         return 109
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 3) != INIT_TID {
         return 110
     }
-    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 4)) != 16 {
         return 111
     }
-    if state.log_detail_at(BOOT_LOG, 4) != PHASE140_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 4) != ARCH_ACTOR {
         return 112
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 5)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 4) != PHASE140_MARKER_DETAIL {
         return 113
     }
-    if state.log_actor_at(BOOT_LOG, 5) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 5)) != 16 {
         return 114
     }
-    if state.log_detail_at(BOOT_LOG, 5) != PHASE141_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 5) != ARCH_ACTOR {
         return 115
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 6)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 5) != PHASE141_MARKER_DETAIL {
         return 116
     }
-    if state.log_actor_at(BOOT_LOG, 6) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 6)) != 16 {
         return 117
     }
-    if state.log_detail_at(BOOT_LOG, 6) != PHASE142_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 6) != ARCH_ACTOR {
         return 118
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 7)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 6) != PHASE142_MARKER_DETAIL {
         return 119
     }
-    if state.log_actor_at(BOOT_LOG, 7) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 7)) != 16 {
         return 120
     }
-    if state.log_detail_at(BOOT_LOG, 7) != PHASE143_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 7) != ARCH_ACTOR {
         return 121
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 8)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 7) != PHASE143_MARKER_DETAIL {
         return 122
     }
-    if state.log_actor_at(BOOT_LOG, 8) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 8)) != 16 {
         return 123
     }
-    if state.log_detail_at(BOOT_LOG, 8) != PHASE144_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 8) != ARCH_ACTOR {
         return 124
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 9)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 8) != PHASE144_MARKER_DETAIL {
         return 125
     }
-    if state.log_actor_at(BOOT_LOG, 9) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 9)) != 16 {
         return 126
     }
-    if state.log_detail_at(BOOT_LOG, 9) != PHASE145_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 9) != ARCH_ACTOR {
         return 127
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 10)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 9) != PHASE145_MARKER_DETAIL {
         return 128
     }
-    if state.log_actor_at(BOOT_LOG, 10) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 10)) != 16 {
         return 129
     }
-    if state.log_detail_at(BOOT_LOG, 10) != PHASE146_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 10) != ARCH_ACTOR {
         return 130
     }
-    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 11)) != 16 {
+    if state.log_detail_at(BOOT_LOG, 10) != PHASE146_MARKER_DETAIL {
         return 131
     }
-    if state.log_actor_at(BOOT_LOG, 11) != ARCH_ACTOR {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 11)) != 16 {
         return 132
     }
-    if state.log_detail_at(BOOT_LOG, 11) != PHASE147_MARKER_DETAIL {
+    if state.log_actor_at(BOOT_LOG, 11) != ARCH_ACTOR {
         return 133
     }
-    if PROCESS_SLOTS[1].pid != INIT_PID {
+    if state.log_detail_at(BOOT_LOG, 11) != PHASE147_MARKER_DETAIL {
         return 134
     }
-    if TASK_SLOTS[1].tid != INIT_TID {
+    if state.boot_stage_score(state.log_stage_at(BOOT_LOG, 12)) != 16 {
         return 135
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if state.log_actor_at(BOOT_LOG, 12) != ARCH_ACTOR {
         return 136
     }
-    return PHASE147_MARKER
+    if state.log_detail_at(BOOT_LOG, 12) != PHASE148_MARKER_DETAIL {
+        return 137
+    }
+    if PROCESS_SLOTS[1].pid != INIT_PID {
+        return 138
+    }
+    if TASK_SLOTS[1].tid != INIT_TID {
+        return 139
+    }
+    if USER_FRAME.task_id != INIT_TID {
+        return 140
+    }
+    return PHASE148_MARKER
 }

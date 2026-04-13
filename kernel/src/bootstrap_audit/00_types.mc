@@ -606,6 +606,22 @@ struct Phase147IpcShapeAuditInputs {
     compiler_reopening_visible: u32
 }
 
+struct Phase148AuthorityErgonomicsAuditInputs {
+    phase147: debug.Phase147IpcShapeAudit
+    serial_endpoint_handle_slot: u32
+    shell_endpoint_handle_slot: u32
+    log_endpoint_handle_slot: u32
+    kv_endpoint_handle_slot: u32
+    explicit_slot_authority_visible: u32
+    retained_state_authority_local_visible: u32
+    restart_handoff_explicit_visible: u32
+    repeated_authority_ceremony_stable_visible: u32
+    narrow_capability_helper_visible: u32
+    overscoped_helper_visible: u32
+    ambient_authority_visible: u32
+    compiler_reopening_visible: u32
+}
+
 struct BootstrapLayoutAudit {
     init_image: init.InitImage
     init_root_page_table: usize

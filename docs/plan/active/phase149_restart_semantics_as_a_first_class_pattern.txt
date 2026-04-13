@@ -7,7 +7,7 @@ PLANNED
 
 Purpose
 -------
-Continue from the planned Phase 148 authority-ergonomics step by turning the
+Continue from the completed Phase 148 authority-ergonomics step by turning the
 landed Phase 145 restart result into one explicit restartable-service
 contract rather than leaving restart semantics as a one-off audit outcome.
 

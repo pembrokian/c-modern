@@ -3,20 +3,32 @@ Phase 148 -- Authority Ergonomics Under Reuse
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
-Continue from the planned Phase 147 IPC-shape audit by classifying whether
+Continue from the completed Phase 147 IPC-shape audit by classifying whether
 explicit authority remains comfortable under repeated use of the landed small
 system rather than merely correct under bounded proofs.
 
-This document is an execution plan for Phase 148.
-It defines one bounded authority-ergonomics phase that must land as explicit
+This document records the landed Phase 148 slice.
+It defines one bounded authority-ergonomics phase that lands as explicit
 reuse evidence and owner classification before it is used to justify any
-helper, kernel, or language change.
+broader helper, kernel, or language change.
 It does not claim shared-state shortcuts, ambient authority, hidden borrowing,
 or a broader authority-management framework.
+
+Phase result
+------------
+Phase 148 is complete as one bounded authority-ergonomics audit over the landed interactive-service slice.
+
+The landed repository slice now includes:
+
+- one repeated authority-bearing workflow grounded in the same shell-plus-log-plus-key-value command path and the landed key-value restart handoff
+- one explicit judgment that retained endpoint-handle slots remain readable and acceptable as explicit service authority under repeated use
+- one explicit judgment that restart-owned authority handoff remains honest and visible without ambient rebinding
+- one narrow capability-local helper, `handle_carries_endpoint_authority(...)`, admitted only to reduce repeated slot-validation ceremony while keeping slot, endpoint, and rights explicit
+- one focused Phase 148 audit and one focused freestanding regression over the same authority-ergonomics boundary
 
 Relationship to companion notes
 -------------------------------
@@ -95,10 +107,10 @@ Targeted boundary shape:
 
 Chosen outcome
 --------------
-Chosen outcome: yes.
+Chosen outcome: landed with one narrow capability-local helper and no broader framework or compiler reopening.
 
-The repository should take this phase because explicit authority is only a
-usable system rule if repeated service work still feels honest and practical.
+The repeated shell-plus-restart workflow showed that explicit authority in the landed small system is still acceptable as written: endpoint-handle slots remain service-local, restart handoff remains init-owned and visible, and the pressure is review-time validation ceremony rather than a structural owner gap.
+The repository therefore landed one narrow capability-local helper to express "this slot still carries this endpoint with these rights" without hiding ownership transfer, widening scope, or reopening compiler surfaces.
 
 What this phase should try to prove
 -----------------------------------
@@ -150,7 +162,7 @@ The owning implementation surfaces for this phase are:
 
 Deliverables
 ------------
-- one canonical Phase 148 execution plan in `docs/plan/active/`
+- one canonical Phase 148 execution note in `docs/plan/active/`
 - one explicit authority-ergonomics judgment for the landed small system
 - zero or one narrow explicit helper justified by repeated reuse
 - one debug-owned Phase 148 audit over repeated authority-bearing workflows
@@ -192,6 +204,14 @@ Exit criteria
 - the focused regression proves build, run, docs, and MIR all expose the same
   Phase 148 boundary
 - the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 148 slice
+- the landed repeated service workflow confirms that explicit endpoint-handle slots remain acceptable, readable authority boundaries under repeated shell, retained-state, and restart pressure
+- the landed narrow capability-local helper reduces repeated slot-validation ceremony without hiding slot ownership, endpoint identity, or exact rights
+- restart-owned authority handoff remains explicit and init-owned rather than drifting into ambient rebinding or framework-owned recovery
+- compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces remain closed in this phase
 
 Non-goals
 ---------

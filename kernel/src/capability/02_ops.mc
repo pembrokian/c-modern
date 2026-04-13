@@ -204,6 +204,14 @@ func resolve_endpoint_handle_for_rights(table: HandleTable, slot_id: u32, requir
     return EndpointHandleResolution{ endpoint_id: endpoint_id, valid: 1 }
 }
 
+func handle_carries_endpoint_authority(table: HandleTable, slot_id: u32, endpoint_id: u32, expected_rights: u32) bool {
+    resolved: EndpointHandleResolution = resolve_endpoint_handle_for_rights(table, slot_id, expected_rights)
+    if resolved.valid == 0 || resolved.endpoint_id != endpoint_id {
+        return false
+    }
+    return find_rights_for_handle(table, slot_id) == expected_rights
+}
+
 func resolve_attached_transfer_handle(table: HandleTable, attached_handle_slot: u32, attached_handle_count: usize) AttachedTransferResolution {
     if attached_handle_count == 0 {
         return AttachedTransferResolution{ attached_endpoint_id: 0, attached_rights: 0, attached_source_handle_slot: 0, attached_count: 0, valid: 1 }

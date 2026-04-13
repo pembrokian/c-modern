@@ -23,7 +23,7 @@ func spawn_serial_service(config: SerialServiceConfig, execution: SerialServiceE
     if syscall.status_score(next_state.spawn_observation.status) != 2 {
         return serial_service_result(next_state, 0)
     }
-    if capability.find_endpoint_for_handle(next_state.child_handle_table, config.endpoint_handle_slot) != config.serial_endpoint_id {
+    if !capability.handle_carries_endpoint_authority(next_state.child_handle_table, config.endpoint_handle_slot, config.serial_endpoint_id, 3) {
         return serial_service_result(next_state, 0)
     }
     return serial_service_result(next_state, 1)
@@ -105,7 +105,7 @@ func execute_phase140_serial_ingress_composed_service_graph(config: SerialServic
         serial_handles = capability.install_endpoint_handle(serial_handles, config.composition_handle_slot, config.composition_endpoint_id, 3)
     }
     next_serial = SerialServiceExecutionState{ program_capability: next_serial.program_capability, gate: next_serial.gate, process_slots: next_serial.process_slots, task_slots: next_serial.task_slots, init_handle_table: next_serial.init_handle_table, child_handle_table: serial_handles, wait_table: next_serial.wait_table, endpoints: next_endpoints, init_image: next_serial.init_image, child_address_space: next_serial.child_address_space, child_user_frame: next_serial.child_user_frame, service_state: next_serial.service_state, spawn_observation: next_serial.spawn_observation, receive_observation: next_serial.receive_observation, ingress: next_serial.ingress, composition: next_serial.composition, failure_observation: next_serial.failure_observation, wait_observation: next_serial.wait_observation, ready_queue: next_serial.ready_queue }
-    if capability.find_endpoint_for_handle(next_serial.child_handle_table, config.composition_handle_slot) != config.composition_endpoint_id {
+    if !capability.handle_carries_endpoint_authority(next_serial.child_handle_table, config.composition_handle_slot, config.composition_endpoint_id, 3) {
         return phase140_serial_ingress_composition_result(next_serial, composition_execution, 0)
     }
 

@@ -156,6 +156,7 @@ Current repository truth
 - The landed Phase 145 service restart, failure, and usage pressure audit also belongs to that same admitted slice rather than to a broader supervision, recovery, rebinding, or reopened compiler wave.
 - The landed Phase 146 service-shape consolidation step also belongs to that same admitted slice rather than to a broader service framework, runtime abstraction, dynamic registration model, or reopened compiler wave.
 - The landed Phase 147 IPC-shape audit under real usage also belongs to that same admitted slice rather than to a broader message bus, dynamic payload model, transport rewrite, or reopened compiler wave.
+- The landed Phase 148 authority-ergonomics audit under reuse also belongs to that same admitted slice rather than to ambient authority shortcuts, a broader authority framework, hidden rebinding helpers, or a reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation

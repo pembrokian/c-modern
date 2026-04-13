@@ -273,10 +273,7 @@ Why this band comes after IPC shape:
   through are already clearer.
 
 Phase 148 -- Authority Ergonomics Under Reuse
-- Exit criterion: the repository can classify the repeated authority-handling
-  friction in the landed small system as either acceptable explicitness, one
-  narrow helper opportunity, or one concrete kernel or language owner gap,
-  without introducing shared-state shortcuts or ambient authority.
+- Phase 148 is now concrete as one bounded authority-ergonomics audit with one repeated shell-plus-restart workflow, one narrow capability-local authority-validation helper, and kernel or compiler surfaces kept closed.
 
 Preferred proof points:
 - at least one repeated authority-handling path is measured against the Phase

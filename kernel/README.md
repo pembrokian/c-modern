@@ -6,6 +6,8 @@ This directory is the repository-owned home for real Canopus kernel sources.
 Current status
 --------------
 
+- Phase 148 has moved the repository-owned kernel artifact beyond the landed Phase 147 IPC-shape audit under real usage into one bounded authority-ergonomics audit under reuse.
+- Phase 148 therefore now publishes one bounded authority-ergonomics audit under reuse.
 - Phase 146 has moved the repository-owned kernel artifact beyond the landed Phase 145 restart-and-usage audit into one bounded service-shape consolidation step.
 - Phase 146 therefore now publishes one bounded service-shape consolidation step.
 - Phase 147 has moved the repository-owned kernel artifact beyond the landed Phase 146 service-shape consolidation step into one bounded IPC-shape audit under real usage.
