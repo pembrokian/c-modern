@@ -46,11 +46,12 @@ static void emit_pass_lines(void) {
     puts("PASS phase147_ipc_shape_audit_under_real_usage");
     puts("PASS phase148_authority_ergonomics_under_reuse");
     puts("PASS phase149_restart_semantics_as_a_first_class_pattern");
+    puts("PASS phase150_one_system_rebuilt_cleanly");
 }
 
 int main(void) {
     const int32_t result = bootstrap_main();
-    if (result != 149) {
+    if (result != 150) {
         return (int)result;
     }
     emit_pass_lines();

@@ -67,7 +67,7 @@ struct BootRecord {
 
 struct BootLog {
     count: usize
-    entries: [14]BootRecord
+    entries: [15]BootRecord
 }
 
 struct BootLogAppendResult {
@@ -273,23 +273,24 @@ func empty_record() BootRecord {
     return BootRecord{ stage: BootStage.Reset, actor: 0, detail: 0 }
 }
 
-func zero_boot_records() [14]BootRecord {
-    entries: [14]BootRecord
-    entries[0] = empty_record()
-    entries[1] = empty_record()
-    entries[2] = empty_record()
-    entries[3] = empty_record()
-    entries[4] = empty_record()
-    entries[5] = empty_record()
-    entries[6] = empty_record()
-    entries[7] = empty_record()
-    entries[8] = empty_record()
-    entries[9] = empty_record()
-    entries[10] = empty_record()
-    entries[11] = empty_record()
-    entries[12] = empty_record()
-    entries[13] = empty_record()
-    return entries
+func zero_boot_records() [15]BootRecord {
+    records: [15]BootRecord
+    records[0] = empty_record()
+    records[1] = empty_record()
+    records[2] = empty_record()
+    records[3] = empty_record()
+    records[4] = empty_record()
+    records[5] = empty_record()
+    records[6] = empty_record()
+    records[7] = empty_record()
+    records[8] = empty_record()
+    records[9] = empty_record()
+    records[10] = empty_record()
+    records[11] = empty_record()
+    records[12] = empty_record()
+    records[13] = empty_record()
+    records[14] = BootRecord{ stage: BootStage.Reset, actor: 0, detail: 0 }
+    return records
 }
 
 func empty_log() BootLog {
@@ -297,10 +298,10 @@ func empty_log() BootLog {
 }
 
 func append_record(log: BootLog, stage: BootStage, actor: u32, detail: u32) BootLogAppendResult {
-    if log.count >= 14 {
+    if log.count >= 15 {
         return BootLogAppendResult{ log: log, appended: 0 }
     }
-    entries: [14]BootRecord = log.entries
+    entries: [15]BootRecord = log.entries
     entries[log.count] = BootRecord{ stage: stage, actor: actor, detail: detail }
     return BootLogAppendResult{ log: BootLog{ count: log.count + 1, entries: entries }, appended: 1 }
 }

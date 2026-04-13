@@ -140,11 +140,12 @@ func validate_state_hardening_contracts(audit: StateHardeningAudit) bool {
     append11: state.BootLogAppendResult = state.append_record(append10.log, state.BootStage.Halted, audit.arch_actor, 12)
     append12: state.BootLogAppendResult = state.append_record(append11.log, state.BootStage.Halted, audit.arch_actor, 13)
     append13: state.BootLogAppendResult = state.append_record(append12.log, state.BootStage.Halted, audit.arch_actor, 14)
-    overflow: state.BootLogAppendResult = state.append_record(append13.log, state.BootStage.Halted, audit.arch_actor, 15)
+    append14: state.BootLogAppendResult = state.append_record(append13.log, state.BootStage.Halted, audit.arch_actor, 15)
+    overflow: state.BootLogAppendResult = state.append_record(append14.log, state.BootStage.Halted, audit.arch_actor, 16)
     if overflow.appended != 0 {
         return false
     }
-    return overflow.log.count == 14
+    return overflow.log.count == 15
 }
 
 func validate_syscall_contract_hardening(audit: SyscallHardeningAudit) bool {

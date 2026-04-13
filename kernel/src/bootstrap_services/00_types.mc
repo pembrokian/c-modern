@@ -349,6 +349,40 @@ struct Phase147IpcShapeWorkflowResult {
     succeeded: u32
 }
 
+struct Phase150RebuiltSystemState {
+    serial_state: serial_service.SerialServiceState
+    shell_state: shell_service.ShellServiceState
+    log_state: log_service.LogServiceState
+    echo_state: echo_service.EchoServiceState
+    kv_state: kv_service.KvServiceState
+}
+
+struct Phase150RebuiltSystemCommandResult {
+    system: Phase150RebuiltSystemState
+    routing: shell_service.ShellRoutingObservation
+    succeeded: u32
+}
+
+struct Phase150RebuiltSystemRestartResult {
+    system: Phase150RebuiltSystemState
+    restart: init.ServiceRestartObservation
+}
+
+struct Phase150RebuiltSystemWorkflowResult {
+    rebuilt_system: Phase150RebuiltSystemState
+    log_append_route: shell_service.ShellRoutingObservation
+    log_tail_route: shell_service.ShellRoutingObservation
+    pre_failure_set_route: shell_service.ShellRoutingObservation
+    pre_failure_get_route: shell_service.ShellRoutingObservation
+    failed_get_route: shell_service.ShellRoutingObservation
+    restarted_get_route: shell_service.ShellRoutingObservation
+    pre_failure_retention: kv_service.KvRetentionObservation
+    post_restart_retention: kv_service.KvRetentionObservation
+    restart: init.ServiceRestartObservation
+    event_log_retention: log_service.LogRetentionObservation
+    succeeded: u32
+}
+
 func log_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_translation_root: mmu.TranslationRoot) LogServiceConfig {
     return LogServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: LOG_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: LOG_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte: LOG_SERVICE_REQUEST_BYTE, exit_code: LOG_SERVICE_EXIT_CODE, program_slot: LOG_SERVICE_PROGRAM_SLOT, program_object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
 }
@@ -411,4 +445,20 @@ func serial_service_result(state: SerialServiceExecutionState, succeeded: u32) S
 
 func phase140_serial_ingress_composition_result(serial_state: SerialServiceExecutionState, composition_state: CompositionServiceExecutionState, succeeded: u32) Phase140SerialIngressCompositionResult {
     return Phase140SerialIngressCompositionResult{ serial_state: serial_state, composition_state: composition_state, succeeded: succeeded }
+}
+
+func phase150_rebuilt_system_state(serial_state: serial_service.SerialServiceState, shell_state: shell_service.ShellServiceState, log_state: log_service.LogServiceState, echo_state: echo_service.EchoServiceState, kv_state: kv_service.KvServiceState) Phase150RebuiltSystemState {
+    return Phase150RebuiltSystemState{ serial_state: serial_state, shell_state: shell_state, log_state: log_state, echo_state: echo_state, kv_state: kv_state }
+}
+
+func phase150_rebuilt_system_command_result(system: Phase150RebuiltSystemState, routing: shell_service.ShellRoutingObservation, succeeded: u32) Phase150RebuiltSystemCommandResult {
+    return Phase150RebuiltSystemCommandResult{ system: system, routing: routing, succeeded: succeeded }
+}
+
+func phase150_rebuilt_system_restart_result(system: Phase150RebuiltSystemState, restart: init.ServiceRestartObservation) Phase150RebuiltSystemRestartResult {
+    return Phase150RebuiltSystemRestartResult{ system: system, restart: restart }
+}
+
+func phase150_rebuilt_system_workflow_result(rebuilt_system: Phase150RebuiltSystemState, log_append_route: shell_service.ShellRoutingObservation, log_tail_route: shell_service.ShellRoutingObservation, pre_failure_set_route: shell_service.ShellRoutingObservation, pre_failure_get_route: shell_service.ShellRoutingObservation, failed_get_route: shell_service.ShellRoutingObservation, restarted_get_route: shell_service.ShellRoutingObservation, pre_failure_retention: kv_service.KvRetentionObservation, post_restart_retention: kv_service.KvRetentionObservation, restart: init.ServiceRestartObservation, event_log_retention: log_service.LogRetentionObservation, succeeded: u32) Phase150RebuiltSystemWorkflowResult {
+    return Phase150RebuiltSystemWorkflowResult{ rebuilt_system: rebuilt_system, log_append_route: log_append_route, log_tail_route: log_tail_route, pre_failure_set_route: pre_failure_set_route, pre_failure_get_route: pre_failure_get_route, failed_get_route: failed_get_route, restarted_get_route: restarted_get_route, pre_failure_retention: pre_failure_retention, post_restart_retention: post_restart_retention, restart: restart, event_log_retention: event_log_retention, succeeded: succeeded }
 }

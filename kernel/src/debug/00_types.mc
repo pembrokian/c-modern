@@ -827,3 +827,26 @@ struct Phase149RestartSemanticsFirstClassPatternAudit {
     durable_recovery_visible: u32
     compiler_reopening_visible: u32
 }
+
+struct Phase150OneSystemRebuiltCleanlyAudit {
+    phase149: Phase149RestartSemanticsFirstClassPatternAudit
+    serial_service_pid: u32
+    shell_service_pid: u32
+    log_service_pid: u32
+    kv_service_pid: u32
+    log_append_route: shell_service.ShellRoutingObservation
+    log_tail_route: shell_service.ShellRoutingObservation
+    pre_failure_set_route: shell_service.ShellRoutingObservation
+    pre_failure_get_route: shell_service.ShellRoutingObservation
+    failed_get_route: shell_service.ShellRoutingObservation
+    restarted_get_route: shell_service.ShellRoutingObservation
+    pre_failure_retention: kv_service.KvRetentionObservation
+    post_restart_retention: kv_service.KvRetentionObservation
+    restart: init.ServiceRestartObservation
+    event_log_retention: log_service.LogRetentionObservation
+    rebuilt_system_helper_visible: u32
+    owner_local_system_state_visible: u32
+    manual_state_threading_removed_visible: u32
+    dynamic_service_framework_visible: u32
+    compiler_reopening_visible: u32
+}

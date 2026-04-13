@@ -3,25 +3,44 @@ Phase 150 -- One System, Rebuilt Cleanly
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
-Continue from the planned Phase 149 restart-contract step by rebuilding the
+Continue from the completed Phase 149 restart-contract step by rebuilding the
 same bounded shell, log, and key-value system using only the surviving
-lessons from landed Phase 146 through Phase 149 and measuring whether the second
-version is simpler than the first.
+lessons from landed Phase 146 through Phase 149 and measuring whether the
+second version is simpler than the first.
 
-This document is an execution plan for Phase 150.
-It defines one bounded clean-rebuild phase that must land as a clearer system
+This document records the landed Phase 150 slice.
+It defines one bounded clean-rebuild phase that lands as a clearer system
 shape over the real kernel artifact before the repository widens into broader
 subsystem work.
 It does not claim a new platform wave, more services, or a general framework
 layer.
 
+Phase result
+------------
+Phase 150 is complete as one bounded clean rebuild of the admitted
+interactive-service system.
+
+The landed repository slice now includes:
+
+- one explicit rebuilt-system helper shape in `bootstrap_services` that owns
+  the repeated shell-plus-log-plus-key-value state threading previously kept
+  phase-local in `main.mc`
+- one real rebuilt workflow that preserves bounded log append or tail, key-
+  value set or get, failure exposure, restart visibility, and post-restart
+  reset-state truth over the same small system
+- one explicit comparison stating that the second version is simpler because
+  it removes the hand-threaded five-state choreography from the root kernel
+  proof path without adding a framework layer
+- one debug-owned Phase 150 audit and one focused freestanding regression over
+  the rebuilt-system boundary
+
 Relationship to companion notes
 -------------------------------
-This phase plan should stay aligned with:
+This phase note should stay aligned with:
 
 - `docs/plan/admin/speculative_roadmap_post_phase145.txt`
 - `docs/plan/active/phase146_service_shape_consolidation.txt`
@@ -34,11 +53,11 @@ This phase plan should stay aligned with:
 
 Repository status note
 ----------------------
-- Earlier phases in this wave should extract service shape, classify IPC and
-  authority ergonomics, and formalize restart truth.
+- Earlier phases in this wave extracted service shape, classified IPC and
+  authority ergonomics, and formalized restart truth.
 - Those results only become a convincing system-building method if the same
   small system can be rebuilt more clearly on a second pass.
-- The repository therefore needs one explicit rebuild discriminator before it
+- The repository therefore needed one explicit rebuild discriminator before it
   widens into filesystem, networking, scheduling richness, or any broader
   platform ambition.
 
@@ -49,7 +68,7 @@ Problem being solved
 - Without one clean-rebuild phase, later growth could assume the previous
   audits produced a reusable method when they may only have produced a
   successful one-off system.
-- The repository therefore needs one bounded phase that removes ad hoc glue,
+- The repository therefore needed one bounded phase that removes ad hoc glue,
   rebuilds the same system using the surviving lessons, and records honestly
   whether the second version is simpler.
 
@@ -98,18 +117,23 @@ Chosen outcome
 --------------
 Chosen outcome: yes.
 
-The repository should take this phase because a clean rebuild is the strongest
-available discriminator between a real pattern and a one-off success.
+The landed rebuild is simpler.
+The decisive simplification is that the repeated serial, shell, log, echo,
+and key-value state threading no longer lives as phase-local choreography in
+`kernel/src/main.mc`; it now lives behind one bounded
+`bootstrap_services.Phase150RebuiltSystemState` plus one bounded
+`execute_phase150_rebuilt_system_workflow(...)` helper that preserves the
+existing owner boundaries and restart truth.
 
-What this phase should try to prove
------------------------------------
+What this phase proved
+----------------------
 - the shell, log, and key-value system can be rebuilt using the surviving
   lessons from the earlier post-145 phases
 - at least one earlier ad hoc pattern can be removed without losing the
   admitted bounded behavior
 - the rebuilt system is simpler in a way the repository can state explicitly
-- if the rebuilt system is not simpler, the repository can record that truth
-  honestly before widening scope
+- compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces can
+  remain closed while landing that simplification
 
 Required implementation surfaces
 --------------------------------
@@ -139,7 +163,8 @@ The owning implementation surfaces for this phase are:
 
 7. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
    - add one audit path that compares the rebuilt system against the admitted
-     bounded behavior claims
+     bounded behavior claims and the earlier Phase 145 through Phase 149
+     truths
 
 8. `tests/tool/freestanding/kernel/`
    - add one focused Phase 150 regression plus one projected MIR golden over
@@ -151,7 +176,7 @@ The owning implementation surfaces for this phase are:
 
 Deliverables
 ------------
-- one canonical Phase 150 execution plan in `docs/plan/active/`
+- one canonical Phase 150 execution note in `docs/plan/active/`
 - one rebuilt shell-plus-log-plus-key-value system over the same bounded
   behavior envelope
 - one explicit comparison statement between the first and second versions
@@ -196,6 +221,26 @@ Exit criteria
 - the focused regression proves build, run, docs, and MIR all expose the same
   Phase 150 boundary
 - the compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 150 slice
+- the landed rebuild removes the earlier hand-threaded five-state shell-plus-
+  log-plus-key-value choreography from `kernel/src/main.mc` and replaces it
+  with one bounded rebuilt-system helper inside `kernel/src/bootstrap_services`
+- the second version is simpler because it centralizes the repeated system
+  state transition pattern without introducing a runtime framework, kernel
+  supervisor, dynamic registration model, or compiler expansion
+- the rebuilt workflow still preserves the admitted bounded system envelope:
+  one explicit log append path, one explicit log tail path, one explicit
+  key-value set or get path, one explicit unavailable consequence, one
+  explicit init-owned restart, and one explicit post-restart empty-state retry
+  result
+- compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces
+  remain closed; the only supporting acceptance adjustments were the bounded
+  boot log capacity increase needed to record the additional late-phase marker
+  and the freestanding bootstrap pass-line shim refresh needed to recognize
+  the new Phase 150 marker during runtime regressions
 
 Non-goals
 ---------

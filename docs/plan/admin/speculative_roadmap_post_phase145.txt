@@ -330,10 +330,10 @@ Why this band comes last:
   one-off pile of locally correct fixes.
 
 Phase 150 -- One System, Rebuilt Cleanly
-- Exit criterion: the repository can rebuild the same bounded shell-plus-log-
-  plus-key-value system using the lessons from Phase 146 through Phase 149,
-  and the second version is demonstrably simpler in ownership story, service
-  shape, or restart explanation than the first version.
+- Phase 150 is now concrete as one bounded clean rebuild of the same
+  shell-plus-log-plus-key-value system, with the earlier manual five-state
+  threading removed from the root proof path and replaced by one bounded
+  rebuilt-system helper while compiler and framework surfaces stay closed.
 
 Preferred proof points:
 - the rebuilt system removes at least one earlier ad hoc pattern rather than

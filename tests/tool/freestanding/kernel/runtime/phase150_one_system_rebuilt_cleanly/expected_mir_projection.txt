@@ -1,0 +1,4 @@
+  TypeDecl kind=struct name=debug.Phase150OneSystemRebuiltCleanlyAudit
+  Function name=bootstrap_audit.build_phase150_one_system_rebuilt_cleanly_audit returns=[debug.Phase150OneSystemRebuiltCleanlyAudit]
+  Function name=bootstrap_services.execute_phase150_rebuilt_system_workflow returns=[bootstrap_services.Phase150RebuiltSystemWorkflowResult]
+  Function name=debug.validate_phase150_one_system_rebuilt_cleanly returns=[bool]
