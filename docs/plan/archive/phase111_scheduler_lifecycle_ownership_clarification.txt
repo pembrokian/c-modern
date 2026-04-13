@@ -20,7 +20,7 @@ admitted first running kernel slice.
 Repository status note
 ----------------------
 - Phase 110 closed one bounded kernel ownership split over the landed first
-  running Canopus kernel slice.
+  running Veya kernel slice.
 - That split made scheduler-facing validation and aggregate debug audits
   explicit, but the concrete task-state and process-state mutations still
   remained distributed across `kernel/src/syscall.mc` and
@@ -153,7 +153,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 111 is complete as a scheduler and lifecycle ownership clarification.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now makes task-state ownership explicit: scheduler-
 facing lifecycle validation remains in `sched`, while concrete task and
 process transition mutation now lives behind the distinct lifecycle owner.

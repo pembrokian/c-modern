@@ -1,5 +1,5 @@
 schema = 1
-project = "canopus-kernel"
+project = "veya-kernel"
 default = "kernel"
 
 [targets.kernel]
@@ -78,6 +78,7 @@ files = [
 	"src/bootstrap_services/08_phase145.mc",
 	"src/bootstrap_services/09_phase147.mc",
 	"src/bootstrap_services/10_phase150.mc",
+	"src/bootstrap_services/11_phase151.mc",
 ]
 
 [targets.kernel.runtime]

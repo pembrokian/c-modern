@@ -191,4 +191,4 @@ APIs can be cleaned up later. I do not agree with removing `ok_` or weakening
 
 That narrow cleanup slice is now complete. The remaining parser follow-through
 is documentation or later lexer/parser contract work, not an active blocker for
-resuming adjacent compiler or Canopus work.
+resuming adjacent compiler or Veya work.

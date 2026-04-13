@@ -17,7 +17,7 @@ This document is both the Phase 119 execution note and its closeout.
 It does not claim general namespace policy, dynamic service discovery,
 ambient capability lookup, a service manager, or a compiler wave.
 It records one narrow namespace-pressure answer inside the already admitted
-first running Canopus kernel slice.
+first running Veya kernel slice.
 
 Repository status note
 ----------------------
@@ -161,7 +161,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 119 is complete as a namespace-pressure audit.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now publishes one more running-system truth honestly:
 the current namespace pressure is answered by one fixed init-owned service
 directory over the landed log, echo, and transfer service set, dynamic

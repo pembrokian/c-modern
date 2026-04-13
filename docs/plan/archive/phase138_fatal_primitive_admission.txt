@@ -25,7 +25,7 @@ Repository status note
   discard, and no hidden propagation in the current admitted slice.
 - The remaining open error-handling question is ergonomic follow-through,
   not a second recoverable control-flow system.
-- Canopus and freestanding kernel work now have real pressure for one
+- Veya and freestanding kernel work now have real pressure for one
   architecturally explicit fatal path that is stronger than a testing helper
   or debug-only assertion but narrower than a language-level assertion family.
 - The strongest critique against a first-pass `require` admission is that it
@@ -99,7 +99,7 @@ Chosen outcome
 Chosen outcome: yes.
 
 The repository should take this phase because fatal-path pressure is now real
-in the Canopus direction, but the smallest honest answer is one primitive
+in the Veya direction, but the smallest honest answer is one primitive
 fatal form rather than a broader failure-language redesign or an early
 `require` admission.
 

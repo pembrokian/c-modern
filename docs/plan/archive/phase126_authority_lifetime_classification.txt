@@ -9,7 +9,7 @@ Purpose
 -------
 Continue from the completed Phase 125 invalidation and rejection audit step
 by proving one explicit long-lived versus short-lived authority distinction
-over the same already-landed Canopus kernel artifact.
+over the same already-landed Veya kernel artifact.
 
 This document is both the Phase 126 execution note and its closeout.
 It does not claim a broader lifetime framework, service-death handling,
@@ -165,7 +165,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 126 is complete as an authority lifetime classification step.
-The repository still claims only one bounded small Canopus running-system
+The repository still claims only one bounded small Veya running-system
 plateau, but that plateau now includes one explicit proof that the final
 holder keeps one long-lived control path while one short-lived delegated path
 is invalidated and stays rejected, and the compiler stays closed because this

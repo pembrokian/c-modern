@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from freestanding and narrow `hal`
+Take the next Veya-driven `v0.3` proof from freestanding and narrow `hal`
 bring-up into the first kernel-mechanism representation check: prove that one
 bounded endpoint queue and one bounded message shape can be expressed and
 validated with ordinary Modern C structs, enums, arrays, and functions rather
@@ -24,14 +24,14 @@ Repository status note
   narrow `hal` console proof real.
 - Phase 84 then turned that first non-hosted tranche into a published,
   repository-bounded support statement and one tooling audit.
-- The next strongest Canopus proof was no longer another build-model or
+- The next strongest Veya proof was no longer another build-model or
   hardware-boundary question. It was whether the admitted core language could
   represent one kernel-owned endpoint queue honestly without reopening parser,
   sema, MIR, or runtime policy work.
 
 Problem being solved
 --------------------
-- The Canopus proof ladder names endpoint queues and bounded message buffers as
+- The Veya proof ladder names endpoint queues and bounded message buffers as
   the first kernel-mechanism representation pressure after the initial
   freestanding crossing, but the repository had not yet exercised that shape in
   a real proof.

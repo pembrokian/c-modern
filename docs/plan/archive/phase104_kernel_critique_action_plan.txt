@@ -330,7 +330,7 @@ Exit criteria
 - main.mc remains a bounded proof harness but its sequencing assumptions are
   materially clearer and less duplicated
 - focused kernel regressions cover the new contracts without widening into
-  broader Canopus claims
+  broader Veya claims
 
 Non-goals
 ---------

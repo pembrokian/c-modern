@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from the first helper-boundary
+Take the next Veya-driven `v0.3` proof from the first helper-boundary
 anchor into the first explicit user-space lifecycle proof: prove that one
 minimal launch, ready, exit, and observation path can be expressed honestly
 across the first user-space bring-up boundary with explicit launchable program
@@ -55,7 +55,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The Canopus planning surface already names explicit program capabilities and
+- The Veya planning surface already names explicit program capabilities and
   parent-owned wait paths, but the repository had not yet exercised those
   shapes in a concrete freestanding proof.
 - Without one explicit user-space lifecycle proof, it would be too easy to

@@ -7,7 +7,7 @@ PROPOSED
 
 Purpose
 -------
-Name a small ordered proof set for a Canopus-driven `v0.3` wave so the next
+Name a small ordered proof set for a Veya-driven `v0.3` wave so the next
 work can be executed as bounded milestones rather than as a vague freestanding
 or OS-bring-up ambition.
 
@@ -75,7 +75,7 @@ Minimal behavior:
 - init sends one message and receives one reply or acknowledgment
 
 Why it matters:
-- this is the smallest honest user-space policy proof in the Canopus model
+- this is the smallest honest user-space policy proof in the Veya model
 
 5. Capability-handle transfer proof
 
@@ -88,12 +88,12 @@ Minimal behavior:
 - receiver uses that handle for one bounded action
 
 Why it matters:
-- this directly exercises one of Canopus Lite's central architectural claims
+- this directly exercises one of Veya Lite's central architectural claims
 
 6. Child-process or task lifecycle proof
 
 Goal:
-- prove the minimal create, exit, and wait lifecycle that Canopus Lite names
+- prove the minimal create, exit, and wait lifecycle that Veya Lite names
 
 Minimal behavior:
 - init launches one child task or process
@@ -113,10 +113,10 @@ Minimal behavior:
   event into an endpoint path
 
 Why it matters:
-- Canopus Lite explicitly includes timer and interrupt delivery in the kernel
+- Veya Lite explicitly includes timer and interrupt delivery in the kernel
   mechanism set, but this proof should stay minimal and single-purpose
 
-8. Canopus Lite first-system demo
+8. Veya Lite first-system demo
 
 Goal:
 - combine the earlier proofs into the first end-to-end bring-up slice the
@@ -156,7 +156,7 @@ Milestone 3 -- Validate user-space policy shape
 - proof 5: capability-handle transfer proof
 
 Primary output:
-- the Canopus Lite "kernel owns mechanism, user space owns policy" story is
+- the Veya Lite "kernel owns mechanism, user space owns policy" story is
   now exercised directly
 
 Milestone 4 -- Add one event source
@@ -166,7 +166,7 @@ Primary output:
 - the kernel has one honest wakeup path beyond simple synchronous setup
 
 Milestone 5 -- First-system integration
-- proof 8: Canopus Lite first-system demo
+- proof 8: Veya Lite first-system demo
 
 Primary output:
 - one small but complete end-to-end bring-up story
@@ -207,7 +207,7 @@ Do not reopen core-language work merely because the OS domain is large.
 
 Bottom line
 -----------
-The fastest honest path to a Canopus-driven `v0.3` is not to design a large
+The fastest honest path to a Veya-driven `v0.3` is not to design a large
 new language surface. It is to execute a small proof ladder that turns
 freestanding, `hal`, and first-system bring-up into concrete compiler and
 runtime requirements.

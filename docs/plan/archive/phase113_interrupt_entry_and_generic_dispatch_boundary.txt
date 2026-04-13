@@ -16,7 +16,7 @@ This document is both the Phase 113 execution note and its closeout.
 It does not claim a broad interrupt framework, general trap handling,
 preemption, a public timer API, broader MMU work, or a compiler wave.
 It records one narrow hardware-boundary step inside the already admitted
-first running Canopus kernel slice.
+first running Veya kernel slice.
 
 Repository status note
 ----------------------
@@ -151,7 +151,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 113 is complete as an interrupt entry and generic dispatch boundary.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now expresses one real interrupt path more honestly:
 architecture-local entry is explicit, generic dispatch is visible, timer-
 backed wake follow-through no longer lives as direct root-proof sequencing,

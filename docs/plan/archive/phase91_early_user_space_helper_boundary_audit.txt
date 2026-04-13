@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from the first explicit
+Take the next Veya-driven `v0.3` proof from the first explicit
 capability-transfer anchor into the first narrow user-space helper-boundary
 audit: prove that the repeated transfer-message, received-handle-install, and
 request-or-ack scaffolding can move into one ordinary helper module without
@@ -15,7 +15,7 @@ admitting a public `sys` wrapper, hidden capability-runtime machinery, or a
 wider service framework.
 
 This document is both the Phase 91 execution note and its closeout.
-It does not claim a public Canopus std wrapper, general helper-library policy,
+It does not claim a public Veya std wrapper, general helper-library policy,
 process spawning, richer service startup, or full user-space lifecycle
 completion.
 
@@ -152,7 +152,7 @@ Exit criteria
 
 Non-goals
 ---------
-- a public `sys` wrapper or broader Canopus std wrapper admission
+- a public `sys` wrapper or broader Veya std wrapper admission
 - general capability-table APIs, service registries, or helper-framework
   design
 - process spawn, wait-handle transfer, or broader user-space lifecycle work
@@ -184,7 +184,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 91 is complete as an early user-space helper-boundary audit. The
-repository still does not claim a public Canopus `sys` wrapper, a capability-
+repository still does not claim a public Veya `sys` wrapper, a capability-
 runtime helper family, process spawning, or full user-space lifecycle support,
 but it now has one honest proof that the admitted Modern C core and existing
 freestanding path can carry one imported helper module for repeated explicit-

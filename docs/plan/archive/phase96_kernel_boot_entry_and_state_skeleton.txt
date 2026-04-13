@@ -8,7 +8,7 @@ IMPLEMENTED
 Purpose
 -------
 Turn the completed Phase 95 freestanding `v0.3` slice into the first honest
-post-slice Canopus kernel bring-up step: prove that one real kernel-owned
+post-slice Veya kernel bring-up step: prove that one real kernel-owned
 artifact can boot through an explicit architecture entry, initialize one
 deterministic set of fixed kernel state tables, emit one bounded boot marker,
 and stop without yet claiming user-space entry, syscall truth, IPC delivery,
@@ -16,7 +16,7 @@ or broader kernel-image completion.
 
 This document is both the Phase 96 execution note and its closeout.
 It does not claim first user-space entry, real syscall handling, endpoint
-delivery, timer interrupts, scheduler policy, MMU setup, or full Canopus
+delivery, timer interrupts, scheduler policy, MMU setup, or full Veya
 kernel bring-up completion.
 
 Repository status note
@@ -33,14 +33,14 @@ Repository status note
 - Phase 95 then froze that proof ladder into the first admitted freestanding
   `v0.3` slice statement without yet claiming a real kernel-owned bring-up
   path.
-- The strongest next Canopus question was therefore no longer whether the
+- The strongest next Veya question was therefore no longer whether the
   language could model the early kernel shapes. It was whether the repository
   could turn those shapes back into one real kernel-owned boot artifact while
   keeping the claim smaller than first user-space entry or syscall truth.
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names Phase 96 as the first point
+- The speculative Veya kernel roadmap names Phase 96 as the first point
   where the repository should stop talking only about freestanding proof
   modules and start proving one real kernel-owned boot path.
 - The repository already had the component shapes needed for fixed kernel
@@ -89,7 +89,7 @@ user-space entry in the same step.
 What this phase proves
 ----------------------
 - the existing language, freestanding build path, and runtime startup can
-  carry one explicit Canopus kernel entry artifact rather than only earlier
+  carry one explicit Veya kernel entry artifact rather than only earlier
   proof modules
 - kernel-owned fixed tables for processes, tasks, ready-state, and boot-log
   records can be initialized deterministically at boot through ordinary code
@@ -111,7 +111,7 @@ Deliverables
 - MIR inspection proving the kernel state skeleton stays within ordinary
   imported-module, aggregate-init, top-level-global, and pointer-based global
   write behavior
-- refreshed planning notes so the Canopus kernel roadmap records Phase 96 as
+- refreshed planning notes so the Veya kernel roadmap records Phase 96 as
   concrete and Phase 97 becomes the next speculative owner
 
 Suggested execution order
@@ -145,7 +145,7 @@ Non-goals
 - first user-space entry, address-space setup, or program loading
 - syscall admission, IPC delivery, endpoint ownership, or handle tables
 - public scheduler, timer, or interrupt policy
-- claiming a general kernel image, broader target support, or full Canopus
+- claiming a general kernel image, broader target support, or full Veya
   kernel completion
 
 Implemented slice
@@ -169,7 +169,7 @@ Implemented slice
 - the proof also validates that no user-space entry is recorded, the ready
   queue contains only the boot task, and the boot log remains deterministic at
   exit
-- the backlog, decision log, and speculative Canopus kernel roadmap now record
+- the backlog, decision log, and speculative Veya kernel roadmap now record
   Phase 96 as the first concrete real-kernel bring-up step while keeping Phase
   97 as the next explicit owner for address-space and first-user-entry work
 
@@ -177,7 +177,7 @@ Closeout statement
 ------------------
 Phase 96 is complete as a kernel boot entry and state-skeleton proof. The
 repository still does not claim address-space setup, user-space entry,
-syscall truth, or broader Canopus kernel completion, but it now has one honest
+syscall truth, or broader Veya kernel completion, but it now has one honest
 real-kernel artifact that boots through explicit architecture entry, seeds
 deterministic kernel-owned state tables, emits one bounded boot marker, and
 stops at exactly that boundary.

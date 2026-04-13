@@ -17,7 +17,7 @@ This document is both the Phase 118 execution note and its closeout.
 It does not claim namespace policy, service discovery, multi-child service
 topologies, dynamic loading, or a new compiler wave.
 It records one narrow running-system follow-through inside the already
-admitted first running Canopus kernel slice.
+admitted first running Veya kernel slice.
 
 Repository status note
 ----------------------
@@ -162,7 +162,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 118 is complete as a delegated request-reply follow-through.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now publishes one more running-system truth honestly:
 init can retain one reply handle while delegating a sibling handle to a
 bounded service owner, the delegated reply remains request-derived, the old

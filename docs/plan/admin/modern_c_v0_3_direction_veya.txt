@@ -1,0 +1,166 @@
+Modern C -- v0.3 Direction From Veya Pressure
+===============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define one concrete framing for the work after the repository-bounded `v0.2`
+hosted plateau now that a new real consumer exists: the planned Veya Lite
+v0 operating-system bring-up.
+
+This note is a planning document.
+It does not admit a new repository slice by itself.
+It does not reopen the already closed `v0.2` core-language plateau.
+
+Repository status note
+----------------------
+- Phase 65 recorded that the admitted `v0.2` core is semantically complete
+  enough for repository-bounded release hardening.
+- Phase 66 through Phase 80 then chose adjacent stdlib follow-through,
+  workflow hardening, support-statement audit, and narrow release execution
+  work rather than another core-language expansion wave.
+- The current admitted repository slice remains a hosted Darwin arm64 path.
+- Freestanding startup, non-hosted execution support, and `hal` admission are
+  still explicitly deferred in the repository planning surface.
+- The attached Veya Lite v0 architecture is the first concrete upcoming
+  consumer that materially changes that deferral logic.
+
+Problem being solved
+--------------------
+- Without a new planning frame, the repository risks treating post-`v0.2`
+  motion as either vague language-version chatter or an unstructured grab-bag
+  of deferred backlog items.
+- The Veya effort introduces real pressure, but that pressure is not mainly
+  asking for new expression syntax or another arbitrary stdlib family.
+- The repository needs one explicit answer to the question: if there is a
+  `v0.3`, what kind of version is it?
+
+Core rule
+---------
+- Treat Veya Lite as a new concrete consumer, not as permission to widen
+  the language everywhere at once.
+- Keep the `v0.2` core-language plateau closed unless the Veya proof set
+  exposes a fresh parser, sema, MIR, or backend ownership gap.
+- Prefer freestanding truth, hardware-boundary truth, and target/toolchain
+  truth over speculative language machinery.
+- Do not smuggle OS policy into the language through hidden scheduler,
+  channel, namespace, or capability-runtime features.
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+The next coherent planning wave should be described as `v0.3`, but `v0.3`
+should mean a freestanding and hardware-boundary tranche of Modern C rather
+than a broad new core-language feature wave.
+
+Working definition of `v0.3`
+----------------------------
+`v0.3` should be the smallest honest version of Modern C that can serve as the
+implementation language for the first Veya Lite bring-up slice.
+
+That implies work in four bands:
+
+1. Freestanding execution becomes real.
+2. A narrow `hal` module becomes real.
+3. Build and target selection become honest for kernel-oriented outputs.
+4. The proof surface shifts from hosted utilities toward kernel and user-space
+   bring-up programs.
+
+What `v0.3` is not
+------------------
+`v0.3` should not be framed as any of the following unless fresh proof forces
+it:
+
+- a broad syntax-expansion release
+- a hidden async-runtime or scheduler release
+- a channel-first or actor-first language revision
+- a language-level capability system
+- a full Veya architecture completion claim
+- a broad `os` expansion wave for hosted process policy
+
+Why this framing fits Veya Lite
+----------------------------------
+The Veya Lite architecture asks for:
+
+- explicit tasks, address spaces, endpoints, capability handles, mappings, and
+  one init process
+- explicit IPC rather than hidden scheduler machinery
+- explicit hardware-facing boundaries for MMIO, interrupts, and barriers
+- policy in user space rather than in the kernel or in a language runtime
+
+Those goals already align with Modern C's current runtime stance:
+
+- no hidden runtime
+- no mandatory scheduler
+- hosted and freestanding both first-class in architecture
+- explicit `os` and `hal` escape hatches for target-facing reality
+
+The main missing pieces are therefore not conceptual language ideology.
+They are unadmitted freestanding, target, and hardware-boundary slices.
+
+Recommended `v0.3` scope
+------------------------
+Primary fronts:
+
+- freestanding startup and replacement entry
+- freestanding build targets with explicit runtime selection
+- narrow `hal` admission for MMIO and volatile operations
+- backend and link path honest enough to produce the first non-hosted images
+- proof programs tied directly to Veya Lite bring-up
+
+Secondary fronts, only if the proof set requires them:
+
+- a narrow barrier or interrupt-facing `hal` extension
+- bounded compile or link support for kernel-owned static data patterns
+- minimal target-triple or platform selection work needed for the first real
+  kernel environment
+
+Deferred by default:
+
+- broad `os` growth beyond the already admitted hosted subprocess slice
+- language-level IPC abstractions
+- hidden capability propagation helpers
+- scheduler-visible language features
+- full zero-copy or shared-memory communication design
+- broad packaging or distribution work
+
+Repository execution guidance
+----------------------------
+If the repository chooses to operationalize this direction, the next planning
+wave should follow this order:
+
+1. freeze the Veya-driven consumer matrix
+2. choose the smallest proof-program set that makes freestanding and `hal`
+   admission honest
+3. admit only the compiler, runtime, and stdlib slices required for that proof
+4. reopen core-language work only if one of those proofs exposes a real owner
+   gap inside the language rather than in the target boundary
+
+Recommended success statement
+-----------------------------
+The first successful `v0.3` statement should sound roughly like this:
+
+Modern C can now honestly build and validate a narrow freestanding target
+slice with explicit startup replacement, narrow `hal` hardware access, and the
+first Veya Lite bring-up proofs, while still avoiding hidden runtime policy
+and broad OS-surface claims.
+
+Exit criteria for this planning note
+------------------------------------
+- the repository has one explicit answer to what `v0.3` should mean
+- that answer distinguishes freestanding and hardware-boundary work from broad
+  core-language widening
+- the next-step conversation can proceed through consumer matrix and proof
+  programs rather than through abstract version speculation
+
+Bottom line
+-----------
+The big post-`v0.2` question is not whether the language needs another general
+feature wave. The concrete next question is whether Modern C can become an
+honest Veya implementation language without violating its current design
+stance. That makes `v0.3` primarily a freestanding, `hal`, target, and
+bring-up-proof release concept.

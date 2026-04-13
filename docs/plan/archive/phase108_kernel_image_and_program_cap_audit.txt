@@ -55,7 +55,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names kernel image and program-cap
+- The speculative Veya kernel roadmap names kernel image and program-cap
   audit pressure as the next bounded owner after the landed user-to-user
   transfer proof.
 - The repository already had most of the necessary truth, but it was spread
@@ -182,7 +182,7 @@ Implemented slice
   artifacts, manually re-links those artifacts through the host Clang
   toolchain, runs both linked artifacts to the current marker, and inspects
   MIR for explicit program-cap globals and seed helpers
-- refreshed the speculative Canopus kernel roadmap, repository map, kernel
+- refreshed the speculative Veya kernel roadmap, repository map, kernel
   README, tool-test notes, and decision log so the repository now records
   Phase 108 as concrete and shifts the next speculative owner upward
 

@@ -16,7 +16,7 @@ This document is both the Phase 116 execution note and its closeout.
 It does not claim broad barrier taxonomy, SMP completion, target-entry
 redesign, broader `hal` growth, a device framework, or a compiler wave.
 It records one narrow low-level hook follow-through inside the already
-admitted first running Canopus kernel slice.
+admitted first running Veya kernel slice.
 
 Repository status note
 ----------------------
@@ -154,7 +154,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 116 is complete as an MMU activation barrier follow-through.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now expresses one more hardware-facing truth honestly:
 translation-root activation publishes through one explicit `hal` barrier hook,
 the MMU owner names that hook locally, and the compiler remains widened only

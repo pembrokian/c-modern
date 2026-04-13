@@ -32,7 +32,7 @@ Repository status note
 Problem being solved
 --------------------
 - A freestanding target without an explicit target name leaves the artifact
-  identity implicit even though the Canopus direction requires target truth to
+  identity implicit even though the Veya direction requires target truth to
   stay visible.
 - The build model already had explicit runtime startup selection, but it still
   lacked one manifest-owned place to name extra prebuilt object or archive
@@ -72,7 +72,7 @@ Why this is the right next step
 -------------------------------
 - It strengthens the first freestanding artifact path without reopening the
   language core.
-- It aligns the implemented manifest more closely with the Canopus target-model
+- It aligns the implemented manifest more closely with the Veya target-model
   note.
 - It exposes one real target-owned support boundary while staying much smaller
   than general linker or cross-compilation design.
@@ -138,7 +138,7 @@ Implemented slice
 - the tool regression suite now proves one explicit-target diagnostic, one
   missing-link-input diagnostic, and one successful freestanding executable
   linked against a target-owned support object
-- the build-spec and Canopus target-model notes now describe the landed narrow
+- the build-spec and Veya target-model notes now describe the landed narrow
   manifest shape and explicitly defer broader linker-script policy
 
 Closeout statement

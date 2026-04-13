@@ -15,7 +15,7 @@ surfaces.
 This document records the landed Phase 146 slice.
 It defines one bounded service-shape consolidation step that lands as
 published service-owned structure plus audit truth before it is treated as a
-stable Canopus pattern.
+stable Veya pattern.
 It does not claim a service framework, a generic runtime, dynamic discovery,
 dynamic registration, or a broader platform expansion.
 It does not claim service framework, dynamic registration, or compiler expansion.

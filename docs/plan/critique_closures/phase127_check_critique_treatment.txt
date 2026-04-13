@@ -256,4 +256,4 @@ larger factoring work explicitly deferred.
 
 Those local correctness gaps are now closed in the current tree. The remaining
 Phase 127 sema follow-through is documentation or later architecture work, not
-an active blocker for Canopus-facing work.
+an active blocker for Veya-facing work.

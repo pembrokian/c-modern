@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from kernel build integration into
+Take the next Veya-driven `v0.3` proof from kernel build integration into
 the first user-space policy check: prove that the kernel can start one init
 context, pass one explicit log-service endpoint capability into that init
 path, and complete one bounded log request or acknowledgment flow with
@@ -36,14 +36,14 @@ Repository status note
 - Phase 88 then proved that the emitted freestanding entry object and
   generated runtime object compose honestly with one minimal external relink
   step.
-- The next strongest Canopus proof was no longer another kernel-only storage
+- The next strongest Veya proof was no longer another kernel-only storage
   or build question. It was whether the repository could express the first
   small user-space policy boundary honestly without reopening compiler or
   runtime-policy work.
 
 Problem being solved
 --------------------
-- The Canopus proof ladder names init startup plus one service handshake as
+- The Veya proof ladder names init startup plus one service handshake as
   the first small user-space policy story, but the repository had not yet
   exercised that shape in a real freestanding proof.
 - Without one concrete handshake proof, it would be too easy to speculate

@@ -8,7 +8,7 @@ IMPLEMENTED
 Purpose
 -------
 Continue from the completed Phase 124 delegation-chain stress step by proving
-one explicit authority-loss path over the same already-landed Canopus kernel
+one explicit authority-loss path over the same already-landed Veya kernel
 artifact.
 
 This document is both the Phase 125 execution note and its closeout.
@@ -166,7 +166,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 125 is complete as an invalidation and rejection audit step.
-The repository still claims only one bounded small Canopus running-system
+The repository still claims only one bounded small Veya running-system
 plateau, but that plateau now includes one explicit proof that a delegated
 handle can be invalidated at the final holder and then rejected consistently
 at the current use sites, and the compiler stays closed because this phase

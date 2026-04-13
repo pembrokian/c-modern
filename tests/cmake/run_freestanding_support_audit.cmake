@@ -105,7 +105,7 @@ require_contains(
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"
-  "the repository still does not claim full Canopus Lite completion")
+  "the repository still does not claim full Veya Lite completion")
 require_contains(
   "freestanding_support_statement.txt"
   "${FREESTANDING_NOTE_CONTENT}"

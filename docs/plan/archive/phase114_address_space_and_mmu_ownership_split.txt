@@ -16,7 +16,7 @@ This document is both the Phase 114 execution note and its closeout.
 It does not claim a broad VM subsystem, richer loader policy, paging
 algorithms, broader MMU APIs, public mapping management, or a compiler wave.
 It records one narrow ownership split inside the already admitted first
-running Canopus kernel slice.
+running Veya kernel slice.
 
 Repository status note
 ----------------------
@@ -151,7 +151,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 114 is complete as an address-space and MMU ownership split.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now expresses its translation-root boundary more
 honestly: address-space layout stays generic, MMU mechanics are explicit,
 spawn and first-user construction no longer move raw page-table facts through

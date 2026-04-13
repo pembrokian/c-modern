@@ -90,7 +90,7 @@ What this phase proves
 - the current running-system truth still stops well short of dynamic
   discovery, dynamic loading, a service manager, or a broader public
   freestanding workflow claim
-- the repository can advance its published Canopus position without widening
+- the repository can advance its published Veya position without widening
   compiler or low-level ownership surfaces
 
 Deliverables
@@ -160,7 +160,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 120 is complete as a running-system support statement.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now has one explicit published running-system support
 statement over the landed init-owned multi-service, delegated request-reply,
 and fixed-directory boundaries, and the compiler stays closed because this

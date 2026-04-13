@@ -9,7 +9,7 @@ Purpose
 -------
 Continue from the completed Phase 128 service death observation step by
 proving one bounded partial-failure path over the same already-landed
-Canopus kernel artifact.
+Veya kernel artifact.
 
 This document is both the Phase 129 execution note and its closeout.
 It does not claim restart policy, service replacement, capability rebinding,
@@ -169,7 +169,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 129 is complete as a partial failure propagation step.
-The repository still claims only one bounded small Canopus running-system
+The repository still claims only one bounded small Veya running-system
 plateau, but that plateau now includes one explicit proof that one bounded
 service death remains a partial failure because one second bounded service
 path still replies and exits cleanly through the landed fixed-directory and

@@ -1,5 +1,7 @@
 import address_space
+import bootstrap_audit
 import capability
+import debug
 import echo_service
 import ipc
 import init
@@ -318,6 +320,66 @@ struct SerialServiceExecutionResult {
     succeeded: u32
 }
 
+struct ServiceRuntimeState {
+    gate: syscall.SyscallGate
+    process_slots: [3]state.ProcessSlot
+    task_slots: [3]state.TaskSlot
+    init_handle_table: capability.HandleTable
+    child_handle_table: capability.HandleTable
+    wait_table: capability.WaitTable
+    endpoints: ipc.EndpointTable
+    init_image: init.InitImage
+    ready_queue: state.ReadyQueue
+}
+
+struct LogServiceSnapshot {
+    program_capability: capability.CapabilitySlot
+    address_space: address_space.AddressSpace
+    user_frame: address_space.UserEntryFrame
+    state: log_service.LogServiceState
+    spawn_observation: syscall.SpawnObservation
+    receive_observation: syscall.ReceiveObservation
+    ack_observation: syscall.ReceiveObservation
+    handshake: log_service.LogHandshakeObservation
+    wait_observation: syscall.WaitObservation
+}
+
+struct EchoServiceSnapshot {
+    program_capability: capability.CapabilitySlot
+    address_space: address_space.AddressSpace
+    user_frame: address_space.UserEntryFrame
+    state: echo_service.EchoServiceState
+    spawn_observation: syscall.SpawnObservation
+    receive_observation: syscall.ReceiveObservation
+    reply_observation: syscall.ReceiveObservation
+    exchange: echo_service.EchoExchangeObservation
+    wait_observation: syscall.WaitObservation
+}
+
+struct TransferServiceSnapshot {
+    program_capability: capability.CapabilitySlot
+    address_space: address_space.AddressSpace
+    user_frame: address_space.UserEntryFrame
+    state: transfer_service.TransferServiceState
+    spawn_observation: syscall.SpawnObservation
+    grant_observation: syscall.ReceiveObservation
+    emit_observation: syscall.ReceiveObservation
+    transfer: transfer_service.TransferObservation
+    wait_observation: syscall.WaitObservation
+}
+
+struct SerialServiceSnapshot {
+    program_capability: capability.CapabilitySlot
+    address_space: address_space.AddressSpace
+    user_frame: address_space.UserEntryFrame
+    state: serial_service.SerialServiceState
+    spawn_observation: syscall.SpawnObservation
+    receive_observation: syscall.ReceiveObservation
+    ingress: serial_service.SerialIngressObservation
+    failure_observation: SerialServiceFailureObservation
+    wait_observation: syscall.WaitObservation
+}
+
 struct Phase140SerialIngressCompositionResult {
     serial_state: SerialServiceExecutionState
     composition_state: CompositionServiceExecutionState
@@ -387,6 +449,22 @@ func log_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asi
     return LogServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: LOG_SERVICE_WAIT_HANDLE_SLOT, endpoint_handle_slot: LOG_SERVICE_ENDPOINT_HANDLE_SLOT, request_byte: LOG_SERVICE_REQUEST_BYTE, exit_code: LOG_SERVICE_EXIT_CODE, program_slot: LOG_SERVICE_PROGRAM_SLOT, program_object_id: LOG_SERVICE_PROGRAM_OBJECT_ID }
 }
 
+func service_runtime_state(gate: syscall.SyscallGate, process_slots: [3]state.ProcessSlot, task_slots: [3]state.TaskSlot, init_handle_table: capability.HandleTable, child_handle_table: capability.HandleTable, wait_table: capability.WaitTable, endpoints: ipc.EndpointTable, init_image: init.InitImage, ready_queue: state.ReadyQueue) ServiceRuntimeState {
+    return ServiceRuntimeState{ gate: gate, process_slots: process_slots, task_slots: task_slots, init_handle_table: init_handle_table, child_handle_table: child_handle_table, wait_table: wait_table, endpoints: endpoints, init_image: init_image, ready_queue: ready_queue }
+}
+
+func log_service_execution_state(snapshot: LogServiceSnapshot, runtime: ServiceRuntimeState) LogServiceExecutionState {
+    return LogServiceExecutionState{ program_capability: snapshot.program_capability, gate: runtime.gate, process_slots: runtime.process_slots, task_slots: runtime.task_slots, init_handle_table: runtime.init_handle_table, child_handle_table: runtime.child_handle_table, wait_table: runtime.wait_table, endpoints: runtime.endpoints, init_image: runtime.init_image, child_address_space: snapshot.address_space, child_user_frame: snapshot.user_frame, service_state: snapshot.state, spawn_observation: snapshot.spawn_observation, receive_observation: snapshot.receive_observation, ack_observation: snapshot.ack_observation, handshake: snapshot.handshake, wait_observation: snapshot.wait_observation, ready_queue: runtime.ready_queue }
+}
+
+func log_service_snapshot(execution: LogServiceExecutionState) LogServiceSnapshot {
+    return LogServiceSnapshot{ program_capability: execution.program_capability, address_space: execution.child_address_space, user_frame: execution.child_user_frame, state: execution.service_state, spawn_observation: execution.spawn_observation, receive_observation: execution.receive_observation, ack_observation: execution.ack_observation, handshake: execution.handshake, wait_observation: execution.wait_observation }
+}
+
+func service_runtime_state_from_log_execution(execution: LogServiceExecutionState) ServiceRuntimeState {
+    return service_runtime_state(execution.gate, execution.process_slots, execution.task_slots, execution.init_handle_table, execution.child_handle_table, execution.wait_table, execution.endpoints, execution.init_image, execution.ready_queue)
+}
+
 func log_service_result(state: LogServiceExecutionState, succeeded: u32) LogServiceExecutionResult {
     return LogServiceExecutionResult{ state: state, succeeded: succeeded }
 }
@@ -399,12 +477,36 @@ func echo_service_result(state: EchoServiceExecutionState, succeeded: u32) EchoS
     return EchoServiceExecutionResult{ state: state, succeeded: succeeded }
 }
 
+func echo_service_execution_state(snapshot: EchoServiceSnapshot, runtime: ServiceRuntimeState) EchoServiceExecutionState {
+    return EchoServiceExecutionState{ program_capability: snapshot.program_capability, gate: runtime.gate, process_slots: runtime.process_slots, task_slots: runtime.task_slots, init_handle_table: runtime.init_handle_table, child_handle_table: runtime.child_handle_table, wait_table: runtime.wait_table, endpoints: runtime.endpoints, init_image: runtime.init_image, child_address_space: snapshot.address_space, child_user_frame: snapshot.user_frame, service_state: snapshot.state, spawn_observation: snapshot.spawn_observation, receive_observation: snapshot.receive_observation, reply_observation: snapshot.reply_observation, exchange: snapshot.exchange, wait_observation: snapshot.wait_observation, ready_queue: runtime.ready_queue }
+}
+
+func echo_service_snapshot(execution: EchoServiceExecutionState) EchoServiceSnapshot {
+    return EchoServiceSnapshot{ program_capability: execution.program_capability, address_space: execution.child_address_space, user_frame: execution.child_user_frame, state: execution.service_state, spawn_observation: execution.spawn_observation, receive_observation: execution.receive_observation, reply_observation: execution.reply_observation, exchange: execution.exchange, wait_observation: execution.wait_observation }
+}
+
+func service_runtime_state_from_echo_execution(execution: EchoServiceExecutionState) ServiceRuntimeState {
+    return service_runtime_state(execution.gate, execution.process_slots, execution.task_slots, execution.init_handle_table, execution.child_handle_table, execution.wait_table, execution.endpoints, execution.init_image, execution.ready_queue)
+}
+
 func transfer_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, init_endpoint_id: u32, init_endpoint_handle_slot: u32, child_translation_root: mmu.TranslationRoot, source_handle_slot: u32, init_received_handle_slot: u32) TransferServiceConfig {
     return TransferServiceConfig{ init_pid: init_pid, child_pid: child_pid, child_tid: child_tid, child_asid: child_asid, init_endpoint_id: init_endpoint_id, init_endpoint_handle_slot: init_endpoint_handle_slot, child_translation_root: child_translation_root, wait_handle_slot: TRANSFER_SERVICE_WAIT_HANDLE_SLOT, control_handle_slot: TRANSFER_SERVICE_CONTROL_HANDLE_SLOT, source_handle_slot: source_handle_slot, init_received_handle_slot: init_received_handle_slot, service_received_handle_slot: TRANSFER_SERVICE_RECEIVED_HANDLE_SLOT, grant_byte0: TRANSFER_SERVICE_GRANT_BYTE0, grant_byte1: TRANSFER_SERVICE_GRANT_BYTE1, grant_byte2: TRANSFER_SERVICE_GRANT_BYTE2, grant_byte3: TRANSFER_SERVICE_GRANT_BYTE3, exit_code: TRANSFER_SERVICE_EXIT_CODE, program_slot: TRANSFER_SERVICE_PROGRAM_SLOT, program_object_id: TRANSFER_SERVICE_PROGRAM_OBJECT_ID }
 }
 
 func transfer_service_result(state: TransferServiceExecutionState, succeeded: u32) TransferServiceExecutionResult {
     return TransferServiceExecutionResult{ state: state, succeeded: succeeded }
+}
+
+func transfer_service_execution_state(snapshot: TransferServiceSnapshot, runtime: ServiceRuntimeState) TransferServiceExecutionState {
+    return TransferServiceExecutionState{ program_capability: snapshot.program_capability, gate: runtime.gate, process_slots: runtime.process_slots, task_slots: runtime.task_slots, init_handle_table: runtime.init_handle_table, child_handle_table: runtime.child_handle_table, wait_table: runtime.wait_table, endpoints: runtime.endpoints, init_image: runtime.init_image, child_address_space: snapshot.address_space, child_user_frame: snapshot.user_frame, service_state: snapshot.state, spawn_observation: snapshot.spawn_observation, grant_observation: snapshot.grant_observation, emit_observation: snapshot.emit_observation, transfer: snapshot.transfer, wait_observation: snapshot.wait_observation, ready_queue: runtime.ready_queue }
+}
+
+func transfer_service_snapshot(execution: TransferServiceExecutionState) TransferServiceSnapshot {
+    return TransferServiceSnapshot{ program_capability: execution.program_capability, address_space: execution.child_address_space, user_frame: execution.child_user_frame, state: execution.service_state, spawn_observation: execution.spawn_observation, grant_observation: execution.grant_observation, emit_observation: execution.emit_observation, transfer: execution.transfer, wait_observation: execution.wait_observation }
+}
+
+func service_runtime_state_from_transfer_execution(execution: TransferServiceExecutionState) ServiceRuntimeState {
+    return service_runtime_state(execution.gate, execution.process_slots, execution.task_slots, execution.init_handle_table, execution.child_handle_table, execution.wait_table, execution.endpoints, execution.init_image, execution.ready_queue)
 }
 
 func composition_service_config(init_pid: u32, child_pid: u32, child_tid: u32, child_asid: u32, control_endpoint_id: u32, echo_endpoint_id: u32, log_endpoint_id: u32, init_control_handle_slot: u32, child_translation_root: mmu.TranslationRoot) CompositionServiceConfig {
@@ -435,12 +537,44 @@ func empty_serial_service_failure_observation() SerialServiceFailureObservation 
     return SerialServiceFailureObservation{ endpoint_id: 0, closed: 0, aborted_messages: 0, wake_count: 0 }
 }
 
+func empty_log_service_snapshot() LogServiceSnapshot {
+    return LogServiceSnapshot{ program_capability: capability.empty_slot(), address_space: address_space.empty_space(), user_frame: address_space.empty_frame(), state: log_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), ack_observation: syscall.empty_receive_observation(), handshake: log_service.LogHandshakeObservation{ service_pid: 0, client_pid: 0, endpoint_id: 0, tag: log_service.LogMessageTag.None, request_len: 0, request_byte: 0, ack_byte: 0, request_count: 0, ack_count: 0 }, wait_observation: syscall.empty_wait_observation() }
+}
+
+func empty_echo_service_snapshot() EchoServiceSnapshot {
+    return EchoServiceSnapshot{ program_capability: capability.empty_slot(), address_space: address_space.empty_space(), user_frame: address_space.empty_frame(), state: echo_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), reply_observation: syscall.empty_receive_observation(), exchange: echo_service.EchoExchangeObservation{ service_pid: 0, client_pid: 0, endpoint_id: 0, tag: echo_service.EchoMessageTag.None, request_len: 0, request_byte0: 0, request_byte1: 0, reply_len: 0, reply_byte0: 0, reply_byte1: 0, request_count: 0, reply_count: 0 }, wait_observation: syscall.empty_wait_observation() }
+}
+
+func empty_transfer_service_snapshot() TransferServiceSnapshot {
+    return TransferServiceSnapshot{ program_capability: capability.empty_slot(), address_space: address_space.empty_space(), user_frame: address_space.empty_frame(), state: transfer_service.service_state(0, 0, 0), spawn_observation: syscall.empty_spawn_observation(), grant_observation: syscall.empty_receive_observation(), emit_observation: syscall.empty_receive_observation(), transfer: transfer_service.TransferObservation{ service_pid: 0, client_pid: 0, control_endpoint_id: 0, transferred_endpoint_id: 0, transferred_rights: 0, tag: transfer_service.CapabilityTransferTag.None, grant_len: 0, grant_byte0: 0, grant_byte1: 0, grant_byte2: 0, grant_byte3: 0, emit_len: 0, emit_byte0: 0, emit_byte1: 0, emit_byte2: 0, emit_byte3: 0, grant_count: 0, emit_count: 0 }, wait_observation: syscall.empty_wait_observation() }
+}
+
+func empty_serial_service_snapshot() SerialServiceSnapshot {
+    return SerialServiceSnapshot{ program_capability: capability.empty_slot(), address_space: address_space.empty_space(), user_frame: address_space.empty_frame(), state: serial_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), ingress: serial_service.empty_ingress_observation(), failure_observation: empty_serial_service_failure_observation(), wait_observation: syscall.empty_wait_observation() }
+}
+
 func empty_serial_service_execution_state() SerialServiceExecutionState {
     return SerialServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.gate_closed(), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.empty_handle_table(), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: init.bootstrap_image(), child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: serial_service.service_state(0, 0), spawn_observation: syscall.empty_spawn_observation(), receive_observation: syscall.empty_receive_observation(), ingress: serial_service.empty_ingress_observation(), composition: serial_service.empty_composition_observation(), failure_observation: empty_serial_service_failure_observation(), wait_observation: syscall.empty_wait_observation(), ready_queue: state.empty_queue() }
 }
 
 func serial_service_result(state: SerialServiceExecutionState, succeeded: u32) SerialServiceExecutionResult {
     return SerialServiceExecutionResult{ state: state, succeeded: succeeded }
+}
+
+func serial_service_execution_state(snapshot: SerialServiceSnapshot, runtime: ServiceRuntimeState) SerialServiceExecutionState {
+    return SerialServiceExecutionState{ program_capability: snapshot.program_capability, gate: runtime.gate, process_slots: runtime.process_slots, task_slots: runtime.task_slots, init_handle_table: runtime.init_handle_table, child_handle_table: runtime.child_handle_table, wait_table: runtime.wait_table, endpoints: runtime.endpoints, init_image: runtime.init_image, child_address_space: snapshot.address_space, child_user_frame: snapshot.user_frame, service_state: snapshot.state, spawn_observation: snapshot.spawn_observation, receive_observation: snapshot.receive_observation, ingress: snapshot.ingress, composition: serial_service.observe_composition(snapshot.state), failure_observation: snapshot.failure_observation, wait_observation: snapshot.wait_observation, ready_queue: runtime.ready_queue }
+}
+
+func serial_service_snapshot(execution: SerialServiceExecutionState) SerialServiceSnapshot {
+    return SerialServiceSnapshot{ program_capability: execution.program_capability, address_space: execution.child_address_space, user_frame: execution.child_user_frame, state: execution.service_state, spawn_observation: execution.spawn_observation, receive_observation: execution.receive_observation, ingress: execution.ingress, failure_observation: execution.failure_observation, wait_observation: execution.wait_observation }
+}
+
+func service_runtime_state_from_serial_execution(execution: SerialServiceExecutionState) ServiceRuntimeState {
+    return service_runtime_state(execution.gate, execution.process_slots, execution.task_slots, execution.init_handle_table, execution.child_handle_table, execution.wait_table, execution.endpoints, execution.init_image, execution.ready_queue)
+}
+
+func service_runtime_state_from_composition_execution(execution: CompositionServiceExecutionState) ServiceRuntimeState {
+    return service_runtime_state(execution.gate, execution.process_slots, execution.task_slots, execution.init_handle_table, execution.child_handle_table, execution.wait_table, execution.endpoints, execution.init_image, execution.ready_queue)
 }
 
 func phase140_serial_ingress_composition_result(serial_state: SerialServiceExecutionState, composition_state: CompositionServiceExecutionState, succeeded: u32) Phase140SerialIngressCompositionResult {

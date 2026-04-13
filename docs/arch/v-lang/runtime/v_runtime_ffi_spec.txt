@@ -1,0 +1,175 @@
+V - Runtime And FFI Boundary
+
+Purpose
+
+This document defines the intended runtime stance for V and the boundary
+between V, Modern C, and the kernel-facing support layers.
+
+Primary role
+
+V is intended to run service processes and user-space system components.
+Its runtime should therefore be:
+- explicit
+- narrow
+- replaceable
+- honest about what support it requires
+
+V should not depend on a large hidden managed runtime.
+
+1. Runtime stance
+
+The current design direction is:
+- no required global tracing GC
+- no hidden exception runtime
+- no mandatory language-wide actor framework
+- no hidden module initialization machinery
+
+V may still require a modest execution layer for:
+- process entry
+- task startup support
+- channel implementation
+- explicit allocation facilities
+- service-facing syscall or kernel IPC wrappers
+
+That support should remain a documented runtime layer, not an invisible policy
+engine.
+
+2. Execution layers
+
+Keep the layers separate:
+
+1. kernel and low-level runtime support in Modern C
+2. V runtime support for tasks, channels, allocation, and startup
+3. ordinary V libraries and service code
+
+This separation matters because:
+- the kernel and hardware boundary has different constraints
+- V services need stronger composition support than the kernel should depend
+  on
+- keeping the layers visible reduces pressure to hide policy in the language
+
+3. Service process assumptions
+
+V runtime support may assume a service-oriented environment where:
+- tasks can be created explicitly
+- channels or queues are available
+- handles or capabilities can be passed explicitly
+- readiness or event waiting can be surfaced through ordinary APIs
+
+The runtime should not assume:
+- ambient filesystem or network authority
+- broad inherited process privilege
+- implicit background services that programs cannot name
+
+4. Startup
+
+V needs an explicit startup model.
+
+The runtime should define:
+- how an V service starts
+- what entry function shape is expected
+- how initial capabilities, handles, arguments, or configuration arrive
+
+Preferred direction:
+- startup receives explicit inputs
+- initial authority is explicit in parameters or launch context
+- service initialization does not depend on hidden global constructors
+
+5. Allocation boundary
+
+V may provide conventional allocation helpers, but allocation must remain
+architecturally visible.
+
+Recommended direction:
+- support explicit allocators and arenas
+- allow a conventional default allocator in hosted service environments only if
+  it stays visible and replaceable
+- do not make hidden allocation the default consequence of ordinary language
+  features
+
+6. C and Modern C interop
+
+V must interoperate with Modern C because the operating system will use
+Modern C for the kernel and low-level hardware-facing code.
+
+The interop boundary should define:
+- calling-convention rules
+- layout expectations for interoperable structs and enums
+- string and buffer boundary rules
+- ownership transfer rules across the boundary
+- error and status representation rules
+
+Strong recommendation:
+- keep the V to Modern C interop surface explicit and narrow
+- prefer ordinary C-compatible ABI shapes for the first admitted boundary
+- do not rely on hidden runtime object metadata to cross the boundary
+
+7. Buffer and handle crossing rules
+
+The FFI boundary must say who owns what.
+
+At minimum it should define:
+- when a buffer is borrowed versus transferred
+- who frees transferred storage
+- whether handles are duplicated, moved, or merely viewed
+- what lifetimes are valid after the call returns
+
+Without these rules, V ownership semantics will become vague exactly where
+the OS boundary is most sensitive.
+
+8. Kernel and syscall boundary
+
+V should not talk directly to hardware.
+That remains a Modern C and kernel concern.
+
+V should instead interact through explicit kernel-facing interfaces such as:
+- syscalls
+- capability transfer operations
+- message endpoints
+- readiness or event sources
+
+The runtime and FFI design should make these boundaries ordinary and explicit
+rather than magical built-ins.
+
+9. Capability boundary
+
+V should support explicit capability-bearing values, but the runtime must not
+smuggle ambient privilege into every service.
+
+Preferred direction:
+- initial capabilities are explicitly supplied
+- capability transfer is explicit
+- capability wrapping helpers are ordinary library or runtime APIs
+- authority checks remain visible at the API boundary
+
+10. Replaceability
+
+The V runtime stance is only credible if the execution layer is replaceable.
+
+This means:
+- task and channel implementations may evolve without redefining the language
+- alternate service runtimes should be possible if they preserve the same
+  language-level guarantees
+- low-level startup and FFI shims should be replaceable for different targets
+
+11. What the runtime and FFI spec should avoid
+
+The first V runtime and FFI spec should avoid:
+- promising a broad portable ABI too early
+- requiring a complex VM
+- hiding capability routing in global ambient state
+- making kernel linkage depend on undocumented runtime internals
+- collapsing V libraries and runtime support into one unreviewable blob
+
+12. Summary
+
+V should have:
+- a small explicit runtime
+- explicit startup
+- explicit allocation support
+- explicit task and channel support
+- a narrow and documented Modern C or C interop boundary
+- explicit ownership rules at every foreign boundary
+
+That is enough to support serious system services without turning V into a
+managed-runtime platform.

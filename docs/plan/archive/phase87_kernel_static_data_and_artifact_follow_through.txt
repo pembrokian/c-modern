@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from lifecycle state into the first
+Take the next Veya-driven `v0.3` proof from lifecycle state into the first
 kernel-owned static-data and artifact check: prove that the constants and
 mutable storage required by the earlier endpoint and task proofs survive the
 freestanding build and artifact path honestly rather than only as local stack
@@ -30,7 +30,7 @@ Repository status note
 - Phase 86 then proved one minimal create, ready, exit, and wait lifecycle
   path through an explicit task-state enum and explicit kernel-owned task
   slots.
-- The next strongest Canopus proof was no longer whether those shapes could
+- The next strongest Veya proof was no longer whether those shapes could
   exist locally. It was whether the kernel-owned constants and mutable static
   storage those mechanisms want could survive the freestanding build and
   artifact path honestly.

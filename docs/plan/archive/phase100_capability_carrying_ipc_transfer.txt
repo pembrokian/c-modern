@@ -44,7 +44,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names Phase 100 as the next point
+- The speculative Veya kernel roadmap names Phase 100 as the next point
   where the repository should turn the landed byte-only syscall boundary into
   a capability-carrying IPC boundary.
 - The repository already had explicit endpoint tables, per-process handle
@@ -102,7 +102,7 @@ semantics.
 
 What this phase proves
 ----------------------
-- one real Canopus kernel artifact can now deliver one byte payload plus one
+- one real Veya kernel artifact can now deliver one byte payload plus one
   attached endpoint handle atomically as one syscall-owned message
 - sender-side handle authority is removed only after the send succeeds, rather
   than before queue admission or through hidden ambient policy
@@ -175,7 +175,7 @@ Non-goals
   refinement policy beyond this one bounded slice
 - init-owned service launch, namespace policy, or broader running-kernel
   claims
-- claiming a complete Canopus kernel slice or broader target support
+- claiming a complete Veya kernel slice or broader target support
 
 Implemented slice
 -----------------
@@ -206,7 +206,7 @@ Implemented slice
   inspects merged MIR for imported attached-handle request and observation
   types plus explicit global-state lowering for transferred-handle state
 - refreshed the kernel README, agent map, freestanding test notes, backlog,
-  decision log, and speculative Canopus kernel roadmap so the repository now
+  decision log, and speculative Veya kernel roadmap so the repository now
   records Phase 100 as concrete and leaves Phase 101 as the next remaining
   spawn-plus-wait owner
 

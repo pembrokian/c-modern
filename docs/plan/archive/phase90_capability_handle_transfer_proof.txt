@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from the first bounded user-space
+Take the next Veya-driven `v0.3` proof from the first bounded user-space
 service handshake into the first explicit capability-transfer check: prove
 that one user-space component can receive and use one explicitly transferred
 handle for one bounded action rather than relying on ambient authority,
@@ -39,14 +39,14 @@ Repository status note
 - Phase 89 then proved that the kernel can start one init context, pass one
   explicit log-service endpoint capability into that context, and complete
   one bounded request-and-acknowledgment flow.
-- The next strongest Canopus proof was no longer whether one user-space
+- The next strongest Veya proof was no longer whether one user-space
   component could talk to a service at all. It was whether explicit handle
   ownership could move between user-space components without collapsing back
   into ambient authority.
 
 Problem being solved
 --------------------
-- The Canopus proof ladder names explicit handle transfer as a central
+- The Veya proof ladder names explicit handle transfer as a central
   architectural claim, but the repository had not yet exercised that shape in
   a real freestanding proof.
 - Without one concrete transfer proof, it would be too easy to treat the

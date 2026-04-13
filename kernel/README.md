@@ -1,7 +1,7 @@
-Canopus Kernel Tree
+Veya Kernel Tree
 ===================
 
-This directory is the repository-owned home for real Canopus kernel sources.
+This directory is the repository-owned home for real Veya kernel sources.
 
 Current status
 --------------
@@ -87,7 +87,7 @@ Current status
   echo-service request-reply flow with explicit service reap, one bounded real
   user-to-user endpoint transfer with explicit sender-side removal and
   receiver-side installation, one bounded kernel image-input and program-cap
-  audit, one bounded first running Canopus kernel slice audit, one bounded
+  audit, one bounded first running Veya kernel slice audit, one bounded
   kernel ownership split audit, one bounded scheduler and lifecycle ownership
   clarification, one bounded syscall boundary thinness audit, one bounded
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
@@ -215,7 +215,7 @@ Phase boundary
   service reap, one bounded real echo-service request-reply flow with explicit
   service reap, one bounded real user-to-user endpoint transfer with explicit
   service-side follow-through, one bounded kernel image-and-program-cap audit,
-  one bounded first running Canopus kernel slice audit, one bounded kernel
+  one bounded first running Veya kernel slice audit, one bounded kernel
   ownership split audit, one bounded scheduler and lifecycle ownership
   clarification, one bounded syscall boundary thinness audit, one bounded
   interrupt-entry and generic-dispatch boundary, one bounded address-space and
@@ -228,7 +228,7 @@ Phase boundary
   and rejection audit step, and one bounded authority lifetime classification
   step, one bounded service death observation step, and one bounded partial
   failure propagation step.
-- The repository can now honestly claim one first running Canopus kernel
+- The repository can now honestly claim one first running Veya kernel
   slice with an explicit Phase 120 running-system support statement over the
   landed Phase 118 delegated request-reply follow-through, landed Phase 121
   kernel image-contract hardening step, landed Phase 122 target-surface

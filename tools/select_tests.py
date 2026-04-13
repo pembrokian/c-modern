@@ -308,13 +308,6 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         KERNEL_RUNTIME_TEST: [
             "tests/tool/freestanding/kernel/suite.cpp",
             "tests/tool/freestanding/kernel/runtime/",
-            "tests/tool/freestanding/kernel/phase97_user_entry.cpp",
-            "tests/tool/freestanding/kernel/phase98_endpoint_handle_core.cpp",
-            "tests/tool/freestanding/kernel/phase99_syscall_byte_ipc.cpp",
-            "tests/tool/freestanding/kernel/phase100_capability_transfer.cpp",
-            "tests/tool/freestanding/kernel/phase102_timer_sleep.cpp",
-            "tests/tool/freestanding/kernel/phase103_init_bootstrap_handoff.cpp",
-            "tests/tool/freestanding/kernel/phase104_kernel_critique_hardening.cpp",
             *common_tool_inputs,
             "runtime/freestanding/",
             "kernel/",

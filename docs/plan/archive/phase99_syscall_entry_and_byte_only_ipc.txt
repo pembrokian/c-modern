@@ -41,7 +41,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names Phase 99 as the first point
+- The speculative Veya kernel roadmap names Phase 99 as the first point
   where the repository should turn the landed kernel object core into a real
   syscall-owned byte-only IPC boundary.
 - The repository already had endpoint tables, handle tables, and bounded
@@ -94,7 +94,7 @@ handle transfer or spawn. It is one bounded byte-only send and receive path.
 
 What this phase proves
 ----------------------
-- one real Canopus kernel artifact can now expose one honest syscall-owned IPC
+- one real Veya kernel artifact can now expose one honest syscall-owned IPC
   boundary over the landed endpoint and handle-table object core
 - the current language, freestanding build path, and runtime startup can carry
   explicit syscall request and observation records without new compiler work
@@ -155,7 +155,7 @@ Non-goals
 - timer-backed blocking, wake queues, or scheduler policy
 - init-owned service launch, namespace policy, or broader running-kernel
   claims
-- claiming a complete Canopus kernel slice or broader target support
+- claiming a complete Veya kernel slice or broader target support
 
 Implemented slice
 -----------------
@@ -176,7 +176,7 @@ Implemented slice
   inspects merged MIR for imported syscall request and observation types plus
   explicit global-state lowering for the syscall-boundary state
 - refreshed the kernel README, agent map, tool-test notes, backlog, decision
-  log, and speculative Canopus kernel roadmap so the repository records Phase
+  log, and speculative Veya kernel roadmap so the repository records Phase
   99 as concrete and leaves Phase 100 as the next remaining attached-handle-
   transfer owner
 

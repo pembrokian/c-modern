@@ -8,7 +8,7 @@ SPECULATIVE
 Purpose
 -------
 Sketch one plausible continuation after the hosted `v0.2` plateau and the now
-defined Canopus-driven `v0.3` direction without turning that sketch into a
+defined Veya-driven `v0.3` direction without turning that sketch into a
 committed execution plan.
 
 This document is intentionally forward-looking and tentative.
@@ -54,7 +54,7 @@ Repository status note
   non-hosted workflow claim.
 - The core-language plateau remains closed unless a new proof exposes a real
   parser, sema, MIR, backend, or ABI owner gap.
-- The first concrete next consumer is Canopus Lite bring-up, which changes the
+- The first concrete next consumer is Veya Lite bring-up, which changes the
   pressure profile from hosted utility breadth toward freestanding execution,
   narrow `hal`, and honest non-hosted artifact production.
 
@@ -65,13 +65,13 @@ What this roadmap is trying to answer
 - Which follow-on fronts still belong to target, build, backend, runtime, or
   stdlib owners rather than to a reopened core-language wave?
 - In what order should kernel mechanisms, user-space policy proofs, and
-  documentation hardening likely land if `v0.3` is driven by Canopus Lite?
+  documentation hardening likely land if `v0.3` is driven by Veya Lite?
 - Where should the repository stop before it drifts into a full OS-completion
   claim, broad cross-compilation promise, or speculative language redesign?
 
 Core rule
 ---------
-- Keep the hosted `v0.2` plateau closed unless the Canopus proof ladder
+- Keep the hosted `v0.2` plateau closed unless the Veya proof ladder
   exposes a concrete language-owner failure.
 - Prefer freestanding truth, hardware-boundary truth, and target/toolchain
   truth over new language machinery.
@@ -256,7 +256,7 @@ Band C - Validate User-Space Policy Shape
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Phases 89 through 92 now cover the first concrete user-space policy stories,
 the first ordinary helper-boundary proof, and the first explicit launch-and-
-observation lifecycle proof that Canopus Lite needs before event delivery.
+observation lifecycle proof that Veya Lite needs before event delivery.
 
 Likely themes:
 - init startup and one service handshake
@@ -265,7 +265,7 @@ Likely themes:
 - no hidden scheduler or capability-runtime machinery
 
 Why this band is separate:
-- Canopus Lite is not only about kernel boot; it is about keeping policy in
+- Veya Lite is not only about kernel boot; it is about keeping policy in
   user space, so the roadmap needs an explicit band where that claim is proved
   without yet demanding a full operating-system completion story
 
@@ -289,7 +289,7 @@ Why this band comes last:
 Possible phases in this band:
 
 Phase 94 -- First-System Demo Integration
-- Exit criterion: one small end-to-end Canopus Lite bring-up demo combines the
+- Exit criterion: one small end-to-end Veya Lite bring-up demo combines the
   earlier kernel, init, logging, and request or reply proofs honestly.
 
 Phase 95 -- Freestanding v0.3 Slice Audit
@@ -307,14 +307,14 @@ If the repository keeps following the same pattern, the safest order is:
 4. Build from the first landed wakeup source into the first-system demo.
 5. Freeze the first freestanding `v0.3` support statement last.
 
-That ordering keeps the repository from confusing Canopus pressure with
+That ordering keeps the repository from confusing Veya pressure with
 permission to widen target policy, IPC abstractions, or language machinery all
 at once.
 
 Non-goals
 ---------
 - treating this note as a committed implementation plan
-- claiming full Canopus Lite completion inside the roadmap horizon
+- claiming full Veya Lite completion inside the roadmap horizon
 - turning `v0.3` into a broad syntax or runtime-feature release
 - implying broad cross-compilation, packaging, or multi-architecture support
 - admitting broad `os`, scheduler, channel, actor, or capability-runtime work

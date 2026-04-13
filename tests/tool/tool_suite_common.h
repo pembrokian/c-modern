@@ -36,6 +36,7 @@ struct FreestandingKernelRunArtifacts {
 struct FreestandingKernelPhaseCheck {
     std::string_view label;
     std::string_view expected_run_lines_file;
+    std::string_view run_contract;
     std::span<const std::string_view> required_object_files;
     std::span<const std::string_view> mir_selectors;
     std::string_view expected_mir_contract_file;
@@ -50,6 +51,7 @@ struct FreestandingKernelRuntimePhaseDescriptor {
     std::string output_stem;
     std::string build_context;
     std::string run_context;
+    std::string run_contract;
     std::string mir_contract;
     std::string label;
     std::string expected_run_lines_file;

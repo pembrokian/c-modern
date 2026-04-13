@@ -1,4 +1,4 @@
-Phase 124 Through Phase 140 -- Speculative Post-Phase-123 Canopus Roadmap
+Phase 124 Through Phase 140 -- Speculative Post-Phase-123 Veya Roadmap
 =========================================================================
 
 Status
@@ -8,12 +8,12 @@ SPECULATIVE
 Purpose
 -------
 Sketch one plausible continuation after the completed Phase 123 plateau audit
-over the current Canopus running-system slice.
+over the current Veya running-system slice.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
 It does not replace the concrete Phase 109 through Phase 128 closeout notes.
-It gives one plausible ordering for the next Canopus wave if the repository
+It gives one plausible ordering for the next Veya wave if the repository
 keeps following the same evidence-first rules used so far:
 
 - one owner-local gap at a time
@@ -30,12 +30,12 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/phase123_next_plateau_audit.txt`
 - `docs/plan/phase124_delegation_chain_stress.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
-- `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
-- `docs/arch/canopus/canopus_lite_v0.txt`
-- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
-- `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
-- `docs/arch/canopus/canopus_sys_interface_v0.txt`
-- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+- `docs/arch/veya/canopus_kernel_endstate_arch.txt`
+- `docs/arch/veya/canopus_lite_v0.txt`
+- `docs/arch/veya/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/veya/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/veya/canopus_sys_interface_v0.txt`
+- `docs/arch/veya/canopus_syscall_mapping_v0.txt`
 
 If those notes define the current admitted slice, the Phase 123 plateau, the
 landed Phase 124 through Phase 126 authority-lifecycle stress steps, the
@@ -54,13 +54,13 @@ Repository numbering note
   authority-lifecycle stress waves.
 - Proposed compiler planning now reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
-- The next speculative Canopus continuation therefore starts at Phase 128.
+- The next speculative Veya continuation therefore starts at Phase 128.
 
 Repository status note
 ----------------------
 - The repository can now honestly claim one bounded small running-system
   plateau plus one completed authority-lifecycle stress band plus one bounded
-  service-death observation step over a real Canopus kernel artifact.
+  service-death observation step over a real Veya kernel artifact.
 - That plateau remains intentionally narrow: explicit authority, bounded IPC
   and lifecycle behavior, one bounded init-owned service set, one bounded
   namespace answer, and explicit image plus target truth over the same owned
@@ -73,7 +73,7 @@ Repository status note
 What this roadmap is trying to answer
 -------------------------------------
 - What likely comes after the first honest post-Phase-123 plateau if the
-  repository keeps growing Canopus conservatively?
+  repository keeps growing Veya conservatively?
 - Which follow-on fronts belong first to stress-testing authority, failure,
   IPC composition, and device boundaries rather than to new platform breadth?
 - In what order should the repository pressure the current model so the next
@@ -456,7 +456,7 @@ as the next phase.
 Non-goals
 ---------
 - treating this roadmap as a committed execution plan
-- declaring a broader Canopus platform because the current small system is now
+- declaring a broader Veya platform because the current small system is now
   cleanly staged
 - reopening Modern C core-language design before a stress phase exposes a real
   owner gap

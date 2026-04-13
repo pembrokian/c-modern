@@ -1,0 +1,366 @@
+Veya Service Shape -- Phase 146 v0
+=====================================
+
+Status
+------
+PUBLISHED DRAFT
+
+Purpose
+-------
+Describe the minimal service shape identified by the landed Phase 146
+service-shape consolidation step.
+
+This note is not a runtime framework design, not a kernel subsystem proposal,
+and not a claim that all future Veya services must look identical.
+It records the smallest common service pattern that is already visible in the
+landed shell, log, and key-value owners over the real kernel artifact.
+
+Relationship to companion notes
+-------------------------------
+This document should stay aligned with:
+
+- `docs/plan/active/phase141_interactive_service_system_scope_freeze.txt`
+- `docs/plan/active/phase142_serial_shell_command_routing.txt`
+- `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/decision_log.txt`
+- `docs/plan/backlog.txt`
+- `docs/arch/veya/canopus_kernel_endstate_arch.txt`
+
+Those notes record how the current interactive-service system was landed.
+This note answers a narrower question: what common service shape is now
+actually proved by that landed system?
+
+Scope
+-----
+This document is about the service-owner pattern currently visible in:
+
+- `shell_service`
+- `log_service`
+- `kv_service`
+
+It covers:
+
+- the minimal common structure shared by those owners
+- the ownership split between transport, shell syntax, and service semantics
+- intentional differences between the current service owners
+- rules for how later phases should reuse this pattern honestly
+
+It does not cover:
+
+- a generic runtime service framework
+- dynamic registration or discovery
+- inheritance, macros, or service templates
+- broader platform, filesystem, networking, or storage policy
+- compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Phase 146 conclusion
+--------------------
+The landed shell, log, and key-value services do share one minimal common
+service shape.
+
+That shape is real enough to publish, but still narrow enough that it must be
+treated as an owner-local convention rather than as a reusable framework.
+
+The repository now has enough evidence to say all of the following:
+
+- each landed service begins from init-owned fixed boot wiring
+- each landed service owns one primary endpoint-handle boundary for request ingress
+- each landed service owns one explicit request or reply consequence
+- service behavior remains local to the owning service rather than being
+  hidden in transport glue or a runtime layer
+- restart and failure consequences stay explicit in service or init owners
+  rather than collapsing into a supervisor model
+
+Canonical minimal service shape
+-------------------------------
+The current minimal Veya service shape is:
+
+1. fixed boot wiring installs the service into the system deliberately
+2. the service receives work through one primary endpoint-handle boundary for request ingress
+3. the service owns its own request interpretation
+4. the service mutates only its own retained state or owner-local observation
+   state
+5. the service publishes one explicit reply or visible consequence
+6. failure and restart consequences remain explicit in service-visible or
+   init-visible paths
+
+Stated more compactly:
+
+one boot-installed owner + one explicit endpoint-handle boundary + one
+owner-local request interpretation + one owner-local state transition + one
+explicit reply or consequence
+
+Required common elements
+------------------------
+Every service that matches the landed Phase 146 shape currently carries these
+elements.
+
+1. Fixed boot wiring
+
+- The service exists because init and boot wiring made it exist.
+- The service is not discovered dynamically.
+- The service does not self-register into a general runtime registry.
+
+2. Explicit authority possession
+
+- The service owns one primary endpoint-handle slot for request ingress.
+- Phase 146 does not require that this is the only endpoint the service may
+  ever use, only that request ingress stays explicit and owner-visible.
+- The service boundary is visible in owner-local state.
+- Authority is not ambient and is not inferred from framework membership.
+
+3. Owner-local request interpretation
+
+- The owning service decides what its request means.
+- Request meaning is not hidden in a generic transport or broker layer.
+- Request interpretation is specific to the service's admitted vocabulary.
+
+4. Owner-local state transition
+
+- The service mutates its own retained or observational state.
+- The mutation is explicit in service-local data structures.
+- No shared runtime object owns the service's semantic state for it.
+- Phase 146 does not yet define cross-service visibility timing or ordering
+  guarantees beyond what a service makes explicit in its own reply or visible
+  state.
+
+5. Explicit reply or explicit consequence
+
+- The service produces one visible reply shape or one visible consequence.
+- Missing values, overwrite truth, unavailable state, append acknowledgments,
+  tail replies, and malformed-command consequences stay explicit.
+- The system does not hide unhappy paths behind framework-default behavior.
+
+Reply semantics clarification
+----------------------------
+When a service publishes one explicit reply or visible consequence, that
+surface should make explicit as much of the following as the current service
+admits:
+
+- whether the request was accepted
+- whether the intended state transition occurred
+- whether any observable side-effect was produced
+
+Phase 146 does not require these three facts to collapse into one uniform
+reply algebra.
+An acknowledgment, a result, and an observable side-effect may coincide in one
+service and diverge in another.
+What matters in the landed shape is that those truths remain explicit and
+owner-local rather than being hidden behind framework-default behavior.
+
+6. Explicit failure and restart truth
+
+- If a service becomes unavailable, that consequence is visible.
+- If init restarts a service, that action is visible.
+- Post-restart truth stays explicit, including reset-state truth when present.
+- After restart, no implicit guarantee is made about whether a previously
+  issued request completed unless that truth is explicitly represented in
+  service-visible state, reply state, or another admitted observation path.
+
+Request identity and replay boundary
+------------------------------------
+Phase 146 does not define request identity, deduplication, idempotency, or
+replay semantics.
+
+The landed services prove that requests are handled explicitly, but they do
+not yet answer these questions:
+
+- whether two requests are the same request retried later
+- whether a request was already applied before restart
+- whether a retried request should be ignored, replayed, or applied again
+
+That omission is deliberate in Phase 146.
+It keeps the service-shape result structural and owner-local rather than
+forcing a premature reliability or request-tracking framework.
+
+Ownership split
+---------------
+The landed service shape depends on keeping these owners separate.
+
+Transport owner
+
+- `serial_service` owns frame transport, ingress validation, forwarded-request
+  observation, and final reply observation.
+- It does not own shell syntax.
+- It does not own peer-service semantics.
+
+Syntax and routing owner
+
+- `shell_service` owns shell command syntax, command classification, and fixed
+  routing policy.
+- It translates shell-visible commands into service-directed requests.
+- The shell must not accumulate implicit state or hidden orchestration logic
+  beyond bounded command routing in this phase band.
+- It does not absorb serial framing.
+- It does not absorb peer-service meaning.
+
+Peer service owners
+
+- `log_service` owns retained-log semantics, append meaning, tail meaning,
+  overwrite-on-full consequence, and log reply truth.
+- `kv_service` owns key-value lookup and update semantics, missing-key truth,
+  overwrite truth, unavailable consequence, and post-restart empty-state
+  truth.
+- Peer services do not depend on a generic service base class, registry, or
+  runtime service manager.
+
+Minimal lifecycle shape
+-----------------------
+The landed services also share one lifecycle shape.
+
+1. install
+
+- init-owned fixed wiring makes the service reachable
+
+2. serve
+
+- the service receives one explicit request through its endpoint boundary
+- the service interprets that request locally
+- the service updates local state or observations
+- the service emits one explicit reply or visible consequence
+
+3. fail
+
+- unavailability is visible rather than silently absorbed
+
+4. restart
+
+- restart remains init-owned and explicit rather than framework-owned
+
+5. observe post-restart truth
+
+- retained state, reset state, and manual retry costs remain visible
+
+Request and reply shape rule
+----------------------------
+The current service shape does not require uniform message semantics across
+all services.
+
+What it does require is this:
+
+- each service must own its own request meaning
+- each service must own its own reply or consequence meaning
+- the shell-visible syntax boundary must remain separate from peer-service
+  semantics
+- transport framing must remain separate from both shell syntax and
+  peer-service semantics
+
+That means shared shape is structural, not semantic.
+The services look alike because they share an ownership pattern, not because
+they share one generic request schema.
+
+What Phase 146 does not yet define over time
+--------------------------------------------
+Phase 146 successfully defines what a service is structurally.
+It does not yet define what a service means over time.
+
+The following remain intentionally open for later phases:
+
+- reply semantics once acknowledgment, result, and side-effect diverge
+- request identity and replay handling
+- restart guarantees across ambiguous completion boundaries
+- cross-service composition friction under repeated use
+
+Phase 149 later turns the currently admitted restart path into one explicit
+caller-visible contract, but it still does not introduce request identity,
+deduplication, transparent retry, or a supervisor model.
+
+Intentional differences
+-----------------------
+Phase 146 did not conclude that the current services should become identical.
+It concluded that their differences fall into two categories.
+
+Intentional difference 1: shell is a syntax-and-routing owner
+
+- `shell_service` is intentionally different because it owns command syntax
+  and routing policy.
+- It is the boundary between user-facing shell vocabulary and peer-service
+  requests.
+- That difference should remain explicit.
+
+Intentional difference 2: log and key-value are retained-state owners
+
+- `log_service` and `kv_service` are intentionally different because they own
+  retained semantic state rather than shell syntax.
+- They keep service-local reply truth tied to their own state models.
+- They should not be rewritten to imitate shell just for superficial
+  structural symmetry.
+
+Intentional difference 3: service-local reply truth varies by service
+
+- `log_service` replies in terms of append acknowledgement and tail state.
+- `kv_service` replies in terms of set or get consequences, including
+  missing, overwrite, unavailable, and reset-state truth.
+- These differences are semantic and should stay local to the service owner.
+
+What this shape does not justify
+--------------------------------
+The landed Phase 146 result does not justify any of the following:
+
+- a generic service runtime
+- a kernel service manager
+- dynamic service registration
+- service inheritance or service macros
+- a common hidden request dispatcher
+- transport-magical request rewriting
+- compiler expansion to support service patterns directly
+
+The correct reading of Phase 146 is:
+
+the repository has identified one honest owner-local service pattern
+
+not:
+
+the repository now needs a service framework
+
+Adoption rule for later phases
+------------------------------
+Later phases should reuse the Phase 146 service shape only when all of the
+following remain true.
+
+1. The new service can still be expressed as a boot-installed explicit owner.
+2. The request boundary remains explicit and endpoint-handle-based.
+3. Request meaning still belongs to the owning service.
+4. State mutation still belongs to the owning service.
+5. Reply or failure consequences remain explicit.
+6. No new framework is needed to explain the service honestly.
+
+If a later service cannot satisfy those conditions, that is evidence for a new
+owner or a new architecture decision.
+It is not permission to hide the mismatch inside a framework by default.
+
+Review rule
+-----------
+When reviewing later Veya service work, ask these questions first:
+
+- where is the fixed boot wiring owned?
+- where is the endpoint-handle authority stored?
+- who interprets the request?
+- who owns the semantic state transition?
+- where is the reply or visible consequence made explicit?
+- who owns failure visibility?
+- who owns restart policy?
+
+If those answers do not point to explicit owners, the design has drifted away
+from the landed Phase 146 service shape.
+
+Summary statement
+-----------------
+The Phase 146 Veya service shape is a small explicit owner pattern:
+
+- boot-installed
+- endpoint-handle-based
+- request-interpreting
+- state-owning
+- reply-or-consequence-publishing
+- failure-visible
+- restart-explicit
+
+It is a published convention extracted from real code.
+It is not a framework.

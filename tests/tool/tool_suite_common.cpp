@@ -20,6 +20,10 @@ using mc::test_support::WriteFile;
 namespace {
 
 constexpr std::string_view kKernelRuntimeRootRelativePath = "runtime";
+constexpr std::string_view kFreestandingKernelRunContractStdoutContainsV1 =
+    "stdout-contains-v1";
+constexpr std::string_view kFreestandingKernelRunContractSuccessExitV1 =
+    "success-exit-v1";
 constexpr std::string_view kFreestandingKernelMirContractFirstMatchProjectionV1 =
     "first-match-projection-v1";
 
@@ -117,10 +121,38 @@ void ValidateFreestandingKernelRuntimePhaseDescriptor(const FreestandingKernelRu
     if (phase_check.phase == 0 || phase_check.shard != shard || phase_check.project != "kernel/build.toml" ||
         phase_check.target != "kernel" ||
         phase_check.mir_contract != kFreestandingKernelMirContractFirstMatchProjectionV1 || phase_check.label.empty() ||
-        phase_check.expected_run_lines_file.empty() || phase_check.expected_mir_contract_file.empty() ||
+        phase_check.expected_mir_contract_file.empty() ||
         phase_check.mir_selector_storage.empty()) {
         Fail("runtime phase directory missing or invalid required fields: " + phase_toml_path.generic_string());
     }
+    if (phase_check.run_contract == kFreestandingKernelRunContractStdoutContainsV1) {
+        if (phase_check.expected_run_lines_file.empty()) {
+            Fail("runtime phase directory missing stdout run golden for run contract: " +
+                 phase_toml_path.generic_string());
+        }
+        return;
+    }
+    if (phase_check.run_contract == kFreestandingKernelRunContractSuccessExitV1) {
+        return;
+    }
+    Fail("runtime phase directory has an unsupported run contract: " + phase_toml_path.generic_string());
+}
+
+void ExpectFreestandingKernelRunContract(std::string_view run_output,
+                                         const FreestandingKernelPhaseCheck& phase_check,
+                                         const std::filesystem::path& source_root,
+                                         const std::string& context) {
+    if (phase_check.run_contract == kFreestandingKernelRunContractSuccessExitV1) {
+        return;
+    }
+    if (phase_check.run_contract == kFreestandingKernelRunContractStdoutContainsV1) {
+        ExpectTextContainsLinesFile(run_output,
+                                    ResolveFreestandingKernelGoldenPath(source_root,
+                                                                        phase_check.expected_run_lines_file),
+                                    context);
+        return;
+    }
+    Fail(context + " unsupported run contract: " + std::string(phase_check.run_contract));
 }
 
 void ExpectFreestandingKernelMirContract(std::string_view mir_text,
@@ -205,6 +237,7 @@ FreestandingKernelPhaseCheck FreestandingKernelRuntimePhaseDescriptor::View() co
     return {
         .label = label,
         .expected_run_lines_file = expected_run_lines_file,
+        .run_contract = run_contract,
         .required_object_files = required_object_files,
         .mir_selectors = mir_selectors,
         .expected_mir_contract_file = expected_mir_contract_file,
@@ -322,6 +355,10 @@ std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadFreestandingKernelRunt
                 current.run_context = *value;
                 continue;
             }
+            if (const auto value = ParseQuotedSetting(line, "run_contract")) {
+                current.run_contract = *value;
+                continue;
+            }
             if (const auto value = ParseQuotedSetting(line, "run_golden")) {
                 current.expected_run_lines_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
                                                    phase_dir.filename() / *value)
@@ -353,6 +390,11 @@ std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadFreestandingKernelRunt
         }
         if (current.shard != shard) {
             continue;
+        }
+        if (current.run_contract.empty()) {
+            current.run_contract = current.expected_run_lines_file.empty()
+                                       ? std::string(kFreestandingKernelRunContractSuccessExitV1)
+                                       : std::string(kFreestandingKernelRunContractStdoutContainsV1);
         }
         current.RefreshViews();
         ValidateFreestandingKernelRuntimePhaseDescriptor(current, phase_toml_path, shard);
@@ -439,6 +481,10 @@ std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadAllFreestandingKernelR
                 current.run_context = *value;
                 continue;
             }
+            if (const auto value = ParseQuotedSetting(line, "run_contract")) {
+                current.run_contract = *value;
+                continue;
+            }
             if (const auto value = ParseQuotedSetting(line, "run_golden")) {
                 current.expected_run_lines_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
                                                    phase_dir.filename() / *value)
@@ -467,6 +513,11 @@ std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadAllFreestandingKernelR
         }
         if (array_mode != ArrayMode::none) {
             Fail("runtime phase directory has an unterminated selectors array: " + phase_toml_path.generic_string());
+        }
+        if (current.run_contract.empty()) {
+            current.run_contract = current.expected_run_lines_file.empty()
+                                       ? std::string(kFreestandingKernelRunContractSuccessExitV1)
+                                       : std::string(kFreestandingKernelRunContractStdoutContainsV1);
         }
         current.RefreshViews();
         ValidateFreestandingKernelRuntimePhaseDescriptor(current, phase_toml_path, current.shard);
@@ -1302,10 +1353,7 @@ void ExpectFreestandingKernelPhaseFromArtifacts(const std::filesystem::path& sou
                                                 std::string_view mir_text,
                                                 const FreestandingKernelPhaseCheck& phase_check) {
     const std::string label(phase_check.label);
-    ExpectTextContainsLinesFile(run_output,
-                                ResolveFreestandingKernelGoldenPath(source_root,
-                                                                    phase_check.expected_run_lines_file),
-                                label + " run");
+    ExpectFreestandingKernelRunContract(run_output, phase_check, source_root, label + " run");
 
     for (const auto object_name : phase_check.required_object_files) {
         if (!std::filesystem::exists(object_dir / std::string(object_name))) {

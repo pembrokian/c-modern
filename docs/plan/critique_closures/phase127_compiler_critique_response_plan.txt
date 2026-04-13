@@ -70,7 +70,7 @@ The current tree and treatment notes agree on the following points:
 
 Recommended next order
 ----------------------
-If Phase 127 compiler-critique follow-through continues before a wider Canopus
+If Phase 127 compiler-critique follow-through continues before a wider Veya
 restart, the narrow honest order is:
 
 1. `check.cpp`: fix duplicate-name bind-vs-assign fact recording in one
@@ -100,5 +100,5 @@ Phase 127 critique work is no longer one broad compiler response queue. The
 backend and parser slices are landed, the AST and MIR critiques are mostly in
 documentation-or-scale territory, and the only clearly live implementation work
 left from this wave sits in sema and driver. That is a small enough remainder
-that Canopus development does not need to stay blocked on a vague "finish the
+that Veya development does not need to stay blocked on a vague "finish the
 compiler critique wave first" requirement.

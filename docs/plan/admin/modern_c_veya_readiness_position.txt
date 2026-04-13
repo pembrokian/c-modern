@@ -1,0 +1,428 @@
+Modern C / Veya -- Current Position Assessment
+================================================
+
+Status
+------
+PUBLISHED
+
+Purpose
+-------
+Record one maintained repository position after Phase 133 published one bounded message lifetime and reuse audit over the landed running kernel slice.
+Record one maintained repository position after Phase 134 published one bounded minimal device-service handoff over that same slice.
+Record one maintained repository position after Phase 135 published one bounded buffer ownership boundary audit over that same slice.
+Record one maintained repository position after Phase 136 published one bounded device failure containment probe over that same slice.
+Record one maintained repository position after Phase 137 published one bounded optional completion-backed follow-through over that same slice.
+Record one maintained repository position after Phase 140 published one bounded serial-ingress composed service graph over that same slice.
+Record one maintained repository position after Phase 141 published one bounded interactive service system scope freeze over that same slice.
+Record one maintained repository position after Phase 142 published one bounded serial shell command-routing step over that same slice.
+Record one maintained repository position after Phase 143 published one bounded long-lived log-service follow-through over that same slice.
+Record one maintained repository position after Phase 144 published one bounded stateful key-value service follow-through over that same slice.
+Record one maintained repository position after Phase 145 published one bounded service restart, failure, and usage pressure audit over that same slice.
+Record one maintained repository position after Phase 146 published one bounded service-shape consolidation step over that same slice.
+Record one maintained repository position after Phase 147 published one bounded IPC-shape audit under real usage over that same slice.
+
+This note answers four questions that now matter:
+
+- what Veya currently is in repository terms
+- what maturity and quality the landed kernel slice currently has
+- what Modern C currently proves, and what it still does not prove
+- what the next milestone themes and work areas should be
+
+This note is not a support statement, a full phase plan, or a claim that the
+full Veya architecture is implemented.
+It does not replace the Phase 109 through Phase 131 closeouts, the Veya
+architecture notes, or the narrower hosted and freestanding support
+statements.
+
+Relationship to companion notes
+-------------------------------
+This position statement is meant to stay aligned with:
+
+- `docs/plan/admin/canopus_post_phase109_speculative_roadmap.txt`
+- `docs/plan/phase109_first_running_canopus_kernel_slice_audit.txt`
+- `docs/plan/phase110_kernel_ownership_split_audit.txt`
+- `docs/plan/phase111_scheduler_lifecycle_ownership_clarification.txt`
+- `docs/plan/phase112_syscall_boundary_thinness_audit.txt`
+- `docs/plan/phase113_interrupt_entry_and_generic_dispatch_boundary.txt`
+- `docs/plan/phase114_address_space_and_mmu_ownership_split.txt`
+- `docs/plan/phase115_timer_ownership_hardening.txt`
+- `docs/plan/phase116_mmu_activation_barrier_follow_through.txt`
+- `docs/plan/phase117_init_orchestrated_multi_service_bring_up.txt`
+- `docs/plan/phase118_request_reply_and_delegation_follow_through.txt`
+- `docs/plan/phase119_namespace_pressure_audit.txt`
+- `docs/plan/active/phase131_fan_in_or_fan_out_composition_probe.txt`
+- `docs/plan/active/phase132_backpressure_and_blocking_audit.txt`
+- `docs/plan/active/phase133_message_lifetime_and_reuse_audit.txt`
+- `docs/plan/active/phase134_minimal_device_service_handoff.txt`
+- `docs/plan/active/phase135_buffer_ownership_boundary_audit.txt`
+- `docs/plan/active/phase136_device_failure_containment_probe.txt`
+- `docs/plan/active/phase137_optional_dma_or_equivalent_follow_through.txt`
+- `docs/plan/active/phase140_serial_ingress_composed_service_graph.txt`
+- `docs/plan/active/phase141_interactive_service_system_scope_freeze.txt`
+- `docs/plan/active/phase142_serial_shell_command_routing.txt`
+- `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/phase120_running_system_support_statement.txt`
+- `docs/plan/phase121_kernel_image_contract_hardening.txt`
+- `docs/plan/phase122_target_surface_audit.txt`
+- `docs/plan/phase123_next_plateau_audit.txt`
+- `docs/plan/phase124_delegation_chain_stress.txt`
+- `docs/plan/phase125_invalidation_and_rejection_audit.txt`
+- `docs/plan/phase126_authority_lifetime_classification.txt`
+- `docs/plan/phase128_service_death_observation.txt`
+- `docs/plan/phase129_partial_failure_propagation.txt`
+- `docs/plan/phase130_explicit_restart_or_replacement_probe.txt`
+- `docs/plan/canopus_running_system_support_statement.txt`
+- `docs/plan/phase108_kernel_image_and_program_cap_audit.txt`
+- `docs/plan/freestanding_support_statement.txt`
+- `docs/arch/veya/canopus_lite_v0.txt`
+- `docs/arch/veya/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/veya/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/veya/canopus_kernel_endstate_arch.txt`
+
+If those notes describe the landed running slice, the kernel architecture, and
+the longer-term ownership target, this document describes the repository's
+current working position after that first running slice became real.
+
+Current repository truth
+------------------------
+- Modern C still has a repository-bounded hosted `v0.2` plateau, and it now
+  also has a separate bounded freestanding or kernel lane that now reaches one
+  small running-system plateau for Veya.
+- The repository-owned kernel is no longer merely a proof sketch. It now
+  builds and runs one explicit bounded kernel artifact with real boot entry,
+  first user entry, endpoint and handle state, syscall-owned byte IPC,
+  attached-handle transfer, program-cap spawn and wait, timer-backed wake,
+  bootstrap-capability handoff, bounded service follow-through, ownership
+  split and lifecycle-owner clarification, thinner syscall and interrupt
+  boundaries, clearer address-space versus MMU ownership, timer hardening,
+  one MMU activation barrier follow-through, one bounded init-orchestrated
+  multi-service answer, one delegated request-reply plus invalidation answer,
+  one fixed-directory namespace-pressure answer, one running-system support
+  statement, one landed Phase 121 kernel image-contract hardening step, one
+  target-surface audit, one landed Phase 123 next-plateau audit, one landed
+  Phase 124 delegation-chain stress step, one landed Phase 125 invalidation
+  and rejection audit step, one landed Phase 126 authority lifetime
+  classification step, one landed Phase 128 service death observation step,
+  one landed Phase 129 partial failure propagation step, one landed Phase 130
+  explicit restart or replacement probe, one landed Phase 131 fan-out
+  composition probe, one landed Phase 132 backpressure and blocking audit,
+  one landed Phase 133 message lifetime and reuse audit, one landed Phase 134
+  minimal device-service handoff, and one landed Phase 135 buffer ownership
+  boundary audit over that same admitted slice.
+- The landed Phase 124 delegation-chain stress step, the landed Phase 125 invalidation and rejection audit step, the landed Phase 126 authority lifetime classification step, the landed Phase 128 service death observation step, and the landed Phase 129 partial failure propagation step all belong to that same admitted slice rather than to a broader authority or failure framework.
+- The landed Phase 130 explicit restart or replacement probe also belongs to
+  that same admitted slice rather than to a broader supervision or recovery
+  framework.
+- The landed Phase 131 fan-out composition probe also belongs to that same
+  admitted slice rather than to a broader broker, routing, or namespace
+  framework.
+- The landed Phase 132 backpressure and blocking audit also belongs to that
+  same admitted slice rather than to a broader scheduler-policy, fairness, or
+  broker framework.
+- The landed Phase 133 message lifetime and reuse audit also belongs to that
+  same admitted slice rather than to a broader memory-management, capability
+  GC, or recovery framework.
+- The landed Phase 134 minimal device-service handoff also belongs to that
+  same admitted slice rather than to a broader driver framework, generic
+  device-event layer, or reopened compiler wave.
+- The landed Phase 135 buffer ownership boundary audit also belongs to that
+  same admitted slice rather than to a broader buffer pool, zero-copy device
+  path, or reopened compiler wave.
+- The landed Phase 136 device failure containment probe also belongs to that
+  same admitted slice rather than to a broader supervision, retry,
+  fault-management, or reopened compiler wave.
+- The landed Phase 137 optional completion-backed follow-through also belongs to
+  that same admitted slice rather than to a broader DMA framework,
+  descriptor-policy subsystem, or reopened compiler wave.
+- The landed Phase 140 serial-ingress composed service graph also belongs to
+  that same admitted slice rather than to a broader broker, dynamic routing,
+  general service-graph, or reopened compiler wave.
+- The landed Phase 141 interactive service system scope freeze also belongs to
+  that same admitted slice rather than to a broader shell framework, dynamic
+  discovery model, persistence layer, or reopened compiler wave.
+- The landed Phase 142 serial shell command-routing step also belongs to that
+  same admitted slice rather than to a broader shell framework, wider payload
+  model, dynamic discovery model, or reopened compiler wave.
+- The landed Phase 143 long-lived log-service follow-through also belongs to
+  that same admitted slice rather than to a broader persistence layer,
+  filesystem, observability framework, or reopened compiler wave.
+- The landed Phase 144 stateful key-value service follow-through also belongs to
+  that same admitted slice rather than to a broader storage layer, database
+  abstraction, middleware framework, or reopened compiler wave.
+- The landed Phase 145 service restart, failure, and usage pressure audit also belongs to that same admitted slice rather than to a broader supervision, recovery, rebinding, or reopened compiler wave.
+- The landed Phase 146 service-shape consolidation step also belongs to that same admitted slice rather than to a broader service framework, runtime abstraction, dynamic registration model, or reopened compiler wave.
+- The landed Phase 147 IPC-shape audit under real usage also belongs to that same admitted slice rather than to a broader message bus, dynamic payload model, transport rewrite, or reopened compiler wave.
+- The landed Phase 148 authority-ergonomics audit under reuse also belongs to that same admitted slice rather than to ambient authority shortcuts, a broader authority framework, hidden rebinding helpers, or a reopened compiler wave.
+- The repository therefore proves that the current language, sema, MIR,
+  backend, runtime, and build path are sufficient for one honest small kernel
+  and running-system slice rather than only for freestanding representation
+  proofs.
+- The repository still does not claim full Veya Lite completion, a general
+  Veya platform, broad target support, general loading or packaging,
+  multicore truth, broader device policy, or a mature freestanding workflow
+  surface beyond the explicitly admitted kernel path.
+
+Veya position
+----------------
+Veya is now beyond a first-running-kernel claim and into a first small
+running-system plateau.
+
+That statement is intentionally narrow.
+It means:
+
+- the repository owns one real Veya kernel artifact rather than only a
+  speculative roadmap or proof-model ladder
+- the current admitted slice is still a small capability-based microkernel in
+  a fixed-size, table-driven, single-core, inspectable form
+- explicit boot, user entry, IPC, authority transfer, spawn, wait, sleep or
+  wake, bounded init-owned service orchestration, and a bounded namespace
+  answer are now real inside that slice
+- broader platform, packaging, target-family, loader, namespace, kill, and
+  scheduler-completion claims remain out of scope
+
+Phase 96 through Phase 137 are now concrete as one first real kernel wave,
+one ownership and hardware-boundary clarification wave, one first bounded
+running-system and plateau freeze wave, and two first post-plateau
+authority-lifecycle stress steps plus one explicit lifetime-classification
+step and one explicit service-death observation step plus one explicit
+partial-failure propagation step plus one explicit restart-or-replacement
+probe plus one explicit fan-out composition probe plus one explicit
+backpressure and blocking audit plus one explicit message lifetime and reuse
+audit plus one explicit minimal device-service handoff plus one explicit
+buffer ownership boundary audit plus one explicit device failure containment
+probe plus one explicit optional completion-backed follow-through plus one explicit
+serial-ingress composed service graph plus one explicit interactive-service
+scope freeze.
+That is meaningful implementation progress, but it is still an early system
+plateau rather than architectural completion.
+
+The repository now includes a landed Phase 131 fan-out composition probe that
+keeps routing policy with init and service owners, adds no compiler-facing
+surface, and expands the running-system slice by one honest composed IPC path
+rather than by another proof-only restatement of one-hop service behavior.
+
+The repository now also includes a landed Phase 132 backpressure and blocking
+audit that keeps queue pressure in endpoint, lifecycle, and syscall owners,
+adds no compiler-facing surface, and expands the running-system slice by one
+honest sender-block and one honest receiver-block path rather than by another
+proof-only restatement of `WouldBlock` return codes.
+
+The repository now also includes a landed Phase 133 message lifetime and reuse
+audit that keeps slot retirement, payload scrubbing, close-or-death abort
+cleanup, and attached-handle lifetime in ipc and capability owners, adds no
+compiler-facing surface, and expands the running-system slice by one repeated
+slot-reuse path plus one direct close-or-death wake-and-abort path rather than
+by another fixture-only queue assumption.
+
+The repository now also includes a landed Phase 134 minimal device-service
+handoff that keeps one UART receive interrupt, one concrete byte read, one
+interrupt-origin IPC publish, and one fixed serial-service receive path in
+target-local and service-local owners, adds no compiler-facing surface, and
+expands the running-system slice by one honest device-facing boundary rather
+than by another proof-only timer-backed exercise.
+
+The repository now also includes a landed Phase 135 buffer ownership boundary
+audit that keeps one UART-owned staging frame, one copied IPC payload, and one
+serial-service-owned consumed log explicit under repeated delivery, adds no
+compiler-facing surface, and expands the running-system slice by one honest
+ownership boundary rather than by another fixture-only byte assumption.
+
+The repository now also includes a landed Phase 136 device failure containment
+probe that keeps malformed-byte classification inside the serial service, keeps
+queue-full and endpoint-closed consequences explicit inside UART and IPC
+owners, adds no compiler-facing surface, and expands the running-system slice
+by one honest unhappy-path statement rather than by another happy-path-only
+device demonstration.
+
+The repository now also includes a landed Phase 140 serial-ingress composed service graph that keeps the new forward edge and aggregate-reply interpretation inside service owners, adds no compiler-facing surface, and expands the running-system slice by one honest device-facing-to-composed-service route rather than by another init-only composition restatement.
+
+The repository now also includes a landed Phase 141 interactive service system scope freeze that keeps serial framing in `serial_service`, keeps command ownership in one concrete `shell_service` owner, keeps bounded state in one concrete `kv_service` owner, adds no compiler-facing surface, and expands the running-system slice by one honest shell-owned boundary rather than by another transport-only or roadmap-only restatement.
+
+The repository now also includes a landed Phase 142 serial shell command routing step that keeps framing and final reply observation in `serial_service`, keeps command parsing and fixed routing in `shell_service`, keeps the serial and IPC payload width fixed at four bytes through a compact command encoding, adds no compiler-facing surface, and expands the running-system slice by one honest user-facing shell route rather than by another freeze-only restatement.
+
+Kernel maturity and quality
+---------------------------
+The current kernel should be treated as an early but real implementation
+slice with better evidence quality and stronger boundary discipline than its
+size might suggest.
+
+Quality strengths:
+
+- the slice is backed by ordered phase proofs rather than by architecture prose
+  alone
+- the running artifact is tied to deterministic build, MIR, and regression
+  checks rather than to hand-waved bring-up claims
+- authority remains explicit through endpoints, handles, wait handles, and
+  program capabilities instead of through ambient shortcuts
+- user-space policy is still visible as user-space policy; the kernel has not
+  yet drifted into an in-kernel service framework
+- the implementation pressure so far has been answered mostly with explicit
+  helper contracts, ownership splits, build truth, and audit functions rather
+  than with hidden runtime machinery
+
+Quality limits:
+
+- the owned kernel tree is still young and partly staged; it is not yet close
+  to the full end-state subsystem layout
+- the current artifact is still one bounded kernel lane on the bootstrap
+  Darwin arm64 target family, not a broad kernel-product support matrix
+- scheduler, trap, MMU, loader, namespace, device, and service management are
+  still admitted only in the narrow forms already proved
+- the current quality bar is honest bring-up quality with explicit audits, not
+  broad robustness claims such as multicore, fault recovery, driver breadth,
+  packaging, or ABI portability
+
+Modern C position
+-----------------
+Modern C should now be treated as small-running-system-capable in repository
+terms for this Veya lane.
+
+That is stronger than the older readiness statement.
+The repository now proves that Modern C can carry one first running kernel
+plus bounded running-system slice, not just that it seems suitable to start
+one.
+
+It is still intentionally weaker than any claim that Modern C is a finished
+kernel platform language.
+
+What the current repository now proves well:
+
+- bounded freestanding startup and target-owned kernel builds
+- kernel-owned static state, process or task records, endpoint queues, handle
+  tables, and explicit authority transfer in ordinary Modern C code
+- user-to-kernel and user-to-user state transitions without hidden runtime or
+  language-level scheduler machinery
+- enough compiler and backend truth to keep the real kernel artifact, its MIR,
+  its service-orchestration and delegated-request contracts, its fixed
+  service-directory answer, and its emitted image inputs aligned through
+  regression tests
+
+What it still does not prove:
+
+- broad target portability beyond the bootstrap proof lane
+- a public freestanding workflow comparable to hosted `mc run` or `mc test`
+- complete trap, interrupt, MMU, barrier, or device frameworks beyond the
+  landed translation-root split
+- a general loader, namespace, or service-discovery model
+- evidence that new core-language machinery is the next owner by default
+
+Working engineering stance
+--------------------------
+The right stance after Phase 130 is still conservative.
+The current plateau carried forward by Phase 128 is still intentionally
+narrow.
+
+- treat the current core language as sufficient until a real next kernel step
+  proves otherwise
+- expect the next meaningful pressure to land first on stress-testing the
+  current authority, IPC, failure, and device boundaries, then on target,
+  build, ABI, or narrow `hal` edges rather than on new syntax
+- preserve the small-microkernel and user-space-policy bias while the current
+  kernel grows from one bounded slice into a slightly more stressed and
+  better-defended running system
+- refuse claims that outrun the proof surface, especially on portability,
+  packaging, loader scope, or service-management generality
+
+Assessment of the end-state architecture note
+---------------------------------------------
+The draft end-state kernel architecture is directionally sound and should now
+be treated as reviewed guidance for later ownership splits.
+
+Why it is a good fit:
+
+- it keeps `sys/` thin and pushes real semantics into owning subsystems
+- it preserves the explicit separation between capability mechanics, IPC,
+  address-space ownership, scheduling, and user-space policy
+- it fits the current landed file families already visible in `kernel/src/`
+  even though the tree has not yet been reorganized into the final directory
+  shape
+- it correctly treats `debug/` as part of the implementation strategy rather
+  than as optional convenience
+
+What still needs discipline as implementation grows:
+
+- do not force a full directory churn before ownership pressure makes the
+  split real
+- clarify process and task ownership boundaries as spawn, wait, and scheduler
+  flows widen so that `core/`, `sched/`, `mm/`, `cap/`, and the lifecycle
+  owner do not blur together
+- keep the interrupt, timer, and device boundary narrow so timer truth does
+  not accidentally turn into a large in-kernel device policy layer
+- keep init sequencing distinct from long-lived service or namespace policy
+
+Next milestone themes and work areas
+------------------------------------
+The next milestones should not be described as a broader platform wave.
+They should be described as pressure-testing the current model before any
+larger widening claims are entertained.
+
+Recommended work themes:
+
+- kernel ownership hardening: preserve the landed `sys`, `cap`, `ipc`, `mm`,
+  `sched`, `lifecycle`, and `debug` seams, and extract new owners only where
+  the next real kernel step proves one boundary is still too blurry
+- authority and lifecycle stress: prove that delegated authority,
+  invalidation, rejection, and lifetime handling remain explicit under deeper
+  composition without importing a broader kernel policy layer
+- IPC and failure stress: prove that IPC composition, backpressure, service
+  failure, and partial-failure observation stay explicit without letting
+  scheduler or recovery policy leak into the wrong owner
+- device-boundary experiments: only after the above, test whether one real
+  device-service path can fit the current ownership model without turning the
+  kernel into a driver framework
+- target and image hardening: keep manifest, relink, emitted-artifact, and
+  kernel-image ownership explicit as the kernel build path grows beyond the
+  current bootstrap lane
+- compiler boundary discipline: reopen sema, MIR, backend, ABI, or `hal`
+  surfaces only when the next real kernel proof exposes a concrete owner gap
+
+Deferred by default
+-------------------
+The following should still stay deferred unless a concrete kernel proof makes
+one of them unavoidable:
+
+- language-level channels, actors, or capability runtimes
+- hidden scheduler or async-runtime abstractions
+- broad namespace, discovery, or service-framework policy inside the kernel
+- speculative multicore work
+- speculative zero-copy-first IPC growth
+- broad driver or filesystem frameworks
+- broad portability, packaging, or install claims
+
+Decision rule for reopening language work
+-----------------------------------------
+Reopen core language or compiler design only when a real next kernel step
+demonstrates a concrete owned failure in representation, layout, ABI,
+volatile or barrier semantics, target entry convention, or emitted-artifact
+truth.
+
+Do not reopen the language merely because the operating-system domain remains
+large or because the end-state architecture is more ambitious than the current
+slice.
+
+Recommended practical reading
+-----------------------------
+The best current practical reading is:
+
+The repository now has one honest small Veya running-system plateau over a
+real kernel artifact, and the current Modern C implementation is strong enough
+to stress and selectively widen that plateau further without assuming a new
+language wave first.
+
+The next honest work is to stress authority, IPC, failure, and device
+boundaries around real kernel evidence, not to claim platform completion or to
+chase speculative language machinery.
+
+Bottom line
+-----------
+Veya should currently be described as a bounded small running system over a
+real microkernel artifact, and Modern C should currently be described as
+capable of carrying that kernel and running-system slice.
+
+Both statements are meaningful, but both remain intentionally narrow.
+The repository is beyond readiness and beyond pure proof sketches, yet still
+well short of a general kernel platform or a finished systems-language story.

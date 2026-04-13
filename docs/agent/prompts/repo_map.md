@@ -7,8 +7,8 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Canopus kernel bring-up tree; currently a Phase 150 one-system-rebuilt-cleanly target
-- `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Canopus source, build, and test placement
+- `kernel/`: repository-owned Veya kernel bring-up tree; currently a Phase 150 one-system-rebuilt-cleanly target
+- `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
 - `docs/plan/decision_log.txt`: record of intentional limited solutions and deferred fuller fixes
@@ -28,7 +28,7 @@ This file is a fast orientation map for agents working in this repository.
 ### Key Directories
 
 - `kernel`
-  - repository-owned Canopus kernel sources rather than disposable proof-only fixtures
+  - repository-owned Veya kernel sources rather than disposable proof-only fixtures
   - `build.toml`: freestanding kernel manifest for the active bring-up slice
   - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed first-user-entry, endpoint core, syscall IPC, interrupt classification, timer-owned tick delivery, MMU-owned translation-root construction, bounded init-owned multi-service orchestration, one bounded delegated request-reply follow-through, one bounded fixed service-directory publication step, one bounded image-contract hardening step, one bounded target-surface audit, one bounded next-plateau audit, one bounded delegation-chain stress step, one bounded invalidation and rejection audit step, one bounded authority lifetime classification step, one bounded service-death observation step, one bounded partial-failure propagation step, one bounded UART receive-frame ownership-boundary audit step, one bounded device-failure-containment audit step, one bounded optional completion-backed follow-through step, one bounded serial-ingress composed service graph step, one bounded serial shell command-routing step, one bounded long-lived log-service follow-through step, one bounded service-shape consolidation step, one bounded IPC-shape audit under real usage step, one bounded authority-ergonomics-under-reuse step, one bounded restart-contract step, one bounded rebuilt-system clean-second-pass step, and thin root orchestration across the owned scheduler, lifecycle, bootstrap helper, and debug audit modules
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
@@ -111,7 +111,7 @@ This file is a fast orientation map for agents working in this repository.
 
 - `tests/tool`
   - smoke and support-layer tests for the driver/tooling path
-  - Canopus-facing execution proofs still stay here for now; do not create a separate `tests/tool/canopus/` subtree yet
+  - Veya-facing execution proofs still stay here for now; do not create a separate `tests/tool/veya/` subtree yet
   - grouped tool coverage now lives in:
     - `tests/tool/tool_suite_common.cpp`: shared grouped tool helpers
     - `tests/tool/tool_workflow_tests.cpp`: workflow and CLI/project validation driver
@@ -128,12 +128,12 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/freestanding/kernel/docs/`: descriptor-owned kernel documentation audits
     - `tests/tool/freestanding/kernel/artifact_specs/`: descriptor-owned kernel artifact audits
     - `tests/tool/freestanding/kernel/synthetic/suite.cpp`: standalone synthetic kernel proofs for phases 85-88
-    - `tests/tool/freestanding/kernel/phase97_user_entry.cpp`, `phase98_endpoint_handle_core.cpp`, `phase99_syscall_byte_ipc.cpp`, `phase100_capability_transfer.cpp`, `phase102_timer_sleep.cpp`, `phase103_init_bootstrap_handoff.cpp`, and `phase104_kernel_critique_hardening.cpp`: earlier narrow proof owners that still stand alone, with owned MIR goldens under `tests/tool/freestanding/kernel/runtime/legacy_goldens/`
+    - `tests/tool/freestanding/kernel/runtime/legacy_goldens/`: preserved early narrow MIR proof slices kept as regression references alongside the active descriptor-owned runtime surface
     - late ownership-hardening kernel audits now keep checked-in expectations adjacent to their owning surfaces under `tests/tool/freestanding/kernel/runtime/`, `tests/tool/freestanding/kernel/synthetic/`, and `tests/tool/freestanding/kernel/artifact_specs/`; runtime, synthetic, docs, and artifact validation all run through top-level surfaces rather than shard targets
     - `tests/tool/tool_suite_common.cpp`: `ExpectMirFirstMatchProjectionFile` is the shared helper for those projected MIR goldens
     - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
-  - if freestanding or Canopus coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split
+  - if freestanding or Veya coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split
   - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` are thin compatibility runners only
 
 - `tests/support`
@@ -155,7 +155,7 @@ This file is a fast orientation map for agents working in this repository.
 - Full Phase 3 from `docs/plan/plan.txt` is still not complete.
 - Primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`.
 - Repository-owned smoke and regression outputs should prefer semantic build-tree roots such as `build/debug/audit/...`, `build/debug/probes/...`, `build/debug/tmp/...`, `build/debug/tool/...`, and `build/debug/codegen/executable/...`.
-- Canopus-specific disposable outputs should stay under those same roots, usually beneath `build/debug/tool/freestanding/...` for repo-owned regressions or `build/debug/probes/canopus/...` for manual experiments.
+- Veya-specific disposable outputs should stay under those same roots, usually beneath `build/debug/tool/freestanding/...` for repo-owned regressions or `build/debug/probes/veya/...` for manual experiments.
 - Remaining top-level `build/debug/phase*` paths are preserved manual or probe areas rather than active regression output policy.
 
 ## Where To Change Things

@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from kernel static-data follow-
+Take the next Veya-driven `v0.3` proof from kernel static-data follow-
 through into the first external build-integration check: prove that the
 freestanding artifacts emitted by `mc` compose honestly with one minimal
 kernel-owned link step rather than only through the driver's own final link
@@ -32,7 +32,7 @@ Repository status note
   slots.
 - Phase 87 then proved that kernel-owned aggregate const templates and
   mutable global storage survive the freestanding build and artifact path.
-- The next strongest Canopus proof was no longer whether the driver could link
+- The next strongest Veya proof was no longer whether the driver could link
   one freestanding executable. It was whether the emitted entry object and
   generated runtime object could participate in one honest external kernel
   build step without hidden driver behavior.

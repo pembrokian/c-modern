@@ -9,7 +9,7 @@ Purpose
 -------
 Continue from the completed Phase 129 partial failure propagation step by
 proving one bounded explicit restart or replacement story over the same
-already-landed Canopus kernel artifact.
+already-landed Veya kernel artifact.
 
 This document is both the Phase 130 execution note and its closeout.
 It does not claim kernel-side supervision, automatic restart policy,
@@ -179,7 +179,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 130 is complete as an explicit restart or replacement probe.
-The repository still claims only one bounded small Canopus running-system
+The repository still claims only one bounded small Veya running-system
 plateau, but that plateau now includes one explicit proof that init can rerun
 one dead service through the retained program capability and same fixed
 service key without turning the kernel into a supervisor, while the fixed

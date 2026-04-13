@@ -1,6 +1,7 @@
 import address_space
 import bootstrap_audit
 import bootstrap_proofs
+import bootstrap_runtime
 import bootstrap_services
 import capability
 import debug
@@ -8,7 +9,6 @@ import echo_service
 import ipc
 import init
 import interrupt
-import lifecycle
 import kv_service
 import log_service
 import mmu
@@ -45,54 +45,32 @@ const BOOT_STACK_TOP: usize = 8192
 const INIT_ROOT_PAGE_TABLE: usize = 32768
 const CHILD_ROOT_PAGE_TABLE: usize = 49152
 const CHILD_EXIT_CODE: i32 = 41
-const PHASE124_MARKER: i32 = 124
-const PHASE125_MARKER: i32 = 125
+const PHASE124_MARKER_DETAIL: u32 = 124
 const PHASE125_MARKER_DETAIL: u32 = 125
-const PHASE126_MARKER: i32 = 126
 const PHASE126_MARKER_DETAIL: u32 = 126
-const PHASE128_MARKER: i32 = 128
 const PHASE128_MARKER_DETAIL: u32 = 128
-const PHASE129_MARKER: i32 = 129
 const PHASE129_MARKER_DETAIL: u32 = 129
-const PHASE130_MARKER: i32 = 130
 const PHASE130_MARKER_DETAIL: u32 = 130
-const PHASE131_MARKER: i32 = 131
 const PHASE131_MARKER_DETAIL: u32 = 131
-const PHASE134_MARKER: i32 = 134
 const PHASE134_MARKER_DETAIL: u32 = 134
-const PHASE135_MARKER: i32 = 135
 const PHASE135_MARKER_DETAIL: u32 = 135
-const PHASE136_MARKER: i32 = 136
 const PHASE136_MARKER_DETAIL: u32 = 136
-const PHASE137_MARKER: i32 = 137
 const PHASE137_MARKER_DETAIL: u32 = 137
-const PHASE140_MARKER: i32 = 140
 const PHASE140_MARKER_DETAIL: u32 = 140
-const PHASE141_MARKER: i32 = 141
 const PHASE141_MARKER_DETAIL: u32 = 141
-const PHASE142_MARKER: i32 = 142
 const PHASE142_MARKER_DETAIL: u32 = 142
-const PHASE143_MARKER: i32 = 143
 const PHASE143_MARKER_DETAIL: u32 = 143
-const PHASE144_MARKER: i32 = 144
 const PHASE144_MARKER_DETAIL: u32 = 144
-const PHASE145_MARKER: i32 = 145
 const PHASE145_MARKER_DETAIL: u32 = 145
-const PHASE146_MARKER: i32 = 146
 const PHASE146_MARKER_DETAIL: u32 = 146
-const PHASE147_MARKER: i32 = 147
 const PHASE147_MARKER_DETAIL: u32 = 147
-const PHASE148_MARKER: i32 = 148
 const PHASE148_MARKER_DETAIL: u32 = 148
-const PHASE149_MARKER: i32 = 149
 const PHASE149_MARKER_DETAIL: u32 = 149
-const PHASE150_MARKER: i32 = 150
 const PHASE150_MARKER_DETAIL: u32 = 150
 const LOG_SERVICE_DIRECTORY_KEY: u32 = 1
 const ECHO_SERVICE_DIRECTORY_KEY: u32 = 2
 const TRANSFER_SERVICE_DIRECTORY_KEY: u32 = 3
 const COMPOSITION_SERVICE_DIRECTORY_KEY: u32 = 4
-const SERIAL_SERVICE_DIRECTORY_KEY: u32 = 5
 const KV_SERVICE_DIRECTORY_KEY: u32 = 6
 const SHELL_SERVICE_DIRECTORY_KEY: u32 = 7
 const COMPOSITION_ECHO_ENDPOINT_ID: u32 = 3
@@ -113,10 +91,6 @@ const SHELL_COMMAND_KV_GET_BYTE1: u8 = 71
 const UART_RECEIVE_VECTOR: u32 = 33
 const UART_COMPLETION_VECTOR: u32 = 34
 const UART_SOURCE_ACTOR: u32 = 134
-const UART_FRAME_ONE_BYTE0: u8 = 70
-const UART_FRAME_ONE_BYTE1: u8 = 82
-const UART_FRAME_TWO_BYTE0: u8 = 65
-const UART_FRAME_TWO_BYTE1: u8 = 77
 const UART_QUEUE_FRAME_ONE_BYTE0: u8 = 81
 const UART_QUEUE_FRAME_ONE_BYTE1: u8 = 49
 const UART_QUEUE_FRAME_TWO_BYTE0: u8 = 81
@@ -141,73 +115,52 @@ var TASK_SLOTS: [3]state.TaskSlot
 var READY_QUEUE: state.ReadyQueue
 var BOOT_LOG: state.BootLog
 var BOOT_LOG_APPEND_FAILED: u32
-var BOOT_MARKER_EMITTED: u32
 var ROOT_CAPABILITY: capability.CapabilitySlot
 var INIT_PROGRAM_CAPABILITY: capability.CapabilitySlot
-var LOG_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
-var ECHO_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
-var TRANSFER_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
+var LOG_SERVICE_SNAPSHOT: bootstrap_services.LogServiceSnapshot
+var ECHO_SERVICE_SNAPSHOT: bootstrap_services.EchoServiceSnapshot
+var TRANSFER_SERVICE_SNAPSHOT: bootstrap_services.TransferServiceSnapshot
 var HANDLE_TABLES: [3]capability.HandleTable
 var WAIT_TABLES: [3]capability.WaitTable
 var ENDPOINTS: ipc.EndpointTable
 var INTERRUPTS: interrupt.InterruptController
 var LAST_INTERRUPT_KIND: interrupt.InterruptDispatchKind
 var UART_DEVICE: uart.UartDevice
-var INIT_TRANSLATION_ROOT: mmu.TranslationRoot
-var CHILD_TRANSLATION_ROOT: mmu.TranslationRoot
+var INIT_RUNTIME_SNAPSHOT: bootstrap_runtime.InitRuntimeSnapshot
+var CHILD_EXECUTION_SNAPSHOT: bootstrap_runtime.ChildExecutionSnapshot
 var SYSCALL_GATE: syscall.SyscallGate
 var INIT_IMAGE: init.InitImage
-var INIT_BOOTSTRAP_CAPS: init.BootstrapCapabilitySet
-var INIT_BOOTSTRAP_HANDOFF: init.BootstrapHandoffObservation
-var ADDRESS_SPACE: address_space.AddressSpace
-var USER_FRAME: address_space.UserEntryFrame
-var CHILD_ADDRESS_SPACE: address_space.AddressSpace
-var CHILD_USER_FRAME: address_space.UserEntryFrame
-var LOG_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
-var LOG_SERVICE_USER_FRAME: address_space.UserEntryFrame
-var ECHO_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
-var ECHO_SERVICE_USER_FRAME: address_space.UserEntryFrame
-var TRANSFER_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
-var TRANSFER_SERVICE_USER_FRAME: address_space.UserEntryFrame
 var TIMER_STATE: timer.TimerState
 var DELIVERED_MESSAGE: ipc.KernelMessage
 var RECEIVE_OBSERVATION: syscall.ReceiveObservation
 var ATTACHED_RECEIVE_OBSERVATION: syscall.ReceiveObservation
 var TRANSFERRED_HANDLE_USE_OBSERVATION: syscall.ReceiveObservation
-var SPAWN_OBSERVATION: syscall.SpawnObservation
-var SLEEP_OBSERVATION: syscall.SleepObservation
-var TIMER_WAKE_OBSERVATION: timer.TimerWakeObservation
-var WAKE_READY_QUEUE: state.ReadyQueue
-var PRE_EXIT_WAIT_OBSERVATION: syscall.WaitObservation
-var EXIT_WAIT_OBSERVATION: syscall.WaitObservation
-var LOG_SERVICE_STATE: log_service.LogServiceState
-var LOG_SERVICE_SPAWN_OBSERVATION: syscall.SpawnObservation
-var LOG_SERVICE_RECEIVE_OBSERVATION: syscall.ReceiveObservation
-var LOG_SERVICE_ACK_OBSERVATION: syscall.ReceiveObservation
-var LOG_SERVICE_HANDSHAKE: log_service.LogHandshakeObservation
-var LOG_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
-var ECHO_SERVICE_STATE: echo_service.EchoServiceState
-var ECHO_SERVICE_SPAWN_OBSERVATION: syscall.SpawnObservation
-var ECHO_SERVICE_RECEIVE_OBSERVATION: syscall.ReceiveObservation
-var ECHO_SERVICE_REPLY_OBSERVATION: syscall.ReceiveObservation
-var ECHO_SERVICE_EXCHANGE: echo_service.EchoExchangeObservation
-var ECHO_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
-var TRANSFER_SERVICE_STATE: transfer_service.TransferServiceState
-var TRANSFER_SERVICE_SPAWN_OBSERVATION: syscall.SpawnObservation
-var TRANSFER_SERVICE_GRANT_OBSERVATION: syscall.ReceiveObservation
-var TRANSFER_SERVICE_EMIT_OBSERVATION: syscall.ReceiveObservation
-var TRANSFER_SERVICE_TRANSFER: transfer_service.TransferObservation
-var TRANSFER_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
-var SERIAL_SERVICE_PROGRAM_CAPABILITY: capability.CapabilitySlot
-var SERIAL_SERVICE_ADDRESS_SPACE: address_space.AddressSpace
-var SERIAL_SERVICE_USER_FRAME: address_space.UserEntryFrame
-var SERIAL_SERVICE_STATE: serial_service.SerialServiceState
-var SERIAL_SERVICE_SPAWN_OBSERVATION: syscall.SpawnObservation
-var SERIAL_SERVICE_RECEIVE_OBSERVATION: syscall.ReceiveObservation
-var SERIAL_SERVICE_INGRESS: serial_service.SerialIngressObservation
-var SERIAL_SERVICE_FAILURE_OBSERVATION: bootstrap_services.SerialServiceFailureObservation
-var SERIAL_SERVICE_WAIT_OBSERVATION: syscall.WaitObservation
+var SERIAL_SERVICE_SNAPSHOT: bootstrap_services.SerialServiceSnapshot
 var UART_INGRESS: uart.UartIngressObservation
+
+func empty_log_service_snapshot() bootstrap_services.LogServiceSnapshot {
+    return bootstrap_services.empty_log_service_snapshot()
+}
+
+func empty_echo_service_snapshot() bootstrap_services.EchoServiceSnapshot {
+    return bootstrap_services.empty_echo_service_snapshot()
+}
+
+func empty_transfer_service_snapshot() bootstrap_services.TransferServiceSnapshot {
+    return bootstrap_services.empty_transfer_service_snapshot()
+}
+
+func empty_serial_service_snapshot() bootstrap_services.SerialServiceSnapshot {
+    return bootstrap_services.empty_serial_service_snapshot()
+}
+
+func empty_init_runtime_snapshot() bootstrap_runtime.InitRuntimeSnapshot {
+    return bootstrap_runtime.empty_init_runtime_snapshot()
+}
+
+func empty_child_execution_snapshot() bootstrap_runtime.ChildExecutionSnapshot {
+    return bootstrap_runtime.empty_child_execution_snapshot()
+}
 
 func reset_kernel_state() {
     KERNEL = state.empty_descriptor()
@@ -216,72 +169,27 @@ func reset_kernel_state() {
     READY_QUEUE = state.empty_queue()
     BOOT_LOG = state.empty_log()
     BOOT_LOG_APPEND_FAILED = 0
-    BOOT_MARKER_EMITTED = 0
     ROOT_CAPABILITY = capability.empty_slot()
     INIT_PROGRAM_CAPABILITY = capability.empty_slot()
-    LOG_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
-    ECHO_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
-    TRANSFER_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
+    LOG_SERVICE_SNAPSHOT = empty_log_service_snapshot()
+    ECHO_SERVICE_SNAPSHOT = empty_echo_service_snapshot()
+    TRANSFER_SERVICE_SNAPSHOT = empty_transfer_service_snapshot()
     HANDLE_TABLES = capability.zero_handle_tables()
     WAIT_TABLES = capability.zero_wait_tables()
     ENDPOINTS = ipc.empty_table()
     INTERRUPTS = interrupt.reset_controller()
     LAST_INTERRUPT_KIND = interrupt.InterruptDispatchKind.None
     UART_DEVICE = uart.empty_device()
-    INIT_TRANSLATION_ROOT = mmu.empty_translation_root()
-    CHILD_TRANSLATION_ROOT = mmu.empty_translation_root()
+    INIT_RUNTIME_SNAPSHOT = empty_init_runtime_snapshot()
+    CHILD_EXECUTION_SNAPSHOT = empty_child_execution_snapshot()
     SYSCALL_GATE = syscall.gate_closed()
     INIT_IMAGE = init.bootstrap_image()
-    INIT_BOOTSTRAP_CAPS = init.empty_bootstrap_capability_set()
-    INIT_BOOTSTRAP_HANDOFF = init.BootstrapHandoffObservation{ owner_pid: 0, authority_count: 0, endpoint_handle_slot: 0, program_capability_slot: 0, program_object_id: 0, ambient_root_visible: 0 }
-    ADDRESS_SPACE = address_space.empty_space()
-    USER_FRAME = address_space.empty_frame()
-    CHILD_ADDRESS_SPACE = address_space.empty_space()
-    CHILD_USER_FRAME = address_space.empty_frame()
-    LOG_SERVICE_ADDRESS_SPACE = address_space.empty_space()
-    LOG_SERVICE_USER_FRAME = address_space.empty_frame()
-    ECHO_SERVICE_ADDRESS_SPACE = address_space.empty_space()
-    ECHO_SERVICE_USER_FRAME = address_space.empty_frame()
-    TRANSFER_SERVICE_ADDRESS_SPACE = address_space.empty_space()
-    TRANSFER_SERVICE_USER_FRAME = address_space.empty_frame()
     TIMER_STATE = timer.empty_timer_state()
     DELIVERED_MESSAGE = ipc.empty_message()
     RECEIVE_OBSERVATION = syscall.empty_receive_observation()
     ATTACHED_RECEIVE_OBSERVATION = syscall.empty_receive_observation()
     TRANSFERRED_HANDLE_USE_OBSERVATION = syscall.empty_receive_observation()
-    SPAWN_OBSERVATION = syscall.empty_spawn_observation()
-    SLEEP_OBSERVATION = syscall.empty_sleep_observation()
-    TIMER_WAKE_OBSERVATION = timer.TimerWakeObservation{ task_id: 0, deadline_tick: 0, wake_tick: 0, wake_count: 0 }
-    WAKE_READY_QUEUE = state.empty_queue()
-    PRE_EXIT_WAIT_OBSERVATION = syscall.empty_wait_observation()
-    EXIT_WAIT_OBSERVATION = syscall.empty_wait_observation()
-    LOG_SERVICE_STATE = log_service.service_state(0, 0)
-    LOG_SERVICE_SPAWN_OBSERVATION = syscall.empty_spawn_observation()
-    LOG_SERVICE_RECEIVE_OBSERVATION = syscall.empty_receive_observation()
-    LOG_SERVICE_ACK_OBSERVATION = syscall.empty_receive_observation()
-    LOG_SERVICE_HANDSHAKE = log_service.LogHandshakeObservation{ service_pid: 0, client_pid: 0, endpoint_id: 0, tag: log_service.LogMessageTag.None, request_len: 0, request_byte: 0, ack_byte: 0, request_count: 0, ack_count: 0 }
-    LOG_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
-    ECHO_SERVICE_STATE = echo_service.service_state(0, 0)
-    ECHO_SERVICE_SPAWN_OBSERVATION = syscall.empty_spawn_observation()
-    ECHO_SERVICE_RECEIVE_OBSERVATION = syscall.empty_receive_observation()
-    ECHO_SERVICE_REPLY_OBSERVATION = syscall.empty_receive_observation()
-    ECHO_SERVICE_EXCHANGE = echo_service.EchoExchangeObservation{ service_pid: 0, client_pid: 0, endpoint_id: 0, tag: echo_service.EchoMessageTag.None, request_len: 0, request_byte0: 0, request_byte1: 0, reply_len: 0, reply_byte0: 0, reply_byte1: 0, request_count: 0, reply_count: 0 }
-    ECHO_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
-    TRANSFER_SERVICE_STATE = transfer_service.service_state(0, 0, 0)
-    TRANSFER_SERVICE_SPAWN_OBSERVATION = syscall.empty_spawn_observation()
-    TRANSFER_SERVICE_GRANT_OBSERVATION = syscall.empty_receive_observation()
-    TRANSFER_SERVICE_EMIT_OBSERVATION = syscall.empty_receive_observation()
-    TRANSFER_SERVICE_TRANSFER = transfer_service.TransferObservation{ service_pid: 0, client_pid: 0, control_endpoint_id: 0, transferred_endpoint_id: 0, transferred_rights: 0, tag: transfer_service.CapabilityTransferTag.None, grant_len: 0, grant_byte0: 0, grant_byte1: 0, grant_byte2: 0, grant_byte3: 0, emit_len: 0, emit_byte0: 0, emit_byte1: 0, emit_byte2: 0, emit_byte3: 0, grant_count: 0, emit_count: 0 }
-    TRANSFER_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
-    SERIAL_SERVICE_PROGRAM_CAPABILITY = capability.empty_slot()
-    SERIAL_SERVICE_ADDRESS_SPACE = address_space.empty_space()
-    SERIAL_SERVICE_USER_FRAME = address_space.empty_frame()
-    SERIAL_SERVICE_STATE = serial_service.service_state(0, 0)
-    SERIAL_SERVICE_SPAWN_OBSERVATION = syscall.empty_spawn_observation()
-    SERIAL_SERVICE_RECEIVE_OBSERVATION = syscall.empty_receive_observation()
-    SERIAL_SERVICE_INGRESS = serial_service.empty_ingress_observation()
-    SERIAL_SERVICE_FAILURE_OBSERVATION = bootstrap_services.empty_serial_service_failure_observation()
-    SERIAL_SERVICE_WAIT_OBSERVATION = syscall.empty_wait_observation()
+    SERIAL_SERVICE_SNAPSHOT = empty_serial_service_snapshot()
     UART_INGRESS = uart.empty_ingress_observation()
     bootstrap_proofs.reset_late_phase_proofs()
 }
@@ -421,13 +329,13 @@ func validate_seeded_owner_state() bool {
     if INIT_IMAGE.image_id != 1 {
         return false
     }
-    if address_space.state_score(ADDRESS_SPACE.state) != 1 {
+    if address_space.state_score(INIT_RUNTIME_SNAPSHOT.address_space.state) != 1 {
         return false
     }
-    if USER_FRAME.task_id != 0 {
+    if INIT_RUNTIME_SNAPSHOT.user_frame.task_id != 0 {
         return false
     }
-    if CHILD_USER_FRAME.task_id != 0 {
+    if CHILD_EXECUTION_SNAPSHOT.user_frame.task_id != 0 {
         return false
     }
     return true
@@ -525,23 +433,16 @@ func architecture_entry() bool {
 }
 
 func construct_first_user_address_space() bool {
-    if !init.bootstrap_image_valid(INIT_IMAGE) {
+    result: bootstrap_runtime.InitAddressSpaceResult = bootstrap_runtime.construct_first_user_address_space(INIT_PID, INIT_TID, INIT_ASID, INIT_TASK_SLOT, INIT_ROOT_PAGE_TABLE, INIT_IMAGE, INIT_RUNTIME_SNAPSHOT, PROCESS_SLOTS, TASK_SLOTS)
+    if result.succeeded == 0 {
+        INIT_RUNTIME_SNAPSHOT = result.snapshot
         return false
     }
-    slots: [3]state.ProcessSlot = PROCESS_SLOTS
-    tasks: [3]state.TaskSlot = TASK_SLOTS
-    INIT_TRANSLATION_ROOT = mmu.bootstrap_translation_root(INIT_ASID, INIT_ROOT_PAGE_TABLE)
-    ADDRESS_SPACE = address_space.bootstrap_space(INIT_ASID, INIT_PID, INIT_TRANSLATION_ROOT, INIT_IMAGE.image_base, INIT_IMAGE.image_size, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_base, INIT_IMAGE.stack_size, INIT_IMAGE.stack_top)
-    if address_space.state_score(ADDRESS_SPACE.state) != 2 {
-        return false
-    }
-    INIT_PROGRAM_CAPABILITY = capability.bootstrap_init_program_slot(INIT_PID)
-    slots[1] = state.init_process_slot(INIT_PID, INIT_TASK_SLOT, INIT_ASID)
-    tasks[1] = state.user_task_slot(INIT_TID, INIT_PID, INIT_ASID, INIT_IMAGE.entry_pc, INIT_IMAGE.stack_top)
-    PROCESS_SLOTS = slots
-    TASK_SLOTS = tasks
-    READY_QUEUE = state.user_ready_queue(INIT_TID)
-    USER_FRAME = address_space.bootstrap_user_frame(ADDRESS_SPACE, INIT_TID)
+    INIT_PROGRAM_CAPABILITY = result.program_capability
+    PROCESS_SLOTS = result.process_slots
+    TASK_SLOTS = result.task_slots
+    READY_QUEUE = result.ready_queue
+    INIT_RUNTIME_SNAPSHOT = result.snapshot
     record_boot_stage(state.BootStage.AddressSpaceReady, INIT_ASID)
     return BOOT_LOG_APPEND_FAILED == 0
 }
@@ -595,69 +496,69 @@ func validate_first_user_entry_ready() bool {
     if INIT_PROGRAM_CAPABILITY.owner_pid != INIT_PID {
         return false
     }
-    if address_space.state_score(ADDRESS_SPACE.state) != 2 {
+    if address_space.state_score(INIT_RUNTIME_SNAPSHOT.address_space.state) != 2 {
         return false
     }
-    if ADDRESS_SPACE.asid != INIT_ASID {
+    if INIT_RUNTIME_SNAPSHOT.address_space.asid != INIT_ASID {
         return false
     }
-    if ADDRESS_SPACE.owner_pid != INIT_PID {
+    if INIT_RUNTIME_SNAPSHOT.address_space.owner_pid != INIT_PID {
         return false
     }
-    if ADDRESS_SPACE.translation_root.page_table_base != INIT_ROOT_PAGE_TABLE {
+    if INIT_RUNTIME_SNAPSHOT.address_space.translation_root.page_table_base != INIT_ROOT_PAGE_TABLE {
         return false
     }
-    if ADDRESS_SPACE.translation_root.owner_asid != INIT_ASID {
+    if INIT_RUNTIME_SNAPSHOT.address_space.translation_root.owner_asid != INIT_ASID {
         return false
     }
-    if mmu.state_score(ADDRESS_SPACE.translation_root.state) != 2 {
+    if mmu.state_score(INIT_RUNTIME_SNAPSHOT.address_space.translation_root.state) != 2 {
         return false
     }
-    if ADDRESS_SPACE.mapping_count != 2 {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mapping_count != 2 {
         return false
     }
-    image_mapping_index: usize = address_space.find_mapping_index(ADDRESS_SPACE, address_space.MappingKind.ImageText)
-    if image_mapping_index >= ADDRESS_SPACE.mapping_count {
+    image_mapping_index: usize = address_space.find_mapping_index(INIT_RUNTIME_SNAPSHOT.address_space, address_space.MappingKind.ImageText)
+    if image_mapping_index >= INIT_RUNTIME_SNAPSHOT.address_space.mapping_count {
         return false
     }
-    stack_mapping_index: usize = address_space.find_mapping_index(ADDRESS_SPACE, address_space.MappingKind.UserStack)
-    if stack_mapping_index >= ADDRESS_SPACE.mapping_count {
+    stack_mapping_index: usize = address_space.find_mapping_index(INIT_RUNTIME_SNAPSHOT.address_space, address_space.MappingKind.UserStack)
+    if stack_mapping_index >= INIT_RUNTIME_SNAPSHOT.address_space.mapping_count {
         return false
     }
-    if ADDRESS_SPACE.mappings[image_mapping_index].base != INIT_IMAGE.image_base {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mappings[image_mapping_index].base != INIT_IMAGE.image_base {
         return false
     }
-    if ADDRESS_SPACE.mappings[image_mapping_index].size != INIT_IMAGE.image_size {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mappings[image_mapping_index].size != INIT_IMAGE.image_size {
         return false
     }
-    if ADDRESS_SPACE.mappings[image_mapping_index].writable != 0 {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mappings[image_mapping_index].writable != 0 {
         return false
     }
-    if ADDRESS_SPACE.mappings[image_mapping_index].executable != 1 {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mappings[image_mapping_index].executable != 1 {
         return false
     }
-    if ADDRESS_SPACE.mappings[stack_mapping_index].base != INIT_IMAGE.stack_base {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mappings[stack_mapping_index].base != INIT_IMAGE.stack_base {
         return false
     }
-    if ADDRESS_SPACE.mappings[stack_mapping_index].size != INIT_IMAGE.stack_size {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mappings[stack_mapping_index].size != INIT_IMAGE.stack_size {
         return false
     }
-    if ADDRESS_SPACE.mappings[stack_mapping_index].writable != 1 {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mappings[stack_mapping_index].writable != 1 {
         return false
     }
-    if ADDRESS_SPACE.mappings[stack_mapping_index].executable != 0 {
+    if INIT_RUNTIME_SNAPSHOT.address_space.mappings[stack_mapping_index].executable != 0 {
         return false
     }
-    if USER_FRAME.entry_pc != INIT_IMAGE.entry_pc {
+    if INIT_RUNTIME_SNAPSHOT.user_frame.entry_pc != INIT_IMAGE.entry_pc {
         return false
     }
-    if USER_FRAME.stack_top != INIT_IMAGE.stack_top {
+    if INIT_RUNTIME_SNAPSHOT.user_frame.stack_top != INIT_IMAGE.stack_top {
         return false
     }
-    if USER_FRAME.address_space_id != INIT_ASID {
+    if INIT_RUNTIME_SNAPSHOT.user_frame.address_space_id != INIT_ASID {
         return false
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if INIT_RUNTIME_SNAPSHOT.user_frame.task_id != INIT_TID {
         return false
     }
     if READY_QUEUE.count != 1 {
@@ -685,31 +586,21 @@ func transfer_to_first_user_entry() bool {
     if !validate_first_user_entry_ready() {
         return false
     }
-    if !address_space.can_activate(ADDRESS_SPACE) {
+    result: bootstrap_runtime.FirstUserEntryTransferResult = bootstrap_runtime.transfer_to_first_user_entry(KERNEL, INIT_PID, INIT_TID, INIT_ASID, INIT_RUNTIME_SNAPSHOT)
+    KERNEL = result.kernel
+    INIT_RUNTIME_SNAPSHOT = result.snapshot
+    if result.succeeded == 0 {
         return false
     }
-    ADDRESS_SPACE = address_space.activate(ADDRESS_SPACE)
-    if address_space.state_score(ADDRESS_SPACE.state) != 4 {
-        return false
-    }
-    KERNEL = state.start_user_entry(KERNEL, INIT_PID, INIT_TID, INIT_ASID)
     record_boot_stage(state.BootStage.UserEntryReady, INIT_TID)
     return true
 }
 
 func bootstrap_endpoint_handle_core() {
-    handle_tables: [3]capability.HandleTable = HANDLE_TABLES
-    endpoints: ipc.EndpointTable = ENDPOINTS
-
-    endpoints = ipc.install_endpoint(endpoints, INIT_PID, INIT_ENDPOINT_ID)
-    handle_tables[1] = capability.handle_table_for_owner(INIT_PID)
-    handle_tables[1] = capability.install_endpoint_handle(handle_tables[1], INIT_ENDPOINT_HANDLE_SLOT, INIT_ENDPOINT_ID, 7)
-    endpoints = ipc.enqueue_message(endpoints, 0, ipc.bootstrap_init_message(BOOT_PID, INIT_ENDPOINT_ID))
-    DELIVERED_MESSAGE = ipc.mark_delivered(ipc.peek_head_message(endpoints, 0))
-    endpoints = ipc.consume_head_message(endpoints, 0)
-
-    HANDLE_TABLES = handle_tables
-    ENDPOINTS = endpoints
+    result: bootstrap_runtime.EndpointBootstrapResult = bootstrap_runtime.bootstrap_endpoint_handle_core(BOOT_PID, INIT_PID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, HANDLE_TABLES, ENDPOINTS)
+    HANDLE_TABLES = result.handle_tables
+    ENDPOINTS = result.endpoints
+    DELIVERED_MESSAGE = result.delivered_message
 }
 
 func validate_endpoint_handle_core() bool {
@@ -816,58 +707,58 @@ func validate_endpoint_handle_core() bool {
 }
 
 func handoff_init_bootstrap_capability_set() bool {
-    INIT_BOOTSTRAP_CAPS = init.install_bootstrap_capability_set(INIT_PID, INIT_ENDPOINT_HANDLE_SLOT, INIT_PROGRAM_CAPABILITY)
-    INIT_BOOTSTRAP_HANDOFF = init.observe_bootstrap_handoff(INIT_BOOTSTRAP_CAPS)
-    return INIT_BOOTSTRAP_HANDOFF.authority_count == 2
+    result: bootstrap_runtime.BootstrapCapabilityHandoffResult = bootstrap_runtime.handoff_init_bootstrap_capability_set(INIT_PID, INIT_ENDPOINT_HANDLE_SLOT, INIT_PROGRAM_CAPABILITY, INIT_RUNTIME_SNAPSHOT)
+    INIT_RUNTIME_SNAPSHOT = result.snapshot
+    return result.succeeded != 0
 }
 
 func validate_init_bootstrap_capability_handoff() bool {
-    if INIT_BOOTSTRAP_CAPS.owner_pid != INIT_PID {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.owner_pid != INIT_PID {
         return false
     }
-    if INIT_BOOTSTRAP_CAPS.endpoint_handle_slot != INIT_ENDPOINT_HANDLE_SLOT {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.endpoint_handle_slot != INIT_ENDPOINT_HANDLE_SLOT {
         return false
     }
-    if INIT_BOOTSTRAP_CAPS.endpoint_handle_count != 1 {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.endpoint_handle_count != 1 {
         return false
     }
-    if INIT_BOOTSTRAP_CAPS.program_capability_count != 1 {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.program_capability_count != 1 {
         return false
     }
-    if INIT_BOOTSTRAP_CAPS.wait_handle_count != 0 {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.wait_handle_count != 0 {
         return false
     }
-    if INIT_BOOTSTRAP_CAPS.ambient_root_visible != 0 {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.ambient_root_visible != 0 {
         return false
     }
-    if !capability.is_program_capability(INIT_BOOTSTRAP_CAPS.program_capability) {
+    if !capability.is_program_capability(INIT_RUNTIME_SNAPSHOT.bootstrap_caps.program_capability) {
         return false
     }
-    if INIT_BOOTSTRAP_CAPS.program_capability.owner_pid != INIT_PID {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.program_capability.owner_pid != INIT_PID {
         return false
     }
-    if INIT_BOOTSTRAP_CAPS.program_capability.slot_id != INIT_PROGRAM_CAPABILITY.slot_id {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.program_capability.slot_id != INIT_PROGRAM_CAPABILITY.slot_id {
         return false
     }
-    if INIT_BOOTSTRAP_CAPS.program_capability.object_id != INIT_PROGRAM_CAPABILITY.object_id {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_caps.program_capability.object_id != INIT_PROGRAM_CAPABILITY.object_id {
         return false
     }
-    if INIT_BOOTSTRAP_HANDOFF.owner_pid != INIT_PID {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_handoff.owner_pid != INIT_PID {
         return false
     }
-    if INIT_BOOTSTRAP_HANDOFF.authority_count != 2 {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_handoff.authority_count != 2 {
         return false
     }
-    if INIT_BOOTSTRAP_HANDOFF.endpoint_handle_slot != INIT_ENDPOINT_HANDLE_SLOT {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_handoff.endpoint_handle_slot != INIT_ENDPOINT_HANDLE_SLOT {
         return false
     }
-    if INIT_BOOTSTRAP_HANDOFF.program_capability_slot != INIT_PROGRAM_CAPABILITY.slot_id {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_handoff.program_capability_slot != INIT_PROGRAM_CAPABILITY.slot_id {
         return false
     }
-    if INIT_BOOTSTRAP_HANDOFF.program_object_id != INIT_PROGRAM_CAPABILITY.object_id {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_handoff.program_object_id != INIT_PROGRAM_CAPABILITY.object_id {
         return false
     }
-    if INIT_BOOTSTRAP_HANDOFF.ambient_root_visible != 0 {
+    if INIT_RUNTIME_SNAPSHOT.bootstrap_handoff.ambient_root_visible != 0 {
         return false
     }
     if capability.kind_score(ROOT_CAPABILITY.kind) != 2 {
@@ -879,48 +770,22 @@ func validate_init_bootstrap_capability_handoff() bool {
     if HANDLE_TABLES[1].count != 1 {
         return false
     }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], INIT_BOOTSTRAP_CAPS.endpoint_handle_slot) != INIT_ENDPOINT_ID {
+    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], INIT_RUNTIME_SNAPSHOT.bootstrap_caps.endpoint_handle_slot) != INIT_ENDPOINT_ID {
         return false
     }
-    if WAIT_TABLES[1].count != INIT_BOOTSTRAP_CAPS.wait_handle_count {
+    if WAIT_TABLES[1].count != INIT_RUNTIME_SNAPSHOT.bootstrap_caps.wait_handle_count {
         return false
     }
     return true
 }
 
 func execute_syscall_byte_ipc() bool {
-    payload: [4]u8 = ipc.zero_payload()
-    payload[0] = 83
-    payload[1] = 89
-    payload[2] = 83
-    payload[3] = 67
-
-    SYSCALL_GATE = syscall.open_gate(SYSCALL_GATE)
-    send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload))
-    SYSCALL_GATE = send_result.gate
-    HANDLE_TABLES[1] = send_result.handle_table
-    ENDPOINTS = send_result.endpoints
-    if syscall.status_score(send_result.status) != 2 {
-        return false
-    }
-
-    receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
-    SYSCALL_GATE = receive_result.gate
-    HANDLE_TABLES[1] = receive_result.handle_table
-    ENDPOINTS = receive_result.endpoints
-    RECEIVE_OBSERVATION = receive_result.observation
-    if syscall.status_score(RECEIVE_OBSERVATION.status) != 2 {
-        return false
-    }
-
-    would_block_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(INIT_ENDPOINT_HANDLE_SLOT))
-    SYSCALL_GATE = would_block_result.gate
-    HANDLE_TABLES[1] = would_block_result.handle_table
-    ENDPOINTS = would_block_result.endpoints
-    if syscall.status_score(would_block_result.observation.status) != 4 {
-        return false
-    }
-    return syscall.block_reason_score(would_block_result.observation.block_reason) == 4
+    result: bootstrap_runtime.SyscallByteIpcResult = bootstrap_runtime.execute_syscall_byte_ipc(INIT_PID, INIT_ENDPOINT_HANDLE_SLOT, SYSCALL_GATE, HANDLE_TABLES, ENDPOINTS)
+    SYSCALL_GATE = result.gate
+    HANDLE_TABLES = result.handle_tables
+    ENDPOINTS = result.endpoints
+    RECEIVE_OBSERVATION = result.observation
+    return result.succeeded != 0
 }
 
 func validate_syscall_byte_ipc() bool {
@@ -976,89 +841,20 @@ func validate_syscall_byte_ipc() bool {
 }
 
 func seed_transfer_endpoint_handle() bool {
-    handle_tables: [3]capability.HandleTable = HANDLE_TABLES
-    endpoints: ipc.EndpointTable = ENDPOINTS
-
-    endpoints = ipc.install_endpoint(endpoints, INIT_PID, TRANSFER_ENDPOINT_ID)
-    handle_tables[1] = capability.install_endpoint_handle(handle_tables[1], TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, 7)
-
-    HANDLE_TABLES = handle_tables
-    ENDPOINTS = endpoints
-
-    if ENDPOINTS.count != 2 {
-        return false
-    }
-    if ENDPOINTS.slots[1].endpoint_id != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-    if ENDPOINTS.slots[1].owner_pid != INIT_PID {
-        return false
-    }
-    if ENDPOINTS.slots[1].active != 1 {
-        return false
-    }
-    if HANDLE_TABLES[1].count != 2 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-    if capability.find_rights_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 7 {
-        return false
-    }
-    return true
+    result: bootstrap_runtime.TransferEndpointSeedResult = bootstrap_runtime.seed_transfer_endpoint_handle(INIT_PID, TRANSFER_ENDPOINT_ID, TRANSFER_SOURCE_HANDLE_SLOT, HANDLE_TABLES, ENDPOINTS)
+    HANDLE_TABLES = result.handle_tables
+    ENDPOINTS = result.endpoints
+    return result.succeeded != 0
 }
 
 func execute_capability_carrying_ipc_transfer() bool {
-    payload: [4]u8 = ipc.zero_payload()
-    payload[0] = 67
-    payload[1] = 65
-    payload[2] = 80
-    payload[3] = 83
-
-    transfer_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_transfer_send_request(INIT_ENDPOINT_HANDLE_SLOT, 4, payload, TRANSFER_SOURCE_HANDLE_SLOT))
-    SYSCALL_GATE = transfer_send_result.gate
-    HANDLE_TABLES[1] = transfer_send_result.handle_table
-    ENDPOINTS = transfer_send_result.endpoints
-    if syscall.status_score(transfer_send_result.status) != 2 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_SOURCE_HANDLE_SLOT) != 0 {
-        return false
-    }
-
-    transfer_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_transfer_receive_request(INIT_ENDPOINT_HANDLE_SLOT, TRANSFER_RECEIVED_HANDLE_SLOT))
-    SYSCALL_GATE = transfer_receive_result.gate
-    HANDLE_TABLES[1] = transfer_receive_result.handle_table
-    ENDPOINTS = transfer_receive_result.endpoints
-    ATTACHED_RECEIVE_OBSERVATION = transfer_receive_result.observation
-    if syscall.status_score(ATTACHED_RECEIVE_OBSERVATION.status) != 2 {
-        return false
-    }
-    if capability.find_endpoint_for_handle(HANDLE_TABLES[1], TRANSFER_RECEIVED_HANDLE_SLOT) != TRANSFER_ENDPOINT_ID {
-        return false
-    }
-
-    follow_payload: [4]u8 = ipc.zero_payload()
-    follow_payload[0] = 77
-    follow_payload[1] = 79
-    follow_payload[2] = 86
-    follow_payload[3] = 69
-
-    follow_send_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(TRANSFER_RECEIVED_HANDLE_SLOT, 4, follow_payload))
-    SYSCALL_GATE = follow_send_result.gate
-    HANDLE_TABLES[1] = follow_send_result.handle_table
-    ENDPOINTS = follow_send_result.endpoints
-    if syscall.status_score(follow_send_result.status) != 2 {
-        return false
-    }
-
-    follow_receive_result: syscall.ReceiveResult = syscall.perform_receive(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, syscall.build_receive_request(TRANSFER_RECEIVED_HANDLE_SLOT))
-    SYSCALL_GATE = follow_receive_result.gate
-    HANDLE_TABLES[1] = follow_receive_result.handle_table
-    ENDPOINTS = follow_receive_result.endpoints
-    TRANSFERRED_HANDLE_USE_OBSERVATION = follow_receive_result.observation
-    return syscall.status_score(TRANSFERRED_HANDLE_USE_OBSERVATION.status) == 2
+    result: bootstrap_runtime.CapabilityCarryingIpcTransferResult = bootstrap_runtime.execute_capability_carrying_ipc_transfer(INIT_PID, INIT_ENDPOINT_HANDLE_SLOT, TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_RECEIVED_HANDLE_SLOT, TRANSFER_ENDPOINT_ID, SYSCALL_GATE, HANDLE_TABLES, ENDPOINTS)
+    SYSCALL_GATE = result.gate
+    HANDLE_TABLES = result.handle_tables
+    ENDPOINTS = result.endpoints
+    ATTACHED_RECEIVE_OBSERVATION = result.attached_receive_observation
+    TRANSFERRED_HANDLE_USE_OBSERVATION = result.transferred_handle_use_observation
+    return result.succeeded != 0
 }
 
 func validate_capability_carrying_ipc_transfer() bool {
@@ -1164,29 +960,20 @@ func validate_capability_carrying_ipc_transfer() bool {
     return true
 }
 
-func validate_timer_hardening_contracts() bool {
-    return bootstrap_audit.validate_timer_hardening_contracts()
-}
-
-func validate_bootstrap_layout_contracts() bool {
-    return bootstrap_audit.validate_bootstrap_layout_contracts(bootstrap_audit.BootstrapLayoutAudit{ init_image: INIT_IMAGE, init_root_page_table: INIT_ROOT_PAGE_TABLE })
-}
-
-func validate_endpoint_and_capability_contracts() bool {
-    return bootstrap_audit.validate_endpoint_and_capability_contracts(bootstrap_audit.EndpointCapabilityAudit{ init_pid: INIT_PID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT })
-}
-
-func validate_state_hardening_contracts() bool {
-    return bootstrap_audit.validate_state_hardening_contracts(bootstrap_audit.StateHardeningAudit{ boot_tid: BOOT_TID, boot_pid: BOOT_PID, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, child_tid: CHILD_TID, child_pid: CHILD_PID, child_asid: CHILD_ASID, init_image: INIT_IMAGE, arch_actor: ARCH_ACTOR })
-}
-
-func validate_syscall_contract_hardening() bool {
-    return bootstrap_audit.validate_syscall_contract_hardening(bootstrap_audit.SyscallHardeningAudit{ init_pid: INIT_PID, init_endpoint_handle_slot: INIT_ENDPOINT_HANDLE_SLOT, init_endpoint_id: INIT_ENDPOINT_ID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, child_root_page_table: CHILD_ROOT_PAGE_TABLE, boot_pid: BOOT_PID, boot_tid: BOOT_TID, boot_task_slot: BOOT_TASK_SLOT, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, init_image: INIT_IMAGE, transfer_source_handle_slot: TRANSFER_SOURCE_HANDLE_SLOT })
+func install_service_runtime_state(next_state: bootstrap_services.ServiceRuntimeState) {
+    SYSCALL_GATE = next_state.gate
+    PROCESS_SLOTS = next_state.process_slots
+    TASK_SLOTS = next_state.task_slots
+    HANDLE_TABLES[1] = next_state.init_handle_table
+    HANDLE_TABLES[2] = next_state.child_handle_table
+    WAIT_TABLES[1] = next_state.wait_table
+    ENDPOINTS = next_state.endpoints
+    READY_QUEUE = next_state.ready_queue
 }
 
 func validate_phase104_contract_hardening() bool {
     timer_hardened: u32 = 0
-    if validate_timer_hardening_contracts() {
+    if bootstrap_audit.validate_timer_hardening_contracts() {
         timer_hardened = 1
     }
     return bootstrap_audit.validate_phase104_contract_hardening(bootstrap_audit.Phase104HardeningAudit{ boot_log_append_failed: BOOT_LOG_APPEND_FAILED, timer_hardened: timer_hardened, bootstrap_layout: bootstrap_audit.BootstrapLayoutAudit{ init_image: INIT_IMAGE, init_root_page_table: INIT_ROOT_PAGE_TABLE }, endpoint_capability: bootstrap_audit.EndpointCapabilityAudit{ init_pid: INIT_PID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT }, state_hardening: bootstrap_audit.StateHardeningAudit{ boot_tid: BOOT_TID, boot_pid: BOOT_PID, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, child_tid: CHILD_TID, child_pid: CHILD_PID, child_asid: CHILD_ASID, init_image: INIT_IMAGE, arch_actor: ARCH_ACTOR }, syscall_hardening: bootstrap_audit.SyscallHardeningAudit{ init_pid: INIT_PID, init_endpoint_handle_slot: INIT_ENDPOINT_HANDLE_SLOT, init_endpoint_id: INIT_ENDPOINT_ID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, child_root_page_table: CHILD_ROOT_PAGE_TABLE, boot_pid: BOOT_PID, boot_tid: BOOT_TID, boot_task_slot: BOOT_TASK_SLOT, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, init_image: INIT_IMAGE, transfer_source_handle_slot: TRANSFER_SOURCE_HANDLE_SLOT } })
@@ -1196,39 +983,24 @@ func build_log_service_config() bootstrap_services.LogServiceConfig {
     return bootstrap_services.log_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
 }
 
-func build_log_service_execution_state() bootstrap_services.LogServiceExecutionState {
-    return bootstrap_services.LogServiceExecutionState{ program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: LOG_SERVICE_ADDRESS_SPACE, child_user_frame: LOG_SERVICE_USER_FRAME, service_state: LOG_SERVICE_STATE, spawn_observation: LOG_SERVICE_SPAWN_OBSERVATION, receive_observation: LOG_SERVICE_RECEIVE_OBSERVATION, ack_observation: LOG_SERVICE_ACK_OBSERVATION, handshake: LOG_SERVICE_HANDSHAKE, wait_observation: LOG_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
+func build_service_runtime_state() bootstrap_services.ServiceRuntimeState {
+    return bootstrap_services.service_runtime_state(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, HANDLE_TABLES[1], HANDLE_TABLES[2], WAIT_TABLES[1], ENDPOINTS, INIT_IMAGE, READY_QUEUE)
 }
 
-func install_log_service_execution_state(next_state: bootstrap_services.LogServiceExecutionState) {
-    LOG_SERVICE_PROGRAM_CAPABILITY = next_state.program_capability
-    SYSCALL_GATE = next_state.gate
-    PROCESS_SLOTS = next_state.process_slots
-    TASK_SLOTS = next_state.task_slots
-    HANDLE_TABLES[1] = next_state.init_handle_table
-    HANDLE_TABLES[2] = next_state.child_handle_table
-    WAIT_TABLES[1] = next_state.wait_table
-    ENDPOINTS = next_state.endpoints
-    LOG_SERVICE_ADDRESS_SPACE = next_state.child_address_space
-    LOG_SERVICE_USER_FRAME = next_state.child_user_frame
-    LOG_SERVICE_STATE = next_state.service_state
-    LOG_SERVICE_SPAWN_OBSERVATION = next_state.spawn_observation
-    LOG_SERVICE_RECEIVE_OBSERVATION = next_state.receive_observation
-    LOG_SERVICE_ACK_OBSERVATION = next_state.ack_observation
-    LOG_SERVICE_HANDSHAKE = next_state.handshake
-    LOG_SERVICE_WAIT_OBSERVATION = next_state.wait_observation
-    READY_QUEUE = next_state.ready_queue
+func build_log_service_execution_state() bootstrap_services.LogServiceExecutionState {
+    return bootstrap_services.log_service_execution_state(LOG_SERVICE_SNAPSHOT, build_service_runtime_state())
 }
 
 func execute_phase105_log_service_handshake() bool {
     result: bootstrap_services.LogServiceExecutionResult = bootstrap_services.execute_phase105_log_service_handshake(build_log_service_config(), build_log_service_execution_state())
-    install_log_service_execution_state(result.state)
+    install_service_runtime_state(bootstrap_services.service_runtime_state_from_log_execution(result.state))
+    LOG_SERVICE_SNAPSHOT = bootstrap_services.log_service_snapshot(result.state)
     return result.succeeded != 0
 }
 
 func validate_phase105_log_service_handshake() bool {
     config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    return bootstrap_audit.validate_phase105_log_service_handshake(bootstrap_audit.LogServicePhaseAudit{ program_capability: LOG_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, spawn_observation: LOG_SERVICE_SPAWN_OBSERVATION, receive_observation: LOG_SERVICE_RECEIVE_OBSERVATION, ack_observation: LOG_SERVICE_ACK_OBSERVATION, service_state: LOG_SERVICE_STATE, handshake: LOG_SERVICE_HANDSHAKE, wait_observation: LOG_SERVICE_WAIT_OBSERVATION, wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: LOG_SERVICE_ADDRESS_SPACE, child_user_frame: LOG_SERVICE_USER_FRAME, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, endpoint_handle_slot: config.endpoint_handle_slot, request_byte: config.request_byte, exit_code: config.exit_code })
+    return bootstrap_audit.validate_phase105_log_service_handshake(bootstrap_audit.LogServicePhaseAudit{ program_capability: LOG_SERVICE_SNAPSHOT.program_capability, gate: SYSCALL_GATE, spawn_observation: LOG_SERVICE_SNAPSHOT.spawn_observation, receive_observation: LOG_SERVICE_SNAPSHOT.receive_observation, ack_observation: LOG_SERVICE_SNAPSHOT.ack_observation, service_state: LOG_SERVICE_SNAPSHOT.state, handshake: LOG_SERVICE_SNAPSHOT.handshake, wait_observation: LOG_SERVICE_SNAPSHOT.wait_observation, wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: LOG_SERVICE_SNAPSHOT.address_space, child_user_frame: LOG_SERVICE_SNAPSHOT.user_frame, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, endpoint_handle_slot: config.endpoint_handle_slot, request_byte: config.request_byte, exit_code: config.exit_code })
 }
 
 func build_echo_service_config() bootstrap_services.EchoServiceConfig {
@@ -1236,38 +1008,19 @@ func build_echo_service_config() bootstrap_services.EchoServiceConfig {
 }
 
 func build_echo_service_execution_state() bootstrap_services.EchoServiceExecutionState {
-    return bootstrap_services.EchoServiceExecutionState{ program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: ECHO_SERVICE_ADDRESS_SPACE, child_user_frame: ECHO_SERVICE_USER_FRAME, service_state: ECHO_SERVICE_STATE, spawn_observation: ECHO_SERVICE_SPAWN_OBSERVATION, receive_observation: ECHO_SERVICE_RECEIVE_OBSERVATION, reply_observation: ECHO_SERVICE_REPLY_OBSERVATION, exchange: ECHO_SERVICE_EXCHANGE, wait_observation: ECHO_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
-}
-
-func install_echo_service_execution_state(next_state: bootstrap_services.EchoServiceExecutionState) {
-    ECHO_SERVICE_PROGRAM_CAPABILITY = next_state.program_capability
-    SYSCALL_GATE = next_state.gate
-    PROCESS_SLOTS = next_state.process_slots
-    TASK_SLOTS = next_state.task_slots
-    HANDLE_TABLES[1] = next_state.init_handle_table
-    HANDLE_TABLES[2] = next_state.child_handle_table
-    WAIT_TABLES[1] = next_state.wait_table
-    ENDPOINTS = next_state.endpoints
-    ECHO_SERVICE_ADDRESS_SPACE = next_state.child_address_space
-    ECHO_SERVICE_USER_FRAME = next_state.child_user_frame
-    ECHO_SERVICE_STATE = next_state.service_state
-    ECHO_SERVICE_SPAWN_OBSERVATION = next_state.spawn_observation
-    ECHO_SERVICE_RECEIVE_OBSERVATION = next_state.receive_observation
-    ECHO_SERVICE_REPLY_OBSERVATION = next_state.reply_observation
-    ECHO_SERVICE_EXCHANGE = next_state.exchange
-    ECHO_SERVICE_WAIT_OBSERVATION = next_state.wait_observation
-    READY_QUEUE = next_state.ready_queue
+    return bootstrap_services.echo_service_execution_state(ECHO_SERVICE_SNAPSHOT, build_service_runtime_state())
 }
 
 func execute_phase106_echo_service_request_reply() bool {
     result: bootstrap_services.EchoServiceExecutionResult = bootstrap_services.execute_phase106_echo_service_request_reply(build_echo_service_config(), build_echo_service_execution_state())
-    install_echo_service_execution_state(result.state)
+    install_service_runtime_state(bootstrap_services.service_runtime_state_from_echo_execution(result.state))
+    ECHO_SERVICE_SNAPSHOT = bootstrap_services.echo_service_snapshot(result.state)
     return result.succeeded != 0
 }
 
 func validate_phase106_echo_service_request_reply() bool {
     config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
-    return bootstrap_audit.validate_phase106_echo_service_request_reply(bootstrap_audit.EchoServicePhaseAudit{ program_capability: ECHO_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, spawn_observation: ECHO_SERVICE_SPAWN_OBSERVATION, receive_observation: ECHO_SERVICE_RECEIVE_OBSERVATION, reply_observation: ECHO_SERVICE_REPLY_OBSERVATION, service_state: ECHO_SERVICE_STATE, exchange: ECHO_SERVICE_EXCHANGE, wait_observation: ECHO_SERVICE_WAIT_OBSERVATION, wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: ECHO_SERVICE_ADDRESS_SPACE, child_user_frame: ECHO_SERVICE_USER_FRAME, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, endpoint_handle_slot: config.endpoint_handle_slot, request_byte0: config.request_byte0, request_byte1: config.request_byte1, exit_code: config.exit_code })
+    return bootstrap_audit.validate_phase106_echo_service_request_reply(bootstrap_audit.EchoServicePhaseAudit{ program_capability: ECHO_SERVICE_SNAPSHOT.program_capability, gate: SYSCALL_GATE, spawn_observation: ECHO_SERVICE_SNAPSHOT.spawn_observation, receive_observation: ECHO_SERVICE_SNAPSHOT.receive_observation, reply_observation: ECHO_SERVICE_SNAPSHOT.reply_observation, service_state: ECHO_SERVICE_SNAPSHOT.state, exchange: ECHO_SERVICE_SNAPSHOT.exchange, wait_observation: ECHO_SERVICE_SNAPSHOT.wait_observation, wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: ECHO_SERVICE_SNAPSHOT.address_space, child_user_frame: ECHO_SERVICE_SNAPSHOT.user_frame, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, endpoint_handle_slot: config.endpoint_handle_slot, request_byte0: config.request_byte0, request_byte1: config.request_byte1, exit_code: config.exit_code })
 }
 
 func build_transfer_service_config() bootstrap_services.TransferServiceConfig {
@@ -1275,70 +1028,24 @@ func build_transfer_service_config() bootstrap_services.TransferServiceConfig {
 }
 
 func build_transfer_service_execution_state() bootstrap_services.TransferServiceExecutionState {
-    return bootstrap_services.TransferServiceExecutionState{ program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: TRANSFER_SERVICE_ADDRESS_SPACE, child_user_frame: TRANSFER_SERVICE_USER_FRAME, service_state: TRANSFER_SERVICE_STATE, spawn_observation: TRANSFER_SERVICE_SPAWN_OBSERVATION, grant_observation: TRANSFER_SERVICE_GRANT_OBSERVATION, emit_observation: TRANSFER_SERVICE_EMIT_OBSERVATION, transfer: TRANSFER_SERVICE_TRANSFER, wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
-}
-
-func install_transfer_service_execution_state(next_state: bootstrap_services.TransferServiceExecutionState) {
-    TRANSFER_SERVICE_PROGRAM_CAPABILITY = next_state.program_capability
-    SYSCALL_GATE = next_state.gate
-    PROCESS_SLOTS = next_state.process_slots
-    TASK_SLOTS = next_state.task_slots
-    HANDLE_TABLES[1] = next_state.init_handle_table
-    HANDLE_TABLES[2] = next_state.child_handle_table
-    WAIT_TABLES[1] = next_state.wait_table
-    ENDPOINTS = next_state.endpoints
-    TRANSFER_SERVICE_ADDRESS_SPACE = next_state.child_address_space
-    TRANSFER_SERVICE_USER_FRAME = next_state.child_user_frame
-    TRANSFER_SERVICE_STATE = next_state.service_state
-    TRANSFER_SERVICE_SPAWN_OBSERVATION = next_state.spawn_observation
-    TRANSFER_SERVICE_GRANT_OBSERVATION = next_state.grant_observation
-    TRANSFER_SERVICE_EMIT_OBSERVATION = next_state.emit_observation
-    TRANSFER_SERVICE_TRANSFER = next_state.transfer
-    TRANSFER_SERVICE_WAIT_OBSERVATION = next_state.wait_observation
-    READY_QUEUE = next_state.ready_queue
+    return bootstrap_services.transfer_service_execution_state(TRANSFER_SERVICE_SNAPSHOT, build_service_runtime_state())
 }
 
 func execute_phase107_user_to_user_capability_transfer() bool {
     result: bootstrap_services.TransferServiceExecutionResult = bootstrap_services.execute_phase107_user_to_user_capability_transfer(build_transfer_service_config(), build_transfer_service_execution_state())
-    install_transfer_service_execution_state(result.state)
+    install_service_runtime_state(bootstrap_services.service_runtime_state_from_transfer_execution(result.state))
+    TRANSFER_SERVICE_SNAPSHOT = bootstrap_services.transfer_service_snapshot(result.state)
     return result.succeeded != 0
 }
 
 func validate_phase107_user_to_user_capability_transfer() bool {
     config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    return bootstrap_audit.validate_phase107_user_to_user_capability_transfer(bootstrap_audit.TransferServicePhaseAudit{ program_capability: TRANSFER_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, spawn_observation: TRANSFER_SERVICE_SPAWN_OBSERVATION, grant_observation: TRANSFER_SERVICE_GRANT_OBSERVATION, emit_observation: TRANSFER_SERVICE_EMIT_OBSERVATION, service_state: TRANSFER_SERVICE_STATE, transfer: TRANSFER_SERVICE_TRANSFER, wait_observation: TRANSFER_SERVICE_WAIT_OBSERVATION, init_handle_table: HANDLE_TABLES[1], wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: TRANSFER_SERVICE_ADDRESS_SPACE, child_user_frame: TRANSFER_SERVICE_USER_FRAME, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, source_handle_slot: config.source_handle_slot, control_handle_slot: config.control_handle_slot, init_received_handle_slot: config.init_received_handle_slot, service_received_handle_slot: config.service_received_handle_slot, grant_byte0: config.grant_byte0, grant_byte1: config.grant_byte1, grant_byte2: config.grant_byte2, grant_byte3: config.grant_byte3, exit_code: config.exit_code })
-}
-
-func build_composition_service_config() bootstrap_services.CompositionServiceConfig {
-    return bootstrap_services.composition_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
-}
-
-func build_serial_service_config() bootstrap_services.SerialServiceConfig {
-    return bootstrap_services.serial_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, SERIAL_SERVICE_ENDPOINT_ID, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
-}
-
-func build_serial_service_execution_state() bootstrap_services.SerialServiceExecutionState {
-    return bootstrap_services.SerialServiceExecutionState{ program_capability: SERIAL_SERVICE_PROGRAM_CAPABILITY, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, init_image: INIT_IMAGE, child_address_space: SERIAL_SERVICE_ADDRESS_SPACE, child_user_frame: SERIAL_SERVICE_USER_FRAME, service_state: SERIAL_SERVICE_STATE, spawn_observation: SERIAL_SERVICE_SPAWN_OBSERVATION, receive_observation: SERIAL_SERVICE_RECEIVE_OBSERVATION, ingress: SERIAL_SERVICE_INGRESS, composition: serial_service.observe_composition(SERIAL_SERVICE_STATE), failure_observation: SERIAL_SERVICE_FAILURE_OBSERVATION, wait_observation: SERIAL_SERVICE_WAIT_OBSERVATION, ready_queue: READY_QUEUE }
+    return bootstrap_audit.validate_phase107_user_to_user_capability_transfer(bootstrap_audit.TransferServicePhaseAudit{ program_capability: TRANSFER_SERVICE_SNAPSHOT.program_capability, gate: SYSCALL_GATE, spawn_observation: TRANSFER_SERVICE_SNAPSHOT.spawn_observation, grant_observation: TRANSFER_SERVICE_SNAPSHOT.grant_observation, emit_observation: TRANSFER_SERVICE_SNAPSHOT.emit_observation, service_state: TRANSFER_SERVICE_SNAPSHOT.state, transfer: TRANSFER_SERVICE_SNAPSHOT.transfer, wait_observation: TRANSFER_SERVICE_SNAPSHOT.wait_observation, init_handle_table: HANDLE_TABLES[1], wait_table: WAIT_TABLES[1], child_handle_table: HANDLE_TABLES[2], ready_queue: READY_QUEUE, child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: TRANSFER_SERVICE_SNAPSHOT.address_space, child_user_frame: TRANSFER_SERVICE_SNAPSHOT.user_frame, init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, init_endpoint_id: INIT_ENDPOINT_ID, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, wait_handle_slot: config.wait_handle_slot, source_handle_slot: config.source_handle_slot, control_handle_slot: config.control_handle_slot, init_received_handle_slot: config.init_received_handle_slot, service_received_handle_slot: config.service_received_handle_slot, grant_byte0: config.grant_byte0, grant_byte1: config.grant_byte1, grant_byte2: config.grant_byte2, grant_byte3: config.grant_byte3, exit_code: config.exit_code })
 }
 
 func install_serial_service_execution_state(next_state: bootstrap_services.SerialServiceExecutionState) {
-    SERIAL_SERVICE_PROGRAM_CAPABILITY = next_state.program_capability
-    SYSCALL_GATE = next_state.gate
-    PROCESS_SLOTS = next_state.process_slots
-    TASK_SLOTS = next_state.task_slots
-    HANDLE_TABLES[1] = next_state.init_handle_table
-    HANDLE_TABLES[2] = next_state.child_handle_table
-    WAIT_TABLES[1] = next_state.wait_table
-    ENDPOINTS = next_state.endpoints
-    SERIAL_SERVICE_ADDRESS_SPACE = next_state.child_address_space
-    SERIAL_SERVICE_USER_FRAME = next_state.child_user_frame
-    SERIAL_SERVICE_STATE = next_state.service_state
-    SERIAL_SERVICE_SPAWN_OBSERVATION = next_state.spawn_observation
-    SERIAL_SERVICE_RECEIVE_OBSERVATION = next_state.receive_observation
-    SERIAL_SERVICE_INGRESS = next_state.ingress
-    SERIAL_SERVICE_FAILURE_OBSERVATION = next_state.failure_observation
-    SERIAL_SERVICE_WAIT_OBSERVATION = next_state.wait_observation
-    READY_QUEUE = next_state.ready_queue
+    install_service_runtime_state(bootstrap_services.service_runtime_state_from_serial_execution(next_state))
+    SERIAL_SERVICE_SNAPSHOT = bootstrap_services.serial_service_snapshot(next_state)
 }
 
 func build_late_phase_proof_context() bootstrap_proofs.LatePhaseProofContext {
@@ -1347,851 +1054,37 @@ func build_late_phase_proof_context() bootstrap_proofs.LatePhaseProofContext {
 
 func install_composition_service_runtime_state(next_state: bootstrap_services.CompositionServiceExecutionState) {
     bootstrap_proofs.install_composition_service_execution_state(next_state)
-    SYSCALL_GATE = next_state.gate
-    PROCESS_SLOTS = next_state.process_slots
-    TASK_SLOTS = next_state.task_slots
-    HANDLE_TABLES[1] = next_state.init_handle_table
-    HANDLE_TABLES[2] = next_state.child_handle_table
-    WAIT_TABLES[1] = next_state.wait_table
-    ENDPOINTS = next_state.endpoints
-    READY_QUEUE = next_state.ready_queue
+    install_service_runtime_state(bootstrap_services.service_runtime_state_from_composition_execution(next_state))
 }
 
-func execute_phase118_invalidated_source_send_probe() bool {
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    probe_payload: [4]u8 = ipc.zero_payload()
-    probe_payload[0] = transfer_config.grant_byte0
-    probe_result: syscall.SendResult = syscall.perform_send(SYSCALL_GATE, HANDLE_TABLES[1], ENDPOINTS, INIT_PID, syscall.build_send_request(transfer_config.source_handle_slot, 1, probe_payload))
-    SYSCALL_GATE = probe_result.gate
-    HANDLE_TABLES[1] = probe_result.handle_table
-    ENDPOINTS = probe_result.endpoints
-    bootstrap_proofs.record_phase118_invalidated_source_send_status(probe_result.status)
-    return syscall.status_score(bootstrap_proofs.phase118_invalidated_source_send_status()) == 8
+func build_child_execution_config() bootstrap_runtime.ChildExecutionConfig {
+    return bootstrap_runtime.ChildExecutionConfig{ init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_task_slot: CHILD_TASK_SLOT, child_asid: CHILD_ASID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, child_root_page_table: CHILD_ROOT_PAGE_TABLE, child_exit_code: CHILD_EXIT_CODE, timer_interrupt_vector: 32, interrupt_actor: ARCH_ACTOR }
 }
 
-func build_phase108_program_cap_contract(init_pid: u32, log_config: bootstrap_services.LogServiceConfig, echo_config: bootstrap_services.EchoServiceConfig, transfer_config: bootstrap_services.TransferServiceConfig, bootstrap_program_capability: capability.CapabilitySlot, log_service_program_capability: capability.CapabilitySlot, echo_service_program_capability: capability.CapabilitySlot, transfer_service_program_capability: capability.CapabilitySlot, log_service_spawn: syscall.SpawnObservation, echo_service_spawn: syscall.SpawnObservation, transfer_service_spawn: syscall.SpawnObservation, log_service_wait: syscall.WaitObservation, echo_service_wait: syscall.WaitObservation, transfer_service_wait: syscall.WaitObservation) debug.Phase108ProgramCapContract {
-    return bootstrap_proofs.build_phase108_program_cap_contract(init_pid, log_config, echo_config, transfer_config, bootstrap_program_capability, log_service_program_capability, echo_service_program_capability, transfer_service_program_capability, log_service_spawn, echo_service_spawn, transfer_service_spawn, log_service_wait, echo_service_wait, transfer_service_wait)
-}
-
-func execute_spawn_child_process() bool {
-    WAIT_TABLES[1] = capability.wait_table_for_owner(INIT_PID)
-    CHILD_TRANSLATION_ROOT = mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE)
-
-    spawn_request: syscall.SpawnRequest = syscall.build_spawn_request(CHILD_WAIT_HANDLE_SLOT)
-    spawn_result: syscall.SpawnResult = syscall.perform_spawn(SYSCALL_GATE, INIT_PROGRAM_CAPABILITY, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], INIT_IMAGE, spawn_request, CHILD_PID, CHILD_TID, CHILD_ASID, CHILD_TRANSLATION_ROOT)
-    SYSCALL_GATE = spawn_result.gate
-    INIT_PROGRAM_CAPABILITY = spawn_result.program_capability
-    PROCESS_SLOTS = spawn_result.process_slots
-    TASK_SLOTS = spawn_result.task_slots
-    WAIT_TABLES[1] = spawn_result.wait_table
-    CHILD_ADDRESS_SPACE = spawn_result.child_address_space
-    CHILD_USER_FRAME = spawn_result.child_frame
-    SPAWN_OBSERVATION = spawn_result.observation
-    READY_QUEUE = state.user_ready_queue(CHILD_TID)
-    return syscall.status_score(SPAWN_OBSERVATION.status) == 2
-}
-
-func execute_child_sleep_transition() bool {
-    sleep_result: syscall.SleepResult = syscall.perform_sleep(SYSCALL_GATE, TASK_SLOTS, TIMER_STATE, syscall.build_sleep_request(CHILD_TASK_SLOT, 1))
-    SYSCALL_GATE = sleep_result.gate
-    TASK_SLOTS = sleep_result.task_slots
-    TIMER_STATE = sleep_result.timer_state
-    SLEEP_OBSERVATION = sleep_result.observation
-    READY_QUEUE = state.empty_queue()
-    if syscall.status_score(SLEEP_OBSERVATION.status) != 4 {
-        return false
-    }
-    if syscall.id_score(SYSCALL_GATE.last_id) != 32 {
-        return false
-    }
-    if syscall.status_score(SYSCALL_GATE.last_status) != 4 {
-        return false
-    }
-    if state.task_state_score(TASK_SLOTS[2].state) != 8 {
-        return false
-    }
-    if SLEEP_OBSERVATION.task_id != CHILD_TID {
-        return false
-    }
-    return SLEEP_OBSERVATION.deadline_tick == 1
-}
-
-func execute_child_timer_wake_transition() bool {
-    interrupt_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, 32, ARCH_ACTOR)
-    INTERRUPTS = interrupt_entry.controller
-    dispatch_result: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(interrupt_entry)
-    INTERRUPTS = dispatch_result.controller
-    LAST_INTERRUPT_KIND = dispatch_result.kind
-    delivery: timer.TimerInterruptDelivery = timer.deliver_interrupt_tick(TIMER_STATE, 1)
-    TIMER_STATE = delivery.timer_state
-    TIMER_WAKE_OBSERVATION = delivery.observation
-    wake_transition: lifecycle.TaskTransition = lifecycle.ready_task(TASK_SLOTS, 2)
-    TASK_SLOTS = wake_transition.task_slots
-    READY_QUEUE = state.user_ready_queue(CHILD_TID)
-    WAKE_READY_QUEUE = READY_QUEUE
-    if TIMER_WAKE_OBSERVATION.task_id != CHILD_TID {
-        return false
-    }
-    if TIMER_WAKE_OBSERVATION.deadline_tick != 1 {
-        return false
-    }
-    if TIMER_WAKE_OBSERVATION.wake_tick != 1 {
-        return false
-    }
-    if TIMER_WAKE_OBSERVATION.wake_count != 1 {
-        return false
-    }
-    if interrupt.dispatch_kind_score(LAST_INTERRUPT_KIND) != 2 {
-        return false
-    }
-    if TIMER_STATE.monotonic_tick != 1 {
-        return false
-    }
-    if TIMER_STATE.wake_count != 1 {
-        return false
-    }
-    if TIMER_STATE.count != 0 {
-        return false
-    }
-    return state.task_state_score(TASK_SLOTS[2].state) == 4
-}
-
-func execute_child_pre_exit_wait() bool {
-    pre_wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(CHILD_WAIT_HANDLE_SLOT))
-    SYSCALL_GATE = pre_wait_result.gate
-    PROCESS_SLOTS = pre_wait_result.process_slots
-    TASK_SLOTS = pre_wait_result.task_slots
-    WAIT_TABLES[1] = pre_wait_result.wait_table
-    PRE_EXIT_WAIT_OBSERVATION = pre_wait_result.observation
-    return syscall.status_score(PRE_EXIT_WAIT_OBSERVATION.status) == 4
-}
-
-func simulate_child_exit() {
-    processes: [3]state.ProcessSlot = PROCESS_SLOTS
-    tasks: [3]state.TaskSlot = TASK_SLOTS
-    wait_tables: [3]capability.WaitTable = WAIT_TABLES
-    processes = lifecycle.exit_process(processes, 2)
-    tasks = lifecycle.exit_task(tasks, 2)
-    wait_tables[1] = capability.mark_wait_handle_exited(wait_tables[1], CHILD_PID, CHILD_EXIT_CODE)
-    PROCESS_SLOTS = processes
-    TASK_SLOTS = tasks
-    WAIT_TABLES = wait_tables
-    READY_QUEUE = state.empty_queue()
-}
-
-func execute_child_post_exit_wait() bool {
-    wait_result: syscall.WaitResult = syscall.perform_wait(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES[1], syscall.build_wait_request(CHILD_WAIT_HANDLE_SLOT))
-    SYSCALL_GATE = wait_result.gate
-    PROCESS_SLOTS = wait_result.process_slots
-    TASK_SLOTS = wait_result.task_slots
-    WAIT_TABLES[1] = wait_result.wait_table
-    EXIT_WAIT_OBSERVATION = wait_result.observation
-    READY_QUEUE = state.empty_queue()
-    return syscall.status_score(EXIT_WAIT_OBSERVATION.status) == 2
+func install_child_execution_result(next_result: bootstrap_runtime.ChildExecutionResult) {
+    INIT_PROGRAM_CAPABILITY = next_result.init_program_capability
+    SYSCALL_GATE = next_result.gate
+    PROCESS_SLOTS = next_result.process_slots
+    TASK_SLOTS = next_result.task_slots
+    WAIT_TABLES = next_result.wait_tables
+    READY_QUEUE = next_result.ready_queue
+    TIMER_STATE = next_result.timer_state
+    INTERRUPTS = next_result.interrupts
+    LAST_INTERRUPT_KIND = next_result.last_interrupt_kind
+    CHILD_EXECUTION_SNAPSHOT = next_result.snapshot
 }
 
 func execute_program_cap_spawn_and_wait() bool {
-    if !execute_spawn_child_process() {
-        return false
-    }
-    if !execute_child_sleep_transition() {
-        return false
-    }
-    if !execute_child_timer_wake_transition() {
-        return false
-    }
-    if !execute_child_pre_exit_wait() {
-        return false
-    }
-    simulate_child_exit()
-    return execute_child_post_exit_wait()
+    result: bootstrap_runtime.ChildExecutionResult = bootstrap_runtime.execute_program_cap_spawn_and_wait(build_child_execution_config(), INIT_PROGRAM_CAPABILITY, SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES, READY_QUEUE, TIMER_STATE, INTERRUPTS, LAST_INTERRUPT_KIND, INIT_IMAGE, CHILD_EXECUTION_SNAPSHOT)
+    install_child_execution_result(result)
+    return result.succeeded != 0
 }
 
 func build_scheduler_lifecycle_audit() sched.LifecycleAudit {
-    return sched.LifecycleAudit{ init_pid: INIT_PID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, child_translation_root: CHILD_TRANSLATION_ROOT, child_exit_code: CHILD_EXIT_CODE, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, init_entry_pc: INIT_IMAGE.entry_pc, init_stack_top: INIT_IMAGE.stack_top, spawn: SPAWN_OBSERVATION, pre_exit_wait: PRE_EXIT_WAIT_OBSERVATION, exit_wait: EXIT_WAIT_OBSERVATION, sleep: SLEEP_OBSERVATION, timer_wake: TIMER_WAKE_OBSERVATION, timer_state: TIMER_STATE, wake_ready_queue: WAKE_READY_QUEUE, wait_table: WAIT_TABLES[1], child_process: PROCESS_SLOTS[2], child_task: TASK_SLOTS[2], child_address_space: CHILD_ADDRESS_SPACE, child_user_frame: CHILD_USER_FRAME, ready_queue: READY_QUEUE }
+    return bootstrap_runtime.build_scheduler_lifecycle_audit(build_child_execution_config(), INIT_IMAGE, PROCESS_SLOTS, TASK_SLOTS, WAIT_TABLES, READY_QUEUE, TIMER_STATE, CHILD_EXECUTION_SNAPSHOT)
 }
 
-func bootstrap_main() i32 {
-    phase104_contract_hardened: u32 = 0
-    phase108_contract_hardened: u32 = 0
-    scheduler_contract_hardened: u32 = 0
-    lifecycle_contract_hardened: u32 = 0
-    capability_contract_hardened: u32 = 0
-    ipc_contract_hardened: u32 = 0
-    address_space_contract_hardened: u32 = 0
-    interrupt_contract_hardened: u32 = 0
-    timer_contract_hardened: u32 = 0
-    barrier_contract_hardened: u32 = 0
-    if !architecture_entry() {
-        return 10
-    }
-    if !transfer_to_first_user_entry() {
-        return 11
-    }
-    bootstrap_endpoint_handle_core()
-    if KERNEL.booted != 1 {
-        return 12
-    }
-    if KERNEL.current_pid != INIT_PID {
-        return 13
-    }
-    if KERNEL.current_tid != INIT_TID {
-        return 14
-    }
-    if KERNEL.active_asid != INIT_ASID {
-        return 15
-    }
-    if KERNEL.user_entry_started != 1 {
-        return 16
-    }
-    if address_space.state_score(ADDRESS_SPACE.state) != 4 {
-        return 17
-    }
-    if !validate_endpoint_handle_core() {
-        return 18
-    }
-    if !handoff_init_bootstrap_capability_set() {
-        return 19
-    }
-    if !validate_init_bootstrap_capability_handoff() {
-        return 20
-    }
-    if !execute_syscall_byte_ipc() {
-        return 21
-    }
-    if !validate_syscall_byte_ipc() {
-        return 22
-    }
-    if !seed_transfer_endpoint_handle() {
-        return 23
-    }
-    if !execute_capability_carrying_ipc_transfer() {
-        return 24
-    }
-    if !validate_capability_carrying_ipc_transfer() {
-        return 25
-    }
-    if !execute_program_cap_spawn_and_wait() {
-        return 26
-    }
-    if !sched.validate_program_cap_spawn_and_wait(build_scheduler_lifecycle_audit()) {
-        return 27
-    }
-    scheduler_contract_hardened = 1
-    if !lifecycle.validate_task_transition_contracts() {
-        return 28
-    }
-    lifecycle_contract_hardened = 1
-    if !capability.validate_syscall_capability_boundary() {
-        return 29
-    }
-    capability_contract_hardened = 1
-    if !ipc.validate_syscall_ipc_boundary() {
-        return 30
-    }
-    ipc_contract_hardened = 1
-    if !address_space.validate_syscall_address_space_boundary() {
-        return 31
-    }
-    address_space_contract_hardened = 1
-    if !mmu.validate_address_space_mmu_boundary() {
-        return 32
-    }
-    if !interrupt.validate_interrupt_entry_and_dispatch_boundary() {
-        return 33
-    }
-    interrupt_contract_hardened = 1
-    if !timer.validate_interrupt_delivery_boundary() {
-        return 34
-    }
-    timer_contract_hardened = 1
-    if !mmu.validate_activation_barrier_boundary() {
-        return 35
-    }
-    barrier_contract_hardened = 1
-    if !validate_phase104_contract_hardening() {
-        return 36
-    }
-    phase104_contract_hardened = 1
-    if !execute_phase105_log_service_handshake() {
-        return 37
-    }
-    if !validate_phase105_log_service_handshake() {
-        return 38
-    }
-    if !execute_phase106_echo_service_request_reply() {
-        return 39
-    }
-    if !validate_phase106_echo_service_request_reply() {
-        return 40
-    }
-    if !execute_phase107_user_to_user_capability_transfer() {
-        return 41
-    }
-    if !validate_phase107_user_to_user_capability_transfer() {
-        return 42
-    }
-    log_config: bootstrap_services.LogServiceConfig = build_log_service_config()
-    echo_config: bootstrap_services.EchoServiceConfig = build_echo_service_config()
-    transfer_config: bootstrap_services.TransferServiceConfig = build_transfer_service_config()
-    if !debug.validate_phase108_kernel_image_and_program_cap_contracts(build_phase108_program_cap_contract(INIT_PID, log_config, echo_config, transfer_config, INIT_BOOTSTRAP_CAPS.program_capability, LOG_SERVICE_PROGRAM_CAPABILITY, ECHO_SERVICE_PROGRAM_CAPABILITY, TRANSFER_SERVICE_PROGRAM_CAPABILITY, LOG_SERVICE_SPAWN_OBSERVATION, ECHO_SERVICE_SPAWN_OBSERVATION, TRANSFER_SERVICE_SPAWN_OBSERVATION, LOG_SERVICE_WAIT_OBSERVATION, ECHO_SERVICE_WAIT_OBSERVATION, TRANSFER_SERVICE_WAIT_OBSERVATION)) {
-        return 43
-    }
-    phase108_contract_hardened = 1
-    running_slice_audit: debug.RunningKernelSliceAudit = bootstrap_proofs.build_phase109_running_kernel_slice_audit(log_config, echo_config, transfer_config, KERNEL, INIT_PID, INIT_TID, INIT_ASID, CHILD_TID, CHILD_EXIT_CODE, TRANSFER_ENDPOINT_ID, INIT_BOOTSTRAP_HANDOFF, RECEIVE_OBSERVATION, ATTACHED_RECEIVE_OBSERVATION, TRANSFERRED_HANDLE_USE_OBSERVATION, PRE_EXIT_WAIT_OBSERVATION, EXIT_WAIT_OBSERVATION, SLEEP_OBSERVATION, TIMER_WAKE_OBSERVATION, LOG_SERVICE_HANDSHAKE, LOG_SERVICE_WAIT_OBSERVATION, ECHO_SERVICE_EXCHANGE, ECHO_SERVICE_WAIT_OBSERVATION, TRANSFER_SERVICE_TRANSFER, TRANSFER_SERVICE_WAIT_OBSERVATION, phase104_contract_hardened, phase108_contract_hardened, PROCESS_SLOTS[1], TASK_SLOTS[1], USER_FRAME, BOOT_LOG_APPEND_FAILED)
-    if !debug.validate_phase109_first_running_kernel_slice(running_slice_audit) {
-        return 44
-    }
-    if !debug.validate_phase110_kernel_ownership_split(running_slice_audit, scheduler_contract_hardened) {
-        return 45
-    }
-    if !debug.validate_phase111_scheduler_and_lifecycle_ownership(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened) {
-        return 46
-    }
-    if !debug.validate_phase112_syscall_boundary_thinness(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened) {
-        return 47
-    }
-    if !debug.validate_phase113_interrupt_entry_and_generic_dispatch_boundary(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, LAST_INTERRUPT_KIND) {
-        return 48
-    }
-    if !debug.validate_phase114_address_space_and_mmu_ownership_split(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened) {
-        return 49
-    }
-    if !debug.validate_phase115_timer_ownership_hardening(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened) {
-        return 50
-    }
-    if !debug.validate_phase116_mmu_activation_barrier_follow_through(running_slice_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 51
-    }
-    phase117_audit: debug.Phase117MultiServiceBringUpAudit = bootstrap_proofs.build_phase117_multi_service_bring_up_audit(running_slice_audit, INIT_ENDPOINT_ID, TRANSFER_ENDPOINT_ID, LOG_SERVICE_PROGRAM_CAPABILITY, ECHO_SERVICE_PROGRAM_CAPABILITY, TRANSFER_SERVICE_PROGRAM_CAPABILITY, LOG_SERVICE_SPAWN_OBSERVATION, ECHO_SERVICE_SPAWN_OBSERVATION, TRANSFER_SERVICE_SPAWN_OBSERVATION, LOG_SERVICE_WAIT_OBSERVATION, ECHO_SERVICE_WAIT_OBSERVATION, TRANSFER_SERVICE_WAIT_OBSERVATION, LOG_SERVICE_HANDSHAKE, ECHO_SERVICE_EXCHANGE, TRANSFER_SERVICE_TRANSFER)
-    if !debug.validate_phase117_init_orchestrated_multi_service_bring_up(phase117_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 52
-    }
-    if !execute_phase118_invalidated_source_send_probe() {
-        return 53
-    }
-    phase118_audit: debug.Phase118DelegatedRequestReplyAudit = bootstrap_proofs.build_phase118_delegated_request_reply_audit(phase117_audit, transfer_config, HANDLE_TABLES[1], TRANSFER_SERVICE_TRANSFER)
-    if !debug.validate_phase118_request_reply_and_delegation_follow_through(phase118_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 54
-    }
-    phase119_audit: debug.Phase119NamespacePressureAudit = bootstrap_proofs.build_phase119_namespace_pressure_audit(phase118_audit, INIT_PID, INIT_ENDPOINT_ID, LOG_SERVICE_DIRECTORY_KEY, ECHO_SERVICE_DIRECTORY_KEY, TRANSFER_SERVICE_DIRECTORY_KEY, log_config, echo_config, transfer_config, LOG_SERVICE_SPAWN_OBSERVATION, ECHO_SERVICE_SPAWN_OBSERVATION, TRANSFER_SERVICE_SPAWN_OBSERVATION)
-    if !debug.validate_phase119_namespace_pressure_audit(phase119_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 55
-    }
-    phase120_audit: debug.Phase120RunningSystemSupportAudit = bootstrap_proofs.build_phase120_running_system_support_audit(phase119_audit, INIT_PID, INIT_ENDPOINT_ID)
-    if !debug.validate_phase120_running_system_support_statement(phase120_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 56
-    }
-    phase121_audit: debug.Phase121KernelImageContractAudit = bootstrap_proofs.build_phase121_kernel_image_contract_audit(phase120_audit)
-    if !debug.validate_phase121_kernel_image_contract_hardening(phase121_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 57
-    }
-    phase122_audit: debug.Phase122TargetSurfaceAudit = bootstrap_proofs.build_phase122_target_surface_audit(phase121_audit)
-    if !debug.validate_phase122_target_surface_audit(phase122_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 58
-    }
-    phase123_audit: debug.Phase123NextPlateauAudit = bootstrap_proofs.build_phase123_next_plateau_audit(phase122_audit)
-    if !debug.validate_phase123_next_plateau_audit(phase123_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 59
-    }
-    late_phase_context: bootstrap_proofs.LatePhaseProofContext = build_late_phase_proof_context()
-    if !bootstrap_proofs.execute_phase124_delegation_chain_probe(late_phase_context, transfer_config) {
-        return 60
-    }
-    phase124_audit: debug.Phase124DelegationChainAudit = bootstrap_proofs.build_phase124_delegation_chain_audit(late_phase_context, transfer_config, phase123_audit)
-    if !debug.validate_phase124_delegation_chain_stress(phase124_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 61
-    }
-    if !bootstrap_proofs.execute_phase125_invalidation_probe(late_phase_context, transfer_config) {
-        return 62
-    }
-    phase125_audit: debug.Phase125InvalidationAudit = bootstrap_proofs.build_phase125_invalidation_audit(late_phase_context, phase124_audit)
-    if !debug.validate_phase125_invalidation_and_rejection_audit(phase125_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 63
-    }
-    if !bootstrap_proofs.execute_phase126_authority_lifetime_probe(late_phase_context, transfer_config) {
-        return 64
-    }
-    phase126_audit: debug.Phase126AuthorityLifetimeAudit = bootstrap_proofs.build_phase126_authority_lifetime_audit(late_phase_context, phase125_audit)
-    if !debug.validate_phase126_authority_lifetime_classification(phase126_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 65
-    }
-    if !bootstrap_proofs.execute_phase128_service_death_observation_probe(late_phase_context, log_config, LOG_SERVICE_SPAWN_OBSERVATION, LOG_SERVICE_WAIT_OBSERVATION) {
-        return 66
-    }
-    phase128_audit: debug.Phase128ServiceDeathObservationAudit = bootstrap_proofs.build_phase128_service_death_observation_audit(phase126_audit)
-    if !debug.validate_phase128_service_death_observation(phase128_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 67
-    }
-    if !bootstrap_proofs.execute_phase129_partial_failure_propagation_probe(log_config, build_log_service_execution_state(), echo_config) {
-        return 68
-    }
-    phase129_audit: debug.Phase129PartialFailurePropagationAudit = bootstrap_proofs.build_phase129_partial_failure_propagation_audit(late_phase_context, log_config, echo_config, phase128_audit)
-    if !debug.validate_phase129_partial_failure_propagation(phase129_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 69
-    }
-    if !bootstrap_proofs.execute_phase130_explicit_restart_or_replacement_probe(log_config, build_log_service_execution_state()) {
-        return 70
-    }
-    phase130_audit: debug.Phase130ExplicitRestartOrReplacementAudit = bootstrap_proofs.build_phase130_explicit_restart_or_replacement_audit(late_phase_context, log_config, phase129_audit)
-    if !debug.validate_phase130_explicit_restart_or_replacement(phase130_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 71
-    }
-    composition_config: bootstrap_services.CompositionServiceConfig = build_composition_service_config()
-    composition_result: bootstrap_services.CompositionServiceExecutionResult = bootstrap_services.execute_phase131_fan_out_composition(composition_config, bootstrap_proofs.build_composition_service_execution_state(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, HANDLE_TABLES[1], HANDLE_TABLES[2], WAIT_TABLES[1], ENDPOINTS, INIT_IMAGE))
-    install_composition_service_runtime_state(composition_result.state)
-    if composition_result.succeeded == 0 {
-        return 72
-    }
-    if !bootstrap_proofs.phase131_composition_probe_succeeded() {
-        return 72
-    }
-    phase131_audit: debug.Phase131FanOutCompositionAudit = bootstrap_proofs.build_phase131_fan_out_composition_audit(late_phase_context, composition_config, phase130_audit)
-    if !debug.validate_phase131_fan_out_composition(phase131_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 73
-    }
-
-    serial_config: bootstrap_services.SerialServiceConfig = build_serial_service_config()
-    serial_state: bootstrap_services.SerialServiceExecutionState = bootstrap_services.seed_serial_service_program_capability(serial_config, build_serial_service_execution_state())
-    install_serial_service_execution_state(serial_state)
-    if !capability.is_program_capability(SERIAL_SERVICE_PROGRAM_CAPABILITY) {
-        return 74
-    }
-    serial_spawn: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.spawn_serial_service(serial_config, build_serial_service_execution_state())
-    install_serial_service_execution_state(serial_spawn.state)
-    if serial_spawn.succeeded == 0 {
-        return 75
-    }
-    if !ipc.validate_runtime_frame_copy_boundary() {
-        return 76
-    }
-    UART_DEVICE = uart.configure_receive(UART_DEVICE, UART_RECEIVE_VECTOR, serial_config.serial_endpoint_id)
-    malformed_uart_payload: [4]u8 = ipc.zero_payload()
-    malformed_uart_payload[0] = serial_service.SERIAL_INVALID_BYTE
-    UART_DEVICE = uart.stage_receive_frame(UART_DEVICE, 1, malformed_uart_payload)
-    malformed_uart_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
-    malformed_uart_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(malformed_uart_entry)
-    INTERRUPTS = malformed_uart_dispatch.controller
-    LAST_INTERRUPT_KIND = malformed_uart_dispatch.kind
-    malformed_uart_result: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, malformed_uart_entry, malformed_uart_dispatch, ENDPOINTS, BOOT_PID)
-    UART_DEVICE = malformed_uart_result.device
-    ENDPOINTS = malformed_uart_result.endpoints
-    if malformed_uart_result.handled == 0 {
-        return 77
-    }
-    if !ipc.runtime_publish_succeeded(malformed_uart_result.observation.publish) {
-        return 78
-    }
-    serial_malformed_receive: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.execute_serial_service_receive(serial_config, build_serial_service_execution_state())
-    install_serial_service_execution_state(serial_malformed_receive.state)
-    if serial_malformed_receive.succeeded == 0 {
-        return 79
-    }
-    queue_uart_payload_one: [4]u8 = ipc.zero_payload()
-    queue_uart_payload_one[0] = UART_QUEUE_FRAME_ONE_BYTE0
-    queue_uart_payload_one[1] = UART_QUEUE_FRAME_ONE_BYTE1
-    UART_DEVICE = uart.stage_receive_frame(UART_DEVICE, 2, queue_uart_payload_one)
-    queue_uart_entry_one: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
-    queue_uart_dispatch_one: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(queue_uart_entry_one)
-    INTERRUPTS = queue_uart_dispatch_one.controller
-    LAST_INTERRUPT_KIND = queue_uart_dispatch_one.kind
-    queue_uart_result_one: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, queue_uart_entry_one, queue_uart_dispatch_one, ENDPOINTS, BOOT_PID)
-    UART_DEVICE = queue_uart_result_one.device
-    ENDPOINTS = queue_uart_result_one.endpoints
-    if queue_uart_result_one.handled == 0 {
-        return 80
-    }
-    if !ipc.runtime_publish_succeeded(queue_uart_result_one.observation.publish) {
-        return 81
-    }
-    queue_uart_payload_two: [4]u8 = ipc.zero_payload()
-    queue_uart_payload_two[0] = UART_QUEUE_FRAME_TWO_BYTE0
-    queue_uart_payload_two[1] = UART_QUEUE_FRAME_TWO_BYTE1
-    UART_DEVICE = uart.stage_receive_frame(UART_DEVICE, 2, queue_uart_payload_two)
-    queue_uart_entry_two: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
-    queue_uart_dispatch_two: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(queue_uart_entry_two)
-    INTERRUPTS = queue_uart_dispatch_two.controller
-    LAST_INTERRUPT_KIND = queue_uart_dispatch_two.kind
-    queue_uart_result_two: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, queue_uart_entry_two, queue_uart_dispatch_two, ENDPOINTS, BOOT_PID)
-    UART_DEVICE = queue_uart_result_two.device
-    ENDPOINTS = queue_uart_result_two.endpoints
-    if queue_uart_result_two.handled == 0 {
-        return 82
-    }
-    if !ipc.runtime_publish_succeeded(queue_uart_result_two.observation.publish) {
-        return 83
-    }
-    queue_uart_payload_three: [4]u8 = ipc.zero_payload()
-    queue_uart_payload_three[0] = UART_QUEUE_FRAME_THREE_BYTE0
-    queue_uart_payload_three[1] = UART_QUEUE_FRAME_THREE_BYTE1
-    UART_DEVICE = uart.stage_receive_frame(UART_DEVICE, 2, queue_uart_payload_three)
-    queue_full_uart_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
-    queue_full_uart_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(queue_full_uart_entry)
-    INTERRUPTS = queue_full_uart_dispatch.controller
-    LAST_INTERRUPT_KIND = queue_full_uart_dispatch.kind
-    queue_full_uart_result: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, queue_full_uart_entry, queue_full_uart_dispatch, ENDPOINTS, BOOT_PID)
-    UART_DEVICE = queue_full_uart_result.device
-    ENDPOINTS = queue_full_uart_result.endpoints
-    if queue_full_uart_result.handled == 0 {
-        return 84
-    }
-    if queue_full_uart_result.observation.publish.queue_full == 0 {
-        return 85
-    }
-    serial_failure_close: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.close_serial_service_after_failure(serial_config, build_serial_service_execution_state())
-    install_serial_service_execution_state(serial_failure_close.state)
-    if serial_failure_close.succeeded == 0 {
-        return 86
-    }
-    closed_uart_payload: [4]u8 = ipc.zero_payload()
-    closed_uart_payload[0] = UART_CLOSED_FRAME_BYTE0
-    closed_uart_payload[1] = UART_CLOSED_FRAME_BYTE1
-    UART_DEVICE = uart.stage_receive_frame(UART_DEVICE, 2, closed_uart_payload)
-    closed_uart_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_RECEIVE_VECTOR, UART_SOURCE_ACTOR)
-    closed_uart_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(closed_uart_entry)
-    INTERRUPTS = closed_uart_dispatch.controller
-    LAST_INTERRUPT_KIND = closed_uart_dispatch.kind
-    closed_uart_result: uart.UartInterruptResult = uart.handle_receive_interrupt(UART_DEVICE, closed_uart_entry, closed_uart_dispatch, ENDPOINTS, BOOT_PID)
-    UART_DEVICE = closed_uart_result.device
-    ENDPOINTS = closed_uart_result.endpoints
-    UART_INGRESS = closed_uart_result.observation
-    if closed_uart_result.handled == 0 {
-        return 87
-    }
-    if closed_uart_result.observation.publish.endpoint_closed == 0 {
-        return 88
-    }
-    phase136_audit: debug.Phase136DeviceFailureContainmentAudit = debug.Phase136DeviceFailureContainmentAudit{ phase131: phase131_audit, uart_service_endpoint_id: malformed_uart_result.observation.service_endpoint_id, malformed_interrupt_kind: malformed_uart_dispatch.kind, malformed_dispatch_handled: malformed_uart_dispatch.handled, malformed_published_queued: malformed_uart_result.observation.publish.queued, malformed_published_queue_full: malformed_uart_result.observation.publish.queue_full, malformed_published_endpoint_valid: malformed_uart_result.observation.publish.endpoint_valid, malformed_published_endpoint_closed: malformed_uart_result.observation.publish.endpoint_closed, malformed_serial_service_pid: SERIAL_SERVICE_INGRESS.service_pid, malformed_serial_tag: SERIAL_SERVICE_INGRESS.tag, malformed_receive_status: SERIAL_SERVICE_RECEIVE_OBSERVATION.status, malformed_payload_len: SERIAL_SERVICE_INGRESS.payload_len, malformed_received_byte: SERIAL_SERVICE_INGRESS.received_byte, malformed_ingress_count: SERIAL_SERVICE_INGRESS.ingress_count, malformed_service_malformed_count: SERIAL_SERVICE_INGRESS.malformed_ingress_count, malformed_log_len: SERIAL_SERVICE_INGRESS.log_len, malformed_total_consumed_bytes: SERIAL_SERVICE_INGRESS.total_consumed_bytes, queue_one_published_queued: queue_uart_result_one.observation.publish.queued, queue_two_published_queued: queue_uart_result_two.observation.publish.queued, queue_full_dispatch_handled: queue_full_uart_dispatch.handled, queue_full_published_queued: queue_full_uart_result.observation.publish.queued, queue_full_published_queue_full: queue_full_uart_result.observation.publish.queue_full, queue_full_published_endpoint_valid: queue_full_uart_result.observation.publish.endpoint_valid, queue_full_published_endpoint_closed: queue_full_uart_result.observation.publish.endpoint_closed, queue_full_drop_count: queue_full_uart_result.observation.dropped_count, queue_full_failure_kind: queue_full_uart_result.observation.failure_kind, uart_ack_count_after_queue_full: queue_full_uart_result.observation.ack_count, uart_ingress_count_after_queue_full: queue_full_uart_result.observation.ingress_count, uart_retire_count_after_queue_full: queue_full_uart_result.observation.retire_count, close_endpoint_id: SERIAL_SERVICE_FAILURE_OBSERVATION.endpoint_id, close_closed: SERIAL_SERVICE_FAILURE_OBSERVATION.closed, close_aborted_messages: SERIAL_SERVICE_FAILURE_OBSERVATION.aborted_messages, close_wake_count: SERIAL_SERVICE_FAILURE_OBSERVATION.wake_count, close_wait_status: SERIAL_SERVICE_WAIT_OBSERVATION.status, closed_dispatch_handled: closed_uart_dispatch.handled, closed_published_queued: closed_uart_result.observation.publish.queued, closed_published_queue_full: closed_uart_result.observation.publish.queue_full, closed_published_endpoint_valid: closed_uart_result.observation.publish.endpoint_valid, closed_published_endpoint_closed: closed_uart_result.observation.publish.endpoint_closed, closed_drop_count: closed_uart_result.observation.dropped_count, closed_endpoint_closed_drop_count: closed_uart_result.observation.endpoint_closed_drop_count, closed_failure_kind: closed_uart_result.observation.failure_kind, kernel_policy_visible: 0, driver_framework_visible: 0, retry_framework_visible: 0, protocol_parsing_in_kernel_visible: 0, compiler_reopening_visible: 0 }
-    if !debug.validate_phase136_device_failure_containment(phase136_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 89
-    }
-    respawn_serial_state: bootstrap_services.SerialServiceExecutionState = bootstrap_services.seed_serial_service_program_capability(serial_config, build_serial_service_execution_state())
-    install_serial_service_execution_state(respawn_serial_state)
-    serial_respawn: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.spawn_serial_service(serial_config, build_serial_service_execution_state())
-    install_serial_service_execution_state(serial_respawn.state)
-    if serial_respawn.succeeded == 0 {
-        return 90
-    }
-    UART_DEVICE = uart.configure_receive(UART_DEVICE, UART_RECEIVE_VECTOR, serial_config.serial_endpoint_id)
-    UART_DEVICE = uart.configure_receive_completion(UART_DEVICE, UART_COMPLETION_VECTOR)
-    completion_payload: [4]u8 = ipc.zero_payload()
-    completion_payload[0] = UART_COMPLETION_FRAME_BYTE0
-    completion_payload[1] = UART_COMPLETION_FRAME_BYTE1
-    completion_payload[2] = UART_COMPLETION_FRAME_BYTE2
-    completion_payload[3] = UART_COMPLETION_FRAME_BYTE3
-    UART_DEVICE = uart.stage_receive_completion_frame(UART_DEVICE, 4, completion_payload)
-    completion_entry: interrupt.InterruptEntry = interrupt.arch_enter_interrupt(INTERRUPTS, UART_COMPLETION_VECTOR, UART_SOURCE_ACTOR)
-    completion_dispatch: interrupt.InterruptDispatchResult = interrupt.dispatch_interrupt(completion_entry)
-    INTERRUPTS = completion_dispatch.controller
-    LAST_INTERRUPT_KIND = completion_dispatch.kind
-    completion_result: uart.UartCompletionInterruptResult = uart.handle_receive_completion_interrupt(UART_DEVICE, completion_entry, completion_dispatch, ENDPOINTS, BOOT_PID)
-    UART_DEVICE = completion_result.device
-    ENDPOINTS = completion_result.endpoints
-    if completion_result.handled == 0 {
-        return 91
-    }
-    if !ipc.runtime_publish_succeeded(completion_result.observation.publish) {
-        return 92
-    }
-    serial_completion_receive: bootstrap_services.SerialServiceExecutionResult = bootstrap_services.execute_serial_service_receive(serial_config, build_serial_service_execution_state())
-    install_serial_service_execution_state(serial_completion_receive.state)
-    if serial_completion_receive.succeeded == 0 {
-        return 93
-    }
-    phase137_audit: debug.Phase137OptionalDmaOrEquivalentAudit = debug.Phase137OptionalDmaOrEquivalentAudit{ phase136: phase136_audit, completion_interrupt_kind: completion_dispatch.kind, completion_dispatch_handled: completion_dispatch.handled, completion_endpoint_id: completion_result.observation.service_endpoint_id, completion_staged_payload_len: completion_result.observation.staged_payload_len, completion_staged_payload0: completion_result.observation.staged_payload0, completion_staged_payload1: completion_result.observation.staged_payload1, completion_staged_payload2: completion_result.observation.staged_payload2, completion_staged_payload3: completion_result.observation.staged_payload3, completion_published_payload_len: completion_result.observation.published_payload_len, completion_published_payload0: completion_result.observation.published_payload0, completion_published_payload1: completion_result.observation.published_payload1, completion_published_payload2: completion_result.observation.published_payload2, completion_published_payload3: completion_result.observation.published_payload3, completion_retired_payload_len: completion_result.observation.retired_payload_len, completion_retired_payload0: completion_result.observation.retired_payload0, completion_retired_payload1: completion_result.observation.retired_payload1, completion_retired_payload2: completion_result.observation.retired_payload2, completion_retired_payload3: completion_result.observation.retired_payload3, completion_publish_queued: completion_result.observation.publish.queued, completion_publish_queue_full: completion_result.observation.publish.queue_full, completion_publish_endpoint_valid: completion_result.observation.publish.endpoint_valid, completion_publish_endpoint_closed: completion_result.observation.publish.endpoint_closed, completion_ingress_count: completion_result.observation.completion_ingress_count, completion_retire_count: completion_result.observation.completion_retire_count, serial_service_pid: SERIAL_SERVICE_INGRESS.service_pid, serial_receive_status: SERIAL_SERVICE_RECEIVE_OBSERVATION.status, serial_tag: SERIAL_SERVICE_INGRESS.tag, serial_payload_len: SERIAL_SERVICE_INGRESS.payload_len, serial_received_byte: SERIAL_SERVICE_INGRESS.received_byte, serial_ingress_count: SERIAL_SERVICE_INGRESS.ingress_count, serial_log_len: SERIAL_SERVICE_INGRESS.log_len, serial_total_consumed_bytes: SERIAL_SERVICE_INGRESS.total_consumed_bytes, serial_log_byte0: SERIAL_SERVICE_INGRESS.log_byte0, serial_log_byte1: SERIAL_SERVICE_INGRESS.log_byte1, serial_log_byte2: SERIAL_SERVICE_INGRESS.log_byte2, serial_log_byte3: SERIAL_SERVICE_INGRESS.log_byte3, dma_manager_visible: 0, descriptor_framework_visible: 0, compiler_reopening_visible: 0 }
-    if !debug.validate_phase137_optional_dma_or_equivalent_follow_through(phase137_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 94
-    }
-
-    phase140_serial_config: bootstrap_services.SerialServiceConfig = bootstrap_services.serial_service_composition_config(BOOT_PID, INIT_PID, INIT_TID, INIT_ASID, SERIAL_SERVICE_ENDPOINT_ID, INIT_ENDPOINT_ID, mmu.bootstrap_translation_root(INIT_ASID, INIT_ROOT_PAGE_TABLE))
-    phase140_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
-    phase140_serial_execution: bootstrap_services.SerialServiceExecutionState = bootstrap_services.SerialServiceExecutionState{ program_capability: capability.empty_slot(), gate: syscall.open_gate(syscall.gate_closed()), process_slots: state.zero_process_slots(), task_slots: state.zero_task_slots(), init_handle_table: capability.empty_handle_table(), child_handle_table: capability.handle_table_for_owner(INIT_PID), wait_table: capability.empty_wait_table(), endpoints: ipc.empty_table(), init_image: INIT_IMAGE, child_address_space: address_space.empty_space(), child_user_frame: address_space.empty_frame(), service_state: phase140_serial_state, spawn_observation: syscall.empty_spawn_observation(), receive_observation: SERIAL_SERVICE_RECEIVE_OBSERVATION, ingress: serial_service.observe_ingress(phase140_serial_state), composition: serial_service.observe_composition(phase140_serial_state), failure_observation: bootstrap_services.empty_serial_service_failure_observation(), wait_observation: syscall.empty_wait_observation(), ready_queue: state.empty_queue() }
-    phase140_composition_config: bootstrap_services.CompositionServiceConfig = bootstrap_services.composition_service_config(INIT_PID, CHILD_PID, CHILD_TID, CHILD_ASID, INIT_ENDPOINT_ID, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, phase140_serial_config.composition_handle_slot, mmu.bootstrap_translation_root(CHILD_ASID, CHILD_ROOT_PAGE_TABLE))
-    phase140_composition_execution: bootstrap_services.CompositionServiceExecutionState = bootstrap_services.empty_composition_service_execution_state()
-    phase140_composition_execution = bootstrap_services.CompositionServiceExecutionState{ program_capability: phase140_composition_execution.program_capability, gate: phase140_composition_execution.gate, process_slots: phase140_composition_execution.process_slots, task_slots: phase140_composition_execution.task_slots, init_handle_table: phase140_composition_execution.init_handle_table, child_handle_table: capability.handle_table_for_owner(CHILD_PID), wait_table: phase140_composition_execution.wait_table, endpoints: phase140_composition_execution.endpoints, init_image: INIT_IMAGE, child_address_space: phase140_composition_execution.child_address_space, child_user_frame: phase140_composition_execution.child_user_frame, echo_peer_state: phase140_composition_execution.echo_peer_state, log_peer_state: phase140_composition_execution.log_peer_state, spawn_observation: phase140_composition_execution.spawn_observation, request_receive_observation: phase140_composition_execution.request_receive_observation, echo_fanout_observation: phase140_composition_execution.echo_fanout_observation, echo_peer_receive_observation: phase140_composition_execution.echo_peer_receive_observation, echo_reply_send_observation: phase140_composition_execution.echo_reply_send_observation, echo_reply_observation: phase140_composition_execution.echo_reply_observation, log_fanout_observation: phase140_composition_execution.log_fanout_observation, log_peer_receive_observation: phase140_composition_execution.log_peer_receive_observation, log_ack_send_observation: phase140_composition_execution.log_ack_send_observation, log_ack_observation: phase140_composition_execution.log_ack_observation, aggregate_reply_send_observation: phase140_composition_execution.aggregate_reply_send_observation, aggregate_reply_observation: phase140_composition_execution.aggregate_reply_observation, wait_observation: phase140_composition_execution.wait_observation, observation: phase140_composition_execution.observation, ready_queue: phase140_composition_execution.ready_queue }
-    phase140_result: bootstrap_services.Phase140SerialIngressCompositionResult = bootstrap_services.execute_phase140_serial_ingress_composed_service_graph(phase140_serial_config, phase140_composition_config, phase140_serial_execution, phase140_composition_execution)
-    if phase140_result.succeeded == 0 {
-        return 95
-    }
-    phase140_audit: debug.Phase140SerialIngressComposedServiceGraphAudit = bootstrap_audit.build_phase140_serial_ingress_composed_service_graph_audit(bootstrap_audit.Phase140SerialIngressComposedServiceGraphAuditInputs{ phase137: phase137_audit, serial_service_pid: phase140_result.serial_state.composition.service_pid, composition_service_pid: phase140_result.composition_state.observation.service_pid, serial_forward_endpoint_id: phase140_result.serial_state.composition.forward_endpoint_id, serial_forward_status: phase140_result.serial_state.composition.forward_status, serial_forward_request_len: phase140_result.serial_state.composition.forwarded_request_len, serial_forward_request_byte0: phase140_result.serial_state.composition.forwarded_request_byte0, serial_forward_request_byte1: phase140_result.serial_state.composition.forwarded_request_byte1, serial_forward_count: phase140_result.serial_state.composition.forwarded_request_count, composition_request_receive_status: phase140_result.composition_state.request_receive_observation.status, composition_request_source_pid: phase140_result.composition_state.request_receive_observation.source_pid, composition_request_len: phase140_result.composition_state.observation.request_len, composition_request_byte0: phase140_result.composition_state.observation.request_byte0, composition_request_byte1: phase140_result.composition_state.observation.request_byte1, composition_control_endpoint_id: phase140_composition_config.control_endpoint_id, composition_echo_endpoint_id: phase140_composition_config.echo_endpoint_id, composition_log_endpoint_id: phase140_composition_config.log_endpoint_id, composition_echo_fanout_status: phase140_result.composition_state.echo_fanout_observation.status, composition_echo_fanout_endpoint_id: phase140_result.composition_state.echo_fanout_observation.endpoint_id, composition_log_fanout_status: phase140_result.composition_state.log_fanout_observation.status, composition_log_fanout_endpoint_id: phase140_result.composition_state.log_fanout_observation.endpoint_id, composition_aggregate_reply_status: phase140_result.composition_state.aggregate_reply_observation.status, composition_outbound_edge_count: phase140_result.composition_state.observation.outbound_edge_count, composition_aggregate_reply_count: phase140_result.composition_state.observation.aggregate_reply_count, serial_aggregate_reply_status: phase140_result.serial_state.composition.aggregate_reply_status, serial_aggregate_reply_len: phase140_result.serial_state.composition.aggregate_reply_len, serial_aggregate_reply_byte0: phase140_result.serial_state.composition.aggregate_reply_byte0, serial_aggregate_reply_byte1: phase140_result.serial_state.composition.aggregate_reply_byte1, serial_aggregate_reply_byte2: phase140_result.serial_state.composition.aggregate_reply_byte2, serial_aggregate_reply_byte3: phase140_result.serial_state.composition.aggregate_reply_byte3, serial_aggregate_reply_count: phase140_result.serial_state.composition.aggregate_reply_count, kernel_broker_visible: 0, dynamic_routing_visible: 0, general_service_graph_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase140_serial_ingress_composed_service_graph(phase140_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 96
-    }
-
-    phase141_request_len: usize = 4
-    phase141_request_payload: [4]u8 = shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_TAIL_BYTE1, 33, 33)
-    phase141_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
-    phase141_serial_state = serial_service.record_forward(phase141_serial_state, SHELL_SERVICE_ENDPOINT_ID, syscall.SyscallStatus.Ok, phase141_request_len, phase141_request_payload)
-    phase141_shell_state: shell_service.ShellServiceState = shell_service.record_request(shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID), phase141_serial_state.owner_pid, SHELL_SERVICE_ENDPOINT_ID, phase141_request_len, phase141_request_payload)
-    phase141_log_state: log_service.LogServiceState = LOG_SERVICE_STATE
-    phase141_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
-    phase141_kv_state: kv_service.KvServiceState = kv_service.record_set(kv_service.service_state(PHASE141_KV_PID, 1), PHASE141_SHELL_PID, KV_SERVICE_ENDPOINT_ID, 75, 86)
-    phase141_reply_payload: [4]u8 = shell_service.reply_payload(phase141_shell_state, phase141_echo_state, phase141_log_state, phase141_kv_state)
-    phase141_shell_state = shell_service.record_reply(phase141_shell_state, syscall.SyscallStatus.Ok, 2, phase141_reply_payload)
-    phase141_audit: debug.Phase141InteractiveServiceSystemScopeFreezeAudit = bootstrap_audit.build_phase141_interactive_service_system_scope_freeze_audit(bootstrap_audit.Phase141InteractiveServiceSystemScopeFreezeAuditInputs{ phase140: phase140_audit, serial_service_pid: phase141_serial_state.owner_pid, shell_service_pid: phase141_shell_state.owner_pid, kv_service_pid: phase141_kv_state.owner_pid, serial_forward_endpoint_id: phase141_serial_state.forward_endpoint_id, serial_forward_status: phase141_serial_state.forward_status, serial_forward_request_len: phase141_serial_state.forwarded_request_len, serial_forward_request_byte0: phase141_serial_state.forwarded_request_byte0, serial_forward_request_byte1: phase141_serial_state.forwarded_request_byte1, shell_tag: phase141_shell_state.last_tag, shell_request_len: phase141_shell_state.last_request_len, shell_request_byte0: phase141_shell_state.last_byte0, shell_request_byte1: phase141_shell_state.last_byte1, shell_request_byte2: phase141_shell_state.last_byte2, shell_endpoint_id: SHELL_SERVICE_ENDPOINT_ID, echo_endpoint_id: COMPOSITION_ECHO_ENDPOINT_ID, log_endpoint_id: COMPOSITION_LOG_ENDPOINT_ID, kv_endpoint_id: KV_SERVICE_ENDPOINT_ID, echo_route_count: phase141_shell_state.echo_route_count, log_route_count: phase141_shell_state.log_route_count, kv_route_count: phase141_shell_state.kv_route_count, invalid_command_count: phase141_shell_state.invalid_command_count, shell_reply_status: phase141_shell_state.reply_status, shell_reply_len: phase141_shell_state.reply_len, shell_reply_byte0: phase141_shell_state.reply_byte0, shell_reply_byte1: phase141_shell_state.reply_byte1, shell_reply_byte2: phase141_shell_state.reply_byte2, shell_reply_byte3: phase141_shell_state.reply_byte3, fixed_vocabulary_visible: 1, kernel_broker_visible: 0, dynamic_routing_visible: 0, general_shell_framework_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase141_interactive_service_system_scope_freeze(phase141_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 97
-    }
-
-    phase142_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
-    phase142_shell_state: shell_service.ShellServiceState = shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID)
-    phase142_log_state: log_service.LogServiceState = LOG_SERVICE_STATE
-    phase142_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
-    phase142_kv_state: kv_service.KvServiceState = kv_service.service_state(PHASE141_KV_PID, 1)
-
-    phase142_echo_result: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase142_serial_state, phase142_shell_state, phase142_log_state, phase142_echo_state, phase142_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_ECHO_BYTE0, SHELL_COMMAND_ECHO_BYTE1, 72, 73))
-    phase142_serial_state = phase142_echo_result.serial_state
-    phase142_shell_state = phase142_echo_result.shell_state
-    phase142_log_state = phase142_echo_result.log_state
-    phase142_echo_state = phase142_echo_result.echo_state
-    phase142_kv_state = phase142_echo_result.kv_state
-
-    phase142_log_append_result: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase142_serial_state, phase142_shell_state, phase142_log_state, phase142_echo_state, phase142_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_APPEND_BYTE1, 80, 33))
-    phase142_serial_state = phase142_log_append_result.serial_state
-    phase142_shell_state = phase142_log_append_result.shell_state
-    phase142_log_state = phase142_log_append_result.log_state
-    phase142_echo_state = phase142_log_append_result.echo_state
-    phase142_kv_state = phase142_log_append_result.kv_state
-
-    phase142_log_tail_result: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase142_serial_state, phase142_shell_state, phase142_log_state, phase142_echo_state, phase142_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_TAIL_BYTE1, 33, 33))
-    phase142_serial_state = phase142_log_tail_result.serial_state
-    phase142_shell_state = phase142_log_tail_result.shell_state
-    phase142_log_state = phase142_log_tail_result.log_state
-    phase142_echo_state = phase142_log_tail_result.echo_state
-    phase142_kv_state = phase142_log_tail_result.kv_state
-
-    phase142_kv_set_result: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase142_serial_state, phase142_shell_state, phase142_log_state, phase142_echo_state, phase142_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_SET_BYTE1, 75, 86))
-    phase142_serial_state = phase142_kv_set_result.serial_state
-    phase142_shell_state = phase142_kv_set_result.shell_state
-    phase142_log_state = phase142_kv_set_result.log_state
-    phase142_echo_state = phase142_kv_set_result.echo_state
-    phase142_kv_state = phase142_kv_set_result.kv_state
-
-    phase142_kv_get_result: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase142_serial_state, phase142_shell_state, phase142_log_state, phase142_echo_state, phase142_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
-    phase142_serial_state = phase142_kv_get_result.serial_state
-    phase142_shell_state = phase142_kv_get_result.shell_state
-    phase142_log_state = phase142_kv_get_result.log_state
-    phase142_echo_state = phase142_kv_get_result.echo_state
-    phase142_kv_state = phase142_kv_get_result.kv_state
-
-    phase142_invalid_result: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase142_serial_state, phase142_shell_state, phase142_log_state, phase142_echo_state, phase142_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(88, 88, 63, 63))
-    phase142_audit: debug.Phase142SerialShellCommandRoutingAudit = bootstrap_audit.build_phase142_serial_shell_command_routing_audit(bootstrap_audit.Phase142SerialShellCommandRoutingAuditInputs{ phase141: phase141_audit, serial_service_pid: phase142_invalid_result.serial_state.owner_pid, shell_service_pid: phase142_invalid_result.shell_state.owner_pid, kv_service_pid: phase142_invalid_result.kv_state.owner_pid, serial_forward_endpoint_id: phase142_invalid_result.serial_state.forward_endpoint_id, serial_forward_status: phase142_invalid_result.serial_state.forward_status, serial_forward_count: phase142_invalid_result.serial_state.forwarded_request_count, serial_final_reply_status: phase142_invalid_result.serial_state.aggregate_reply_status, serial_final_reply_len: phase142_invalid_result.serial_state.aggregate_reply_len, serial_final_reply_byte0: phase142_invalid_result.serial_state.aggregate_reply_byte0, serial_final_reply_count: phase142_invalid_result.serial_state.aggregate_reply_count, echo_route: phase142_echo_result.routing, log_append_route: phase142_log_append_result.routing, log_tail_route: phase142_log_tail_result.routing, kv_set_route: phase142_kv_set_result.routing, kv_get_route: phase142_kv_get_result.routing, invalid_route: phase142_invalid_result.routing, compact_command_encoding_visible: 1, malformed_command_visible: 1, general_shell_framework_visible: 0, payload_width_reopened_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase142_serial_shell_command_routing(phase142_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 98
-    }
-
-    phase143_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
-    phase143_shell_state: shell_service.ShellServiceState = shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID)
-    phase143_log_state: log_service.LogServiceState = log_service.service_state(LOG_SERVICE_STATE.owner_pid, LOG_SERVICE_STATE.endpoint_handle_slot)
-    phase143_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
-    phase143_kv_state: kv_service.KvServiceState = kv_service.service_state(PHASE141_KV_PID, 1)
-
-    phase143_append_a: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase143_serial_state, phase143_shell_state, phase143_log_state, phase143_echo_state, phase143_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_APPEND_BYTE1, 65, 33))
-    phase143_serial_state = phase143_append_a.serial_state
-    phase143_shell_state = phase143_append_a.shell_state
-    phase143_log_state = phase143_append_a.log_state
-    phase143_echo_state = phase143_append_a.echo_state
-    phase143_kv_state = phase143_append_a.kv_state
-
-    phase143_append_b: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase143_serial_state, phase143_shell_state, phase143_log_state, phase143_echo_state, phase143_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_APPEND_BYTE1, 66, 33))
-    phase143_serial_state = phase143_append_b.serial_state
-    phase143_shell_state = phase143_append_b.shell_state
-    phase143_log_state = phase143_append_b.log_state
-    phase143_echo_state = phase143_append_b.echo_state
-    phase143_kv_state = phase143_append_b.kv_state
-
-    phase143_append_c: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase143_serial_state, phase143_shell_state, phase143_log_state, phase143_echo_state, phase143_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_APPEND_BYTE1, 67, 33))
-    phase143_serial_state = phase143_append_c.serial_state
-    phase143_shell_state = phase143_append_c.shell_state
-    phase143_log_state = phase143_append_c.log_state
-    phase143_echo_state = phase143_append_c.echo_state
-    phase143_kv_state = phase143_append_c.kv_state
-
-    phase143_append_d: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase143_serial_state, phase143_shell_state, phase143_log_state, phase143_echo_state, phase143_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_APPEND_BYTE1, 68, 33))
-    phase143_serial_state = phase143_append_d.serial_state
-    phase143_shell_state = phase143_append_d.shell_state
-    phase143_log_state = phase143_append_d.log_state
-    phase143_echo_state = phase143_append_d.echo_state
-    phase143_kv_state = phase143_append_d.kv_state
-
-    phase143_overflow_append: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase143_serial_state, phase143_shell_state, phase143_log_state, phase143_echo_state, phase143_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_APPEND_BYTE1, 69, 33))
-    phase143_serial_state = phase143_overflow_append.serial_state
-    phase143_shell_state = phase143_overflow_append.shell_state
-    phase143_log_state = phase143_overflow_append.log_state
-    phase143_echo_state = phase143_overflow_append.echo_state
-    phase143_kv_state = phase143_overflow_append.kv_state
-
-    phase143_tail_result: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase142_shell_command(phase143_serial_state, phase143_shell_state, phase143_log_state, phase143_echo_state, phase143_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_TAIL_BYTE1, 33, 33))
-    phase143_log_state = phase143_tail_result.log_state
-    phase143_audit: debug.Phase143LongLivedLogServiceAudit = bootstrap_audit.build_phase143_long_lived_log_service_audit(bootstrap_audit.Phase143LongLivedLogServiceAuditInputs{ phase142: phase142_audit, log_service_pid: phase143_log_state.owner_pid, shell_service_pid: phase143_tail_result.shell_state.owner_pid, overflow_append_route: phase143_overflow_append.routing, tail_route: phase143_tail_result.routing, retention: log_service.observe_retention(phase143_log_state), bounded_retention_visible: 1, explicit_overwrite_policy_visible: 1, durable_persistence_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase143_long_lived_log_service(phase143_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 99
-    }
-
-    phase144_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
-    phase144_shell_state: shell_service.ShellServiceState = shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID)
-    phase144_log_state: log_service.LogServiceState = log_service.service_state(LOG_SERVICE_STATE.owner_pid, LOG_SERVICE_STATE.endpoint_handle_slot)
-    phase144_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
-    phase144_kv_state: kv_service.KvServiceState = kv_service.service_state(PHASE141_KV_PID, 1)
-
-    phase144_missing_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
-    phase144_serial_state = phase144_missing_get.serial_state
-    phase144_shell_state = phase144_missing_get.shell_state
-    phase144_log_state = phase144_missing_get.log_state
-    phase144_echo_state = phase144_missing_get.echo_state
-    phase144_kv_state = phase144_missing_get.kv_state
-
-    phase144_initial_set: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_SET_BYTE1, 75, 86))
-    phase144_serial_state = phase144_initial_set.serial_state
-    phase144_shell_state = phase144_initial_set.shell_state
-    phase144_log_state = phase144_initial_set.log_state
-    phase144_echo_state = phase144_initial_set.echo_state
-    phase144_kv_state = phase144_initial_set.kv_state
-
-    phase144_hit_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
-    phase144_serial_state = phase144_hit_get.serial_state
-    phase144_shell_state = phase144_hit_get.shell_state
-    phase144_log_state = phase144_hit_get.log_state
-    phase144_echo_state = phase144_hit_get.echo_state
-    phase144_kv_state = phase144_hit_get.kv_state
-
-    phase144_overwrite_set: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_SET_BYTE1, 75, 87))
-    phase144_serial_state = phase144_overwrite_set.serial_state
-    phase144_shell_state = phase144_overwrite_set.shell_state
-    phase144_log_state = phase144_overwrite_set.log_state
-    phase144_echo_state = phase144_overwrite_set.echo_state
-    phase144_kv_state = phase144_overwrite_set.kv_state
-
-    phase144_overwrite_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase144_stateful_key_value_shell_command(phase144_serial_state, phase144_shell_state, phase144_log_state, phase144_echo_state, phase144_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
-    phase144_kv_state = phase144_overwrite_get.kv_state
-    phase144_log_state = phase144_overwrite_set.log_state
-    phase144_audit: debug.Phase144StatefulKeyValueServiceFollowThroughAudit = bootstrap_audit.build_phase144_stateful_key_value_service_follow_through_audit(bootstrap_audit.Phase144StatefulKeyValueServiceFollowThroughAuditInputs{ phase143: phase143_audit, kv_service_pid: phase144_kv_state.owner_pid, shell_service_pid: phase144_overwrite_get.shell_state.owner_pid, log_service_pid: phase144_log_state.owner_pid, missing_get_route: phase144_missing_get.routing, initial_set_route: phase144_initial_set.routing, hit_get_route: phase144_hit_get.routing, overwrite_set_route: phase144_overwrite_set.routing, overwrite_get_route: phase144_overwrite_get.routing, kv_retention: kv_service.observe_retention(phase144_kv_state), write_log_retention: log_service.observe_retention(phase144_log_state), bounded_retention_visible: 1, missing_key_visible: 1, explicit_overwrite_visible: 1, fixed_write_log_visible: 1, durable_persistence_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase144_stateful_key_value_service_follow_through(phase144_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 100
-    }
-
-    phase145_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
-    phase145_shell_state: shell_service.ShellServiceState = shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID)
-    phase145_log_state: log_service.LogServiceState = log_service.service_state(LOG_SERVICE_STATE.owner_pid, LOG_SERVICE_STATE.endpoint_handle_slot)
-    phase145_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
-    phase145_kv_state: kv_service.KvServiceState = kv_service.service_state(PHASE141_KV_PID, 1)
-
-    phase145_pre_failure_set: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase145_serial_state, phase145_shell_state, phase145_log_state, phase145_echo_state, phase145_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_SET_BYTE1, 75, 86))
-    phase145_serial_state = phase145_pre_failure_set.serial_state
-    phase145_shell_state = phase145_pre_failure_set.shell_state
-    phase145_log_state = phase145_pre_failure_set.log_state
-    phase145_echo_state = phase145_pre_failure_set.echo_state
-    phase145_kv_state = phase145_pre_failure_set.kv_state
-
-    phase145_pre_failure_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase145_serial_state, phase145_shell_state, phase145_log_state, phase145_echo_state, phase145_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
-    phase145_serial_state = phase145_pre_failure_get.serial_state
-    phase145_shell_state = phase145_pre_failure_get.shell_state
-    phase145_log_state = phase145_pre_failure_get.log_state
-    phase145_echo_state = phase145_pre_failure_get.echo_state
-    phase145_kv_state = phase145_pre_failure_get.kv_state
-
-    phase145_pre_failure_retention: kv_service.KvRetentionObservation = kv_service.observe_retention(phase145_kv_state)
-    phase145_kv_state = kv_service.mark_unavailable(phase145_kv_state)
-
-    phase145_failed_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase145_serial_state, phase145_shell_state, phase145_log_state, phase145_echo_state, phase145_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
-    phase145_serial_state = phase145_failed_get.serial_state
-    phase145_shell_state = phase145_failed_get.shell_state
-    phase145_log_state = phase145_failed_get.log_state
-    phase145_echo_state = phase145_failed_get.echo_state
-    phase145_kv_state = phase145_failed_get.kv_state
-
-    phase145_restart: init.ServiceRestartObservation = init.observe_service_restart(INIT_PID, KV_SERVICE_DIRECTORY_KEY, phase145_kv_state.owner_pid, PHASE141_KV_PID, INIT_ENDPOINT_ID, 1, 1)
-    phase145_kv_state = kv_service.restart_service(phase145_kv_state)
-    phase145_log_state = bootstrap_services.append_phase145_restart_observation(phase145_log_state, INIT_PID, COMPOSITION_LOG_ENDPOINT_ID)
-
-    phase145_restarted_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase145_serial_state, phase145_shell_state, phase145_log_state, phase145_echo_state, phase145_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
-    phase145_kv_state = phase145_restarted_get.kv_state
-    phase145_log_state = phase145_restarted_get.log_state
-    phase145_audit: debug.Phase145ServiceRestartFailureAndUsagePressureAudit = bootstrap_audit.build_phase145_service_restart_failure_and_usage_pressure_audit(bootstrap_audit.Phase145ServiceRestartFailureAndUsagePressureAuditInputs{ phase144: phase144_audit, kv_service_pid: phase145_kv_state.owner_pid, shell_service_pid: phase145_restarted_get.shell_state.owner_pid, log_service_pid: phase145_log_state.owner_pid, init_policy_owner_pid: INIT_PID, pre_failure_set_route: phase145_pre_failure_set.routing, pre_failure_get_route: phase145_pre_failure_get.routing, failed_get_route: phase145_failed_get.routing, restarted_get_route: phase145_restarted_get.routing, pre_failure_retention: phase145_pre_failure_retention, post_restart_retention: kv_service.observe_retention(phase145_kv_state), restart: phase145_restart, event_log_retention: log_service.observe_retention(phase145_log_state), shell_failure_visible: 1, init_restart_visible: 1, post_restart_state_reset_visible: 1, manual_retry_visible: 1, kernel_supervision_visible: 0, durable_persistence_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase145_service_restart_failure_and_usage_pressure(phase145_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 101
-    }
-
-    phase146_audit: debug.Phase146ServiceShapeConsolidationAudit = bootstrap_audit.build_phase146_service_shape_consolidation_audit(bootstrap_audit.Phase146ServiceShapeConsolidationAuditInputs{ phase145: phase145_audit, serial_service_pid: phase145_serial_state.owner_pid, shell_service_pid: phase145_restarted_get.shell_state.owner_pid, log_service_pid: phase145_log_state.owner_pid, kv_service_pid: phase145_kv_state.owner_pid, init_policy_owner_pid: INIT_PID, serial_forward: serial_service.observe_composition(phase145_serial_state), shell_route: phase145_restarted_get.routing, log_retention: log_service.observe_retention(phase145_log_state), kv_retention: kv_service.observe_retention(phase145_kv_state), restart: phase145_restart, serial_endpoint_handle_slot: phase145_serial_state.endpoint_handle_slot, shell_endpoint_handle_slot: phase145_restarted_get.shell_state.endpoint_handle_slot, log_endpoint_handle_slot: phase145_log_state.endpoint_handle_slot, kv_endpoint_handle_slot: phase145_kv_state.endpoint_handle_slot, fixed_boot_wiring_visible: 1, service_local_request_reply_visible: 1, shell_syntax_boundary_visible: 1, service_semantic_boundary_visible: 1, explicit_failure_exposure_visible: 1, init_owned_restart_visible: 1, intentional_shell_difference_visible: 1, intentional_stateful_difference_visible: 1, dynamic_service_framework_visible: 0, dynamic_registration_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase146_service_shape_consolidation(phase146_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 102
-    }
-
-    phase147_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
-    phase147_shell_state: shell_service.ShellServiceState = shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID)
-    phase147_log_state: log_service.LogServiceState = log_service.service_state(LOG_SERVICE_STATE.owner_pid, LOG_SERVICE_STATE.endpoint_handle_slot)
-    phase147_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
-    phase147_kv_state: kv_service.KvServiceState = kv_service.service_state(PHASE141_KV_PID, 1)
-
-    phase147_log_append: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase147_serial_state, phase147_shell_state, phase147_log_state, phase147_echo_state, phase147_kv_state, SHELL_SERVICE_ENDPOINT_ID, 3, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_APPEND_BYTE1, 76, 0))
-    phase147_serial_state = phase147_log_append.serial_state
-    phase147_shell_state = phase147_log_append.shell_state
-    phase147_log_state = phase147_log_append.log_state
-    phase147_echo_state = phase147_log_append.echo_state
-    phase147_kv_state = phase147_log_append.kv_state
-
-    phase147_log_tail: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase147_serial_state, phase147_shell_state, phase147_log_state, phase147_echo_state, phase147_kv_state, SHELL_SERVICE_ENDPOINT_ID, 2, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_TAIL_BYTE1, 0, 0))
-    phase147_serial_state = phase147_log_tail.serial_state
-    phase147_shell_state = phase147_log_tail.shell_state
-    phase147_log_state = phase147_log_tail.log_state
-    phase147_echo_state = phase147_log_tail.echo_state
-    phase147_kv_state = phase147_log_tail.kv_state
-
-    phase147_kv_set: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase147_serial_state, phase147_shell_state, phase147_log_state, phase147_echo_state, phase147_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_SET_BYTE1, 81, 90))
-    phase147_serial_state = phase147_kv_set.serial_state
-    phase147_shell_state = phase147_kv_set.shell_state
-    phase147_log_state = phase147_kv_set.log_state
-    phase147_echo_state = phase147_kv_set.echo_state
-    phase147_kv_state = phase147_kv_set.kv_state
-
-    phase147_kv_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase147_serial_state, phase147_shell_state, phase147_log_state, phase147_echo_state, phase147_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 81, 0))
-    phase147_serial_state = phase147_kv_get.serial_state
-    phase147_shell_state = phase147_kv_get.shell_state
-    phase147_log_state = phase147_kv_get.log_state
-    phase147_echo_state = phase147_kv_get.echo_state
-    phase147_kv_state = phase147_kv_get.kv_state
-
-    phase147_repeated_log_tail: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase147_serial_state, phase147_shell_state, phase147_log_state, phase147_echo_state, phase147_kv_state, SHELL_SERVICE_ENDPOINT_ID, 2, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_TAIL_BYTE1, 0, 0))
-    phase147_serial_state = phase147_repeated_log_tail.serial_state
-    phase147_shell_state = phase147_repeated_log_tail.shell_state
-    phase147_log_state = phase147_repeated_log_tail.log_state
-    phase147_echo_state = phase147_repeated_log_tail.echo_state
-    phase147_kv_state = phase147_repeated_log_tail.kv_state
-
-    phase147_repeated_kv_get: bootstrap_services.Phase142ShellCommandRouteResult = bootstrap_services.execute_phase145_service_restart_shell_command(phase147_serial_state, phase147_shell_state, phase147_log_state, phase147_echo_state, phase147_kv_state, SHELL_SERVICE_ENDPOINT_ID, 4, shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 81, 0))
-    phase147_log_state = phase147_repeated_kv_get.log_state
-    phase147_kv_state = phase147_repeated_kv_get.kv_state
-    phase147_audit: debug.Phase147IpcShapeAudit = bootstrap_audit.build_phase147_ipc_shape_audit(bootstrap_audit.Phase147IpcShapeAuditInputs{ phase146: phase146_audit, serial_service_pid: phase147_repeated_kv_get.serial_state.owner_pid, shell_service_pid: phase147_repeated_kv_get.shell_state.owner_pid, log_service_pid: phase147_log_state.owner_pid, kv_service_pid: phase147_kv_state.owner_pid, serial_observation: serial_service.observe_composition(phase147_repeated_kv_get.serial_state), log_append_route: phase147_log_append.routing, log_tail_route: phase147_log_tail.routing, kv_set_route: phase147_kv_set.routing, kv_get_route: phase147_kv_get.routing, repeated_log_tail_route: phase147_repeated_log_tail.routing, repeated_kv_get_route: phase147_repeated_kv_get.routing, log_retention: log_service.observe_retention(phase147_log_state), kv_retention: kv_service.observe_retention(phase147_kv_state), request_construction_sufficient_visible: 1, reply_shape_service_local_visible: 1, compact_encoding_sufficient_visible: 1, service_to_service_observation_visible: 1, generic_message_bus_visible: 0, dynamic_payload_typing_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase147_ipc_shape_audit_under_real_usage(phase147_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 103
-    }
-
-    phase148_audit: debug.Phase148AuthorityErgonomicsAudit = bootstrap_audit.build_phase148_authority_ergonomics_audit(bootstrap_audit.Phase148AuthorityErgonomicsAuditInputs{ phase147: phase147_audit, serial_endpoint_handle_slot: phase147_repeated_kv_get.serial_state.endpoint_handle_slot, shell_endpoint_handle_slot: phase147_repeated_kv_get.shell_state.endpoint_handle_slot, log_endpoint_handle_slot: phase147_log_state.endpoint_handle_slot, kv_endpoint_handle_slot: phase147_kv_state.endpoint_handle_slot, explicit_slot_authority_visible: 1, retained_state_authority_local_visible: 1, restart_handoff_explicit_visible: 1, repeated_authority_ceremony_stable_visible: 1, narrow_capability_helper_visible: 1, overscoped_helper_visible: 0, ambient_authority_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase148_authority_ergonomics_under_reuse(phase148_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 104
-    }
-
-    phase149_audit: debug.Phase149RestartSemanticsFirstClassPatternAudit = bootstrap_audit.build_phase149_restart_semantics_first_class_pattern_audit(bootstrap_audit.Phase149RestartSemanticsFirstClassPatternAuditInputs{ phase148: phase148_audit, shell_service_pid: phase145_audit.shell_service_pid, kv_service_pid: phase145_audit.kv_service_pid, log_service_pid: phase145_audit.log_service_pid, init_policy_owner_pid: phase145_audit.init_policy_owner_pid, pre_failure_get_route: phase145_audit.pre_failure_get_route, failed_get_route: phase145_audit.failed_get_route, restarted_get_route: phase145_audit.restarted_get_route, post_restart_retention: phase145_audit.post_restart_retention, restart: phase145_audit.restart, event_log_retention: phase145_audit.event_log_retention, caller_retry_obligation_visible: 1, retry_reissues_same_request_visible: 1, request_identity_not_tracked_visible: 1, post_restart_reset_state_visible: 1, init_owned_restart_policy_visible: 1, transparent_retry_visible: 0, kernel_supervision_visible: 0, durable_recovery_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase149_restart_semantics_first_class_pattern(phase149_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 105
-    }
-
-    phase150_serial_state: serial_service.SerialServiceState = serial_service.record_ingress(serial_service.service_state(INIT_PID, phase140_serial_config.endpoint_handle_slot), SERIAL_SERVICE_RECEIVE_OBSERVATION)
-    phase150_shell_state: shell_service.ShellServiceState = shell_service.service_state(PHASE141_SHELL_PID, 1, COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID)
-    phase150_log_state: log_service.LogServiceState = log_service.service_state(LOG_SERVICE_STATE.owner_pid, LOG_SERVICE_STATE.endpoint_handle_slot)
-    phase150_echo_state: echo_service.EchoServiceState = ECHO_SERVICE_STATE
-    phase150_kv_state: kv_service.KvServiceState = kv_service.service_state(PHASE141_KV_PID, 1)
-    phase150_workflow: bootstrap_services.Phase150RebuiltSystemWorkflowResult = bootstrap_services.execute_phase150_rebuilt_system_workflow(phase150_serial_state, phase150_shell_state, phase150_log_state, phase150_echo_state, phase150_kv_state, SHELL_SERVICE_ENDPOINT_ID, INIT_PID, KV_SERVICE_DIRECTORY_KEY, INIT_ENDPOINT_ID, shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_APPEND_BYTE1, 76, 0), shell_command_payload(SHELL_COMMAND_LOG_BYTE0, SHELL_COMMAND_LOG_TAIL_BYTE1, 0, 0), shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_SET_BYTE1, 75, 86), shell_command_payload(SHELL_COMMAND_KV_BYTE0, SHELL_COMMAND_KV_GET_BYTE1, 75, 33))
-    if phase150_workflow.succeeded == 0 {
-        return 106
-    }
-
-    phase150_audit: debug.Phase150OneSystemRebuiltCleanlyAudit = bootstrap_audit.build_phase150_one_system_rebuilt_cleanly_audit(bootstrap_audit.Phase150OneSystemRebuiltCleanlyAuditInputs{ phase149: phase149_audit, serial_service_pid: phase150_workflow.rebuilt_system.serial_state.owner_pid, shell_service_pid: phase150_workflow.rebuilt_system.shell_state.owner_pid, log_service_pid: phase150_workflow.rebuilt_system.log_state.owner_pid, kv_service_pid: phase150_workflow.rebuilt_system.kv_state.owner_pid, log_append_route: phase150_workflow.log_append_route, log_tail_route: phase150_workflow.log_tail_route, pre_failure_set_route: phase150_workflow.pre_failure_set_route, pre_failure_get_route: phase150_workflow.pre_failure_get_route, failed_get_route: phase150_workflow.failed_get_route, restarted_get_route: phase150_workflow.restarted_get_route, pre_failure_retention: phase150_workflow.pre_failure_retention, post_restart_retention: phase150_workflow.post_restart_retention, restart: phase150_workflow.restart, event_log_retention: phase150_workflow.event_log_retention, rebuilt_system_helper_visible: 1, owner_local_system_state_visible: 1, manual_state_threading_removed_visible: 1, dynamic_service_framework_visible: 0, compiler_reopening_visible: 0 })
-    if !debug.validate_phase150_one_system_rebuilt_cleanly(phase150_audit, scheduler_contract_hardened, lifecycle_contract_hardened, capability_contract_hardened, ipc_contract_hardened, address_space_contract_hardened, interrupt_contract_hardened, timer_contract_hardened, barrier_contract_hardened) {
-        return 107
-    }
-
-    BOOT_MARKER_EMITTED = 1
+func emit_late_phase_markers() {
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE140_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE141_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE142_MARKER_DETAIL)
@@ -2203,11 +1096,14 @@ func bootstrap_main() i32 {
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE148_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE149_MARKER_DETAIL)
     record_boot_stage(state.BootStage.MarkerEmitted, PHASE150_MARKER_DETAIL)
-    if BOOT_MARKER_EMITTED != 1 {
-        return 108
-    }
+}
+
+func validate_late_phase_boot_log() i32 {
     if BOOT_LOG_APPEND_FAILED != 0 {
         return 109
+    }
+    if BOOT_LOG.count < 15 {
+        return 108
     }
     if BOOT_LOG.count != 15 {
         return 110
@@ -2320,14 +1216,131 @@ func bootstrap_main() i32 {
     if state.log_detail_at(BOOT_LOG, 14) != PHASE150_MARKER_DETAIL {
         return 146
     }
+    return 0
+}
+
+func build_late_service_system_runtime_context() bootstrap_services.LateServiceSystemRuntimeContext {
+    return bootstrap_services.LateServiceSystemRuntimeContext{ boot_pid: BOOT_PID, init_pid: INIT_PID, init_tid: INIT_TID, init_asid: INIT_ASID, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, phase141_shell_pid: PHASE141_SHELL_PID, phase141_kv_pid: PHASE141_KV_PID, init_endpoint_id: INIT_ENDPOINT_ID, serial_service_endpoint_id: SERIAL_SERVICE_ENDPOINT_ID, composition_echo_endpoint_id: COMPOSITION_ECHO_ENDPOINT_ID, composition_log_endpoint_id: COMPOSITION_LOG_ENDPOINT_ID, kv_service_endpoint_id: KV_SERVICE_ENDPOINT_ID, shell_service_endpoint_id: SHELL_SERVICE_ENDPOINT_ID, kv_service_directory_key: KV_SERVICE_DIRECTORY_KEY, init_root_page_table: INIT_ROOT_PAGE_TABLE, child_root_page_table: CHILD_ROOT_PAGE_TABLE, init_image: INIT_IMAGE, serial_receive_observation: SERIAL_SERVICE_SNAPSHOT.receive_observation, log_service_state: LOG_SERVICE_SNAPSHOT.state, echo_service_state: ECHO_SERVICE_SNAPSHOT.state }
+}
+
+func build_mid_phase_proof_runtime_context() bootstrap_proofs.MidPhaseProofRuntimeContext {
+    return bootstrap_proofs.MidPhaseProofRuntimeContext{ scheduler_lifecycle_audit: build_scheduler_lifecycle_audit(), late_phase_context: build_late_phase_proof_context(), init_pid: INIT_PID, init_tid: INIT_TID, init_asid: INIT_ASID, init_endpoint_id: INIT_ENDPOINT_ID, init_endpoint_handle_slot: INIT_ENDPOINT_HANDLE_SLOT, init_root_page_table: INIT_ROOT_PAGE_TABLE, child_pid: CHILD_PID, child_tid: CHILD_TID, child_asid: CHILD_ASID, child_wait_handle_slot: CHILD_WAIT_HANDLE_SLOT, child_root_page_table: CHILD_ROOT_PAGE_TABLE, child_exit_code: CHILD_EXIT_CODE, boot_pid: BOOT_PID, boot_tid: BOOT_TID, boot_task_slot: BOOT_TASK_SLOT, boot_entry_pc: BOOT_ENTRY_PC, boot_stack_top: BOOT_STACK_TOP, transfer_endpoint_id: TRANSFER_ENDPOINT_ID, transfer_source_handle_slot: TRANSFER_SOURCE_HANDLE_SLOT, transfer_received_handle_slot: TRANSFER_RECEIVED_HANDLE_SLOT, transfer_service_directory_key: TRANSFER_SERVICE_DIRECTORY_KEY, composition_echo_endpoint_id: COMPOSITION_ECHO_ENDPOINT_ID, composition_log_endpoint_id: COMPOSITION_LOG_ENDPOINT_ID, serial_service_endpoint_id: SERIAL_SERVICE_ENDPOINT_ID, init_image: INIT_IMAGE, arch_actor: ARCH_ACTOR, boot_log_append_failed: BOOT_LOG_APPEND_FAILED, gate: SYSCALL_GATE, process_slots: PROCESS_SLOTS, task_slots: TASK_SLOTS, init_handle_table: HANDLE_TABLES[1], child_handle_table: HANDLE_TABLES[2], wait_table: WAIT_TABLES[1], endpoints: ENDPOINTS, ready_queue: READY_QUEUE, kernel: KERNEL, bootstrap_program_capability: INIT_RUNTIME_SNAPSHOT.bootstrap_caps.program_capability, init_bootstrap_handoff: INIT_RUNTIME_SNAPSHOT.bootstrap_handoff, init_user_frame: INIT_RUNTIME_SNAPSHOT.user_frame, receive_observation: RECEIVE_OBSERVATION, attached_receive_observation: ATTACHED_RECEIVE_OBSERVATION, transferred_handle_use_observation: TRANSFERRED_HANDLE_USE_OBSERVATION, pre_exit_wait_observation: CHILD_EXECUTION_SNAPSHOT.pre_exit_wait_observation, exit_wait_observation: CHILD_EXECUTION_SNAPSHOT.exit_wait_observation, sleep_observation: CHILD_EXECUTION_SNAPSHOT.sleep_observation, timer_wake_observation: CHILD_EXECUTION_SNAPSHOT.timer_wake_observation, last_interrupt_kind: LAST_INTERRUPT_KIND, log_service_snapshot: LOG_SERVICE_SNAPSHOT, echo_service_snapshot: ECHO_SERVICE_SNAPSHOT, transfer_service_snapshot: TRANSFER_SERVICE_SNAPSHOT, serial_service_snapshot: SERIAL_SERVICE_SNAPSHOT, interrupts: INTERRUPTS, uart_device: UART_DEVICE, uart_receive_vector: UART_RECEIVE_VECTOR, uart_completion_vector: UART_COMPLETION_VECTOR, uart_source_actor: UART_SOURCE_ACTOR, uart_queue_frame_one_byte0: UART_QUEUE_FRAME_ONE_BYTE0, uart_queue_frame_one_byte1: UART_QUEUE_FRAME_ONE_BYTE1, uart_queue_frame_two_byte0: UART_QUEUE_FRAME_TWO_BYTE0, uart_queue_frame_two_byte1: UART_QUEUE_FRAME_TWO_BYTE1, uart_queue_frame_three_byte0: UART_QUEUE_FRAME_THREE_BYTE0, uart_queue_frame_three_byte1: UART_QUEUE_FRAME_THREE_BYTE1, uart_closed_frame_byte0: UART_CLOSED_FRAME_BYTE0, uart_closed_frame_byte1: UART_CLOSED_FRAME_BYTE1, uart_completion_frame_byte0: UART_COMPLETION_FRAME_BYTE0, uart_completion_frame_byte1: UART_COMPLETION_FRAME_BYTE1, uart_completion_frame_byte2: UART_COMPLETION_FRAME_BYTE2, uart_completion_frame_byte3: UART_COMPLETION_FRAME_BYTE3 }
+}
+
+func install_mid_phase_proof_result(next_result: bootstrap_proofs.MidPhaseProofResult) {
+    LOG_SERVICE_SNAPSHOT = next_result.log_service_snapshot
+    ECHO_SERVICE_SNAPSHOT = next_result.echo_service_snapshot
+    TRANSFER_SERVICE_SNAPSHOT = next_result.transfer_service_snapshot
+    install_composition_service_runtime_state(next_result.composition_state)
+    install_serial_service_execution_state(next_result.serial_state)
+    INTERRUPTS = next_result.interrupts
+    LAST_INTERRUPT_KIND = next_result.last_interrupt_kind
+    UART_DEVICE = next_result.uart_device
+    UART_INGRESS = next_result.uart_ingress
+}
+
+func execute_late_service_system_proofs(phase137_audit: debug.Phase137OptionalDmaOrEquivalentAudit, proof_contract_flags: bootstrap_proofs.ProofContractFlags) i32 {
+    contract_flags: bootstrap_services.LateServiceSystemContractFlags = bootstrap_services.LateServiceSystemContractFlags{ scheduler_contract_hardened: proof_contract_flags.scheduler_contract_hardened, lifecycle_contract_hardened: proof_contract_flags.lifecycle_contract_hardened, capability_contract_hardened: proof_contract_flags.capability_contract_hardened, ipc_contract_hardened: proof_contract_flags.ipc_contract_hardened, address_space_contract_hardened: proof_contract_flags.address_space_contract_hardened, interrupt_contract_hardened: proof_contract_flags.interrupt_contract_hardened, timer_contract_hardened: proof_contract_flags.timer_contract_hardened, barrier_contract_hardened: proof_contract_flags.barrier_contract_hardened }
+    return bootstrap_services.execute_late_service_system_proofs(bootstrap_services.build_late_service_system_proof_inputs(phase137_audit, contract_flags, build_late_service_system_runtime_context()))
+}
+
+func execute_mid_phase_proofs() i32 {
+    status: i32 = bootstrap_proofs.execute_mid_phase_proofs(build_mid_phase_proof_runtime_context())
+    if status != 0 {
+        return status
+    }
+    result: bootstrap_proofs.MidPhaseProofResult = bootstrap_proofs.mid_phase_proof_result()
+    install_mid_phase_proof_result(result)
+    return execute_late_service_system_proofs(result.phase137_audit, result.proof_contract_flags)
+}
+
+func execute_bootstrap_entry_sequence() i32 {
+    if !architecture_entry() {
+        return 10
+    }
+    if !transfer_to_first_user_entry() {
+        return 11
+    }
+    bootstrap_endpoint_handle_core()
+    if KERNEL.booted != 1 {
+        return 12
+    }
+    if KERNEL.current_pid != INIT_PID {
+        return 13
+    }
+    if KERNEL.current_tid != INIT_TID {
+        return 14
+    }
+    if KERNEL.active_asid != INIT_ASID {
+        return 15
+    }
+    if KERNEL.user_entry_started != 1 {
+        return 16
+    }
+    if address_space.state_score(INIT_RUNTIME_SNAPSHOT.address_space.state) != 4 {
+        return 17
+    }
+    if !validate_endpoint_handle_core() {
+        return 18
+    }
+    if !handoff_init_bootstrap_capability_set() {
+        return 19
+    }
+    if !validate_init_bootstrap_capability_handoff() {
+        return 20
+    }
+    if !execute_syscall_byte_ipc() {
+        return 21
+    }
+    if !validate_syscall_byte_ipc() {
+        return 22
+    }
+    if !seed_transfer_endpoint_handle() {
+        return 23
+    }
+    if !execute_capability_carrying_ipc_transfer() {
+        return 24
+    }
+    if !validate_capability_carrying_ipc_transfer() {
+        return 25
+    }
+    if !execute_program_cap_spawn_and_wait() {
+        return 26
+    }
+    return 0
+}
+
+func validate_bootstrap_final_identity() i32 {
     if PROCESS_SLOTS[1].pid != INIT_PID {
         return 147
     }
     if TASK_SLOTS[1].tid != INIT_TID {
         return 148
     }
-    if USER_FRAME.task_id != INIT_TID {
+    if INIT_RUNTIME_SNAPSHOT.user_frame.task_id != INIT_TID {
         return 149
     }
-    return PHASE150_MARKER
+    return 0
+}
+
+func bootstrap_main() i32 {
+    bootstrap_entry_status: i32 = execute_bootstrap_entry_sequence()
+    if bootstrap_entry_status != 0 {
+        return bootstrap_entry_status
+    }
+    mid_phase_status: i32 = execute_mid_phase_proofs()
+    if mid_phase_status != 0 {
+        return mid_phase_status
+    }
+
+    emit_late_phase_markers()
+    late_phase_boot_log_status: i32 = validate_late_phase_boot_log()
+    if late_phase_boot_log_status != 0 {
+        return late_phase_boot_log_status
+    }
+    final_identity_status: i32 = validate_bootstrap_final_identity()
+    if final_identity_status != 0 {
+        return final_identity_status
+    }
+    return 0
 }

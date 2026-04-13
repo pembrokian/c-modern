@@ -46,7 +46,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names init bootstrap capability
+- The speculative Veya kernel roadmap names init bootstrap capability
   handoff as the next remaining owner after the landed timer block-wake path.
 - The repository already had one init-owned endpoint handle, one launchable
   program capability later consumed by spawn, and one root capability kept in
@@ -99,7 +99,7 @@ one explicit statement of what authority `init` starts with.
 
 What this phase proves
 ----------------------
-- one real Canopus kernel artifact now installs one explicit bounded bootstrap
+- one real Veya kernel artifact now installs one explicit bounded bootstrap
   capability set for `init`
 - that set is intentionally small: one init-visible bootstrap endpoint handle
   plus one launchable program capability already used by the landed spawn path
@@ -163,7 +163,7 @@ Non-goals
   derivation rules
 - ambient namespace policy, filesystem lookup, or path-based spawn
 - kill semantics, multi-child orchestration, or broader scheduler policy
-- claiming a complete Canopus kernel slice or broader target support
+- claiming a complete Veya kernel slice or broader target support
 
 Implemented slice
 -----------------
@@ -183,7 +183,7 @@ Implemented slice
   inspects merged MIR for imported bootstrap-handoff types plus explicit
   global-state lowering for the new init bootstrap-set globals
 - refreshed the kernel README, agent map, freestanding test notes, backlog,
-  decision log, and speculative Canopus kernel roadmap so the repository now
+  decision log, and speculative Veya kernel roadmap so the repository now
   records Phase 103 as concrete and leaves Phase 105 as the next remaining
   owner
 

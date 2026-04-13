@@ -16,7 +16,7 @@ This document is both the Phase 115 execution note and its closeout.
 It does not claim a broad timer framework, device policy layer, preemption,
 barrier work, broader interrupt completion, or a compiler wave.
 It records one narrow timer-boundary hardening step inside the already admitted
-first running Canopus kernel slice.
+first running Veya kernel slice.
 
 Repository status note
 ----------------------
@@ -154,7 +154,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 115 is complete as a timer ownership hardening step.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now expresses its timer-backed wake path more honestly:
 interrupt ownership stops at entry and dispatch classification, timer-owned
 tick delivery now owns wake observation and single-delivery consumption, and

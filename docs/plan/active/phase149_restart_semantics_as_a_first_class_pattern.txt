@@ -49,7 +49,7 @@ This phase note should stay aligned with:
 - `docs/plan/active/phase146_service_shape_consolidation.txt`
 - `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
 - `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
-- `docs/arch/canopus/canopus_service_shape_phase146_v0.txt`
+- `docs/arch/veya/canopus_service_shape_phase146_v0.txt`
 - `docs/plan/backlog.txt`
 - `docs/plan/decision_log.txt`
 
@@ -63,7 +63,7 @@ Repository status note
   explicit and init-owned under repeated use.
 - The repository therefore had restart evidence already, but it still needed
   one published statement about what a restartable service means in the
-  admitted Canopus slice.
+  admitted Veya slice.
 
 Problem being solved
 --------------------
@@ -107,7 +107,7 @@ Chosen slice for this phase
 Targeted boundary shape:
 
 1. one canonical Phase 149 execution note that defines the restartable-
-   service contract for the admitted Canopus slice
+   service contract for the admitted Veya slice
 2. one explicit statement of caller obligations after service death or
    restart, including retry and reset-state consequences
 3. one explicit statement of what restart policy remains init-owned rather
@@ -174,7 +174,7 @@ The owning implementation surfaces for this phase are:
 Deliverables
 ------------
 - one canonical Phase 149 execution note in `docs/plan/active/`
-- one explicit restartable-service contract for the admitted Canopus slice
+- one explicit restartable-service contract for the admitted Veya slice
 - one real repeated workflow demonstrating the contract over the artifact
 - one debug-owned Phase 149 audit over the published restart truth
 - one focused freestanding regression plus projected MIR golden for the Phase
@@ -207,7 +207,7 @@ Exit criteria
 -------------
 - the real kernel artifact builds and runs to a Phase 149 marker
 - the repository publishes one explicit restartable-service contract for the
-  admitted Canopus slice
+  admitted Veya slice
 - caller-visible retry and post-restart state truth remain explicit
 - one audit validates the published restart contract over the real kernel
   artifact

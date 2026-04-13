@@ -16,7 +16,7 @@ This document is both the Phase 112 execution note and its closeout.
 It does not claim broader syscall families, a public syscall wrapper layer,
 broader scheduler completion, broader MMU policy, or a larger compiler wave.
 It records one bounded boundary-hardening step inside the already admitted
-first running Canopus kernel slice.
+first running Veya kernel slice.
 
 Repository status note
 ----------------------
@@ -156,7 +156,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 112 is complete as a syscall boundary thinness audit. The repository
-still claims only one bounded first running Canopus kernel slice, but that
+still claims only one bounded first running Veya kernel slice, but that
 slice now keeps the syscall edge thinner and more honest: syscall decode,
 gate state, and observations remain local, while IPC, capability-transfer,
 address-space, and lifecycle semantics stay with their owning subsystems.

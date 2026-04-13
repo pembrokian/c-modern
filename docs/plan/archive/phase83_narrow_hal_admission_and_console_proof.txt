@@ -35,7 +35,7 @@ Problem being solved
 - The original Phase 81 regression proved the dedicated MIR and LLVM lowering
   for the `hal` intrinsics, but its console-side example was still only a
   minimal single-register smoke.
-- The Canopus proof ladder calls for a bounded MMIO-backed console path rather
+- The Veya proof ladder calls for a bounded MMIO-backed console path rather
   than a one-off intrinsic check.
 - The repository needed one regression that exercises polling, volatile loads,
   volatile stores, and manifest-owned freestanding support objects together so
@@ -114,7 +114,7 @@ Non-goals
   `volatile_store`
 - barrier, interrupt, DMA, or device-framework support
 - claims about real hardware execution outside the repository harness
-- widening freestanding support into a general Canopus target or packaging
+- widening freestanding support into a general Veya target or packaging
   story
 
 Implemented slice

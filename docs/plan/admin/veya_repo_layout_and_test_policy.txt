@@ -1,0 +1,108 @@
+Veya Repository Layout And Test Policy
+=========================================
+
+Status
+------
+PUBLISHED
+
+Purpose
+-------
+Record the current repository policy for how Veya-owned source, build
+outputs, and test coverage should live alongside the Modern C compiler while
+the two are still being developed together.
+
+This note is intentionally about repository structure and validation policy.
+It is not a phase closeout.
+It does not create a broader support claim.
+
+Current policy
+--------------
+- Do not split the repository into parallel top-level `modern-c/` and
+  `veya/` trees at the current stage.
+- Keep compiler and generic toolchain ownership under `compiler/`.
+- Keep real Veya kernel-owned source under `kernel/`.
+- Keep Veya architecture and interface notes under `docs/arch/veya/`.
+- Keep one canonical CMake build graph for the compiler and test harness in
+  the repository root.
+
+Why the top level stays unified
+-------------------------------
+- Veya is currently the strongest real consumer and proof pressure for the
+  compiler, not a fully separate product with an independent build and test
+  stack.
+- The current shared owners are still substantial: stdlib, driver behavior,
+  freestanding packaging, dumps, diagnostics, and grouped tool harnesses all
+  belong to the compiler repository as a whole.
+- A premature top-level split would mostly add path churn and duplicated build
+  and test structure before the source tree has enough independent Veya
+  surface to justify it.
+
+Source layout rule
+------------------
+- `compiler/` remains the owner for language, sema, MIR, codegen, and CLI
+  behavior.
+- `kernel/` remains the owner for real repository-owned Veya kernel source.
+- Future Veya runtime or service source should not force a top-level split
+  by default. If later phases land a substantial init, loader, service, and
+  image tree beyond the kernel, reopen whether a dedicated top-level Veya
+  source family is justified.
+
+Build layout rule
+-----------------
+- Do not create a separate root CMake build such as `build/veya` for the
+  current Veya work.
+- Keep one compiler build root such as `build/debug` and `build/release`.
+- Treat Veya outputs as disposable artifacts produced by `mc` inside the
+  existing build tree.
+- Repository-owned Veya regression outputs should continue to live under
+  suite-owned roots such as `build/debug/tool/freestanding/...`.
+- Manual Veya experiments should prefer roots such as
+  `build/debug/probes/veya/...` or `build/debug/tmp/veya/...`.
+
+Test layout rule
+----------------
+- Do not create `tests/tool/veya/` yet.
+- Keep active Veya proof coverage under `tests/tool/` because the current
+  ownership question is still primarily about driver, build, and freestanding
+  integration truth.
+- The current home for Veya-facing execution proofs is the freestanding
+  tool suite.
+- If that suite grows substantially, split by focused suite files under
+  `tests/tool/` before introducing a deeper subtree. For example:
+  - `freestanding/kernel/suite.cpp`
+  - `freestanding/system/suite.cpp`
+  - `freestanding/kernel/runtime/phase108_kernel_image_program_cap_audit/phase.toml`
+- Only introduce a dedicated `tests/tool/veya/` subtree later if Veya
+  gains enough repository-owned source and harness code that folder ownership
+  becomes clearer than suite-based naming.
+
+Validation policy
+-----------------
+- During Veya-focused iteration, run the narrowest owning Veya-facing
+  checks first, especially the owning freestanding slice (`mc_tool_freestanding_bootstrap_unit`,
+  the owning `mc_tool_freestanding_kernel_case_<name>_unit`, or `mc_tool_freestanding_system_unit`).
+- If a change touches compiler ownership directly, also run the narrowest
+  relevant compiler suites for that layer, such as parser, sema, MIR, or other
+  tool tests.
+- Before closing a phase or landing a cross-cutting change, run the broader
+  repository validation path rather than relying only on the Veya proof.
+
+Decision rule for reopening structure
+-------------------------------------
+Reopen this structure only when one of these becomes true:
+
+- Veya has enough repository-owned source outside `kernel/` that a true
+  top-level source family is clearer than the current split.
+- Veya test harnesses become materially different from the existing grouped
+  tool model.
+- Veya image, packaging, loader, or service bring-up requires a distinct
+  build graph rather than ordinary `mc`-driven disposable outputs.
+
+Bottom line
+-----------
+For now, keep one repository, one compiler build graph, one shared `tests/tool`
+family, one real `kernel/` tree, and one `docs/arch/veya/` documentation
+tree.
+
+Veya should stay structurally visible, but not artificially separated from
+the compiler layers it is actively proving.

@@ -1,0 +1,480 @@
+Phase 151 -- Complete The Main Simplification
+=============================================
+
+Status
+------
+IMPLEMENTED
+
+Purpose
+-------
+Continue from the landed Phase 150 rebuilt-system step by finishing the
+structural simplification of `kernel/src/main.mc` so that it becomes a thin
+bootstrap orchestrator rather than the owner of phase-local proof
+choreography.
+
+This document defines the next bounded cleanup phase after the service,
+init-runtime, child-execution, and rebuilt-system extractions already landed.
+It does not claim a new service wave, a wider kernel architecture, or a
+generic framework layer.
+
+Phase target
+------------
+Phase 151 should complete the main-file simplification by removing the
+remaining large proof and workflow ownership bands from `kernel/src/main.mc`
+without changing the admitted bounded kernel behavior.
+
+The intended repository result is:
+
+- `kernel/src/main.mc` owns boot sequencing, phase sequencing, marker
+  emission, and final status checks only
+- phase-local workflow construction moves to the nearest existing owner such
+  as `bootstrap_services`, `bootstrap_proofs`, `bootstrap_audit`, `init`, or
+  other already-admitted kernel modules
+- the remaining runtime snapshots stay explicit, but their mutation and
+  validation no longer force `main.mc` to host the full proof narrative
+- the focused freestanding runtime surface continues to prove the same Phase
+  105 through Phase 150 behavior after the refactor
+
+Relationship to companion notes
+-------------------------------
+This phase note should stay aligned with:
+
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase146_service_shape_consolidation.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/active/phase150_one_system_rebuilt_cleanly.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Earlier cleanup slices already removed the freestanding runtime pass-line
+  contract, retired obsolete standalone proof files, grouped service bring-up
+  state into service snapshots, and grouped init or child mutable runtime
+  state into owner-local snapshots.
+- The first Phase 151 implementation slice moved the Phase 140 through Phase
+  150 service-system scenario band into the split `bootstrap_services` owner
+  surface.
+- The next landed Phase 151 slice moved the Phase 117 through Phase 123
+  plateau proof-composition band into `bootstrap_proofs` as one bounded
+  owner-local helper.
+- The next landed Phase 151 slices moved the remaining Phase 124 through
+  Phase 137 proof tail into `bootstrap_proofs`, including the authority,
+  composition, device-failure, and completion-backed follow-through band.
+- `bootstrap_main()` now defers the full early boot, first-user handoff,
+  endpoint, capability, IPC, and child-lifecycle branch ladder through one
+  explicit `execute_bootstrap_entry_sequence()` helper.
+- The next landed Phase 151 slice moved the child spawn or sleep or wake or
+  wait workflow into `bootstrap_runtime` without reopening the root-side
+  state model or widening kernel runtime policy surfaces.
+- The next landed Phase 151 slice moved the init address-space bring-up and
+  bootstrap-capability handoff workflow into `bootstrap_runtime` while
+  keeping the root-side sequencing and validation checks explicit.
+- Those steps proved the simplification direction was correct, and the final
+  closing slice has now moved the remaining Phase 104 through Phase 137 live
+  workflow ownership behind the existing `bootstrap_proofs` owner surface.
+- `kernel/src/main.mc` now keeps the explicit boot-entry sequence, one
+  grouped mid-phase runtime-context builder, one grouped mid-phase result
+  installer, one late-phase delegation call, marker emission, and final
+  bounded status checks.
+- A small Phase 104 through Phase 107 helper set remains in `main.mc` only as
+  a non-owning compatibility surface for descriptor-owned MIR projections;
+  those helpers no longer control the live mid-phase proof path and do not
+  reopen the phase.
+
+Problem being solved
+--------------------
+- The repository has already simplified state ownership, but not yet control
+  ownership.
+- As long as `main.mc` still hosts large, phase-local workflow bodies, the
+  kernel proof path remains difficult to audit, difficult to extend honestly,
+  and vulnerable to reintroducing ad hoc coupling.
+- Without one explicit completion phase, later work will keep building on a
+  partially simplified root artifact and the repository will lose the chance
+  to state clearly what `main.mc` is supposed to own.
+
+Core rule
+---------
+- Simplify ownership, do not relocate clutter blindly.
+- `main.mc` should keep orchestration responsibilities only: boot ordering,
+  sequencing between admitted helpers, phase markers, and final return-code
+  decisions.
+- If logic computes service-local meaning, phase-local workflow state, or
+  audit-local comparisons, it should move to the nearest existing owner
+  rather than remain in `main.mc`.
+- Do not answer this phase by inventing a generic runtime framework,
+  scheduler layer, or dynamic registration model.
+- Debug audits, MIR projections, and runtime descriptors remain acceptance
+  artifacts only.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless a concrete extraction blocker forces a narrow change.
+
+Planning rule for this band
+---------------------------
+Use this sanity check on every Phase 151 change:
+
+- shrinking `main.mc` by moving phase-local workflow ownership to an already
+  correct module: admissible
+- replacing explicit ownership with a framework, callback table, or generic
+  service runtime: wrong layer
+
+The goal is a thinner root orchestrator, not a more abstract system.
+
+Controlling simplification gaps
+-------------------------------
+Phase 151 treated these as the controlling gaps and closed them as follows:
+
+1. Early boot helper ownership needed to stop dominating the root file
+   - `bootstrap_main()` no longer hosts the full early boot branch ladder,
+     and the live boot and first-user workflow now routes through the already
+     admitted `bootstrap_runtime` owner surface.
+
+2. Cross-phase validation state needed to stop dominating the root file
+   - hardening flags, repeated config construction, and repeated audit-input
+     assembly for the live mid-phase path now route through
+     `bootstrap_proofs.execute_mid_phase_proofs(...)` and its grouped runtime
+     and result records rather than through root-owned choreography.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 151 execution note that defines the completion target
+   for the `main.mc` simplification
+2. one explicit ownership statement for what `main.mc` should still own after
+   the phase lands
+3. one extraction pass over the early boot and user-entry workflow so root
+   boot wiring stays thin and explicit
+4. one extraction pass over the Phase 104 through Phase 137 proof band so the
+   root file stops owning mid-phase proof composition details
+4. preserve the landed Phase 117 through Phase 123, Phase 124 through Phase
+  137, and Phase 140 through Phase 150 extractions while finishing the
+  remaining early-boot ownership moves
+5. one focused runtime validation pass that proves the simplified root file
+   still exposes the same admitted behavior and deterministic MIR boundaries
+
+Desired end-state for `main.mc`
+-------------------------------
+When Phase 151 is complete, `kernel/src/main.mc` should read as:
+
+1. reset and seed kernel state
+2. transfer into first-user setup
+3. execute the admitted early IPC and child lifecycle bring-up
+4. delegate mid-phase proof composition to one bounded owner-local surface
+5. delegate late-phase service-system proofs to one bounded owner-local
+   surface
+6. emit late markers and perform final bounded status checks
+
+The file should no longer be the primary home of service scenario assembly,
+restart scenario assembly, or large audit-input choreography.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase151_complete_main_simplification.txt`
+   - publish the canonical completion plan for the remaining root-file
+     simplification
+
+2. `kernel/src/main.mc`
+  - shrink to a thin orchestration surface with explicit sequencing only;
+    the root entrypoint now does this, while residual helper ownership is the
+    remaining cleanup pressure
+
+4. `kernel/src/bootstrap_services/`
+   - own the landed late service-system workflow extraction and absorb any
+     remaining bounded service-system workflow owners that still belong with
+     the existing service-local split owners
+
+4. `kernel/src/bootstrap_proofs.mc`
+   - absorb bounded proof workflow composition that is proof-owned rather than
+     root-orchestration-owned
+
+5. `kernel/src/bootstrap_audit/` and `kernel/src/debug/`
+   - absorb or normalize repeated audit-input construction where the audit
+     owner is already clear
+
+6. `kernel/src/init.mc`, `kernel/src/serial_service.mc`,
+   `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`, and
+   `kernel/src/kv_service.mc`
+   - receive narrowly extracted workflow helpers only where the existing
+     service or init owner is the right semantic home
+
+7. `tests/tool/freestanding/kernel/runtime/phase.../`
+   - update the narrowest descriptor-owned runtime regressions whose MIR or
+     selector boundaries move because global ownership or helper ownership
+     changes
+
+8. supporting docs under `docs/plan/`, `docs/agent/`, and repo memory
+   - refresh only after the final owner boundaries are stable
+
+Key activities and tasks
+------------------------
+Activity 1. Freeze the ownership contract for `main.mc`
+
+- Task 1.1: publish the final allowed responsibilities of `main.mc`
+- Task 1.2: classify the remaining code in `main.mc` by owner: root
+  orchestration, proof workflow, service workflow, audit input assembly, or
+  boot validation
+- Task 1.3: record any slice that intentionally remains in `main.mc` and why
+
+Activity 2. Finish the early boot simplification
+
+- Task 2.1: extract the remaining first-user bring-up workflow into one
+  bounded helper owner without hiding explicit boot sequencing
+- Task 2.2: extract the endpoint-handle and bootstrap-capability handoff path
+  into the narrowest owner-local helpers that preserve explicit ownership
+- Task 2.3: keep init and child runtime snapshots explicit while reducing the
+  amount of validation choreography visible in `main.mc`
+
+Activity 2 progress note
+
+- Landed: `bootstrap_main()` now delegates the full early boot, handoff, IPC,
+  and child-lifecycle branch ladder through
+  `execute_bootstrap_entry_sequence()`.
+- Landed: `bootstrap_runtime` now owns the init address-space bring-up,
+  bootstrap-capability handoff, and child lifecycle execution workflow while
+  `main.mc` keeps only the explicit sequencing, global installation, and
+  validation steps.
+- Landed: the remaining endpoint-handle install and first byte-IPC execution
+  band now also runs through `bootstrap_runtime`, leaving `main.mc` with the
+  explicit status checks and validation-only helpers for that early runtime
+  path.
+- Landed: the first-user activation and kernel handoff portion of
+  `transfer_to_first_user_entry()` now runs through `bootstrap_runtime`,
+  leaving `main.mc` with the explicit readiness validation and boot-log
+  sequencing for that transition.
+- Landed: the remaining transfer-endpoint seed and capability-carrying IPC
+  execution band now runs through `bootstrap_runtime`, leaving `main.mc`
+  with the explicit transfer validation helpers and entry-sequence status
+  checks only.
+- Closure note: the remaining early-boot helper bodies should continue to
+  move only when there is a clear existing owner or the already-admitted
+  `bootstrap_runtime` surface can take them without introducing a generic
+  carrier layer.
+
+Activity 3. Collapse the mid-phase proof band
+
+- Task 3.1: identify stable sub-bands inside Phase 104 through Phase 137
+  rather than moving the whole body blindly
+- Task 3.2: move repeated config building, audit assembly, and proof-owned
+  scenario wiring into `bootstrap_proofs` or the nearest existing owner
+- Task 3.3: leave `main.mc` with one bounded mid-phase delegation call plus
+  explicit failure handling only
+
+Activity 3 progress note
+
+- Landed: the Phase 117 through Phase 123 plateau sub-band now runs through
+  `bootstrap_proofs.execute_phase117_to_123_proofs(...)` and one bounded
+  `Phase117To123ProofInputs` record.
+- Landed: the remaining Phase 124 through Phase 137 tail now runs through
+  bounded `bootstrap_proofs` helpers, including the UART, device-failure, and
+  completion-backed follow-through band.
+- Landed: the remaining live Phase 104 through Phase 107 hardening ladder,
+  service execution-and-validation sequence, repeated config construction,
+  proof-contract threading, and post-Phase 131 through Phase 137 proof-state
+  installation now run through
+  `bootstrap_proofs.execute_mid_phase_proofs(...)` plus
+  `MidPhaseProofRuntimeContext` and `MidPhaseProofResult`, leaving
+  `main.mc` with one delegation call, one grouped context builder, one grouped
+  result installer, and one late-phase handoff.
+- Landed: the retained Phase 104 through Phase 107 helper symbols in
+  `main.mc` are now compatibility-only wrappers for descriptor-owned MIR
+  projections rather than part of the live mid-phase control path.
+- Constraint kept visible: this extraction intentionally reused the existing
+  proof owner surface and avoided reopening compiler, framework, or runtime
+  policy layers.
+
+Activity 4. Collapse the late-phase service-system band
+
+- Task 4.1: identify the remaining repeated scenario shapes across Phase 140
+  through Phase 150
+- Task 4.2: move shell, log, key-value, serial, and restart scenario
+  construction into bounded owner-local helpers rather than phase-local root
+  choreography
+- Task 4.3: reuse the Phase 150 rebuilt-system lesson where it simplifies
+  repeated late-phase patterns without inventing a framework
+- Task 4.4: leave `main.mc` with one bounded late-phase delegation call plus
+  explicit marker or final-check sequencing only
+
+Activity 4 progress note
+
+- Landed: the late Phase 140 through Phase 150 service-system scenario band
+  now runs through `kernel/src/bootstrap_services/11_phase151.mc` via
+  `bootstrap_services.execute_late_service_system_proofs(...)` and one
+  explicit `LateServiceSystemProofInputs` owner-local input record.
+- Landed: the late owner now reuses the existing Phase 150 rebuilt-system
+  state and command helper for the repeated Phase 145 restart-pressure and
+  Phase 147 IPC-shape shell-command threading, deleting another duplicated
+  late-band state-rethreading pattern without reopening any framework or
+  compiler surface.
+- Landed: the late owner now also routes the repeated Phase 142 command-band,
+  Phase 143 log-retention band, and Phase 144 stateful key-value band through
+  the same rebuilt-system state shape plus narrow owner-local command
+  adapters, removing another large block of manual serial, shell, log, echo,
+  and key-value state threading from `11_phase151.mc`.
+- Landed: the late owner now centralizes the remaining repeated initial
+  rebuilt-system setup behind two narrow helpers for the retained-log and
+  fresh-log cases, so Phase 142, Phase 143, Phase 144, Phase 145, Phase 147,
+  and Phase 150 no longer hand-assemble that common late-band starting state.
+- Constraint kept visible: this extraction intentionally reused the existing
+  split `bootstrap_services` surface rather than adding a framework layer,
+  generic orchestrator, or compiler-facing support.
+
+Activity 5. Remove manual cross-phase threading that no longer belongs in the
+root file
+
+- Task 5.1: reduce repeated hardening-flag plumbing where an owner-local
+  helper can absorb it safely
+- Task 5.2: reduce repeated audit-input literal construction when the audit
+  owner can provide a narrow builder
+- Task 5.3: preserve deterministic data flow and explicit status checking
+  while removing duplicated root-file scaffolding
+
+Activity 5 progress note
+
+- Landed: the repeated hardening flags for the `bootstrap_proofs` delegation
+  path now flow through one bounded owner-local record rather than being
+  threaded as eight separate root-file arguments at each proof helper call.
+- Landed: the late service-system proof wrapper now builds one bounded
+  `bootstrap_services` contract record plus one runtime-context record and
+  delegates the final `LateServiceSystemProofInputs` assembly to the owner
+  surface instead of hand-assembling that large literal in `main.mc`.
+- Landed: the root-side Phase 124 through Phase 126 probe, audit-construction,
+  and validator sequence has been deleted in favor of the already-admitted
+  `bootstrap_proofs.execute_phase124_to_130_proofs(...)` owner-local band, so
+  `main.mc` no longer repeats that adjacent proof-contract flow.
+- Landed: the root-side Phase 108 through Phase 116 contract build,
+  running-slice audit construction, and adjacent validator fan-out now run
+  through one bounded `bootstrap_proofs.execute_phase108_to_116_proofs(...)`
+  helper plus a stored running-slice audit getter, so `main.mc` no longer
+  hosts that early mid-band proof choreography directly.
+- Landed: the remaining Phase 117 through Phase 123 delegation call in
+  `main.mc` no longer hand-assembles the full `Phase117To123ProofInputs`
+  literal; it now builds one grouped runtime-context helper and lets
+  `bootstrap_proofs.build_phase117_to_123_proof_inputs(...)` assemble the
+  final owner-local input record.
+- Landed: the remaining Phase 131 through Phase 137 delegation call in
+  `main.mc` no longer hand-assembles the full `Phase131To137ProofInputs`
+  literal; it now builds one grouped runtime-context helper and lets
+  `bootstrap_proofs.build_phase131_to_137_proof_inputs(...)` assemble the
+  final owner-local input record.
+- Landed: the root late-phase wrapper no longer threads eight separate
+  contract-hardening scalars into `execute_late_service_system_proofs(...)`;
+  it now passes the already-grouped `ProofContractFlags` record and performs
+  the owner-boundary translation to `LateServiceSystemContractFlags` in one
+  narrow place.
+- Landed: the remaining Phase 108 through Phase 116 delegation call in
+  `main.mc` no longer hand-assembles the full `Phase108To116ProofInputs`
+  literal; it now builds one grouped runtime-context helper and lets
+  `bootstrap_proofs.build_phase108_to_116_proof_inputs(...)` assemble the
+  final owner-local input record.
+
+Activity 6. Rebase validation on the final ownership boundaries
+
+- Task 6.1: update the narrowest runtime descriptor selectors and projected
+  MIR goldens that move with the new helper or global ownership
+- Task 6.2: rerun the focused freestanding runtime suite first, then widen
+  only if the changed-path surface requires it
+- Task 6.3: record any remaining backend or lowering boundary that constrains
+  how the simplification can be expressed
+
+Activity 6 progress note
+
+- Landed with the Activity 5 Phase 108 through Phase 116 move: the narrow
+  Phase 108 runtime MIR selector now targets
+  `bootstrap_proofs.build_phase108_program_cap_contract` rather than the
+  removed root wrapper, keeping the descriptor-owned runtime surface aligned
+  with the new owner boundary.
+- Landed with the closing mid-phase move: the descriptor-owned runtime
+  surface kept the expected Phase 104 through Phase 107 helper symbols in
+  `main.mc` as compatibility-only wrappers where projected MIR selectors still
+  depend on those names, while the live execution path moved behind
+  `bootstrap_proofs.execute_mid_phase_proofs(...)`.
+- Validation result: the focused freestanding runtime surface still builds,
+  runs, and validates deterministically after the final owner move.
+
+Deliverables
+------------
+- one canonical Phase 151 planning note in `docs/plan/active/`
+- one explicit ownership contract for the final `main.mc` shape
+- one thinner `kernel/src/main.mc` that keeps orchestration only
+- extracted owner-local helpers for the remaining early and later mid-phase
+  bands, plus the landed Phase 117 through Phase 123 and late-phase
+  workflow extractions
+- updated descriptor-owned runtime validations and MIR projections where
+  ownership moves
+- refreshed supporting docs only after the simplification boundary is stable
+
+Suggested execution order
+-------------------------
+1. Freeze the final ownership contract for `main.mc` in docs.
+2. Finish the early boot simplification first so the root bring-up shape is
+   stable.
+3. Extract the remaining Phase 124 through Phase 137 proof tail into bounded
+  owner-local helpers.
+4. Preserve and validate the landed Phase 117 through Phase 123 and Phase 140
+  through Phase 150 extractions while finishing the remaining ownership
+  moves.
+5. Remove any remaining manual cross-phase threading that survives those
+   extractions.
+6. Rebase the narrow runtime descriptors and MIR projections on the final
+   ownership boundaries.
+7. Advance the kernel proof marker to 151 only after the root file is thin,
+   the focused runtime suite is green, and the repository can state clearly
+   what still belongs in `main.mc`.
+
+Preferred proof points
+----------------------
+1. `main.mc` no longer contains large phase-local service or restart
+  scenarios.
+2. `main.mc` no longer contains the landed Phase 117 through Phase 123
+  plateau proof-composition body or the live remaining Phase 124 through
+  Phase 137 tail.
+3. The root file still exposes explicit sequencing and failure handling.
+4. The focused freestanding runtime suite proves the same bounded Phase 105
+   through Phase 150 behavior after the simplification.
+5. Any MIR selector changes correspond to explicit ownership moves rather
+   than accidental refactors.
+
+Exit criteria
+-------------
+- the repository publishes one explicit completion plan for the remaining
+  `main.mc` simplification
+- `kernel/src/main.mc` is reduced to a thin orchestration shell rather than a
+  phase-local workflow owner
+- the remaining early boot and live Phase 104 through Phase 137 workflow bands
+  move to the nearest correct owners while the landed Phase 117 through Phase
+  123 and Phase 140 through Phase 150 extractions stay stable
+- the focused freestanding runtime surface still builds, runs, and validates
+  deterministically after the simplification
+- the narrow MIR projections and runtime descriptors are rebased wherever
+  helper or global ownership changes
+- compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces
+  remain unchanged unless a documented extraction blocker forces a narrow
+  additive fix
+
+Non-goals
+---------
+- adding new services or widening the platform scope
+- inventing a generic framework layer to hide remaining root-file clutter
+- changing service semantics, restart policy, or admitted user-visible
+  behavior during the simplification
+- reopening compiler or low-level toolchain surfaces without a concrete
+  extraction blocker
+
+Closeout statement
+------------------
+Phase 151 is complete as the main-file simplification closeout. The live
+Phase 104 through Phase 137 workflow now runs through the existing
+`bootstrap_proofs` owner surface, the late Phase 140 through Phase 150
+service-system band stays behind `bootstrap_services`, and `kernel/src/main.mc`
+now serves as a thin bootstrap orchestrator with explicit sequencing,
+installation, marker emission, and final bounded status checks only. The
+repository still does not claim a reusable orchestration framework, hidden
+runtime policy layer, or compiler-facing service support, and the retained
+Phase 104 through Phase 107 helper symbols in `main.mc` are accepted only as
+compatibility surfaces for descriptor-owned MIR projections rather than as
+live workflow owners.

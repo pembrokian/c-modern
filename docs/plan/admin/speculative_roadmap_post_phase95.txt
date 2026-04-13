@@ -1,4 +1,4 @@
-Phase 96 Through Phase 109 -- Speculative Canopus Kernel Bring-Up Roadmap
+Phase 96 Through Phase 109 -- Speculative Veya Kernel Bring-Up Roadmap
 =========================================================================
 
 Status
@@ -8,12 +8,12 @@ COMPLETED HORIZON (historical speculative roadmap)
 Purpose
 -------
 Sketch one plausible continuation after the completed Phase 95 freestanding
-`v0.3` slice audit if the repository now chooses to turn the Canopus proof
+`v0.3` slice audit if the repository now chooses to turn the Veya proof
 ladder into a real first kernel bring-up.
 
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
-It does not replace the existing Canopus architecture notes.
+It does not replace the existing Veya architecture notes.
 It gives one plausible implementation ordering for the first kernel wave if
 the repository keeps following the same evidence-first rules used so far:
 
@@ -32,11 +32,11 @@ This roadmap is meant to stay aligned with:
 
 - `docs/plan/admin/canopus_post_phase109_speculative_roadmap.txt`
 - `docs/plan/admin/modern_c_canopus_readiness_position.txt`
-- `docs/arch/canopus/canopus_lite_v0.txt`
-- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
-- `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
-- `docs/arch/canopus/canopus_sys_interface_v0.txt`
-- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+- `docs/arch/veya/canopus_lite_v0.txt`
+- `docs/arch/veya/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/veya/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/veya/canopus_sys_interface_v0.txt`
+- `docs/arch/veya/canopus_syscall_mapping_v0.txt`
 
 If those notes define readiness, architecture, and kernel-boundary shape,
 this roadmap suggests one practical phase ordering for turning them into a
@@ -58,7 +58,7 @@ Repository numbering note
 Repository status note
 ----------------------
 - The repository can now honestly claim a bounded freestanding `v0.3` slice.
-- The Canopus blueprints now describe a small capability-based microkernel,
+- The Veya blueprints now describe a small capability-based microkernel,
   but that kernel remains architectural and proof-guided rather than yet a
   landed repository-owned implementation wave.
 - The strongest next question is no longer whether the language can model the
@@ -69,7 +69,7 @@ Repository status note
 What this roadmap is trying to answer
 -------------------------------------
 - In what order should the repository turn the bounded proof models into a
-  real Canopus kernel bring-up?
+  real Veya kernel bring-up?
 - Which fronts belong first to kernel implementation, target and build
   integration, or user-space service follow-through rather than to new
   language machinery?
@@ -83,7 +83,7 @@ Core rule
 - Prefer real kernel boot, real syscall truth, and real user-space service
   handoff over widening architecture prose alone.
 - Keep the first implementation as small, table-driven, and inspectable as the
-  Canopus implementation blueprint recommends.
+  Veya implementation blueprint recommends.
 - Do not let scheduler policy, namespace policy, or general service frameworks
   outrun the first working kernel path.
 
@@ -108,7 +108,7 @@ Why this band comes first:
 
 Phase 96 is now concrete as kernel boot entry and state skeleton:
 
-- one real Canopus kernel artifact now boots through explicit architecture
+- one real Veya kernel artifact now boots through explicit architecture
   entry, initializes deterministic kernel-owned descriptor, process-slot,
   task-slot, ready-queue, and boot-record tables, emits one bounded boot
   marker, and stops before claiming user-space entry.
@@ -263,9 +263,9 @@ Phase 108 -- Kernel Image And Program-Cap Audit
   and emitted artifact ownership are documented and validated honestly without
   widening into broad packaging or install claims.
 
-Phase 109 -- First Running Canopus Kernel Slice Audit
+Phase 109 -- First Running Veya Kernel Slice Audit
 - Exit criterion: complete. The repository now states one first running
-  Canopus kernel slice honestly, names the admitted boot, syscall, IPC,
+  Veya kernel slice honestly, names the admitted boot, syscall, IPC,
   spawn, timer, service, and image-contract paths exactly, and keeps broader
   OS and target claims deferred.
 
@@ -284,7 +284,7 @@ permission to claim a running kernel platform too early.
 Non-goals
 ---------
 - treating this note as a committed execution plan
-- claiming full Canopus Lite completion inside this roadmap horizon
+- claiming full Veya Lite completion inside this roadmap horizon
 - implying broad target support, cross-compilation, or packaging support
 - adding broad driver frameworks, VFS layers, or network stacks before the
   first running kernel slice is honest
@@ -294,7 +294,7 @@ Non-goals
 Interpretation guide
 --------------------
 - Treat this as a rough map, not a contract.
-- The current Canopus blueprints remain the architectural owners.
+- The current Veya blueprints remain the architectural owners.
 - The freestanding `v0.3` support note remains the current admitted support
   boundary until a later phase lands a real running-kernel statement.
 - If the real kernel path exposes an actual compiler or language distortion,

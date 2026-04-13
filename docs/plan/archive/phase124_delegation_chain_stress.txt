@@ -8,7 +8,7 @@ IMPLEMENTED
 Purpose
 -------
 Continue from the completed Phase 123 next-plateau audit by proving one
-bounded multi-hop delegation chain over the same already-landed Canopus
+bounded multi-hop delegation chain over the same already-landed Veya
 kernel artifact.
 
 This document is both the Phase 124 execution note and its closeout.
@@ -88,7 +88,7 @@ What this phase proves
   intermediary and one final holder while both prior holders lose reuse rights
 - the current authority answer still stops well short of a broader revocation
   framework, service manager, namespace model, or compiler reopening
-- the repository can widen Canopus evidence quality through kernel-owner proof
+- the repository can widen Veya evidence quality through kernel-owner proof
   pressure rather than through new language or backend work
 
 Deliverables
@@ -161,7 +161,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 124 is complete as a delegation-chain stress step.
-The repository still claims only one bounded small Canopus running-system
+The repository still claims only one bounded small Veya running-system
 plateau, but that plateau now includes one explicit proof that delegated
 authority can survive one deeper hop without ambient reuse, and the compiler
 stays closed because this phase needed authority-stress evidence rather than

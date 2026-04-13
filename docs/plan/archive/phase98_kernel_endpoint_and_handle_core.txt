@@ -37,7 +37,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names Phase 98 as the point where the
+- The speculative Veya kernel roadmap names Phase 98 as the point where the
   repository should turn the first-user-entry anchor into explicit endpoint-
   and handle-owned kernel object state.
 - The repository already had placeholder capability and endpoint records in the
@@ -88,7 +88,7 @@ inside that same repository-owned kernel artifact.
 
 What this phase proves
 ----------------------
-- one real Canopus kernel artifact can now own the remaining small object-core
+- one real Veya kernel artifact can now own the remaining small object-core
   state around endpoints, handle tables, and queued kernel messages
 - the current language, freestanding build path, and runtime startup can carry
   bounded ring-buffer message state and per-process handle tables without new
@@ -145,7 +145,7 @@ Non-goals
 - attached-handle transfer across the syscall boundary
 - spawn, wait, timer-backed blocking, or scheduler policy
 - init-owned service launch, namespaces, or broader running-kernel claims
-- claiming a complete Canopus kernel slice or broader target support
+- claiming a complete Veya kernel slice or broader target support
 
 Implemented slice
 -----------------
@@ -169,7 +169,7 @@ Implemented slice
   Phase 98 marker, and inspects merged MIR for the imported handle-table,
   endpoint-message, and explicit global-state lowering surface
 - refreshed the kernel README, agent map, layout-and-test policy note,
-  backlog, decision log, and speculative Canopus kernel roadmap so the
+  backlog, decision log, and speculative Veya kernel roadmap so the
   repository records Phase 98 as concrete and leaves Phase 99 as the next
   remaining syscall-boundary owner
 

@@ -7,7 +7,7 @@ PROPOSED
 
 Purpose
 -------
-Convert the first two Canopus-driven proof programs into an implementation
+Convert the first two Veya-driven proof programs into an implementation
 checklist spanning compiler, build, runtime, stdlib, and proof artifacts.
 
 Scope
@@ -105,4 +105,4 @@ Phase 81 should not be considered done until all of the following are true:
 - one narrow `hal` API exists and is used by a real proof
 - one output-oriented MMIO or equivalent console proof exists
 - remaining blockers, if any, are named precisely as target, backend, or later
-  Canopus-library work
+  Veya-library work

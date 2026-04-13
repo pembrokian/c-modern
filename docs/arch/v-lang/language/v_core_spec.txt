@@ -1,0 +1,187 @@
+V - Core Language Spec
+
+Purpose
+
+This document defines the basic semantic shape of V apart from the detailed
+memory, concurrency, and runtime documents.
+
+Scope
+
+This document covers:
+- source-program structure
+- modules and visibility
+- declarations
+- fundamental type categories
+- expressions and statements at a high level
+- control flow and error shape at a high level
+
+This document does not define:
+- ownership or lifetime rules in detail
+- task, channel, or scheduler behavior
+- runtime ABI or C boundary details
+- full capability semantics
+
+1. Language stance
+
+V is a systems language for service processes.
+It is intended for code that is:
+- long-lived
+- protocol-driven
+- explicit about resources
+- easier to compose through messages than through shared mutable state
+
+V should prefer:
+- ordinary values over hidden object identity
+- explicit effects over implicit control flow
+- simple type-system rules over maximal inference
+
+2. Program structure
+
+V programs are built from modules.
+
+Baseline module rules:
+- imports are explicit
+- module initialization must not rely on hidden constructors
+- visibility should be simple and explicit
+- package and service structure should be visible in build or source metadata,
+  not inferred from filesystem accidents alone
+
+Early recommendation:
+- keep one file equals one module for the earliest implementation
+- add larger packaging structure only when real service code justifies it
+
+3. Declaration model
+
+V should admit ordinary top-level declarations such as:
+- `const`
+- `var`
+- `type`
+- `struct`
+- `enum`
+- `func`
+
+The declaration model should stay unsurprising:
+- top-level names do not execute on declaration
+- compile-time constants are separate from runtime initialization
+- hidden registration systems are out of scope
+
+4. Type-system direction
+
+V should start with a compact set of type categories:
+- booleans
+- fixed-width integers
+- possibly fixed-width floats if service code pressure justifies them
+- strings and byte slices
+- structs
+- enums
+- arrays
+- slices or views
+- owned buffers
+- channels
+- task handles
+- explicit capability or handle types once the OS boundary is ready
+
+Preferred type-system posture:
+- nominal enough to keep protocol boundaries readable
+- explicit enough to keep ownership visible
+- powerful enough for ordinary systems-library construction
+- not dependent on traits, type classes, or advanced metaprogramming in the
+  first admitted design
+
+5. Value semantics
+
+V values should have ordinary value semantics unless a type explicitly says
+otherwise.
+
+Default expectation:
+- assignment transfers or copies according to the memory model
+- function arguments are explicit values
+- references and shared ownership forms are explicit in the type or operation
+
+The language should avoid:
+- hidden heap boxing as a default consequence of ordinary value use
+- hidden reference semantics for aggregates
+
+6. Protocol-first data model
+
+V should treat protocol messages as ordinary typed data.
+
+This means:
+- message enums and structs should be normal language constructs
+- protocol definitions should not require a separate actor or interface IDL
+- channels do not define protocol shape; they carry protocol values
+
+Example direction:
+- `enum Msg { Read { ... }, Write { ... }, Clunk { ... } }`
+- `enum Reply { Ok { ... }, Error { ... } }`
+
+7. Control flow
+
+V should keep control flow explicit.
+
+Baseline direction:
+- ordinary conditionals and loops
+- pattern matching over enums and other decomposable values
+- explicit returns
+- no exceptions
+- no hidden propagation
+
+Error-handling direction:
+- use explicit result-bearing forms rather than hidden unwinding
+- keep success and failure visible in function signatures or protocol replies
+- prefer one simple error story over multiple overlapping mechanisms
+
+8. Functions
+
+Functions should be ordinary named code units with explicit parameters and
+results.
+
+Early direction:
+- first-class functions are optional and should be admitted only if service
+  code needs them early
+- closures should be deferred unless repeated real pressure appears
+- async-function rewriting should not be the default concurrency story
+
+9. Generics
+
+Generics may be useful for containers, channels, buffers, and library helpers,
+but they should stay modest.
+
+Early recommendation:
+- admit only the minimum generic power needed for ordinary systems-library
+  construction
+- avoid a large trait or concept system in the first design
+- avoid making error messages or compilation model depend on heavy inference
+
+10. Capability-aware API surface
+
+V should make it easy to pass and store explicit capability values, but the
+language should not hardcode a full capability theory into every type rule.
+
+Baseline direction:
+- capabilities are explicit values or handles
+- APIs declare when they require or transfer them
+- ambient global authority should be discouraged by architecture and runtime
+  design rather than hidden by syntax
+
+11. Non-goals for the core spec
+
+The first V core spec should not try to solve:
+- full distributed-object semantics
+- a universal actor model
+- dependent types or proof-carrying interfaces
+- pervasive compile-time execution
+- a large macro system
+- hidden service discovery or naming semantics
+
+12. Summary
+
+V core should stay small and boring in the good sense:
+- ordinary modules
+- ordinary declarations
+- explicit protocol data
+- explicit control flow
+- enough types to write services cleanly
+
+The interesting design work belongs mostly in the memory, concurrency, and
+runtime boundaries rather than in making the core syntax unusually clever.

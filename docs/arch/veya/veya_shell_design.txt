@@ -1,0 +1,661 @@
+Veya Shell Design
+=================
+
+Status
+------
+NORMATIVE DRAFT
+
+Purpose
+-------
+Define the architectural role, required boundaries, and normative contracts
+for a Veya shell.
+
+This document answers four questions:
+
+1. what the shell is allowed to own
+2. what services must exist before the shell becomes genuinely useful
+3. what IPC contract the shell should rely on
+4. how the current landed bounded shell slice relates to the fuller intended
+	 service shell
+
+This note is intentionally not a Unix compatibility promise, not a scripting
+language design, and not a generic runtime framework proposal.
+
+Relationship to companion notes
+-------------------------------
+This document should stay aligned with:
+
+- `docs/arch/veya/veya_sys_interface_v0.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+- `docs/plan/active/phase141_interactive_service_system_scope_freeze.txt`
+- `docs/plan/active/phase142_serial_shell_command_routing.txt`
+- `docs/plan/active/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/active/phase144_stateful_key_value_service_follow_through.txt`
+- `docs/plan/active/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/active/phase148_authority_ergonomics_under_reuse.txt`
+- `docs/plan/active/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/backlog.txt`
+
+Those notes describe the landed bounded interactive-service slice.
+This document defines the shell boundary that later work must preserve.
+
+Scope
+-----
+This document covers:
+
+- the shell as a user-visible control surface over services
+- the ownership split between console transport, shell syntax, IPC, and
+	service semantics
+- the minimal service set required for a useful shell
+- the normative semantic IPC contract for a service-oriented shell
+- the bounded bootstrap shell profile already proved by the repository
+- the broader service-shell profile that later work may adopt
+
+This document does not cover:
+
+- POSIX compatibility
+- a general scripting language
+- pipelines, jobs, redirection, or process groups
+- filesystem semantics beyond shell dependency classification
+- a kernel-resident broker, supervisor, or command framework
+- compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Shell definition
+----------------
+The Veya shell is the first user-visible integration surface for the service
+system.
+
+The shell is not merely a convenience CLI.
+It is the primary architecture-level proof that a user can:
+
+- observe system state
+- trigger real work
+- receive structured results or explicit failure
+- do so through the same authority and IPC boundaries that ordinary services
+	must obey
+
+The shell therefore acts as an integration test of the OS model, not as a
+special privileged escape hatch around it.
+
+Core rules
+----------
+The following rules are normative.
+
+1. The shell SHALL remain a client of the system, not a second kernel.
+
+- The shell SHALL NOT gain ambient authority beyond what its explicit handles,
+	capabilities, or boot wiring provide.
+- The shell SHALL NOT perform privileged work through hidden kernel-only
+	shortcuts.
+- The shell SHALL NOT be allowed to do anything architecturally unavailable to
+	a normal service or user program with equivalent authority.
+
+2. The shell SHALL own syntax, command classification, and presentation only.
+
+- Parsing command text or compact command tokens belongs to the shell.
+- Rendering human-readable output belongs to the shell.
+- Translating shell input into service requests belongs to the shell.
+- Peer-service meaning SHALL remain owned by the target service.
+
+3. Transport SHALL stay separate from shell semantics.
+
+- Console or serial framing belongs to a transport owner such as
+	`serial_service` or a future TTY owner.
+- The shell SHALL consume validated input from that transport layer.
+- The shell SHALL NOT absorb UART framing, terminal driver policy, or device
+	recovery semantics.
+
+4. Service semantics SHALL stay separate from shell syntax.
+
+- The shell MAY choose command names, aliases, or compact encodings.
+- The shell SHALL NOT become the semantic owner of log retention, key-value
+	state, process state, or filesystem interpretation.
+- Errors and state-transition truth SHALL remain explicit at the service
+	boundary.
+
+5. The shell SHALL prefer explicit failure over hidden behavior.
+
+- No hidden retries.
+- No silent fallback to a different service.
+- No implicit mutation of global shell state when a service call fails.
+
+Design goals
+------------
+The shell design exists to satisfy these goals.
+
+1. Make the system observable early.
+2. Make real service behavior triggerable early.
+3. Keep the shell small and stable while the kernel evolves.
+4. Keep request and reply truth explicit.
+5. Avoid reintroducing POSIX-style ambient global process state by accident.
+6. Avoid forcing a full filesystem, networking stack, or process hierarchy
+	 before the shell can provide value.
+
+Non-goals
+---------
+The shell design explicitly does not require:
+
+- a complete filesystem before the shell is useful
+- a dynamic command plugin system
+- a general broker or message bus
+- shell-owned persistence policy
+- shell-owned restart policy
+- shell-owned service registration
+- early async streaming or futures
+
+Minimal useful service set
+--------------------------
+The shell becomes useful when the system is observable and controllable.
+That does not require a complete platform.
+
+Required for any usable shell
+-----------------------------
+1. Console or TTY transport
+
+- The system MUST provide validated input delivery to the shell.
+- The system MUST provide output emission from the shell.
+- Basic blocking input is sufficient for the first usable shell.
+
+2. IPC request-reply path
+
+- The shell MUST be able to send a request to a service and obtain an explicit
+	response or explicit failure.
+- Synchronous blocking request-reply is sufficient initially.
+
+3. Service naming or fixed wiring
+
+- The shell MUST be able to target specific services.
+- In the bootstrap profile, fixed boot wiring is sufficient.
+- In the broader service-shell profile, a service registry SHOULD exist.
+
+Strongly recommended before the first general shell profile
+----------------------------------------------------------
+1. Process or task service
+
+- The shell SHOULD be able to inspect running processes or tasks.
+- The shell SHOULD eventually support spawn.
+- Kill or terminate controls MAY come later.
+
+2. Logging or diagnostics service
+
+- The shell SHOULD provide a direct path to log inspection.
+- This is the first practical debugging surface when the rest of the system is
+	still incomplete.
+
+3. Key-value or other simple retained-state service
+
+- The shell SHOULD expose at least one mutable service with explicit retained
+	state.
+- A small key-value service is preferred over waiting for a full filesystem.
+
+Optional for the first usable shell
+-----------------------------------
+1. Filesystem service
+
+- A filesystem is useful once path-based workflows matter.
+- It is not a prerequisite for the first shell if other real services are
+	already observable and controllable.
+
+2. Networking service
+
+- Not required for shell bring-up.
+
+3. Scripting and pipelines
+
+- Not required for the first shell.
+
+Required ownership split
+------------------------
+The shell design depends on a strict ownership split.
+
+Transport owner
+---------------
+- Owns console or serial framing.
+- Owns device-facing buffering and validation.
+- Owns malformed-frame handling at the device or transport boundary.
+- Does not own shell syntax.
+- Does not own peer-service semantics.
+
+Shell owner
+-----------
+- Owns command syntax.
+- Owns command classification.
+- Owns routing from shell-visible syntax to service requests.
+- Owns local presentation and formatting policy.
+- May own local session conveniences such as prompt rendering or help text.
+- Does not own peer-service state semantics.
+
+Peer-service owners
+-------------------
+- Own their own request meaning.
+- Own their own retained state.
+- Own their own failure and restart consequences.
+- Own their own reply meaning.
+
+Init or boot owner
+------------------
+- Owns fixed boot installation and initial authority wiring.
+- Owns explicit restart wiring when restart exists.
+- Does not disappear behind a supervisor framework in this design band.
+
+Semantic execution model
+------------------------
+The general shell execution model is:
+
+1. read one validated input unit
+2. parse into one shell command
+3. classify the target service and method
+4. build one explicit request value
+5. perform one synchronous service call
+6. receive one explicit success value or explicit error value
+7. render the result without inventing hidden semantics
+
+Normative rules for execution
+-----------------------------
+- Every shell command that mutates or queries system state SHALL correspond to
+	one explicit service request.
+- The shell SHALL NOT smuggle system actions through ad hoc side channels.
+- The shell MAY support local meta-commands such as `help` or `exit`, but
+	such commands SHALL remain strictly local to the shell session and SHALL NOT
+	impersonate service semantics.
+- The shell SHALL make any distinction between local meta-commands and service
+	commands visible in the design and implementation.
+
+Normative semantic IPC contract
+-------------------------------
+The general service-shell profile SHALL rely on one semantic operation:
+
+`call(service_name, method_name, request_value) -> Result<Value, Error>`
+
+This is a semantic contract, not a demand that the kernel syscall layer adopt
+this exact surface syntax.
+The kernel boundary may remain a lower-level byte-plus-capability transport as
+described by `veya_sys_interface_v0.txt`.
+What the shell requires is a stable semantic model above that transport.
+
+Request and response envelopes
+------------------------------
+The normative semantic shape is:
+
+Request:
+
+```
+Request {
+		service: string
+		method:  string
+		body:    Value
+}
+```
+
+Response:
+
+```
+Response {
+		result: Result<Value, Error>
+}
+```
+
+Value model
+-----------
+The general service-shell profile SHOULD use a small closed data model:
+
+```
+Value =
+		| Null
+		| Bool
+		| Int
+		| String
+		| List<Value>
+		| Map<String, Value>
+```
+
+Normative rules for `Value`
+---------------------------
+- The shell SHALL treat returned values as structured data, not as opaque text
+	blobs.
+- Services SHOULD describe request and reply payloads using only this closed
+	value model when participating in the general service-shell profile.
+- The shell SHALL NOT require custom per-service dynamic types in order to
+	execute the core service shell.
+- Binary blobs, streaming handles, or user-defined schemas MAY be added later,
+	but they are not part of the core shell contract.
+
+Result and error model
+----------------------
+All service responses in the general service-shell profile SHALL be explicit
+results:
+
+```
+Result<T, E> =
+		| Ok(T)
+		| Err(E)
+
+Error {
+		code: string
+		message: string
+		data: Value
+}
+```
+
+Normative error rules
+---------------------
+- Errors SHALL be returned as data, not as hidden exceptions.
+- Error codes SHOULD be stable and machine-meaningful.
+- Error messages SHOULD be human-readable.
+- Optional structured error data MAY carry service-specific details.
+- The shell SHALL present error results without inventing success semantics.
+
+Memory and ownership model for the semantic profile
+--------------------------------------------------
+The shell contract must remain compatible with explicit ownership.
+The preferred value model is arena-backed.
+
+Normative memory rules
+----------------------
+- Request storage SHALL be caller-owned.
+- Response storage SHOULD be allocated from caller-provided arena or region
+	storage.
+- The IPC layer SHALL NOT require per-object hidden heap ownership.
+- Lists and maps SHOULD be represented as bounded views over caller-visible
+	storage rather than as opaque runtime objects.
+
+Reference C-style semantic structs
+----------------------------------
+The following shapes are normative as a reference model for the general
+service-shell profile, though exact source syntax may differ in Modern C.
+
+```c
+typedef struct {
+		const char* data;
+		size_t len;
+} mc_str;
+
+typedef enum {
+		MC_VAL_NULL = 0,
+		MC_VAL_BOOL,
+		MC_VAL_INT,
+		MC_VAL_STRING,
+		MC_VAL_LIST,
+		MC_VAL_MAP,
+} mc_value_tag;
+
+typedef struct mc_value mc_value;
+
+typedef struct {
+		size_t len;
+		mc_value* items;
+} mc_list;
+
+typedef struct {
+		mc_str* keys;
+		mc_value* values;
+		size_t len;
+} mc_map;
+
+struct mc_value {
+		mc_value_tag tag;
+		union {
+				int64_t v_int;
+				bool v_bool;
+				mc_str v_str;
+				mc_list v_list;
+				mc_map v_map;
+		} as;
+};
+
+typedef struct {
+		mc_str code;
+		mc_str message;
+		mc_value data;
+} mc_error;
+
+typedef enum {
+		MC_RES_OK = 0,
+		MC_RES_ERR,
+} mc_result_tag;
+
+typedef struct {
+		mc_result_tag tag;
+		union {
+				mc_value ok;
+				mc_error err;
+		} as;
+} mc_result;
+
+typedef struct {
+		mc_str service;
+		mc_str method;
+		mc_value body;
+} mc_request;
+
+typedef struct {
+		mc_result result;
+} mc_response;
+
+typedef struct {
+		void* (*alloc)(size_t size, void* ctx);
+		void* ctx;
+} mc_arena;
+```
+
+Transport abstraction rule
+--------------------------
+The shell SHALL depend on a call abstraction, not on the details of UART,
+endpoints, message queues, or future transport revisions.
+
+That means:
+
+- the shell may build `Request` and consume `Response`
+- the shell may call one transport adapter
+- the shell SHALL NOT depend on whether the lower layer is implemented with
+	syscalls, in-process dispatch, queues, shared memory, or another explicit
+	transport
+
+This preserves shell stability while the kernel evolves.
+
+Service discovery rule
+----------------------
+The design distinguishes two profiles.
+
+Bootstrap profile
+-----------------
+- Fixed boot wiring is sufficient.
+- The shell may route only to a fixed admitted service set.
+- Dynamic discovery is not required.
+
+General service-shell profile
+-----------------------------
+- The system SHOULD expose one well-known service registry.
+- The minimum registry surface SHOULD be:
+
+```
+service.list() -> List<String>
+service.describe(name) -> Map<String, Value>
+```
+
+- The shell SHOULD use this service for introspection rather than hardcoding
+	an ever-growing service table.
+
+Process and retained-state service guidance
+-------------------------------------------
+Before declaring the broader service shell complete, the system SHOULD expose
+at least the following command-worthy services:
+
+1. `proc`
+	 - `proc.list`
+	 - `proc.spawn`
+	 - optional early `proc.kill`
+
+2. `log`
+	 - `log.read` or `log.tail`
+	 - optional `log.append` if the system wants shell-driven test writes
+
+3. `kv`
+	 - `kv.get`
+	 - `kv.set`
+	 - optional `kv.list`
+
+4. `service`
+	 - `service.list`
+	 - `service.describe`
+
+5. `fs`
+	 - optional for the first usable shell
+
+This ordering is intentional.
+For Veya, retained-state and observability services are more important than
+waiting for a full filesystem before the shell becomes real.
+
+Bootstrap shell profile
+-----------------------
+The current repository already proves one narrower shell profile.
+That bootstrap profile is normative for the landed bounded interactive slice.
+
+Bootstrap shell profile rules
+-----------------------------
+1. The shell is a distinct owner from transport.
+2. The shell operates over a bounded four-byte request payload.
+3. The shell vocabulary is fixed and deterministic.
+4. The shell routes only to the fixed admitted services.
+5. Reply semantics remain service-local even though shell routing is fixed.
+6. No discovery, scripting, or pipeline semantics are implied.
+
+Current admitted bounded vocabulary
+-----------------------------------
+The landed bootstrap shell vocabulary is:
+
+- `ECxy -> echo <text>`
+- `LAx! -> log append <text>`
+- `LT!! -> log tail`
+- `KSkv -> kv set <key> <value>`
+- `KGk! -> kv get <key>`
+
+Current admitted bounded graph
+------------------------------
+The landed bootstrap graph is:
+
+`UART -> serial_service -> shell_service -> { echo_service, log_service, kv_service }`
+
+Normative truth about the bootstrap profile
+-------------------------------------------
+- This profile is real and repository-proved.
+- This profile does not yet constitute a general service shell.
+- This profile intentionally freezes routing, message width, and service set.
+- Later work SHALL NOT mislabel this bounded profile as proof of dynamic
+	discovery, a shell language, or a generic service framework.
+
+Shell-local commands versus service commands
+--------------------------------------------
+The shell may provide a very small set of local session commands.
+If it does, all of the following SHALL hold:
+
+- local commands SHALL be explicitly documented as local
+- local commands SHALL NOT mutate peer-service state except through the same
+	service call path available to normal commands
+- local commands SHALL NOT require privileged bypass capability unavailable to
+	other actors with the same authority
+
+Examples of admissible local commands:
+
+- `help`
+- `exit`
+- purely local formatting mode toggles
+
+Examples of inadmissible shell shortcuts:
+
+- a shell-only hidden process inspector that bypasses `proc`
+- a shell-only filesystem read path that bypasses `fs`
+- a shell-only privileged restart path that bypasses the explicit restart
+	owner
+
+Presentation rules
+------------------
+The shell is allowed to format structured replies for humans, but it SHALL
+preserve semantic truth.
+
+That means:
+
+- a successful service reply may be rendered compactly or prettily
+- an error SHALL remain visibly an error
+- the shell SHALL NOT suppress key reply facts such as found-state,
+	unavailable-state, or restart-visible emptiness when those facts are part of
+	the service contract
+
+Evolution rules
+---------------
+The shell may evolve in stages, but the following ordering constraints are
+normative.
+
+1. First stabilize the small service slice.
+
+- console or serial transport
+- synchronous request-reply IPC
+- fixed or registry-backed service naming
+- observability service such as `log`
+- retained-state service such as `kv`
+
+2. Then widen command ergonomics.
+
+- line editing
+- richer formatting
+- command aliases
+- help and describe flows
+
+3. Only later consider richer composition.
+
+- pipelines over structured values
+- streaming replies
+- background execution
+- script files
+
+The shell SHALL NOT widen into a scripting runtime before the service boundary
+itself is stable.
+
+Explicit prohibitions
+---------------------
+The shell design forbids the following in this architecture band:
+
+- a kernel-owned shell framework
+- a dynamic broker hidden behind shell commands
+- ambient authority in the shell
+- service semantics hidden in transport code
+- transport framing hidden in shell code
+- shell commands that bypass the normal service boundary for real system work
+- a requirement that the filesystem be complete before the shell is admitted
+
+Conformance
+-----------
+A shell implementation conforms to the Veya bootstrap shell profile if all of
+the following hold:
+
+- it preserves transport versus shell versus service ownership boundaries
+- it uses the fixed bounded vocabulary and fixed admitted service graph
+- it returns explicit service-local success or failure consequences
+- it does not claim dynamic discovery, pipelines, or a generic framework
+
+A shell implementation conforms to the broader Veya service-shell profile if
+all of the following hold:
+
+- it treats real system commands as explicit service calls
+- it depends on synchronous request-reply with explicit `Result<Value, Error>`
+	semantics
+- it preserves the ownership split defined above
+- it requires no ambient authority or shell-only privileged bypass
+- it makes the system observably usable before filesystem completeness
+
+Summary judgment
+----------------
+The Veya shell should be designed as a small service-oriented control surface,
+not as a privileged monolith and not as a Unix clone.
+
+Its first duty is to make the system observable and controllable through the
+same explicit boundaries the OS claims to value.
+
+For the current repository slice, that means preserving the landed bounded
+`serial_service -> shell_service -> { echo, log, kv }` system honestly.
+
+For the broader intended system, that means evolving toward a shell that can
+issue explicit synchronous service calls over a small structured value model,
+with process, registry, log, and key-value services taking priority over a
+premature full filesystem requirement.

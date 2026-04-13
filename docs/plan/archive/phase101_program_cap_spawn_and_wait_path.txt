@@ -45,7 +45,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names Phase 101 as the next point
+- The speculative Veya kernel roadmap names Phase 101 as the next point
   where the repository should turn the landed syscall boundary into one honest
   spawn-and-wait path.
 - The repository already had one bounded init image descriptor, one consumed-
@@ -102,7 +102,7 @@ wait-handle observation path.
 
 What this phase proves
 ----------------------
-- one real Canopus kernel artifact can now consume one explicit launchable
+- one real Veya kernel artifact can now consume one explicit launchable
   program capability and turn it into one bounded child process, task, and
   address-space record
 - the parent receives one explicit wait handle rather than relying on ambient
@@ -177,7 +177,7 @@ Non-goals
   bounded init image
 - init-owned service launch, namespace policy, or broader running-kernel
   claims
-- claiming a complete Canopus kernel slice or broader target support
+- claiming a complete Veya kernel slice or broader target support
 
 Implemented slice
 -----------------
@@ -203,7 +203,7 @@ Implemented slice
   inspects merged MIR for imported spawn and wait types plus explicit global-
   state lowering for wait-handle and child lifecycle state
 - refreshed the kernel README, agent map, tool-test notes, backlog, decision
-  log, and speculative Canopus kernel roadmap so the repository now records
+  log, and speculative Veya kernel roadmap so the repository now records
   Phase 101 as concrete and leaves Phase 102 as the next remaining timer-
   backed blocking owner
 

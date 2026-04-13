@@ -9,7 +9,7 @@ Purpose
 -------
 Continue from the completed Phase 126 authority lifetime classification step
 by proving one explicit service-death observation path over the same already-
-landed Canopus kernel artifact.
+landed Veya kernel artifact.
 
 This document is both the Phase 128 execution note and its closeout.
 It does not claim restart policy, service replacement, partial-failure
@@ -165,7 +165,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 128 is complete as a service death observation step.
-The repository still claims only one bounded small Canopus running-system
+The repository still claims only one bounded small Veya running-system
 plateau, but that plateau now includes one explicit proof that a bounded
 service disappearance is observable through the landed wait-handle path while
 the kernel stays free of supervision and restart policy, and the compiler

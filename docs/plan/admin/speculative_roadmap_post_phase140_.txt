@@ -1,4 +1,4 @@
-Phase 141 Through Phase 145 -- Speculative Post-Phase-140 Canopus Roadmap
+Phase 141 Through Phase 145 -- Speculative Post-Phase-140 Veya Roadmap
 =========================================================================
 
 Status
@@ -14,7 +14,7 @@ This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
 It does not replace the concrete Phase 109 through Phase 140 execution and
 closeout notes.
-It gives one plausible ordering for the next Canopus wave if the repository
+It gives one plausible ordering for the next Veya wave if the repository
 keeps following the same evidence-first rules used so far:
 
 - one bounded real system pressure point at a time
@@ -38,12 +38,12 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/active/phase139_conditional_subsystem_rebuild_decision.txt`
 - `docs/plan/active/phase140_serial_ingress_composed_service_graph.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
-- `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
-- `docs/arch/canopus/canopus_lite_v0.txt`
-- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
-- `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
-- `docs/arch/canopus/canopus_sys_interface_v0.txt`
-- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
+- `docs/arch/veya/canopus_kernel_endstate_arch.txt`
+- `docs/arch/veya/canopus_lite_v0.txt`
+- `docs/arch/veya/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/veya/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/veya/canopus_sys_interface_v0.txt`
+- `docs/arch/veya/canopus_syscall_mapping_v0.txt`
 
 If those notes define the current admitted slice, the landed authority,
 failure, IPC, UART, fatal-path, rebuild-deferral, and serial-ingress
@@ -69,11 +69,11 @@ Repository numbering note
 - Phase 140 is occupied by the concrete serial-ingress composed service graph.
 - Proposed compiler planning still reserves Phase 127 for
   `docs/plan/active/phase127_project_mode_multi_file_modules.txt`.
-- The next speculative Canopus continuation therefore starts at Phase 141.
+- The next speculative Veya continuation therefore starts at Phase 141.
 
 Repository status note
 ----------------------
-- The repository can now honestly claim one bounded running Canopus kernel and
+- The repository can now honestly claim one bounded running Veya kernel and
   one bounded running service system with explicit authority, bounded failure,
   bounded IPC composition, bounded UART ingress, one compiler-known fatal
   path, and one richer serial-ingress route over the real kernel artifact.

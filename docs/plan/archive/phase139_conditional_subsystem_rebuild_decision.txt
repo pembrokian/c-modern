@@ -7,7 +7,7 @@ DEFERRED
 
 Purpose
 -------
-Decide whether the repository should spend the next Canopus step on a
+Decide whether the repository should spend the next Veya step on a
 subsystem rebuild after the landed Phase 131 through Phase 138 stress and
 follow-through wave.
 

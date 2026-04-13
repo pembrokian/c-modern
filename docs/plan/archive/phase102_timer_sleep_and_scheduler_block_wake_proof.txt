@@ -45,7 +45,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names timer-backed blocking as the
+- The speculative Veya kernel roadmap names timer-backed blocking as the
   next remaining owner after the landed spawn-and-wait path.
 - The repository already had explicit process, task, wait-handle, endpoint,
   and syscall state, plus a deterministic child exit path, but it still had no
@@ -101,7 +101,7 @@ wake path.
 
 What this phase proves
 ----------------------
-- one real Canopus kernel artifact can now block one child task with one
+- one real Veya kernel artifact can now block one child task with one
   explicit sleep request and one bounded monotonic timer source
 - the sleep request returns deterministic `WouldBlock` behavior while the
   child is blocked
@@ -170,7 +170,7 @@ Non-goals
   bounded first slice
 - init-owned service launch, namespace policy, or broader running-kernel
   claims
-- claiming a complete Canopus kernel slice or broader target support
+- claiming a complete Veya kernel slice or broader target support
 
 Implemented slice
 -----------------
@@ -194,7 +194,7 @@ Implemented slice
   inspects merged MIR for imported sleep-request and wake-observation types
   plus explicit global-state lowering for timer state
 - refreshed the kernel README, agent map, freestanding test notes, backlog,
-  decision log, and speculative Canopus kernel roadmap so the repository now
+  decision log, and speculative Veya kernel roadmap so the repository now
   records Phase 102 as concrete and leaves Phase 103 as the next remaining
   owner
 

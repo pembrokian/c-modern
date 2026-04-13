@@ -9,8 +9,8 @@ Purpose
 -------
 Turn the completed Phase 81 through Phase 94 freestanding proof ladder into
 the first honest admitted freestanding `v0.3` slice statement so the
-repository can describe what that Canopus-driven wave now supports without
-implying full Canopus Lite completion, broad non-hosted workflow support,
+repository can describe what that Veya-driven wave now supports without
+implying full Veya Lite completion, broad non-hosted workflow support,
 broad target expansion, or a reopened core-language redesign.
 
 This document is both the Phase 95 execution note and its closeout.
@@ -38,9 +38,9 @@ Repository status note
 
 Problem being solved
 --------------------
-- The repository now has a real bounded Canopus-driven freestanding wave, but
+- The repository now has a real bounded Veya-driven freestanding wave, but
   public support wording still risked underselling that result as only a
-  scattered proof set or overselling it as broad freestanding or Canopus
+  scattered proof set or overselling it as broad freestanding or Veya
   support.
 - The existing freestanding support note was correctly separate from the
   hosted `v0.2` note, but it still needed one final tightening step so the
@@ -133,7 +133,7 @@ Exit criteria
 Non-goals
 ---------
 - adding a new freestanding command beyond the admitted `mc build` proof path
-- claiming full Canopus Lite completion, namespace policy, or general service
+- claiming full Veya Lite completion, namespace policy, or general service
   frameworks
 - admitting broad target support, cross-compilation, multi-architecture
   packaging, or broader linker control
@@ -146,7 +146,7 @@ Implemented slice
   admitted freestanding `v0.3` slice
 - refreshed `docs/plan/freestanding_support_statement.txt` so it now speaks in
   terms of the first admitted freestanding `v0.3` slice, keeps the proof set
-  frozen at Phase 81 through Phase 94, and names full Canopus completion,
+  frozen at Phase 81 through Phase 94, and names full Veya completion,
   broad target support, broader non-hosted workflows, and language redesign as
   still deferred
 - refreshed README and the hosted release-hardening note so they point to the
@@ -161,7 +161,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 95 is complete as a freestanding `v0.3` slice audit. The repository
-still does not claim full Canopus Lite completion, broad non-hosted workflow
+still does not claim full Veya Lite completion, broad non-hosted workflow
 support, broad target or packaging support, or a reopened core-language wave,
 but it can now state the first admitted freestanding `v0.3` slice honestly,
 tie that statement directly to the Phase 81 through Phase 94 proof ladder,

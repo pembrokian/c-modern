@@ -8,7 +8,7 @@ IMPLEMENTED
 Purpose
 -------
 Take the completed freestanding proof ladder through the first honest
-end-to-end Canopus Lite demo: prove that one kernel-owned bring-up path can
+end-to-end Veya Lite demo: prove that one kernel-owned bring-up path can
 boot init, launch one log service, launch one echo service, launch one client,
  wake that client from one deterministic timer-backed block, route one bounded
 request-and-reply exchange, and preserve one deterministic boot log of the
@@ -18,7 +18,7 @@ layer, scheduler runtime, or full operating-system completion claim.
 This document is both the Phase 94 execution note and its closeout.
 It does not claim general service discovery, richer scheduler policy, multiple
 clients, multiple services per role, restart policy, namespace rewriting,
-packaging, or full Canopus Lite completion.
+packaging, or full Veya Lite completion.
 
 Repository status note
 ----------------------
@@ -35,13 +35,13 @@ Repository status note
 - Phase 93 then proved that one explicit timer-backed wait can wake one
   blocked worker at one deterministic tick and publish one explicit wake
   observation without widening into a public timer or interrupt framework.
-- The next strongest Canopus question was no longer whether the individual
+- The next strongest Veya question was no longer whether the individual
   proof ingredients could stay explicit. It was whether one small first-system
   bring-up slice could compose those ingredients honestly at the same time.
 
 Problem being solved
 --------------------
-- The Canopus Lite architecture note names a first system that can boot,
+- The Veya Lite architecture note names a first system that can boot,
   enter user space, launch a minimal service set, route one bounded request,
   and keep the kernel-mechanism versus user-space-policy story explicit.
 - The repository already had those ingredients in isolation, but no integrated
@@ -93,7 +93,7 @@ larger OS framework.
 
 What this phase proves
 ----------------------
-- the current language and toolchain can carry one integrated Canopus Lite
+- the current language and toolchain can carry one integrated Veya Lite
   bring-up slice that composes explicit launch capabilities, endpoint
   capabilities, timer wake, request-reply state, wait-handle observation, and
   deterministic logs through ordinary code
@@ -155,7 +155,7 @@ Non-goals
 - multiple clients, multiple request or reply exchanges, retries, or restart
   policy
 - a public timer, scheduler, spawn, or capability-runtime API
-- claiming full Canopus Lite completion, broader freestanding workflow
+- claiming full Veya Lite completion, broader freestanding workflow
   admission, or packaging support
 
 Implemented slice
@@ -176,12 +176,12 @@ Implemented slice
 - the README, freestanding support statement, backlog, decision log, focused
   freestanding support audit, and speculative `v0.3` roadmap now record Phase
   94 as the first concrete first-system demo integration proof while keeping
-  broader Canopus completion claims deferred
+  broader Veya completion claims deferred
 
 Closeout statement
 ------------------
 Phase 94 is complete as a first-system demo integration proof. The repository
-still does not claim full Canopus Lite completion, namespace policy,
+still does not claim full Veya Lite completion, namespace policy,
 service-discovery generality, scheduler policy, or broader freestanding
 workflow admission, but it now has one honest integrated bring-up story that
 composes the admitted kernel, init, service, timer, request-reply, and

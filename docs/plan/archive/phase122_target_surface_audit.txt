@@ -9,7 +9,7 @@ Purpose
 -------
 Continue from the completed Phase 121 kernel image-contract hardening step by
 publishing one explicit target-surface audit over the same already-landed
-Canopus kernel artifact.
+Veya kernel artifact.
 
 This document is both the Phase 122 execution note and its closeout.
 It does not claim a broader target-family admission, dynamic loading, a
@@ -86,7 +86,7 @@ What this phase proves
   runtime startup, and emitted image-input contract explicit
 - the current target claim still stops well short of dynamic loading,
   broader target-family admission, or compiler reopening
-- the repository can advance its published Canopus position without
+- the repository can advance its published Veya position without
   widening compiler or low-level ownership surfaces
 
 Deliverables
@@ -157,7 +157,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 122 is complete as a target-surface audit.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now has one explicit published target surface over the
 landed Phase 121 image contract, and the compiler stays closed because this
 phase needed publication and audit rather than new language or backend work.

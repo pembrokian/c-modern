@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Continue from the completed Phase 109 first running Canopus kernel slice
+Continue from the completed Phase 109 first running Veya kernel slice
 audit by making the current repository-owned kernel easier to evolve along
 real owner seams without widening the admitted running slice.
 
@@ -19,7 +19,7 @@ already admitted first running kernel slice.
 
 Repository status note
 ----------------------
-- Phase 109 closed the first running Canopus kernel slice support statement
+- Phase 109 closed the first running Veya kernel slice support statement
   over the landed repository-owned kernel artifact.
 - That slice was honest, but the root proof module still directly owned too
   many subsystem-local validation paths.
@@ -94,7 +94,7 @@ Deliverables
 - refreshed kernel-facing documentation and one focused Phase 110 freestanding
   kernel regression
 - one refreshed speculative continuation note that now treats Phase 110 as the
-  landed historical bridge into the next Canopus wave rather than as future
+  landed historical bridge into the next Veya wave rather than as future
   work
 
 Suggested execution order
@@ -148,6 +148,6 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 110 is complete as a kernel ownership split audit. The repository still
-claims only one bounded first running Canopus kernel slice, but that slice now
+claims only one bounded first running Veya kernel slice, but that slice now
 has clearer scheduler and debug ownership boundaries that are mechanically
 visible in the source tree, build artifacts, and regression surface.

@@ -53,7 +53,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names explicit user-to-user
+- The speculative Veya kernel roadmap names explicit user-to-user
   capability transfer as the next bounded user-policy owner after the landed
   real echo-service proof.
 - The repository already had the necessary ingredients spread across the
@@ -117,7 +117,7 @@ component to another with the smallest necessary syscall correction.
 
 What this phase proves
 ----------------------
-- one real Canopus kernel artifact now removes one transferred endpoint handle
+- one real Veya kernel artifact now removes one transferred endpoint handle
   from the sender on successful send and installs it only into the real
   receiver-local table at receive time
 - init can transfer one explicit endpoint capability to one spawned service
@@ -193,7 +193,7 @@ Non-goals
   routing policy
 - service restart policy, loader generalization, or a running general user-
   space system claim
-- claiming a complete Canopus kernel slice or broader target support
+- claiming a complete Veya kernel slice or broader target support
 
 Implemented slice
 -----------------
@@ -217,7 +217,7 @@ Implemented slice
   runs the repository-owned kernel target, expects the Phase 107 marker, and
   inspects merged MIR for preserved Phase 106 coverage plus explicit
   `transfer_service` helper-module records and functions
-- refreshed the speculative Canopus kernel roadmap, repository map, kernel
+- refreshed the speculative Veya kernel roadmap, repository map, kernel
   README, freestanding test notes, and decision log so the repository now
   records Phase 107 as concrete and shifts the next speculative owner upward
 

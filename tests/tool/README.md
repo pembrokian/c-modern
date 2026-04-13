@@ -28,10 +28,9 @@ Current structure
     `kernel/runtime/phase.../phase.toml` without shard dispatch.
     The top-level `kernel-synthetic` surface owns the standalone phases85-88
     proofs.
-  - `kernel/phase97_user_entry.cpp` through
-    `kernel/phase104_kernel_critique_hardening.cpp`: earlier focused
-    freestanding kernel proof files that still stand alone, with owned MIR
-    goldens under `kernel/runtime/legacy_goldens/`.
+  - `kernel/runtime/legacy_goldens/`: preserved early freestanding kernel MIR
+    proof slices kept for narrow regression reference alongside the active
+    descriptor-owned runtime surface.
   - `kernel/synthetic/suite.cpp`: early synthetic standalone-project proof owner for
     phases85-88.
   - late ownership-hardening kernel audits keep checked-in kernel goldens under
@@ -56,13 +55,13 @@ Layout rule
 - When a freestanding kernel audit needs structural ownership checks, prefer an
   adjacent projected MIR golden over raw source-text assertions if the merged
   MIR already preserves the relevant routed call or owner-local symbol.
-- Keep Canopus-facing execution proofs in this directory for now rather than
-  creating a separate `tests/tool/canopus/` subtree.
+- Keep Veya-facing execution proofs in this directory for now rather than
+  creating a separate `tests/tool/veya/` subtree.
 
 Validation rule
 
 - During focused iteration, run the narrowest owning tool test target.
-- For freestanding or Canopus-facing changes, prefer the narrowest owning freestanding surface first: `mc_tool_freestanding_bootstrap_unit`, `mc_tool_freestanding_kernel_runtime_unit`, `mc_tool_freestanding_kernel_synthetic_unit`, `mc_tool_freestanding_kernel_docs_unit`, `mc_tool_freestanding_kernel_artifacts_unit`, or `mc_tool_freestanding_system_unit`.
+- For freestanding or Veya-facing changes, prefer the narrowest owning freestanding surface first: `mc_tool_freestanding_bootstrap_unit`, `mc_tool_freestanding_kernel_runtime_unit`, `mc_tool_freestanding_kernel_synthetic_unit`, `mc_tool_freestanding_kernel_docs_unit`, `mc_tool_freestanding_kernel_artifacts_unit`, or `mc_tool_freestanding_system_unit`.
 - The top-level runtime/synthetic/docs/artifacts targets are the freestanding kernel workflow surfaces.
 - For targeted kernel debugging, prefer the top-level direct runtime selector such as `build/debug/bin/mc_tool_freestanding_tests /Users/ro/dev/c_modern /Users/ro/dev/c_modern/build/debug kernel-runtime:phase106_real_echo_service_request_reply`.
   For standalone synthetic proofs, use `kernel-synthetic:<label>`.

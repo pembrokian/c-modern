@@ -9,7 +9,7 @@ Purpose
 -------
 Continue from the completed Phase 120 running-system support statement by
 publishing one explicit kernel image-contract hardening step over the same
-already-landed Canopus kernel artifact.
+already-landed Veya kernel artifact.
 
 This document is both the Phase 121 execution note and its closeout.
 It does not claim a broader loader model, dynamic discovery, dynamic loading,
@@ -89,7 +89,7 @@ What this phase proves
   explicit
 - the current image contract still stops well short of dynamic loading, a
   service manager, broader target-family admission, or compiler reopening
-- the repository can advance its published Canopus position without widening
+- the repository can advance its published Veya position without widening
   compiler or low-level ownership surfaces
 
 Deliverables
@@ -159,7 +159,7 @@ Implemented slice
 Closeout statement
 ------------------
 Phase 121 is complete as a kernel image-contract hardening step.
-The repository still claims only one bounded first running Canopus kernel
+The repository still claims only one bounded first running Veya kernel
 slice, but that slice now has one explicit published image contract over the
 landed Phase 120 running-system support statement, and the compiler stays
 closed because this phase needed publication and audit rather than new

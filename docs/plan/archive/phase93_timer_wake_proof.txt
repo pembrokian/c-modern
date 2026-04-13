@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from the first explicit user-space
+Take the next Veya-driven `v0.3` proof from the first explicit user-space
 lifecycle anchor into the first narrow event-source proof: prove that one
 explicit timer-owned wake path can unblock one waiting task and publish one
 deterministic wake observation without widening into a public timer API,
@@ -48,14 +48,14 @@ Repository status note
 - Phase 92 then proved that init can launch one child from one explicit
   program capability and observe one child exit through one explicit wait
   handle.
-- The next strongest Canopus question was no longer whether one launch or
+- The next strongest Veya question was no longer whether one launch or
   wake-free lifecycle path could stay explicit. It was whether the first real
   event source beyond pure synchronous setup could stay equally narrow and
   honest.
 
 Problem being solved
 --------------------
-- The Canopus planning surface already names timer or interrupt delivery as a
+- The Veya planning surface already names timer or interrupt delivery as a
   required kernel mechanism, but the repository had not yet exercised any
   event-source proof on the freestanding lane.
 - Without one narrow wake proof, it would be too easy to blur later work into
@@ -180,7 +180,7 @@ Closeout statement
 ------------------
 Phase 93 is complete as a timer wake proof. The repository still does not
 claim a public timer API, general interrupt handling, scheduler policy, or
-full Canopus first-system integration, but it now has one honest proof that
+full Veya first-system integration, but it now has one honest proof that
 the admitted Modern C core and existing freestanding path can carry one
 explicit timer-owned wake source, one blocked worker, and one deterministic
 wake observation path directly in ordinary code.

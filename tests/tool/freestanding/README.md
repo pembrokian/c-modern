@@ -1,6 +1,6 @@
 # Freestanding Tool Tests
 
-This subtree contains the repository-owned freestanding and Canopus-facing tool
+This subtree contains the repository-owned freestanding and Veya-facing tool
 proofs.
 
 Structure
@@ -14,16 +14,14 @@ Structure
     surfaces now load their owned checks from descriptor directories under
     `kernel/runtime/...`, `kernel/docs/...`, and
     `kernel/artifact_specs/...`.
-  - `phase97_user_entry.cpp`: real-kernel address-space and first-user-entry proof.
-  - `phase98_endpoint_handle_core.cpp`: real-kernel endpoint-and-handle-core proof.
-  - `phase99_syscall_byte_ipc.cpp` through `phase104_kernel_critique_hardening.cpp`: earlier focused real-kernel proof files that still stand alone, with owned MIR goldens under `runtime/legacy_goldens/`.
+  - `runtime/legacy_goldens/`: preserved early real-kernel MIR proof slices kept for narrow regression reference while the active runtime surface stays descriptor-owned.
   - `synthetic/suite.cpp`: standalone synthetic proof owner for phases85-88.
 - `system/suite.cpp`: init, user-space policy, timer wake, and first-system
   integration proofs.
 
 Late kernel audit pattern
 
-- For ownership-hardening kernel audits, keep checked-in per-phase descriptors under `kernel/runtime/phase.../` with adjacent run and projected MIR expectations, keep the earlier standalone runtime MIR goldens under `kernel/runtime/legacy_goldens/`, and keep artifact expectations adjacent to `kernel/artifact_specs/.../artifact.toml`.
+- For ownership-hardening kernel audits, keep checked-in per-phase descriptors under `kernel/runtime/phase.../` with adjacent success-exit run metadata and projected MIR expectations, keep the earlier standalone runtime MIR goldens under `kernel/runtime/legacy_goldens/`, and keep artifact expectations adjacent to `kernel/artifact_specs/.../artifact.toml`.
 - Treat shard1 phases85-88 as a separate synthetic-project proof surface rather
   than part of the shared runtime descriptor contract. They write standalone
   projects and, in phase88, own an explicit relink proof.
@@ -39,8 +37,7 @@ Late kernel audit pattern
   `kernel/runtime/phase.../phase.toml` directory over another large
   static C++ table.
 - Runtime-folder kernel phases now own execution metadata in `phase.toml`
-  (`output_stem`, `build_context`, and `run_context`) in addition to run and
-  MIR golden references.
+  (`output_stem`, `build_context`, `run_context`, and `run_contract`) in addition to MIR golden references.
 - Runtime-folder kernel phases now also declare the explicit MIR contract
   `mir_contract = "first-match-projection-v1"` in `phase.toml`.
 - Use `ExpectMirFirstMatchProjectionFile` from `tests/tool/tool_suite_common.*`

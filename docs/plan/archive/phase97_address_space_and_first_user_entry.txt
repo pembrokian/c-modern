@@ -35,7 +35,7 @@ Repository status note
 
 Problem being solved
 --------------------
-- The speculative Canopus kernel roadmap names Phase 97 as the first point
+- The speculative Veya kernel roadmap names Phase 97 as the first point
   where the repository should turn boot-state truth into one bounded
   address-space and user-entry path.
 - The repository already had explicit boot-owned kernel state and a bounded
@@ -87,7 +87,7 @@ service work. It is one bounded address-space and first-user-entry path.
 
 What this phase proves
 ----------------------
-- one real Canopus kernel artifact can now move from boot-only state seeding
+- one real Veya kernel artifact can now move from boot-only state seeding
   into one explicit user-entry handoff
 - the current language, freestanding build path, and runtime startup can carry
   one kernel-owned address-space object, two explicit mappings, and one saved
@@ -166,7 +166,7 @@ Implemented slice
   Phase 97 marker, and inspects merged MIR for the new address-space and user-
   entry lowering surface
 - refreshed the kernel README, agent map, testing notes, decision log,
-  backlog, and speculative Canopus kernel roadmap so the repository records
+  backlog, and speculative Veya kernel roadmap so the repository records
   Phase 97 as concrete and leaves Phase 98 as the next remaining kernel
   object-core owner
 

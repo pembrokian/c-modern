@@ -120,6 +120,6 @@ Newly admitted narrow `hal` bootstrap surface:
   `hal.memory_barrier()`, `hal.volatile_load<T>(...)`, and
   `hal.volatile_store<T>(...)`
 - this surface is intentionally target-oriented and non-portable by design; it
-  exists so early freestanding or Canopus-oriented proofs can express MMIO,
+  exists so early freestanding or Veya-oriented proofs can express MMIO,
   activation barriers, and volatile traffic without pushing that ownership
   into `mem` or `sync`

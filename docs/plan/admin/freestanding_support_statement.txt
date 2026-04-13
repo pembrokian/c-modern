@@ -163,7 +163,7 @@ explicit freestanding manifest identity, explicit startup selection, optional
 manifest-owned extra link inputs, and the narrow public `hal` MMIO surface
 proved through the Phase 81 through Phase 94 tool regressions.
 
-the repository still does not claim full Canopus Lite completion.
+the repository still does not claim full Veya Lite completion.
 
 The repository still does not claim broader
 freestanding workflow admission, namespace policy, scheduler policy, or

@@ -7,7 +7,7 @@ IMPLEMENTED
 
 Purpose
 -------
-Take the next Canopus-driven `v0.3` proof from kernel message representation
+Take the next Veya-driven `v0.3` proof from kernel message representation
 into the first explicit lifecycle check: prove that one minimal create,
 ready, exit, and wait path can be modeled at the kernel boundary with
 ordinary Modern C enums, structs, and functions rather than with a new `sys`
@@ -27,13 +27,13 @@ Repository status note
 - Phase 85 then proved that one bounded endpoint queue and message-buffer
   shape can already be expressed through ordinary Modern C structs, enums,
   arrays, and pointer-based mutation on the same freestanding path.
-- The next strongest Canopus proof was no longer queue representation alone.
+- The next strongest Veya proof was no longer queue representation alone.
   It was whether the admitted core language could carry one honest task
   lifecycle path without reopening parser, sema, MIR, or runtime-policy work.
 
 Problem being solved
 --------------------
-- The Canopus proof ladder names child-task lifecycle as the next minimal
+- The Veya proof ladder names child-task lifecycle as the next minimal
   kernel mechanism after endpoint representation, but the repository had not
   yet exercised that shape in a real proof.
 - Without one concrete lifecycle proof, it would be too easy to speculate

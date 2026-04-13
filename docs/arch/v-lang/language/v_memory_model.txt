@@ -1,0 +1,189 @@
+V - Memory And Ownership Model
+
+Purpose
+
+This document defines the intended default memory model for V.
+
+Primary goal
+
+V should make memory behave the same way the operating-system architecture
+wants messages and resources to behave:
+- owned by default
+- explicitly transferred
+- not shared by accident
+
+This model is chosen because V is intended for long-lived system services
+where:
+- latency matters
+- ownership transfer is common
+- zero-copy paths matter for larger payloads
+- hidden GC behavior would be an architectural mismatch
+
+1. Default rule
+
+Values are owned by default.
+
+This means:
+- each owned value has one current owner
+- using a transfer operation moves ownership to a new place
+- the previous owner may no longer use the moved value
+
+Assignment rule
+
+The default design direction is:
+- assignment moves owned values unless the value's type is explicitly copyable
+- explicit copy operations should exist for types where copying is valid and
+  intended
+
+The language should avoid:
+- implicit deep copies for ordinary aggregates
+- default shared ownership
+
+2. Copyable versus move-only values
+
+V should distinguish between:
+- trivially copyable values, such as small scalar types
+- owned values, such as buffers, channels, handles, and other resource-bearing
+  aggregates
+
+Early rule of thumb:
+- scalars may be copied freely
+- resource-bearing aggregates move by default
+
+The exact surface syntax can be decided later, but the semantic distinction
+should be present from the start.
+
+3. Borrowing
+
+V should support borrowing, but in a deliberately simpler form than the full
+Rust model.
+
+Borrowing goals:
+- allow efficient read access without transfer
+- allow local mutation when obviously exclusive
+- keep the rules teachable and implementation-bounded
+
+Desired posture:
+- immutable borrows are ordinary and cheap
+- mutable borrows are more restricted
+- borrow scopes should stay local and obvious
+- the language should avoid lifetime reasoning that dominates ordinary service
+  code
+
+Design bias:
+- if a choice must be made, prefer a simpler and more local borrow system even
+  if it rejects some programs a more sophisticated system could accept
+
+4. Destruction
+
+Owned values should be destroyed deterministically when they leave their owning
+scope, unless ownership has been transferred elsewhere.
+
+This implies:
+- no tracing GC is required for ordinary program execution
+- cleanup of buffers, handles, and other resources is predictable
+- shutdown and failure paths can be reasoned about explicitly
+
+The language may provide explicit destruction hooks for resource-bearing types,
+but those hooks must remain visible and ordinary rather than hidden runtime
+machinery.
+
+5. Regions and arenas
+
+V should support region-style or arena-style allocation as a first-class
+design tool.
+
+Reason:
+- request-scoped and message-scoped allocation is common in services
+- many service allocations have a clear bulk lifetime
+- bulk release is often simpler and more predictable than per-object teardown
+
+Recommended direction:
+- arenas are explicit values
+- allocation through an arena is explicit
+- freeing an arena invalidates values tied to that arena
+
+The language and runtime should make arena-backed service code natural rather
+than forcing every design into one-object-at-a-time ownership.
+
+6. Shared ownership
+
+Shared ownership should exist only as an explicit opt-in form.
+
+Design direction:
+- no implicit shared ownership
+- if reference counting exists, it should be visible in the type or constructor
+- the cost of sharing should be clear to readers and implementers
+
+Why:
+- the default operating-system shape wants transfer, not ambient sharing
+- shared ownership makes capability, buffer, and shutdown reasoning harder
+- explicit sharing keeps hot paths and architecture reviews honest
+
+7. No global tracing GC
+
+The current design direction is that V should not require a global tracing
+garbage collector.
+
+Why:
+- global tracing GC weakens ownership transfer as the default mental model
+- it complicates zero-copy and external buffer integration
+- it introduces runtime policy that is poorly matched to service latency goals
+
+This does not forbid carefully bounded runtime-managed helpers later, but the
+core language should not depend on a general tracing collector.
+
+8. Buffer and payload transfer
+
+V should make payload handoff natural.
+
+Examples of intended behavior:
+- sending a buffer across a channel transfers ownership
+- handing a payload to a protocol reply transfers ownership
+- passing a large owned object to another task should not imply a hidden copy
+
+The spec should make zero-copy transfer the natural fast path rather than an
+advanced escape hatch.
+
+9. Handles and capabilities
+
+Capability-bearing values and resource handles should behave like owned
+resources by default.
+
+Baseline rule:
+- creating, receiving, or transferring a handle is an ownership event
+- duplication, if allowed, must be explicit
+- borrowing a handle must not silently widen authority
+
+This aligns V memory rules with the eventual operating-system capability
+model.
+
+10. What the memory model must make easy
+
+V should make these patterns straightforward:
+- receive a request, mutate local state, and send a reply
+- allocate request-local temporary storage in an arena
+- move a large payload to a worker without copying it
+- keep immutable shared configuration data borrowed or explicitly shared
+- destroy resources deterministically during shutdown
+
+11. What the memory model should avoid
+
+V should avoid:
+- hidden heap allocation for ordinary values
+- hidden aliasing through ordinary assignment
+- default shared mutable state
+- a borrow system so expressive that protocol code becomes harder to read than
+  the protocol itself
+
+12. Summary
+
+The intended V memory model is:
+- ownership by default
+- moves as the normal transfer mechanism
+- explicit copies
+- simple local borrowing
+- deterministic destruction
+- arenas for bulk lifetimes
+- explicit shared ownership only when needed
+- no required global tracing GC
