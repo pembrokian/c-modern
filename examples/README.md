@@ -6,7 +6,7 @@ The example tree is staged for three roles:
 - `small/` for smoke-test programs used during compiler bring-up
 - `real/` for small real utilities used in later semantic pressure testing
 
-Current bootstrap canonical examples mirror the representative MIR fixtures under `tests/mir/` so Phase 4 close-out validation can point at concrete canonical sources outside the test harness itself.
+Current bootstrap canonical examples mirror the representative MIR fixtures under `tests/compiler/mir/` so Phase 4 close-out validation can point at concrete canonical sources outside the test harness itself.
 
 Current repository-specific admitted real projects:
 

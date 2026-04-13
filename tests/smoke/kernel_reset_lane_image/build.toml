@@ -1,0 +1,16 @@
+schema = 1
+project = "kernel-reset-lane-image"
+default = "app"
+
+[targets.app]
+kind = "exe"
+package = "app"
+root = "__KERNEL_NEW_SRC__/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.app.search_paths]
+modules = ["__KERNEL_NEW_SRC__"]
+
+[targets.app.runtime]
+startup = "default"

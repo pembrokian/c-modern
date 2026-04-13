@@ -153,3 +153,9 @@ Non-goals
 - widening into persistence, metrics infrastructure, or hosted observability
   tooling
 - reopening sema, MIR, backend, ABI, target, runtime, or `hal`
+
+kernel/ module admission
+------------------------
+Modules are added to `kernel/` only when THIS phase's audit forces them.
+See `kernel/README.md` for the full admission policy and per-module gates.
+Do not copy legacy implementations; follow the four-section standard.

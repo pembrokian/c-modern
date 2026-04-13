@@ -66,9 +66,9 @@ make select-tests
 
 ## Testing Conventions
 
-- `tests/parser`: parser fixtures and parse-fail diagnostics
-- `tests/sema`: semantic module dumps and semantic-fail diagnostics
-- `tests/mir`: MIR dumps and lowering failures
+- `tests/compiler/parser`: parser fixtures and parse-fail diagnostics
+- `tests/compiler/sema`: semantic module dumps and semantic-fail diagnostics
+- `tests/compiler/mir`: MIR dumps and lowering failures
 - `tests/tool`: driver and support-layer smoke/unit tests
 
 Active grouped regression layout:
@@ -90,7 +90,7 @@ Active grouped regression layout:
 - when adding a new freestanding kernel phase, update the owned runtime descriptor directory plus its goldens first, update `tests/tool/freestanding/kernel/synthetic/` only for the separate synthetic phases85-88 surface, and update `tools/select_tests.py` only if the new phase changes top-level surface ownership or adds a new surface such as synthetic, docs, or artifacts
 - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
 - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`: compatibility runners only, not the active implementation owners
-- `tests/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation
+- `tests/compiler/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation
 - primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`
 - grouped tool outputs now belong under semantic suite roots such as `build/debug/tool/workflow/...`
 - grouped codegen executable outputs now belong under semantic suite roots such as `build/debug/codegen/executable/core/...`, `build/debug/codegen/executable/stdlib/...`, and `build/debug/codegen/executable/project/...`

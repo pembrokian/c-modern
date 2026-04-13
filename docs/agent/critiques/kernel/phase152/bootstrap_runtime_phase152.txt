@@ -1,0 +1,332 @@
+kernel/src/bootstrap_runtime.mc — Phase 152 Architectural Review
+=================================================================
+
+FILE: kernel/src/bootstrap_runtime.mc  (~470 lines)
+PHASE: 152 — bootstrap execution infrastructure, spawn-and-wait,
+             address space setup, IPC bootstrapping
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL (code does not represent its own semantics correctly)
+  1. execute_program_cap_spawn_and_wait takes 12 parameters where
+     10 constitute unnamed kernel runtime state.
+  2. ChildExecutionResult is KernelRuntimeState hidden inside a result
+     envelope; the name misrepresents what it contains.
+  3. ChildExecutionSnapshot is rebuilt from scratch 8 times in the
+     same function body — a missing incremental update primitive.
+
+P2 — DESIGN INTEGRITY (organisational smells that will compound)
+  4. Magic score literals are used throughout the function body for
+     all post-operation checks.
+  5. build_scheduler_lifecycle_audit accepts 8 individual parameters
+     that are already bundled in ChildExecutionResult.
+  6. The result constructor child_execution_result is called 15+ times
+     with 11 arguments each.
+
+P3 — READABILITY / MAINTENANCE COST
+  7. empty_child_execution_snapshot() enumerates all 9 empty values
+     individually rather than composing from named empties.
+  8. All four address-space and IPC helper functions follow the same
+     local-state threading pattern without abstraction.
+
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL
+────────────────────────────────────────────────────────────────────────
+
+1. execute_program_cap_spawn_and_wait takes 12 parameters where
+   10 constitute unnamed kernel runtime state.
+
+The signature is:
+
+  func execute_program_cap_spawn_and_wait(
+      config: ChildExecutionConfig,
+      init_program_capability: capability.CapabilitySlot,
+      gate: syscall.SyscallGate,
+      process_slots: [3]state.ProcessSlot,
+      task_slots: [3]state.TaskSlot,
+      wait_tables: [3]capability.WaitTable,
+      ready_queue: state.ReadyQueue,
+      timer_state: timer.TimerState,
+      interrupts: interrupt.InterruptController,
+      last_interrupt_kind: interrupt.InterruptDispatchKind,
+      init_image: init.InitImage,
+      snapshot: ChildExecutionSnapshot) ChildExecutionResult
+
+Parameters 2–11 are the live kernel execution context: the syscall
+gate, process/task/wait table state, ready queue, timer, and interrupt
+controller.  They belong together as a typed unit.  They are not
+10 independent values — they are one kernel runtime state that happens
+to be decomposed at the call boundary.
+
+Every call site must name all 10 slots explicitly.  As the kernel
+context grows (e.g. adding DMA state, page-fault state), each new
+field must be threaded through every call site individually.
+
+The correct representation is a KernelRuntimeState struct:
+
+  struct KernelRuntimeState {
+      init_program_capability: capability.CapabilitySlot
+      gate: syscall.SyscallGate
+      process_slots: [3]state.ProcessSlot
+      task_slots: [3]state.TaskSlot
+      wait_tables: [3]capability.WaitTable
+      ready_queue: state.ReadyQueue
+      timer_state: timer.TimerState
+      interrupts: interrupt.InterruptController
+      last_interrupt_kind: interrupt.InterruptDispatchKind
+  }
+
+The function then takes (config, kernel_state, init_image, snapshot)
+— four parameters with coherent semantics.
+
+
+2. ChildExecutionResult is KernelRuntimeState hidden inside a result
+   envelope; the name misrepresents what it contains.
+
+  struct ChildExecutionResult {
+      init_program_capability: capability.CapabilitySlot
+      gate: syscall.SyscallGate
+      process_slots: [3]state.ProcessSlot
+      task_slots: [3]state.TaskSlot
+      wait_tables: [3]capability.WaitTable
+      ready_queue: state.ReadyQueue
+      timer_state: timer.TimerState
+      interrupts: interrupt.InterruptController
+      last_interrupt_kind: interrupt.InterruptDispatchKind
+      snapshot: ChildExecutionSnapshot
+      succeeded: u32
+  }
+
+The first 9 fields are the post-execution kernel runtime state —
+identical to what a KernelRuntimeState struct would contain.  The
+name "ChildExecutionResult" implies a result scoped to the child's
+execution, but it contains the full updated kernel state that the
+caller needs to continue operating.
+
+This naming hides the fact that the caller is getting back the kernel
+state it passed in, updated by the spawn-sleep-interrupt-wait sequence.
+A caller reading result.gate is reading the updated kernel gate state
+— not something specific to the child execution.  A caller reading
+result.process_slots is reading all process slots, not child slots.
+
+If ChildExecutionResult were renamed KernelRuntimeStateResult, or if
+the kernel state were embedded as a nested field, the structure would
+be honest about what it represents.
+
+
+3. ChildExecutionSnapshot is rebuilt from scratch 8 times in the
+   same function body.
+
+Every step in execute_program_cap_spawn_and_wait updates exactly one
+field of the snapshot, then reconstructs the entire 9-field struct:
+
+  // After spawn step:
+  next_snapshot = child_execution_snapshot(
+      new_translation_root,
+      spawn_result.child_address_space,
+      spawn_result.child_frame,
+      spawn_result.observation,
+      next_snapshot.sleep_observation,
+      next_snapshot.timer_wake_observation,
+      next_snapshot.wake_ready_queue,
+      next_snapshot.pre_exit_wait_observation,
+      next_snapshot.exit_wait_observation)
+
+  // After sleep step — same 9 args, only sleep_observation changes:
+  next_snapshot = child_execution_snapshot(
+      next_snapshot.translation_root,
+      next_snapshot.address_space,
+      next_snapshot.user_frame,
+      next_snapshot.spawn_observation,
+      sleep_result.observation,    // <-- only this changed
+      next_snapshot.timer_wake_observation,
+      next_snapshot.wake_ready_queue,
+      next_snapshot.pre_exit_wait_observation,
+      next_snapshot.exit_wait_observation)
+
+Each update passes 8 unchanged fields and 1 new value.  The
+reconstruction is repeated 8 times for 8 distinct lifecycle steps.
+Adding a 10th field to ChildExecutionSnapshot requires updating every
+reconstruction in the function body.
+
+The correct approach is per-field update helpers:
+
+  func snapshot_with_spawn(s: ChildExecutionSnapshot,
+      translation_root, address_space, user_frame, observation) ChildExecutionSnapshot
+  func snapshot_with_sleep(s: ChildExecutionSnapshot,
+      observation: syscall.SleepObservation) ChildExecutionSnapshot
+  func snapshot_with_timer_wake(s: ChildExecutionSnapshot,
+      observation: timer.TimerWakeObservation) ChildExecutionSnapshot
+  ...
+
+Each helper takes the existing snapshot and returns a copy with only
+the relevant field(s) changed.
+
+────────────────────────────────────────────────────────────────────────
+P2 — DESIGN INTEGRITY
+────────────────────────────────────────────────────────────────────────
+
+4. Magic score literals are used throughout the function body for all
+   post-operation checks.
+
+The function's post-operation verification uses score comparisons
+throughout:
+
+  if syscall.status_score(next_snapshot.spawn_observation.status) != 2
+  if syscall.status_score(next_snapshot.sleep_observation.status) != 4
+  if syscall.id_score(next_gate.last_id) != 32
+  if syscall.status_score(next_gate.last_status) != 4
+  if state.task_state_score(next_task_slots[2].state) != 8
+  if state.task_state_score(next_task_slots[2].state) != 4
+  if interrupt.dispatch_kind_score(next_last_interrupt_kind) != 2
+
+The values 2, 4, 8, 32 are scores for specific enum variants but their
+identity is not visible here.  A reader must cross-reference the score
+tables in state.mc, syscall.mc, and interrupt.mc to decode what each
+check means.
+
+The same problem appears in state.mc (finding 4 of that critique).
+Where direct enum comparison is possible, it should be used.  At
+minimum, a named constant or comment should identify the enum variant
+each score encodes.
+
+
+5. build_scheduler_lifecycle_audit accepts 8 individual parameters
+   that are already bundled in ChildExecutionResult.
+
+  func build_scheduler_lifecycle_audit(
+      config: ChildExecutionConfig,
+      init_image: init.InitImage,
+      process_slots: [3]state.ProcessSlot,
+      task_slots: [3]state.TaskSlot,
+      wait_tables: [3]capability.WaitTable,
+      ready_queue: state.ReadyQueue,
+      timer_state: timer.TimerState,
+      snapshot: ChildExecutionSnapshot) sched.LifecycleAudit
+
+The function is always called with fields taken directly from a
+ChildExecutionResult and a ChildExecutionConfig.  These 8 parameters
+are already organised in those two structs.  The function should
+accept (config, result) and extract the fields internally:
+
+  func build_scheduler_lifecycle_audit(
+      config: ChildExecutionConfig,
+      init_image: init.InitImage,
+      result: ChildExecutionResult) sched.LifecycleAudit
+
+
+6. The result constructor child_execution_result is called 15+ times
+   with 11 arguments each.
+
+Every early return and the final return in execute_program_cap_spawn_and_wait
+calls:
+
+  return child_execution_result(
+      next_init_program_capability,
+      next_gate,
+      next_process_slots,
+      next_task_slots,
+      next_wait_tables,
+      next_ready_queue,
+      next_timer_state,
+      next_interrupts,
+      next_last_interrupt_kind,
+      next_snapshot,
+      0)  // or 1 on success
+
+The 15+ identical argument lists obscure the only meaningful
+variation: the final succeeded flag.  When a KernelRuntimeState struct
+exists (see finding 1), all early returns simplify to:
+
+  return kernel_state_result(next_kernel_state, next_snapshot, 0)
+
+────────────────────────────────────────────────────────────────────────
+P3 — READABILITY / MAINTENANCE COST
+────────────────────────────────────────────────────────────────────────
+
+7. empty_child_execution_snapshot() enumerates all 9 empty values
+   individually.
+
+  func empty_child_execution_snapshot() ChildExecutionSnapshot {
+      return child_execution_snapshot(
+          mmu.empty_translation_root(),
+          address_space.empty_space(),
+          address_space.empty_frame(),
+          syscall.empty_spawn_observation(),
+          syscall.empty_sleep_observation(),
+          timer.TimerWakeObservation{ task_id: 0, deadline_tick: 0,
+                                      wake_tick: 0, wake_count: 0 },
+          state.empty_queue(),
+          syscall.empty_wait_observation(),
+          syscall.empty_wait_observation())
+  }
+
+The inline TimerWakeObservation literal deviates from the pattern used
+by all other empty values, which use module-provided empty constructors.
+If timer.mc gains an empty_timer_wake_observation() function, this line
+must be found and updated.  The inconsistency is the same as the
+zero_boot_records entry-15 problem in state.mc.
+
+
+8. All four address-space and IPC helper functions follow the same
+   local-state threading pattern without abstraction.
+
+construct_first_user_address_space, handoff_init_bootstrap_capability_set,
+transfer_to_first_user_entry, and bootstrap_endpoint_handle_core all:
+
+  - declare a set of next_* local variables cloned from parameters
+  - perform operations that update individual next_* variables
+  - check each update result and return early on failure
+  - return a result struct containing all next_* variables
+
+This is the same threading pattern as execute_program_cap_spawn_and_wait
+but applied across four separate functions.  The pattern is not
+inherently wrong (it is a consequence of value semantics), but the
+absence of any shared infrastructure for threading kernel state means
+each function independently manages 6–10 local variables with identical
+naming conventions and identical failure-return shapes.
+
+────────────────────────────────────────────────────────────────────────
+COMPOUND EFFECT
+────────────────────────────────────────────────────────────────────────
+
+Findings 1, 2, and 6 share a single root: there is no named type for
+"the live kernel execution context."  Without that type, every function
+that touches kernel state must accept each field separately, return each
+field separately, and construct the result struct 15 times per function.
+The absence of this type is the largest structural gap in this file.
+
+Finding 3 (snapshot reconstruction) is the same problem applied to
+the observation sub-state.  The snapshot is a mini-context that suffers
+the same absence of update helpers.
+
+Finding 4 (magic scores) is the same problem as in state.mc and
+syscall.mc.  The practice propagates into every consumer of those
+modules.  Fixing the score tables at their source (preferably replacing
+them with direct enum comparisons) fixes all downstream magic literals
+simultaneously.
+
+────────────────────────────────────────────────────────────────────────
+RECOMMENDED RESOLUTION ORDER
+────────────────────────────────────────────────────────────────────────
+
+1. Introduce KernelRuntimeState (or equivalent) as a struct grouping
+   the 9 kernel context fields.  Update execute_program_cap_spawn_and_wait
+   to accept and return this struct.  Update all call sites.
+
+2. Rename ChildExecutionResult or restructure it to embed
+   KernelRuntimeState as a named field.  The succeeded flag and snapshot
+   are the result-specific additions.
+
+3. Introduce per-field snapshot update helpers and replace the 8 full
+   reconstructions in execute_program_cap_spawn_and_wait.
+
+4. Update build_scheduler_lifecycle_audit to accept (config, init_image,
+   result) instead of 8 individual fields.
+
+5. Replace all score literal comparisons with direct enum comparisons
+   or at minimum named constants that identify the enum variant.
+
+6. Add timer.empty_timer_wake_observation() and use it in
+   empty_child_execution_snapshot() for consistency.

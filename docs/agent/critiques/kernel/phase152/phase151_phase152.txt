@@ -1,0 +1,317 @@
+kernel/src/bootstrap_services/11_phase151.mc — Phase 152 Architectural Review
+==============================================================================
+
+FILE: kernel/src/bootstrap_services/11_phase151.mc  (~150+ lines read)
+PHASE: 151–152 — late service system proof execution, rebuilt system
+                 command routing, shell command constants
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL (code does not represent its own semantics correctly)
+  1. LateServiceSystemProofInputs expands the 8 contract flags as
+     flat scalars instead of embedding LateServiceSystemContractFlags.
+  2. build_late_service_system_proof_inputs mechanically copies every
+     field from two input structs into one flat output struct.
+
+P2 — DESIGN INTEGRITY (organisational smells that will compound)
+  3. execute_late_service_system_proofs opens by manually constructing
+     two large execution state structs as inline literals.
+  4. build_late_rebuilt_system_state_with_retained_log and
+     build_late_rebuilt_system_state_with_fresh_log are near-duplicates
+     differing only in one argument.
+  5. execute_phase142_rebuilt_system_command and
+     execute_phase144_rebuilt_system_command wrap different routing
+     functions with identical boilerplate.
+
+P3 — READABILITY / MAINTENANCE COST
+  6. SHELL_COMMAND_* byte constants are defined here but the shell
+     command vocabulary they encode is not co-located with the command
+     dispatcher.
+  7. Phase150RebuiltSystemState is assembled and used here but its
+     type definition appears to live in a higher-numbered phase file.
+
+────────────────────────────────────────────────────────────────────────
+NOTE: PARTIAL PROGRESS
+────────────────────────────────────────────────────────────────────────
+
+LateServiceSystemContractFlags is already defined in this file:
+
+  struct LateServiceSystemContractFlags {
+      scheduler_contract_hardened: u32
+      lifecycle_contract_hardened: u32
+      capability_contract_hardened: u32
+      ipc_contract_hardened: u32
+      address_space_contract_hardened: u32
+      interrupt_contract_hardened: u32
+      timer_contract_hardened: u32
+      barrier_contract_hardened: u32
+  }
+
+This is exactly the type recommended in the main.mc critique (finding 4)
+and implemented as ProofContractFlags in bootstrap_proofs.mc.  The
+type exists at the service layer.  The gap is that LateServiceSystemProofInputs
+does not embed it — it re-expands the 8 fields as scalars.
+Completing the adoption is one struct-embed away.
+
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL
+────────────────────────────────────────────────────────────────────────
+
+1. LateServiceSystemProofInputs expands the 8 contract flags as flat
+   scalars instead of embedding LateServiceSystemContractFlags.
+
+  struct LateServiceSystemProofInputs {
+      phase137_audit: debug.Phase137OptionalDmaOrEquivalentAudit
+      scheduler_contract_hardened: u32      // \
+      lifecycle_contract_hardened: u32      //  |
+      capability_contract_hardened: u32     //  |  these 8 are
+      ipc_contract_hardened: u32            //  |  LateServiceSystemContractFlags
+      address_space_contract_hardened: u32  //  |
+      interrupt_contract_hardened: u32      //  |
+      timer_contract_hardened: u32          //  |
+      barrier_contract_hardened: u32        // /
+      boot_pid: u32
+      init_pid: u32
+      ... (24 more fields)
+  }
+
+LateServiceSystemContractFlags is defined in this same file.  The 8
+fields are its exact contents.  ProofInputs should embed it:
+
+  struct LateServiceSystemProofInputs {
+      phase137_audit: debug.Phase137OptionalDmaOrEquivalentAudit
+      contract_flags: LateServiceSystemContractFlags
+      boot_pid: u32
+      init_pid: u32
+      ... (24 remaining fields)
+  }
+
+The same inconsistency exists in main.mc (which uses 8 flat u32 fields)
+and in Phase108To116ProofInputs in bootstrap_proofs.mc.  This file is
+closest to fixing it — the struct exists here — but the ProofInputs
+type was not updated to use it.
+
+
+2. build_late_service_system_proof_inputs mechanically copies every
+   field from two input structs into one flat output struct.
+
+  func build_late_service_system_proof_inputs(
+      phase137_audit: debug.Phase137OptionalDmaOrEquivalentAudit,
+      contract_flags: LateServiceSystemContractFlags,
+      runtime_context: LateServiceSystemRuntimeContext) LateServiceSystemProofInputs {
+      return LateServiceSystemProofInputs{
+          phase137_audit: phase137_audit,
+          scheduler_contract_hardened: contract_flags.scheduler_contract_hardened,
+          lifecycle_contract_hardened: contract_flags.lifecycle_contract_hardened,
+          ... (8 contract flag copies)
+          boot_pid: runtime_context.boot_pid,
+          init_pid: runtime_context.init_pid,
+          ... (24 runtime context copies) }
+  }
+
+This function copies 32+ fields with no transformation.  It exists
+only because the ProofInputs type is flat where it should be nested.
+
+If ProofInputs embedded its two source types:
+
+  struct LateServiceSystemProofInputs {
+      phase137_audit: ...
+      contract_flags: LateServiceSystemContractFlags
+      context: LateServiceSystemRuntimeContext
+  }
+
+Then build_late_service_system_proof_inputs becomes a 3-line struct
+literal and the 32-field copy disappears.
+
+The same mechanical copy-conversion pattern exists in bootstrap_proofs.mc
+(build_phase108_to_116_proof_inputs, build_phase117_to_123_proof_inputs,
+build_phase131_to_137_proof_inputs).  All of these stem from the same
+decision to flatten nested inputs into a wide scalar struct.
+
+────────────────────────────────────────────────────────────────────────
+P2 — DESIGN INTEGRITY
+────────────────────────────────────────────────────────────────────────
+
+3. execute_late_service_system_proofs opens by manually constructing
+   two large execution state structs as inline literals.
+
+The function body begins by constructing phase140_serial_execution and
+phase140_composition_execution as full inline struct literals:
+
+  phase140_serial_execution: SerialServiceExecutionState =
+      SerialServiceExecutionState{
+          program_capability: capability.empty_slot(),
+          gate: syscall.open_gate(syscall.gate_closed()),
+          process_slots: state.zero_process_slots(),
+          task_slots: state.zero_task_slots(),
+          init_handle_table: capability.empty_handle_table(),
+          child_handle_table: capability.handle_table_for_owner(inputs.init_pid),
+          wait_table: capability.empty_wait_table(),
+          endpoints: ipc.empty_table(),
+          init_image: inputs.init_image,
+          child_address_space: address_space.empty_space(),
+          child_user_frame: address_space.empty_frame(),
+          service_state: phase140_serial_state,
+          spawn_observation: syscall.empty_spawn_observation(),
+          receive_observation: inputs.serial_receive_observation,
+          ingress: serial_service.observe_ingress(phase140_serial_state),
+          composition: serial_service.observe_composition(phase140_serial_state),
+          failure_observation: empty_serial_service_failure_observation(),
+          wait_observation: syscall.empty_wait_observation(),
+          ready_queue: state.empty_queue() }
+
+This is an 18-field inline struct literal at the entry point of
+execute_late_service_system_proofs.  A name like
+build_initial_serial_service_execution_state(inputs, serial_state)
+would communicate what is being set up and why, and would ensure that
+future fields added to SerialServiceExecutionState do not require
+finding every direct-construction site.
+
+The composition execution state then follows with an even larger inline
+literal (~28 fields) that immediately replaces child_handle_table
+with a non-default value via a second struct literal assignment.
+The two-step initialise-then-patch pattern should be a constructor
+that handles the non-default field.
+
+
+4. build_late_rebuilt_system_state_with_retained_log and
+   build_late_rebuilt_system_state_with_fresh_log are near-duplicates.
+
+  func build_late_rebuilt_system_state_with_retained_log(...) Phase150RebuiltSystemState {
+      return build_late_rebuilt_system_state(inputs, slot, inputs.log_service_state)
+  }
+
+  func build_late_rebuilt_system_state_with_fresh_log(...) Phase150RebuiltSystemState {
+      return build_late_rebuilt_system_state(inputs, slot,
+          log_service.service_state(
+              inputs.log_service_state.owner_pid,
+              inputs.log_service_state.endpoint_handle_slot))
+  }
+
+The two functions differ only in whether the log state is the existing
+inputs.log_service_state or a freshly constructed state from the same
+owner_pid and endpoint_handle_slot.
+
+Callers of the "fresh" variant are asserting that log state should be
+reset while keeping the identity (PID and handle slot) intact.  This
+is a meaningful semantic distinction but it should be expressed by a
+use_fresh_log: bool parameter or a log_reset_policy enum, not by two
+separate functions.
+
+
+5. execute_phase142_rebuilt_system_command and
+   execute_phase144_rebuilt_system_command wrap different routing
+   functions with identical boilerplate.
+
+  func execute_phase142_rebuilt_system_command(system, endpoint_id, len, payload) {
+      routed: Phase142ShellCommandRouteResult =
+          execute_phase142_shell_command(system.serial_state, system.shell_state,
+              system.log_state, system.echo_state, system.kv_state,
+              endpoint_id, len, payload)
+      return phase150_rebuilt_system_command_result(
+          phase150_rebuilt_system_state(routed.serial_state, routed.shell_state,
+              routed.log_state, routed.echo_state, routed.kv_state),
+          routed.routing, routed.succeeded)
+  }
+
+  func execute_phase144_rebuilt_system_command(system, endpoint_id, len, payload) {
+      routed: Phase142ShellCommandRouteResult =
+          execute_phase144_stateful_key_value_shell_command(  // <-- only difference
+              system.serial_state, system.shell_state, ...same 7 args...)
+      return phase150_rebuilt_system_command_result(...)  // identical
+  }
+
+The two functions are identical except for which routing function is
+called.  If the routing function could be passed as a parameter (or
+resolved via a phase-version selector), this could be a single generic
+command executor.  As written, any change to the state extraction or
+result packing must be applied to both functions identically.
+
+────────────────────────────────────────────────────────────────────────
+P3 — READABILITY / MAINTENANCE COST
+────────────────────────────────────────────────────────────────────────
+
+6. SHELL_COMMAND_* byte constants are defined here but not co-located
+   with the command dispatcher.
+
+  const SHELL_COMMAND_ECHO_BYTE0: u8 = 69   // 'E'
+  const SHELL_COMMAND_ECHO_BYTE1: u8 = 67   // 'C'
+  const SHELL_COMMAND_LOG_BYTE0: u8 = 76    // 'L'
+  const SHELL_COMMAND_LOG_APPEND_BYTE1: u8 = 65  // 'A'
+  const SHELL_COMMAND_LOG_TAIL_BYTE1: u8 = 84    // 'T'
+  const SHELL_COMMAND_KV_BYTE0: u8 = 75     // 'K'
+  const SHELL_COMMAND_KV_SET_BYTE1: u8 = 83 // 'S'
+  const SHELL_COMMAND_KV_GET_BYTE1: u8 = 71 // 'G'
+
+These are the byte-level encoding of shell command discriminants.
+They correctly use named constants rather than inline hex values —
+that is the right direction.  However, they are defined in this file
+while the shell command router lives in shell_service.mc or a
+comparable module.  A change to the command protocol must be made in
+sync across the router and this file.
+
+The byte pair encoding should be defined in shell_service.mc alongside
+the dispatcher, and exported as constants or as payload constructor
+functions.  The use here should import them from that module.
+
+
+7. Phase150RebuiltSystemState is assembled and used here but defined
+   in a higher-numbered phase file.
+
+This file assembles Phase150RebuiltSystemState in
+build_late_rebuilt_system_state, uses it in
+execute_phase142_rebuilt_system_command and
+execute_phase144_rebuilt_system_command, and passes it into
+execute_phase140_serial_ingress_composed_service_graph.  The type name
+implies it is owned by phase 150; its definition is presumably in
+10_phase150.mc or nearby.
+
+A reader in this file encounters a central type with no visible
+definition and must search to find it.  If Phase150RebuiltSystemState
+represents the canonical "all services up" system state, it belongs in
+a shared types module (e.g. bootstrap_services.mc) rather than being
+named after a phase number.  Type names with phase numbers in them
+accumulate: future phases will define Phase152RebuiltSystemState
+rather than evolving Phase150RebuiltSystemState in place.
+
+────────────────────────────────────────────────────────────────────────
+COMPOUND EFFECT
+────────────────────────────────────────────────────────────────────────
+
+Findings 1 and 2 are the same problem as the RuntimeContext/ProofInputs
+duality in bootstrap_proofs.mc, applied one level down.  The presence
+of LateServiceSystemContractFlags in this file, but its non-use in
+LateServiceSystemProofInputs, shows the fix was half-applied.  The
+ProofContractFlags struct already exists in bootstrap_proofs.mc as the
+equivalent type; completing the adoption here would provide consistency
+across the entire late bootstrap proof chain.
+
+Finding 3 (large inline construction) and finding 4 (near-duplicate
+builders) both stem from the absence of factory functions for the
+execution state types.  Without named constructors that communicate
+"initial state with these parameters," any code that sets up an
+execution state must write the full struct literal.
+
+────────────────────────────────────────────────────────────────────────
+RECOMMENDED RESOLUTION ORDER
+────────────────────────────────────────────────────────────────────────
+
+1. Embed LateServiceSystemContractFlags as a nested field in
+   LateServiceSystemProofInputs.  Update build_late_service_system_proof_inputs
+   to a 3-line struct literal.
+
+2. Adopt the same embedding pattern in bootstrap_proofs.mc and main.mc
+   to complete uniform adoption of the contract flags type.
+
+3. Add named factory functions for SerialServiceExecutionState and
+   CompositionServiceExecutionState initial states; replace the
+   inline struct literals in execute_late_service_system_proofs.
+
+4. Merge build_late_rebuilt_system_state_with_retained_log and
+   _with_fresh_log into one function with a log_reset parameter.
+
+5. Move SHELL_COMMAND_* constants to shell_service.mc and import them.
+
+6. Rename Phase150RebuiltSystemState to a name that does not encode
+   a phase number, and move its definition to a shared module.

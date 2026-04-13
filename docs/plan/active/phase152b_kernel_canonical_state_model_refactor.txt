@@ -1,0 +1,463 @@
+Phase 152b -- Kernel Canonical State Model Refactor
+===================================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Insert one explicit structural refactor phase between the landed Phase 152
+controlled-variation result and the later Phase 153 through Phase 160 service
+and system audits.
+
+This phase exists because the current bootstrap kernel state model has become
+the dominant source of friction. The repository can still add local helpers,
+but the critiques now show that the harder problem is representational: too
+much live state is still carried as flat globals, repeated parameter groups,
+phase-indexed outputs, and copy-converted context structs.
+
+The attached target note
+`docs/plan/admin/kernel_state_model_phase152.txt` is the authoritative design
+destination. This Phase 152b document defines the bounded implementation plan
+that moves the repository toward that destination without widening kernel
+behavior, inventing a framework layer, or reopening compiler work.
+
+Phase target
+------------
+Phase 152b should replace the current ad hoc bootstrap state plumbing with a
+named, value-semantic kernel state model that is explicit, composable, and
+cheap to validate.
+
+The intended repository result is:
+
+- the bootstrap kernel path stops threading the same state groups as long
+  positional parameter lists
+- the 8 contract-hardening flags become one canonical `ContractState` type
+- runtime contexts, proof inputs, and result records stop duplicating the same
+  fields mechanically
+- phase outputs stop living in phase-indexed globals and instead return from
+  execution helpers as explicit values
+- the kernel's live execution state, capabilities, IPC state, identities, and
+  service state become named groups that can later compose into one
+  `SystemState`
+- later Phase 153 through Phase 160 work can build on an honest state model
+  instead of adding more pressure to `main.mc`, `bootstrap_proofs.mc`, and the
+  current bootstrap glue
+
+Relationship to companion notes
+-------------------------------
+This phase note should stay aligned with:
+
+- `docs/plan/admin/kernel_state_model_phase152.txt`
+- `docs/agent/critiques/kernel/phase152/main_phase152.txt`
+- `docs/agent/critiques/kernel/phase152/bootstrap_runtime_phase152.txt`
+- `docs/agent/critiques/kernel/phase152/bootstrap_proofs_phase152.txt`
+- `docs/agent/critiques/kernel/phase152/state_phase152.txt`
+- `docs/agent/critiques/kernel/phase152/syscall_phase152.txt`
+- `docs/plan/active/phase151_complete_main_simplification.txt`
+- `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
+- `docs/plan/active/phase153_service_composition_shape_audit.txt`
+- `docs/plan/active/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/active/phase155_temporal_semantics_and_backpressure_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 150 through Phase 152 improved late service-system ownership and proved
+  one bounded controlled variation, but those phases did not solve the deeper
+  bootstrap state-shape problem.
+- The Phase 152 critiques identify the same failure from multiple angles:
+  missing state grouping, missing value-typed result boundaries, phase-global
+  leakage, runtime or proof duplication, and silent index coupling.
+- The repository now has enough evidence to treat the state model itself as
+  the active blocker.
+- The next honest step is therefore not another service-behavior phase. It is
+  one explicit structural refactor phase that makes later service and system
+  phases cheaper and more honest.
+
+Problem being solved
+--------------------
+- `kernel/src/main.mc` still carries too much live system state through flat
+  globals, flat flags, and adapter shims that only enumerate fields.
+- `kernel/src/bootstrap_runtime.mc` still treats kernel execution state as
+  long positional parameter lists and result envelopes that hide their true
+  contents.
+- `kernel/src/bootstrap_proofs.mc` still duplicates runtime-context and
+  proof-input shapes, stores outputs in phase-indexed globals, and flattens
+  unrelated concerns into mega-structs.
+- `kernel/src/bootstrap_services/11_phase151.mc` already defines one contract
+  flag struct locally, which confirms the missing abstraction, but the usage
+  is still inconsistent.
+- Without a dedicated refactor phase, each later kernel phase would keep
+  paying the cost of the current representation and would likely make the
+  duplication worse.
+
+Hard constraints
+----------------
+- Preserve value semantics. No mutable-pointer emulation, no new global-state
+  pattern, and no hidden in-place mutation model.
+- Preserve phase boundaries. Parser, sema, MIR, backend, ABI, target,
+  runtime, and `hal` surfaces stay closed unless a narrow blocker forces a
+  change.
+- Preserve admitted kernel behavior. Phase 152b is a structural refactor, not
+  a service-behavior expansion.
+- Prefer named grouping over generic frameworking. The answer is not a new
+  service runtime, callback registry, or orchestration framework.
+- Land the model incrementally. Do not attempt a big-bang rewrite of the full
+  bootstrap kernel path in one patch series.
+
+Non-goals
+---------
+- no new service families, broader shell routing, namespace growth, or restart
+  policy changes
+- no widening of syscall families beyond what the current admitted kernel path
+  already uses
+- no new compiler, MIR, backend, or artifact-surface work unless the refactor
+  uncovers a concrete blocker that cannot be closed locally
+- no attempt to make the whole kernel spec-complete in this phase
+
+Core rule
+---------
+- Extract state groups because they are real semantic units, not because the
+  code looks long.
+- If the same parameter group or field group appears repeatedly, give it one
+  owner-local type and move callers onto that type.
+- If a helper only copies fields from one struct into another, either embed
+  the source struct or delete the helper.
+- If a phase output must survive after execution, return it from the phase.
+  Do not store it in a module-level phase global.
+- If a struct mixes state, observations, and probe configuration, split those
+  concerns before widening the type.
+
+Controlling refactor gaps
+-------------------------
+Phase 152b treats these as the controlling structural gaps:
+
+1. The contract-hardening state is one concept but exists as repeated scalar
+   fields under multiple names.
+
+2. The kernel execution state travels as repeated unnamed groups across
+   `main.mc`, `bootstrap_runtime.mc`, `bootstrap_proofs.mc`, and late
+   service-system helpers.
+
+3. Proof inputs are flattened copies of runtime contexts instead of thin views
+   over returned state and observations.
+
+4. Phase-indexed globals are compensating for missing result types.
+
+5. Identity, capability-table ownership, IPC state, service state, and UART
+   probe data are present but not yet expressed as coherent named groups.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 152b execution note defining the state-model refactor
+   target and the allowed scope
+2. one canonical `ContractState` adoption pass that removes the flat 8-flag
+   duplication first
+3. one `UartProbeFrames` adoption pass that removes the repeated individual
+   UART frame bytes from runtime and proof contexts
+4. one `TaskIdentity` and `IdentityConfig` adoption pass that groups repeated
+   pid or tid or asid triples
+5. one `KernelExecState` adoption pass over the spawn or sleep or wake or wait
+   bootstrap path
+6. one `CapabilityState` and `IpcState` adoption pass that removes repeated
+   handle-table, wait-table, and endpoint threading from the active proof path
+7. one runtime-context or proof-input simplification pass that embeds grouped
+   runtime state and contract state rather than copying fields mechanically
+8. one phase-global elimination pass that makes mid-phase outputs explicit
+   returned results
+9. one final composition pass that introduces `ServiceState` and then
+   `SystemState` only after the component groups are already stable
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase152b_kernel_canonical_state_model_refactor.txt`
+   - publish the canonical implementation plan and sequencing rules
+
+2. `docs/plan/admin/kernel_state_model_phase152.txt`
+   - remain the design target and authoritative destination document
+
+3. `kernel/src/state.mc`
+   - own `TaskIdentity`, `IdentityConfig`, boot or ready or slot-state helper
+     cleanup, and any phase-neutral state grouping that belongs with core
+     kernel state types
+
+4. `kernel/src/bootstrap_runtime.mc`
+   - adopt grouped kernel execution state on the child spawn or sleep or wake
+     or wait path and stop hiding full kernel runtime state inside misleading
+     result names
+
+5. `kernel/src/bootstrap_proofs.mc`
+   - eliminate runtime-context or proof-input duplication, remove phase-indexed
+     globals from the active path, and separate observations from live state
+
+6. `kernel/src/bootstrap_services/11_phase151.mc` and neighboring split owner
+   files
+   - adopt canonical contract state and grouped late service-system runtime
+     inputs without reopening service semantics
+
+7. `kernel/src/main.mc`
+   - stop enumerating kernel state and contract state manually at phase
+     boundaries and remain a thin orchestrator
+
+8. `kernel/src/syscall.mc`
+   - align result families and state threading where the new grouped state
+     boundary materially simplifies the active bootstrap path
+
+9. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
+   - consume grouped proof inputs and explicit observations rather than flat
+     scalar fans
+
+10. `tests/tool/freestanding/kernel/runtime/`
+   - keep descriptor-owned runtime proofs and projected MIR goldens aligned to
+     the new grouped state boundaries
+
+Detailed execution plan
+-----------------------
+Activity 1. Freeze the canonical vocabulary before moving call sites
+
+- Task 1.1: publish the canonical type names and ownership boundaries from
+  `docs/plan/admin/kernel_state_model_phase152.txt` as the active repository
+  contract for this refactor
+- Task 1.2: decide the owning module for `ContractState`; the preferred result
+  is one phase-neutral owner rather than separate proof-local and
+  service-local copies
+- Task 1.3: decide the owning module for `TaskIdentity`, `IdentityConfig`,
+  `KernelExecState`, `CapabilityState`, `IpcState`, `ServiceState`, and
+  `UartProbeFrames`
+- Task 1.4: write down temporary compatibility rules for phase-numbered types
+  that will survive part of the migration but must eventually collapse into
+  phase-neutral names
+
+Activity 2. Canonicalize contract hardening state first
+
+- Task 2.1: replace `ProofContractFlags`, `LateServiceSystemContractFlags`,
+  and the flat 8-scalar spellings with one canonical `ContractState`
+- Task 2.2: update `LateServiceSystemProofInputs` and neighboring proof-input
+  types to embed `ContractState` instead of expanding the 8 fields
+- Task 2.3: update validation helpers so they accept one `ContractState`
+  argument instead of a growing positional list
+- Task 2.4: remove pure field-forwarding helpers whose only reason to exist
+  was the flat scalar representation
+
+Why this lands first:
+The critiques already show that contract-state duplication is the smallest,
+lowest-risk entry point. It reduces signature churn immediately without yet
+forcing the full runtime-state move.
+
+Activity 3. Introduce `UartProbeFrames` and stop embedding probe bytes in
+runtime state
+
+- Task 3.1: add `UartProbeFrames` in the owner that already defines UART or
+  serial-service-facing probe behavior
+- Task 3.2: replace the 12 individual UART byte fields in
+  `Phase131To137RuntimeContext` and `MidPhaseProofRuntimeContext`
+- Task 3.3: update proof builders and validators to accept the grouped probe
+  frames as explicit probe configuration rather than as hidden state fields
+- Task 3.4: keep probe data out of any future `SystemState` composition
+
+Activity 4. Group repeated identity tuples
+
+- Task 4.1: add `TaskIdentity` to `kernel/src/state.mc`
+- Task 4.2: replace repeated boot or init or child pid or tid or asid triples
+  in runtime contexts with `TaskIdentity`
+- Task 4.3: add `IdentityConfig` once the three repeated identity groups are
+  in place
+- Task 4.4: keep service PID and endpoint identity as service-owned state,
+  not as top-level identity configuration
+
+Activity 5. Introduce grouped execution-state carriers on the active runtime
+path
+
+- Task 5.1: add `KernelExecState` for descriptor, gate, process slots, task
+  slots, ready queue, timer, and interrupts
+- Task 5.2: add `CapabilityState` for handle tables and wait tables, with
+  named accessors that remove silent slot-index meaning from callers
+- Task 5.3: add `IpcState` for endpoint ownership and related queue state
+  as it exists today
+- Task 5.4: move `execute_program_cap_spawn_and_wait(...)` from a 12-parameter
+  signature to grouped state arguments and grouped result state
+- Task 5.5: rename or reshape `ChildExecutionResult` so its kernel-state
+  payload is honest about what it contains
+
+Why this is the controlling runtime step:
+`bootstrap_runtime.mc` is the narrowest active surface where the grouped state
+model pays off immediately and can be validated independently before the
+broader proof path moves.
+
+Activity 6. Replace mechanical proof-input duplication with embedding
+
+- Task 6.1: change `Phase108To116ProofInputs`, `Phase117To123ProofInputs`,
+  `Phase131To137ProofInputs`, and `LateServiceSystemProofInputs` to embed the
+  corresponding runtime context or grouped state plus `ContractState`
+- Task 6.2: delete field-by-field conversion helpers that only copied runtime
+  context into proof inputs
+- Task 6.3: split live state, observations, and probe configuration so proof
+  inputs become thin views rather than parallel mega-structs
+- Task 6.4: move validator entry points toward `inputs.context`,
+  `inputs.observations`, and `inputs.contracts` rather than long scalar lists
+
+Activity 7. Eliminate phase-indexed globals from the active mid-phase path
+
+- Task 7.1: introduce one explicit mid-phase returned result that owns the
+  observations and audits currently persisted in `PHASE124_*`, `PHASE131_*`,
+  and related globals
+- Task 7.2: make `execute_mid_phase_proofs(...)` return that result instead of
+  writing module globals
+- Task 7.3: delete `reset_late_phase_proofs()` once the returned result owns
+  the same data explicitly
+- Task 7.4: update the driver-side storage and any test harness readers to
+  consume the returned value rather than hidden globals
+
+Activity 8. Compose service state and then the first real `SystemState`
+
+- Task 8.1: add `ServiceState` for the currently admitted log, echo, serial,
+  key-value, and shell owners
+- Task 8.2: separate live service state from service observations or launch
+  snapshots, keeping only state in `ServiceState`
+- Task 8.3: introduce `SystemState` as the composition of `IdentityConfig`,
+  `KernelExecState`, `CapabilityState`, `IpcState`, `ServiceState`, and
+  `ContractState` only after the component types are already in active use
+- Task 8.4: keep result types explicit: `SystemState` is what the system is,
+  and result records carry the observations of what happened
+
+Activity 9. Remove transitional shims and rename stabilized concepts
+
+- Task 9.1: delete compatibility constructors, pure pass-through builders, and
+  adapter shims that became redundant once grouped types land
+- Task 9.2: rename stabilized phase-numbered types to phase-neutral names
+  where the concept is now clearly general
+- Task 9.3: audit `main.mc`, `bootstrap_proofs.mc`, `bootstrap_runtime.mc`,
+  and late service-system helpers for any remaining functions that still break
+  the new parameter-group rules
+- Task 9.4: keep only the smallest temporary compatibility layer required by
+  descriptor-owned MIR or regression fixtures, and delete it before closing
+  the phase if no active consumer still needs it
+
+Implementation order rule
+-------------------------
+Apply the phase in this order unless one narrow compile blocker forces a local
+swap:
+
+1. `ContractState`
+2. `UartProbeFrames`
+3. `TaskIdentity` and `IdentityConfig`
+4. `KernelExecState`
+5. `CapabilityState` and `IpcState`
+6. proof-input embedding and copy-helper deletion
+7. phase-global elimination
+8. `ServiceState`
+9. `SystemState`
+
+This order is intentional:
+
+- it starts with the highest-leverage low-risk grouping work
+- it moves the narrow runtime execution path before the broader proof path
+- it delays the final `SystemState` composition until the component groups are
+  real code, not a speculative top-level wrapper
+
+Validation plan
+---------------
+Use narrow validation after each landed activity rather than waiting for one
+late full-suite gate.
+
+Preferred validation order for each activity:
+
+1. build the touched kernel slice in the existing debug tree
+2. run the narrowest affected unit or workflow test family
+3. run the narrowest affected freestanding runtime descriptor selector and its
+   projected MIR golden
+4. only after grouped activities stabilize, rerun the broader freestanding
+   kernel shards and the full debug `ctest` path
+
+Minimum expected validation surfaces:
+
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure`
+  when doc-driven tool workflow glue changes
+- `ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure`
+  when grouped build-state ownership changes surface in tests
+- `ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_(docs|shard[1-9])|system)_unit' -j8 --output-on-failure`
+  once the grouped kernel state changes stabilize enough for shard reruns
+- the narrowest descriptor-owned selector under
+  `tests/tool/freestanding/kernel/runtime/` that covers the touched phase band
+
+Design invariants for acceptance
+--------------------------------
+Phase 152b should make these invariants true on the active bootstrap path:
+
+1. no active proof or runtime helper expands the 8 contract flags as separate
+   scalar fields
+2. no active mid-phase path stores its durable outputs in phase-indexed
+   module globals
+3. runtime-context and proof-input pairs do not duplicate more than 80 percent
+   of their fields; they embed grouped state instead
+4. UART probe bytes appear only as `UartProbeFrames`, not as individually
+   named scalar fields
+5. repeated pid or tid or asid triples appear only through `TaskIdentity` or
+   `IdentityConfig`
+6. the child spawn or sleep or wake or wait path accepts grouped kernel state
+   rather than long positional state lists
+7. `main.mc` does not manually enumerate whole-system state at phase
+   boundaries when one grouped state or result value would express the same
+   truth
+
+Exit criteria
+-------------
+- one canonical `ContractState` type exists and is used on the active
+  bootstrap proof path
+- one canonical `UartProbeFrames` type exists and replaces individual UART
+  frame-byte fields on the active proof path
+- the active child spawn or sleep or wake or wait runtime path uses grouped
+  execution state and grouped results
+- the active proof-input families embed grouped runtime state and
+  `ContractState` instead of copying flattened fields mechanically
+- the active mid-phase proof path no longer depends on phase-indexed globals
+  for durable outputs
+- one `ServiceState` exists for the currently admitted late service-system
+  owners, and the first composed `SystemState` exists for the active bootstrap
+  path
+- focused freestanding runtime regressions and projected MIR goldens pass on
+  the refactored path
+- later Phase 153 through Phase 160 notes can name `SystemState` and its
+  grouped sub-states as the baseline representation rather than as a pending
+  design goal
+
+Failure conditions
+------------------
+Phase 152b should be treated as incomplete if any of the following remain on
+the active path:
+
+- flat 8-flag signatures on validators or proof-input records
+- phase-indexed globals required for mid-phase proof execution correctness
+- new pure pass-through struct builders added instead of deleted
+- new functions that accept the same kernel-state group as separate parameters
+- `SystemState` added only as a wrapper while the real active path still uses
+  the old flat globals and field fans underneath
+
+Why this phase comes before Phase 153
+------------------------------------
+Phase 153 through Phase 160 are about composition shape, service identity,
+temporal semantics, multi-client behavior, failure consistency, and system
+observability. All of those phases become noisier and less credible if the
+repository still lacks a coherent state model.
+
+Phase 152b is therefore a prerequisite simplification phase. It does not
+replace the later audits; it makes them honest enough to land without further
+state-shape drift.
+
+Suggested close-out statement
+-----------------------------
+When this phase is complete, the repository should be able to say:
+
+"The bootstrap kernel no longer treats execution state, proof state, and
+service state as flat phase-local field fans. The active path now uses one
+named value-semantic state model with explicit returned observations, and the
+later service and system phases build on that model rather than on hidden
+globals or duplicated context structs."

@@ -1,4 +1,4 @@
-Phase 146 Through Phase 160 -- Speculative Post-Phase-145 Veya Roadmap
+Phase 146 Through Phase 151 -- Speculative Post-Phase-145 Canopus Roadmap
 =========================================================================
 
 Status
@@ -11,15 +11,11 @@ Sketch one plausible continuation after the completed Phase 145 service
 restart, failure, and usage-pressure audit over the current interactive
 service-system slice.
 
-This note now also records a plausible post-Phase-151 continuation after the
-service-shape, IPC, authority, restart-contract, rebuild, and main-file
-simplification wave became concrete.
-
 This document is intentionally forward-looking and tentative.
 It does not replace `docs/plan/plan.txt`.
 It does not replace the concrete Phase 141 through Phase 145 execution and
 closeout notes.
-It gives one plausible ordering for the next Veya wave if the repository
+It gives one plausible ordering for the next Canopus wave if the repository
 keeps following the same evidence-first rules used so far:
 
 - one repeatability question at a time
@@ -42,12 +38,12 @@ This roadmap is meant to stay aligned with:
 - `docs/plan/backlog.txt`
 - `docs/plan/decision_log.txt`
 - `docs/plan/canopus_running_system_support_statement.txt`
-- `docs/arch/veya/canopus_kernel_endstate_arch.txt`
-- `docs/arch/veya/canopus_lite_v0.txt`
-- `docs/arch/veya/canopus_kernel_blueprint_v0.txt`
-- `docs/arch/veya/canopus_kernel_implementation_blueprint_v0.txt`
-- `docs/arch/veya/canopus_sys_interface_v0.txt`
-- `docs/arch/veya/canopus_syscall_mapping_v0.txt`
+- `docs/arch/canopus/canopus_kernel_endstate_arch.txt`
+- `docs/arch/canopus/canopus_lite_v0.txt`
+- `docs/arch/canopus/canopus_kernel_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_kernel_implementation_blueprint_v0.txt`
+- `docs/arch/canopus/canopus_sys_interface_v0.txt`
+- `docs/arch/canopus/canopus_syscall_mapping_v0.txt`
 
 If those notes define the current admitted slice, the landed interactive
 system wave, and the current repository position, this roadmap suggests one
@@ -79,18 +75,18 @@ Repository numbering note
 - Phase 150 is occupied by the concrete rebuilt-system helper and comparison
   audit.
 - Phase 151 is occupied by the active `main.mc` simplification wave, with the
-  Phase 117 through Phase 123 plateau proof band and the remaining Phase 124
-  through Phase 137 authority, composition, device, and completion-backed tail
-  already moved into `bootstrap_proofs`, the late Phase 140 through Phase 150
-  service-system scenario band already moved into the split
-  `bootstrap_services` owner surface, and `bootstrap_main()` now deferring the
-  early bootstrap ladder through one explicit entry helper while any residual
-  early-helper ownership cleanup remains active.
-- The next speculative Veya continuation therefore starts at Phase 152.
+  late Phase 140 through Phase 150 service-system scenario band already moved
+  into the split `bootstrap_services` owner surface while early-boot and
+  mid-phase simplification remain active.
+- Phase 152 is now occupied by one bounded controlled variation over the same
+  shell-plus-log-plus-key-value system: restart `log_service` while keeping
+  `kv_service` state live, classify that result as a partial generalization,
+  and keep compiler and framework surfaces closed.
+- The next speculative Canopus continuation therefore starts at Phase 153.
 
 Repository status note
 ----------------------
-- The repository can now honestly claim one bounded running Veya kernel and
+- The repository can now honestly claim one bounded running Canopus kernel and
   one bounded interactive service system with explicit authority, bounded
   failure, bounded IPC composition, bounded UART ingress, one shell-owned
   command path, one retained log owner, one retained key-value owner, and one
@@ -115,7 +111,7 @@ What this roadmap is trying to answer
 -------------------------------------
 - What should come after the completed Phase 145 restart-and-usage audit if
   the next goal is not more services but a repeatable way to build systems in
-  Veya?
+  Canopus?
 - Which next phases should classify message-shape, authority, restart, and
   composition friction before any broader subsystem ambition?
 - How should the repository shift from "one small system is usable" to "one
@@ -178,7 +174,7 @@ Chosen wave shape:
 5. rebuild the same small system cleanly using only the surviving lessons
 
 The target is not a service framework.
-The target is one repeatable way to build a small Veya system without
+The target is one repeatable way to build a small Canopus system without
 hiding ownership or failure under convenience abstractions.
 
 Friction classification rule
@@ -352,6 +348,57 @@ Phase 150 -- One System, Rebuilt Cleanly
   threading removed from the root proof path and replaced by one bounded
   rebuilt-system helper while compiler and framework surfaces stay closed.
 
+Band F - Pattern Stability Under One Controlled Variation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+After the clean rebuild, the next honest question is whether that extracted
+pattern survives one small difference or only one cleaned-up special case.
+
+Likely themes:
+- vary exactly one owner-local fact inside the same system
+- measure whether the rebuilt-system helper remains honest without new glue
+- classify the first explicit awkwardness instead of hiding it behind new
+  abstraction
+
+Why this band matters:
+- a second clean build is useful, but one controlled variation is the
+  smallest real discriminator between a reusable system pattern and a tidy
+  special case.
+
+Phase 152 -- Pattern Stability Under One Controlled Variation
+- Phase 152 is now concrete as one bounded controlled variation that restarts
+  `log_service` instead of `kv_service` while keeping the shell vocabulary,
+  serial boundary, and retained key-value state unchanged.
+- The current result is partial generalization: the owner-local rebuilt-system
+  helper, shell command shape, and explicit init-owned restart policy survive,
+  but restart evidence can no longer live entirely inside the restarted
+  retained-log owner because restarting `log_service` clears the same state
+  that would have retained that evidence.
+
+Preferred proof points:
+- the repository can point to one precise variation rather than a broader
+  service wave
+- the surviving pattern elements remain explicit and owner-local
+- the first awkwardness is named as a service-shape limitation rather than as
+  permission for compiler or framework expansion
+- if further change is needed, the next step is composition or evidence-shape
+  pressure, not breadth growth
+
+Band G - Composition Pressure After Variation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Once the single-variation result is explicit, the next pressure point is not
+another arbitrary service. It is whether the now-varied system still composes
+honestly without accumulating hidden translation glue.
+
+Why this band comes next:
+- the partial-generalization result means the next real question is where the
+  awkwardness lives across owner boundaries, not whether the repository can
+  add more surface area.
+
+Phase 153 -- Service Composition Shape Audit
+- Phase 153 should measure whether the post-Phase-152 system still composes
+  through explicit owner-local glue or is starting to justify one tightly
+  bounded primitive.
+
 Preferred proof points:
 - the rebuilt system removes at least one earlier ad hoc pattern rather than
   merely rearranging it
@@ -365,7 +412,7 @@ What should naturally emerge from this wave
 If the repository follows this roadmap honestly, the next useful results
 should be concrete evidence about:
 
-- whether Veya now has one canonical service pattern rather than a set of
+- whether Canopus now has one canonical service pattern rather than a set of
   phase-local service implementations
 - whether the current IPC shape remains stable under repeated real usage or
   needs one narrow helper boundary
@@ -375,6 +422,8 @@ should be concrete evidence about:
   repeated implementation pain rather than by taste
 - whether the system can be built twice with the second version being simpler
   than the first
+- whether that rebuilt pattern still holds when one retained-state owner is
+  varied without broader system growth
 
 Likely ordering bias
 --------------------
@@ -386,284 +435,12 @@ If the repository keeps following the same discipline, the safest order is:
 4. formalize restartable-service contracts before allowing broader subsystem
    dependence on the current pattern
 5. rebuild the same system cleanly before considering filesystem, networking,
-   richer scheduling, or any broader platform wave
+  richer scheduling, or any broader platform wave
+6. vary one retained-state owner before widening into composition, identity,
+  or temporal follow-through
 
 That ordering keeps the repository from confusing one-off implementation
 success with a real system-building method.
-
-Post-Phase-151 continuation
----------------------------
-Phase 146 through Phase 151 answered the first repeatability question:
-
-- whether the repository can extract one honest service pattern from the
-  landed shell-plus-log-plus-key-value system
-- whether that pattern survives one rebuild and one root-file
-  simplification without smuggling framework behavior back into the kernel or
-  into helper layers
-
-If that wave is kept honest, the next question changes.
-The repository should no longer ask only whether the same small system can be
-rebuilt more cleanly.
-It should ask whether the extracted pattern remains stable once the system is
-varied slightly and then exposed to more realistic pressure.
-
-The new center of gravity is therefore:
-
-- first: stable under one controlled variation
-- then: stable under real multi-actor, long-lived, failure, and observation
-  pressure
-
-New meta-rule
---------------
-Treat Phase 152 through Phase 160 as a pressure wave, not as a breadth wave.
-
-- do not answer this wave by adding more services just to increase surface
-  area
-- do not jump to filesystem, networking, multicore, dynamic discovery,
-  broader scheduling policy, or a service framework
-- do use one small difference or one honest pressure source at a time to
-  expose whether the current model survives without new hidden rules
-
-Recurring abstraction rule
---------------------------
-Apply this invariant across every post-Phase-151 step:
-
-- no hidden generalization
-
-For any helper, abstraction, or reusable pattern admitted during this wave,
-the repository should be able to show:
-
-- what concrete duplication or friction it removes
-- that it does not hide ownership
-- that it does not hide failure
-- that it does not smuggle policy into the kernel, shell, or helper layer
-
-If a proposed abstraction fails that check, the phase should reject it and
-record the friction directly instead of normalizing a second-system rewrite.
-
-Band F - Controlled Variation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The first post-151 move should be one bounded variation over the rebuilt
-system rather than immediate breadth.
-
-Core question:
-- does the extracted service pattern survive when the system is slightly
-  different, or was the earlier result only a well-cleaned special case?
-
-Admissible variation examples:
-- one new service shape that is structurally different from the current trio,
-  such as a stateless request-reply owner or a bounded multi-reply owner
-- one deeper service-to-service chain rather than only shell-to-service
-  interaction
-- one simulated multi-client interaction over the existing fixed-wiring model
-
-What this band should test:
-- whether service shape still reads as one pattern rather than one frozen
-  special case
-- whether current IPC and authority handling remain honest under slightly
-  different traffic
-- whether the repository can add one difference without inventing new routing,
-  discovery, or framework rules
-
-Phase 152 -- Pattern Stability Under One Controlled Variation
-- introduce one small system variation and classify whether the current
-  service pattern still holds without new hidden rules
-
-Preferred proof points:
-- one specific variation is admitted and justified as the smallest useful
-  discriminator
-- the repository can name which existing pattern elements survive unchanged
-  and which one difference becomes explicit
-- any newly exposed awkwardness is classified as service-local, helper-local,
-  kernel-boundary, or language-ergonomics pressure rather than hidden behind
-  new abstraction
-
-Band G - Composition Without Glue Explosion
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Once one variation exists, the next question is whether services compose
-honestly or only through growing translation glue.
-
-Core question:
-- can services compose without becoming a mini-framework?
-
-Likely signals:
-- repetitive adapters between service-local request and reply shapes
-- translation helpers that start to behave like implicit conventions
-- shell-owned or init-owned orchestration glue that no longer reads as a
-  clear owner-local policy decision
-
-Phase 153 -- Service Composition Shape Audit
-- measure whether cross-service composition still fits explicit owner-local
-  glue or now exposes one honest need for a minimal composition primitive
-
-Preferred proof points:
-- at least one awkward composition path is classified concretely
-- the repository either confirms that explicit composition remains the honest
-  model or names one tightly bounded composition primitive candidate
-- no broker, orchestration framework, or hidden routing policy is admitted
-
-Band H - Identity And Addressing Semantics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The rebuilt interactive slice already hints at addressing and identity
-awkwardness across fixed restarts.
-The next move should be to clarify the semantics already being relied on,
-without widening to dynamic discovery or registries.
-
-Core question:
-- what does it mean to refer to a service across time in the current model?
-
-Likely themes:
-- fixed wiring versus stable identity
-- positional, capability-derived, or explicitly named reference meaning
-- what survives restart and what must be reacquired explicitly
-
-Phase 154 -- Service Identity And Addressing Semantics
-- publish one explicit identity and addressing statement for the current
-  fixed-wiring service model and classify any restart-time ambiguity
-
-Preferred proof points:
-- at least one current identity assumption is made explicit rather than
-  remaining phase-local folklore
-- the repository can state what remains stable across restart and what does
-  not
-- no discovery service, registry, or dynamic rebinding mechanism is admitted
-
-Band I - Temporal Semantics And Backpressure Truth
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-After identity is clearer, the repository should make time and queue pressure
-explicit rather than letting them remain accidental properties of the current
-small system.
-
-Core question:
-- what happens when service latency, queued requests, delayed replies, or
-  repeated use make temporal behavior visible?
-
-Likely themes:
-- ordering guarantees versus accidental ordering
-- slow-service consequences
-- hidden queue pressure becoming user-visible
-- late or out-of-order replies and what the current model says about them
-
-Phase 155 -- Temporal Semantics And Backpressure Audit
-- classify the current model's ordering, delay, and queue-pressure truth
-  without widening to a scheduler rewrite or an async framework
-
-Preferred proof points:
-- one temporal awkwardness is stated in user-visible terms rather than in
-  implementation-only terms
-- the repository can distinguish guaranteed ordering from accidental current
-  behavior
-- any visible backpressure consequence remains explicit and owner-local
-
-Band J - Real System Pressure
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If Phase 152 through Phase 155 remain honest, the next frontier is no longer
-shape extraction.
-It is whether that shape survives when the system stops being quiet.
-
-The next steps should therefore expose the existing model to a small set of
-real-system pressures without widening into platform breadth.
-
-Band J1 - Multi-Client Reality
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-The current system is still effectively organized around one shell-owned flow.
-The next question is what breaks first when two independent clients interact
-with the same fixed-wiring services.
-
-Phase 156 -- Multi-Client Interaction Audit
-- introduce one bounded multi-client interaction proof and classify ordering,
-  reply-routing, fairness, or hidden-global-state assumptions that become
-  visible
-
-Preferred proof points:
-- two independent clients can exercise one shared service path
-- the repository names the first assumption that fails under interleaving
-- no scheduler expansion, priority system, or wider concurrency model is
-  admitted yet
-
-Band J2 - Long-Lived System Coherence
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Restart has already been proved.
-The next question is whether the current service meanings remain coherent over
-time rather than only across one reboot boundary.
-
-Phase 157 -- Long-Lived System Coherence Audit
-- measure whether repeated long-lived use keeps state, logs, and restart
-  meaning coherent without widening to persistence or lifecycle frameworks
-
-Preferred proof points:
-- one long-lived interaction sequence is audited for semantic drift
-- the repository can state whether restart means the same thing after many
-  interactions as it did after the first proof wave
-- any inconsistency is recorded as a model issue rather than hidden behind
-  more instrumentation
-
-Band J3 - Cross-Service Failure Semantics
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-The repository already has bounded restart contracts.
-The next move is to check whether failure is understandable and usable across
-services rather than only correct within each one.
-
-Phase 158 -- Cross-Service Failure Semantics Consistency
-- compare the visible failure contracts of the admitted services and classify
-  whether retry, loss, reset, and user-visible explanation remain consistent
-
-Preferred proof points:
-- at least one cross-service failure mismatch is either justified or rejected
-- users can tell what was lost and what can be retried without guessing
-- no hidden recovery framework or kernel-owned retry policy is admitted
-
-Band J4 - Observability Without Frameworks
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-The current log service is useful evidence, but the repository should not let
-debugging pressure grow into instrumentation sprawl or a logging platform.
-
-Phase 159 -- Observability As A System Property
-- classify the smallest truthful observation surface the system needs in
-  order to explain itself without turning logging into a framework
-
-Preferred proof points:
-- one debugging workflow is supported by truthful system-visible observation
-  rather than by internal folklore
-- the repository can distinguish implementation detail from user-meaningful
-  observability
-- no cross-cutting debug-print culture or broader telemetry platform is
-  admitted
-
-Band J5 - First Model Boundary Identification
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-If the earlier pressure steps are honest, at least one problem should start to
-look unnatural in the current model.
-That is a success condition, not a failure.
-
-Phase 160 -- First Model Boundary Identification
-- name the first repeated problem that the current model cannot solve cleanly
-  without new rules, and classify the narrowest possible expansion axis
-
-Preferred proof points:
-- the repository can point to one repeated pressure that the current model
-  does not answer well
-- the boundary is stated before any fix is admitted
-- any future expansion candidate is tied to repeated evidence rather than to
-  speculative platform ambition
-
-What Phase 160 should earn
---------------------------
-Only after this pressure wave should the repository consider one carefully
-chosen expansion axis, such as:
-
-- state generalization pressure that might justify filesystem work
-- identity or addressing pressure that might justify remote or network-facing
-  work
-- fairness or queue-pressure pressure that might justify scheduler work
-- repeated authority-ergonomics pressure that might justify a capability-model
-  refinement
-
-The admission rule stays the same:
-
-- before any new subsystem is added, the repository should be able to say
-  that it tried to stay within the current model, that the model failed here,
-  and that the failure repeated under real use
 
 Non-goals
 ---------

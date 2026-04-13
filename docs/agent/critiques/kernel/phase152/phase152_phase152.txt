@@ -1,0 +1,261 @@
+kernel/src/bootstrap_services/12_phase152.mc — Phase 152 Architectural Review
+==============================================================================
+
+FILE: kernel/src/bootstrap_services/12_phase152.mc  (~70 lines)
+PHASE: 152 — controlled variation workflow (restart log service mid-sequence)
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL (code does not represent its own semantics correctly)
+  1. execute_phase152_controlled_variation_workflow takes 14 parameters
+     where 5 are individual service states and 4 are payloads.
+  2. Six parallel early-return paths each construct an 11-argument
+     result inline with increasing numbers of missing values.
+
+P2 — DESIGN INTEGRITY (organisational smells that will compound)
+  3. Each failure path must manually fill all unset routing and
+     retention observations with sentinel empty values.
+  4. phase152_restart_log_service passes system.log_state.owner_pid
+     as both the old and new PID — the semantics of "same PID, new
+     endpoint" are not expressed.
+
+P3 — READABILITY / MAINTENANCE COST
+  5. empty_route and empty_restart are defined as inline literals
+     inside the function body.
+  6. The 5 service state parameters are the Phase150RebuiltSystemState
+     decomposed at the call boundary.
+
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL
+────────────────────────────────────────────────────────────────────────
+
+1. execute_phase152_controlled_variation_workflow takes 14 parameters
+   where 5 are individual service states and 4 are payloads.
+
+  func execute_phase152_controlled_variation_workflow(
+      serial_state: serial_service.SerialServiceState,
+      shell_state: shell_service.ShellServiceState,
+      log_state: log_service.LogServiceState,
+      echo_state: echo_service.EchoServiceState,
+      kv_state: kv_service.KvServiceState,
+      shell_endpoint_id: u32,
+      init_pid: u32,
+      log_service_directory_key: u32,
+      shared_control_endpoint_id: u32,
+      log_append_payload: [4]u8,
+      log_tail_payload: [4]u8,
+      kv_set_payload: [4]u8,
+      kv_get_payload: [4]u8) Phase152ControlledVariationWorkflowResult
+
+The first line of the function body constructs a Phase150RebuiltSystemState
+from the first 5 parameters:
+
+  system: Phase150RebuiltSystemState = phase150_rebuilt_system_state(
+      serial_state, shell_state, log_state, echo_state, kv_state)
+
+The 5 service states are immediately unified into a single struct.
+They should be accepted as that struct in the first place:
+
+  func execute_phase152_controlled_variation_workflow(
+      system: Phase150RebuiltSystemState,
+      shell_endpoint_id: u32,
+      init_pid: u32,
+      log_service_directory_key: u32,
+      shared_control_endpoint_id: u32,
+      log_append_payload: [4]u8,
+      log_tail_payload: [4]u8,
+      kv_set_payload: [4]u8,
+      kv_get_payload: [4]u8) Phase152ControlledVariationWorkflowResult
+
+That removes 4 parameters.  The 4 payloads are the test vectors for
+each command; they could similarly be gathered into a struct:
+
+  struct Phase152WorkflowPayloads {
+      log_append: [4]u8
+      log_tail:   [4]u8
+      kv_set:     [4]u8
+      kv_get:     [4]u8
+  }
+
+reducing the signature to 6 parameters.
+
+
+2. Six parallel early-return paths each construct an 11-argument result
+   inline with increasing numbers of missing values.
+
+The function has 6 steps; each step checks success and returns early
+on failure.  Each early return constructs a
+phase152_controlled_variation_workflow_result with 11 arguments.  As
+the workflow progresses, more actual values become available; earlier
+positions in the argument list hold empty_route or
+empty_restart sentinels:
+
+  // After step 1 fails (pre_restart_log_append):
+  return phase152_controlled_variation_workflow_result(
+      pre_restart_log_append.system,
+      pre_restart_log_append.routing,  // position 2: actual
+      empty_route,                      // position 3: missing
+      empty_route,                      // position 4: missing
+      empty_route,                      // position 5: missing
+      empty_route,                      // position 6: missing
+      empty_route,                      // position 7: missing
+      log_retention(...),               // position 8: actual
+      log_retention(...),               // position 9: actual
+      kv_retention(...),                // position 10: actual
+      empty_restart,                    // position 11: missing
+      0)                                // succeeded = 0
+
+  // After step 3 fails (pre_restart_kv_set):
+  return phase152_controlled_variation_workflow_result(
+      pre_restart_kv_set.system,
+      pre_restart_log_append.routing,   // position 2: from step 1
+      pre_restart_log_tail.routing,     // position 3: from step 2
+      pre_restart_kv_set.routing,       // position 4: from step 3
+      empty_route,                      // position 5: missing
+      ...
+
+The pattern makes evident that the result type is accumulating routing
+observations from each step — it is an observation log, not a result.
+Each early-return path must reach back to earlier step variables to
+fill in all the routing positions that have been accumulated so far.
+
+The correct representation is an incremental accumulator:
+
+  struct Phase152WorkflowObservations {
+      log_append_routing: shell_service.ShellRoutingObservation
+      log_tail_routing:   shell_service.ShellRoutingObservation
+      kv_set_routing:     shell_service.ShellRoutingObservation
+      kv_get_routing:     shell_service.ShellRoutingObservation
+      post_restart_log_tail_routing: shell_service.ShellRoutingObservation
+      post_restart_kv_get_routing:   shell_service.ShellRoutingObservation
+      restart:            init.ServiceRestartObservation
+  }
+
+initialized to empty values at the start, updated at each step, and
+passed through to the result.  Each early return then fills the result
+from this accumulator rather than reaching into earlier step variables.
+
+────────────────────────────────────────────────────────────────────────
+P2 — DESIGN INTEGRITY
+────────────────────────────────────────────────────────────────────────
+
+3. Each failure path must manually fill all unset routing and retention
+   observations with sentinel empty values.
+
+Because the result type carries all 6 routing slots regardless of how
+far the workflow progressed, every early return must fill the positions
+that have not yet been produced.  The empty values must be constructed
+at the call site for each slot:
+
+  empty_route: shell_service.ShellRoutingObservation =
+      shell_service.observe_routing(system.shell_state)
+
+This creates a silent correctness dependency: callers that examine a
+result must know which positions represent actual observations versus
+which are sentinel empties.  There is no flag or marker in the result
+type that communicates how far the workflow progressed.
+
+The succeeded: u32 field indicates only pass/fail.  A caller that
+wants to diagnose a failure must infer the progress from which routing
+fields are populated versus empty.  A step count or progress indicator
+would make this explicit.
+
+
+4. phase152_restart_log_service passes system.log_state.owner_pid as
+   both the old and new PID.
+
+  func phase152_restart_log_service(
+      system: Phase150RebuiltSystemState,
+      init_pid: u32,
+      log_service_directory_key: u32,
+      shared_control_endpoint_id: u32) Phase150RebuiltSystemRestartResult {
+      restart: init.ServiceRestartObservation = init.observe_service_restart(
+          init_pid,
+          log_service_directory_key,
+          system.log_state.owner_pid,   // old_pid
+          system.log_state.owner_pid,   // new_pid  <-- same value
+          shared_control_endpoint_id,
+          1,
+          1)
+      restarted_log_state: log_service.LogServiceState =
+          log_service.service_state(system.log_state.owner_pid, ...)
+  }
+
+observe_service_restart takes separate old_pid and new_pid parameters.
+Passing the same value for both signals "restart in place" — the
+service restarts with the same PID.  That semantic (same PID, new
+endpoint state) is not communicated by the code; a reader sees two
+identical expressions and wonders if the second should differ.
+
+If the intent is always "same PID restart," the function should take
+one PID or document the constraint explicitly.  If in-place versus
+migration restart are distinct operations, they should be distinct
+functions.
+
+────────────────────────────────────────────────────────────────────────
+P3 — READABILITY / MAINTENANCE COST
+────────────────────────────────────────────────────────────────────────
+
+5. empty_route and empty_restart are defined as inline literals inside
+   the function body.
+
+  empty_route: shell_service.ShellRoutingObservation =
+      shell_service.observe_routing(system.shell_state)
+  empty_restart: init.ServiceRestartObservation =
+      init.observe_service_restart(0, 0, 0, 0, 0, 0, 0)
+
+These are used six times each as sentinel values for result slots that
+haven't been reached yet.  They should be named module-level constants
+or obtained from a zero-value constructor at the module level
+(shell_service.empty_routing_observation(),
+init.empty_service_restart_observation()) so that all use sites across
+the phase151/152 files use the same canonical empty value.
+
+
+6. The 5 service state parameters are the Phase150RebuiltSystemState
+   decomposed at the call boundary.
+
+The caller that invokes execute_phase152_controlled_variation_workflow
+must destructure a Phase150RebuiltSystemState into 5 individual fields
+to pass them in, then the function's first line reconstructs the struct.
+This decompose-then-reconstruct at every call boundary is the same
+pattern as the 12-parameter execute_program_cap_spawn_and_wait in
+bootstrap_runtime.mc.  The fix is the same: accept the already-composed
+struct directly.
+
+────────────────────────────────────────────────────────────────────────
+COMPOUND EFFECT
+────────────────────────────────────────────────────────────────────────
+
+Findings 1 and 6 are the same problem: the boundary between this file
+and its callers is defined by 14 flat scalars rather than the 3–4
+logical inputs the function actually operates on.  This forces every
+caller to destructure its existing structs before calling and then
+reassemble them from the results.
+
+Finding 2 and finding 3 are consequences of the result type design: by
+pre-allocating slots for all 6 step observations regardless of progress,
+the early-return paths are forced to fill dead positions with sentinels.
+An incremental accumulator pattern would eliminate both problems.
+
+────────────────────────────────────────────────────────────────────────
+RECOMMENDED RESOLUTION ORDER
+────────────────────────────────────────────────────────────────────────
+
+1. Change the function signature to accept Phase150RebuiltSystemState
+   directly instead of 5 individual service states.
+
+2. Introduce Phase152WorkflowPayloads (or equivalent) to group the
+   4 payload parameters.
+
+3. Introduce a Phase152WorkflowObservations accumulator struct,
+   initialise it to empty at the function entry, and update it
+   incrementally.  Simplify all early-return paths to read from the
+   accumulator.
+
+4. Add module-level empty constructors for ShellRoutingObservation and
+   ServiceRestartObservation; replace the inline sentinel definitions.
+
+5. Document or rename the same-PID restart in phase152_restart_log_service
+   so the old_pid == new_pid convention is clearly communicated.

@@ -93,10 +93,10 @@ class Rule:
 
 
 RULES = [
-    Rule(("tests/parser/",), ("mc_parser_fixture_unit",), "parser fixture ownership"),
-    Rule(("tests/sema/",), ("mc_sema_fixture_unit",), "semantic fixture ownership"),
-    Rule(("tests/mir/",), ("mc_mir_fixture_unit", "mc_mir_unit"), "MIR fixture ownership"),
-    Rule(("tests/codegen/",), ("mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "codegen fixture ownership"),
+    Rule(("tests/compiler/parser/",), ("mc_parser_fixture_unit",), "parser fixture ownership"),
+    Rule(("tests/compiler/sema/",), ("mc_sema_fixture_unit",), "semantic fixture ownership"),
+    Rule(("tests/compiler/mir/",), ("mc_mir_fixture_unit", "mc_mir_unit"), "MIR fixture ownership"),
+    Rule(("tests/compiler/codegen/",), ("mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "codegen fixture ownership"),
     Rule(("tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_suite.cpp"), ("mc_tool_workflow_unit",), "workflow suite ownership"),
     Rule(("tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp"), ("mc_tool_build_state_unit",), "build-state suite ownership"),
     Rule(("tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp"), ("mc_tool_real_project_unit",), "real-project suite ownership"),
@@ -292,15 +292,15 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
     ]
 
     explicit_inputs = {
-        "mc_parser_fixture_unit": ["tests/parser/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "tests/support/"],
-        "mc_sema_fixture_unit": ["tests/sema/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "compiler/resolve/", "compiler/sema/", "tests/support/"],
-        "mc_mir_fixture_unit": ["tests/mir/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "compiler/resolve/", "compiler/sema/", "compiler/mir/", "tests/support/"],
+        "mc_parser_fixture_unit": ["tests/compiler/parser/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "tests/support/"],
+        "mc_sema_fixture_unit": ["tests/compiler/sema/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "compiler/resolve/", "compiler/sema/", "tests/support/"],
+        "mc_mir_fixture_unit": ["tests/compiler/mir/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "compiler/resolve/", "compiler/sema/", "compiler/mir/", "tests/support/"],
         "mc_mir_unit": ["compiler/mir/", "compiler/resolve/", "compiler/sema/", "compiler/parse/", "compiler/ast/"],
-        "mc_codegen_fixture_unit": ["tests/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "tests/support/"],
+        "mc_codegen_fixture_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "tests/support/"],
         "mc_codegen_llvm_unit": ["compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "tests/tool/codegen_llvm_tests.cpp"],
-        "mc_codegen_executable_core_unit": ["tests/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "tests/codegen/codegen_executable_tests.cpp"],
-        "mc_codegen_executable_stdlib_unit": ["tests/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "stdlib/", "tests/codegen/codegen_executable_tests.cpp"],
-        "mc_codegen_executable_project_unit": ["tests/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "examples/", "tests/codegen/codegen_executable_tests.cpp"],
+        "mc_codegen_executable_core_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
+        "mc_codegen_executable_stdlib_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "stdlib/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
+        "mc_codegen_executable_project_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "examples/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
         "mc_tool_workflow_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
         "mc_tool_build_state_unit": ["tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
         "mc_tool_real_project_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/", "tests/support/"],

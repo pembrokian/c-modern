@@ -88,26 +88,26 @@ This file is a fast orientation map for agents working in this repository.
 
 ## Tests
 
-- `tests/parser`
+- `tests/compiler/parser`
   - parser fixtures
   - success cases compare AST dumps
   - failure cases compare diagnostic substrings in `.errors.txt`
 
-- `tests/sema`
+- `tests/compiler/sema`
   - semantic fixture coverage
   - success cases compare `DumpModule` output
   - includes import-resolution and layout fixtures
 
-- `tests/mir`
+- `tests/compiler/mir`
   - MIR unit tests and MIR fixture dumps
 
-- `tests/codegen`
+- `tests/compiler/codegen`
   - deterministic backend inspectability fixtures
   - grouped executable coverage now lives in:
-    - `tests/codegen/codegen_executable_tests.cpp`: shared grouped executable implementation
-    - `tests/codegen/codegen_executable_core_tests.cpp`: core executable behavior driver
-    - `tests/codegen/codegen_executable_stdlib_tests.cpp`: stdlib and canonical executable behavior driver
-    - `tests/codegen/codegen_executable_project_tests.cpp`: project and imported-module executable behavior driver
+    - `tests/compiler/codegen/codegen_executable_tests.cpp`: shared grouped executable implementation
+    - `tests/compiler/codegen/codegen_executable_core_tests.cpp`: core executable behavior driver
+    - `tests/compiler/codegen/codegen_executable_stdlib_tests.cpp`: stdlib and canonical executable behavior driver
+    - `tests/compiler/codegen/codegen_executable_project_tests.cpp`: project and imported-module executable behavior driver
 
 - `tests/tool`
   - smoke and support-layer tests for the driver/tooling path

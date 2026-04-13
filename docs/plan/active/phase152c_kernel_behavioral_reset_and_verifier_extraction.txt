@@ -1,0 +1,409 @@
+Phase 152c -- Kernel Behavioral Reset And Verifier Extraction
+=============================================================
+
+Status
+------
+COMPLETE (2026-04-13)
+
+Purpose
+-------
+Insert one explicit corrective phase between the active Phase 152b state-model
+refactor direction and the later Phase 153 through Phase 160 service and
+system audit notes.
+
+This phase exists because the repository now has enough evidence that the
+current kernel slice is over-constrained by proof-owned structure. The kernel
+still contains real owner-local primitives and useful service concepts, but
+too much of the active architecture is dominated by phase-indexed audits,
+proof-context duplication, immutable state threading, and observation-heavy
+glue that is more complex than the behavior it is trying to justify.
+
+Phase 152c therefore changes the direction of travel. The immediate goal is
+not to add another audit, not to widen service behavior, and not to continue
+refactoring the current proof-owned bootstrap shape into cleaner versions of
+the same burden. The immediate goal is to make the kernel small enough to
+understand, direct enough to change, and testable enough that correctness can
+come primarily from structure plus small behavioral checks.
+
+Relationship to companion notes
+-------------------------------
+This phase note should stay aligned with:
+
+- `docs/plan/active/phase151_complete_main_simplification.txt`
+- `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
+- `docs/plan/active/phase152b_kernel_canonical_state_model_refactor.txt`
+- `docs/plan/active/phase153_service_composition_shape_audit.txt`
+- `docs/plan/active/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/active/phase155_temporal_semantics_and_backpressure_audit.txt`
+- `docs/plan/active/phase156_multi_client_interaction_audit.txt`
+- `docs/plan/active/phase157_long_lived_system_coherence_audit.txt`
+- `docs/plan/active/phase158_cross_service_failure_semantics_consistency.txt`
+- `docs/plan/active/phase159_observability_as_a_system_property.txt`
+- `docs/plan/active/phase160_first_model_boundary_identification.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 140 through Phase 152 proved that the repository can grow one bounded
+  service graph, retained-state services, restart pressure, and one
+  controlled variation over the real kernel tree.
+- Phase 151 and Phase 152b correctly identified `kernel_old/src/main.mc`,
+  `kernel_old/src/bootstrap_proofs.mc`, `kernel_old/src/bootstrap_runtime.mc`, and
+  the split `bootstrap_services` owners as the main concentration of friction.
+- The active problem is now larger than naming or grouping. The proof-owned
+  architecture itself has become the dominant source of cost.
+- The current kernel shape pays too much code for each unit of behavior:
+  long copied state structs, phase-indexed audit outputs, repeated observation
+  records, and helper layers that preserve verification structure instead of
+  simplifying kernel execution.
+- The next honest step is therefore a bounded architectural correction: make
+  runtime behavior primary again, move verification out of the kernel hot path,
+  and re-establish simple owner-local state and tests as the main source of
+  truth.
+
+Problem being solved
+--------------------
+- The repository accidentally made verification the dominant architecture
+  instead of a supporting tool.
+- `kernel_old/src/bootstrap_proofs.mc`, `kernel_old/src/bootstrap_audit/`, and
+  `kernel_old/src/debug/` now carry a large amount of phase-specific state and
+  observation structure that obscures the smaller kernel behaviors they are
+  meant to describe.
+- `kernel_old/src/bootstrap_services/` frequently threads large immutable result
+  records whose main job is to copy unchanged fields back into a fresh value.
+- This shape slows design iteration exactly where the repository still needs
+  freedom: IPC boundaries, service ownership, mutable retained state, and the
+  first simple kernel execution model.
+- If the repository keeps extending this architecture, later phases will be
+  validating increasingly elaborate scaffolding instead of simplifying the
+  kernel itself.
+- The same problem now exists in `tests/`: too much of the active test tree is
+  phase-driven, artifact-driven, and projection-driven, so it rewards
+  preserving proof shape rather than checking whether the system actually
+  works.
+
+Phase target
+------------
+Phase 152c should reassert the correct architecture boundary:
+
+- the kernel owns behavior, state, IPC, scheduling, lifecycle, and services
+- debug observability remains available but becomes simple and optional
+- proof and audit machinery stop dominating runtime code paths and move toward
+  offline or post-run interpretation of logged events
+- service code becomes small, direct, and locally understandable
+- focused behavioral tests become the primary acceptance surface for kernel
+  invariants
+
+The intended repository result is:
+
+- one first rewritten service path that is materially simpler than the current
+  proof-owned equivalent
+- one explicit event-log or ring-buffer observability path replacing record
+  and audit struct accumulation on the selected slice
+- one frozen or deprecated proof-owned bootstrap band that stops growing while
+  the simpler kernel shape is established
+- one updated testing direction that favors small behavioral checks over
+  phase-indexed runtime proofs for the rewritten slice
+- one clear policy that later verification belongs outside the kernel core
+  path rather than inside every service transition
+
+Hard constraints
+----------------
+- Preserve the current admitted kernel scope. This phase is a structural
+  correction, not permission to widen into filesystems, networking, SMP,
+  persistence, or a broader platform claim.
+- Keep compiler, parser, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces closed unless a narrow blocker forces a local change.
+- Prefer deletion over translation. Do not mechanically port proof-heavy
+  structures into renamed versions of the same architecture.
+- Prefer owner-local mutable or directly updated state over repeated
+  immutable-copy envelopes when the existing proof scaffolding is the only
+  reason for the copy pressure.
+- Keep observability explicit and bounded. Event logs are acceptable; new
+  nested audit trees, score systems, or runtime proof composition are not.
+- Land the correction incrementally. Do not attempt a one-patch rewrite of the
+  entire kernel tree.
+
+Non-goals
+---------
+- no attempt to complete the whole kernel architecture in this phase
+- no new general service framework, broker, registry, supervisor, or policy
+  layer disguised as simplification
+- no new language or compiler feature added only to support the rewrite
+- no widening of message payload width, namespace policy, persistence policy,
+  or restart policy beyond what the selected rewrite slice actually needs
+- no claim that all verification is permanently abandoned; the correction is
+  that verification moves out of the runtime core path until the kernel shape
+  is stable enough to justify it again
+
+Core rule
+---------
+- The kernel must dominate the verifier, not the other way around.
+- If ten lines of proof exist to justify one line of behavior, simplify the
+  behavior surface first.
+- If a helper mainly copies unchanged fields into a fresh result value, delete
+  the abstraction pressure causing that copy before adding more helpers.
+- If an invariant can be checked with a small direct test, prefer that test to
+  another runtime audit struct.
+- If observability is needed, emit a small event and interpret it later.
+  Do not turn runtime state itself into the proof artifact.
+
+Controlling correction gaps
+---------------------------
+Phase 152c treats these as the controlling architectural gaps:
+
+1. Verification currently lives inside the kernel rather than outside it.
+
+2. Service execution is distorted by immutable state-copy discipline and
+   observation accumulation instead of direct owner-local behavior.
+
+3. `main.mc` and the bootstrap proof path still describe phase machinery more
+   strongly than they describe the kernel boot and service model.
+
+4. The active freestanding kernel tests still reward proof-shape preservation
+   more than behavioral clarity on rewritten slices.
+
+5. The repository lacks one canonical slim service path that later rewrites
+   can copy honestly.
+
+6. The test tree still treats runtime shape and audit artifacts as the primary
+  acceptance surface instead of using simple smokes and direct system flows.
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+0. keep the existing legacy proof-shaped kernel tree frozen enough to remain a
+  reference and compile-safe fallback while the reset lane is established
+
+0a. use `kernel/` as the clean rewrite lane and treat `kernel_old/`
+   as the legacy proof-shaped tree during the reset
+
+1. one canonical Phase 152c execution note defining the reset in direction and
+   the allowed bounded scope
+
+2. one freeze on new feature growth inside `kernel_old/src/bootstrap_proofs.mc`,
+   `kernel_old/src/bootstrap_audit/`, and `kernel_old/src/debug/` while the simpler
+   kernel shape is established
+
+3. one first service rewrite, with `serial_service` as the preferred anchor,
+   that replaces proof-owned state threading with small owner-local state and
+   direct behavior
+
+4. one observability replacement pass on that same slice, converting record or
+   audit accumulation into a small event-log or ring-buffer path that can be
+   compiled out or ignored by default
+
+5. one `main.mc` simplification pass that removes phase-marker and
+   proof-routing pressure only as far as the rewritten slice requires
+
+6. one focused test rewrite that proves the new slice through small behavioral
+   checks instead of phase-indexed audit expectations
+
+7. one explicit deprecation path for the old verifier-owned structures so they
+   can be deleted or archived in later follow-through without ambiguity
+
+8. one test-tree cleanup activity that establishes `tests/smoke/` and
+  `tests/system/` as the new behavior-first owners for kernel cleanup work,
+  while freezing the phase-driven runtime-proof suites as legacy surfaces
+
+Recommended sequencing
+---------------------
+Phase 152c should land in this order:
+
+0. fork the lane, not the architecture
+   - keep the legacy tree available as the compile-safe reference
+   - land the first reset work under `kernel/` so simplification is not
+     forced to preserve verifier-owned compatibility at every step
+
+1. freeze verifier growth
+   - stop adding new behavior to `bootstrap_proofs`, `bootstrap_audit`, and
+     `debug`
+   - treat those surfaces as deprecated implementation debt during this phase
+
+2. choose one canonical simple slice
+  - use `kernel/src/serial_service.mc` as the first rewrite anchor
+    because the serial path already exposes the failure directly: small
+    behavior hidden by large observation and copy scaffolding
+
+Service standard for the reset lane
+-----------------------------------
+Every service admitted into `kernel/` should have only four sections:
+
+1. state
+  - only fields that cannot be recomputed from present behavior
+
+2. initialization
+  - one small constructor with obvious defaults
+
+3. core handlers
+  - receive, forward, reply, or similarly direct owner-local behavior
+
+4. optional debug hooks
+  - thin side-channel hooks only; no proof-owned state accumulation
+
+The reset lane must not admit these old-shape categories into service files:
+
+- `record_*`
+- `observe_*`
+- `*Observation`
+- event-tag score systems
+- phase-indexed audit routing
+- runtime history stored only for verifier consumption
+
+3. rewrite the selected service around direct state
+   - replace proof-shaped execution envelopes with a small service-owned state
+   - keep ingress, composition, and failure semantics only where they are real
+     kernel behavior, not where they exist to feed an audit tree
+
+4. replace recording with logging
+   - preserve debugging value through a small event log or ring buffer
+   - keep emitted events flat and local
+   - make post-run or offline interpretation the place where richer analysis
+     can happen later
+
+5. cut the first proof-owned dependency chain
+   - remove the rewritten slice from the active phase-indexed proof path
+   - stop requiring new audit structs for the new service flow
+
+6. rewrite the corresponding tests
+   - prefer direct behavioral assertions and small synthetic proofs
+   - keep only the narrowest runtime or MIR checks needed to guard the new
+     behavior surface
+
+6a. establish the replacement test layout
+   - create `tests/smoke/` for tiny pass-fail checks such as build, hello,
+     IPC round trip, serial basic flow, and shell boot
+   - create `tests/system/` for direct service and multi-service behavior such
+     as serial ingress, IPC round trip, echo, log, and key-value flows
+   - treat parser, sema, MIR, and codegen tests as compiler validation only
+     and keep them under their existing owners
+   - freeze `tests/tool/freestanding/kernel/runtime/phase*` and related
+     projection-heavy runtime-proof paths as read-only legacy surfaces during
+     the transition
+
+7. decide the next deletion band
+   - after the first service rewrite proves the direction, choose whether the
+     next cut is `bootstrap_services`, `main.mc` proof routing, or the old
+     audit directories
+
+Why this is the right next step
+-------------------------------
+- It addresses the active bottleneck directly instead of polishing the current
+  proof-owned architecture.
+- It creates one falsifiable discriminator: can the repository express one
+  real service path more simply without losing clarity or testability?
+- It keeps the rewrite bounded and evidence-based by forcing one concrete
+  service anchor before wider deletion.
+- It restores room for later service, identity, and temporal phases to talk
+  about the kernel again rather than about the verifier wrapped around it.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/plan/active/phase152c_kernel_behavioral_reset_and_verifier_extraction.txt`
+   - publish the canonical corrective plan and sequencing rules
+
+2. `kernel/src/serial_service.mc`
+   - host the first direct service rewrite and become the reference shape for
+     later simplification passes
+
+3. `kernel_old/src/bootstrap_services/05_serial.mc`
+   - lose proof-owned execution scaffolding on the selected service path and
+     keep only the narrow boot or spawn glue that still belongs here
+
+4. `kernel_old/src/main.mc`
+   - remain an explicit orchestrator but stop carrying proof-routing burden for
+     the rewritten slice
+
+5. `kernel_old/src/state.mc`, `kernel_old/src/ipc/`, `kernel_old/src/lifecycle.mc`, and
+   `kernel_old/src/sched.mc`
+   - remain the primary kernel owners for the direct state and behavior that
+     the rewritten slice still depends on
+
+6. `kernel_old/src/bootstrap_proofs.mc`, `kernel_old/src/bootstrap_audit/`, and
+   `kernel_old/src/debug/`
+   - freeze for new growth and then lose ownership of the rewritten slice
+
+7. `tests/smoke/`, `tests/system/`, and the nearby workflow runners that can
+  execute them simply
+  - own the new behavior-first acceptance path for rewritten slices
+
+8. `tests/tool/freestanding/kernel/` and the older runtime-proof suites
+  - freeze as legacy validation surfaces and stop acting as the primary shape
+    owners for new kernel cleanup work
+
+Deliverables
+------------
+- one canonical Phase 152c execution note in `docs/plan/active/`
+- one first simplified service slice with materially less proof-owned state
+  threading
+- one small event-log or ring-buffer observability replacement on that slice
+- one focused behavioral regression proving the rewritten service path
+- one test-tree cleanup note and starter layout for `tests/smoke/` and
+  `tests/system/`
+- one explicit freeze or deprecation statement for the old verifier-owned
+  kernel scaffolding
+
+Acceptance criteria
+-------------------
+Phase 152c is complete when all of the following are true:
+
+- one selected service path is simpler in structure, not just renamed
+- the rewritten slice no longer requires new audit or proof structs to evolve
+- the primary invariant checks for that slice are small behavioral tests
+- debug visibility still exists through flat events or similarly small
+  observability, not nested runtime proof state
+- the old proof-owned surfaces are no longer the controlling architecture for
+  that slice
+- `tests/smoke/` and `tests/system/` exist as the explicit destination for
+  new behavior-first kernel cleanup checks
+- the old phase-driven runtime-proof suites are frozen as legacy surfaces
+  rather than expanded as the default validation path
+- the repository can name the next rewrite target based on evidence from the
+  first simplified slice rather than from speculation
+
+Completion evidence
+-------------------
+- The first simplified reset-lane service path now lives under `kernel/`
+  through `serial_service`, `shell_service`, `serial_shell_path`, and the
+  retained-state `log_service` follow-through.
+- The rewritten slice no longer depends on new proof structs or audit-owned
+  state; its acceptance path is the behavior-first smoke and system fixtures
+  rooted under `tests/smoke/` and `tests/system/` and exercised by the
+  workflow runner.
+- Debug visibility now exists through the flat four-entry
+  `kernel/src/serial_shell_event_log.mc` ring buffer rather than through
+  nested runtime proof state.
+- The old phase-driven runtime-proof suites are documented and treated as
+  legacy validation surfaces during the reset instead of as the controlling
+  architecture for new cleanup work.
+- Evidence from the first slice says the next rewrite target is the legacy
+  serial bootstrap glue plus `main.mc` proof-routing burden, because the
+  reset-lane services themselves are already small enough while the remaining
+  complexity still sits in orchestration and verifier-owned routing.
+
+Risks and explicit tradeoffs
+----------------------------
+- The repository will temporarily carry both old proof-owned paths and new
+  simpler paths during the transition.
+- Some existing runtime-proof tests will need to be retired or rewritten
+  because they currently encode the old architecture rather than the intended
+  kernel behavior.
+- The first rewrite may expose missing direct state helpers in `state`, `ipc`,
+  or lifecycle owners. That is acceptable if the helpers remain owner-local
+  and behavior-driven.
+- This phase intentionally accepts less in-kernel proof structure in exchange
+  for a kernel that is easier to understand, change, and test honestly.
+
+Exit note for later phases
+--------------------------
+If Phase 152c succeeds, later phases should proceed from the simpler kernel
+shape, not from the assumption that the current verifier-owned bootstrap band
+must survive. Phase 153 through Phase 160 should be reevaluated against the
+new behavioral architecture before more proof-owned work is admitted. The
+first evidence-backed follow-on target is the legacy `bootstrap_services`
+serial glue plus the `main.mc` proof-routing band that still owns more phase
+machinery than runtime behavior.

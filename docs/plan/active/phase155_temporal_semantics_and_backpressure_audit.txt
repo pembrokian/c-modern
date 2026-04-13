@@ -157,3 +157,19 @@ Non-goals
 - adding automatic retries, hidden buffering, or dynamic queue growth
 - widening into broader timing APIs or async language features
 - reopening sema, MIR, backend, ABI, target, runtime, or `hal`
+
+kernel/ module admission
+------------------------
+Modules are added to `kernel/` only when THIS phase's audit forces them.
+Do not copy legacy implementations. Follow the four-section standard: state,
+init, handlers, optional debug.
+
+`uart` is admissible if this phase's backpressure audit requires staging
+payloads explicitly: staged payload + completion + one failure field, ~40
+lines. No `last_rx_*`, `last_tx_*`, or observation-count fields.
+
+`timer` is admissible only if temporal dispatch semantics are under audit
+and existing `boot.mc` dispatch ordering does not model them adequately:
+lean tick source + one expiry callback, no watchdog or counter arrays.
+
+Otherwise, no modules are added in Phase 155.

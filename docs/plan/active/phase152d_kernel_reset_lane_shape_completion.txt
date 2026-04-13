@@ -1,0 +1,156 @@
+Phase 152d -- Kernel Reset Lane Shape Completion
+=================================================
+
+Status
+------
+COMPLETE (2026-04-13)
+
+Purpose
+-------
+Close the service shape gap in `kernel/` opened by Phase 152c.
+
+Phase 152c established the reset lane with two of the three canonical reset
+service shapes: the forwarding path (serial→shell) and retained append/tail
+(log). The third shape -- retained key/value (read/write by key) -- was
+intentionally deferred as a follow-through item because the forwarding and
+append shapes alone were enough to prove the reset direction.
+
+Phase 152d completes that proof by:
+- adding `kv_service.mc` to `kernel/` as the third canonical shape
+- adding `boot.mc` to `kernel/` as a minimal multi-service dispatch entry
+  that composes all four services through a single step function
+- adding a focused kv-roundtrip system test and a boot dispatch smoke test
+- wiring both new tests into the workflow suite alongside the Phase 152c tests
+
+The result is that `kernel/` now contains all three shape classes, a
+working dispatch entry, and coverage for every service path. The shape gap
+is closed. Phase 153 can now start a composition audit inside `kernel/`
+rather than the old proof-shaped tree.
+
+Relationship to companion notes
+--------------------------------
+- `docs/plan/active/phase152c_kernel_behavioral_reset_and_verifier_extraction.txt`
+- `docs/plan/active/phase153_service_composition_shape_audit.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 152c landed the reset lane (`kernel/`) with serial, shell, log,
+  serial_shell_path, serial_shell_event_log, ipc, and syscall modules.
+- Three system/smoke tests covered the forwarding path and log shape.
+- `kv_service.mc` was identified as blocking the generalization claim: without
+  it, the reset lane could only demonstrate two of three service shapes.
+- `boot.mc` was identified as the missing dispatch entry that converts isolated
+  modules into a testable composed system slice.
+
+Problem being solved
+--------------------
+- `kernel/` after Phase 152c had no retained read/write shape. The
+  generalization claim -- the reset model works for all three atomic service
+  shapes -- could not be made honestly without also covering get/set semantics.
+- `kernel/` had no common dispatch entry. Each module was tested in
+  isolation. There was no proof that the four services could compose through
+  a shared dispatch step without friction.
+- Without both gaps closed, Phase 153's composition audit would have to start
+  by filling them rather than auditing actual composition pressure.
+
+Phase target
+------------
+Phase 152d delivers:
+
+- one `kv_service.mc` in `kernel/src/` covering the retained read/write
+  shape via set-by-observation (payload_len >= 2) and get-by-observation
+  (payload_len == 1) dispatch
+- one `boot.mc` in `kernel/src/` exposing `kernel_init()` and
+  `kernel_dispatch_step()` that composes serial_shell_path, log, and kv
+  through endpoint-id routing
+- one `kernel_reset_lane_kv_roundtrip` system test covering set, get,
+  overwrite, and independent-key semantics
+- one `kernel_reset_lane_boot` smoke test covering init emptiness, per-service
+  dispatch routing, and unknown-endpoint rejection
+- two new workflow suite test functions registered in `RunWorkflowToolSuite`
+
+Hard constraints
+----------------
+- Same constraints as Phase 152c: preserve admitted kernel scope, no language
+  or compiler changes, prefer deletion over translation, keep observability
+  bounded.
+- `kv_service.mc` and `boot.mc` must follow the four-section service standard
+  from Phase 152c: state, initialization, core handlers, optional debug hooks.
+  No `record_*`, `observe_*`, `*Observation`, or audit routing admitted.
+- `boot.mc` dispatch must remain a flat if-chain. No dynamic dispatch table,
+  no registry, no service supervisor admitted as a consequence of this phase.
+
+Non-goals
+---------
+- no persistence policy, no multi-client kv semantics beyond the fixed 4-slot
+  capacity already sufficient to prove the shape
+- no boot sequencing, capability seeding, or privilege separation in `boot.mc`
+  beyond what is needed to demonstrate dispatch routing
+- no new language or compiler feature
+- no claim that `boot.mc` is the final kernel dispatch architecture
+
+Core rule
+---------
+- Same as Phase 152c: the kernel must dominate the verifier, not the other way
+  around.
+- A shape is proven when it can be written, tested, and understood without
+  scaffolding. `kv_service.mc` at ~110 lines and `boot.mc` at ~65 lines are
+  evidence of this. Both modules fit the four-section standard with no audit
+  surface required.
+
+Required implementation surfaces
+---------------------------------
+
+1. `kernel/src/kv_service.mc`
+   - `KvServiceState`, `KvReply`, `KvReceiveResult`
+   - `kv_init`, `kv_on_set`, `kv_on_get`, `kv_on_receive`
+   - `debug_kv_count`
+
+2. `kernel/src/boot.mc`
+   - `KernelBootState`, `DispatchResult`
+   - `kernel_init`, `kernel_dispatch_step`
+   - `debug_boot_routed`
+   - endpoint ID constants: `SERIAL_ENDPOINT_ID`, `LOG_ENDPOINT_ID`,
+     `KV_ENDPOINT_ID`
+
+3. `tests/system/kernel_reset_lane_kv_roundtrip/`
+   - `build.toml` with `__KERNEL_NEW_SRC__` placeholder
+   - `src/main.mc` with four smoke functions: set/get round trip, missing key
+     status, overwrite semantics, independent key isolation
+
+4. `tests/smoke/kernel_reset_lane_boot/`
+   - `build.toml` with `__KERNEL_NEW_SRC__` placeholder
+   - `src/main.mc` with five smoke functions: empty-init check,
+     serial/log/kv dispatch routing, unknown-endpoint rejection
+
+5. `tests/tool/tool_workflow_suite.cpp`
+   - `TestKernelResetLaneKvRoundtripProjectRuns`
+   - `TestKernelResetLaneBootProjectRuns`
+   - both registered at the end of `RunWorkflowToolSuite`
+
+Acceptance criteria
+-------------------
+- `mc_tool_workflow_unit` passes with all five kernel reset lane tests green
+- `kernel/` contains all three canonical service shapes: forwarding,
+  append/tail, and key/value read/write
+- no module in `kernel/src/` admits audit structs, record functions, or
+  phase-indexed observation routing
+- `boot.mc` composes all four services through a single dispatch step function
+  that can be exercised by a hosted test binary without any runtime scaffolding
+
+Exit note
+---------
+Phase 152d completes the Phase 152c shape gap. The `kernel/` lane now
+has:
+- 9 modules (ipc, syscall, serial_service, shell_service, log_service,
+  serial_shell_path, serial_shell_event_log, kv_service, boot)
+- ~520 lines of source covering all admitted service shapes plus composition
+- 5 tests covering forwarding, observability, retained-state, kv-roundtrip,
+  and boot dispatch
+
+The lane is ready for Phase 153's composition audit. Phase 153 should reframe
+its audit surface from `kernel_old/src/bootstrap_services/` to `kernel/src/`,
+starting with the question of whether `boot.mc`'s flat dispatch or
+`serial_shell_path.mc`'s explicit composition reveals any glue pressure that
+the isolated module tests missed.

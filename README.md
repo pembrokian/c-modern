@@ -173,7 +173,7 @@ ctest --test-dir build/debug --output-on-failure
 ctest --test-dir build/debug -j4 --output-on-failure
 ctest --test-dir build/debug -R 'mc_tool_|mc_codegen_executable_(stdlib|project)_unit' --output-on-failure
 build/debug/mc check tests/cases/hello.mc --dump-ast --emit-dump-paths
-build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/probes/smoke_return_zero --dump-backend
+build/debug/mc build tests/compiler/codegen/smoke_return_zero.mc --build-dir build/debug/probes/smoke_return_zero --dump-backend
 build/debug/mc check tests/stdlib/hello_stdout.mc
 build/debug/mc build tests/stdlib/hello_stdout.mc --build-dir build/debug/probes/hello_stdout
 build/debug/mc check --project tests/tool/phase7_project/build.toml
@@ -225,7 +225,7 @@ make public-cut-smoke
 
 ```sh
 build/debug/mc check tests/cases/hello.mc
-build/debug/mc build tests/codegen/smoke_return_zero.mc --build-dir build/debug/audit/public_cut_smoke/smoke_return_zero
+build/debug/mc build tests/compiler/codegen/smoke_return_zero.mc --build-dir build/debug/audit/public_cut_smoke/smoke_return_zero
 build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
 build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/audit/public_cut_smoke/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
 build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/audit/public_cut_smoke/issue_rollup

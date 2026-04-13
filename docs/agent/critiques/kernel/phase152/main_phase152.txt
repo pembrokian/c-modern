@@ -1,0 +1,609 @@
+kernel/src/main.mc — Phase 152 Architectural Review
+=====================================================
+
+FILE: kernel/src/main.mc  (~2025 lines)
+PHASE: 152 — late service system proofs
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL (code does not represent its own semantics correctly)
+  1. execute_late_service_system_proofs() is not a function.
+  2. execute_mid_phase_proofs() is not a function.
+  3. build/execute/install triads are a missing abstraction.
+  4. The 8 contract-hardened flags are a missing type.
+
+P2 — DESIGN INTEGRITY (organisational smells that will compound)
+  5. No coherent representation of kernel system state.
+  6. Snapshot structs belong in their service modules, not main.mc.
+  7. HANDLE_TABLES and WAIT_TABLES use silent index-identity coupling.
+  8. build_phase108_program_cap_contract() is a pure pass-through.
+  9. validate_ functions do not take their inputs — they read globals.
+ 10. Audit struct construction is inline in execution functions.
+
+P3 — READABILITY / MAINTENANCE COST
+ 11. ~50 top-level constants with no grouping.
+ 12. Protocol byte constants are opaque ASCII literals.
+ 13. Boolean flags typed u32.
+ 14. Empty snapshot constructors will drift from struct definitions.
+ 15. emit_late_phase_markers() is a sequential list with no structure.
+ 16. validate_late_phase_boot_log() is 130 lines of the same three
+     checks repeated for every phase marker.
+
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL
+────────────────────────────────────────────────────────────────────────
+
+1. execute_late_service_system_proofs() is not a function.
+
+The signature carries 9 individual parameters forwarded from the
+call site in execute_mid_phase_proofs():
+
+  func execute_late_service_system_proofs(
+      phase137_audit: debug.Phase137OptionalDmaOrEquivalentAudit,
+      scheduler_contract_hardened: u32,
+      lifecycle_contract_hardened: u32,
+      capability_contract_hardened: u32,
+      ipc_contract_hardened: u32,
+      address_space_contract_hardened: u32,
+      interrupt_contract_hardened: u32,
+      timer_contract_hardened: u32,
+      barrier_contract_hardened: u32) i32
+
+The body is a single call that constructs LateServiceSystemProofInputs
+from those 9 parameters plus ~26 globals (PIDs, TIDs, ASIDs, endpoint
+IDs, directory keys, page table bases, INIT_IMAGE, and service snapshot
+fields).  The function adds no logic.  It is an adapter shim that
+manually enumerates the entire system state.
+
+This happens because the caller (execute_mid_phase_proofs) mixes two
+concerns: it accumulates flag state (the 8 u32 contract flags) as local
+variables, and it calls into the service proof layer.  At the seam
+between the two concerns, main.mc has no way to express "the contract
+state so far" except by threading the 8 flags manually.
+
+The correct direction: the 8 flags are a type ("ContractState" — see P1
+item 4 below).  With that type, the call site becomes:
+
+  return bootstrap_services.execute_late_service_system_proofs(
+      contracts, phase137_audit)
+
+and the function either vanishes entirely (direct call at the use site)
+or stays as a one-liner that is obviously a delegation, not a manual
+enumeration.
+
+────────────────────────────────────────────────────────────────────────
+
+2. execute_mid_phase_proofs() is not a function.
+
+At ~340 lines, it is a phase journal: a sequential narrative of the
+kernel bring-up from phase 104 through phase 137.  It contains:
+
+  - 9 local u32 flags accumulating contract-hardening state
+  - calls to validate_* and execute_* functions for each phase
+  - inline audit struct construction (see P2 item 10)
+  - direct manipulation of the UART/interrupt pipeline
+  - manual service spawn/receive/close sequences for the serial service
+
+The function does not have a single conceptual responsibility.  Its
+length and complexity make it impossible to follow the contract between
+phases.  The only structure is temporal: "this runs before that."
+
+The deeper issue: each phase boundary in execute_mid_phase_proofs has
+the shape:
+  [setup local inputs]
+  → [call execute_phaseN_X()]
+  → [check return, early-out with code N]
+  → [call validate_phaseN_X()]
+  → [check return, early-out with code N+1]
+  → [build audit struct for phase N+1]
+
+This is the same three-step pattern repeated across every phase.  It is
+a mechanism, not business logic.  The mechanism should be named and
+abstracted (even lightly), so that the function body reads as a
+description of the phase sequence, not a manual unrolling of it.
+
+────────────────────────────────────────────────────────────────────────
+
+3. build/execute/install triads are a missing abstraction.
+
+For every service (log, echo, transfer, serial), main.mc provides three
+functions:
+
+  build_X_service_execution_state()   — pack globals → service struct
+  execute_phaseNNN_X_...()            — call bootstrap_services, unpack
+  install_X_service_execution_state() — unpack result → globals
+
+These triads exist because bootstrap_services operates on immutable
+value-typed state, while main.mc holds live global state.  The triad
+is the glue layer.
+
+The problem: the triad is written four times, with near-identical
+structure.  Each install_ function repeats the same pattern:
+
+  SYSCALL_GATE   = next_state.gate
+  PROCESS_SLOTS  = next_state.process_slots
+  TASK_SLOTS     = next_state.task_slots
+  HANDLE_TABLES[1] = next_state.init_handle_table
+  HANDLE_TABLES[2] = next_state.child_handle_table
+  WAIT_TABLES[1] = next_state.wait_table
+  ENDPOINTS      = next_state.endpoints
+  READY_QUEUE    = next_state.ready_queue
+
+That kernel state restoration block is identical across install_log_,
+install_echo_, install_transfer_, and install_serial_.  The only
+variation per service is the snapshot field update at the end.  This
+duplication is a maintenance trap: add a new field to the kernel
+execution state and you must find and update all four install functions.
+
+The direction: the common kernel fields constitute a "KernelExecutionContext"
+that can be installed with a single helper.  Each service's snapshot
+delta can then follow separately.  This gives:
+
+  install_kernel_execution_context(next_state.kernel_ctx)
+  LOG_SERVICE_SNAPSHOT = log_snapshot_from(next_state)
+
+────────────────────────────────────────────────────────────────────────
+
+4. The 8 contract-hardened flags are a missing type.
+
+Local variables in execute_mid_phase_proofs():
+
+  scheduler_contract_hardened:    u32 = 0
+  lifecycle_contract_hardened:    u32 = 0
+  capability_contract_hardened:   u32 = 0
+  ipc_contract_hardened:          u32 = 0
+  address_space_contract_hardened: u32 = 0
+  interrupt_contract_hardened:    u32 = 0
+  timer_contract_hardened:        u32 = 0
+  barrier_contract_hardened:      u32 = 0
+
+These 8 flags are passed together to every validate_phaseNNN_* call in
+the file.  By phase 116 the validate call has 9 positional arguments;
+by phase 117 it has 10.  The argument list grows by one each time a new
+contract is added.
+
+The flags are not independent values — they are a single composite
+object: "what has the kernel proved so far."  They should be a struct:
+
+  struct ContractState {
+      scheduler:    u32
+      lifecycle:    u32
+      capability:   u32
+      ipc:          u32
+      address_space: u32
+      interrupt:    u32
+      timer:        u32
+      barrier:      u32
+  }
+
+With that struct, every validate_phaseNNN_ call becomes:
+
+  debug.validate_phaseNNN_...(audit, contracts)
+
+instead of:
+
+  debug.validate_phaseNNN_...(audit, a, b, c, d, e, f, g, h)
+
+This is not a cosmetic change.  The function signatures in bootstrap_services
+and debug then stop growing with each new phase, and the caller no longer
+needs to know the internal ordering of the flags.
+
+────────────────────────────────────────────────────────────────────────
+P2 — DESIGN INTEGRITY
+────────────────────────────────────────────────────────────────────────
+
+5. No coherent representation of kernel system state.
+
+main.mc declares ~30 module-level global variables:
+
+  KERNEL, PROCESS_SLOTS, TASK_SLOTS, READY_QUEUE, BOOT_LOG,
+  BOOT_LOG_APPEND_FAILED, ROOT_CAPABILITY, INIT_PROGRAM_CAPABILITY,
+  LOG_SERVICE_SNAPSHOT, ECHO_SERVICE_SNAPSHOT, TRANSFER_SERVICE_SNAPSHOT,
+  HANDLE_TABLES, WAIT_TABLES, ENDPOINTS, INTERRUPTS, LAST_INTERRUPT_KIND,
+  UART_DEVICE, INIT_RUNTIME_SNAPSHOT, CHILD_EXECUTION_SNAPSHOT,
+  SYSCALL_GATE, INIT_IMAGE, TIMER_STATE, DELIVERED_MESSAGE,
+  RECEIVE_OBSERVATION, ATTACHED_RECEIVE_OBSERVATION,
+  TRANSFERRED_HANDLE_USE_OBSERVATION, SERIAL_SERVICE_SNAPSHOT,
+  UART_INGRESS
+
+These 30 variables carry the complete runtime state of the system.
+They have no grouping, no enforced coherence, and no single place where
+"the system" can be inspected or reset atomically.
+
+reset_kernel_state() provides the closest approximation to a full
+system reset, but it is a 35-line function that touches every variable
+by name.  Add a new global and reset_kernel_state() silently stops
+resetting it unless the author remembers to add the line.
+
+The natural groups are already visible in the variable names:
+  - Kernel descriptor + process/task/queue   ("ExecutionState")
+  - Boot log + append-failed flag            ("BootRecord")
+  - Capability root + program cap            ("CapabilityState")  
+  - Handle tables + wait tables + endpoints  ("IPCState")
+  - Interrupts + last kind + UART device     ("InterruptState")
+  - Syscall gate + observations              ("SyscallGateState")
+  - Service snapshots (log, echo, transfer,
+    serial, init, child)                     ("ServiceRegistry")
+
+Grouping these into named structs would make reset_kernel_state() a
+flat record construction, make the system state inspectable, and make
+the build/execute/install triad pattern (P1 item 3) mechanically
+expressible without naming every field individually.
+
+────────────────────────────────────────────────────────────────────────
+
+6. Snapshot structs belong in their service modules, not main.mc.
+
+main.mc defines:
+
+  struct LogServiceSnapshot    { ... }
+  struct EchoServiceSnapshot   { ... }
+  struct TransferServiceSnapshot { ... }
+  struct SerialServiceSnapshot { ... }
+  struct InitRuntimeSnapshot   { ... }
+  struct ChildExecutionSnapshot { ... }
+
+Each snapshot bundles a service's program capability, address space,
+user frame, service state, syscall observations, and wait observation.
+
+The service modules (log_service, echo_service, transfer_service,
+serial_service) already own their state types.  The snapshot type is
+"the kernel's view of one running service" — it is a service-module
+concern, not a main.mc concern.  Declaring snapshot types in main.mc
+couples the orchestration layer to the layout details of each service.
+
+When a service adds a new observation field, the snapshot struct in
+main.mc must be updated, the empty_X_service_snapshot() constructor
+must be updated, and the build_/install_ functions must be updated.
+That is four edit sites across two abstractions for what should be one.
+
+────────────────────────────────────────────────────────────────────────
+
+7. HANDLE_TABLES and WAIT_TABLES use silent index-identity coupling.
+
+  HANDLE_TABLES: [3]capability.HandleTable
+  WAIT_TABLES:   [3]capability.WaitTable
+
+Every access in main.mc uses literal index 1 (INIT) or 2 (CHILD):
+
+  HANDLE_TABLES[1] = ...  // always means init's handle table
+  HANDLE_TABLES[2] = ...  // always means child's handle table
+
+This coupling is never stated.  It is derived from the fact that
+INIT_TASK_SLOT = 1 and CHILD_TASK_SLOT = 2 (which are themselves
+module-level constants with no enforcement).
+
+The build_log_service_execution_state() function passes:
+  init_handle_table:  HANDLE_TABLES[1]
+  child_handle_table: HANDLE_TABLES[2]
+
+Both of these index-to-role mappings are implicit.  A reader must know
+the PID→slot assignment to understand which table is which.  A future
+function that passes the wrong index will compile and fail silently at
+runtime.  Named accessors, even simple ones (init_handle_table(),
+child_handle_table()), would make the coupling explicit and checkable.
+
+────────────────────────────────────────────────────────────────────────
+
+8. build_phase108_program_cap_contract() is a pure pass-through.
+
+  func build_phase108_program_cap_contract(
+      init_pid: u32,
+      log_config: bootstrap_services.LogServiceConfig,
+      echo_config: bootstrap_services.EchoServiceConfig,
+      transfer_config: bootstrap_services.TransferServiceConfig,
+      bootstrap_program_capability: capability.CapabilitySlot,
+      log_service_program_capability: capability.CapabilitySlot,
+      echo_service_program_capability: capability.CapabilitySlot,
+      transfer_service_program_capability: capability.CapabilitySlot,
+      log_service_spawn: syscall.SpawnObservation,
+      echo_service_spawn: syscall.SpawnObservation,
+      transfer_service_spawn: syscall.SpawnObservation,
+      log_service_wait: syscall.WaitObservation,
+      echo_service_wait: syscall.WaitObservation,
+      transfer_service_wait: syscall.WaitObservation
+  ) debug.Phase108ProgramCapContract {
+      return bootstrap_proofs.build_phase108_program_cap_contract(
+          init_pid, log_config, echo_config, transfer_config,
+          bootstrap_program_capability, ...
+      )
+  }
+
+This function has 14 parameters and adds zero logic.  Its only purpose
+is to be the trampoline from main.mc's name to bootstrap_proofs's name.
+The caller (execute_mid_phase_proofs) already has all 14 values in
+scope.  Deleting this function and calling bootstrap_proofs directly
+saves 14 positional arguments at the definition site and removes a
+layer of indirection with no benefit.
+
+The pattern of "main.mc wrapper that just forwards to the real module"
+appears in several places and should be treated as a smell: if the
+wrapper adds no value, delete it.
+
+────────────────────────────────────────────────────────────────────────
+
+9. validate_ functions do not take their inputs — they read globals.
+
+  func validate_phase105_log_service_handshake() bool {
+      config: bootstrap_services.LogServiceConfig = build_log_service_config()
+      return bootstrap_audit.validate_phase105_log_service_handshake(
+          bootstrap_audit.LogServicePhaseAudit{
+              program_capability:   LOG_SERVICE_SNAPSHOT.program_capability,
+              gate:                 SYSCALL_GATE,
+              spawn_observation:    LOG_SERVICE_SNAPSHOT.spawn_observation,
+              ...
+          })
+  }
+
+The function is named "validate" but it gathers all inputs from globals
+before calling the real validator.  The signature takes no arguments.
+This means:
+  - it cannot be tested in isolation
+  - it can only be called after the globals are in a valid state
+  - errors surface as assertion failures on global state, not as type
+    errors on inputs
+
+This is not a validator — it is a "validate global state now" snapshot
+function.  If main.mc had a coherent system state struct (see P2 item 5),
+these could all become:
+
+  debug.validate_phaseNNN_X(system.log_service_snapshot, contracts)
+
+called directly at the use site, removing the validate_ wrappers entirely.
+
+────────────────────────────────────────────────────────────────────────
+
+10. Audit struct construction is inline in execution functions.
+
+In execute_mid_phase_proofs(), audit structs for later phases are built
+inline with 30-50 field assignments each:
+
+  phase136_audit: debug.Phase136DeviceFailureContainmentAudit =
+      debug.Phase136DeviceFailureContainmentAudit{
+          phase131: phase131_audit,
+          uart_service_endpoint_id: malformed_uart_result.observation.service_endpoint_id,
+          malformed_interrupt_kind: malformed_uart_dispatch.kind,
+          ...  // 40+ more fields
+          kernel_policy_visible: 0,
+          driver_framework_visible: 0,
+          retry_framework_visible: 0,
+          protocol_parsing_in_kernel_visible: 0,
+          compiler_reopening_visible: 0
+      }
+
+These 50-field inline struct literals bury the actual execution logic
+inside data assembly.  The phase136_audit construction spans
+approximately 45 lines — longer than most functions in the file.
+
+The pattern applies to phase137_audit as well (~45 fields).  These
+audit structs know too much about the implementation details of the
+execution that preceded them.  The construction should live in
+bootstrap_proofs alongside the execution, not inline in the main
+function body.
+
+────────────────────────────────────────────────────────────────────────
+P3 — READABILITY / MAINTENANCE COST
+────────────────────────────────────────────────────────────────────────
+
+11. ~50 top-level constants with no grouping.
+
+The file opens with a flat list of 50+ constants:
+
+  BOOT_PID, BOOT_TID, BOOT_TASK_SLOT,
+  INIT_PID, INIT_TID, INIT_TASK_SLOT, INIT_ASID,
+  CHILD_PID, CHILD_TID, CHILD_TASK_SLOT, CHILD_ASID,
+  INIT_ENDPOINT_ID, INIT_ENDPOINT_HANDLE_SLOT,
+  CHILD_WAIT_HANDLE_SLOT, TRANSFER_ENDPOINT_ID,
+  TRANSFER_SOURCE_HANDLE_SLOT, TRANSFER_RECEIVED_HANDLE_SLOT,
+  KERNEL_MAGIC, BOOT_ENTRY_PC, BOOT_STACK_TOP,
+  INIT_ROOT_PAGE_TABLE, CHILD_ROOT_PAGE_TABLE, CHILD_EXIT_CODE,
+  PHASE124_MARKER_DETAIL .. PHASE152_MARKER_DETAIL (12 constants),
+  LOG_SERVICE_DIRECTORY_KEY .. SHELL_SERVICE_DIRECTORY_KEY (6 constants),
+  COMPOSITION_ECHO_ENDPOINT_ID, COMPOSITION_LOG_ENDPOINT_ID,
+  SERIAL_SERVICE_ENDPOINT_ID, KV_SERVICE_ENDPOINT_ID,
+  SHELL_SERVICE_ENDPOINT_ID, PHASE141_SHELL_PID, PHASE141_KV_PID,
+  SHELL_COMMAND_ECHO_BYTE0..SHELL_COMMAND_KV_GET_BYTE1 (8 constants),
+  UART_RECEIVE_VECTOR, UART_COMPLETION_VECTOR, UART_SOURCE_ACTOR,
+  UART_QUEUE_FRAME_ONE..THREE_BYTE0/BYTE1 (6 constants),
+  UART_CLOSED_FRAME_BYTE0/BYTE1, UART_COMPLETION_FRAME_BYTE0..BYTE3,
+  PHASE124_INTERMEDIARY_PID, PHASE124_FINAL_HOLDER_PID,
+  PHASE124_CONTROL_HANDLE_SLOT, PHASE124_INTERMEDIARY_RECEIVE_HANDLE_SLOT,
+  PHASE124_FINAL_RECEIVE_HANDLE_SLOT
+
+These belong to distinct domains: process/task identity, IPC topology,
+boot layout, phase markers, service directory keys, shell command
+protocol bytes, UART protocol frames.  Keeping them flat means every
+reader must scan the entire list to find what they need and has no help
+understanding which are related.
+
+────────────────────────────────────────────────────────────────────────
+
+12. Protocol byte constants are opaque ASCII literals.
+
+  SHELL_COMMAND_ECHO_BYTE0:       u8 = 69   // 'E'
+  SHELL_COMMAND_ECHO_BYTE1:       u8 = 67   // 'C'
+  SHELL_COMMAND_LOG_BYTE0:        u8 = 76   // 'L'
+  SHELL_COMMAND_LOG_APPEND_BYTE1: u8 = 65   // 'A'
+  SHELL_COMMAND_LOG_TAIL_BYTE1:   u8 = 84   // 'T'
+  SHELL_COMMAND_KV_BYTE0:         u8 = 75   // 'K'
+  SHELL_COMMAND_KV_SET_BYTE1:     u8 = 83   // 'S'
+  SHELL_COMMAND_KV_GET_BYTE1:     u8 = 71   // 'G'
+
+  UART_COMPLETION_FRAME_BYTE0:    u8 = 68   // 'D'
+  UART_COMPLETION_FRAME_BYTE1:    u8 = 77   // 'M'
+  UART_COMPLETION_FRAME_BYTE2:    u8 = 65   // 'A'
+  UART_COMPLETION_FRAME_BYTE3:    u8 = 33   // '!'
+
+These are ASCII character codes for protocol tokens: the shell protocol
+uses "EC", "LA", "LT", "KS", "KG" as command prefixes; the UART
+completion frame is the 4-byte token "DMA!".  None of this is apparent
+from the constant names or values.  A developer unfamiliar with the
+protocol must decode each byte from ASCII to understand what it means.
+The protocol tokens should be the documented values; the byte constants
+should be derived from them, not the other way around.
+
+────────────────────────────────────────────────────────────────────────
+
+13. Boolean flags typed u32.
+
+The 8 contract-hardened locals and BOOT_LOG_APPEND_FAILED are all
+typed u32, set to 0 or 1, and compared with != 0 or == 1.  This
+adds visual noise on every read and makes the flag semantics ambiguous
+("is this a count? a bitflag? an enum?").  The correct type is bool or,
+given the compiler's current support, a named boolean-like enum.
+
+────────────────────────────────────────────────────────────────────────
+
+14. Empty snapshot constructors will drift from struct definitions.
+
+  func empty_log_service_snapshot() LogServiceSnapshot {
+      return LogServiceSnapshot{
+          program_capability: capability.empty_slot(),
+          address_space: address_space.empty_space(),
+          user_frame: address_space.empty_frame(),
+          state: log_service.service_state(0, 0),
+          spawn_observation: syscall.empty_spawn_observation(),
+          receive_observation: syscall.empty_receive_observation(),
+          ack_observation: syscall.empty_receive_observation(),
+          handshake: log_service.LogHandshakeObservation{
+              service_pid: 0, client_pid: 0, endpoint_id: 0,
+              tag: log_service.LogMessageTag.None, ...
+          },
+          wait_observation: syscall.empty_wait_observation()
+      }
+  }
+
+Six empty constructors of this form exist (log, echo, transfer, serial,
+init_runtime, child_execution).  Each one constructs an inline literal
+with 8-15 fields.  Adding a field to any snapshot struct requires
+finding and updating the corresponding empty constructor.  There is no
+compiler enforcement that the empty constructor is complete (the struct
+literal is complete, but optional fields could legally be omitted).
+
+If snapshot structs lived in their service modules (see P2 item 6),
+the service module would own the empty constructor, and main.mc would
+not need to know the individual fields.
+
+────────────────────────────────────────────────────────────────────────
+
+15. emit_late_phase_markers() is a sequential list with no structure.
+
+  func emit_late_phase_markers() {
+      record_boot_stage(state.BootStage.MarkerEmitted, PHASE140_MARKER_DETAIL)
+      record_boot_stage(state.BootStage.MarkerEmitted, PHASE141_MARKER_DETAIL)
+      record_boot_stage(state.BootStage.MarkerEmitted, PHASE142_MARKER_DETAIL)
+      ...12 identical calls...
+  }
+
+This function exists to log 12 phase markers in order.  The structure
+is interesting: phase 151 is absent (skipped), which is invisible in
+the unstructured list.  The function could better express "emit markers
+for all completed phases in this sequence" rather than being a naked
+list — even a comment stating the sequence and calling out phase 151
+explicitly as absent would help.
+
+────────────────────────────────────────────────────────────────────────
+
+16. validate_late_phase_boot_log() is 130 lines of three checks.
+
+  func validate_late_phase_boot_log() i32 {
+      if BOOT_LOG_APPEND_FAILED != 0 { return 109 }
+      if BOOT_LOG.count < 16          { return 108 }
+      if BOOT_LOG.count != 16         { return 110 }
+      // then for each of log entries 3..15:
+      if state.boot_stage_score(state.log_stage_at(BOOT_LOG, N)) != 16 { return X }
+      if state.log_actor_at(BOOT_LOG, N) != ARCH_ACTOR                  { return X }
+      if state.log_detail_at(BOOT_LOG, N) != PHASE???_MARKER_DETAIL     { return X }
+  }
+
+The three-check block repeats 12 times, once per phase marker.  The
+function reads correctly but is brittle: the expected entry count (16)
+and the expected return codes (108-149) are scattered throughout.
+Adding or removing a phase marker requires updating the count check,
+the loop body, and potentially renumbering return codes.  This should
+be data-driven: a table of (expected stage, expected actor, expected
+detail) triples, validated once with a loop.
+
+────────────────────────────────────────────────────────────────────────
+COMPOUND EFFECT
+────────────────────────────────────────────────────────────────────────
+
+The patterns above do not occur in isolation.  They compound:
+
+Because there is no ContractState struct (P1.4), every validate call
+takes 8+ positional arguments.  Because validate functions read globals
+instead of taking typed inputs (P2.9), the wrappers in main.mc must
+manually stitch globals into audit structs (P2.10).  Because snapshots
+are defined in main.mc rather than service modules (P2.6), the build
+and install functions must enumerate every field by name (P1.3).
+Because there is no coherent KernelState (P2.5), the build/install
+pattern must repeat identically for every service.
+
+The result is that execute_mid_phase_proofs() is ~340 lines of code
+that is structurally impossible to follow: it is simultaneously
+managing contract flag accumulation, service execution, UART/interrupt
+pipeline manipulation, and inline 50-field struct construction.  Every
+new phase adds to its length, and every new contract or service adds
+to the width of every function call in it.
+
+────────────────────────────────────────────────────────────────────────
+RECOMMENDED RESOLUTION ORDER
+────────────────────────────────────────────────────────────────────────
+
+These are design directions, not prescriptions.  The compiler is still
+in bootstrap: some of these require language features (nested struct
+field initialisation from an existing value, helper methods on structs)
+that may not yet be fully supported.  Carry out what is practical in
+the current language surface; record the rest in the backlog.
+
+Step 1 — Introduce ContractState (P1.4, unblocks P1.1, P1.2)
+
+  struct ContractState {
+      scheduler:    u32
+      lifecycle:    u32
+      capability:   u32
+      ipc:          u32
+      address_space: u32
+      interrupt:    u32
+      timer:        u32
+      barrier:      u32
+  }
+
+  func empty_contracts() ContractState { ... }
+
+Substitute ContractState for the 8 local u32 flags in
+execute_mid_phase_proofs() and thread the single struct to every
+validate_phaseNNN call.  Update bootstrap_services and debug call sites
+to accept ContractState.
+
+Step 2 — Extract build_phase_execution_kernel_context() (P1.3, P2.5)
+
+Identify the common fields restored by all install_ functions
+(SYSCALL_GATE, PROCESS_SLOTS, TASK_SLOTS, HANDLE_TABLES[1/2],
+WAIT_TABLES[1], ENDPOINTS, READY_QUEUE) and write one install helper
+for them.  Each service's install_ function reduces to calling that
+helper then setting its snapshot.
+
+Step 3 — Kill pass-through wrapper functions (P1.1, P2.8)
+
+Delete execute_late_service_system_proofs() and
+build_phase108_program_cap_contract() as named functions in main.mc.
+Call the underlying modules directly where needed.
+
+Step 4 — Move audit construction to bootstrap_proofs (P2.10)
+
+phase136_audit and phase137_audit should be built in bootstrap_proofs
+alongside their execution functions.  execute_mid_phase_proofs() should
+only call build_ and validate_ — not also construct 50-field structs
+inline.
+
+Step 5 — Document protocol byte constants (P3.12)
+
+Add inline comments (or rename constants) to make the ASCII provenance
+of each byte visible.  This costs nothing and immediately clarifies the
+protocol.
+
+────────────────────────────────────────────────────────────────────────
+END OF CRITIQUE
+────────────────────────────────────────────────────────────────────────

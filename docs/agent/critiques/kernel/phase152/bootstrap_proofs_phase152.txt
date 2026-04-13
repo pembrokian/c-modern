@@ -1,0 +1,407 @@
+kernel/src/bootstrap_proofs.mc — Phase 152 Architectural Review
+================================================================
+
+FILE: kernel/src/bootstrap_proofs.mc  (~560+ lines, read to line 560)
+PHASE: 152 — mid-phase proof orchestration, phase 108–137,
+             phase-indexed global state, audit builders
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL (code does not represent its own semantics correctly)
+  1. Phase-indexed global variables replace a coherent runtime state
+     type for the late bootstrap window.
+  2. Phase*RuntimeContext and Phase*ProofInputs are structurally
+     identical structs separated by one field (contract_flags),
+     producing mechanical copy-conversion functions.
+  3. MidPhaseProofRuntimeContext is a ~65-field mega-struct that
+     inlines all kernel state, all service snapshots, and all UART
+     byte values as flat scalar fields.
+
+P2 — DESIGN INTEGRITY (organisational smells that will compound)
+  4. build_log/echo/transfer/serial_service_config functions are
+     near-identical, each extracting the same 7 fields from
+     MidPhaseProofRuntimeContext.
+  5. build_phase108_program_cap_contract is a pure argument-forwarding
+     shim with no logic.
+  6. The runtime-context-to-proof-inputs conversion functions exist
+     only because the ProofInputs type embeds the contract flags
+     as expanded scalars instead of a nested ProofContractFlags.
+  7. Phase-indexed global accessor functions are one-line read-global
+     wrappers that add no value.
+
+P3 — READABILITY / MAINTENANCE COST
+  8. reset_late_phase_proofs() manually resets ~35 variables by name.
+  9. UART frame bytes are individually named fields rather than a
+     typed array or struct, leading to ~12 scalar fields per context.
+
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL
+────────────────────────────────────────────────────────────────────────
+
+1. Phase-indexed global variables replace a coherent runtime state
+   type for the late bootstrap window.
+
+The file declares approximately 35 module-level globals, all with
+PHASE-prefixed names:
+
+  var INVALIDATED_SOURCE_SEND_STATUS: syscall.SyscallStatus
+  var PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS: syscall.SyscallStatus
+  var PHASE124_FINAL_SEND_STATUS: syscall.SyscallStatus
+  var PHASE124_FINAL_SEND_SOURCE_PID: u32
+  var PHASE124_FINAL_ENDPOINT_QUEUE_DEPTH: usize
+  var PHASE125_REJECTED_SEND_STATUS: syscall.SyscallStatus
+  var PHASE125_SURVIVING_CONTROL_SEND_STATUS: syscall.SyscallStatus
+  ... (continuing to PHASE131 and PHASE137)
+  var MID_PHASE_PROOF_RESULT: MidPhaseProofResult
+
+These are the observations and state outputs of the phases 124–137
+bootstrap proof sequence.  They are global because execute_mid_phase_proofs
+writes them and the test harness reads them later.
+
+The same pattern was identified in main.mc for the full proof output
+set.  Here, the globals represent a subset of the phase outputs that
+need to survive past the function return.  The correct representation
+is a struct:
+
+  struct LatePhaseProofOutputs {
+      invalidated_source_send_status: syscall.SyscallStatus
+      phase124_delegator_invalidated_send_status: syscall.SyscallStatus
+      phase124_final_send_status: syscall.SyscallStatus
+      ...
+      mid_phase_proof_result: MidPhaseProofResult
+  }
+
+returned by execute_mid_phase_proofs and stored by the driver that
+calls it.  reset_late_phase_proofs() would become the zero value of
+this struct.
+
+
+2. Phase*RuntimeContext and Phase*ProofInputs are structurally
+   identical structs separated by one field, producing mechanical
+   copy-conversion functions.
+
+Each phase group has two structs:
+
+  struct Phase108To116RuntimeContext { ... 30+ fields ... }
+  struct Phase108To116ProofInputs    { ... 30+ fields + contract_flags: ProofContractFlags }
+
+The ProofInputs struct is the RuntimeContext struct with contract_flags
+appended.  The conversion function:
+
+  func build_phase108_to_116_proof_inputs(
+      runtime_context: Phase108To116RuntimeContext,
+      contract_flags: ProofContractFlags) Phase108To116ProofInputs {
+      return Phase108To116ProofInputs{
+          field1: runtime_context.field1,
+          field2: runtime_context.field2,
+          ...
+          contract_flags: contract_flags }
+  }
+
+is a mechanical field-by-field copy.  The same pattern exists for
+Phase117To123 and Phase131To137.  Three pairs of nearly-identical
+30-field structs and three mechanical copy functions.
+
+The correct representation is to embed the RuntimeContext in the
+ProofInputs rather than re-declaring every field:
+
+  struct Phase108To116ProofInputs {
+      context: Phase108To116RuntimeContext
+      contract_flags: ProofContractFlags
+  }
+
+The conversion function then becomes a two-line struct literal.
+Call sites that previously named individual proof input fields
+would name context.field instead.
+
+
+3. MidPhaseProofRuntimeContext is a ~65-field mega-struct that
+   inlines all kernel state, all service snapshots, and all UART
+   byte values as flat scalar fields.
+
+  struct MidPhaseProofRuntimeContext {
+      scheduler_lifecycle_audit: sched.LifecycleAudit
+      late_phase_context: LatePhaseProofContext
+      init_pid: u32
+      init_tid: u32
+      init_asid: u32
+      init_endpoint_id: u32
+      init_endpoint_handle_slot: u32
+      init_root_page_table: usize
+      child_pid: u32
+      child_tid: u32
+      child_asid: u32
+      child_wait_handle_slot: u32
+      child_root_page_table: usize
+      child_exit_code: i32
+      boot_pid: u32
+      boot_tid: u32
+      boot_task_slot: u32
+      boot_entry_pc: usize
+      boot_stack_top: usize
+      transfer_endpoint_id: u32
+      transfer_source_handle_slot: u32
+      transfer_received_handle_slot: u32
+      ...
+      gate: syscall.SyscallGate
+      process_slots: [3]state.ProcessSlot
+      task_slots: [3]state.TaskSlot
+      init_handle_table: capability.HandleTable
+      child_handle_table: capability.HandleTable
+      wait_table: capability.WaitTable
+      endpoints: ipc.EndpointTable
+      ready_queue: state.ReadyQueue
+      kernel: state.KernelDescriptor
+      ...
+      log_service_snapshot: bootstrap_services.LogServiceSnapshot
+      echo_service_snapshot: bootstrap_services.EchoServiceSnapshot
+      transfer_service_snapshot: bootstrap_services.TransferServiceSnapshot
+      serial_service_snapshot: bootstrap_services.SerialServiceSnapshot
+      ...
+      uart_queue_frame_one_byte0: u8
+      uart_queue_frame_one_byte1: u8
+      uart_queue_frame_two_byte0: u8
+      uart_queue_frame_two_byte1: u8
+      uart_queue_frame_three_byte0: u8
+      uart_queue_frame_three_byte1: u8
+      uart_closed_frame_byte0: u8
+      uart_closed_frame_byte1: u8
+      uart_completion_frame_byte0: u8
+      uart_completion_frame_byte1: u8
+      uart_completion_frame_byte2: u8
+      uart_completion_frame_byte3: u8
+  }
+
+This struct mixes three distinct concerns:
+  a. Identity configuration (PIDs, TIDs, ASIDs, endpoint IDs)
+  b. Live kernel state (gate, slots, tables, queue, kernel descriptor)
+  c. Service execution snapshots and UART probe data
+
+The struct exists because execute_mid_phase_proofs reads globals and
+builds this context once, then fans it out to all mid-phase validators.
+The same critique applies here as to execute_late_service_system_proofs
+in main.mc: this is not a context — it is the entire kernel state
+accumulated over 30+ phases, named as if it were a simple function
+argument.
+
+Each concern group should be a distinct named type, and
+MidPhaseProofRuntimeContext should embed them:
+
+  struct MidPhaseProofRuntimeContext {
+      identity: BootstrapIdentityConfig
+      kernel_state: KernelRuntimeState
+      service_snapshots: ServiceSnapshotSet
+      uart_probe: UartProbeConfig
+      ...
+  }
+
+────────────────────────────────────────────────────────────────────────
+P2 — DESIGN INTEGRITY
+────────────────────────────────────────────────────────────────────────
+
+4. build_log/echo/transfer/serial_service_config functions are
+   near-identical.
+
+  func build_log_service_config(ctx: MidPhaseProofRuntimeContext) LogServiceConfig {
+      return log_service_config(ctx.init_pid, ctx.child_pid, ctx.child_tid,
+          ctx.child_asid, ctx.init_endpoint_id, ctx.init_endpoint_handle_slot,
+          mmu.bootstrap_translation_root(ctx.child_asid, ctx.child_root_page_table))
+  }
+
+  func build_echo_service_config(ctx: MidPhaseProofRuntimeContext) EchoServiceConfig {
+      return echo_service_config(ctx.init_pid, ctx.child_pid, ctx.child_tid,
+          ctx.child_asid, ctx.init_endpoint_id, ctx.init_endpoint_handle_slot,
+          mmu.bootstrap_translation_root(ctx.child_asid, ctx.child_root_page_table))
+  }
+
+  // ... same for transfer (adds 2 extra fields) and serial
+
+The first 7 arguments are identical across three of the four functions.
+The only difference between the log and echo variants is which
+service config function they call.  The transfer variant adds
+transfer_source_handle_slot and transfer_received_handle_slot.
+
+These functions exist because the common argument set is not named.
+A ChildSpawnConfig struct grouping the shared 7 fields would replace
+the four near-identical extraction sequences with a single
+build_child_spawn_config(ctx) call.
+
+
+5. build_phase108_program_cap_contract is a pure argument-forwarding
+   shim with no logic.
+
+The function accepts 14 individual parameters and constructs a
+Phase108ProgramCapContractInputs struct, then passes it to
+bootstrap_audit.build_phase108_program_cap_contract.  Every parameter
+is forwarded literally:
+
+  return bootstrap_audit.build_phase108_program_cap_contract(
+      bootstrap_audit.Phase108ProgramCapContractInputs{
+          init_pid: init_pid,
+          log_service_program_object_id: log_config.program_object_id,
+          ...19 more fields... })
+
+There is no transformation.  Every field from the 14 parameters maps
+one-to-one into the inputs struct.  This is the same pure-pass-through
+anti-pattern identified in main.mc finding 8.
+
+Callers should construct the inputs struct directly and call
+bootstrap_audit directly, or the inputs struct should be accepted
+in place of the 14 individual parameters.
+
+
+6. The runtime-context-to-proof-inputs conversion functions exist
+   only because ProofInputs embeds the contract flags as expanded
+   scalars rather than a nested struct.
+
+In Phase108To116ProofInputs, the 8 contract fields appear as:
+  phase104_contract_hardened: u32
+  contract_flags: ProofContractFlags
+
+But in Phase117To123ProofInputs they appear as a nested struct:
+  contract_flags: ProofContractFlags
+
+The inconsistency means Phase108To116ProofInputs has one extra manually
+expanded field (phase104_contract_hardened) that must be extracted
+individually in build_phase108_to_116_proof_inputs.
+
+Meanwhile the existence of the ProofContractFlags type (see also
+main.mc finding 4) is a partial fix that has not been applied
+uniformly: main.mc still uses 8 flat u32 fields for the same flags,
+while bootstrap_proofs.mc uses the struct.  The struct exists here;
+it should propagate to all consumers.
+
+
+7. Phase-indexed global accessor functions add no value.
+
+  func phase123_plateau_audit() debug.Phase123NextPlateauAudit {
+      return PHASE123_PLATEAU_AUDIT
+  }
+  func phase109_running_slice_audit() debug.RunningKernelSliceAudit {
+      return PHASE109_RUNNING_SLICE_AUDIT
+  }
+  // ... seven more identical wrappers
+
+Each is a single-line read of the corresponding global variable.  The
+functions provide no additional encapsulation: callers can already read
+the global directly.  If the intent is to allow future interception or
+computed values, a comment to that effect would communicate it.  As
+written, they accumulate without purpose.
+
+────────────────────────────────────────────────────────────────────────
+P3 — READABILITY / MAINTENANCE COST
+────────────────────────────────────────────────────────────────────────
+
+8. reset_late_phase_proofs() manually resets ~35 variables by name.
+
+The reset function enumerates every global variable and assigns it
+to None, 0, or an empty constructor:
+
+  INVALIDATED_SOURCE_SEND_STATUS = syscall.SyscallStatus.None
+  PHASE124_DELEGATOR_INVALIDATED_SEND_STATUS = syscall.SyscallStatus.None
+  PHASE124_FINAL_SEND_STATUS = syscall.SyscallStatus.None
+  PHASE124_FINAL_SEND_SOURCE_PID = 0
+  ... (35 assignments)
+
+If the globals were collected into a LatePhaseProofOutputs struct
+(see finding 1), the reset function would be a single assignment to
+the zero value of that struct, and it would be impossible to forget
+to reset a newly added field.
+
+
+9. UART frame bytes are individually named scalar fields, leading to
+   ~12 scalar fields per context struct.
+
+Both MidPhaseProofRuntimeContext and Phase131To137RuntimeContext carry:
+
+  uart_queue_frame_one_byte0: u8
+  uart_queue_frame_one_byte1: u8
+  uart_queue_frame_two_byte0: u8
+  uart_queue_frame_two_byte1: u8
+  uart_queue_frame_three_byte0: u8
+  uart_queue_frame_three_byte1: u8
+  uart_closed_frame_byte0: u8
+  uart_closed_frame_byte1: u8
+  uart_completion_frame_byte0: u8
+  uart_completion_frame_byte1: u8
+  uart_completion_frame_byte2: u8
+  uart_completion_frame_byte3: u8
+
+These 12 fields represent 5 logical UART frames.  They should be
+typed:
+
+  struct UartProbeFrames {
+      queue_frame_one:   [2]u8
+      queue_frame_two:   [2]u8
+      queue_frame_three: [2]u8
+      closed_frame:      [2]u8
+      completion_frame:  [4]u8
+  }
+
+and embedded as a single field in both context structs.
+
+────────────────────────────────────────────────────────────────────────
+COMPOUND EFFECT
+────────────────────────────────────────────────────────────────────────
+
+Findings 1, 2, and 3 share the same root as the central problem in
+main.mc: the absence of a coherent named type for "the executing kernel
+state at a given bootstrap phase."  Without it, every context struct
+re-declares the same 10–15 kernel state fields, every conversion
+function copies them individually, and every accessor function wraps
+one global rather than returning a typed bundle.
+
+The ProofContractFlags type (finding 6) exists and is already the
+right answer for the 8 contract flags.  Its inconsistent adoption
+(used in some Phase*ProofInputs but not others, absent from main.mc)
+demonstrates how a partial fix leaves the codebase in a worse state
+than either all-in or all-out: readers see three different shapes for
+the same data and cannot determine which is canonical.
+
+────────────────────────────────────────────────────────────────────────
+NOTE: PARTIAL PROGRESS
+────────────────────────────────────────────────────────────────────────
+
+The ProofContractFlags struct in this file is the correct type for the
+8 contract flags identified as missing in the main.mc critique.  Its
+existence here shows the design was recognised and partially
+implemented.  The remaining gap is:
+
+  a. main.mc still uses 8 flat u32 fields instead of ProofContractFlags.
+  b. Phase108To116ProofInputs partially embeds it but also has
+     phase104_contract_hardened as a separate field.
+  c. The LateServiceSystemProofInputs in 11_phase151.mc re-expands
+     the 8 fields as scalars rather than embedding ProofContractFlags.
+
+Completing the adoption of ProofContractFlags uniformly would address
+all three gaps.
+
+────────────────────────────────────────────────────────────────────────
+RECOMMENDED RESOLUTION ORDER
+────────────────────────────────────────────────────────────────────────
+
+1. Collect the ~35 phase-indexed globals into a LatePhaseProofOutputs
+   struct.  Have execute_mid_phase_proofs return it.  Delete
+   reset_late_phase_proofs() and replace with zero-value assignment.
+
+2. Replace the Runtime/Inputs struct pair pattern with embedded
+   context — ProofInputs = { context: RuntimeContext,
+   contract_flags: ProofContractFlags }.  Delete the mechanical
+   copy-conversion functions.
+
+3. Decompose MidPhaseProofRuntimeContext into nested sub-structs
+   for identity, kernel state, service snapshots, and UART probe data.
+
+4. Replace build_log/echo/transfer/serial_service_config with a single
+   build_child_spawn_config that extracts the shared 7-field set.
+
+5. Complete adoption of ProofContractFlags: update main.mc and
+   LateServiceSystemProofInputs in 11_phase151.mc to embed it.
+
+6. Remove the global accessor wrapper functions; callers that need
+   the struct approach from finding 1 will access it via the returned
+   LatePhaseProofOutputs.
+
+7. Introduce UartProbeFrames struct and replace the 12 individual
+   byte fields in all context structs.

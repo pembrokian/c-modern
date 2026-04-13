@@ -1,0 +1,448 @@
+Kernel Canonical State Model — Target Design (Phase 152 Baseline)
+==================================================================
+
+Status:  PROPOSED
+Date:    2026-04-13
+
+Purpose
+-------
+Define the canonical state model that the kernel bootstrap infrastructure
+should converge toward.  This document is the authoritative target; every
+refactoring pass should move the codebase closer to this shape and not
+introduce patterns that contradict it.
+
+This document does not describe work to be done in a single step.  It
+defines the destination so that each incremental move can be judged as
+either progress toward or drift away from the target.
+
+
+Hard Constraint: Value Semantics
+---------------------------------
+The language has no mutable pointers.  Every function that modifies state
+must accept the current state as an input and return the updated state
+as part of its result.  The canonical calling convention is:
+
+    func do_something(s: SystemState, ...) SomethingResult
+
+    struct SomethingResult {
+        state: SystemState
+        observation: SomethingObservation
+        succeeded: u32
+    }
+
+Phases are pure transformations over SystemState.  There is no mutation
+in place.  This is not a limitation — it means every phase transition
+is an explicit, testable value transformation and the previous state is
+always available for comparison.  All proposed designs must honour this.
+
+The pattern `func phase137(state: *SystemState)` does not exist in this
+language and must never be proposed or emulated via global variables.
+
+
+Canonical Model: Overview
+--------------------------
+The top-level type is SystemState.
+
+    struct SystemState {
+        identity:    IdentityConfig
+        kernel:      KernelExecState
+        capabilities: CapabilityState
+        ipc:         IpcState
+        services:    ServiceState
+        contracts:   ContractState
+    }
+
+Notes:
+  - Observations are NOT part of SystemState.  They are outputs returned
+    alongside SystemState in result types.  See "Results and Observations"
+    below.
+  - ProofInputs and RuntimeContexts are NOT part of SystemState.  They are
+    derived views assembled at the boundary between execution and validation.
+  - SystemState represents what the system IS.  A result type represents
+    what happened when a transformation was applied to it.
+
+
+Layer 1: IdentityConfig (who exists, permanent configuration)
+--------------------------------------------------------------
+Replaces: scattered pid/tid/asid triples across all context structs.
+
+    struct IdentityConfig {
+        boot:   TaskIdentity
+        init:   TaskIdentity
+        child:  TaskIdentity          -- current active child slot
+    }
+
+    struct TaskIdentity {
+        pid:  u32
+        tid:  u32
+        asid: u32
+    }
+
+Note: service identities (PIDs, endpoint IDs) are service-specific fields
+on the corresponding ServiceState entries, not top-level identity fields.
+Service PIDs migrate as services restart; they are not configuration.
+
+Current equivalent: the pid/tid/asid fields scattered across
+MidPhaseProofRuntimeContext, LateServiceSystemRuntimeContext, and the
+explicitly named init_pid/child_pid/child_tid/etc. parameters that appear
+in dozens of function signatures.
+
+Migration trigger: any function or struct that carries both *_pid and *_tid
+for the same actor (boot/init/child) without grouping them.
+
+
+Layer 2: KernelExecState (live execution state)
+------------------------------------------------
+Replaces: the 9–10 kernel fields that currently travel everywhere as
+individually named parameters or ungrouped struct fields.
+
+    struct KernelExecState {
+        descriptor:  state.KernelDescriptor
+        gate:        syscall.SyscallGate
+        processes:   [3]state.ProcessSlot
+        tasks:       [3]state.TaskSlot
+        ready_queue: state.ReadyQueue
+        timer:       timer.TimerState
+        interrupts:  interrupt.InterruptController
+    }
+
+This is the type that should be the single argument to any function
+currently accepting the following parameter group:
+
+    gate: SyscallGate,
+    process_slots: [3]ProcessSlot,
+    task_slots: [3]TaskSlot,
+    ready_queue: ReadyQueue,
+    timer_state: TimerState,
+    interrupts: InterruptController,
+    last_interrupt_kind: InterruptDispatchKind
+
+Note: last_interrupt_kind is an observation (output of a dispatch), not
+kernel state.  It belongs in a result type, not in KernelExecState.
+
+Current equivalent: the 10 fields that appear together in
+ChildExecutionResult, MidPhaseProofRuntimeContext, Phase131To137RuntimeContext,
+and the parameter list of execute_program_cap_spawn_and_wait.
+
+Migration trigger: any function with ≥3 of {gate, process_slots, task_slots,
+ready_queue, timer_state, interrupts} as separate parameters.
+
+
+Layer 3: CapabilityState (handles and wait tables)
+--------------------------------------------------
+Replaces: init_handle_table, child_handle_table, wait_table, wait_tables[3]
+appearing as separate parameters.
+
+    struct CapabilityState {
+        handle_tables: [3]capability.HandleTable
+        wait_tables:   [3]capability.WaitTable
+    }
+
+The array size 3 matches the current process slot count.  If the slot
+count changes, this changes with it.
+
+Note: the silent index-identity coupling (handle_tables[0]=boot,
+handle_tables[1]=init, handle_tables[2]=child) must be resolved before
+or during this migration.  The arrays should be accessed through named
+accessor helpers, not raw indices.
+
+Current equivalent: the handle_tables and wait_tables arrays (and their
+scalar variants init_handle_table/child_handle_table) spread across
+bootstrap_runtime.mc and bootstrap_proofs.mc.
+
+
+Layer 4: IpcState (endpoints and message queues)
+-------------------------------------------------
+Replaces: the ipc.EndpointTable that travels alongside handle tables.
+
+    struct IpcState {
+        endpoints: ipc.EndpointTable
+    }
+
+This layer may grow (queue state, delivery counts) but starts minimal.
+
+Current equivalent: the endpoints field that appears beside handle_tables
+in every execute_* and perform_* function that touches IPC.
+
+
+Layer 5: ServiceState (live service execution state)
+----------------------------------------------------
+Replaces: log_service_snapshot, echo_service_snapshot,
+transfer_service_snapshot, serial_service_snapshot, and the equivalent
+LogServiceState/EchoServiceState/SerialServiceState/KvServiceState/
+ShellServiceState fields in LateServiceSystemRuntimeContext and
+Phase150RebuiltSystemState.
+
+    struct ServiceState {
+        log:      log_service.LogServiceState
+        echo:     echo_service.EchoServiceState
+        serial:   serial_service.SerialServiceState
+        kv:       kv_service.KvServiceState
+        shell:    shell_service.ShellServiceState
+    }
+
+Services that have not yet been spawned hold zero-value states.  The
+service state type itself knows whether the service is live (owner_pid
+!= 0 is the current convention).
+
+Note: "snapshots" in the current code (LogServiceSnapshot, EchoServiceSnapshot,
+etc.) bundle the service state together with the spawn/wait observations for
+that service launch.  The service state portion belongs here; the
+observations belong in proof input/audit types.
+
+Migration trigger: any struct that carries multiple *ServiceState or
+*ServiceSnapshot fields without composing them.
+
+
+Layer 6: ContractState (hardening flags)
+-----------------------------------------
+Replaces: the 8 flat u32 fields for contract hardening that currently
+appear under three different names (ProofContractFlags in bootstrap_proofs.mc,
+LateServiceSystemContractFlags in 11_phase151.mc, and 8 anonymous u32
+scalar fields in main.mc and LateServiceSystemProofInputs).
+
+    struct ContractState {
+        scheduler:     u32
+        lifecycle:     u32
+        capability:    u32
+        ipc:           u32
+        address_space: u32
+        interrupt:     u32
+        timer:         u32
+        barrier:       u32
+    }
+
+The field type is u32 to match current usage (not bool) for ABI
+consistency with the existing validation functions.
+
+Rules:
+  1. One canonical definition.  The current ProofContractFlags in
+     bootstrap_proofs.mc is the closest; it should be promoted or
+     moved to a shared module (e.g., state.mc or a new contracts.mc).
+  2. All other representations (LateServiceSystemContractFlags, the 8
+     flat scalars) must be replaced by this type.
+  3. ProofInputs structs that expand these 8 fields as scalars must
+     embed ContractState instead.
+
+Current status: partial.  ProofContractFlags exists in bootstrap_proofs.mc.
+It is not used in main.mc, LateServiceSystemProofInputs, or Phase108To116ProofInputs.
+
+
+Results and Observations
+-------------------------
+Observations are not part of SystemState.  They are the outputs of
+operations — things the system witnessed during a transition — not part of
+what the system is.
+
+Category distinction:
+
+    SYSTEM STATE (lives in SystemState):
+      - process slot contents
+      - task slot contents
+      - ready queue
+      - timer tick and wake counts
+      - interrupt controller state
+      - handle and wait table contents
+      - endpoint table contents
+      - service state (owner PID, message counts, etc.)
+
+    OBSERVATIONS (live in result types only):
+      - spawn observations
+      - sleep/wake observations
+      - wait observations
+      - receive/send observations
+      - UART ingress observations
+      - service handshake/exchange observations
+      - interrupt dispatch kind
+
+The ChildExecutionSnapshot type in bootstrap_runtime.mc is a correctly
+scoped observation bundle — it collects the observations from one
+spawn-sleep-interrupt-wait sequence.  Its placement as a field inside
+ChildExecutionResult (and not inside the kernel state portion of that
+result) is correct.
+
+Where things go wrong: MidPhaseProofRuntimeContext and similar types carry
+both kernel state AND observations as flat fields at the same level.  Those
+observations should live in result types, returned from the phase execution
+function, not stored in the context that is passed in.
+
+
+Proof Inputs: Thin Views Over SystemState
+-----------------------------------------
+ProofInputs types (Phase108To116ProofInputs, LateServiceSystemProofInputs,
+etc.) exist to give validation functions a named, stable input shape.  They
+should be thin projections assembled at the call boundary between execution
+and validation, not parallel long-lived structs.
+
+The target shape for a proof input is:
+
+    struct PhaseNProofInputs {
+        state:          SystemState          -- or a sub-struct
+        observations:   PhaseNObservations   -- what happened during execution
+        contracts:      ContractState
+    }
+
+and the conversion function from execution context to proof inputs should be
+trivial (3 fields, not 30+).
+
+The current RuntimeContext ↔ ProofInputs duplication (Phase108To116RuntimeContext
+vs Phase108To116ProofInputs, etc.) is eliminated entirely by this shape: the
+RuntimeContext becomes SystemState, and the proof inputs are (state,
+observations, contracts).
+
+
+UART Probe Data
+---------------
+The 12 individually named UART byte fields in MidPhaseProofRuntimeContext
+and Phase131To137RuntimeContext represent 5 logical frames.  They are
+probe/test configuration, not system state.  They should not appear inside
+any state or context struct.
+
+Target type (in the module that owns UART serial interaction):
+
+    struct UartProbeFrames {
+        queue_one:    [2]u8
+        queue_two:    [2]u8
+        queue_three:  [2]u8
+        closed:       [2]u8
+        completion:   [4]u8
+    }
+
+This type belongs in the UART or serial service module.  Proof functions
+that need it should accept it as an explicit separate parameter, not have
+it embedded in a context struct.
+
+
+Phase-Indexed Globals
+---------------------
+Phase-indexed globals (PHASE124_*, PHASE131_*, etc.) are prohibited in
+the target model.  They are the mutable-pointer pattern expressed through
+module state rather than pointers.
+
+Each function that currently writes phase globals should instead return a
+result struct containing the values it would have written:
+
+    -- Current:
+    func execute_mid_phase_proofs(ctx: MidPhaseProofRuntimeContext) i32 {
+        ...
+        PHASE131_COMPOSITION_STATE = ...
+        MID_PHASE_PROOF_RESULT = ...
+    }
+
+    -- Target:
+    func execute_mid_phase_proofs(ctx: MidPhaseProofRuntimeContext) MidPhaseProofResult {
+        ...
+        return MidPhaseProofResult{ ... }
+    }
+
+The caller stores the result in whatever scope owns it.  No globals required.
+
+reset_* functions that zero these globals are symptoms: they would not
+exist if the values were returned rather than written.
+
+
+The Incremental Migration Path
+-------------------------------
+The model should be adopted incrementally.  Each step is a self-contained
+improvement that does not require the others to land first.
+
+STEP 1 — ContractState unification (zero call-site breakage)
+  - Canonicalise ProofContractFlags → ContractState in one module
+  - Update all three current representations to embed it
+  - Compile and test at each update
+  - No change to function signatures yet
+
+STEP 2 — UartProbeFrames introduction (zero call-site breakage)
+  - Add struct to uart.mc or serial_service.mc
+  - Replace 12 individual fields in Phase131To137RuntimeContext first
+  - Propagate to MidPhaseProofRuntimeContext
+
+STEP 3 — TaskIdentity grouping (minimal call-site changes)
+  - Add TaskIdentity struct to state.mc
+  - Replace init_pid/init_tid/init_asid as a group in
+    MidPhaseProofRuntimeContext and LateServiceSystemRuntimeContext
+  - Update callers to pass task_identity.init.pid etc.
+
+STEP 4 — KernelExecState introduction (medium impact)
+  - Add KernelExecState struct grouping the 9–10 kernel execution fields
+  - Update execute_program_cap_spawn_and_wait to accept and return it
+  - Update ChildExecutionResult to embed it as a named field
+  - Propagate to Phase131To137RuntimeContext and MidPhaseProofRuntimeContext
+
+STEP 5 — RuntimeContext embedding (eliminates copy-conversion functions)
+  - For each Phase*RuntimeContext / Phase*ProofInputs pair:
+      ProofInputs = { context: RuntimeContext, contracts: ContractState,
+                      observations: PhaseNObservations }
+  - Delete the field-by-field conversion functions
+
+STEP 6 — Phase globals → returned results
+  - Convert execute_mid_phase_proofs to return MidPhaseProofResult
+  - Delete reset_late_phase_proofs()
+  - Update the call site in main.mc (or wherever the driver lives)
+
+STEP 7 — Introduce IdentityConfig
+  - Group the three TaskIdentity values into IdentityConfig
+  - This step is preparatory for a future full SystemState
+
+STEP 8 — Introduce ServiceState
+  - Compose the five service states into a single named group
+  - Replace all struct fields that carry multiple *ServiceState values
+
+STEP 9 — Introduce SystemState (composition of all prior layers)
+  - At this point the components exist; SystemState is assembly, not design
+  - Phase functions become: func phase137(s: SystemState) SystemStateResult
+
+
+Design Rules (summary)
+-----------------------
+These are the invariants the codebase should maintain going forward.
+
+R1  Functions may not accept >12 parameters.  If the limit is reached,
+    the excess parameters belong in a named struct.
+
+R2  Any function that today accepts {gate, process_slots, task_slots,
+    ready_queue, timer_state, interrupts} as separate parameters is a
+    KernelExecState consumer and must be updated during Step 4.
+
+R3  Phase-indexed globals are prohibited.  All phase outputs are returned
+    values.
+
+R4  Two structs that share >80% of their fields must be related by
+    embedding, not by field-by-field duplication.
+
+R5  A function whose body consists solely of constructing a struct from
+    its parameters (zero transformation) must be deleted.  Callers
+    construct the struct directly.
+
+R6  The 8 contract hardening flags always appear as ContractState.
+    Expanded scalar representations are a defect.
+
+R7  Observations are never stored in SystemState.  They are returned
+    alongside SystemState in result types.
+
+R8  UART frame bytes are always UartProbeFrames.  Individual byte fields
+    are a defect.
+
+R9  The same parameter group (e.g., pid + tid + asid, or pid + endpoint_id
+    + handle_slot for a single service) appearing in ≥2 function signatures
+    requires extraction into a named struct.
+
+R10 Phase-numbered type names (Phase150RebuiltSystemState, Phase108To116ProofInputs,
+    etc.) are acceptable during bring-up but must be renamed to phase-neutral
+    names once the concept stabilises.
+
+
+Relationship to Existing Documents
+-----------------------------------
+This document defines the implementation target for the state refactoring
+direction discussed during phase 152 code review.
+
+Related notes:
+  docs/agent/critiques/kernel/phase152/main_phase152.txt
+  docs/agent/critiques/kernel/phase152/bootstrap_proofs_phase152.txt
+  docs/agent/critiques/kernel/phase152/bootstrap_runtime_phase152.txt
+  docs/agent/critiques/kernel/phase152/state_phase152.txt
+  docs/agent/critiques/kernel/phase152/syscall_phase152.txt
+
+This is not a spec for the language semantics.  It is a design target for
+how the bootstrap kernel state should be organised in .mc source.

@@ -150,3 +150,9 @@ Non-goals
 - widening into general scheduling policy or service prioritization
 - introducing a hidden client coordinator or reply broker
 - reopening sema, MIR, backend, ABI, target, runtime, or `hal`
+
+kernel/ module admission
+------------------------
+Modules are added to `kernel/` only when THIS phase's audit forces them.
+See `kernel/README.md` for the full admission policy and per-module gates.
+Do not copy legacy implementations; follow the four-section standard.

@@ -247,10 +247,10 @@ FreestandingKernelPhaseCheck FreestandingKernelRuntimePhaseDescriptor::View() co
 
 FreestandingKernelCommonPaths MakeFreestandingKernelCommonPaths(const std::filesystem::path& source_root) {
     return {
-        .project_path = source_root / "kernel" / "build.toml",
-        .main_source_path = source_root / "kernel" / "src" / "main.mc",
+        .project_path = source_root / "kernel_old" / "build.toml",
+        .main_source_path = source_root / "kernel_old" / "src" / "main.mc",
         .roadmap_path = source_root / "docs" / "plan" / "admin" / "canopus_post_phase109_speculative_roadmap.txt",
-        .kernel_readme_path = source_root / "kernel" / "README.md",
+        .kernel_readme_path = source_root / "kernel_old" / "README.md",
         .repo_map_path = source_root / "docs" / "agent" / "prompts" / "repo_map.md",
         .freestanding_readme_path = source_root / "tests" / "tool" / "freestanding" / "README.md",
         .decision_log_path = source_root / "docs" / "plan" / "decision_log.txt",

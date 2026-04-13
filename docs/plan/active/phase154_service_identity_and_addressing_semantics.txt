@@ -151,3 +151,19 @@ Non-goals
 - widening into network identity, remote addressing, or distributed naming
 - turning the shell into a namespace authority or policy engine
 - reopening sema, MIR, backend, ABI, target, runtime, or `hal`
+
+kernel/ module admission
+------------------------
+Modules are added to `kernel/` only when THIS phase's audit forces them.
+Do not copy legacy implementations. Follow the four-section standard: state,
+init, handlers, optional debug.
+
+`capability` is admissible if identity/addressing semantics require explicit
+rights or handle table modeling: rights model + handle table, ~80 lines,
+no validation-observation coupling, no `last_*` fields.
+
+`transfer_service` is admissible if the identity audit reveals that the
+grant/emit dispatch needs an explicit service shape: lean version only,
+no `last_*` observation fields.
+
+Otherwise, no modules are added in Phase 154.

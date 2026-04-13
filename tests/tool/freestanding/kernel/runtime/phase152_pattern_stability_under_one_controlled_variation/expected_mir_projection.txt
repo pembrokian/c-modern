@@ -1,0 +1,4 @@
+  TypeDecl kind=struct name=debug.Phase152PatternStabilityAudit
+  Function name=bootstrap_audit.build_phase152_pattern_stability_audit returns=[debug.Phase152PatternStabilityAudit]
+  Function name=bootstrap_services.execute_phase152_controlled_variation_workflow returns=[bootstrap_services.Phase152ControlledVariationWorkflowResult]
+  Function name=debug.validate_phase152_pattern_stability returns=[bool]

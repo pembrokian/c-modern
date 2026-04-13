@@ -1,0 +1,18 @@
+label = "phase152_pattern_stability_under_one_controlled_variation"
+phase = 152
+shard = 9
+project = "kernel/build.toml"
+target = "kernel"
+output_stem = "kernel_phase152_pattern_stability_under_one_controlled_variation"
+build_context = "freestanding kernel phase152 pattern stability under one controlled variation build"
+run_context = "freestanding kernel phase152 pattern stability under one controlled variation run"
+run_contract = "success-exit-v1"
+mir_golden = "expected_mir_projection.txt"
+mir_contract = "first-match-projection-v1"
+required_objects = ["_Users_ro_dev_c_modern_kernel_src_shell_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_log_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_kv_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_serial_service.mc.o", "_Users_ro_dev_c_modern_kernel_src_init.mc.o", "_Users_ro_dev_c_modern_kernel_src_state.mc.o", "kernel__bootstrap_services.o", "kernel__bootstrap_audit.o", "kernel__debug.o"]
+selectors = [
+  "TypeDecl kind=struct name=debug.Phase152PatternStabilityAudit",
+  "Function name=bootstrap_audit.build_phase152_pattern_stability_audit returns=[debug.Phase152PatternStabilityAudit]",
+  "Function name=bootstrap_services.execute_phase152_controlled_variation_workflow returns=[bootstrap_services.Phase152ControlledVariationWorkflowResult]",
+  "Function name=debug.validate_phase152_pattern_stability returns=[bool]",
+]

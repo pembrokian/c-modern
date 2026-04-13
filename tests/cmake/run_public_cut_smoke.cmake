@@ -6,7 +6,7 @@ include(CMakeParseArguments)
 
 set(PUBLIC_CUT_ROOT "${BINARY_DIR}/audit/public_cut_smoke")
 set(HELLO_SOURCE "${SOURCE_ROOT}/tests/cases/hello.mc")
-set(SMOKE_BUILD_SOURCE "${SOURCE_ROOT}/tests/codegen/smoke_return_zero.mc")
+set(SMOKE_BUILD_SOURCE "${SOURCE_ROOT}/tests/compiler/codegen/smoke_return_zero.mc")
 set(HELLO_BUILD_DIR "${PUBLIC_CUT_ROOT}/hello_check")
 set(SMOKE_BUILD_DIR "${PUBLIC_CUT_ROOT}/smoke_return_zero")
 set(ISSUE_ROLLUP_PROJECT "${SOURCE_ROOT}/examples/real/issue_rollup/build.toml")

@@ -9,10 +9,36 @@ namespace {
 using mc::test_support::ExpectOutputContains;
 using mc::test_support::Fail;
 using mc::test_support::RunCommandCapture;
+using mc::test_support::CopyDirectoryTree;
+using mc::test_support::ReadFile;
 using mc::test_support::WriteFile;
 using namespace mc::tool_tests;
 using mc::tool_tests::BuildProjectTargetAndExpectFailure;
 using mc::tool_tests::WriteTestProject;
+
+std::filesystem::path InstallKernelResetLaneFixtureProject(const std::filesystem::path& source_root,
+                                                           const std::filesystem::path& fixture_root,
+                                                           const std::filesystem::path& project_root) {
+    constexpr std::string_view kKernelNewSourcePlaceholder = "__KERNEL_NEW_SRC__";
+
+    std::filesystem::remove_all(project_root);
+    CopyDirectoryTree(fixture_root, project_root);
+
+    const std::filesystem::path build_toml_path = project_root / "build.toml";
+    std::string build_toml_text = ReadFile(build_toml_path);
+    if (build_toml_text.find(kKernelNewSourcePlaceholder) == std::string::npos) {
+        Fail("kernel reset-lane fixture build.toml is missing the kernel_new source placeholder");
+    }
+
+    const std::string kernel_src = (source_root / "kernel" / "src").generic_string();
+    size_t pos = 0;
+    while ((pos = build_toml_text.find(kKernelNewSourcePlaceholder, pos)) != std::string::npos) {
+        build_toml_text.replace(pos, kKernelNewSourcePlaceholder.size(), kernel_src);
+        pos += kernel_src.size();
+    }
+    WriteFile(build_toml_path, build_toml_text);
+    return build_toml_path;
+}
 
 void TestHelpMentionsRun(const std::filesystem::path& binary_root,
                          const std::filesystem::path& mc_path) {
@@ -940,6 +966,186 @@ void TestDuplicateTopLevelAcrossModulePartsFails(const std::filesystem::path& bi
                          "duplicate top-level declarations across module parts should fail deterministically");
 }
 
+void TestKernelResetLaneSmokeProjectRuns(const std::filesystem::path& source_root,
+                                         const std::filesystem::path& binary_root,
+                                         const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "smoke" / "kernel_reset_lane_serial_round_trip";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_smoke_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_smoke_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_smoke_build_output.txt",
+                                       "kernel reset lane smoke build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_smoke_run_output.txt",
+                                                             "kernel reset lane smoke run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane smoke project should return 0, got:\n" + run_output);
+    }
+}
+
+void TestKernelResetLaneRetainedStateProjectRuns(const std::filesystem::path& source_root,
+                                                 const std::filesystem::path& binary_root,
+                                                 const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "system" / "kernel_reset_lane_retained_log";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_retained_state_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_retained_state_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_retained_state_build_output.txt",
+                                       "kernel reset lane retained-state build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_retained_state_run_output.txt",
+                                                             "kernel reset lane retained-state run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane retained-state project should return 0, got:\n" + run_output);
+    }
+}
+
+void TestKernelResetLaneObservabilityProjectRuns(const std::filesystem::path& source_root,
+                                                 const std::filesystem::path& binary_root,
+                                                 const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "system" / "kernel_reset_lane_serial_observability";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_observability_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_observability_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_observability_build_output.txt",
+                                       "kernel reset lane observability build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_observability_run_output.txt",
+                                                             "kernel reset lane observability run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane observability project should return 0, got:\n" + run_output);
+    }
+}
+
+void TestKernelResetLaneKvRoundtripProjectRuns(const std::filesystem::path& source_root,
+                                               const std::filesystem::path& binary_root,
+                                               const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "system" / "kernel_reset_lane_kv_roundtrip";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_kv_roundtrip_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_kv_roundtrip_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_kv_roundtrip_build_output.txt",
+                                       "kernel reset lane kv-roundtrip build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_kv_roundtrip_run_output.txt",
+                                                             "kernel reset lane kv-roundtrip run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane kv-roundtrip project should return 0, got:\n" + run_output);
+    }
+}
+
+void TestKernelResetLaneBootProjectRuns(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "smoke" / "kernel_reset_lane_boot";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_boot_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_boot_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_boot_build_output.txt",
+                                       "kernel reset lane boot build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_boot_run_output.txt",
+                                                             "kernel reset lane boot run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane boot project should return 0, got:\n" + run_output);
+    }
+}
+
+void TestKernelResetLaneImageProjectRuns(const std::filesystem::path& source_root,
+                                         const std::filesystem::path& binary_root,
+                                         const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "smoke" / "kernel_reset_lane_image";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_image_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_image_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_image_build_output.txt",
+                                       "kernel reset lane image build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_image_run_output.txt",
+                                                             "kernel reset lane image run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane image project should return 0, got:\n" + run_output);
+    }
+}
+
 
 }  // namespace
 
@@ -970,6 +1176,12 @@ void RunWorkflowToolSuite(const std::filesystem::path& source_root,
     TestProjectModeMultiFileModulesBuildAndRun(suite_root, mc_path);
     TestDuplicateModuleSetFileOwnershipFails(suite_root, mc_path);
     TestDuplicateTopLevelAcrossModulePartsFails(suite_root, mc_path);
+    TestKernelResetLaneSmokeProjectRuns(source_root, suite_root, mc_path);
+    TestKernelResetLaneRetainedStateProjectRuns(source_root, suite_root, mc_path);
+    TestKernelResetLaneObservabilityProjectRuns(source_root, suite_root, mc_path);
+    TestKernelResetLaneKvRoundtripProjectRuns(source_root, suite_root, mc_path);
+    TestKernelResetLaneBootProjectRuns(source_root, suite_root, mc_path);
+    TestKernelResetLaneImageProjectRuns(source_root, suite_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

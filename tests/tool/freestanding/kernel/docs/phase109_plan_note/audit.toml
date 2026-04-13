@@ -1,5 +1,5 @@
 label = "phase109_plan_note"
-source = "docs/plan/archive/phase109_first_running_canopus_kernel_slice_audit.txt"
+source = "docs/plan/archive/phase109_first_running_veya_kernel_slice_audit.txt"
 context = "phase109 plan note descriptor audit"
 contains = [
   "Phase 109 -- First Running Veya Kernel Slice Audit",

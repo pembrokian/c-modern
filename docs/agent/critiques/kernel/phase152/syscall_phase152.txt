@@ -1,0 +1,294 @@
+kernel/src/syscall.mc — Phase 152 Architectural Review
+=======================================================
+
+FILE: kernel/src/syscall.mc  (~620 lines)
+PHASE: 152 — syscall gate, IPC operations, spawn, wait, sleep
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL (code does not represent its own semantics correctly)
+  1. perform_send and perform_send_with_backpressure are near-identical;
+     same for the receive pair.
+  2. SendResult and BackpressureSendResult are two families for one
+     operation, diverging on a single boolean trait.
+
+P2 — DESIGN INTEGRITY (organisational smells that will compound)
+  3. SendResult duplicates status and block_reason at the top level
+     and inside observation.
+  4. Four closed_* error-path helpers are near-identical struct-literal
+     variations.
+  5. All result constructors are pure struct-literal wrappers.
+  6. FIRST_RUNTIME_MESSAGE_ID is an unexplained magic constant.
+  7. perform_spawn implicitly destroys program_capability with no
+     visible declaration.
+
+P3 — READABILITY / MAINTENANCE COST
+  8. SpawnAdmission is an internal type exposed at module scope.
+  9. Score functions carry unreachable return 0 after switch.
+
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL
+────────────────────────────────────────────────────────────────────────
+
+1. perform_send and perform_send_with_backpressure are near-identical;
+   same for the receive pair.
+
+perform_send and perform_send_with_backpressure are approximately 55
+lines each.  The common logic is:
+
+  - validate message_id and endpoint existence
+  - route the message through the endpoint table
+  - record gate state and observation
+  - return a result struct
+
+The backpressure variant adds three extra parameters (task_slots,
+ready_queue, and a callback that transitions a task to Blocked) and
+returns a BackpressureSendResult instead of SendResult.  The entire
+common body — including intermediate variable declarations, endpoint
+lookup, queue depth checks, and all the early-return error paths — is
+copy-pasted between the two versions.
+
+A change to the send routing logic must be applied in two places.  The
+four closed_* error helpers (see finding 4) multiply this problem
+further: each variant pair produces its own set of error paths that
+diverge on struct shape alone.
+
+The correct structure is a single core function that performs the send,
+extended by the caller to apply backpressure if the result indicates
+WouldBlock:
+
+  result: SendResult = perform_send(gate, handle_table, endpoints, pid, req)
+  if backpressure_wanted and result indicates WouldBlock {
+      // caller-side task blocking
+  }
+
+This is preferable to two functions that share a full body.
+
+
+2. SendResult and BackpressureSendResult are two families for one
+   operation, diverging on a single boolean trait.
+
+SendResult:
+  gate, handle_table, endpoints, status, block_reason, observation
+
+BackpressureSendResult:
+  gate, handle_table, endpoints, task_slots, ready_queue, observation
+
+The two structs are used for what is conceptually the same operation.
+Their observation fields are the same type.  The only difference is
+that BackpressureSendResult carries task_slots and ready_queue because
+the backpressure path mutates them.
+
+This creates two parallel call graphs through every function that
+processes a send result.  Callers must choose at the call site which
+family to use, and there is no path from one family to the other once
+chosen.  As IPC evolves (backpressure priorities, fairness policies)
+the duplication will compound into four or more families.
+
+The result families should be unified.  If `task_slots` and
+`ready_queue` are needed only in the backpressure path, they belong on
+a secondary result struct returned by the backpressure extension, not
+baked into the primary result.
+
+────────────────────────────────────────────────────────────────────────
+P2 — DESIGN INTEGRITY
+────────────────────────────────────────────────────────────────────────
+
+3. SendResult duplicates status and block_reason at the top level
+   and inside observation.
+
+  struct SendResult {
+      gate: SyscallGate
+      handle_table: capability.HandleTable
+      endpoints: ipc.EndpointTable
+      status: SyscallStatus          // top-level
+      block_reason: BlockReason       // top-level
+      observation: SendObservation    // also contains status and block_reason
+  }
+
+  struct SendObservation {
+      status: SyscallStatus
+      block_reason: BlockReason
+      ...
+  }
+
+A caller reading send_result.status gets the same value as
+send_result.observation.status, but there is no enforcement that they
+stay in sync.  A future function that updates only the top-level field
+or only the observation field will silently produce an inconsistent
+result.
+
+The authoritative fields should live in one place.  The canonical
+choice is to remove the top-level status and block_reason from SendResult
+and have callers read from observation.  Alternatively, remove the
+redundant fields from the observation.  The duplication should not exist
+at all.
+
+
+4. Four closed_* error-path helpers are near-identical.
+
+  closed_send_result(gate, handle_table, endpoints) SendResult
+  closed_receive_result(gate, handle_table, endpoints) ReceiveResult
+  closed_backpressure_send_result(gate, htable, eps, tslots, rq)
+  closed_backpressure_receive_result(gate, htable, eps, tslots, rq)
+
+All four return a struct with the same semantics: the operation was
+rejected because the endpoint is closed.  They differ only in which
+struct shape they produce.  The underlying logic is identical.
+
+This is a symptom of having two result families (finding 2): every
+error path must be duplicated across the family boundary.  Merging the
+result families eliminates three of the four helpers.
+
+
+5. All result constructors are pure struct-literal wrappers.
+
+Every perform_* function has a matching constructor:
+
+  func send_result(gate, handle_table, endpoints, status, block_reason,
+                   observation) SendResult {
+      return SendResult{ gate: gate, handle_table: handle_table, ... }
+  }
+
+These constructors contain no logic.  They exist only because the
+language does not support inline struct construction without field
+names.  They add an indirection level that a reader must mentally
+unfold, and they grow stale if a field is added to the struct without
+updating the constructor signature.
+
+Where the language allows direct struct literal construction, these
+wrappers should be eliminated in favour of call-site literals.  Where
+the constructors genuinely reduce noise (e.g. complex derivation),
+they should contain the derivation logic rather than being trivial
+forwarding shims.
+
+
+6. FIRST_RUNTIME_MESSAGE_ID is an unexplained magic constant.
+
+  const FIRST_RUNTIME_MESSAGE_ID: u32 = 2
+
+The constant appears in the message-ID validation logic inside
+perform_send and perform_receive.  Its value (2) carries the meaning
+"message IDs below this threshold are reserved for bootstrap use and
+should be rejected from runtime operations," but this is not stated
+anywhere in the file.
+
+A reader encountering this constant must trace through the message-ID
+assignment history across the bootstrap sequence to understand why 2
+is the threshold.  A comment or a better name (e.g.
+MIN_USER_MESSAGE_ID) would make the constraint self-evident.
+
+
+7. perform_spawn implicitly destroys program_capability with no
+   visible declaration.
+
+  func perform_spawn(..., program_capability: capability.CapabilitySlot,
+                     ...) SpawnResult {
+      ...
+      return SpawnResult{ ..., program_capability: capability.empty_slot(), ... }
+  }
+
+The function accepts a program_capability and returns an empty slot in
+its place.  The capability is consumed — the caller loses it after this
+call.  This consumption is not declared in the function signature; it is
+only observable by reading the return value assignment.
+
+In a language without move semantics or ownership annotations, this
+is particularly easy to miss.  A future caller that inspects the
+SpawnResult.program_capability field expecting the original value will
+get an empty slot with no warning.
+
+The function name or a prominent comment should declare that the
+program_capability is consumed and zeroed as part of the spawn
+operation.
+
+────────────────────────────────────────────────────────────────────────
+P3 — READABILITY / MAINTENANCE COST
+────────────────────────────────────────────────────────────────────────
+
+8. SpawnAdmission is an internal type exposed at module scope.
+
+  struct SpawnAdmission {
+      task_slot: u32
+      process_slot: u32
+      wait_table_slot: u32
+      admitted: u32
+  }
+
+SpawnAdmission is an intermediate result used exclusively inside
+perform_spawn to structure the admission check before the actual spawn
+operation.  It is not part of the module's public contract; no external
+caller constructs or receives one.
+
+Exposing it at module scope enlarges the module's apparent API surface.
+A reader surveying the file's structs will encounter SpawnAdmission and
+wonder whether it is needed externally.  Internal helper types should
+be clearly marked or scoped; if the language provides no scoping
+mechanism, a naming convention such as a leading underscore or a
+comment saying "internal to perform_spawn" should be applied.
+
+
+9. Score functions carry unreachable return 0 after switch.
+
+All score functions in this file follow the same pattern seen in
+state.mc:
+
+  func status_score(status: SyscallStatus) u32 {
+      switch status {
+          case SyscallStatus.Ok: return 2
+          ...
+          default: return 0
+      }
+      return 0   // unreachable
+  }
+
+The trailing return is dead code and accumulates silently across every
+enum in the file.
+
+────────────────────────────────────────────────────────────────────────
+COMPOUND EFFECT
+────────────────────────────────────────────────────────────────────────
+
+Findings 1, 2, and 4 are a single design problem: by carrying
+backpressure state inside the result type rather than as a separate
+extension, the code was forced to duplicate every send/receive
+function and every error-path helper.  The resulting surface is four
+times larger than necessary and will continue to grow as new IPC
+semantics are added.
+
+Finding 3 (field duplication inside SendResult) interacts with
+finding 1 because the send and backpressure-send functions each
+independently initialise both the top-level fields and the observation
+fields.  The duplication in the result struct is reinforced by the
+duplication in the construction code.
+
+────────────────────────────────────────────────────────────────────────
+RECOMMENDED RESOLUTION ORDER
+────────────────────────────────────────────────────────────────────────
+
+1. Remove the top-level status and block_reason fields from SendResult
+   (and the equivalent from ReceiveResult) and consolidate into the
+   observation.  Update all callers.
+
+2. Merge BackpressureSendResult and BackpressureReceiveResult into the
+   base result types by adding optional task_slots and ready_queue
+   fields.  Alternatively, have the backpressure callers apply task
+   state changes after receiving a base SendResult.
+
+3. Once result families are unified, delete closed_backpressure_send_result
+   and closed_backpressure_receive_result.
+
+4. Extract the shared core of perform_send / perform_send_with_backpressure
+   into a single shared function.  Apply the same treatment to the
+   receive pair.
+
+5. Replace FIRST_RUNTIME_MESSAGE_ID with a more descriptive name
+   and add a comment explaining the bootstrap reservation boundary.
+
+6. Add a declaration (name or comment) to perform_spawn that the
+   program_capability is consumed.
+
+7. Mark SpawnAdmission as internal with a comment or naming convention.
+
+8. Remove the trailing unreachable return 0 from all score functions.

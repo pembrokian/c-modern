@@ -1,0 +1,167 @@
+Phase 152e -- Kernel Reset Lane Image Entry
+===========================================
+
+Status
+------
+COMPLETE (2026-04-13)
+
+Purpose
+-------
+Add the missing kernel image entry point to `kernel/` and prove it
+runs as a self-contained hosted binary.
+
+Phase 152d closed the service shape gap: `kernel/` now has all three
+canonical service shapes (forwarding, append/tail, key/value), a working
+dispatch entry in `boot.mc`, and five passing tests. The one remaining gap
+before Phase 153 can audit composition pressure honestly is that `kernel/`
+has no `main.mc`. The boot smoke test in Phase 152d exercises `boot.mc` from
+an external test harness. There is no proof yet that `kernel/` can stand
+up as a runnable image with its own `func main() i32`.
+
+Phase 152e adds that entry point:
+
+- `kernel/src/main.mc` — a minimal kernel image `func main() i32` that
+  initialises all four services through `boot.kernel_init()`, dispatches a
+  fixed sequence of messages across every service path, and returns 0 on
+  success or 1 on failure
+- `tests/smoke/kernel_reset_lane_image/` — an image-mode smoke test that
+  uses `kernel/src/main.mc` directly as its root, with no separate
+  test-owned entrypoint
+- one update to `InstallKernelResetLaneFixtureProject` to replace all
+  occurrences of `__KERNEL_NEW_SRC__` in a fixture `build.toml` rather than
+  only the first, enabling the image `build.toml` to reference the kernel_new
+  source both as the root and as the module search path
+- one new workflow test wired into `RunWorkflowToolSuite`
+- one update to the Phase 153 plan redirecting its composition audit surface
+  from `kernel_old/src/bootstrap_services/` to `kernel/src/`
+
+Relationship to companion notes
+--------------------------------
+- `docs/plan/active/phase152c_kernel_behavioral_reset_and_verifier_extraction.txt`
+- `docs/plan/active/phase152d_kernel_reset_lane_shape_completion.txt`
+- `docs/plan/active/phase153_service_composition_shape_audit.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- After Phase 152d, `kernel/` has 9 modules totaling ~565 lines.
+- The lane was tested only through external harnesses: each test has its own
+  `src/main.mc` that imports `kernel/src/` modules as a library.
+- `kernel_old/src/main.mc` is 1,706 lines and still the only kernel image entry
+  in the repository. The contrast between the two trees is the clearest
+  available evidence for the Phase 152c correction.
+- `kernel/` needs one `main.mc` to convert the lane from a tested
+  module library into a testable kernel image.
+
+Problem being solved
+--------------------
+- Phase 153 is chartered as a composition audit over the admitted service
+  slice. Its plan currently references `kernel_old/src/bootstrap_services/` and
+  the old proof-shaped tree. Without a `kernel/src/main.mc`, Phase 153
+  has no honest composition surface to audit inside the reset lane.
+- The boot smoke test from Phase 152d tests `kernel_init()` and
+  `kernel_dispatch_step()` from outside using an external `main`. It does not
+  test the kernel image itself.
+- The comparison `kernel/src/main.mc` (~55 lines) vs
+  `kernel_old/src/main.mc` (1,706 lines) is the single clearest piece of evidence
+  the reset direction produces: if that comparison cannot be shown, the reset
+  lane remains a library of modules rather than a kernel.
+
+Phase target
+------------
+Phase 152e delivers:
+
+- one `kernel/src/main.mc` with a `func main() i32` that:
+  - initialises via `boot.kernel_init()`
+  - dispatches a serial byte through the serial→shell path
+  - appends one byte to the log service
+  - sets a key-value pair and reads it back
+  - returns 0 on success, 1 on any routing or value failure
+- one `tests/smoke/kernel_reset_lane_image/build.toml` with root pointing
+  directly at `__KERNEL_NEW_SRC__/main.mc` and modules pointing at
+  `__KERNEL_NEW_SRC__`, using the updated multi-occurrence installer
+- `InstallKernelResetLaneFixtureProject` updated to replace all occurrences
+  of `__KERNEL_NEW_SRC__` rather than only the first
+- `TestKernelResetLaneImageProjectRuns` registered in `RunWorkflowToolSuite`
+- `phase153_service_composition_shape_audit.txt` updated so that its
+  "Required implementation surfaces" section references `kernel/src/`
+  instead of the old proof-shaped kernel tree
+
+Hard constraints
+----------------
+- `kernel/src/main.mc` must follow the four-section service standard from
+  Phase 152c: only behavior, no proof structs, no phase constants, no audit
+  routing, no `record_*` or `observe_*` calls.
+- `main.mc` must remain under ~60 lines. Width over that threshold is evidence
+  the image entry is absorbing boot logic that belongs in `boot.mc` or a
+  service module.
+- The installer change must remain backward-compatible: existing tests with a
+  single `__KERNEL_NEW_SRC__` in their `build.toml` must continue to work
+  exactly as before.
+- No changes to `kernel/src/` in this phase. The old tree stays frozen.
+
+Non-goals
+---------
+- no real scheduler loop, interrupt dispatch, or hardware init sequence
+- no capability seeding, privilege separation, or real boot protocol
+- no process lifecycle or restart handling
+- no claim that `main.mc` is the complete kernel boot path; it is the minimum
+  needed to prove the image compiles and the service paths are reachable from
+  a single entrypoint
+
+Core rule
+---------
+- Same as Phase 152c and 152d: the kernel must dominate the verifier.
+- A kernel image entry that calls three services in 55 lines is evidence of
+  this. An image entry that needs 1,700 lines is the problem Phase 152c
+  exists to fix.
+
+Required implementation surfaces
+---------------------------------
+
+1. `kernel/src/main.mc`
+   - `func main() i32`
+   - uses `boot.kernel_init()` and `boot.kernel_dispatch_step()`
+   - exercises serial, log, and kv paths in sequence
+   - returns 0 on all-pass, 1 on first failure
+
+2. `tests/smoke/kernel_reset_lane_image/build.toml`
+   - no `src/` directory; root is `__KERNEL_NEW_SRC__/main.mc`
+   - modules is `["__KERNEL_NEW_SRC__"]`
+   - uses updated multi-occurrence installer
+
+3. `tests/tool/tool_workflow_suite.cpp`
+   - `InstallKernelResetLaneFixtureProject`: replace all occurrences of
+     `__KERNEL_NEW_SRC__` rather than only the first
+   - `TestKernelResetLaneImageProjectRuns`: build + run the image project
+   - registered at the end of `RunWorkflowToolSuite`
+
+4. `docs/plan/active/phase153_service_composition_shape_audit.txt`
+   - "Required implementation surfaces" items 3–7 redirected to `kernel/`
+   - Deliverables note updated to reference `kernel/src/main.mc` as the
+     primary composition audit surface
+
+Acceptance criteria
+-------------------
+- `mc_tool_workflow_unit` passes with all six kernel reset lane tests green
+- `kernel/src/main.mc` exists and is under 60 lines
+- no module in `kernel/src/` admits audit structs, record functions, or
+  phase-indexed observation routing
+- the image build and run both succeed without a separate test-owned `src/main.mc`
+- the contrast `kernel/src/main.mc` (~55 lines) vs `kernel_old/src/main.mc`
+  (1706 lines) is visible in the repository
+
+Exit note
+---------
+After Phase 152e, `kernel/` is a complete and testable kernel image:
+- 10 modules (~620 lines) covering primitives, all three service shapes,
+  explicit composition, ring-buffer observability, dispatch, and image entry
+- 6 tests exercising every path at the unit, system, and image levels
+- a clear target for Phase 153's composition audit
+
+The Phase 153 composition audit should now start from `kernel/src/main.mc`
+and `kernel/src/boot.mc` and ask: does the flat dispatch in `boot.mc`
+expose any composition friction that the isolated module tests missed?
+Specifically: is the endpoint-id routing in `kernel_dispatch_step` already the
+beginning of a hidden convention, or is it the honest and minimal composition
+boundary for this kernel slice?

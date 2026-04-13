@@ -1,0 +1,271 @@
+kernel/src/state.mc — Phase 152 Architectural Review
+=====================================================
+
+FILE: kernel/src/state.mc  (~430 lines)
+PHASE: 152 — kernel state types, slot tables, boot log
+
+────────────────────────────────────────────────────────────────────────
+PRIORITY SUMMARY
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL (code does not represent its own semantics correctly)
+  1. PROCESS_SLOT_NOT_FOUND = 3 and TASK_SLOT_NOT_FOUND = 3 use the
+     array bound as the sentinel value.
+  2. All slot lookup functions manually unroll exactly 3 branches.
+
+P2 — DESIGN INTEGRITY (organisational smells that will compound)
+  3. boot_ready_queue() and user_ready_queue() are identical.
+  4. can_block_task() encodes its condition as a magic score value.
+  5. Enum score values double as domain discriminants and booleans,
+     conflating semantics across unrelated types.
+  6. blocked_task_slot() always produces BlockedOnTimer regardless
+     of which variant helper is called.
+
+P3 — READABILITY / MAINTENANCE COST
+  7. zero_boot_records() manually names all 16 entries; entry 15
+     deviates from the empty_record() helper used by all others.
+  8. Score functions have unreachable return 0 after switch.
+
+────────────────────────────────────────────────────────────────────────
+P1 — STRUCTURAL
+────────────────────────────────────────────────────────────────────────
+
+1. PROCESS_SLOT_NOT_FOUND = 3 and TASK_SLOT_NOT_FOUND = 3 use the
+   array bound as the sentinel value.
+
+Both constants are declared with value 3:
+
+  const PROCESS_SLOT_COUNT:     u32 = 3
+  const PROCESS_SLOT_NOT_FOUND: u32 = 3
+  const TASK_SLOT_COUNT:        u32 = 3
+  const TASK_SLOT_NOT_FOUND:    u32 = 3
+
+The array is indexed 0..2.  The sentinel for "not found" is 3, which
+equals the array bound.  Any caller looping 0..PROCESS_SLOT_COUNT will
+include the sentinel in the range.  Any caller testing
+`result == PROCESS_SLOT_COUNT` is actually testing
+`result == PROCESS_SLOT_NOT_FOUND` — correct only by accident.
+
+If the array is ever extended to 4 slots, both constants must be
+updated in lockstep.  There is no name that signals the invariant
+"NOT_FOUND must always equal COUNT".
+
+The deeper issue is that a u32 slot index is returned where no valid
+slot exists.  A proper representation would be an optional type:
+
+  struct SlotLookup { slot: u32, found: u32 }
+
+or a distinct sentinel chosen to be outside any plausible array bound
+(e.g. 0xFFFF_FFFF).  Using the array bound as the sentinel is
+convenient to write and dangerous to maintain.
+
+
+2. All slot lookup functions manually unroll exactly 3 branches.
+
+Every function that searches or returns a slot by index uses the same
+pattern:
+
+  if slot == 0 { return process_slots[0] }
+  if slot == 1 { return process_slots[1] }
+  return process_slots[2]
+
+This pattern appears in find_process_slot(), find_task_slot(),
+and in every function that creates a slot at a specific index
+(init_process_slot(), user_task_slot(), etc.) using the same
+conditional chain.
+
+The language does not support a general loop over arrays, but the
+manual unrolling must be repeated for every new operation.  If the
+slot count changes from 3 to 4, every function must independently
+be extended.  The current pattern silently truncates: any caller
+passing slot index 3 or higher gets slot[2].
+
+The correct approach is to centralise the selector:
+
+  func select_process_slot(slots: [3]ProcessSlot, index: u32) ProcessSlot {
+      if index == 0 { return slots[0] }
+      if index == 1 { return slots[1] }
+      return slots[2]
+  }
+
+and call it instead of inlining the conditional chain at each site.
+
+────────────────────────────────────────────────────────────────────────
+P2 — DESIGN INTEGRITY
+────────────────────────────────────────────────────────────────────────
+
+3. boot_ready_queue() and user_ready_queue() are identical.
+
+Both functions are declared and both delegate to single_ready_queue():
+
+  func boot_ready_queue(boot_tid: u32) ReadyQueue {
+      return single_ready_queue(boot_tid)
+  }
+
+  func user_ready_queue(user_tid: u32) ReadyQueue {
+      return single_ready_queue(user_tid)
+  }
+
+The names imply a meaningful distinction — boot-time readiness versus
+user-space readiness — but the implementations are identical.  A reader
+encountering both names must examine both bodies before concluding they
+are the same.
+
+Either the distinction is meaningful and the implementations diverged
+accidentally, or the two names are aliases for the same operation and
+one should be deleted.  Keeping both creates a vocabulary burden: every
+new call site must decide which name to prefer with no correctness
+consequence.
+
+
+4. can_block_task() encodes its condition as a magic score value.
+
+  func can_block_task(slot: TaskSlot) u32 {
+      if task_state_score(slot.state) == 4 {
+          return 1
+      }
+      return 0
+  }
+
+The value 4 is the score for TaskState.Ready.  This is not visible at
+the call site and is not named.  If the score table changes, this
+function silently breaks.
+
+The correct expression is:
+
+  func can_block_task(slot: TaskSlot) u32 {
+      if slot.state == TaskState.Ready { return 1 }
+      return 0
+  }
+
+Score-based comparison exists to handle cases where the language lacks
+direct enum comparison.  Where a direct comparison is possible, using
+the score only obscures the intent.
+
+
+5. Enum score values double as domain discriminants and booleans,
+   conflating semantics across unrelated types.
+
+ProcessState.Empty and BootStage.Reset both return a score of 1:
+
+  func process_state_score(state: ProcessState) u32 {
+      // Empty → 1
+  }
+
+  func boot_stage_score(stage: BootStage) u32 {
+      // Reset → 1
+  }
+
+Several call sites use the "score 1 is falsy, score > 1 is truthy"
+idiom:
+
+  if process_state_score(slot.state) == 1     // means "slot is Empty"
+  if boot_stage_score(record.stage) != 1      // means "not Reset"
+
+The scores are reused as booleans across two unrelated type families.
+A future change to either scoring table (e.g. adding a new variant
+before Empty) would silently invert the boolean logic at every call
+site that uses the score-as-bool pattern without touching the score
+functions.
+
+
+6. blocked_task_slot() always produces BlockedOnTimer regardless
+   of which variant helper is called.
+
+  func blocked_task_slot(slot: TaskSlot, deadline: u32) TaskSlot {
+      return TaskSlot{ ..., state: TaskState.BlockedOnTimer, ... }
+  }
+
+  func blocked_task_slot_on_endpoint_send(slot: TaskSlot) TaskSlot { ... }
+  func blocked_task_slot_on_endpoint_receive(slot: TaskSlot) TaskSlot { ... }
+
+The base function is named blocked_task_slot with a deadline parameter,
+implying it is the general case.  But the endpoint variants exist
+precisely because blocking on an endpoint is semantically distinct from
+blocking on a timer.  Any caller that passes a deadline but intends
+endpoint-blocking will get the wrong state variant silently.
+
+The base function should not exist independently; each blocking reason
+should have its own named constructor with only the fields it requires.
+
+────────────────────────────────────────────────────────────────────────
+P3 — READABILITY / MAINTENANCE COST
+────────────────────────────────────────────────────────────────────────
+
+7. zero_boot_records() manually names all 16 entries; entry 15
+   deviates from the empty_record() helper.
+
+The function initialises a [16]BootRecord array by assigning each
+index individually.  Entries 0–14 call empty_record().  Entry 15
+uses an inline struct literal:
+
+  records[15] = BootRecord{ stage: BootStage.Reset, actor: 0, detail: 0 }
+
+The deviation from the helper is visually undetectable — the values
+are identical to what empty_record() returns.  The inconsistency
+will cause unnecessary diff noise when the BootRecord layout changes,
+and it signals to future readers that entry 15 might be special.
+
+All 16 assignments should call empty_record().
+
+
+8. Score functions have unreachable return 0 after switch.
+
+All score functions follow this pattern:
+
+  func process_state_score(state: ProcessState) u32 {
+      switch state {
+          case ProcessState.Empty: return 1
+          case ProcessState.Running: return 2
+          ...
+          default: return 0
+      }
+      return 0   // unreachable
+  }
+
+The final return 0 is after the switch, which is exhaustive.  It is
+dead code.  It accumulates silently across every enum in this file.
+
+────────────────────────────────────────────────────────────────────────
+COMPOUND EFFECT
+────────────────────────────────────────────────────────────────────────
+
+The sentinel-equals-bound pattern (finding 1) and the manual three-way
+unrolling (finding 2) interact: every lookup function silently truncates
+out-of-bound inputs to slot[2], and a NOT_FOUND result is also a valid
+slot index in the eyes of any caller that does arithmetic on the return
+value.  These are independently unsafe and together they produce
+incorrect results for any future code that extends the slot count or
+interprets NOT_FOUND numerically.
+
+The score-as-bool pattern (finding 5) and the magic score in
+can_block_task (finding 4) share the same root: scores are used where
+direct semantic comparisons are available.  Once score values diverge
+from intent (e.g. a new variant inserted before Empty), both fail
+together and the failure is invisible at every call site.
+
+────────────────────────────────────────────────────────────────────────
+RECOMMENDED RESOLUTION ORDER
+────────────────────────────────────────────────────────────────────────
+
+1. Replace PROCESS_SLOT_NOT_FOUND and TASK_SLOT_NOT_FOUND with a
+   sentinel value outside any plausible array bound, or introduce
+   a SlotLookup result type.  Audit all callers that compare to
+   SLOT_COUNT after this change.
+
+2. Introduce centralised slot selector helpers and replace inline
+   three-way unrolls at all call sites.
+
+3. Replace the magic score comparison in can_block_task with a
+   direct state comparison.  Audit other score-as-bool sites and
+   replace them similarly.
+
+4. Delete boot_ready_queue() or user_ready_queue() — keep the more
+   descriptive name, remove the other.
+
+5. Fix blocked_task_slot() so the base name is removed or takes
+   an explicit block reason parameter.
+
+6. Make zero_boot_records() call empty_record() uniformly for all
+   16 entries.
+
+7. Remove the trailing unreachable return 0 from all score functions.

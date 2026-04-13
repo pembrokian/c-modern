@@ -91,36 +91,42 @@ The owning implementation surfaces for this phase are:
 2. `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
    - provide the variation context used to judge composition honesty
 
-3. `kernel/src/bootstrap_services/`
-   - remain the primary owner-local composition surface and the first place to
-     detect glue growth
+3. `kernel/src/boot.mc` and `kernel/src/serial_shell_path.mc`
+   - the primary composition surfaces for this audit; `boot.mc` exposes the
+     flat endpoint-id dispatch and `serial_shell_path.mc` exposes the explicit
+     serial→shell forwarding path
+   - first question: does the flat dispatch in `kernel_dispatch_step` already
+     encode a hidden routing convention or is it the honest minimum?
 
 4. `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`,
-   `kernel/src/kv_service.mc`, and any Phase 152 variation owner
+   `kernel/src/kv_service.mc`
    - expose the current request, reply, and service-to-service composition
-     seams directly
+     seams inside the reset lane directly
 
-5. `kernel/src/init.mc` and `kernel/src/main.mc`
-   - keep boot wiring explicit and prevent orchestration pressure from being
-     hidden at the root
+5. `kernel/src/main.mc`
+   - keep the image entry explicit and prevent orchestration pressure from
+     being hidden at the root; was 1,706 lines in the old tree, is ~55 lines
+     in the reset lane
 
-6. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
-   - add one audit path that classifies repeated glue and rejects hidden
-     conventions
+6. `kernel/src/serial_shell_event_log.mc`
+   - the one observability surface in the reset lane; audit whether it
+     introduces cross-service observation coupling or remains locally owned
 
-7. `tests/tool/freestanding/kernel/`
-   - add one focused Phase 153 regression plus one projected MIR golden over
-     the admitted composition boundary
+7. `tests/tool/tool_workflow_suite.cpp` and `tests/system/`
+   - use the existing kernel reset lane tests as the composition regression
+     baseline; add one focused Phase 153 behavioral test if concrete glue
+     pressure is found
 
 Deliverables
 ------------
 - one canonical Phase 153 execution note in `docs/plan/active/`
-- one explicit inventory of cross-service glue paths
+- one explicit inventory of cross-service glue paths within `kernel/`
 - one classification of composition pressure and one conclusion about whether
-  explicit composition remains sufficient
-- one audit-owned Phase 153 proof over at least one awkward composition path
-- one focused freestanding regression plus projected MIR golden for the Phase
-  153 boundary
+  explicit composition remains sufficient in the reset lane
+- one audit over at least one composition seam in `kernel/` finding either
+  honest owner-local glue or evidence for one minimal primitive
+- one focused behavioral test if concrete repeated glue is found, or an
+  explicit doc note affirming explicit composition if it is not
 
 Suggested execution order
 -------------------------
@@ -164,3 +170,18 @@ Non-goals
 - widening the command surface just to create more composition cases
 - hiding repeated glue behind implicit conventions or callback tables
 - reopening sema, MIR, backend, ABI, target, runtime, or `hal`
+
+kernel/ module admission
+------------------------
+Modules are added to `kernel/` only when THIS phase's audit forces them.
+Do not copy legacy implementations. Follow the four-section standard: state,
+init, handlers, optional debug.
+
+If this phase's composition audit reveals lifecycle pressure (spawn/exit
+needed as a composition primitive), then `lifecycle/init` is admissible:
+one state struct + two handlers, not a LifecycleAudit.
+
+If lifecycle admission requires task scheduling, `sched` is admissible in
+a minimal form: ReadyQueue + TaskSlot, no LifecycleAudit prefix.
+
+Otherwise, no modules are added in Phase 153.

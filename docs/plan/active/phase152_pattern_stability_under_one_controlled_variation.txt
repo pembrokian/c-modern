@@ -3,7 +3,7 @@ Phase 152 -- Pattern Stability Under One Controlled Variation
 
 Status
 ------
-PLANNED
+ACTIVE
 
 Purpose
 -------
@@ -12,10 +12,10 @@ whether the extracted shell-plus-log-plus-key-value system pattern survives
 one small controlled variation before the repository widens into broader
 subsystem work.
 
-This document is a repository execution plan, not a closeout note.
-It defines one bounded variation phase over the landed interactive-service
-slice.
-It does not claim a new platform wave, a service framework, dynamic
+This document now records the landed implementation slice and the current
+validation state for one bounded variation phase over the landed
+interactive-service slice.
+It still does not claim a new platform wave, a service framework, dynamic
 discovery, a broker, or immediate filesystem, networking, or scheduling
 growth.
 
@@ -56,6 +56,58 @@ Problem being solved
   controlled variation, states why that variation is the smallest useful
   discriminator, and classifies the first pattern break honestly if one
   appears.
+
+Implementation result
+---------------------
+The landed Phase 152 implementation now exercises one controlled variation of
+the same shell-plus-log-plus-key-value system:
+
+- the rebuilt-system helper and shell command vocabulary are kept unchanged
+- the varied axis is which retained-state owner absorbs the explicit
+  init-owned restart step
+- the concrete variation restarts `log_service` instead of `kv_service`
+  while keeping the shell route, the serial ingress boundary, and the
+  retained key-value state live
+
+This is the smallest useful discriminator because it changes one real owner
+boundary inside the already extracted pattern without adding another service,
+another route family, wider payloads, or broader platform scope.
+If the pattern were only a tidy special case, that single change would force
+new framework-like glue immediately.
+
+Chosen outcome
+--------------
+Chosen outcome: partially generalizes.
+
+What survives unchanged:
+
+- the bounded `bootstrap_services` rebuilt-system helper remains an honest
+  owner-local place for the variation
+- the shell command vocabulary and request-routing shape remain sufficient
+- the unaffected retained-state peer (`kv_service`) keeps its state across
+  the other service's restart
+- the restart policy remains explicit and init-owned rather than drifting
+  into hidden supervision
+
+What becomes newly awkward:
+
+- when the restarted owner is itself the retained-log owner, the simple
+  "append restart evidence into the retained log" pattern no longer works as
+  self-contained evidence because restarting `log_service` clears the same
+  state that would have retained that evidence
+- the first honest break is therefore not a compiler or runtime gap; it is a
+  service-shape limitation in where restart evidence can live when the
+  restarted owner is also the evidence owner
+
+Validation status
+-----------------
+- the Phase 152 owner-local implementation slice, audit types, marker, and
+  runtime descriptor are now landed
+- local edited-file diagnostics are clean
+- the focused freestanding runtime selector is currently blocked by an
+  existing `kernel/src/bootstrap_proofs.mc` project-build failure that also
+  breaks the neighboring Phase 150 runtime selector, so the repository does
+  not yet claim the focused runtime regression is green
 
 Core rule
 ---------
@@ -137,6 +189,36 @@ Deliverables
 - one focused freestanding regression plus projected MIR golden for the Phase
   152 boundary
 
+Landed implementation surfaces
+------------------------------
+The owning implementation surfaces for the current landed slice are:
+
+1. `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
+  - records the chosen variation, the partial-generalization result, and the
+    current validation state
+
+2. `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+  - now treats Phase 152 as one bounded controlled-variation discriminator
+    rather than as permission for broader subsystem growth
+
+3. `kernel/src/bootstrap_services/11_phase151.mc` and
+  `kernel/src/bootstrap_services/12_phase152.mc`
+  - keep the variation inside the existing late service-system owner surface
+    by reusing the rebuilt-system state and adding one explicit log-restart
+    workflow
+
+4. `kernel/src/debug/23_phase152.mc` and `kernel/src/bootstrap_audit/`
+  - name which pattern elements survive and which awkwardness is first
+    exposed
+
+5. `kernel/src/main.mc`, `kernel/src/state.mc`, and
+  `kernel/src/bootstrap_audit/01_phase104_105.mc`
+  - carry the bounded Phase 152 marker acceptance updates only
+
+6. `tests/tool/freestanding/kernel/runtime/phase152_pattern_stability_under_one_controlled_variation/`
+  - owns the focused runtime descriptor and projected MIR golden for the
+    Phase 152 boundary
+
 Suggested execution order
 -------------------------
 1. Freeze the Phase 152 rule in docs: one small variation, no breadth wave.
@@ -171,6 +253,18 @@ Exit criteria
 - the focused regression proves build, run, docs, and MIR all expose the same
   Phase 152 boundary
 - compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Current status against exit criteria
+-----------------------------------
+- satisfied: the repository now publishes one explicit Phase 152 note, one
+  chosen variation, one bounded owner-local implementation slice, one audit,
+  and one focused runtime descriptor plus projected MIR golden
+- satisfied: compiler, sema, MIR, backend, ABI, target, runtime, and `hal`
+  surfaces stayed closed; only the bounded marker-acceptance surfaces moved
+- not yet re-verified locally: the focused freestanding runtime regression is
+  blocked by the existing `bootstrap_proofs` build failure noted above, so
+  the build or run proof portion of the exit criteria remains pending until
+  that broader baseline issue is cleared
 
 Non-goals
 ---------

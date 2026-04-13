@@ -127,10 +127,10 @@ tests/
 ```
 
 Meanings:
-- `tests/parser/`: parser pass and parse-fail fixtures
-- `tests/sema/`: semantic pass/fail fixtures and semantic module dumps
-- `tests/mir/`: MIR lowering fixtures, MIR dumps, and MIR-fail expectations
-- `tests/codegen/`: backend dump fixtures and executable behavior tests
+- `tests/compiler/parser/`: parser pass and parse-fail fixtures
+- `tests/compiler/sema/`: semantic pass/fail fixtures and semantic module dumps
+- `tests/compiler/mir/`: MIR lowering fixtures, MIR dumps, and MIR-fail expectations
+- `tests/compiler/codegen/`: backend dump fixtures and executable behavior tests
 - `tests/stdlib/`: checked-in stdlib proof programs and behavior fixtures
 - `tests/tool/`: `mc` driver, manifest, rebuild, and workflow tests
 - `tests/cases/`: tiny shared direct-source fixtures when centralization helps

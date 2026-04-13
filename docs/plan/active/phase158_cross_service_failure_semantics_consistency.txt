@@ -155,3 +155,9 @@ Non-goals
 - widening into durable failure logging or persistence platforms
 - turning error reporting into a general policy subsystem
 - reopening sema, MIR, backend, ABI, target, runtime, or `hal`
+
+kernel/ module admission
+------------------------
+Modules are added to `kernel/` only when THIS phase's audit forces them.
+See `kernel/README.md` for the full admission policy and per-module gates.
+Do not copy legacy implementations; follow the four-section standard.
