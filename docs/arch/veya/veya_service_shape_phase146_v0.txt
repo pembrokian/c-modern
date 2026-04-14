@@ -88,8 +88,8 @@ shape over the same owner model:
   `*Dispatch` or `*Result` structs
 - shell remains a protocol translator from compact command bytes to explicit
   effects (`Reply` or `Send`), not a hidden runtime
-- routing integers and synthetic control fields are transitional debt and
-  should be removed as effect-owned composition replaces them
+- endpoint IDs must not be hardcoded inside services; they must be injected
+  as explicit boot-wiring fields at service initialisation time
 
 This addendum does not admit a broker, framework, dynamic registry, or
 compiler expansion.
@@ -114,7 +114,12 @@ Preferred shape:
 
 - shared `Message`
 - shared `Effect` (`None`, `Reply`, `Send`)
-- service handler mutates service state and returns exactly one shared effect
+- service handler produces exactly one shared effect per message
+- state transition is returned as a new value alongside the effect
+  (a minimal `{state, effect}` pair is acceptable when the language lacks
+  multi-return, provided the pair carries no routing logic or control-flow
+  branching)
+- no routing choice or dispatch logic inside the result type
 
 Observability rule
 ------------------
@@ -138,19 +143,24 @@ effect, rather than by inventing a service-local composite effect variant.
 
 Kernel reset-lane recurrence audit (current)
 -------------------------------------------
-After applying the shell and key-value cleanup, the remaining recurrence in
-`kernel/src/` is mostly at orchestration boundaries rather than in service
-owners:
+After the Phase 153 service cleanup the remaining recurrence in
+`kernel/src/` is at orchestration boundaries rather than in service owners:
 
-- `boot.DispatchResult` still mixes next-state and transport reply metadata
-  for top-level call-site convenience
-- syscall-shaped observation builders still exist in orchestration helpers
-  where service-to-service calls should continue moving toward message-shaped
-  values
+- `log_service` and `kv_service` now return `{state, effect}` pair types
+  (`LogHandleResult`, `KvHandleResult`) instead of mutating via pointer.
+  These pair types carry no routing logic; they are a mechanical language
+  workaround for the absence of multi-return and are consistent with the
+  preferred shape.
+- `message_to_observation` still exists in `boot.mc` to bridge a `Message`
+  to a `ReceiveObservation` for the path-step call; service-to-service
+  calls should continue moving toward message-shaped values to eliminate
+  this crossing.
 
-Service owners (`shell_service`, `kv_service`) now use the shared message-plus-
-effect contract and no longer define service-local dispatch enums or
-service-local effect systems.
+Service owners (`shell_service`, `kv_service`, `log_service`) now use the
+shared message-plus-effect contract and no longer hardcode cross-service
+endpoint IDs; those IDs are injected at boot-wiring time. KV-to-Log
+composition now lives in `boot.kernel_dispatch_message`, not inside
+`kv_service`.
 
 Canonical minimal service shape
 -------------------------------
