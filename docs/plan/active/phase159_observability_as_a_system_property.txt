@@ -3,7 +3,7 @@ Phase 159 -- Observability As A System Property
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------

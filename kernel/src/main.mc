@@ -16,6 +16,9 @@ func main() i32 {
     if scenarios.run_cross_service_failure(&state) != 0 {
         return 1
     }
+    if scenarios.run_observability_inspection(&state) != 0 {
+        return 1
+    }
 
     return 0
 }

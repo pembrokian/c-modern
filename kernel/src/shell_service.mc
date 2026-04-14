@@ -68,6 +68,10 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
         return service_effect.effect_send(s.pid, s.kv_endpoint_id, 1, payload)
     }
 
+    if m.payload[0] == CMD_K && m.payload[1] == CMD_C && m.payload[2] == CMD_BANG && m.payload[3] == CMD_BANG {
+        return service_effect.effect_send(s.pid, s.kv_endpoint_id, 0, payload)
+    }
+
     return invalid_effect()
 }
 

@@ -188,3 +188,52 @@ func run_cross_service_failure(state: *boot.KernelBootState) i32 {
 
     return 0
 }
+
+// Observability inspection (Phase 159).
+//
+// Called after run_cross_service_failure.
+// State: kv has count=2 (keys 5 and 20), log is at capacity (4 retained entries).
+//
+// Proves the user can inspect system state truthfully via the public protocol
+// without requiring internal knowledge:
+//
+//   kv_count (KC!!) returns how many entries exist without the caller needing
+//   to know the stored keys.  This is the minimum gap Phase 159 closes: the
+//   log was already fully observable via LT!!, but kv state was opaque unless
+//   the caller already knew the keys.
+//
+//   log_tail (LT!!) returns all retained entries even when the buffer is full.
+//   Observation never triggers backpressure; Exhausted is only for writes.
+//
+//   Observation is non-mutating: a second count query returns the same value.
+func run_observability_inspection(state: *boot.KernelBootState) i32 {
+    effect: service_effect.Effect
+
+    // kv count query: proves a user can determine how many entries exist
+    // without needing to know the stored keys in advance.
+    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_count()))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 1
+    }
+    if service_effect.effect_reply_payload_len(effect) != 2 {
+        return 2
+    }
+
+    // Observation is non-mutating: a second count returns the same value.
+    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_count()))
+    if service_effect.effect_reply_payload_len(effect) != 2 {
+        return 3
+    }
+
+    // Log tail returns all retained entries at capacity: observation never
+    // triggers backpressure.
+    effect = boot.kernel_dispatch_step(state, cmd_log_tail())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 4
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return 5
+    }
+
+    return 0
+}

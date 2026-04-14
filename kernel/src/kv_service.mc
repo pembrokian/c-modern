@@ -65,7 +65,7 @@ func kvget(s: KvServiceState, m: service_effect.Message) service_effect.Effect {
 
 func handle(s: KvServiceState, m: service_effect.Message) KvResult {
     if m.payload_len == 0 {
-        return KvResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
+        return KvResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, s.count, primitives.zero_payload()) }
     }
     if m.payload_len >= 2 {
         // Backpressure: new key when full is visible to the caller as Exhausted.
