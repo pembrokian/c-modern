@@ -8,44 +8,88 @@ PUBLISHED
 Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
-broader position note so the repository can state exactly what the landed
-Phase 117 through Phase 121 work does and does not support.
+broader position note so the repository can state exactly what the work
+through Phase 166 does and does not support.
+
+This is the refreshed Phase 168 statement.  It supersedes the earlier Phase
+120 through Phase 121 statement and reflects the post-Phase-166 landing.
 
 This note is intentionally narrower than the current-position assessment.
 It does not claim a general Veya platform, dynamic loading, dynamic
 service discovery, a service manager, broader freestanding workflow support,
-or wider target-family admission.
+multicore, or wider target-family admission.
 
 Repository status note
 ----------------------
-- Phase 109 already published one first running Veya kernel slice over the
+- Phase 109 published the first running Veya kernel slice over the
   repository-owned kernel artifact.
-- Phase 117 then turned the landed log, echo, and transfer proofs into one
-  explicit init-orchestrated multi-service bring-up.
-- Phase 118 then published one delegated request-reply path together with one
-  explicit invalidated-source refusal after delegation.
-- Phase 119 then answered the next namespace pressure point with one fixed
-  init-owned three-entry service directory over that same service set.
-- Phase 120 now publishes those running-system truths together as one
-  explicit support statement tied to the same regression-owned kernel
-  artifact.
-- Phase 121 then hardens the image contract for that same admitted slice so
-  the manifest, target identity, runtime startup, emitted image-input
-  contract, and linked executable shape stay explicit.
+- Phases 110–116 clarified ownership boundaries (scheduler, lifecycle,
+  syscall, interrupt, address-space, MMU, timer).
+- Phase 117 added init-orchestrated multi-service bring-up.
+- Phase 118 added delegated request-reply with explicit invalidated-source
+  refusal.
+- Phase 119 answered namespace pressure with a fixed init-owned service
+  directory.
+- Phase 120 published the first running-system support statement.
+- Phase 121 hardened the image contract.
+- Phases 122–126 covered target-surface, next-plateau, delegation-chain
+  stress, invalidation and rejection, and authority lifetime classification.
+- Phase 128–130 covered service-death observation, partial-failure
+  propagation, and the restart-or-replacement probe.
+- Phases 131–137 covered fan-out composition, backpressure and blocking,
+  message lifetime and reuse, minimal device-service handoff, buffer
+  ownership boundary, device failure containment, and optional
+  completion-backed follow-through.
+- Phases 140–150 built the interactive serial-shell system: composed service
+  graph, scope freeze, shell command routing, long-lived log service,
+  stateful key-value service, service restart and failure pressure,
+  service-shape consolidation, IPC-shape audit under real usage,
+  authority-ergonomics under reuse, restart semantics, and one rebuilt-system
+  clean second pass.
+- Phase 151 reduced main.mc to init plus one scenario call.
+- Phase 152–152c introduced the kernel behavioral reset lane; kernel_old/ is
+  now frozen under archive/legacy_freestanding/; kernel/ is the live tree.
+- Phase 153 established the shared service_effect execution contract across
+  shell, log, kv, and serial services.
+- Phase 154 formalized service identity and addressing as plain ServiceRef
+  wrappers over endpoint_id constants.
+- Phases 157–159 audited long-lived coherence, cross-service failure
+  semantics consistency, and observability as a system property.
+- Phase 160 named the first model boundary: advisory sends were silently
+  dropped with no caller witness.
+- Phase 161 repaired it by adding send_dropped: u32 to the Effect struct.
+- Phase 162 cleaned orchestration impurities in boot.mc by naming all
+  dispatch arms explicitly (kernel_dispatch_kv, kernel_dispatch_leaf,
+  kernel_dispatch_serial).
+- Phase 163 closed exported constant linkage and aggregate const
+  follow-through on the active kernel path.
+- Phase 164 explicitly deferred struct embedding after the pressure audit
+  found no genuine repeated pressure beyond what with-helpers resolve.
+- Phase 165 named the second model boundary: service-to-service reachability
+  topology had no structural home.
+- Phase 166 repaired both second-boundary findings: service_topology.mc owns
+  the four endpoint ID constants (SERIAL, SHELL, LOG, KV); event_codes.mc
+  owns the six observable event code constants; shell_service.mc is now
+  topology-neutral; nine system test fixtures dropped their local constant
+  duplicates; serial_shell_event_log.mc switched from four separate slot
+  fields with an if-chain to a slots: [4]u32 array; serial_on_receive loop
+  rewritten as a for loop (style guide repair).
+- Phase 168 publishes this refreshed support statement and updates the
+  aggregate smoke to cover the admitted running-system path.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 117 through Phase 121 running-system slice,
+- State only the admitted Phase 109 through Phase 166 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
   them honestly.
 
-admitted support-statement posture: first admitted running-system support
-statement only, not a general Veya platform or broader freestanding
-workflow guarantee.
+Admitted support posture: refreshed Phase 168 running-system support
+statement; not a general Veya platform or broader freestanding workflow
+guarantee.
 
 Frozen support matrix
 ---------------------
@@ -53,27 +97,62 @@ Frozen support matrix
   arm64 bootstrap target family only
 - admitted runtime environment: repository-owned freestanding kernel target
   built through `mc build --project kernel/build.toml --target kernel --build-dir <dir>`
-- admitted mechanism boundary: explicit boot entry, first user entry,
+- admitted kernel mechanism boundary: explicit boot entry, first user entry,
   endpoint and handle state, syscall-owned byte IPC, attached-handle
   transfer, program-cap spawn and wait, timer-backed wake, bootstrap-
-  capability handoff, and the earlier Phase 109 first-running-kernel slice
-- admitted running-system boundary: one init-orchestrated log, echo, and
-  transfer service set, one delegated request-derived reply route with one
-  explicit invalidated-source refusal, and one fixed init-owned three-entry
-  service directory over one shared control endpoint
-- admitted proof set: Phase 109 first-running-kernel slice audit, Phase 110
-  ownership split audit, Phase 111 scheduler and lifecycle ownership
-  clarification, Phase 112 syscall boundary thinness audit, Phase 113
-  interrupt-entry and generic-dispatch boundary, Phase 114 address-space and
-  MMU ownership split, Phase 115 timer ownership hardening, Phase 116 MMU
-  activation barrier follow-through, Phase 117 init-orchestrated multi-
-  service bring-up, Phase 118 delegated request-reply follow-through, Phase
-  119 namespace-pressure audit, Phase 120 running-system support audit, and
-  Phase 121 kernel image-contract hardening
+  capability handoff, named dispatch arms, per-send delivery witness, and
+  the Phase 109 first-running-kernel mechanism boundary
+- admitted service-layer boundary: shared service_effect Message and Effect
+  execution contract; log_service with bounded in-memory retention and
+  overwrite-on-full; kv_service with bounded in-memory key-value state and
+  kv-count query; shell_service as a stateless command-routing owner;
+  serial_service as serial ingress and reply staging owner; echo_service and
+  transfer_service as bounded stateless reply owners
+- admitted topology boundary: service_topology.mc owns SERIAL_ENDPOINT_ID,
+  SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, and KV_ENDPOINT_ID as the neutral
+  topology module with no service imports; shell_service.mc is
+  topology-neutral; kernel_dispatch routes through named arms referencing
+  service_topology
+- admitted event codes boundary: event_codes.mc owns EVENT_SERIAL_BUFFERED
+  through EVENT_SERIAL_CLEARED; serial_shell_event_log.mc is a ring-buffer
+  sink consuming those codes from real effects
+- admitted orchestration boundary: scenarios.mc owns one scripted observation
+  loop; main.mc is init plus one call to scenarios.run(state); boot.mc owns
+  kernel_init and the dispatch loop with named arms
+- admitted proof set: Phase 109 first-running-kernel slice, Phase 110
+  ownership split, Phase 111 scheduler and lifecycle clarification, Phase
+  112 syscall boundary, Phase 113 interrupt-entry and generic-dispatch, Phase
+  114 address-space and MMU split, Phase 115 timer hardening, Phase 116 MMU
+  activation barrier, Phase 117 init-orchestrated multi-service, Phase 118
+  delegated request-reply, Phase 119 namespace-pressure, Phase 120
+  running-system support, Phase 121 image-contract hardening, Phase 122
+  target-surface audit, Phase 123 next-plateau audit, Phase 124 delegation-
+  chain stress, Phase 125 invalidation and rejection, Phase 126 authority
+  lifetime classification, Phase 128 service-death observation, Phase 129
+  partial-failure propagation, Phase 130 restart-or-replacement probe, Phase
+  131 fan-out composition probe, Phase 132 backpressure and blocking, Phase
+  133 message lifetime and reuse, Phase 134 minimal device-service handoff,
+  Phase 135 buffer ownership boundary, Phase 136 device failure containment,
+  Phase 137 optional completion-backed follow-through, Phase 140 serial-
+  ingress composed service graph, Phase 141 interactive service scope freeze,
+  Phase 142 serial shell command routing, Phase 143 long-lived log service,
+  Phase 144 stateful key-value service, Phase 145 service restart and failure
+  pressure, Phase 146 service-shape consolidation, Phase 147 IPC-shape audit,
+  Phase 148 authority-ergonomics, Phase 149 restart semantics, Phase 150
+  rebuilt-system second pass, Phase 151 main simplification, Phase 152–152c
+  kernel behavioral reset, Phase 153 service composition shape, Phase 154
+  service identity and addressing, Phase 157 long-lived coherence, Phase 158
+  cross-service failure consistency, Phase 159 observability, Phase 160 first
+  model boundary identification, Phase 161 per-send delivery witness, Phase
+  162 orchestration cleanup, Phase 163 constant linkage follow-through, Phase
+  164 struct embedding deferral, Phase 165 second model boundary
+  identification, Phase 166 service topology and event codes formalization,
+  and Phase 168 this support statement refresh
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
-  run` or `mc test`, broader target-family admission, multicore claims, and
-  general packaging or install policy
+  run` or `mc test`, broader target-family admission, multicore claims,
+  general packaging or install policy, struct embedding, const functions, and
+  arbitrary compile-time execution
 
 Usage and audit
 ---------------
@@ -96,10 +175,17 @@ Supported command pattern for the admitted running-system slice:
 build/debug/bin/mc build --project kernel/build.toml --target kernel --build-dir <dir>
 ```
 
-Repo-owned audit entrypoint for this support statement:
+Repo-owned regression entrypoint for this support statement:
 
 ```sh
 ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure
+```
+
+Aggregate public-cut smoke covering both the hosted and running-system
+admitted slices:
+
+```sh
+make public-cut-smoke
 ```
 
 Artifact expectations
@@ -123,20 +209,26 @@ Known limitations
   test` workflow support
 - the repository still does not claim broad device, filesystem, portability,
   packaging, or install policy
+- struct embedding has been explicitly deferred; the decision is recorded in
+  the decision log
 
 Practical support statement
 ---------------------------
-The current repository can honestly claim one bounded running-system support statement over the repository-owned Veya kernel artifact: one explicit
-init-orchestrated log, echo, and transfer service set, one delegated
-request-derived reply route with one explicit invalidated-source refusal, one
-fixed init-owned three-entry service directory over the landed first running
-kernel slice, and one explicit image-contract hardening step that keeps the
-manifest, target identity, runtime startup, emitted image-input contract, and
-linked executable shape reviewable.
+The current repository can honestly claim one bounded running-system support
+statement over the repository-owned Veya kernel artifact: one interactive
+serial-shell system with log, kv, shell, and serial services; one named
+neutral service topology module; one named event codes module; per-send
+delivery witness on the Effect type; named dispatch arms in the boot
+orchestrator; a scripted observation loop in scenarios.mc; and a thin
+main.mc that is init plus one call.
+
+The repository also provides the complete Phase 109–121 mechanism boundary
+and the Phase 122–166 authority, service, orchestration, and model-repair
+wave over that same artifact.
 
 The repository still does not claim a general Veya platform, broader
 freestanding workflow support, dynamic discovery, dynamic loading, a service
-manager, or a broader namespace or loader model.
+manager, a general namespace model, multicore, or a broader loader model.
 
 Everything outside that slice should be treated as explicitly unsupported
 until a later phase note and proof layer admit it.

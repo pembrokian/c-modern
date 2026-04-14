@@ -20,6 +20,23 @@ Record one maintained repository position after Phase 144 published one bounded 
 Record one maintained repository position after Phase 145 published one bounded service restart, failure, and usage pressure audit over that same slice.
 Record one maintained repository position after Phase 146 published one bounded service-shape consolidation step over that same slice.
 Record one maintained repository position after Phase 147 published one bounded IPC-shape audit under real usage over that same slice.
+Record one maintained repository position after Phase 148 published one bounded authority-ergonomics audit under reuse over that same slice.
+Record one maintained repository position after Phase 149 published one bounded restart-semantics-as-a-first-class-pattern step over that same slice.
+Record one maintained repository position after Phase 150 published one bounded rebuilt-system clean second pass over the shell-plus-log-plus-key-value system.
+Record one maintained repository position after Phase 151 simplified main.mc to init plus one scenario call.
+Record one maintained repository position after Phase 152–152c introduced the kernel behavioral reset lane and established kernel/ as the live clean tree.
+Record one maintained repository position after Phase 153 established the shared service_effect execution contract across shell, log, kv, and serial services.
+Record one maintained repository position after Phase 154 formalized service identity and addressing as explicit ServiceRef wrappers.
+Record one maintained repository position after Phase 157 published one bounded long-lived system coherence audit over the growing service set.
+Record one maintained repository position after Phase 158 published one bounded cross-service failure semantics consistency audit over that same slice.
+Record one maintained repository position after Phase 159 published one bounded observability-as-a-system-property step over that same slice.
+Record one maintained repository position after Phase 160 named the first repeated model boundary (advisory sends silently dropped, no witness) over that same slice.
+Record one maintained repository position after Phase 161 repaired the first model boundary by adding send_dropped: u32 to the Effect struct.
+Record one maintained repository position after Phase 162 cleaned orchestration impurities by naming all dispatch arms explicitly in boot.mc.
+Record one maintained repository position after Phase 163 closed exported constant linkage and aggregate const follow-through on the active kernel path.
+Record one maintained repository position after Phase 164 explicitly deferred struct embedding after the pressure audit found no genuine repeated pressure.
+Record one maintained repository position after Phase 165 named the second repeated model boundary (service-to-service reachability topology had no structural home).
+Record one maintained repository position after Phase 166 repaired both second-boundary findings with service_topology.mc and event_codes.mc.
 
 This note answers four questions that now matter:
 
@@ -157,6 +174,22 @@ Current repository truth
 - The landed Phase 146 service-shape consolidation step also belongs to that same admitted slice rather than to a broader service framework, runtime abstraction, dynamic registration model, or reopened compiler wave.
 - The landed Phase 147 IPC-shape audit under real usage also belongs to that same admitted slice rather than to a broader message bus, dynamic payload model, transport rewrite, or reopened compiler wave.
 - The landed Phase 148 authority-ergonomics audit under reuse also belongs to that same admitted slice rather than to ambient authority shortcuts, a broader authority framework, hidden rebinding helpers, or a reopened compiler wave.
+- The landed Phase 149 restart-semantics-as-a-first-class-pattern step also belongs to that same admitted slice rather than to a broader supervision, recovery, or reopened compiler wave.
+- The landed Phase 150 rebuilt-system clean second pass also belongs to that same admitted slice rather than to a reusable runtime framework, dynamic registration model, or reopened compiler wave.
+- The landed Phase 151 main simplification (main.mc reduced to init plus one scenarios call) also belongs to that same admitted slice rather than to a generic orchestration framework or compiler-facing service support.
+- The landed Phase 152–152c kernel behavioral reset establishes kernel/ as the live clean tree and kernel_old/ as the frozen legacy reference; the reset-lane service rule is state plus init plus handlers plus optional debug only.
+- The landed Phase 153 shared service_effect execution contract (Message and Effect types shared across shell, log, kv, and serial services) also belongs to that same admitted slice rather than to a service runtime, hidden broker, or reopened compiler wave.
+- The landed Phase 154 service identity and addressing formalization (plain ServiceRef wrapping endpoint_id as a compile-time constant) also belongs to that same admitted slice rather than to a compiler-known type or dynamic runtime registry.
+- The landed Phase 157 long-lived system coherence audit also belongs to that same admitted slice rather than to a broader consistency framework, persistent store, or reopened compiler wave.
+- The landed Phase 158 cross-service failure semantics consistency audit also belongs to that same admitted slice rather than to a recovery, retry, or audit-trail-integrity framework; the advisory log drop is explicitly named as one intentional cross-service inconsistency.
+- The landed Phase 159 observability-as-a-system-property step (kv count query added; effect-backed ring-buffer event codes) also belongs to that same admitted slice rather than to a telemetry platform or enumeration framework.
+- The landed Phase 160 first model boundary identification named the advisory-send silent-drop gap as a first-class problem; this naming belongs to the boundary-identification method, not to a recovery or framework claim.
+- The landed Phase 161 per-send delivery witness (send_dropped: u32 on Effect) closed the named boundary with one field; it is additive and does not imply recovery.
+- The landed Phase 162 orchestration cleanup (named dispatch arms: kernel_dispatch_kv, kernel_dispatch_leaf, kernel_dispatch_serial) also belongs to that same admitted slice rather than to a general routing table or service bus.
+- The landed Phase 163 exported constant linkage and aggregate const follow-through admits direct cross-module constant reuse and ordinary aggregate const literals on the active kernel path; it does not admit const functions or arbitrary compile-time execution.
+- Phase 164 explicitly deferred struct embedding after the pressure audit proved that all identified pressure sites (KernelBootState, SerialShellPathState) resolve through with-helpers without the language feature; embedding remains deferred.
+- The landed Phase 165 second model boundary identification named "service-to-service reachability topology has no structural home" as the second repeated boundary; three sites (ShellServiceState fields, boot.mc constants, kernel_dispatch if-chains) had to agree by convention with no neutral owning module.
+- The landed Phase 166 repair introduced service_topology.mc (four endpoint ID constants, no imports) and event_codes.mc (six event code constants, no imports); shell_service.mc is now topology-neutral; nine system test fixtures dropped local constant duplicates; serial_shell_event_log.mc switched to a slots: [4]u32 array with a for loop; serial_on_receive was also rewritten as a for loop per the style guide.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -179,70 +212,28 @@ It means:
 - the current admitted slice is still a small capability-based microkernel in
   a fixed-size, table-driven, single-core, inspectable form
 - explicit boot, user entry, IPC, authority transfer, spawn, wait, sleep or
-  wake, bounded init-owned service orchestration, and a bounded namespace
-  answer are now real inside that slice
+  wake, bounded init-owned service orchestration, a bounded namespace
+  answer, named dispatch topology, per-send delivery witnessing, and
+  explicit event code ownership are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
-Phase 96 through Phase 137 are now concrete as one first real kernel wave,
+Phase 96 through Phase 166 are now concrete as one first real kernel wave,
 one ownership and hardware-boundary clarification wave, one first bounded
-running-system and plateau freeze wave, and two first post-plateau
-authority-lifecycle stress steps plus one explicit lifetime-classification
-step and one explicit service-death observation step plus one explicit
-partial-failure propagation step plus one explicit restart-or-replacement
-probe plus one explicit fan-out composition probe plus one explicit
-backpressure and blocking audit plus one explicit message lifetime and reuse
-audit plus one explicit minimal device-service handoff plus one explicit
-buffer ownership boundary audit plus one explicit device failure containment
-probe plus one explicit optional completion-backed follow-through plus one explicit
-serial-ingress composed service graph plus one explicit interactive-service
-scope freeze.
+running-system and plateau freeze wave, one interactive serial-shell system
+wave, one kernel behavioral reset wave, a service execution contract wave,
+and a model-boundary identification and repair wave.
+
 That is meaningful implementation progress, but it is still an early system
 plateau rather than architectural completion.
 
-The repository now includes a landed Phase 131 fan-out composition probe that
-keeps routing policy with init and service owners, adds no compiler-facing
-surface, and expands the running-system slice by one honest composed IPC path
-rather than by another proof-only restatement of one-hop service behavior.
-
-The repository now also includes a landed Phase 132 backpressure and blocking
-audit that keeps queue pressure in endpoint, lifecycle, and syscall owners,
-adds no compiler-facing surface, and expands the running-system slice by one
-honest sender-block and one honest receiver-block path rather than by another
-proof-only restatement of `WouldBlock` return codes.
-
-The repository now also includes a landed Phase 133 message lifetime and reuse
-audit that keeps slot retirement, payload scrubbing, close-or-death abort
-cleanup, and attached-handle lifetime in ipc and capability owners, adds no
-compiler-facing surface, and expands the running-system slice by one repeated
-slot-reuse path plus one direct close-or-death wake-and-abort path rather than
-by another fixture-only queue assumption.
-
-The repository now also includes a landed Phase 134 minimal device-service
-handoff that keeps one UART receive interrupt, one concrete byte read, one
-interrupt-origin IPC publish, and one fixed serial-service receive path in
-target-local and service-local owners, adds no compiler-facing surface, and
-expands the running-system slice by one honest device-facing boundary rather
-than by another proof-only timer-backed exercise.
-
-The repository now also includes a landed Phase 135 buffer ownership boundary
-audit that keeps one UART-owned staging frame, one copied IPC payload, and one
-serial-service-owned consumed log explicit under repeated delivery, adds no
-compiler-facing surface, and expands the running-system slice by one honest
-ownership boundary rather than by another fixture-only byte assumption.
-
-The repository now also includes a landed Phase 136 device failure containment
-probe that keeps malformed-byte classification inside the serial service, keeps
-queue-full and endpoint-closed consequences explicit inside UART and IPC
-owners, adds no compiler-facing surface, and expands the running-system slice
-by one honest unhappy-path statement rather than by another happy-path-only
-device demonstration.
-
-The repository now also includes a landed Phase 140 serial-ingress composed service graph that keeps the new forward edge and aggregate-reply interpretation inside service owners, adds no compiler-facing surface, and expands the running-system slice by one honest device-facing-to-composed-service route rather than by another init-only composition restatement.
+The repository now includes a landed Phase 140 serial-ingress composed service graph that keeps the new forward edge and aggregate-reply interpretation inside service owners, adds no compiler-facing surface, and expands the running-system slice by one honest device-facing-to-composed-service route rather than by another init-only composition restatement.
 
 The repository now also includes a landed Phase 141 interactive service system scope freeze that keeps serial framing in `serial_service`, keeps command ownership in one concrete `shell_service` owner, keeps bounded state in one concrete `kv_service` owner, adds no compiler-facing surface, and expands the running-system slice by one honest shell-owned boundary rather than by another transport-only or roadmap-only restatement.
 
 The repository now also includes a landed Phase 142 serial shell command routing step that keeps framing and final reply observation in `serial_service`, keeps command parsing and fixed routing in `shell_service`, keeps the serial and IPC payload width fixed at four bytes through a compact command encoding, adds no compiler-facing surface, and expands the running-system slice by one honest user-facing shell route rather than by another freeze-only restatement.
+
+The repository now also includes the Phase 148–166 model-discipline wave: authority-ergonomics under reuse with one narrow capability-local helper, restart semantics as a first-class pattern with explicit caller retry and reset-state truth, one rebuilt-system clean second pass over the shell-plus-log-plus-key-value system, main.mc reduced to init plus one call, a kernel behavioral reset establishing kernel/ as the live clean tree, a shared service_effect execution contract, service identity formalized as compile-time constants, three coherence and failure audits, advisory-send witness (send_dropped field), named dispatch arms, exported constant linkage, explicit struct embedding deferral, service topology formalized in service_topology.mc, and observable event codes formalized in event_codes.mc.  None of these admit a broader compiler wave, dynamic framework, or general platform claim.
 
 Kernel maturity and quality
 ---------------------------
@@ -356,29 +347,28 @@ What still needs discipline as implementation grows:
 
 Next milestone themes and work areas
 ------------------------------------
-The next milestones should not be described as a broader platform wave.
-They should be described as pressure-testing the current model before any
-larger widening claims are entertained.
+The Phase 160–166 boundary-identification and repair wave established a
+repeatable two-phase method (name first, fix in the next phase).  The next
+milestones should apply that discipline to whatever the next real kernel step
+exposes.
 
-Recommended work themes:
+Recommended work themes after Phase 168:
 
-- kernel ownership hardening: preserve the landed `sys`, `cap`, `ipc`, `mm`,
-  `sched`, `lifecycle`, and `debug` seams, and extract new owners only where
-  the next real kernel step proves one boundary is still too blurry
-- authority and lifecycle stress: prove that delegated authority,
-  invalidation, rejection, and lifetime handling remain explicit under deeper
-  composition without importing a broader kernel policy layer
-- IPC and failure stress: prove that IPC composition, backpressure, service
-  failure, and partial-failure observation stay explicit without letting
-  scheduler or recovery policy leak into the wrong owner
-- device-boundary experiments: only after the above, test whether one real
-  device-service path can fit the current ownership model without turning the
-  kernel into a driver framework
-- target and image hardening: keep manifest, relink, emitted-artifact, and
-  kernel-image ownership explicit as the kernel build path grows beyond the
-  current bootstrap lane
-- compiler boundary discipline: reopen sema, MIR, backend, ABI, or `hal`
-  surfaces only when the next real kernel proof exposes a concrete owner gap
+- const-eval first expansion: Phase 163 admitted scalar and aggregate const
+  linkage; Phase 169 should determine whether const function evaluation has
+  genuine current owner pressure or whether the current boundary is still
+  sufficient
+- static service topology elaboration: Phase 166 made topology a data
+  concept; Phase 170 should decide whether the topology warrants explicit
+  edges (growability) or stays as constants
+- generic monomorphization first slice: the repository defers generics, but
+  Phase 171 should measure whether one narrow monomorphization path is now
+  justified by the kernel or hosted slice
+- keep the two-phase boundary method: name before fixing; keep repairs scoped
+  by the named evidence, not by aspirational roadmap items
+- compiler boundary discipline: reopen sema, MIR, backend, ABI, or hal
+  surfaces only when the next real kernel or hosted proof exposes a concrete
+  owner gap
 
 Deferred by default
 -------------------
@@ -420,9 +410,16 @@ chase speculative language machinery.
 Bottom line
 -----------
 Veya should currently be described as a bounded small running system over a
-real microkernel artifact, and Modern C should currently be described as
-capable of carrying that kernel and running-system slice.
+real microkernel artifact with an interactive serial-shell service set, named
+service topology, named event codes, a per-send delivery witness, and a
+scripted observation loop that keeps main.mc to four lines.
+
+Modern C should currently be described as capable of carrying that kernel and
+running-system slice through the current admitted language surface.
 
 Both statements are meaningful, but both remain intentionally narrow.
 The repository is beyond readiness and beyond pure proof sketches, yet still
 well short of a general kernel platform or a finished systems-language story.
+
+This position note was last refreshed at Phase 168 to reflect the post-Phase-166
+landing; the next refresh should follow the next evidence-driven plateau.

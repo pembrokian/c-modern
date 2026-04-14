@@ -39,7 +39,21 @@ Supported hosted slice:
 - admitted adjacent helper boundary: narrow hosted `time` `Duration` plus `monotonic()` and pure slash-separated `path` `join(...)`, `basename(...)`, and `dirname(...)`
 - admitted richer real-project proof set: `examples/real/issue_rollup/`, `examples/real/worker_queue/`, `examples/real/pipe_handoff/`, `examples/real/pipe_ready/`, `examples/real/line_filter_relay/`, and `examples/real/evented_echo/`, where `worker_queue` is the low-level shared-memory sync proof, `pipe_handoff` is the direct blocking handle-first communication proof, `pipe_ready` is the pipe-readiness proof over `io.poller_*`, `line_filter_relay` is the narrow subprocess plus stdio proof over `os.spawn_pipe_argv(...)`, `os.spawn_pipe_argv_merged_output(...)`, `os.spawn_pipe_argv_split_output(...)`, and `os.wait(...)`, and `evented_echo` remains the stronger networking proof over the same handle model
 - supported workflow guarantee on the admitted richer proof: deterministic same-build-dir selected-target reuse without non-selected-target churn, now exposed directly on the shipped `issue_rollup` project through its default and report executable consumers over the admitted static-library boundary
-- unsupported today beyond this hosted support claim: the separate freestanding proof slice recorded below, general cross-compilation, shared libraries, external system-library links in project manifests, package management, and any public portability claim beyond Darwin arm64
+- unsupported today beyond this hosted support claim: the separate freestanding proof slice and Veya running-system slice recorded below, general cross-compilation, shared libraries, external system-library links in project manifests, package management, and any public portability claim beyond Darwin arm64
+
+Supported Veya running-system slice:
+
+This summary mirrors the refreshed Phase 168 statement in `docs/plan/admin/veya_running_system_support_statement.txt`.
+
+- supported compiler host and produced proof-artifact target family: Darwin arm64 bootstrap target family only
+- admitted runtime environment: repository-owned freestanding kernel target built through `mc build --project kernel/build.toml --target kernel --build-dir <dir>`
+- admitted kernel mechanism boundary: explicit boot entry, first user entry, endpoint and handle state, syscall-owned byte IPC, attached-handle transfer, program-cap spawn and wait, timer-backed wake, bootstrap-capability handoff, named dispatch arms, per-send delivery witness
+- admitted service-layer boundary: shared service_effect Message and Effect contract; log_service, kv_service, shell_service, serial_service, echo_service, transfer_service
+- admitted topology boundary: service_topology.mc owns SERIAL, SHELL, LOG, KV endpoint ID constants; shell_service.mc is topology-neutral
+- admitted event codes boundary: event_codes.mc owns the six observable event code constants; serial_shell_event_log.mc is a ring-buffer sink
+- admitted orchestration boundary: scenarios.mc owns the scripted observation loop; main.mc is init plus one call
+- admitted proof set: Phases 109–166 (see `docs/plan/admin/veya_running_system_support_statement.txt` for the full list)
+- unsupported today: dynamic discovery, dynamic loading, a service manager, broader init policy, freestanding `mc run` or `mc test`, broader target-family admission, multicore, general packaging, struct embedding, and const functions
 
 Supported freestanding v0.3 slice:
 
@@ -139,7 +153,7 @@ Artifact expectations:
 - remaining top-level `build/debug/phase*` entries are reserved for intentionally preserved manual or probe work, not active repository-owned regression outputs
 - `make build` and `make test` are convenience wrappers around the same CMake-based path, not a separate supported installation story
 - `make first-use-smoke` is the repo-owned convenience wrapper for the narrow documented first-use validation path, not a broader public-cut certification
-- `make public-cut-smoke` is the repo-owned convenience wrapper for the broader current public-cut smoke audit on the admitted hosted slice
+- `make public-cut-smoke` is the repo-owned convenience wrapper for the broader current public-cut smoke audit covering both the admitted hosted slice and the admitted Veya running-system build step
 - `make release-readiness-audit` is the repo-owned convenience wrapper for the current aggregate release-readiness re-audit on the admitted hosted slice
 - `make v0_2_gate` is the repo-owned convenience wrapper for the final documented `v0.2` gate outcome on the admitted hosted slice
 - the retired freestanding proof harness now lives under `archive/legacy_freestanding/`; active kernel validation routes through `kernel/build.toml` and `mc_tool_workflow_unit`
@@ -191,6 +205,7 @@ build/debug/mc build --project examples/real/issue_rollup/build.toml --target is
 build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
 build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
 build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/issue_rollup
+build/debug/mc build --project kernel/build.toml --target kernel --build-dir build/debug/probes/kernel
 ```
 
 Grouped regression targets:

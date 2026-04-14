@@ -22,6 +22,8 @@ set(LINE_FILTER_RELAY_PROJECT "${SOURCE_ROOT}/examples/real/line_filter_relay/bu
 set(LINE_FILTER_RELAY_BUILD_DIR "${PUBLIC_CUT_ROOT}/line_filter_relay")
 set(EVENTED_ECHO_PROJECT "${SOURCE_ROOT}/examples/real/evented_echo/build.toml")
 set(EVENTED_ECHO_BUILD_DIR "${PUBLIC_CUT_ROOT}/evented_echo")
+set(KERNEL_PROJECT "${SOURCE_ROOT}/kernel/build.toml")
+set(KERNEL_BUILD_DIR "${PUBLIC_CUT_ROOT}/kernel")
 
 function(run_and_require_success label)
   set(options)
@@ -104,3 +106,7 @@ run_and_require_success(
   "public-cut evented_echo test"
   EXPECT_STDOUT "PASS target echo"
   COMMAND "${MC}" test --project "${EVENTED_ECHO_PROJECT}" --build-dir "${EVENTED_ECHO_BUILD_DIR}")
+
+run_and_require_success(
+  "public-cut veya kernel build"
+  COMMAND "${MC}" build --project "${KERNEL_PROJECT}" --target kernel --build-dir "${KERNEL_BUILD_DIR}")

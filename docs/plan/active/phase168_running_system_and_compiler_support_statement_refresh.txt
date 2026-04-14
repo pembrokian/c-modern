@@ -3,7 +3,7 @@ Phase 168 -- Running System And Compiler Support Statement Refresh
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -122,3 +122,54 @@ What this phase should prove
 - that the deferred fronts are named and visible rather than implied or hidden
 - that the resulting support state is reviewable without requiring deep reading
   of the phase doc archive
+
+Execution note
+--------------
+
+Phase 168 was executed by auditing the gap between the Phase 120/147
+documentation baseline and the post-Phase-166 admitted landing.
+
+Changes made:
+
+1. docs/plan/admin/veya_running_system_support_statement.txt
+   - Rewritten to cover Phase 109–166 accurately.
+   - Updated admitted mechanism boundary, service-layer boundary, topology
+     boundary, event codes boundary, orchestration boundary, and proof set.
+   - Replaced the Phase 120/121 "first admitted" framing with the Phase 168
+     "refreshed" framing.
+   - Added make public-cut-smoke as the aggregate smoke entrypoint.
+   - Updated known limitations to include struct embedding deferral.
+
+2. docs/plan/admin/modern_c_veya_readiness_position.txt
+   - Added Phase 148–166 entries in the Purpose section.
+   - Extended the "Current repository truth" section with Phase 148–166
+     landed facts.
+   - Replaced the Phase 96–137 summary paragraph with Phase 96–166.
+   - Replaced the old detailed per-phase expansion paragraphs (131–142)
+     with a consolidated Phase 148–166 model-discipline wave paragraph.
+   - Updated the Veya position and "Next milestone themes" sections.
+   - Updated the "Bottom line" to reflect the Phase 168 baseline.
+
+3. README.md
+   - Added a "Supported Veya running-system slice" section after the hosted
+     slice section.
+   - Updated the make public-cut-smoke description to reflect it now covers
+     both the hosted and Veya running-system build step.
+   - Added the kernel build command to the additional developer commands.
+
+4. tests/cmake/run_public_cut_smoke.cmake
+   - Added the Veya kernel build step as the final smoke check:
+     mc build --project kernel/build.toml --target kernel --build-dir <dir>
+   - This extends the existing aggregate public-cut smoke to cover the
+     admitted running-system build claim.
+
+5. docs/plan/decision_log.txt
+   - Recorded the Phase 168 decision not to expand compiler surfaces during
+     the documentation refresh phase.
+
+6. docs/plan/backlog.txt
+   - Added a standing reminder to keep support statements aligned with the
+     admitted slice as later phases land, using Phase 168 as the baseline.
+
+No compiler, sema, MIR, backend, ABI, target, runtime, or hal changes.
+All existing tests pass without modification.
