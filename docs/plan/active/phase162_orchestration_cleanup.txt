@@ -1,0 +1,125 @@
+Phase 162 -- Orchestration Cleanup: Kill Mixed Envelopes and Per-Service Wrappers
+==================================================================================
+
+Status
+------
+COMPLETE
+
+Purpose
+-------
+Remove the two classes of orchestration impurity that remained in boot.mc
+after Phase 161: the mixed state-plus-control envelope in the kv dispatch arm,
+and the per-service post-dispatch wrapper in kernel_dispatch_step.
+
+These impurities duplicated dispatch policy and kept the boot orchestrator
+structurally tangled across concerns that belong in separate named units.
+Removing them reduces the surface where new service behavior can accidentally
+land in the wrong layer, and makes the dispatch topology explicit in function
+names rather than inferred from nested if-chains.
+
+The compiler, sema, MIR, backend, ABI, target, runtime, and hal surfaces
+remain closed.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase161_per_send_delivery_witness.txt`
+- `docs/plan/backlog.txt` (orchestration cleanup entry)
+- `docs/arch/veya/kernel_style_guide.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+
+Repository status note
+----------------------
+- Phase 161 closed the effect model gap (send_dropped witness).
+- The remaining boot.mc impurities had been listed in the backlog since
+  Phase 153.
+- The cleanup is purely structural: no behavior change, no new Effect
+  variants, no module additions.
+
+Problem being solved
+--------------------
+Two structural problems coexisted in boot.mc after Phase 161:
+
+1. Mixed state-plus-control envelope in the kv arm:
+   kernel_dispatch_message contained inline advisory-log dispatch logic
+   (local variables new_log_state and advisory_dropped, a direct
+   log_service.handle call, and a conditional return) mixed alongside the kv
+   routing decision.  The policy intent was opaque without reading the entire
+   arm.
+
+2. Per-service post-dispatch wrapper in kernel_dispatch_step:
+   kernel_dispatch_step called a separate serial_path_post_dispatch function
+   after execute_effect returned, gated behind an explicit endpoint_id check.
+   This two-phase serial processing was isolated from the serial dispatch arm
+   and required the caller to know that serial needed post-processing.
+   The intermediate kernel_dispatch_message function returned a shell Send
+   effect rather than the assembled serial reply, leaking internal state into
+   the step level.
+
+Core rule
+---------
+- No behavior change.  All existing tests must pass before and after.
+- Remove inline advisory logic from the dispatch routing level; give it a
+  named home.
+- Eliminate serial_path_post_dispatch as a separate step; the serial arm owns
+  its full reply assembly.
+- execute_effect calls only leaf dispatch (kernel_dispatch_leaf), not the
+  old unified kernel_dispatch_message, because all Send effects in the chain
+  target log or kv (leaf services only).
+
+Chosen slice for this phase
+---------------------------
+Changes confined to:
+
+1. `kernel/src/boot.mc`
+   - Remove message_to_observation (no longer needed)
+   - Remove kernel_dispatch_message (split into named units)
+   - Remove serial_path_post_dispatch (folded into kernel_dispatch_serial)
+   - Add kernel_dispatch_kv: kv dispatch with advisory log marker as a named
+     concept; identical logic to the extracted kv arm
+   - Add kernel_dispatch_leaf: routes log/kv/default; shell Send effects
+     always target leaf endpoints so execute_effect only needs leaf dispatch
+   - Change execute_effect to call kernel_dispatch_leaf (removes circular
+     dependency; kernel_dispatch_leaf is defined before execute_effect)
+   - Add kernel_dispatch_serial: complete serial path owner; runs path_step,
+     chases the shell->leaf chain via execute_effect, commits the resolved
+     reply via path_commit_reply, then assembles the serial effect with event
+     markers and send_dropped propagation
+   - Simplify kernel_dispatch_step: route to kernel_dispatch_serial or
+     kernel_dispatch_leaf; no post-processing at this level
+
+2. `kernel/src/serial_shell_path.mc`
+   - Add path_commit_reply: pure function that commits a resolved inner effect
+     into the path's serial reply slot if it does not already have one; used
+     by kernel_dispatch_serial to replace the inline receive-reply logic that
+     was in serial_path_post_dispatch
+
+Why this is the correct next step
+----------------------------------
+- The orchestration cleanup backlog item has been open since Phase 153.
+- Phase 161 was the last behavior-adding phase; it is the right moment to
+  remove structural impurity before the next behavioral expansion lands.
+- The cleanup does not widen any surface, does not add a new module, and does
+  not change observable behavior; it only names things that were previously
+  unnamed.
+
+Exit criteria
+-------------
+- kernel_dispatch_message removed; replaced by kernel_dispatch_kv and
+  kernel_dispatch_leaf
+- serial_path_post_dispatch removed; replaced by kernel_dispatch_serial
+- execute_effect calls kernel_dispatch_leaf, not kernel_dispatch_message
+- kernel_dispatch_step has no endpoint-specific post-processing
+- path_commit_reply added to serial_shell_path.mc
+- all 31 tests pass
+
+Non-goals
+---------
+- changing observable behavior of any dispatch path
+- adding new Effect variants or fields
+- introducing new modules
+- removing the EVENT_* constant duplicates (blocked by bootstrap cross-module
+  constant link limitation; noted in boot.mc comment)
+- moving event-tagging policy to serial_shell_path.mc (the named
+  kernel_dispatch_serial function already gives the tagging a clear home)

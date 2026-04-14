@@ -3,7 +3,7 @@ Phase 161 -- Per-Send Delivery Witness
 
 Status
 ------
-ACTIVE
+COMPLETE
 
 Purpose
 -------
@@ -36,7 +36,7 @@ This phase plan should stay aligned with:
 Repository status note
 ----------------------
 - Phase 160 proved the boundary in a standalone system test and in the
-  chained scenarios.mc scenario.
+  scripted scenarios.mc integration loop.
 - Phase 161 admits the narrowest possible fix: one new field on Effect, one
   dispatcher change, one new accessor, and one new accessor call at the
   chained scenario and standalone system test level.
@@ -74,12 +74,12 @@ Targeted change surface:
      to the outer serial reply when routing through the serial path
 
 3. `kernel/src/scenarios.mc`
-   - add `run_delivery_witness(state: *boot.KernelBootState) i32`
-   - called after run_model_boundary; the log is still full at that point;
-     overwriting an existing kv key returns Ok with send_dropped = 1
+  - add one delivery-witness step to the scripted loop
+  - keep it after the model-boundary steps; the log is still full at that
+    point, so overwriting an existing kv key returns Ok with send_dropped = 1
 
 4. `kernel/src/main.mc`
-   - add one call to `scenarios.run_delivery_witness(&state)`
+  - keep main as init plus one call to `scenarios.run(&state)`
 
 5. `tests/system/kernel_reset_lane_delivery_witness/`
    - standalone behavior-first test: proves both cases
@@ -106,15 +106,15 @@ Preferred proof points
 2. `effect_send_dropped(e)` returns 1 for a kv write when the log is full.
 3. Both writes still return `Ok` as the primary reply status.
 4. The standalone system test exercises both cases from a fresh state.
-5. The chained scenario validates the witness in the running integration state.
+5. The scripted integration loop validates the witness in the running state.
 
 Exit criteria
 -------------
 - service_effect.mc extended with `send_dropped` field and accessors
 - boot.mc marks advisory drops and propagates the witness through the
   serial-path layer
-- scenarios.mc run_delivery_witness validates the witness in the chained state
-- main.mc calls run_delivery_witness and returns 0
+- scenarios.mc validates the witness in the scripted loop state
+- main.mc calls scenarios.run and returns 0
 - standalone system test builds and the executable returns 0
 - C++ workflow test builds the fixture and expects exit code 0
 - compiler, sema, MIR, backend, ABI, target, runtime, and hal surfaces

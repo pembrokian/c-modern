@@ -64,3 +64,16 @@ func path_receive_reply(path: SerialShellPathState, effect: service_effect.Effec
     new_serial: serial_service.SerialServiceState = serial_service.serial_on_reply(path.serial_state, obs)
     return SerialShellPathState{ serial_state: new_serial, shell_state: path.shell_state, shell_endpoint_id: path.shell_endpoint_id }
 }
+
+// Commit an inner resolved effect into the path's serial reply slot.
+// If the serial path already has a reply, or the resolved effect is not
+// a reply, the path is returned unchanged.
+func path_commit_reply(path: SerialShellPathState, inner_effect: service_effect.Effect) SerialShellPathState {
+    if path_serial_reply_status(path) != syscall.SyscallStatus.None {
+        return path
+    }
+    if service_effect.effect_has_reply(inner_effect) == 0 {
+        return path
+    }
+    return path_receive_reply(path, inner_effect)
+}

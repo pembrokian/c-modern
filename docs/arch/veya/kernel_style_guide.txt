@@ -425,7 +425,7 @@ When implementing a new kernel service or modifying an existing one:
 
 main.mc is a narrow orchestrator.  It must only:
   - initialize KernelBootState via boot.kernel_init()
-  - call named scenario functions from scenarios.mc
+  - call one loop entry from scenarios.mc
   - return a status code
 
 main.mc must NOT contain:
@@ -434,9 +434,8 @@ main.mc must NOT contain:
   - phase-specific logic or phase comments
   - inline if-chains that check reply status
 
-If a new phase adds integration behavior, it adds one named function to
-kernel/src/scenarios.mc and wires it with one call-site in main.mc.
-main.mc itself does not grow.
+If a new phase adds integration behavior, it extends the scenario or loop
+owner in kernel/src/scenarios.mc.  main.mc itself does not grow.
 
 Companion modules established by this rule:
 
@@ -448,13 +447,20 @@ Companion modules established by this rule:
     cmd_kv_get(key)                  K G <key> !
     cmd_log_tail()                   L T ! !
 
-  scenarios.mc — owns the named integration scenarios:
-    run_basic_kv_log(state)          single-client kv + log round-trip
-    run_multi_client(state)          two source_pids on shared state
-    run_long_lived_coherence(state)  repeated overwrites + stable tail
+    scenarios.mc — owns the scripted integration loop:
+    step_obs(step)                   builds the next observation
+    deliver(step, state, effect)     checks the delivered effect
+    run(state)                       dispatches the loop
 
-The next natural evolution is replacing scenarios.mc with a real event-loop
-dispatcher:
+  Current loop shape:
+
+    loop {
+      obs := next scripted observation
+      effect := boot.kernel_dispatch_step(&state, obs)
+      if !deliver(step, &state, effect) { return code }
+    }
+
+  Future live-source evolution, if later evidence justifies it:
 
     loop {
         obs := syscall.receive()
@@ -462,6 +468,6 @@ dispatcher:
         syscall.reply(effect)
     }
 
-Do not extend scenarios.mc with more named scenario functions once that loop
-shape is the right owner.  New integration slices should push toward the
-loop model rather than adding to the scenario script.
+  Do not reintroduce named scenario chaining in main.mc.  New integration
+  slices should extend the loop owner, and only widen from scripted observations
+  to a live receive source when a real phase requires it.

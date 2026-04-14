@@ -1,9 +1,10 @@
-// Integration scenarios over the boot kernel state.
+// Integration loop over the boot kernel state.
 //
-// Each function runs one named interaction slice, feeds commands through
-// kernel_dispatch_step, and returns 0 on success or a non-zero error code.
-// All scenarios chain on the same state passed in by the caller; later
-// scenarios can observe state written by earlier ones.
+// run(state) is a small scripted event loop: it receives one observation,
+// dispatches it through kernel_dispatch_step, then delivers the returned
+// effect to the current integration checks before moving to the next event.
+// All events share one boot state, so later steps observe real retained
+// state written by earlier ones.
 //
 // This module also owns the transport adapter layer: serial_obs wraps a
 // protocol payload into a syscall.ReceiveObservation.  endpoint and pid are
@@ -19,6 +20,29 @@ import syscall
 // Bootstrap limitation: cross-module constant references are not yet supported
 // at link time, so this const is declared locally rather than via boot.SERIAL_ENDPOINT_ID.
 const SERIAL_ENDPOINT_ID: u32 = 10
+const STEP_COUNT: usize = 22
+
+enum StepCheckKind {
+    Routed,
+    Status,
+    Payload1,
+    LogTailState,
+    ReplyLen,
+    ReplyLenAndLogLen,
+    Witness,
+}
+
+struct StepSpec {
+    obs: syscall.ReceiveObservation
+    failure_code: i32
+    check: StepCheckKind
+    status: syscall.SyscallStatus
+    reply_len: usize
+    payload0: u8
+    payload1: u8
+    log_len: usize
+    send_dropped: u32
+}
 
 // serial_obs wraps a protocol payload into a ReceiveObservation.
 // endpoint and pid are explicit: swap the endpoint to route to a different
@@ -44,299 +68,127 @@ func cmd_kv_get(key: u8) syscall.ReceiveObservation {
     return serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_get(key))
 }
 
-// Basic single-client kv and log round-trip.
-func run_basic_kv_log(state: *boot.KernelBootState) i32 {
-    effect: service_effect.Effect
+func kv_count_obs(pid: u32) syscall.ReceiveObservation {
+    return serial_obs(SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
+}
 
-    effect = boot.kernel_dispatch_step(state, cmd_log_append(77))
-    if boot.debug_boot_routed(effect) == 0 {
-        return 1
-    }
+func routed_step(obs: syscall.ReceiveObservation, failure_code: i32) StepSpec {
+    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.Routed, status: syscall.SyscallStatus.None, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 }
+}
 
-    effect = boot.kernel_dispatch_step(state, cmd_kv_set(5, 42))
-    if boot.debug_boot_routed(effect) == 0 {
-        return 1
-    }
+func status_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus) StepSpec {
+    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.Status, status: status, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 }
+}
 
-    effect = boot.kernel_dispatch_step(state, cmd_kv_get(5))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 1
-    }
-    if service_effect.effect_reply_payload(effect)[1] != 42 {
-        return 1
-    }
+func payload1_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, payload1: u8) StepSpec {
+    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.Payload1, status: status, reply_len: 0, payload0: 0, payload1: payload1, log_len: 0, send_dropped: 0 }
+}
 
-    effect = boot.kernel_dispatch_step(state, cmd_log_tail())
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 1
-    }
+func log_tail_state_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, payload0: u8, payload1: u8) StepSpec {
+    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.LogTailState, status: status, reply_len: 0, payload0: payload0, payload1: payload1, log_len: 0, send_dropped: 0 }
+}
+
+func reply_len_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, reply_len: usize) StepSpec {
+    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.ReplyLen, status: status, reply_len: reply_len, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 }
+}
+
+func reply_len_log_len_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, reply_len: usize, log_len: usize) StepSpec {
+    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.ReplyLenAndLogLen, status: status, reply_len: reply_len, payload0: 0, payload1: 0, log_len: log_len, send_dropped: 0 }
+}
+
+func witness_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, send_dropped: u32) StepSpec {
+    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.Witness, status: status, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: send_dropped }
+}
+
+func step_table() [22]StepSpec {
+    specs: [22]StepSpec
+
+    specs[0] = routed_step(cmd_log_append(77), 1)
+    specs[1] = routed_step(cmd_kv_set(5, 42), 1)
+    specs[2] = payload1_step(cmd_kv_get(5), 1, syscall.SyscallStatus.Ok, 42)
+    specs[3] = log_tail_state_step(cmd_log_tail(), 1, syscall.SyscallStatus.Ok, 77, 75)
+    specs[4] = payload1_step(serial_obs(SERIAL_ENDPOINT_ID, 99, serial_protocol.encode_kv_get(5)), 1, syscall.SyscallStatus.Ok, 42)
+    specs[5] = routed_step(cmd_kv_set(5, 77), 1)
+    specs[6] = routed_step(cmd_kv_set(5, 99), 1)
+    specs[7] = payload1_step(cmd_kv_get(5), 1, syscall.SyscallStatus.Ok, 99)
+    specs[8] = payload1_step(cmd_kv_get(5), 1, syscall.SyscallStatus.Ok, 99)
+    specs[9] = status_step(cmd_log_append(42), 1, syscall.SyscallStatus.Exhausted)
+    specs[10] = status_step(cmd_kv_set(20, 55), 1, syscall.SyscallStatus.Ok)
+    specs[11] = status_step(cmd_log_append(1), 1, syscall.SyscallStatus.Exhausted)
+    specs[12] = status_step(cmd_kv_get(99), 1, syscall.SyscallStatus.InvalidArgument)
+    specs[13] = status_step(cmd_kv_set(20, 77), 1, syscall.SyscallStatus.Ok)
+    specs[14] = reply_len_step(kv_count_obs(1), 1, syscall.SyscallStatus.Ok, 2)
+    specs[15] = reply_len_step(kv_count_obs(1), 1, syscall.SyscallStatus.Ok, 2)
+    specs[16] = reply_len_step(cmd_log_tail(), 1, syscall.SyscallStatus.Ok, 4)
+    specs[17] = reply_len_log_len_step(kv_count_obs(1), 6, syscall.SyscallStatus.Ok, 2, 4)
+    specs[18] = status_step(cmd_kv_set(30, 11), 6, syscall.SyscallStatus.Ok)
+    specs[19] = reply_len_log_len_step(cmd_kv_set(31, 22), 6, syscall.SyscallStatus.Ok, 0, 4)
+    specs[20] = reply_len_step(kv_count_obs(1), 6, syscall.SyscallStatus.Ok, 4)
+    specs[21] = witness_step(cmd_kv_set(5, 123), 7, syscall.SyscallStatus.Ok, 1)
+
+    return specs
+}
+
+func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_effect.Effect) u32 {
     s: boot.KernelBootState = *state
-    if service_effect.effect_reply_payload_len(effect) != log_service.log_len(s.log_state) {
-        return 1
-    }
-    if service_effect.effect_reply_payload(effect)[0] != 77 {
-        return 1
-    }
-    if service_effect.effect_reply_payload(effect)[1] != 75 {
-        return 1
-    }
 
-    return 0
+    if spec.check == StepCheckKind.Routed {
+        return boot.debug_boot_routed(effect)
+    }
+    if service_effect.effect_reply_status(effect) != spec.status {
+        return 0
+    }
+    if spec.check == StepCheckKind.Status {
+        return 1
+    }
+    if spec.check == StepCheckKind.Payload1 {
+        if service_effect.effect_reply_payload(effect)[1] != spec.payload1 {
+            return 0
+        }
+        return 1
+    }
+    if spec.check == StepCheckKind.LogTailState {
+        if service_effect.effect_reply_payload_len(effect) != log_service.log_len(s.log_state) {
+            return 0
+        }
+        if service_effect.effect_reply_payload(effect)[0] != spec.payload0 {
+            return 0
+        }
+        if service_effect.effect_reply_payload(effect)[1] != spec.payload1 {
+            return 0
+        }
+        return 1
+    }
+    if spec.check == StepCheckKind.ReplyLen {
+        if service_effect.effect_reply_payload_len(effect) != spec.reply_len {
+            return 0
+        }
+        return 1
+    }
+    if spec.check == StepCheckKind.ReplyLenAndLogLen {
+        if service_effect.effect_reply_payload_len(effect) != spec.reply_len {
+            return 0
+        }
+        if log_service.log_len(s.log_state) != spec.log_len {
+            return 0
+        }
+        return 1
+    }
+    if service_effect.effect_send_dropped(effect) != spec.send_dropped {
+        return 0
+    }
+    return 1
 }
 
-// Multi-client: a second source_pid reads state written by the first.
-// Shared state; no per-client namespace; reply is the return value of the step.
-func run_multi_client(state: *boot.KernelBootState) i32 {
-    effect: service_effect.Effect
+func run(state: *boot.KernelBootState) i32 {
+    specs: [22]StepSpec = step_table()
 
-    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 99, serial_protocol.encode_kv_get(5)))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 1
+    for step in 0..STEP_COUNT {
+        spec: StepSpec = specs[step]
+        effect: service_effect.Effect = boot.kernel_dispatch_step(state, spec.obs)
+        if step_matches(spec, state, effect) == 0 {
+            return spec.failure_code
+        }
     }
-    if service_effect.effect_reply_payload(effect)[1] != 42 {
-        return 1
-    }
-
-    return 0
-}
-
-// Long-lived coherence: repeated overwrites and repeated reads stay consistent.
-func run_long_lived_coherence(state: *boot.KernelBootState) i32 {
-    effect: service_effect.Effect
-
-    effect = boot.kernel_dispatch_step(state, cmd_kv_set(5, 77))
-    if boot.debug_boot_routed(effect) == 0 {
-        return 1
-    }
-
-    effect = boot.kernel_dispatch_step(state, cmd_kv_set(5, 99))
-    if boot.debug_boot_routed(effect) == 0 {
-        return 1
-    }
-
-    effect = boot.kernel_dispatch_step(state, cmd_kv_get(5))
-    if service_effect.effect_reply_payload(effect)[1] != 99 {
-        return 1
-    }
-
-    effect = boot.kernel_dispatch_step(state, cmd_kv_get(5))
-    if service_effect.effect_reply_payload(effect)[1] != 99 {
-        return 1
-    }
-
-    return 0
-}
-
-// Cross-service failure semantics (Phase 158).
-//
-// Called after run_long_lived_coherence; the log is at capacity (4 entries)
-// at this point due to the kv-write advisory markers written by prior scenarios.
-//
-// This scenario classifies three cross-service failure findings:
-//
-//   Advisory log drop (intentional difference):
-//     When the log is full, a kv write still returns Ok.  The advisory log
-//     marker is silently discarded by the dispatcher.  The kv caller has no
-//     visible signal that the audit trail was lost.  This is the one
-//     cross-service failure inconsistency: kv success does not imply that
-//     the associated log record was written.
-//
-//   Aligned InvalidArgument (consistent):
-//     kv get for a missing key and a shell invalid command both return
-//     InvalidArgument.  The same status code signals "request cannot be
-//     fulfilled as stated" across service boundaries.
-//
-//   Exhausted state is sticky (consistent):
-//     Log full returns Exhausted on every further append.  A kv write does
-//     not free log capacity.  The exhausted state persists until restart.
-func run_cross_service_failure(state: *boot.KernelBootState) i32 {
-    effect: service_effect.Effect
-
-    // Log is full from prior scenarios.  Any further append must return Exhausted.
-    effect = boot.kernel_dispatch_step(state, cmd_log_append(42))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
-        return 1
-    }
-
-    // kv write with a new key: the kv operation succeeds (Ok) even though the
-    // advisory log marker is silently dropped.  The caller sees Ok and has no
-    // signal that the log record was lost.
-    effect = boot.kernel_dispatch_step(state, cmd_kv_set(20, 55))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 2
-    }
-
-    // Log is still full; the kv write did not free any log capacity.
-    effect = boot.kernel_dispatch_step(state, cmd_log_append(1))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
-        return 3
-    }
-
-    // kv get for a key that was never set returns InvalidArgument.
-    // This is the consistent cross-service signal for an unfulfillable request.
-    effect = boot.kernel_dispatch_step(state, cmd_kv_get(99))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.InvalidArgument {
-        return 4
-    }
-
-    // kv overwrite also succeeds when the log is full: advisory marker is
-    // dropped for overwrites as well, with the same silent loss semantics.
-    effect = boot.kernel_dispatch_step(state, cmd_kv_set(20, 77))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 5
-    }
-
-    return 0
-}
-
-// Observability inspection (Phase 159).
-//
-// Called after run_cross_service_failure.
-// State: kv has count=2 (keys 5 and 20), log is at capacity (4 retained entries).
-// run_model_boundary (Phase 160) is called after this and expects that same state.
-//
-// Proves the user can inspect system state truthfully via the public protocol
-// without requiring internal knowledge:
-//
-//   kv_count (KC!!) returns how many entries exist without the caller needing
-//   to know the stored keys.  This is the minimum gap Phase 159 closes: the
-//   log was already fully observable via LT!!, but kv state was opaque unless
-//   the caller already knew the keys.
-//
-//   log_tail (LT!!) returns all retained entries even when the buffer is full.
-//   Observation never triggers backpressure; Exhausted is only for writes.
-//
-//   Observation is non-mutating: a second count query returns the same value.
-func run_observability_inspection(state: *boot.KernelBootState) i32 {
-    effect: service_effect.Effect
-
-    // kv count query: proves a user can determine how many entries exist
-    // without needing to know the stored keys in advance.
-    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_count()))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 1
-    }
-    if service_effect.effect_reply_payload_len(effect) != 2 {
-        return 2
-    }
-
-    // Observation is non-mutating: a second count returns the same value.
-    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_count()))
-    if service_effect.effect_reply_payload_len(effect) != 2 {
-        return 3
-    }
-
-    // Log tail returns all retained entries at capacity: observation never
-    // triggers backpressure.
-    effect = boot.kernel_dispatch_step(state, cmd_log_tail())
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 4
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return 5
-    }
-
-    return 0
-}
-
-// Model boundary identification (Phase 160).
-//
-// Called after run_observability_inspection.
-// State: kv count=2 (keys 5 and 20), log at capacity (4 entries).
-//
-// Named boundary: advisory audit silencing is invisible to the kv caller.
-//
-// When the log is at capacity, a kv write returns Ok but its advisory audit
-// marker is silently discarded by the dispatcher.  The kv caller has no
-// protocol-level signal that the audit trail is incomplete.  The effect
-// model has no witness for advisory send outcomes.
-//
-// Pressure observed across Phase 152-159:
-//   Phase 152: log restart while kv live -- audit gap during selective restart
-//   Phase 156: shared namespace -- no per-client audit isolation
-//   Phase 157: long-lived coherence -- state stays consistent but audit trail diverges
-//   Phase 158: explicitly named advisory silencing as the one cross-service inconsistency
-//   Phase 159: kv count visible, but correlation between kv writes and log
-//              entries breaks once the log is full
-//
-// This scenario proves the boundary is real in the running artifact:
-//   1. kv count and log length both at their Phase 159 post-state (2 and 4).
-//   2. Two new kv writes both return Ok.
-//   3. Log length is unchanged at 4: both advisory markers were dropped.
-//   4. kv count is 4: both entries were stored correctly.
-//   5. The gap (2 kv writes, 0 new log entries) is the named boundary.
-//
-// Narrowest plausible next expansion axis (named but not admitted):
-//   Per-send delivery witnesses.  A witness would let the dispatcher report
-//   Dropped to the kv caller when the advisory send could not be delivered.
-//   This closes the gap without a recovery framework or platform.
-//   No witness implementation is admitted in this phase.
-func run_model_boundary(state: *boot.KernelBootState) i32 {
-    effect: service_effect.Effect
-
-    // Confirm starting state: kv has 2 entries, log is full.
-    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_count()))
-    if service_effect.effect_reply_payload_len(effect) != 2 {
-        return 1
-    }
-    s: boot.KernelBootState = *state
-    if log_service.log_len(s.log_state) != 4 {
-        return 2
-    }
-
-    // Write two new kv entries.  Both return Ok even though the log is full.
-    // The advisory markers are silently dropped; the caller sees no difference.
-    effect = boot.kernel_dispatch_step(state, cmd_kv_set(30, 11))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 3
-    }
-    effect = boot.kernel_dispatch_step(state, cmd_kv_set(31, 22))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 4
-    }
-
-    // Log is still at capacity: both advisory markers were silently dropped.
-    // This is the named boundary: kv success does not imply audit success.
-    s = *state
-    if log_service.log_len(s.log_state) != 4 {
-        return 5
-    }
-
-    // kv count grew by 2: entries were stored correctly.
-    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_count()))
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return 6
-    }
-
-    return 0
-}
-
-// Delivery witness (Phase 161).
-//
-// Called after run_model_boundary.
-// State: kv count=4, log at capacity (full from prior phases).
-//
-// Phase 160 named the boundary: advisory audit silencing is invisible
-// to the kv caller.  Phase 161 closes it with one per-send witness field
-// on Effect.  The caller now reads effect_send_dropped() to determine
-// whether the advisory log record landed.
-//
-// With the log full, overwriting an existing key returns Ok as before,
-// but send_dropped=1 is set in the returned effect.  The caller can
-// distinguish the two cases for the first time.
-func run_delivery_witness(state: *boot.KernelBootState) i32 {
-    effect: service_effect.Effect
-
-    // Log is full from prior phases.  Overwrite key 5 (existing).
-    // kv returns Ok; advisory log append is Exhausted.
-    // Phase 161: send_dropped must be 1 -- the caller sees the drop.
-    effect = boot.kernel_dispatch_step(state, cmd_kv_set(5, 123))
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 1
-    }
-    if service_effect.effect_send_dropped(effect) != 1 {
-        return 2
-    }
-
     return 0
 }

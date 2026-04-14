@@ -20,7 +20,8 @@ Current scope (Phase 153)
 - One bounded kv-write observation now flows into `log_service` through the explicit serial-shell composition seam.
 - Ring-buffer observability lives in [`kernel/src/serial_shell_event_log.mc`](src/serial_shell_event_log.mc).
 - The dispatch entry is [`kernel/src/boot.mc`](src/boot.mc): `kernel_init()` + `kernel_dispatch_step()`.
-- The kernel image entry is [`kernel/src/main.mc`](src/main.mc): ~55 lines vs `kernel_old/src/main.mc` at 1,706 lines.
+- The integration loop owner is [`kernel/src/scenarios.mc`](src/scenarios.mc): one scripted observation loop over the serial path.
+- The kernel image entry is [`kernel/src/main.mc`](src/main.mc): thin init-plus-loop entry vs `kernel_old/src/main.mc` at 1,706 lines.
 - Seven tests cover all paths: three smoke tests and four system tests.
 - The lane is wired into the build via the workflow test suite.
 

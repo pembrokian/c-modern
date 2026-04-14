@@ -558,11 +558,33 @@ Phase 161 -- Per-Send Delivery Witness (LANDED)
   - The change is purely additive: existing callers that do not check
     effect_send_dropped() observe no behavior change.
   - No recovery, retry, two-phase commit, or callback mechanism admitted.
+
+Phase 162 -- Orchestration Cleanup: Kill Mixed Envelopes and Per-Service Wrappers (LANDED)
+- Phase 162 removed the two structural impurities that remained in boot.mc
+  after Phase 161.
+  - Removed kernel_dispatch_message: split into kernel_dispatch_kv (kv
+    advisory dispatch as a named concept) and kernel_dispatch_leaf (routes
+    log/kv/default; called by execute_effect).
+  - Removed serial_path_post_dispatch: the serial arm now owns its complete
+    reply assembly in kernel_dispatch_serial, which runs path_step, chases
+    the shell→leaf chain, commits the resolved reply via path_commit_reply,
+    and assembles the serial effect with event markers and send_dropped.
+  - Removed message_to_observation: no longer needed.
+  - execute_effect now calls kernel_dispatch_leaf instead of
+    kernel_dispatch_message; this eliminates the circular forward-reference
+    and reflects the topology invariant that all Send effects target leaf
+    services only.
+  - Added path_commit_reply to serial_shell_path.mc: pure function that
+    commits a resolved inner effect into the path reply slot.
+  - kernel_dispatch_step is now a thin router: no endpoint-specific
+    post-processing at the step level.
+  - No behavior change; all 31 tests pass.
   - No new modules admitted.  Compiler, sema, MIR, backend, ABI, target,
     runtime, and hal surfaces remain closed.
-- `kernel/src/scenarios.mc` gained `run_delivery_witness`; called after
-  `run_model_boundary`; proves send_dropped = 1 when the log is full.
-- `kernel/src/main.mc` calls `run_delivery_witness` and returns 0.
+- `kernel/src/scenarios.mc` now owns one scripted event loop rather than a
+  chain of named `run_*` helpers; the delivery-witness overwrite step is part
+  of that loop and still proves `send_dropped = 1` when the log is full.
+- `kernel/src/main.mc` now initializes state and calls `scenarios.run(&state)`.
 - `tests/system/kernel_reset_lane_delivery_witness/` proves both cases:
   case A (log has space) → send_dropped = 0;
   case B (log full)      → send_dropped = 1.
