@@ -1,0 +1,18 @@
+Module
+  ConstGlobal names=[CAP] type=usize
+    init 4
+  Function name=fill returns=[[4]u8]
+    Local name=buf type=[4]u8 param readonly
+    Local name=val type=u8 param readonly
+    Local name=next type=[4]u8
+    Block label=entry0
+      load_local %v0:[4]u8 target=buf
+      store_local target=next operands=[%v0]
+      load_local %v1:u8 target=val
+      load_local %v2:[4]u8 target=next
+      const %v3:int_literal op=0
+      const %v4:usize op=4
+      bounds_check op=index operands=[%v3, %v4]
+      store_target target=next[0] target_kind=index target_base=[4]u8 operands=[%v1, %v2, %v3] target_types=[int_literal]
+      load_local %v5:[4]u8 target=next
+      terminator return values=[%v5]

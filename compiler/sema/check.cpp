@@ -3071,4 +3071,61 @@ std::string DumpModule(const Module& module) {
     return stream.str();
 }
 
+// Evaluate a simple array-length expression using pre-computed constant values
+// stored in the module's global summaries.  Handles integer literals and plain
+// name references to module-scoped const declarations.  Returns nullopt for
+// any expression it cannot reduce to a non-negative integer.
+static std::optional<std::size_t> EvalArrayLengthFromModule(
+    const ast::Expr* length_expr, const Module& module) {
+    if (length_expr == nullptr) {
+        return std::nullopt;
+    }
+    if (length_expr->kind == ast::Expr::Kind::kLiteral) {
+        return mc::support::ParseArrayLength(length_expr->text);
+    }
+    if (length_expr->kind == ast::Expr::Kind::kName) {
+        const GlobalSummary* g = FindGlobalSummary(module, length_expr->text);
+        if (g == nullptr || !g->is_const) {
+            return std::nullopt;
+        }
+        for (std::size_t i = 0; i < g->names.size(); ++i) {
+            if (g->names[i] == length_expr->text &&
+                i < g->constant_values.size() &&
+                g->constant_values[i].has_value() &&
+                g->constant_values[i]->kind == ConstValue::Kind::kInteger &&
+                g->constant_values[i]->integer_value >= 0) {
+                return static_cast<std::size_t>(g->constant_values[i]->integer_value);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+Type ResolveTypeFromAst(const ast::TypeExpr* type_expr, const Module& module) {
+    if (type_expr == nullptr ||
+        type_expr->kind != ast::TypeExpr::Kind::kArray) {
+        return TypeFromAst(type_expr);
+    }
+    // Recursively resolve the element type first.
+    Type inner = ResolveTypeFromAst(type_expr->inner.get(), module);
+    // Get base type from TypeFromAst to pick up the length text produced by
+    // RenderExprInline (which is file-local to type.cpp).
+    Type base = TypeFromAst(type_expr);
+    // If the metadata is not already a resolved integer, try to evaluate it
+    // from the module's const globals.
+    if (!mc::support::ParseArrayLength(base.metadata).has_value() &&
+        type_expr->length_expr != nullptr) {
+        const auto len = EvalArrayLengthFromModule(
+            type_expr->length_expr.get(), module);
+        if (len.has_value()) {
+            base.metadata = std::to_string(*len);
+        }
+    }
+    // Replace the inner type with the recursively resolved version.
+    if (!base.subtypes.empty()) {
+        base.subtypes[0] = std::move(inner);
+    }
+    return base;
+}
+
 }  // namespace mc::sema

@@ -206,6 +206,11 @@ std::string DumpModule(const Module& module);
 // Module::type_decls.
 void BuildModuleLookupMaps(Module& module);
 
+// Resolve a type expression to its semantic Type, evaluating array length
+// expressions that refer to named constants in the given module's globals.
+// Falls back to TypeFromAst for any length that cannot be resolved.
+Type ResolveTypeFromAst(const ast::TypeExpr* type_expr, const Module& module);
+
 }  // namespace mc::sema
 
 #endif  // C_MODERN_COMPILER_SEMA_CHECK_H_

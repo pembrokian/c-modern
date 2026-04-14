@@ -13,13 +13,13 @@ const EVENT_SERIAL_CLEARED: u32 = event_codes.EVENT_SERIAL_CLEARED
 const EVENT_LOG_CAPACITY: usize = 4
 
 struct SerialShellEventLog {
-    slots: [4]u32
+    slots: [EVENT_LOG_CAPACITY]u32
     start: usize
     len: usize
 }
 
 func event_log_init() SerialShellEventLog {
-    slots: [4]u32
+    slots: [EVENT_LOG_CAPACITY]u32
     slots[0] = 0
     slots[1] = 0
     slots[2] = 0
@@ -36,7 +36,7 @@ func normalize_slot_index(raw_index: usize) usize {
 }
 
 func with_slot(log: SerialShellEventLog, slot_index: usize, event_code: u32) SerialShellEventLog {
-    next_slots: [4]u32 = log.slots
+    next_slots: [EVENT_LOG_CAPACITY]u32 = log.slots
     next_slots[slot_index] = event_code
     return SerialShellEventLog{ slots: next_slots, start: log.start, len: log.len }
 }

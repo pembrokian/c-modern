@@ -1,7 +1,6 @@
 // Configuration, state construction, and service refs for the kernel boot
-// image.  This module owns the owner PIDs, initial state, and stable service
-// references.  Endpoint ID constants live in service_topology.mc so that
-// shell_service.mc can also import them without a circular dependency.
+// image.  Owner PIDs and endpoint IDs live in service_topology.mc as
+// ServiceSlot constants so that the full static wiring is named in one place.
 //
 // Dispatch and routing logic lives in kernel_dispatch.mc.
 
@@ -15,11 +14,6 @@ import service_topology
 import shell_service
 import syscall
 
-const BOOT_SERIAL_OWNER_PID: u32 = 1
-const BOOT_SHELL_OWNER_PID: u32 = 2
-const BOOT_LOG_OWNER_PID: u32 = 3
-const BOOT_KV_OWNER_PID: u32 = 4
-
 struct KernelBootState {
     path_state: serial_shell_path.SerialShellPathState
     log_state: log_service.LogServiceState
@@ -27,7 +21,11 @@ struct KernelBootState {
 }
 
 func kernel_init() KernelBootState {
-    return KernelBootState{ path_state: serial_shell_path.path_init(serial_service.serial_init(BOOT_SERIAL_OWNER_PID, 1), shell_service.shell_init(BOOT_SHELL_OWNER_PID, 1), service_topology.SHELL_ENDPOINT_ID), log_state: log_service.log_init(BOOT_LOG_OWNER_PID, 1), kv_state: kv_service.kv_init(BOOT_KV_OWNER_PID, 1) }
+    serial_slot: service_topology.ServiceSlot = service_topology.SERIAL_SLOT
+    shell_slot: service_topology.ServiceSlot = service_topology.SHELL_SLOT
+    log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
+    kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
+    return KernelBootState{ path_state: serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint), log_state: log_service.log_init(log_slot.pid, 1), kv_state: kv_service.kv_init(kv_slot.pid, 1) }
 }
 
 func bootwith_log(s: KernelBootState, log: log_service.LogServiceState) KernelBootState {

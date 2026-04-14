@@ -7,7 +7,7 @@ const LOG_BUFFER_CAPACITY: usize = 4
 struct LogServiceState {
     pid: u32
     slot: u32
-    retained: [4]u8
+    retained: [LOG_BUFFER_CAPACITY]u8
     len: usize
 }
 
@@ -20,7 +20,7 @@ func log_init(pid: u32, slot: u32) LogServiceState {
     return LogServiceState{ pid: pid, slot: slot, retained: primitives.zero_payload(), len: 0 }
 }
 
-func logwith(s: LogServiceState, retained: [4]u8, len: usize) LogServiceState {
+func logwith(s: LogServiceState, retained: [LOG_BUFFER_CAPACITY]u8, len: usize) LogServiceState {
     return LogServiceState{ pid: s.pid, slot: s.slot, retained: retained, len: len }
 }
 
@@ -31,13 +31,13 @@ func log_append(s: LogServiceState, obs: syscall.ReceiveObservation) LogServiceS
     if s.len >= LOG_BUFFER_CAPACITY {
         return s
     }
-    next_retained: [4]u8 = s.retained
+    next_retained: [LOG_BUFFER_CAPACITY]u8 = s.retained
     next_retained[s.len] = obs.payload[0]
     return logwith(s, next_retained, s.len + 1)
 }
 
 func log_tail(s: LogServiceState) service_effect.Effect {
-    payload: [4]u8 = primitives.zero_payload()
+    payload: [LOG_BUFFER_CAPACITY]u8 = primitives.zero_payload()
     for i in 0..s.len {
         payload[i] = s.retained[i]
     }

@@ -3,7 +3,47 @@ Phase 170 -- Static Service Topology First Acknowledgment
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Branch A (topology naming admitted).
+
+service_topology.mc previously held four endpoint ID constants only.  The
+owner PIDs for the four boot services lived as separate BOOT_*_OWNER_PID
+constants in boot.mc with no structural link to the endpoint IDs.
+
+This phase added a ServiceSlot struct { endpoint: u32, pid: u32 } and four
+named slot constants (SERIAL_SLOT, SHELL_SLOT, LOG_SLOT, KV_SLOT) plus
+SERVICE_COUNT to service_topology.mc.  boot.mc's four BOOT_*_OWNER_PID
+constants were removed; kernel_init() now reads slot.pid from the imported
+slots.  All other consumers of service_topology.mc (kernel_dispatch.mc,
+shell_service.mc, scenarios.mc) are unchanged because they only access
+endpoint ID constants, which remain present as before.
+
+The trigger condition for reopening topology structure is stated in
+backlog.txt: service count past eight, a supervisor needing runtime slot
+iteration, or a phase requiring dynamic endpoint assignment.
+
+Implementation files changed
+-----------------------------
+- kernel/src/service_topology.mc  — ServiceSlot struct, four slot constants, SERVICE_COUNT
+- kernel/src/boot.mc              — remove BOOT_*_OWNER_PID constants, use slot PIDs in kernel_init()
+
+Test fixture added
+------------------
+- tests/system/kernel_reset_lane_static_topology/  — three smoke checks:
+    A. slot.endpoint fields match the raw endpoint ID constants
+    B. SERVICE_COUNT equals 4
+    C. kernel_init() + round-trip command still returns Ok
+- tests/tool/tool_workflow_suite.cpp  — TestKernelResetLanePhase170StaticTopologyProjectRuns registered
+
+Documentation updated
+---------------------
+- docs/plan/decision_log.txt  — topology naming decision entry
+- docs/plan/backlog.txt       — trigger-condition note for future topology growth
+
+
 
 Purpose
 -------

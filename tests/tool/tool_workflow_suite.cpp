@@ -1447,6 +1447,37 @@ void TestKernelResetLanePhase161DeliveryWitnessProjectRuns(const std::filesystem
 }
 
 
+void TestKernelResetLanePhase170StaticTopologyProjectRuns(const std::filesystem::path& source_root,
+                                                          const std::filesystem::path& binary_root,
+                                                          const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "system" / "kernel_reset_lane_static_topology";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_phase170_static_topology_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_phase170_static_topology_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_phase170_static_topology_build_output.txt",
+                                       "kernel reset lane phase 170 static topology build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_phase170_static_topology_run_output.txt",
+                                                             "kernel reset lane phase 170 static topology run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane phase 170 static topology project should return 0, got:\n" + run_output);
+    }
+}
+
+
 }  // namespace
 
 namespace mc::tool_tests {
@@ -1492,6 +1523,7 @@ void RunWorkflowToolSuite(const std::filesystem::path& source_root,
     TestKernelResetLanePhase159ObservabilityProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLanePhase160ModelBoundaryProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLanePhase161DeliveryWitnessProjectRuns(source_root, suite_root, mc_path);
+    TestKernelResetLanePhase170StaticTopologyProjectRuns(source_root, suite_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

@@ -7,7 +7,7 @@ const SERIAL_INVALID_BYTE: u8 = 255
 struct SerialServiceState {
     pid: u32
     slot: u32
-    buffer: [4]u8
+    buffer: [SERIAL_BUFFER_CAPACITY]u8
     len: usize
     reply_status: syscall.SyscallStatus
     reply_len: usize
@@ -18,7 +18,7 @@ func serial_init(pid: u32, slot: u32) SerialServiceState {
     return SerialServiceState{ pid: pid, slot: slot, buffer: primitives.zero_payload(), len: 0, reply_status: syscall.SyscallStatus.None, reply_len: 0, reply_payload: primitives.zero_payload() }
 }
 
-func serialwith(s: SerialServiceState, buf: [4]u8, blen: usize, rs: syscall.SyscallStatus, rlen: usize, rp: [4]u8) SerialServiceState {
+func serialwith(s: SerialServiceState, buf: [SERIAL_BUFFER_CAPACITY]u8, blen: usize, rs: syscall.SyscallStatus, rlen: usize, rp: [4]u8) SerialServiceState {
     return SerialServiceState{ pid: s.pid, slot: s.slot, buffer: buf, len: blen, reply_status: rs, reply_len: rlen, reply_payload: rp }
 }
 
@@ -58,7 +58,7 @@ func serial_on_receive(s: SerialServiceState, obs: syscall.ReceiveObservation) S
         return next
     }
     // Bytes beyond SERIAL_BUFFER_CAPACITY are intentionally dropped.
-    next_buffer: [4]u8 = next.buffer
+    next_buffer: [SERIAL_BUFFER_CAPACITY]u8 = next.buffer
     next_len: usize = next.len
     for i in 0..obs.payload_len {
         if next_len < SERIAL_BUFFER_CAPACITY {

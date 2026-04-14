@@ -7,8 +7,8 @@ const KV_CAPACITY: usize = 4
 struct KvServiceState {
     pid: u32
     slot: u32
-    keys: [4]u8
-    values: [4]u8
+    keys: [KV_CAPACITY]u8
+    values: [KV_CAPACITY]u8
     count: usize
 }
 
@@ -21,7 +21,7 @@ func kv_init(pid: u32, slot: u32) KvServiceState {
     return KvServiceState{ pid: pid, slot: slot, keys: primitives.zero_payload(), values: primitives.zero_payload(), count: 0 }
 }
 
-func kvwith(s: KvServiceState, keys: [4]u8, vals: [4]u8, count: usize) KvServiceState {
+func kvwith(s: KvServiceState, keys: [KV_CAPACITY]u8, vals: [KV_CAPACITY]u8, count: usize) KvServiceState {
     return KvServiceState{ pid: s.pid, slot: s.slot, keys: keys, values: vals, count: count }
 }
 
@@ -31,8 +31,8 @@ func kvset(s: KvServiceState, m: service_effect.Message) KvServiceState {
     }
     key: u8 = m.payload[0]
     val: u8 = m.payload[1]
-    next_keys: [4]u8 = s.keys
-    next_vals: [4]u8 = s.values
+    next_keys: [KV_CAPACITY]u8 = s.keys
+    next_vals: [KV_CAPACITY]u8 = s.values
     for i in 0..s.count {
         if next_keys[i] == key {
             next_vals[i] = val
