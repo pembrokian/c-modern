@@ -423,6 +423,27 @@ Phase 155 -- Temporal Semantics and Backpressure Audit (LANDED)
   compiler surface was opened
 - Validated by `tests/system/kernel_reset_lane_temporal_backpressure/`
 
+Phase 156 -- Multi-Client Interaction Audit (LANDED)
+- Phase 156 exposed the first ordering and isolation assumptions visible
+  under two-client interleaving:
+  - kv_service and log_service hold globally-shared state; a write from
+    any source_pid is immediately visible to all subsequent dispatch steps
+    regardless of which source_pid submits them (no per-client namespace)
+  - reply routing is by call-return, not by source_pid; the effect returned
+    by `kernel_dispatch_step` belongs to whichever call owns that return
+    value; real concurrency would require per-client reply mailboxes
+  - backpressure is per-service capacity, not per-client quota; a full
+    buffer from client A leaves no room for client B
+  - last writer wins with no read-your-writes isolation between clients
+- The dispatcher remains purely sequential; these assumptions are only
+  exposed by this audit, not fixed — they name what would fail first under
+  real concurrent clients
+- No scheduler, concurrency model, per-client session concept, reply
+  mailbox, or compiler surface was opened
+- `kernel/src/main.mc` gained `make_serial_command_pid` and one multi-client
+  wiring step; no other kernel service files were changed
+- Validated by `tests/system/kernel_reset_lane_multi_client/`
+
 What should naturally emerge from this wave
 -------------------------------------------
 If the repository follows this roadmap honestly, the next useful results

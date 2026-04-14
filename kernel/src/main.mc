@@ -15,6 +15,18 @@ func make_serial_command(b0: u8, b1: u8, b2: u8, b3: u8) syscall.ReceiveObservat
     return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: SERIAL_ENDPOINT_ID, source_pid: 1, payload_len: 4, received_handle_slot: 0, received_handle_count: 0, payload: payload }
 }
 
+// make_serial_command_pid builds an observation from an arbitrary client.
+// Used for Phase 156 multi-client wiring: a second source_pid exercises the
+// same shared service state.
+func make_serial_command_pid(pid: u32, b0: u8, b1: u8, b2: u8, b3: u8) syscall.ReceiveObservation {
+    payload: [4]u8 = primitives.zero_payload()
+    payload[0] = b0
+    payload[1] = b1
+    payload[2] = b2
+    payload[3] = b3
+    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: SERIAL_ENDPOINT_ID, source_pid: pid, payload_len: 4, received_handle_slot: 0, received_handle_count: 0, payload: payload }
+}
+
 // Named command builders encode protocol intent; bytes are ASCII shell protocol.
 func cmd_log_append(value: u8) syscall.ReceiveObservation {
     return make_serial_command(76, 65, value, 33)  // L A <value> !
@@ -71,6 +83,21 @@ func main() i32 {
         return 1
     }
     if service_effect.effect_reply_payload(effect)[1] != 75 {
+        return 1
+    }
+
+    // Phase 156 multi-client: client B (source_pid=99) reads the kv key set by
+    // client A (source_pid=1) above.  No per-client state isolation exists;
+    // both clients share the same kv_state.  The reply is the return value of
+    // kernel_dispatch_step — routing is by call ordering, not by source_pid.
+    effect = boot.kernel_dispatch_step(&state, make_serial_command_pid(99, 75, 71, 5, 33))
+    if boot.debug_boot_routed(effect) == 0 {
+        return 1
+    }
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 1
+    }
+    if service_effect.effect_reply_payload(effect)[1] != 42 {
         return 1
     }
 
