@@ -1,0 +1,240 @@
+Phase 163 -- Bootstrap Constant Linkage And Aggregate Const Follow-Through
+=========================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Close the remaining bootstrap constant usability gap that is now visible in
+the reset-lane kernel: exported module-scoped constants do not yet survive the
+active bootstrap path honestly enough for importing modules to reference them
+directly, so the kernel duplicates endpoint IDs and wire-format constants in
+multiple owners with comments naming the real source of truth.
+
+This phase also reaffirms the admitted aggregate-constant boundary on the
+current bootstrap path. The language and earlier compiler phases already admit
+structural aggregate constants in sema and artifact transport, but the active
+kernel-facing path still needs one explicit follow-through proving that plain
+module-owned aggregate const declarations remain usable without widening into
+const functions or general compile-time execution.
+
+This document is a repository execution plan for the next admitted compiler
+slice after Phase 162.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/arch/c-lang/language/semantics/constants_spec.txt`
+- `docs/plan/archive/phase42_imported_aggregate_constants_or_broader_linking_followthrough.txt`
+- `docs/plan/archive/phase58_structural_aggregate_const_backend_emission.txt`
+- `docs/plan/archive/phase60_compile_time_truth_closure.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The constants spec already admits aggregate constant construction when every
+  participating element or field is itself constant.
+- Earlier phases already closed source-local compile-time lookup drift,
+  imported structural constant transport, and executable emission of admitted
+  top-level structural aggregate const globals on the owning historical paths.
+- The remaining active pressure is narrower and more local to the current
+  bootstrap kernel slice: module-scoped constants are still duplicated in
+  `kernel/src/scenarios.mc`, `kernel/src/shell_service.mc`, and
+  `kernel/src/kernel_dispatch.mc` because cross-module constant references do
+  not yet survive the active bootstrap path honestly.
+- The next truthful step is therefore not a broad const-eval wave. It is one
+  bounded follow-through on exported constant linkage and ordinary aggregate
+  const usability in the active compiler path.
+
+Problem being solved
+--------------------
+- Importing modules should be able to reference exported module-scoped
+  constants directly instead of re-declaring the same values locally.
+- The current bootstrap path still forces local scalar duplication even when a
+  real owning module already exists.
+- The same path should also prove one ordinary structural aggregate const use
+  end-to-end so the supported slice remains consistent with the language and
+  earlier compile-time work.
+- Without this follow-through, the repository keeps a split truth: the
+  language and older compiler notes say aggregate constants and named constant
+  reuse are admitted, but active bootstrap consumers still need workaround
+  comments and local re-declarations.
+
+Core rule
+---------
+- Fix constant ownership at the correct layer: sema, MIR, and bootstrap
+  lowering for exported module-scoped constants.
+- Admit only the already-documented constant subset.
+- Aggregate const initializers in this phase must be built from already
+  admitted constant ingredients only.
+- Do not add const functions, general compile-time execution, or hidden
+  interpreter behavior.
+- Do not claim that every historical constant frontier is reopened; this phase
+  is about the active bootstrap path and current user-visible duplication.
+
+Planning rule for this phase
+----------------------------
+Use this sanity check on every Phase 163 change:
+
+- making one existing owning constant reusable across modules in the active
+  bootstrap path: admissible
+- proving one ordinary aggregate const declaration survives that same path:
+  admissible
+- widening into function execution at compile time, macro systems, or generic
+  metaprogramming: wrong phase
+
+Chosen slice for this phase
+---------------------------
+Targeted boundary shape:
+
+1. one canonical Phase 163 execution note that defines the bootstrap constant
+   follow-through boundary clearly
+2. one active-path proof that imported module-scoped scalar constants can be
+   referenced directly without local re-declaration
+3. one active-path proof that an admitted aggregate const declaration survives
+   checking and lowering honestly on the same path
+4. one narrow compiler implementation slice covering sema lookup,
+   cross-module metadata or MIR ownership as needed, and bootstrap backend
+   lowering for exported constants
+5. one focused regression set proving both scalar constant sharing and
+   structural aggregate const use on the active compiler path
+6. one kernel cleanup pass removing the duplicated bootstrap-limitation
+   comments where the Phase 163 proof actually closes them
+
+Chosen outcome
+--------------
+Chosen outcome: yes.
+
+This phase should be taken now because the repository has active user-visible
+pressure, the owning distortion is narrow, and the alternative is continued
+constant duplication in the current kernel slice.
+
+Contract summary this phase should land
+---------------------------------------
+- Exported module-scoped constants are directly referenceable from importing
+  modules in the active bootstrap path.
+- The constant subset remains the one already documented in
+  `constants_spec.txt`.
+- Structural aggregate const declarations remain limited to aggregate literals
+  whose participating fields or elements are themselves admitted constants.
+- No const-call execution is introduced.
+- No claim is made that function-produced values can initialize const
+  aggregates.
+
+What this phase should try to prove
+-----------------------------------
+- The active bootstrap compiler path can carry scalar constant ownership
+  across module boundaries honestly enough to remove local constant
+  duplication from current kernel code.
+- The same path can preserve one admitted aggregate const declaration without
+  special casing or documentation drift.
+- Sema remains the owner of compile-time truth, MIR remains the owner of
+  lowered constant representation, and backend lowering does not reconstruct
+  constant meaning from source text heuristics.
+- The repository exits the phase with a smaller residual constant frontier,
+  not a larger implicit promise about const-eval.
+
+Required implementation surfaces
+--------------------------------
+The owning implementation surfaces for this phase are:
+
+1. `docs/arch/c-lang/language/semantics/constants_spec.txt`
+   - refresh only if the active-path constant ownership contract needs a
+     clearer statement
+   - keep the admitted constant subset unchanged
+
+2. `docs/plan/decision_log.txt`
+   - record the limited solution only if the landed implementation still
+     intentionally stops short of a fuller exported-constant model
+
+3. `compiler/sema/`
+   - ensure exported module-scoped constants remain first-class semantic
+     constant facts for importing users on the active bootstrap path
+   - keep constant evaluation keyed by name and existing admitted rules
+
+4. `compiler/mir/`
+   - preserve imported or referenced constant ownership explicitly enough that
+     bootstrap lowering does not need source-text reconstruction
+   - keep deterministic dumps honest if MIR-visible representation changes
+
+5. `compiler/codegen_llvm/`
+   - lower direct references to exported module-scoped constants on the active
+     bootstrap path
+   - keep the implementation narrow; do not widen into a second constant
+     runtime or linker-policy wave
+
+6. `compiler/driver/` and `compiler/support/`
+   - touch only if one deterministic build-path or artifact-plumbing update is
+     required to preserve exported constant identity
+   - do not widen CLI policy in this phase
+
+7. `kernel/src/boot.mc`, `kernel/src/serial_protocol.mc`,
+   `kernel/src/scenarios.mc`, `kernel/src/shell_service.mc`, and
+   `kernel/src/kernel_dispatch.mc`
+   - use as the active consumer pressure surface
+   - remove local duplicated constants only where the new support closes the
+     exact owning gap
+
+8. `tests/compiler/sema/`, `tests/compiler/mir/`,
+   `tests/compiler/codegen/`, and `tests/tool/`
+   - add the narrowest proof set for imported scalar const reuse and one
+     aggregate const follow-through on the active path
+
+Preferred proof points
+----------------------
+1. One importing module references an exported scalar constant directly and
+   typechecks without a local copy.
+2. One importing module references an exported structural aggregate const or
+   one local structural aggregate const on the active path and it survives
+   checking deterministically.
+3. One kernel consumer removes a duplicated endpoint or wire constant because
+   the imported owner now works honestly.
+4. One negative test proves that non-constant ingredients still reject in a
+   const aggregate initializer.
+5. The compiler does not admit const function execution in the process.
+
+Deliverables
+------------
+- one canonical Phase 163 execution plan in `docs/plan/active/`
+- one bounded compiler slice for exported constant reuse on the active
+  bootstrap path
+- one bounded proof that admitted aggregate const declarations survive the
+  same path
+- one focused kernel cleanup removing constant duplication where justified
+- one focused regression set across the owning compiler layers
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 163 boundary in docs: exported constant reuse and
+   aggregate-const follow-through only, no broad const-eval expansion.
+2. Reproduce the active-path failure with one focused compiler or tool test.
+3. Repair the owning sema or MIR constant identity path if needed.
+4. Repair the owning bootstrap lowering path so imported module-scoped
+   constants survive honestly.
+5. Add one aggregate const proof on the same path.
+6. Remove the now-unnecessary local duplicated constants from the kernel
+   consumers that motivated the phase.
+7. Refresh decision notes only if a deliberate narrower stop remains.
+
+Exit criteria
+-------------
+- imported module-scoped constants can be referenced directly on the active
+  bootstrap path
+- one admitted aggregate const declaration is proved on the same path
+- the current kernel no longer needs duplicated constants for at least one
+  Phase 163-motivating owner pair
+- compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces do
+  not widen beyond this constant follow-through slice
+
+Non-goals
+---------
+- const functions
+- arbitrary compile-time execution
+- macro systems or template metaprogramming
+- function-call-driven const aggregate initialization
+- reopening broader linker, packaging, or loader policy
+- claiming struct embedding or other composition features as part of the
+  constant slice

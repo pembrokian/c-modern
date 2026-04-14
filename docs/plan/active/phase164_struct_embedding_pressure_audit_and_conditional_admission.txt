@@ -1,0 +1,226 @@
+Phase 164 -- Struct Embedding Pressure Audit And Conditional Admission
+======================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Decide from real repository pressure whether Modern C should admit one narrow
+form of struct embedding, or whether the current explicit-composition model
+should remain the language and kernel default.
+
+This phase exists because there is a credible ergonomic idea here: Plan 9 and
+related systems code often use embedding to reduce mechanical field-forwarding
+and wrapper boilerplate. But the repository also has an explicit counterweight:
+kernel planning and service-shape docs currently prefer visible composition,
+visible owners, and no framework-like hiding of boundaries.
+
+This phase must therefore be an evidence-driven admission decision, not a
+taste-based language expansion.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/arch/c-lang/compiler/compiler_design_ideas.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+- `docs/plan/active/phase153_service_composition_shape_audit.txt`
+- `docs/plan/active/phase163_bootstrap_constant_linkage_and_aggregate_const_follow_through.txt`
+
+Repository status note
+----------------------
+- The compiler-design notes explicitly say to borrow Thompson and Plan 9
+  simplicity as a design constraint, not to recreate Plan 9 implementation
+  strategies literally.
+- The reset-lane kernel style guide asks for small, direct, flat, readable
+  code and removal of repeated boilerplate through small helpers.
+- The service-shape and composition notes also explicitly reject inheritance,
+  service macros, and hidden composition machinery as default answers.
+- Current kernel records such as `KernelBootState` and `SerialShellPathState`
+  show some ordinary wrapper and field-forwarding boilerplate, but the active
+  codebase has not yet proved that this boilerplate is structurally harmful
+  rather than merely visible.
+
+Problem being solved
+--------------------
+- There may be a real language ergonomics gap when one struct exists mostly to
+  wrap another struct plus a small amount of additive state, and callers then
+  pay repeated access or forwarding boilerplate.
+- Struct embedding could reduce that boilerplate if it remains explicit and
+  semantically narrow.
+- But embedding also carries costs: promoted-field lookup, ambiguity rules,
+  layout commitments, and the risk of making ownership boundaries look flatter
+  than they really are.
+- Without one explicit audit phase, the repository could either add embedding
+  because it feels elegant, or reject it because explicit composition feels
+  virtuous, without measuring actual code pressure.
+
+Core rule
+---------
+- Do not admit struct embedding by taste alone.
+- If the repository cannot prove repeated pressure beyond cosmetic dislike,
+  keep explicit composition.
+- If embedding is admitted, keep it strictly structural and deterministic.
+- No inheritance, subtyping, method families, implicit conversions, or hidden
+  delegation semantics are allowed in this phase.
+- Promotion must be shallow, explicit in docs, and rejected on ambiguity.
+
+Planning rule for this phase
+----------------------------
+Use this sanity check on every Phase 164 change:
+
+- measuring repeated wrapper pressure and deciding whether one narrow
+  structural convenience is justified: admissible
+- adding inheritance-like semantics, method promotion, or framework-like code
+  reuse: wrong phase
+
+Conditional branch A -- Narrow struct embedding admission
+---------------------------------------------------------
+Use this branch only if the audit proves that explicit composition remains
+mechanically repetitive even after Phase 163 constant cleanup and ordinary
+helper extraction.
+
+Candidate contract
+------------------
+- one struct may embed another struct as an anonymous field
+- the embedded field contributes its storage exactly as though it were an
+  ordinary named field of that type
+- field lookup may promote directly to the embedded field's members only when
+  the lookup is unambiguous
+- explicit qualification through the embedded type or generated field name is
+  not required for the promoted case, but ambiguity must be a semantic error
+- no method promotion model is introduced because the language has no method
+  system to justify one
+- no subtyping or implicit conversion arises from embedding
+
+Candidate syntax
+----------------
+Preferred candidate syntax if Branch A wins:
+
+```
+struct Outer {
+    Inner
+    extra: u32
+}
+```
+
+Alternative spellings should be considered only if the parser cost or grammar
+ambiguity of anonymous field declarations proves materially worse than the
+ feature itself.
+
+Branch A implementation surfaces
+--------------------------------
+If Branch A wins, the owning surfaces are:
+
+1. `docs/arch/c-lang/language/`
+   - define the admitted embedding syntax and its lookup rules
+   - document ambiguity rejection and layout meaning clearly
+
+2. `compiler/parse/` and `compiler/ast/`
+   - admit one anonymous embedded-field declaration form
+   - keep the AST change explicit and minimal
+
+3. `compiler/sema/`
+   - add promoted-field lookup with deterministic ambiguity rejection
+   - preserve explicit layout and field-order truth
+
+4. `compiler/mir/`
+   - keep field access lowering explicit; promoted access must resolve to the
+     same underlying field path deterministically
+
+5. `compiler/codegen_llvm/`
+   - no special new runtime model; ordinary field offset lowering should stay
+     enough once sema resolves the embedded field path honestly
+
+6. `tests/compiler/parser/`, `tests/compiler/sema/`, and
+   `tests/compiler/mir/`
+   - add the narrowest possible coverage for syntax, field lookup, ambiguity,
+     and lowered field access
+
+7. one real consumer proof
+   - use a small kernel-shaped or support-shaped record where embedding
+     materially reduces owner-local boilerplate without hiding ownership
+
+Conditional branch B -- Explicit deferral
+-----------------------------------------
+Use this branch if the audit shows that the current pressure is mostly stylistic
+or helper-extraction pressure rather than a real language-boundary problem.
+
+Branch B outcome
+----------------
+- keep explicit composition as the admitted model
+- record that Plan 9-inspired clarity means simplicity of structure, not
+  mandatory adoption of Plan 9 language conveniences
+- prefer helpers, smaller records, or better owner factoring over a new
+  language feature
+- refresh backlog or decision notes only if one concrete revisit trigger is
+  sharper after the audit
+
+Chosen outcome
+--------------
+Chosen outcome: not predetermined.
+
+The repository should schedule this phase now, but the phase itself must earn
+either a narrow admission or an explicit deferral from real code pressure.
+
+What this phase should try to prove
+-----------------------------------
+- whether one real repeated wrapper or forwarding pattern is still awkward
+  enough to justify language work after helper extraction and Phase 163
+  constant cleanup
+- whether the semantic cost of promoted-field lookup remains smaller than the
+  boilerplate it removes
+- whether embedding can remain a structural convenience without diluting the
+  repository's explicit-composition rule
+
+Preferred pressure points
+-------------------------
+1. One wrapper record that carries another record plus one or two additive
+   fields.
+2. One repeated access or forwarding pattern that embedding would actually
+   remove.
+3. One ambiguity case proving the lookup rules are honest if Branch A wins.
+4. One example where helper extraction alone is sufficient if Branch B wins.
+
+Deliverables
+------------
+- one canonical Phase 164 execution plan in `docs/plan/active/`
+- one explicit audit result: narrow admission or explicit deferral
+- if admitted: one minimal syntax and sema contract plus focused proofs
+- if deferred: one clear repository note explaining why explicit composition
+  remains the honest model
+
+Suggested execution order
+-------------------------
+1. Freeze the Phase 164 question in docs: pressure audit first, no admission
+   by taste.
+2. Inventory one or two real wrapper-pressure sites in current code.
+3. Attempt the smallest non-language relief first: helper extraction or owner
+   refactoring.
+4. If the pressure remains real, prototype the narrowest embedding contract in
+   parser plus sema terms and reject anything broader.
+5. Add focused proofs for either admission or explicit deferral.
+6. Refresh decision docs only after the branch outcome is clear.
+
+Exit criteria
+-------------
+- the repository can state clearly whether struct embedding is admitted or
+  deferred
+- if admitted, the feature remains structural, shallow, deterministic, and
+  ambiguity-rejecting
+- if deferred, the repository names the concrete reason and revisit trigger
+- compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces do
+  not widen into inheritance, hidden delegation, or framework machinery
+
+Non-goals
+---------
+- inheritance
+- subtyping
+- method promotion
+- trait or mixin systems
+- hidden delegation or automatic forwarding generation
+- composition frameworks for the kernel
+- admitting embedding only because Plan 9 used it

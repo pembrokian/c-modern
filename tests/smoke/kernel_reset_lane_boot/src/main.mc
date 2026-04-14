@@ -1,5 +1,6 @@
 import boot
 import ipc
+import kernel_dispatch
 import kv_service
 import log_service
 import serial_service
@@ -34,7 +35,7 @@ func smoke_serial_dispatch_routes() bool {
     payload[1] = 67
     payload[2] = 65
     payload[3] = 66
-    effect = boot.kernel_dispatch_step(&state, build_observation(SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_observation(SERIAL_ENDPOINT_ID, 4, payload))
     if boot.debug_boot_routed(effect) == 0 {
         return false
     }
@@ -56,7 +57,7 @@ func smoke_serial_composes_services() bool {
     payload[1] = 65
     payload[2] = 77
     payload[3] = 33
-    effect = boot.kernel_dispatch_step(&state, build_observation(SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_observation(SERIAL_ENDPOINT_ID, 4, payload))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -65,7 +66,7 @@ func smoke_serial_composes_services() bool {
     payload[1] = 83
     payload[2] = 5
     payload[3] = 42
-    effect = boot.kernel_dispatch_step(&state, build_observation(SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_observation(SERIAL_ENDPOINT_ID, 4, payload))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -74,7 +75,7 @@ func smoke_serial_composes_services() bool {
     payload[1] = 84
     payload[2] = 33
     payload[3] = 33
-    effect = boot.kernel_dispatch_step(&state, build_observation(SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_observation(SERIAL_ENDPOINT_ID, 4, payload))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -96,7 +97,7 @@ func smoke_log_dispatch_routes() bool {
     effect: service_effect.Effect
 
     payload[0] = 77
-    effect = boot.kernel_dispatch_step(&state, build_observation(LOG_ENDPOINT_ID, 1, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_observation(LOG_ENDPOINT_ID, 1, payload))
     if boot.debug_boot_routed(effect) == 0 {
         return false
     }
@@ -113,7 +114,7 @@ func smoke_kv_dispatch_routes() bool {
 
     payload[0] = 5
     payload[1] = 42
-    effect = boot.kernel_dispatch_step(&state, build_observation(KV_ENDPOINT_ID, 2, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_observation(KV_ENDPOINT_ID, 2, payload))
     if boot.debug_boot_routed(effect) == 0 {
         return false
     }
@@ -128,7 +129,7 @@ func smoke_unknown_endpoint_not_routed() bool {
     payload: [4]u8 = ipc.zero_payload()
     effect: service_effect.Effect
 
-    effect = boot.kernel_dispatch_step(&state, build_observation(99, 0, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_observation(99, 0, payload))
     if boot.debug_boot_routed(effect) != 0 {
         return false
     }

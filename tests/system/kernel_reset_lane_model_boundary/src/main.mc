@@ -35,6 +35,7 @@
 //     This is the indistinguishability proof -- the caller cannot tell them apart.
 
 import boot
+import kernel_dispatch
 import serial_protocol
 import service_effect
 import syscall
@@ -57,41 +58,41 @@ func smoke_audit_silencing_is_invisible() bool {
     effect: service_effect.Effect
 
     // Fill the log to capacity via direct log-append commands.
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(1)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(1)))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(2)))
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(3)))
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(4)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(2)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(3)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(4)))
 
     // Confirm log is full via protocol: tail returns 4 entries.
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_tail()))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_tail()))
     if service_effect.effect_reply_payload_len(effect) != 4 {
         return false
     }
 
     // Write one kv entry.  Returns Ok even though advisory marker cannot land.
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_set(10, 55)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_set(10, 55)))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // Write a second kv entry.  Again Ok; again the marker is dropped.
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_set(11, 66)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_set(11, 66)))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // Log length is still 4 via protocol: both advisory markers were dropped.
     // This is the named boundary.
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_tail()))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_tail()))
     if service_effect.effect_reply_payload_len(effect) != 4 {
         return false
     }
 
     // kv count grew by 2: both entries were stored correctly.
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_count()))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_count()))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -111,16 +112,16 @@ func smoke_audit_silencing_is_invisible() bool {
 func smoke_no_protocol_witness_for_advisory_send() bool {
     // Case A: fresh state, log is empty, advisory kv-write marker can land.
     state_a: boot.KernelBootState = boot.kernel_init()
-    effect_a: service_effect.Effect = boot.kernel_dispatch_step(&state_a, cmd(serial_protocol.encode_kv_set(5, 99)))
+    effect_a: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state_a, cmd(serial_protocol.encode_kv_set(5, 99)))
 
     // Case B: log is full, advisory kv-write marker is silently dropped.
     state_b: boot.KernelBootState = boot.kernel_init()
     effect_b: service_effect.Effect
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(10)))
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(20)))
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(30)))
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(40)))
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_kv_set(5, 99)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(10)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(20)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(30)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(40)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_kv_set(5, 99)))
 
     // Both replies carry the same status and payload: indistinguishable.
     if service_effect.effect_reply_status(effect_a) != syscall.SyscallStatus.Ok {

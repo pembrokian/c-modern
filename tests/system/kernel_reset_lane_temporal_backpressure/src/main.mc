@@ -17,6 +17,7 @@
 //   by the dispatcher.  The kv reply is what the caller sees.
 
 import boot
+import kernel_dispatch
 import ipc
 import kv_service
 import log_service
@@ -41,25 +42,25 @@ func smoke_ordering_is_fifo() bool {
     effect: service_effect.Effect
 
     // LA <65> !  — append 'A'
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 65, 65, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 65, 65, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // LA <66> !  — append 'B'
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 65, 66, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 65, 66, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // LA <67> !  — append 'C'
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 65, 67, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 65, 67, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // LT ! !  — tail
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 84, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 84, 33, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -79,25 +80,25 @@ func smoke_log_full_returns_exhausted() bool {
     effect: service_effect.Effect
 
     // Fill all 4 slots.
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 65, 1, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 65, 1, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 65, 2, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 65, 2, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 65, 3, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 65, 3, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 65, 4, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 65, 4, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // One more append: must return Exhausted.
-    effect = boot.kernel_dispatch_step(&state, make_obs(76, 65, 5, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(76, 65, 5, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
         return false
     }
@@ -115,25 +116,25 @@ func smoke_kv_full_new_key_returns_exhausted() bool {
     effect: service_effect.Effect
 
     // Fill 4 distinct keys.  KS <key> <val>.
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 1, 10))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 1, 10))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 2, 20))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 2, 20))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 3, 30))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 3, 30))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 4, 40))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 4, 40))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // New key 5 when full: must return Exhausted.
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 5, 50))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 5, 50))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
         return false
     }
@@ -149,31 +150,31 @@ func smoke_kv_full_overwrite_is_ok() bool {
     state: boot.KernelBootState = boot.kernel_init()
     effect: service_effect.Effect
 
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 1, 10))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 1, 10))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 2, 20))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 2, 20))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 3, 30))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 3, 30))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 4, 40))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 4, 40))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // Overwrite key 2 when full: must return Ok and update the value.
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 2, 99))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 2, 99))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // Verify the value changed.
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 71, 2, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 71, 2, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -190,13 +191,13 @@ func smoke_write_then_read_same_chain_is_coherent() bool {
     effect: service_effect.Effect
 
     // KS 7 = 11
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 83, 7, 11))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 83, 7, 11))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // KG 7: must see 11, not a stale/default value.
-    effect = boot.kernel_dispatch_step(&state, make_obs(75, 71, 7, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, make_obs(75, 71, 7, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }

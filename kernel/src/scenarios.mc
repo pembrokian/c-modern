@@ -12,6 +12,7 @@
 // protocol encoding in serial_protocol.mc.
 
 import boot
+import kernel_dispatch
 import log_service
 import serial_protocol
 import service_effect
@@ -32,16 +33,20 @@ enum StepCheckKind {
     Witness,
 }
 
-struct StepSpec {
-    obs: syscall.ReceiveObservation
-    failure_code: i32
-    check: StepCheckKind
+struct StepCheck {
+    kind: StepCheckKind
     status: syscall.SyscallStatus
     reply_len: usize
     payload0: u8
     payload1: u8
     log_len: usize
     send_dropped: u32
+}
+
+struct StepSpec {
+    obs: syscall.ReceiveObservation
+    failure_code: i32
+    check: StepCheck
 }
 
 // serial_obs wraps a protocol payload into a ReceiveObservation.
@@ -72,32 +77,36 @@ func kv_count_obs(pid: u32) syscall.ReceiveObservation {
     return serial_obs(SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
 }
 
+func step(obs: syscall.ReceiveObservation, failure_code: i32, check: StepCheck) StepSpec {
+    return StepSpec{ obs: obs, failure_code: failure_code, check: check }
+}
+
 func routed_step(obs: syscall.ReceiveObservation, failure_code: i32) StepSpec {
-    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.Routed, status: syscall.SyscallStatus.None, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 }
+    return step(obs, failure_code, StepCheck{ kind: StepCheckKind.Routed, status: syscall.SyscallStatus.None, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 })
 }
 
 func status_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus) StepSpec {
-    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.Status, status: status, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 }
+    return step(obs, failure_code, StepCheck{ kind: StepCheckKind.Status, status: status, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 })
 }
 
 func payload1_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, payload1: u8) StepSpec {
-    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.Payload1, status: status, reply_len: 0, payload0: 0, payload1: payload1, log_len: 0, send_dropped: 0 }
+    return step(obs, failure_code, StepCheck{ kind: StepCheckKind.Payload1, status: status, reply_len: 0, payload0: 0, payload1: payload1, log_len: 0, send_dropped: 0 })
 }
 
 func log_tail_state_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, payload0: u8, payload1: u8) StepSpec {
-    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.LogTailState, status: status, reply_len: 0, payload0: payload0, payload1: payload1, log_len: 0, send_dropped: 0 }
+    return step(obs, failure_code, StepCheck{ kind: StepCheckKind.LogTailState, status: status, reply_len: 0, payload0: payload0, payload1: payload1, log_len: 0, send_dropped: 0 })
 }
 
 func reply_len_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, reply_len: usize) StepSpec {
-    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.ReplyLen, status: status, reply_len: reply_len, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 }
+    return step(obs, failure_code, StepCheck{ kind: StepCheckKind.ReplyLen, status: status, reply_len: reply_len, payload0: 0, payload1: 0, log_len: 0, send_dropped: 0 })
 }
 
 func reply_len_log_len_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, reply_len: usize, log_len: usize) StepSpec {
-    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.ReplyLenAndLogLen, status: status, reply_len: reply_len, payload0: 0, payload1: 0, log_len: log_len, send_dropped: 0 }
+    return step(obs, failure_code, StepCheck{ kind: StepCheckKind.ReplyLenAndLogLen, status: status, reply_len: reply_len, payload0: 0, payload1: 0, log_len: log_len, send_dropped: 0 })
 }
 
 func witness_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, send_dropped: u32) StepSpec {
-    return StepSpec{ obs: obs, failure_code: failure_code, check: StepCheckKind.Witness, status: status, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: send_dropped }
+    return step(obs, failure_code, StepCheck{ kind: StepCheckKind.Witness, status: status, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: send_dropped })
 }
 
 func step_table() [22]StepSpec {
@@ -131,53 +140,58 @@ func step_table() [22]StepSpec {
 
 func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_effect.Effect) u32 {
     s: boot.KernelBootState = *state
+    check: StepCheck = spec.check
 
-    if spec.check == StepCheckKind.Routed {
+    if check.kind == StepCheckKind.Routed {
         return boot.debug_boot_routed(effect)
     }
-    if service_effect.effect_reply_status(effect) != spec.status {
+    if service_effect.effect_reply_status(effect) != check.status {
         return 0
     }
-    if spec.check == StepCheckKind.Status {
+    if check.kind == StepCheckKind.Status {
         return 1
     }
-    if spec.check == StepCheckKind.Payload1 {
-        if service_effect.effect_reply_payload(effect)[1] != spec.payload1 {
+    if check.kind == StepCheckKind.Payload1 {
+        if service_effect.effect_reply_payload(effect)[1] != check.payload1 {
             return 0
         }
         return 1
     }
-    if spec.check == StepCheckKind.LogTailState {
+    if check.kind == StepCheckKind.LogTailState {
+        payload: [4]u8 = service_effect.effect_reply_payload(effect)
         if service_effect.effect_reply_payload_len(effect) != log_service.log_len(s.log_state) {
             return 0
         }
-        if service_effect.effect_reply_payload(effect)[0] != spec.payload0 {
+        if payload[0] != check.payload0 {
             return 0
         }
-        if service_effect.effect_reply_payload(effect)[1] != spec.payload1 {
-            return 0
-        }
-        return 1
-    }
-    if spec.check == StepCheckKind.ReplyLen {
-        if service_effect.effect_reply_payload_len(effect) != spec.reply_len {
+        if payload[1] != check.payload1 {
             return 0
         }
         return 1
     }
-    if spec.check == StepCheckKind.ReplyLenAndLogLen {
-        if service_effect.effect_reply_payload_len(effect) != spec.reply_len {
-            return 0
-        }
-        if log_service.log_len(s.log_state) != spec.log_len {
+    if check.kind == StepCheckKind.ReplyLen {
+        if service_effect.effect_reply_payload_len(effect) != check.reply_len {
             return 0
         }
         return 1
     }
-    if service_effect.effect_send_dropped(effect) != spec.send_dropped {
-        return 0
+    if check.kind == StepCheckKind.ReplyLenAndLogLen {
+        if service_effect.effect_reply_payload_len(effect) != check.reply_len {
+            return 0
+        }
+        if log_service.log_len(s.log_state) != check.log_len {
+            return 0
+        }
+        return 1
     }
-    return 1
+    if check.kind == StepCheckKind.Witness {
+        if service_effect.effect_send_dropped(effect) != check.send_dropped {
+            return 0
+        }
+        return 1
+    }
+    return 0
 }
 
 func run(state: *boot.KernelBootState) i32 {
@@ -185,7 +199,7 @@ func run(state: *boot.KernelBootState) i32 {
 
     for step in 0..STEP_COUNT {
         spec: StepSpec = specs[step]
-        effect: service_effect.Effect = boot.kernel_dispatch_step(state, spec.obs)
+        effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, spec.obs)
         if step_matches(spec, state, effect) == 0 {
             return spec.failure_code
         }

@@ -1,5 +1,6 @@
 import boot
 import ipc
+import kernel_dispatch
 import serial_service
 import service_effect
 import syscall
@@ -19,7 +20,7 @@ func smoke_echo_round_trip_passes() bool {
     payload[1] = 67
     payload[2] = 72
     payload[3] = 73
-    effect = boot.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
     if serial_service.serial_forwarded(state.path_state.serial_state) == 0 {
         return false
     }
@@ -48,7 +49,7 @@ func smoke_kv_set_logs_and_gets_value() bool {
     payload[1] = 83
     payload[2] = 7
     payload[3] = 42
-    effect = boot.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -58,7 +59,7 @@ func smoke_kv_set_logs_and_gets_value() bool {
     payload[1] = 71
     payload[2] = 7
     payload[3] = 33
-    effect = boot.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -78,7 +79,7 @@ func smoke_invalid_byte_does_not_forward() bool {
     effect: service_effect.Effect
 
     payload[0] = 255
-    effect = boot.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 1, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 1, payload))
     if serial_service.serial_forwarded(state.path_state.serial_state) != 0 {
         return false
     }

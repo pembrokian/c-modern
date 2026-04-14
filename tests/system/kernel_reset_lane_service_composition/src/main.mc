@@ -1,4 +1,5 @@
 import boot
+import kernel_dispatch
 import ipc
 import log_service
 import service_effect
@@ -19,17 +20,17 @@ func smoke_mixed_shell_workflow_stays_explicit() bool {
     state: boot.KernelBootState = boot.kernel_init()
     effect: service_effect.Effect
 
-    effect = boot.kernel_dispatch_step(&state, build_serial_observation(76, 65, 65, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_serial_observation(76, 65, 65, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
-    effect = boot.kernel_dispatch_step(&state, build_serial_observation(75, 83, 4, 9))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_serial_observation(75, 83, 4, 9))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
-    effect = boot.kernel_dispatch_step(&state, build_serial_observation(75, 71, 4, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_serial_observation(75, 71, 4, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -40,7 +41,7 @@ func smoke_mixed_shell_workflow_stays_explicit() bool {
         return false
     }
 
-    effect = boot.kernel_dispatch_step(&state, build_serial_observation(76, 84, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_serial_observation(76, 84, 33, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }

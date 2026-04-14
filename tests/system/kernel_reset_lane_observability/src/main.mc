@@ -22,6 +22,7 @@
 // protocol.  The count query closes that gap with zero new module surface.
 
 import boot
+import kernel_dispatch
 import ipc
 import kv_service
 import log_service
@@ -47,7 +48,7 @@ func smoke_kv_count_reflects_writes() bool {
     effect: service_effect.Effect
 
     // Empty store: count is 0.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -56,27 +57,27 @@ func smoke_kv_count_reflects_writes() bool {
     }
 
     // KS <key=1> <val=10>: one entry.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 1, 10))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 1, 10))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // Count is now 1.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
     if service_effect.effect_reply_payload_len(effect) != 1 {
         return false
     }
 
     // KS <key=2> <val=20>: two distinct entries.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 2, 20))
-    effect = boot.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 2, 20))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
     if service_effect.effect_reply_payload_len(effect) != 2 {
         return false
     }
 
     // Overwrite key=1: count stays at 2.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 1, 99))
-    effect = boot.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 1, 99))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
     if service_effect.effect_reply_payload_len(effect) != 2 {
         return false
     }
@@ -90,14 +91,14 @@ func smoke_observation_is_non_mutating() bool {
     effect: service_effect.Effect
 
     // Write one entry.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 5, 42))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 5, 42))
 
     // Count twice: both should return 1.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
     if service_effect.effect_reply_payload_len(effect) != 1 {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
     if service_effect.effect_reply_payload_len(effect) != 1 {
         return false
     }
@@ -112,19 +113,19 @@ func smoke_log_tail_readable_at_capacity() bool {
     effect: service_effect.Effect
 
     // Fill log to capacity with LA <value> !.
-    effect = boot.kernel_dispatch_step(&state, obs(76, 65, 10, 33))
-    effect = boot.kernel_dispatch_step(&state, obs(76, 65, 20, 33))
-    effect = boot.kernel_dispatch_step(&state, obs(76, 65, 30, 33))
-    effect = boot.kernel_dispatch_step(&state, obs(76, 65, 40, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(76, 65, 10, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(76, 65, 20, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(76, 65, 30, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(76, 65, 40, 33))
 
     // Log is full: a write returns Exhausted.
-    effect = boot.kernel_dispatch_step(&state, obs(76, 65, 50, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(76, 65, 50, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
         return false
     }
 
     // LT!! returns Ok at full capacity; all 4 entries are visible.
-    effect = boot.kernel_dispatch_step(&state, obs(76, 84, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(76, 84, 33, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -139,7 +140,7 @@ func smoke_log_tail_readable_at_capacity() bool {
     }
 
     // Reading log a second time: still Ok and still 4 entries (non-mutating).
-    effect = boot.kernel_dispatch_step(&state, obs(76, 84, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(76, 84, 33, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -156,19 +157,19 @@ func smoke_kv_count_at_capacity_is_ok() bool {
     state: boot.KernelBootState = boot.kernel_init()
     effect: service_effect.Effect
 
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 1, 10))
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 2, 20))
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 3, 30))
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 4, 40))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 1, 10))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 2, 20))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 3, 30))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 4, 40))
 
     // Store is full: a new key returns Exhausted.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 83, 5, 50))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 5, 50))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
         return false
     }
 
     // Count query still returns Ok with count=4.
-    effect = boot.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 67, 33, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }

@@ -1,4 +1,5 @@
 import boot
+import kernel_dispatch
 import ipc
 import log_service
 import service_effect
@@ -94,7 +95,7 @@ func smoke_serial_ref_endpoint_routes_correctly() bool {
     if service_identity.ref_endpoint(serial_ref) != obs.endpoint_id {
         return false
     }
-    effect: service_effect.Effect = boot.kernel_dispatch_step(&state, obs)
+    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, obs)
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }

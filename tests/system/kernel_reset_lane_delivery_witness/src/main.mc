@@ -19,6 +19,7 @@
 // Effect accessor.
 
 import boot
+import kernel_dispatch
 import serial_protocol
 import service_effect
 import syscall
@@ -34,7 +35,7 @@ func cmd(payload: [4]u8) syscall.ReceiveObservation {
 func smoke_witness_absent_when_delivered() bool {
     state: boot.KernelBootState = boot.kernel_init()
 
-    effect: service_effect.Effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_set(1, 10)))
+    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_set(1, 10)))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -53,23 +54,23 @@ func smoke_witness_present_when_dropped() bool {
     effect: service_effect.Effect
 
     // Fill the log to capacity (4 entries).
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(1)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(1)))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(2)))
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(3)))
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(4)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(2)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(3)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_append(4)))
 
     // Confirm log is full.
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_tail()))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_log_tail()))
     if service_effect.effect_reply_payload_len(effect) != 4 {
         return false
     }
 
     // kv write with log full: advisory append is Exhausted.
     // Primary reply must still be Ok.
-    effect = boot.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_set(5, 99)))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, cmd(serial_protocol.encode_kv_set(5, 99)))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -86,16 +87,16 @@ func smoke_witness_present_when_dropped() bool {
 func smoke_caller_can_distinguish_cases() bool {
     // Case A: fresh state, log empty.
     state_a: boot.KernelBootState = boot.kernel_init()
-    effect_a: service_effect.Effect = boot.kernel_dispatch_step(&state_a, cmd(serial_protocol.encode_kv_set(5, 99)))
+    effect_a: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state_a, cmd(serial_protocol.encode_kv_set(5, 99)))
 
     // Case B: log full.
     state_b: boot.KernelBootState = boot.kernel_init()
     effect_b: service_effect.Effect
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(10)))
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(20)))
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(30)))
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(40)))
-    effect_b = boot.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_kv_set(5, 99)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(10)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(20)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(30)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_log_append(40)))
+    effect_b = kernel_dispatch.kernel_dispatch_step(&state_b, cmd(serial_protocol.encode_kv_set(5, 99)))
 
     // Both replies are Ok.
     if service_effect.effect_reply_status(effect_a) != syscall.SyscallStatus.Ok {

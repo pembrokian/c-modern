@@ -29,6 +29,7 @@
 //     is returned to whoever submits the overflowing step, regardless of pid.
 
 import boot
+import kernel_dispatch
 import ipc
 import kv_service
 import log_service
@@ -53,13 +54,13 @@ func smoke_shared_kv_state() bool {
     effect: service_effect.Effect
 
     // Client A: KS 7 11
-    effect = boot.kernel_dispatch_step(&state, obs(1, 75, 83, 7, 11))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 75, 83, 7, 11))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // Client B: KG 7
-    effect = boot.kernel_dispatch_step(&state, obs(99, 75, 71, 7, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(99, 75, 71, 7, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -76,19 +77,19 @@ func smoke_last_writer_wins() bool {
     effect: service_effect.Effect
 
     // A: KS 3 10
-    effect = boot.kernel_dispatch_step(&state, obs(1, 75, 83, 3, 10))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 75, 83, 3, 10))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // B: KS 3 20  (overwrites A's value)
-    effect = boot.kernel_dispatch_step(&state, obs(99, 75, 83, 3, 20))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(99, 75, 83, 3, 20))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // A: KG 3 — sees B's value, not its own
-    effect = boot.kernel_dispatch_step(&state, obs(1, 75, 71, 3, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 75, 71, 3, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -105,25 +106,25 @@ func smoke_backpressure_is_per_service() bool {
     effect: service_effect.Effect
 
     // Client A fills all 4 slots.  LA <byte> !
-    effect = boot.kernel_dispatch_step(&state, obs(1, 76, 65, 1, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 76, 65, 1, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, obs(1, 76, 65, 2, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 76, 65, 2, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, obs(1, 76, 65, 3, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 76, 65, 3, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    effect = boot.kernel_dispatch_step(&state, obs(1, 76, 65, 4, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 76, 65, 4, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // Client B appends: log is full regardless of who asks.
-    effect = boot.kernel_dispatch_step(&state, obs(99, 76, 65, 5, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(99, 76, 65, 5, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
         return false
     }
@@ -140,13 +141,13 @@ func smoke_shared_log_state() bool {
     effect: service_effect.Effect
 
     // Client A: LA <65> !
-    effect = boot.kernel_dispatch_step(&state, obs(1, 76, 65, 65, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 76, 65, 65, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     // Client B: LT ! !
-    effect = boot.kernel_dispatch_step(&state, obs(99, 76, 84, 33, 33))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, obs(99, 76, 84, 33, 33))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
@@ -168,12 +169,12 @@ func smoke_reply_is_return_value_of_step() bool {
 
     // A writes, B reads in alternation.  Each gets the right reply from its
     // own step — no cross-contamination.
-    effect_a_write: service_effect.Effect = boot.kernel_dispatch_step(&state, obs(1, 75, 83, 9, 7))
+    effect_a_write: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, obs(1, 75, 83, 9, 7))
     if service_effect.effect_reply_status(effect_a_write) != syscall.SyscallStatus.Ok {
         return false
     }
 
-    effect_b_read: service_effect.Effect = boot.kernel_dispatch_step(&state, obs(99, 75, 71, 9, 33))
+    effect_b_read: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, obs(99, 75, 71, 9, 33))
     if service_effect.effect_reply_status(effect_b_read) != syscall.SyscallStatus.Ok {
         return false
     }
