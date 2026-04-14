@@ -1,9 +1,6 @@
-import serial_service
-import serial_shell_path
-import syscall
+import service_effect
 
 const EVENT_LOG_CAPACITY: usize = 4
-const SERIAL_INVALID_BYTE: u8 = 255
 const EVENT_SERIAL_BUFFERED: u32 = 1
 const EVENT_SERIAL_REJECTED: u32 = 2
 const EVENT_SHELL_FORWARDED: u32 = 3
@@ -20,20 +17,16 @@ struct SerialShellEventLog {
     len: usize
 }
 
-struct TracedSerialShellStep {
-    result: serial_shell_path.SerialShellPathResult
-    event_log: SerialShellEventLog
-}
-
 func event_log_init() SerialShellEventLog {
     return SerialShellEventLog{ slot0: 0, slot1: 0, slot2: 0, slot3: 0, start: 0, len: 0 }
 }
 
 func normalize_slot_index(raw_index: usize) usize {
-    if raw_index < EVENT_LOG_CAPACITY {
-        return raw_index
+    next_index: usize = raw_index
+    while next_index >= EVENT_LOG_CAPACITY {
+        next_index = next_index - EVENT_LOG_CAPACITY
     }
-    return raw_index - EVENT_LOG_CAPACITY
+    return next_index
 }
 
 func slot_value(log: SerialShellEventLog, slot_index: usize) u32 {
@@ -90,47 +83,36 @@ func event_log_entry(log: SerialShellEventLog, logical_index: usize) u32 {
     return slot_value(log, normalize_slot_index(log.start + logical_index))
 }
 
-func ingress_event_code(observation: syscall.ReceiveObservation) u32 {
-    if observation.payload_len == 0 {
-        return 0
+func append_effect_events(log: SerialShellEventLog, effect: service_effect.Effect) SerialShellEventLog {
+    next_log: SerialShellEventLog = log
+    index: usize = 0
+    while index < service_effect.effect_event_count(effect) {
+        next_log = event_log_push(next_log, service_effect.effect_event(effect, index))
+        index = index + 1
     }
-    if observation.payload[0] == SERIAL_INVALID_BYTE {
-        return EVENT_SERIAL_REJECTED
-    }
-    if serial_service.debug_ingress(observation) == 0 {
-        return 0
-    }
+    return next_log
+}
+
+func event_serial_buffered() u32 {
     return EVENT_SERIAL_BUFFERED
 }
 
-func reply_event_code(result: serial_shell_path.SerialShellPathResult) u32 {
-    if result.reply_status == syscall.SyscallStatus.Ok {
-        return EVENT_SHELL_REPLY_OK
-    }
-    if result.reply_status == syscall.SyscallStatus.InvalidArgument {
-        return EVENT_SHELL_REPLY_INVALID
-    }
-    return 0
+func event_serial_rejected() u32 {
+    return EVENT_SERIAL_REJECTED
 }
 
-func trace_step(state: serial_shell_path.SerialShellPathState, event_log: SerialShellEventLog, observation: syscall.ReceiveObservation) TracedSerialShellStep {
-    result: serial_shell_path.SerialShellPathResult = serial_shell_path.serial_to_shell_step(state, observation)
-    next_log: SerialShellEventLog = event_log
-    event_code: u32 = ingress_event_code(observation)
+func event_shell_forwarded() u32 {
+    return EVENT_SHELL_FORWARDED
+}
 
-    if event_code != 0 {
-        next_log = event_log_push(next_log, event_code)
-    }
-    if serial_shell_path.debug_step(result) != 0 {
-        next_log = event_log_push(next_log, EVENT_SHELL_FORWARDED)
-        event_code = reply_event_code(result)
-        if event_code != 0 {
-            next_log = event_log_push(next_log, event_code)
-        }
-        if result.state.serial_state.len == 0 {
-            next_log = event_log_push(next_log, EVENT_SERIAL_CLEARED)
-        }
-    }
+func event_shell_reply_ok() u32 {
+    return EVENT_SHELL_REPLY_OK
+}
 
-    return TracedSerialShellStep{ result: result, event_log: next_log }
+func event_shell_reply_invalid() u32 {
+    return EVENT_SHELL_REPLY_INVALID
+}
+
+func event_serial_cleared() u32 {
+    return EVENT_SERIAL_CLEARED
 }

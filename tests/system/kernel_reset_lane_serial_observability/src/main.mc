@@ -1,47 +1,44 @@
 import ipc
+import boot
 import serial_service
 import serial_shell_event_log
-import serial_shell_path
-import shell_service
+import service_effect
 import syscall
 
-const EXPECT_SERIAL_BUFFERED: u32 = 1
-const EXPECT_SERIAL_REJECTED: u32 = 2
-const EXPECT_SHELL_FORWARDED: u32 = 3
-const EXPECT_SHELL_REPLY_OK: u32 = 4
-const EXPECT_SERIAL_CLEARED: u32 = 6
+const SERIAL_ENDPOINT_ID: u32 = 10
 
 func build_receive_observation(source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8) syscall.ReceiveObservation {
     return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: endpoint_id, source_pid: source_pid, payload_len: payload_len, received_handle_slot: 0, received_handle_count: 0, payload: payload }
 }
 
-func build_path_state() serial_shell_path.SerialShellPathState {
-    return serial_shell_path.service_state(serial_service.serial_init(10, 1), shell_service.shell_init(11, 1), 77)
-}
-
 func smoke_valid_step_emits_flat_events() bool {
     payload: [4]u8 = ipc.zero_payload()
-    traced: serial_shell_event_log.TracedSerialShellStep
+    state: boot.KernelBootState = boot.kernel_init()
+    event_log: serial_shell_event_log.SerialShellEventLog = serial_shell_event_log.event_log_init()
+    effect: service_effect.Effect
 
-    payload[0] = 72
-    payload[1] = 73
-    traced = serial_shell_event_log.trace_step(build_path_state(), serial_shell_event_log.event_log_init(), build_receive_observation(9, 55, 2, payload))
-    if traced.result.reply_status != syscall.SyscallStatus.Ok {
+    payload[0] = 69
+    payload[1] = 67
+    payload[2] = 72
+    payload[3] = 73
+    effect = boot.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
+    event_log = serial_shell_event_log.append_effect_events(event_log, effect)
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    if serial_shell_event_log.event_log_len(traced.event_log) != 4 {
+    if serial_shell_event_log.event_log_len(event_log) != 4 {
         return false
     }
-    if serial_shell_event_log.event_log_entry(traced.event_log, 0) != EXPECT_SERIAL_BUFFERED {
+    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.event_serial_buffered() {
         return false
     }
-    if serial_shell_event_log.event_log_entry(traced.event_log, 1) != EXPECT_SHELL_FORWARDED {
+    if serial_shell_event_log.event_log_entry(event_log, 1) != serial_shell_event_log.event_shell_forwarded() {
         return false
     }
-    if serial_shell_event_log.event_log_entry(traced.event_log, 2) != EXPECT_SHELL_REPLY_OK {
+    if serial_shell_event_log.event_log_entry(event_log, 2) != serial_shell_event_log.event_shell_reply_ok() {
         return false
     }
-    if serial_shell_event_log.event_log_entry(traced.event_log, 3) != EXPECT_SERIAL_CLEARED {
+    if serial_shell_event_log.event_log_entry(event_log, 3) != serial_shell_event_log.event_serial_cleared() {
         return false
     }
     return true
@@ -49,17 +46,20 @@ func smoke_valid_step_emits_flat_events() bool {
 
 func smoke_invalid_byte_emits_reject_event() bool {
     payload: [4]u8 = ipc.zero_payload()
-    traced: serial_shell_event_log.TracedSerialShellStep
+    state: boot.KernelBootState = boot.kernel_init()
+    event_log: serial_shell_event_log.SerialShellEventLog = serial_shell_event_log.event_log_init()
+    effect: service_effect.Effect
 
     payload[0] = 255
-    traced = serial_shell_event_log.trace_step(build_path_state(), serial_shell_event_log.event_log_init(), build_receive_observation(9, 55, 1, payload))
-    if traced.result.forwarded != 0 {
+    effect = boot.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 1, payload))
+    event_log = serial_shell_event_log.append_effect_events(event_log, effect)
+    if serial_service.serial_forwarded(state.path_state.serial_state) != 0 {
         return false
     }
-    if serial_shell_event_log.event_log_len(traced.event_log) != 1 {
+    if serial_shell_event_log.event_log_len(event_log) != 1 {
         return false
     }
-    if serial_shell_event_log.event_log_entry(traced.event_log, 0) != EXPECT_SERIAL_REJECTED {
+    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.event_serial_rejected() {
         return false
     }
     return true
@@ -68,30 +68,34 @@ func smoke_invalid_byte_emits_reject_event() bool {
 func smoke_ring_keeps_latest_events() bool {
     payload: [4]u8 = ipc.zero_payload()
     event_log: serial_shell_event_log.SerialShellEventLog = serial_shell_event_log.event_log_init()
-    traced: serial_shell_event_log.TracedSerialShellStep
+    state: boot.KernelBootState = boot.kernel_init()
+    effect: service_effect.Effect
 
     payload[0] = 255
-    traced = serial_shell_event_log.trace_step(build_path_state(), event_log, build_receive_observation(9, 55, 1, payload))
-    event_log = traced.event_log
+    effect = boot.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 1, payload))
+    event_log = serial_shell_event_log.append_effect_events(event_log, effect)
 
     payload = ipc.zero_payload()
-    payload[0] = 65
-    traced = serial_shell_event_log.trace_step(build_path_state(), event_log, build_receive_observation(9, 55, 1, payload))
-    event_log = traced.event_log
+    payload[0] = 69
+    payload[1] = 67
+    payload[2] = 65
+    payload[3] = 33
+    effect = boot.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
+    event_log = serial_shell_event_log.append_effect_events(event_log, effect)
 
     if serial_shell_event_log.event_log_len(event_log) != 4 {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 0) != EXPECT_SERIAL_BUFFERED {
+    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.event_serial_buffered() {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 1) != EXPECT_SHELL_FORWARDED {
+    if serial_shell_event_log.event_log_entry(event_log, 1) != serial_shell_event_log.event_shell_forwarded() {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 2) != EXPECT_SHELL_REPLY_OK {
+    if serial_shell_event_log.event_log_entry(event_log, 2) != serial_shell_event_log.event_shell_reply_ok() {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 3) != EXPECT_SERIAL_CLEARED {
+    if serial_shell_event_log.event_log_entry(event_log, 3) != serial_shell_event_log.event_serial_cleared() {
         return false
     }
     return true

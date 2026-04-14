@@ -1,0 +1,881 @@
+KERNEL SOURCE ARCHITECTURE REVIEW — PHASE 153
+==============================================
+Reviewer: Senior Compiler / Systems Engineer perspective
+Scope    : kernel/src/ (all 11 files)
+Date     : 2026-04-14
+
+Design reference principles (from the user brief, summarised):
+  P1  – Services are pure state machines: (State, Msg) → (NewState, Effect)
+  P2  – Effects describe intent, not execution
+  P3  – Only the kernel executes effects (kernel_dispatch_step / execute_effect)
+  P4  – Transport is separate from meaning
+  P5  – Paths are wiring, not logic
+  P6  – No early interpretation of effects
+  P7  – One-way dependency direction: kernel → paths → services
+  P8  – State is always explicit
+  P9  – Messages are the only interface
+  P10 – Small, closed worlds (each service knows only its own domain)
+  P11 – Composition happens outside services
+  P12 – Make invalid states explicit, not implicit
+  P13 – Minimize "smart helpers" becoming hidden control flow
+  P14 – Symmetry (every request has a reply path, every send has a receiver)
+  P15 – Build for composition, not completion
+
+Files reviewed (in dependency order):
+  ipc.mc, syscall.mc, service_effect.mc,
+  shell_service.mc, log_service.mc, kv_service.mc,
+  serial_service.mc, serial_shell_event_log.mc,
+  serial_shell_path.mc, boot.mc, main.mc
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: ipc.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE
+  ipc.mc contains exactly one function: zero_payload() → [4]u8.
+  At this level of abstraction it is a utility shim, not really an
+  IPC module.  It is imported by almost every other file.  The name
+  "ipc" implies a larger charter than one zero-init helper.
+
+CORRECTNESS
+  No correctness issues in isolation.
+
+SIMPLICITY
+  The zero_payload helper requires manual zero-assignment of each of
+  4 slots.  If the language gains a built-in initialiser this can be
+  deleted entirely.  For now it is fine, but should be explicit about
+  "this exists only because the language lacks zero-initialisation of
+  fixed arrays."
+
+RECOMMENDATIONS
+  LOW  – Consider naming the module "primitives" or "zeroutils" to
+         match its actual scope, or absorb it into service_effect.mc.
+         The current name creates a false expectation that IPC routing
+         or capability logic lives here.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: syscall.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE
+  Clean: SyscallStatus, BlockReason, ReceiveObservation, and one
+  constructor.  The separation is correct — this is the boundary
+  between the hardware/OS layer and service semantics.
+
+CORRECTNESS
+  ReceiveObservation carries both a status field AND a payload.  When
+  status == None the payload should be zero/ignored, but no invariant
+  enforces this; callers can construct inconsistent observations.
+
+SIMPLICITY
+  Good.  The file is small and focused.
+
+SAFETY
+  'received_handle_slot' and 'received_handle_count' are present in
+  every ReceiveObservation but are zero-initialised everywhere they
+  appear.  They represent a capability-passing channel that is not yet
+  used.  This is fine as scaffolding but should not silently drift into
+  required semantics without a corresponding capability model.
+
+RECOMMENDATIONS
+  LOW  – Add a comment explaining that received_handle_* fields are
+         reserved for future capability passing and must be ignored by
+         all current services.
+  LOW  – Consider a "checked constructor" that enforces payload_len ≤ 4.
+         Currently payload_len is usize, so a value of 5 is possible
+         and would silently be treated as 4 by downstream consumers.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: service_effect.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE
+  This is the central contract file.  The Effect struct unifies all
+  possible service responses into a single flat structure discriminated
+  by EffectKind.  This is intentional for bootstrap but has two
+  structural issues:
+
+  (a) A single Effect can only be one of {None, Reply, Send}.  There is
+      no way to express "reply to caller AND send to another service"
+      in one step.  This means any service that needs to do both must
+      either:
+        – push the dual-action into the kernel dispatch loop (correct),
+        – or chain two calls from the service layer (a violation of P1).
+      Currently kv_service emits a Send and relies on the kernel to
+      never need to reply to the original caller in the same step.
+      This assumption holds now but it is invisible in the type system.
+
+  (b) The event sub-system (event_count, event0–event3) is packed
+      directly into the Effect struct.  Events are observability
+      metadata (for serial buffering/rejection tracking), not service
+      intent.  Mixing them violates the single-responsibility principle
+      for the Effect type.  An Effect is supposed to describe "what the
+      service wants done"; an event annotation says "what the kernel
+      observed while doing it."
+
+CORRECTNESS
+  effect_with_event silently drops events beyond the 4-event capacity
+  (returns the original effect unchanged).  This is safe but silent.
+  A lost event is indistinguishable from a not-yet-occurred event.
+
+  The accessor function family (effect_has_reply, effect_has_send,
+  effect_reply_status, etc.) is correct but creates a hidden
+  convention: callers must first call effect_has_X before reading
+  the corresponding payload fields, or they get garbage.  There is no
+  static enforcement of this ordering.
+
+SIMPLICITY
+  The constructor functions (effect_none, effect_reply, effect_send)
+  require manually threading unused fields as zeroes.  This is
+  noise-heavy but acceptable given language constraints.
+
+  effect_with_event is 4 nearly-identical branches.  If the language
+  ever gains conditional array write it collapses to one line.
+
+SAFETY
+  No memory safety issues in isolation.  The flat layout means an
+  Effect is always fully initialised; there is no uninitialised-field
+  risk.
+
+RECOMMENDATIONS
+  HIGH – Separate events from the Effect contract.  Define a
+         KernelObservation or EventBatch type that lives alongside
+         (not inside) Effect.  `kernel_dispatch_step` can produce
+         both: (Effect, EventBatch).  This keeps P2 — effects describe
+         service intent — clean.
+
+  MED  – Document the "single-action limitation" of Effect explicitly.
+         The expectation that a service emits at most one observable
+         action per message must be a written invariant, not an implicit
+         assumption.
+
+  LOW  – Rename send_source_pid to send_initiator_pid or
+         send_on_behalf_of_pid.  The current name is ambiguous: the
+         "source" of a synthetic send is the kernel composing services,
+         not the original caller.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: shell_service.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE ⚠️ VIOLATION OF P7, P10, P11
+
+  shell_service.mc contains:
+
+    const LOG_ENDPOINT_ID: u32 = 12
+    const KV_ENDPOINT_ID: u32 = 13
+
+  and uses them directly in effect_send return values.
+
+  This violates P10 (shell knows only command decoding) and P7
+  (dependencies flow downward: kernel → paths → services, never
+  sideways).  Shell should not know the numeric identity of LOG or KV
+  endpoints.  Endpoint IDs are a routing concern owned by the
+  kernel/dispatch layer, not by services.
+
+  The correct model is: shell_handle returns an Effect whose
+  send_endpoint_id is drawn from the message context or from a
+  configuration token passed in at service initialisation, not from
+  a hardcoded constant defined next to ASCII byte codes.
+
+  One clean approach: add log_endpoint_id and kv_endpoint_id fields
+  to ShellServiceState, initialised by the caller (boot/path), and
+  never hardcoded inside the service.  The service stays decoupled;
+  the wiring is explicit in the layer that owns topology.
+
+CORRECTNESS
+  The command protocol uses raw byte values (69='E', 67='C', 76='L',
+  etc.) compared directly.  The intent (ASCII) is invisible without
+  a comment or named constant.  This is not a bug but it makes the
+  code fragile under future command additions.
+
+  handle() returns invalid_effect() when payload_len != 4 or
+  owner_pid == 0.  The payload_len == 4 guard is correct for the
+  current 4-byte fixed protocol, but it means the shell categorically
+  rejects partial payloads.  If a future command uses fewer bytes
+  this becomes a silent breakage.
+
+  There is a subtle symmetry break: LA (log-append) command sets
+  payload[3] == CMD_BANG as a required marker.  LT (log-tail) requires
+  payload[2] and payload[3] both == CMD_BANG.  The validation patterns
+  are inconsistent and magic values should be named.
+
+SIMPLICITY
+  debug_request() is a trivial boolean predicate that is never called
+  from anywhere visible in this review.  If it is only a test hook,
+  that should be documented.
+
+RECOMMENDATIONS
+  HIGH – Remove LOG_ENDPOINT_ID and KV_ENDPOINT_ID constants from
+         shell_service.mc.  Inject them as fields of ShellServiceState
+         (set by boot.mc or serial_shell_path.mc at initialisation).
+         This is the minimal change that restores P10 and P7.
+
+  MED  – Replace magic byte values with named ASCII constants or an
+         enum.  CMD_E = 69 // 'E' at minimum; ideally use a char
+         literal if the language supports it.
+
+  MED  – Rationalise the CMD_BANG marker convention.  If '!' is
+         "end of arguments", define it once and document the calling
+         convention.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: log_service.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE
+  log_service is mostly correct as a pure state machine.
+
+  The handle() function signature takes *LogServiceState (mutable
+  pointer) and returns an Effect.  This is functionally equivalent to
+  (State, Msg) → (NewState, Effect) but the mutation is hidden inside
+  the callee rather than returned explicitly.  The visible contract at
+  the call site is:
+
+    effect = log_service.handle(&current.log_state, msg)
+    // current.log_state is now silently mutated
+
+  For shell_service.handle() the signature is:
+    handle(state: ShellServiceState, msg: Message) Effect
+
+  This inconsistency between services makes the overall model harder
+  to reason about.  Shell is purely functional; log and kv are
+  mutating-pointer style.  A reader must check the signature to know
+  whether a handle() call produces side effects on state.
+
+  The helper log_on_append takes a ReceiveObservation directly when it
+  should work on a service_effect.Message (the internal currency).
+  This leaks the syscall layer into a function that should only see
+  the service abstraction.
+
+  from_receive_observation is defined in both log_service.mc and
+  kv_service.mc identically.  It belongs in service_effect.mc or
+  syscall.mc, not duplicated in two services.
+
+CORRECTNESS
+  log_on_append ignores the append byte when the buffer is full and
+  returns the unchanged state silently.  This is a capacity-limit
+  behaviour that could mask data loss.  The caller gets no indication
+  that the append was dropped.  An explicit Exhausted reply from
+  handle() would make this visible.
+
+  The buffer capacity is 4 elements (LOG_BUFFER_CAPACITY = 4).
+  There is no eviction / ring buffer behaviour; a full log simply
+  stops accepting writes.  When compiling to a real kernel this needs
+  a defined overflow policy.
+
+SAFETY
+  The pointer-based mutation pattern works correctly here because the
+  caller (boot.mc) immediately re-integrates current.log_state after
+  the call.  However the correctness depends on the call sequence
+  never being re-ordered, which is fragile and undocumented.
+
+RECOMMENDATIONS
+  HIGH – Make log_service.handle pure: return (LogServiceState, Effect)
+         instead of mutating via pointer.  This matches shell_service's
+         convention and makes all services uniform.  boot.mc is
+         responsible for integrating the new state (it already does
+         this for kv_service via manual copy-back).
+
+  MED  – Move from_receive_observation to service_effect.mc or syscall.mc
+         and remove the duplicates.
+
+  MED  – log_on_append should not take a ReceiveObservation; it should
+         take the byte to append (u8 or the relevant Message field).
+         This removes the syscall dependency from a pure state
+         transition function.
+
+  LOW  – Document the full-buffer drop behaviour.  Either add a return
+         value for overflow or add a comment acknowledging the
+         intentional silent drop.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: kv_service.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE ⚠️ CRITICAL VIOLATION OF P1, P7, P10, P11
+
+  kv_service.mc contains:
+
+    const LOG_ENDPOINT_ID: u32 = 12
+    const KV_WRITE_LOG_MARKER: u8 = 75
+
+  and uses them in handle():
+
+    return service_effect.effect_send(current.owner_pid, LOG_ENDPOINT_ID,
+                                      1, write_log_payload())
+
+  This is the most significant architectural violation in the codebase.
+  The KV service is directly coupled to the LOG service by numeric
+  endpoint ID.  A service must not know the endpoint identity of another
+  service (P7, P10).
+
+  Furthermore, the cross-service fan-out (KV write → log event) is
+  composition logic that belongs in the kernel dispatch layer or in a
+  dedicated path (P11).  The KV service should say "I accepted the
+  write" via a plain Reply(Ok), and the kernel composition layer should
+  additionally route to LOG if that policy is desired.
+
+  As implemented, if you want to change whether KV writes are logged,
+  you must modify the KV service itself — which is wrong.  Logging
+  policy is composition, not storage semantics.
+
+  As a further consequence, the current handle() has three cases
+  (payload_len == 0 → error, payload_len >= 2 → set→send-to-log,
+  payload_len == 1 → get).  The routing to LOG is interleaved with
+  the set/get discriminator, making both harder to read.
+
+CORRECTNESS
+  kv_on_set: the update-existing-key checks use `state.count > N` as
+  the guard for slot N.  For N=3, `state.count > 3` means count ≥ 4,
+  i.e. a full store.  This guard is correct but counterintuitive —
+  "count > slot index" rather than "slot index < count".  The two are
+  logically equivalent, but the latter form is more natural.
+
+  Capacity: once the store is full (count == 4), a SET with a new key
+  is silently dropped and the state is returned unchanged.  The caller
+  receives a successful-looking send to LOG but no reply.  The original
+  caller never gets a reply at all (the effect is a Send, not a Reply).
+  This is a correctness gap: the caller has sent a message and will
+  block forever waiting for a reply that will never come.  (This is
+  a consequence of the KV service emitting an effect_send when it
+  should emit an effect_reply.)
+
+SIMPLICITY
+  Both kv_on_set and kv_on_get manually unroll the 4-slot iteration.
+  If the language gains indexed array access in a loop, this collapses.
+  For now it is verbose but not wrong.
+
+  write_log_payload() hardcodes byte 75 ('K') as the log marker.  If
+  this is protocol, it should be documented.  If it is arbitrary, use
+  0 and explain it.
+
+RECOMMENDATIONS
+  CRITICAL – Remove LOG_ENDPOINT_ID from kv_service.mc.  Make handle()
+             return effect_reply(Ok, ...) on a successful set/get.  The
+             KV→Log composition belongs in boot.mc's execute_effect or
+             in a dedicated kv_log_path composition layer.
+
+  HIGH     – The handle() set path must return a Reply (or a defined
+             error) so the original caller is not left blocking.  The
+             current Send-only response on set is asymmetric (violates
+             P14).
+
+  MED      – Replace `state.count > N` guards with `N < state.count`
+             for readability.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: serial_service.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE
+  serial_service is the transport layer: buffering, byte validation,
+  reply capture.  It does not know about message semantics.  This is
+  correct per P4.
+
+  The state struct embeds reply fields (reply_status, reply_len,
+  reply_payload) alongside the input buffer.  This means SerialService
+  State is acting as both an input buffer AND an output buffer in one
+  struct.  These two concerns can diverge in lifetime: the input buffer
+  should be cleared after forwarding; the reply buffer should persist
+  until the transport sends it.  serial_clear and serial_clear_reply are
+  separate operations for this reason, but the interplay is subtle.
+
+  serial_forwarded() returns 1 if reply_status != None.  This is a
+  predicate over the reply half of the state being live.  Using the
+  field name "forwarded" for "has a pending reply" is slightly
+  misleading — "has_pending_reply" would be clearer.
+
+CORRECTNESS
+  serial_on_receive: when the input buffer is already full (len ==
+  SERIAL_BUFFER_CAPACITY), additional bytes are silently dropped.
+  There are no checks in serial_on_receive for the case where the
+  observation carries more payload bytes than the buffer can absorb.
+  The first full payload (4 bytes in 4 slots) is correctly bounded,
+  but if the protocol ever allows >4 byte payloads this silently
+  truncates without error.
+
+  serial_on_reply updates the state with a new reply but does NOT
+  check whether there was already a pending reply.  A second reply
+  arriving before the first is consumed would silently overwrite it.
+  This should be a precondition or guarded.
+
+SAFETY
+  No memory issues; all array accesses are bounds-guarded.
+
+RECOMMENDATIONS
+  MED  – Rename serial_forwarded → serial_has_pending_reply.
+  MED  – Guard serial_on_reply against overwriting an unconsumed
+         reply: add a status == None check before overwriting.
+  LOW  – Add a comment documenting the input vs output buffer duality
+         in SerialServiceState.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: serial_shell_event_log.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE ⚠️ MODULE IS EFFECTIVELY DEAD CODE
+
+  serial_shell_event_log.mc defines a ring buffer for 6 event codes
+  (SERIAL_BUFFERED, SERIAL_REJECTED, SHELL_FORWARDED, SHELL_REPLY_OK,
+  SHELL_REPLY_INVALID, SERIAL_CLEARED) plus full ring-buffer logic
+  (push, read by logical index, normalise slot index) and the
+  constants themselves.
+
+  boot.mc:
+    – Does NOT import serial_shell_event_log.
+    – Re-defines all 6 event constants itself (identical numeric
+      values; duplicate definitions).
+    – Embeds events into Effect via effect_with_event instead of
+      into the SerialShellEventLog ring buffer.
+    – Never calls append_effect_events (the function in this module
+      that would bridge from Effect events to the ring buffer).
+
+  The module is therefore a dead letter: it carries correct ring-buffer
+  logic that goes unused, while boot.mc independently reimplements
+  the same event packing inside the Effect struct.
+
+  This represents a design fork that happened during development.  The
+  two approaches are:
+    (A) Events are metadata piggy-backed on Effect (current boot.mc).
+    (B) Events are tracked in a separate log structure alongside state
+        (serial_shell_event_log.mc intent).
+
+  Option B is architecturally cleaner (see recommendation in
+  service_effect.mc section above).  The ring buffer logic here is
+  solid and should be the authoritative implementation once events are
+  separated from Effect.
+
+CORRECTNESS
+  The ring buffer logic is correct: normalize_slot_index performs
+  modular reduction via a while loop (as opposed to a '%' operator,
+  which may not be available in the language at this level).
+
+  event_log_entry returns 0 for out-of-bounds logical indices.  This
+  is safe but silent; the caller cannot distinguish "event code 0" from
+  "no event at this index."  Using an Option type or a sentinel would
+  be clearer.
+
+RECOMMENDATIONS
+  HIGH – Decide definitively on approach A or B for events:
+         (A) Freeze events inside Effect — then delete this file and
+             remove the duplicate constants from boot.mc.
+         (B) Separate events from Effect — then use this file's ring
+             buffer as the canonical event log, remove the event_*
+             fields from Effect, and have boot.mc append to a
+             SerialShellEventLog alongside state updates.
+         The current state (both exist, neither wins) is a maintenance
+         hazard.
+
+  HIGH – Remove the 6 duplicate event constants from boot.mc once the
+         above decision is made.  Duplicate constants with identical
+         values will diverge under future renaming.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: serial_shell_path.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE
+  serial_shell_path is the wiring layer connecting serial transport to
+  the shell service.  This is the right structural idea per P5.
+
+  However, serial_shell_step contains a policy violation (P6):
+
+    if service_effect.effect_has_send(shell_effect) == 0 {
+        invalid_effect = shell_service.invalid_effect()
+        *serial = serial_service.serial_on_reply(...)
+        return invalid_effect
+    }
+
+  This path intercepts a shell Effect that is not a Send (e.g., a
+  Reply or None) and substitutes an InvalidArgument effect.  This is
+  early interpretation: the path layer is deciding that "shell returned
+  non-Send" is an error, when in reality:
+    – A Reply from shell is legitimate (echo command returns directly).
+    – A None from shell might be valid in future.
+    – Only the kernel dispatch layer should adjudicate what to do with
+      a Reply versus a Send emerging from shell.
+
+  The path should pass the shell_effect upward untouched for both
+  branches.  If a Reply should also set serial's pending reply, that
+  can be done by the path without interpreting it as invalid.
+
+  build_reply_observation is a local bridging helper that reconstructs
+  a ReceiveObservation from an Effect.  The round-trip
+  Effect → ReceiveObservation suggests that a lower-level message
+  representation (Message) should flow end-to-end rather than being
+  lost and rebuilt.
+
+CORRECTNESS
+  path_step correctly copies the states before and after
+  serial_shell_step, then writes back the composite SerialShellPathState.
+  The copy-write-back pattern is consistent.
+
+  serial_shell_step passes `current_shell` to shell_service.handle but
+  then sets `updated_shell = current_shell` — no change is captured
+  from handle because shell_service.handle takes its state by value and
+  is stateless (shell has no mutable state in the current model).  This
+  is correct but the assignment `updated_shell = current_shell` and the
+  subsequent `*shell = updated_shell` are no-ops and add noise.
+
+RECOMMENDATIONS
+  HIGH – Remove the `effect_has_send == 0` early-exit in
+         serial_shell_step.  The path should forward all effects
+         upward.  If the kernel needs to convert a Reply from shell
+         into a serial_on_reply call, that conversion belongs in
+         boot.mc's execute_effect or kernel_dispatch_step, not here.
+
+  MED  – Remove the no-op `updated_shell = current_shell; *shell =
+         updated_shell` sequence.  It is dead code given that
+         shell_service.handle is stateless.
+
+  MED  – Replace build_reply_observation with a direct Message pass
+         if the downstream callee (serial_on_reply) can be updated to
+         accept a service_effect.Message.  The observation round-trip
+         is an abstraction leak.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: boot.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE
+  boot.mc is the kernel dispatch nucleus.  It contains:
+    – KernelBootState (composite of path, log, and kv states)
+    – kernel_init()
+    – kernel_dispatch_message() — route by endpoint_id to a service
+    – execute_effect() — recursively chase Send effects
+    – kernel_dispatch_step() — entry point from the observation stream
+    – debug_boot_routed()
+
+  The overall shape is correct: there is one place (this file) that
+  routes messages and executes effects (P3).
+
+  However, kernel_dispatch_step has a large serial-specific block:
+
+    if observation.endpoint_id == SERIAL_ENDPOINT_ID {
+        // manually unwrap serial_state from path_state
+        // call serial_on_reply
+        // reconstruct KernelBootState
+        // annotate Effect with serial event codes
+    }
+
+  This block is 30+ lines of endpoint-specific framing logic embedded
+  inside the kernel's primary dispatch function.  It violates P4:
+  transport concerns (serial reply emission, event annotation) are
+  mixed into the kernel dispatch layer.
+
+  The correct home for serial reply injection is either:
+    (a) returned as part of the path step result, or
+    (b) a post-dispatch hook scoped to the serial-shell path, called
+        from kernel_dispatch_step without embedding the logic inline.
+
+  A related issue: boot.mc imports serial_service directly and
+  accesses the internal serial_state field of path_state by structural
+  name (current.path_state.serial_state).  This breaks encapsulation
+  of SerialShellPathState in serial_shell_path.mc.
+
+CORRECTNESS ⚠️ LOG STATE MUTATION FRAGILITY
+
+  In kernel_dispatch_message:
+
+    current: KernelBootState = *state
+    ...
+    if msg.endpoint_id == LOG_ENDPOINT_ID {
+        effect = log_service.handle(&current.log_state, msg)
+        *state = KernelBootState{ ..., log_state: current.log_state, ... }
+        return effect
+    }
+
+  log_service.handle mutates current.log_state via pointer, then the
+  caller writes current.log_state back into *state.  This works
+  correctly as long as the pointer to current.log_state remains valid
+  and the write-back follows the mutation.  The correctness is fragile:
+  if the two lines are ever separated, reordered, or if a future
+  refactor changes handle() to not mutate, the log state silently stops
+  persisting.  The purely functional handle() pattern (return new
+  state) eliminates this fragility.
+
+CORRECTNESS ⚠️ CONSTANT DUPLICATION
+
+  boot.mc defines:
+    const EVENT_SERIAL_BUFFERED: u32 = 1
+    const EVENT_SERIAL_REJECTED: u32 = 2
+    const EVENT_SHELL_FORWARDED: u32 = 3
+    const EVENT_SHELL_REPLY_OK: u32 = 4
+    const EVENT_SHELL_REPLY_INVALID: u32 = 5
+    const EVENT_SERIAL_CLEARED: u32 = 6
+
+  These are identical to the constants in serial_shell_event_log.mc.
+  If either set is changed independently, event codes will diverge
+  silently.
+
+CORRECTNESS ⚠️ execute_effect RECURSION DEPTH
+
+  execute_effect is a recursive function that chases Send effects up to
+  MAX_EFFECT_CHAIN_DEPTH (8).  At depth 8 it returns an Exhausted
+  reply.  The recursion is over the effect chain, not over message
+  fanout, so the depth is bounded and predictable.  However, returning
+  an Exhausted reply to the ORIGINAL caller (who did not request an
+  Exhausted) conflates "kernel resource limit hit" with "your request
+  produced an error."  The original caller cannot distinguish between
+  their own argument being invalid and an internal chain limit being
+  hit.  A kernel-internal error path (separate from the public
+  SyscallStatus codes seen by userspace) would be cleaner.
+
+SIMPLICITY
+  kernel_dispatch_message body has three endpoint-specific branches
+  followed by a default.  This is the correct shape for a dispatch
+  table.  As services grow, this will become a lookup table rather than
+  N sequential if-blocks.
+
+  kernel_init() constructs the full initial state in one expression.
+  This is correct but deeply nested; it would benefit from named
+  intermediate values (serial_state, shell_state, path_state) that are
+  then composed into KernelBootState.
+
+RECOMMENDATIONS
+  HIGH – Extract the serial-specific post-dispatch logic from
+         kernel_dispatch_step into a helper (e.g.
+         serial_path_post_dispatch) and call it from dispatch_step.
+         This keeps the serial framing concern bounded and decoupled
+         from the generic kernel dispatch loop.
+
+  HIGH – Make log_service.handle and kv_service.handle return their
+         new state explicitly (value return), removing the mutable-
+         pointer mutation model.  This makes boot.mc's state threading
+         uniform and eliminates the fragile pointer-then-writeback
+         pattern.
+
+  HIGH – Remove duplicate event constants from boot.mc; import them
+         from serial_shell_event_log.mc (or from whichever module
+         becomes the canonical event owner after the A/B decision).
+
+  HIGH – Stop accessing path_state.serial_state directly in boot.mc.
+         serial_shell_path.mc should expose the operations boot.mc
+         needs (e.g., path_inject_reply, path_serial_reply_status) so
+         that boot.mc does not reach into the internals of the path
+         state.
+
+  MED  – Replace execute_effect's depth-limit Exhausted reply with a
+         kernel-internal error signal that does not surface as a user-
+         visible SyscallStatus.  Or document clearly that Exhausted is
+         a valid userspace-observable error for chains that loop.
+
+
+═══════════════════════════════════════════════════════════════════
+FILE: main.mc
+═══════════════════════════════════════════════════════════════════
+
+DESIGN & ARCHITECTURE
+  main.mc is the integration smoke test / entry point.  It exercises
+  the LA (log-append), KS (kv-set), KG (kv-get), and LT (log-tail)
+  commands end-to-end and validates specific reply payloads.
+
+  This is the right place for probe-level integration logic.  The file
+  does not reach into service internals except for one access:
+
+    service_effect.effect_reply_payload_len(effect) !=
+      log_service.debug_retained_len(state.log_state)
+
+  This cross-checks the reply payload length against the log service's
+  internal retained length, which is a reasonable bootstrap assertion
+  given the absence of a richer testing framework.
+
+CORRECTNESS
+  SERIAL_ENDPOINT_ID is redefined in main.mc as 10, identical to
+  boot.mc's constant.  This is another duplicate constant.
+
+  The make_observation helper exists but make_serial_command is the
+  only constructor actually used.  make_observation is dead code in
+  this file.
+
+  The test sequence uses hardcoded magic byte values (76, 65, 77, 33,
+  75, 83, 5, 42, ...).  These are opaque bytes that correspond to the
+  ASCII/protocol encoding of commands.  Tracing what each
+  make_serial_command call does requires mentally decoding each byte
+  against shell_service.mc constants.  Integration test readability
+  would benefit from named command builders.
+
+RECOMMENDATIONS
+  MED  – Import and use boot.SERIAL_ENDPOINT_ID rather than redefining
+         it locally.
+  LOW  – Add named wrappers for test commands (e.g.,
+         make_log_append_cmd, make_kv_set_cmd) so the integration test
+         sequence reads as protocol intent, not raw bytes.
+  LOW  – Remove or use make_observation (currently dead code).
+
+
+═══════════════════════════════════════════════════════════════════
+CROSS-CUTTING CONCERNS
+═══════════════════════════════════════════════════════════════════
+
+1. INCONSISTENT handle() SIGNATURES
+
+   shell_service.handle  : (State value,   Message) → Effect
+   log_service.handle    : (*State pointer, Message) → Effect  [also mutates state]
+   kv_service.handle     : (*State pointer, Message) → Effect  [also mutates state]
+
+   All three should have the same shape: (State value, Message) →
+   (State, Effect).  The current mix means callers must treat each
+   service differently to thread state correctly.
+
+2. DUPLICATED from_receive_observation
+
+   Defined identically in both log_service.mc and kv_service.mc.
+   Should live in exactly one place: service_effect.mc or syscall.mc.
+
+3. DUPLICATED ENDPOINT ID CONSTANTS
+
+   LOG_ENDPOINT_ID and KV_ENDPOINT_ID appear in:
+     – boot.mc (canonical)
+     – shell_service.mc (should not exist here)
+     – kv_service.mc (should not exist here)
+
+   SERIAL_ENDPOINT_ID appears in:
+     – boot.mc
+     – main.mc
+
+   All non-canonical duplicates should be removed; services should
+   receive endpoint IDs via initialisation rather than embedding them.
+
+4. DUPLICATED EVENT CONSTANTS
+
+   The 6 EVENT_* constants are defined in both boot.mc and
+   serial_shell_event_log.mc.  One definition must be the owner; the
+   other must import.
+
+5. THE EFFECT STRUCT IS OVER-EXTENDED
+
+   EffectKind has three values (None, Reply, Send).  The struct has
+   grown to carry events alongside these, tangling observability with
+   intent.  The canonical Effect contract should be locked to service
+   intent only; events belong in a parallel KernelObservation type.
+
+6. NO CAPACITY OVERFLOW VISIBILITY
+
+   Three services (log, kv, serial) silently drop data when at
+   capacity.  In each case the caller (or an upstream consumer) has no
+   indication that a write was dropped.  This is intentional for a
+   bootstrap kernel, but the overflow policy should be explicit (either
+   a dropped write returning an error reply, or a documented guarantee
+   that capacity is never exhausted in the expected workload).
+
+
+═══════════════════════════════════════════════════════════════════
+PRIORITISED RECOMMENDATION SUMMARY
+═══════════════════════════════════════════════════════════════════
+
+CRITICAL — Correctness / Architectural Violations
+──────────────────────────────────────────────────
+C1. Remove LOG_ENDPOINT_ID from kv_service.mc.
+    kv_service.handle() should return effect_reply(Ok) on set; the
+    KV→Log composition belongs in boot.mc's execute_effect or a new
+    kv_log_path wiring layer.  (Violated P1, P7, P10, P11, P14)
+
+C2. Remove LOG_ENDPOINT_ID and KV_ENDPOINT_ID from shell_service.mc.
+    Inject routing endpoint IDs into ShellServiceState at init time.
+    (Violated P7, P10)
+
+C3. Remove the effect_has_send == 0 early-exit from serial_shell_path.mc.
+    Paths must not substitute effects; all shell effects flow upward
+    untouched.  (Violated P6, P5)
+
+C4. Extract the serial-specific framing block from kernel_dispatch_step
+    in boot.mc.  Transport concerns (serial reply injection, event
+    annotation) must not be embedded in the generic kernel dispatch
+    function.  (Violated P4)
+
+HIGH — Design Consistency
+─────────────────────────
+H1. Unify handle() signatures across all services to the pure form:
+    (State, Message) → (State, Effect).  Remove pointer mutation from
+    log_service and kv_service.  This eliminates the fragile
+    pointer-then-writeback pattern in boot.mc.
+
+H2. Resolve the event dualism (A vs B decision):
+    Either keep events inside Effect and delete serial_shell_event_log.mc
+    and the duplicate constants in boot.mc; or extract events from
+    Effect into a KernelObservation type and use the ring buffer in
+    serial_shell_event_log.mc as the canonical store.  Do not leave
+    both mechanisms alive.
+
+H3. Consolidate all endpoint ID constants in boot.mc (or a dedicated
+    endpoints.mc if the set grows).  Remove all copies from service
+    files.  Remove the redefinition in main.mc.
+
+H4. Expose shell_inject_reply and serial path accessors from
+    serial_shell_path.mc so boot.mc stops reaching into
+    path_state.serial_state directly.
+
+MEDIUM — Simplicity / Maintainability
+──────────────────────────────────────
+M1. Move from_receive_observation to service_effect.mc and remove the
+    two duplicates.
+
+M2. Remove the no-op updated_shell lines from serial_shell_step.
+
+M3. Replace magic byte values in shell_service.mc with ASCII char
+    constants or an enum.  At minimum add comments (e.g. CMD_E = 69 // 'E').
+
+M4. Replace make_serial_command call sites in main.mc with named
+    command builders that encode protocol intent.
+
+M5. Update kv_on_set guard style from `state.count > N` to `N < state.count`
+    for clarity.
+
+LOW — Observability / Documentation
+─────────────────────────────────────
+L1. Document the silent capacity-overflow policy in log_service,
+    kv_service, and serial_service.  Either fix or explicitly accept.
+
+L2. Add a comment to ReceiveObservation explaining that
+    received_handle_* are reserved scaffolding (not yet active).
+
+L3. Rename serial_forwarded → serial_has_pending_reply.
+
+L4. Rename ipc.mc to something that matches its actual scope
+    (e.g., primitives.mc or zeroutils.mc) or absorb zero_payload
+    into service_effect.mc.
+
+L5. Document MAX_EFFECT_CHAIN_DEPTH = 8 rationale and what
+    Exhausted means to a userspace caller versus a kernel internal
+    chain limit breach.
+
+
+═══════════════════════════════════════════════════════════════════
+OVERALL ASSESSMENT
+═══════════════════════════════════════════════════════════════════
+
+The codebase has a sound skeleton: the Effect type exists, the kernel
+dispatch loop is in one place (boot.mc), services are small, and the
+separation between serial transport and command semantics is visible.
+
+The two most damaging active violations are:
+
+  1. Services (kv_service, shell_service) embed routing topology
+     (endpoint IDs) and thereby couple themselves to each other.
+     This makes the services neither closed worlds nor composable.
+
+  2. The path layer (serial_shell_path) interprets effects early,
+     making it a hidden policy node rather than a pure wiring layer.
+
+When these are corrected — endpoint IDs injected at init, effects
+flowing upward untouched, KV→Log composition done in the kernel —
+the system will satisfy the "Services decide. The kernel does.
+Paths connect. Transport carries." invariant cleanly.
+
+The next recommended step after those fixes is: define the canonical
+Effect contract in final form (as suggested in the brief), fix the
+event dualism, and make all handle() signatures uniform.  That will
+stabilise the entire call surface and make each additional service
+trivially composable.

@@ -3,7 +3,7 @@ Phase 153 -- Service Composition Shape Audit
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -11,11 +11,32 @@ Continue from the planned Phase 152 controlled-variation step by measuring
 whether the current services compose honestly through explicit owner-local
 glue or are starting to accumulate framework-like translation pressure.
 
-This document is a repository execution plan, not a closeout note.
+This document records the landed Phase 153 slice.
 It defines one bounded composition-audit phase over the admitted interactive
 service slice and its chosen Phase 152 variation.
 It does not claim a broker, orchestration framework, dynamic routing, or a
 general service platform.
+
+Phase result
+------------
+Phase 153 is complete as one bounded service-composition audit over the reset-lane kernel path.
+
+The landed repository slice now includes:
+
+- one real compact shell-command route in `kernel/` that reaches `log_service`
+  and `kv_service` through `serial_shell_path` rather than stopping at shell-
+  local echo behavior
+- one explicit bounded key-value-write observation into `log_service` that
+  keeps the only two-service follow-through visible without introducing a
+  middleware layer
+- one updated real kernel image path in `kernel/src/main.mc` that exercises
+  composition through serial-shell ingress instead of bypassing it with direct
+  service-only probes
+- one focused reset-lane system regression proving a mixed shell workflow over
+  the real build-and-run path
+- one explicit conclusion: the current reset-lane composition pressure is
+  still handled honestly by owner-local glue, so no framework or compiler
+  expansion is justified in this phase
 
 Relationship to companion notes
 -------------------------------
@@ -81,52 +102,102 @@ Why this is the right next step
 - It creates a cleaner handoff into identity and temporal work by making the
   composition boundary visible first.
 
-Required implementation surfaces
---------------------------------
-The owning implementation surfaces for this phase are:
+Landed implementation surfaces
+------------------------------
+The owning implementation surfaces for the landed slice are:
 
 1. `docs/plan/active/phase153_service_composition_shape_audit.txt`
-   - publish the canonical Phase 153 execution note
+  - records the concrete Phase 153 conclusion and keeps the no-framework rule explicit
 
-2. `docs/plan/active/phase152_pattern_stability_under_one_controlled_variation.txt`
-   - provide the variation context used to judge composition honesty
+2. `kernel/src/shell_service.mc`
+  - now owns the fixed four-byte shell command classification for echo,
+    log append, log tail, kv set, and kv get
 
-3. `kernel/src/boot.mc` and `kernel/src/serial_shell_path.mc`
-   - the primary composition surfaces for this audit; `boot.mc` exposes the
-     flat endpoint-id dispatch and `serial_shell_path.mc` exposes the explicit
-     serial→shell forwarding path
-   - first question: does the flat dispatch in `kernel_dispatch_step` already
-     encode a hidden routing convention or is it the honest minimum?
+3. `kernel/src/serial_shell_path.mc`
+  - now owns the explicit shell-to-log and shell-to-kv handoff plus the
+    bounded kv-write-to-log follow-through
 
-4. `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`,
-   `kernel/src/kv_service.mc`
-   - expose the current request, reply, and service-to-service composition
-     seams inside the reset lane directly
+4. `kernel/src/boot.mc` and `kernel/src/main.mc`
+  - keep the flat endpoint dispatch and image entry explicit while the real
+    mixed workflow now travels through the serial-shell path
 
-5. `kernel/src/main.mc`
-   - keep the image entry explicit and prevent orchestration pressure from
-     being hidden at the root; was 1,706 lines in the old tree, is ~55 lines
-     in the reset lane
+5. `kernel/src/log_service.mc`, `kernel/src/kv_service.mc`, and
+  `kernel/src/serial_shell_event_log.mc`
+  - preserve service-local reply and observation ownership while exposing the
+    one real two-service composition seam
 
-6. `kernel/src/serial_shell_event_log.mc`
-   - the one observability surface in the reset lane; audit whether it
-     introduces cross-service observation coupling or remains locally owned
+6. `tests/smoke/`, `tests/system/`, and `tests/tool/tool_workflow_suite.cpp`
+  - keep the reset-lane composition regression on behavior-first surfaces
 
-7. `tests/tool/tool_workflow_suite.cpp` and `tests/system/`
-   - use the existing kernel reset lane tests as the composition regression
-     baseline; add one focused Phase 153 behavioral test if concrete glue
-     pressure is found
+Composition judgment
+--------------------
+The landed reset-lane inventory now has three concrete composition seams:
 
-Deliverables
-------------
-- one canonical Phase 153 execution note in `docs/plan/active/`
-- one explicit inventory of cross-service glue paths within `kernel/`
-- one classification of composition pressure and one conclusion about whether
-  explicit composition remains sufficient in the reset lane
-- one audit over at least one composition seam in `kernel/` finding either
-  honest owner-local glue or evidence for one minimal primitive
-- one focused behavioral test if concrete repeated glue is found, or an
-  explicit doc note affirming explicit composition if it is not
+1. `serial_service` buffers one bounded ingress frame and hands one fixed
+  shell payload to `shell_service`
+2. `shell_service` classifies one fixed compact command and
+  `serial_shell_path` routes it to `log_service` or `kv_service`
+3. `kv_service` emits one fixed write marker that `serial_shell_path` forwards
+  into `log_service`
+
+This remains explicit owner-local glue, not hidden framework pressure.
+There is one routing seam and one bounded two-service follow-through, but no
+repeated adapter family, generic request algebra, callback table, or broker
+layer. The honest Phase 153 conclusion is therefore to keep explicit
+composition and advance to identity and temporal questions in later phases.
+
+Overarching pattern captured
+----------------------------
+The post-audit runtime correction makes one stronger execution rule explicit:
+
+1. service step inputs should be message-shaped data
+2. service step outputs should be effect-shaped consequences
+3. routing and reply control should come from effect application, not
+  per-service dispatch or result envelopes
+
+In this repository slice, the shell path now follows that model by emitting
+`Reply` or `Send` effects rather than route-kind dispatch structs.
+The same direction remains expected for remaining reset-lane services as
+future phases remove transitional routing and observation shims.
+
+Specific kv correction
+----------------------
+The key-value owner had briefly reintroduced the same structural mistake in a
+different form by defining service-local message and effect types plus a
+composite effect shape.
+
+The corrected shape now is:
+
+- `kv_service` consumes shared `Message` values
+- `kv_service` returns shared `Effect` values
+- key-value state mutation happens in service-local state
+- side-effect follow-through (`Send` to log) is explicit in orchestration code
+
+This keeps key-value semantics owner-local while preventing another hidden
+service-specific runtime model from forming.
+
+Kernel-wide recurrence check (Phase 153 follow-through)
+------------------------------------------------------
+Audit across `kernel/src/` found the same mistake family mostly reduced to
+orchestration boundaries:
+
+1. service-level `*Dispatch` and service-level mini-effect systems are now
+  removed from shell and kv owners
+2. top-level `boot.DispatchResult` still combines next-state and reply
+  metadata for call-site convenience and remains a known transitional envelope
+3. syscall-shaped observation adapters remain in orchestration helpers and
+  should continue shrinking as message-shaped edges become dominant
+
+Observability correction (Phase 153 follow-through)
+--------------------------------------------------
+Replay-based tracing was removed from the reset lane.
+
+- event logs now consume event codes emitted by real dispatch effects
+- replay helpers and debug-inference tracing are no longer the source of
+  truth for serial-shell observability
+
+This keeps observability aligned with real execution and avoids parallel
+truth systems that can drift from runtime behavior.
 
 Suggested execution order
 -------------------------
@@ -163,6 +234,17 @@ Exit criteria
 - the focused regression proves build, run, docs, and MIR all expose the same
   Phase 153 boundary
 - compiler and low-level toolchain surfaces remain unchanged in this phase
+
+Outcome
+-------
+- all exit criteria above are now satisfied for the bounded Phase 153 slice
+- the reset-lane kernel now carries a real shell-to-log and shell-to-key-value
+  composition path over the compact four-byte command route
+- the only two-service follow-through remains explicit as one fixed key-value-
+  write observation into `log_service`
+- the composition audit concludes that explicit owner-local glue remains the
+  honest model in this slice, so no broker, framework, or compiler work is
+  admitted here
 
 Non-goals
 ---------

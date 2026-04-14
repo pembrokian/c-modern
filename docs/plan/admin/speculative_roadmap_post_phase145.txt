@@ -395,9 +395,11 @@ Why this band comes next:
   add more surface area.
 
 Phase 153 -- Service Composition Shape Audit
-- Phase 153 should measure whether the post-Phase-152 system still composes
-  through explicit owner-local glue or is starting to justify one tightly
-  bounded primitive.
+- Phase 153 is now concrete as one reset-lane service-composition audit that
+  restores a real shell-to-log-plus-key-value path, keeps the only two-service
+  follow-through explicit as one fixed kv-write observation into `log_service`,
+  and concludes that explicit owner-local glue remains sufficient without a
+  framework or compiler expansion.
 
 Preferred proof points:
 - the rebuilt system removes at least one earlier ad hoc pattern rather than

@@ -77,6 +77,81 @@ The repository now has enough evidence to say all of the following:
 - restart and failure consequences stay explicit in service or init owners
   rather than collapsing into a supervisor model
 
+Phase 153 addendum: message-effect execution shape
+--------------------------------------------------
+The reset-lane follow-through after Phase 153 adds one stricter execution
+shape over the same owner model:
+
+- each service-facing step should consume one explicit message-shaped input
+  and produce one explicit effect-shaped output
+- control flow should live in effect application, not in per-service
+  `*Dispatch` or `*Result` structs
+- shell remains a protocol translator from compact command bytes to explicit
+  effects (`Reply` or `Send`), not a hidden runtime
+- routing integers and synthetic control fields are transitional debt and
+  should be removed as effect-owned composition replaces them
+
+This addendum does not admit a broker, framework, dynamic registry, or
+compiler expansion.
+It narrows execution shape so owner-local composition stays explicit and
+auditable as service count grows.
+
+Anti-pattern to avoid (captured from reset-lane kv and shell cleanup)
+---------------------------------------------------------------------
+Do not reintroduce per-service mini runtimes that duplicate shared execution
+concepts.
+
+The concrete mistakes observed were:
+
+- service-local `Message` and `Effect` definitions that shadow a shared
+  contract
+- service-local `*Dispatch` or `*Result` envelopes that mix state mutation,
+  routing choice, and reply metadata in one type
+- hybrid effect variants such as `ReplyAndEmitLog` that hide sequencing and
+  force service-specific branching in callers
+
+Preferred shape:
+
+- shared `Message`
+- shared `Effect` (`None`, `Reply`, `Send`)
+- service handler mutates service state and returns exactly one shared effect
+
+Observability rule
+------------------
+Trace data must be emitted from real execution effects, not reconstructed by
+replaying service steps with synthetic state and not inferred from `debug_*`
+helpers.
+
+Acceptable pattern:
+
+- services and dispatch owners attach event codes to the shared `Effect`
+- tracing surfaces append those event codes into deterministic logs
+
+Disallowed pattern:
+
+- separate replay functions that rerun service logic only to infer events
+- logic that treats debug helpers as authoritative runtime truth
+
+If one step needs multiple consequences, composition should remain explicit in
+the caller by applying an emitted effect and then issuing the next explicit
+effect, rather than by inventing a service-local composite effect variant.
+
+Kernel reset-lane recurrence audit (current)
+-------------------------------------------
+After applying the shell and key-value cleanup, the remaining recurrence in
+`kernel/src/` is mostly at orchestration boundaries rather than in service
+owners:
+
+- `boot.DispatchResult` still mixes next-state and transport reply metadata
+  for top-level call-site convenience
+- syscall-shaped observation builders still exist in orchestration helpers
+  where service-to-service calls should continue moving toward message-shaped
+  values
+
+Service owners (`shell_service`, `kv_service`) now use the shared message-plus-
+effect contract and no longer define service-local dispatch enums or
+service-local effect systems.
+
 Canonical minimal service shape
 -------------------------------
 The current minimal Veya service shape is:

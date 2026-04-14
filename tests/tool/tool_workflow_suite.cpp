@@ -1086,6 +1086,36 @@ void TestKernelResetLaneKvRoundtripProjectRuns(const std::filesystem::path& sour
     }
 }
 
+void TestKernelResetLaneServiceCompositionProjectRuns(const std::filesystem::path& source_root,
+                                                      const std::filesystem::path& binary_root,
+                                                      const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "system" / "kernel_reset_lane_service_composition";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_service_composition_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_service_composition_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_service_composition_build_output.txt",
+                                       "kernel reset lane service composition build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_service_composition_run_output.txt",
+                                                             "kernel reset lane service composition run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane service composition project should return 0, got:\n" + run_output);
+    }
+}
+
 void TestKernelResetLaneBootProjectRuns(const std::filesystem::path& source_root,
                                         const std::filesystem::path& binary_root,
                                         const std::filesystem::path& mc_path) {
@@ -1180,6 +1210,7 @@ void RunWorkflowToolSuite(const std::filesystem::path& source_root,
     TestKernelResetLaneRetainedStateProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLaneObservabilityProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLaneKvRoundtripProjectRuns(source_root, suite_root, mc_path);
+    TestKernelResetLaneServiceCompositionProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLaneBootProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLaneImageProjectRuns(source_root, suite_root, mc_path);
 }
