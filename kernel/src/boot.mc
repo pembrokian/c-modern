@@ -64,6 +64,9 @@ func kernel_dispatch_message(state: *KernelBootState, msg: service_effect.Messag
             log_payload: [4]u8 = primitives.zero_payload()
             log_payload[0] = KV_WRITE_LOG_MARKER
             log_msg: service_effect.Message = service_effect.message(msg.source_pid, LOG_ENDPOINT_ID, 1, log_payload)
+            // The kv-write log marker is advisory: if the log is full the
+            // Exhausted reply is intentionally discarded here.  The kv reply
+            // is what the caller receives; the marker is for observability only.
             kv_log_result: log_service.LogResult = log_service.handle(current.log_state, log_msg)
             new_log_state = kv_log_result.state
         }

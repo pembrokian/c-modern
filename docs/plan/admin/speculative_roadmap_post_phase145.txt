@@ -409,6 +409,20 @@ Preferred proof points:
 - if the second version is not simpler, the repository records that as a model
   problem rather than hiding it behind more features
 
+Phase 155 -- Temporal Semantics and Backpressure Audit (LANDED)
+- Phase 155 made backpressure explicit across all fixed-capacity services:
+  - `log_service.handle` returns `Exhausted` when the 4-entry buffer is full
+    and an append is requested; state is unchanged on `Exhausted`
+  - `kv_service.handle` returns `Exhausted` when the 4-key store is full
+    and a new key is requested; overwriting an existing key is always `Ok`
+  - the kv-write advisory log marker silently discards its own `Exhausted`
+    reply at the boot dispatcher; the kv caller sees only the kv reply
+- Ordering guarantee stated: `kernel_dispatch_step` is sequential and
+  synchronous; a set on step N is always visible to a get on step N+1
+- No scheduler, async framework, dynamic queue growth, timing API, or
+  compiler surface was opened
+- Validated by `tests/system/kernel_reset_lane_temporal_backpressure/`
+
 What should naturally emerge from this wave
 -------------------------------------------
 If the repository follows this roadmap honestly, the next useful results

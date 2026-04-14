@@ -40,7 +40,6 @@ func kvset(s: KvServiceState, m: service_effect.Message) KvServiceState {
         }
     }
     if s.count >= KV_CAPACITY {
-        // Intentional silent drop: capacity is fixed for bootstrap.
         return s
     }
     next_keys[s.count] = key
@@ -69,6 +68,18 @@ func handle(s: KvServiceState, m: service_effect.Message) KvResult {
         return KvResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     if m.payload_len >= 2 {
+        // Backpressure: new key when full is visible to the caller as Exhausted.
+        // An overwrite of an existing key is always Ok regardless of count.
+        key: u8 = m.payload[0]
+        is_existing: u32 = 0
+        for i in 0..s.count {
+            if s.keys[i] == key {
+                is_existing = 1
+            }
+        }
+        if is_existing == 0 && s.count >= KV_CAPACITY {
+            return KvResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()) }
+        }
         return KvResult{ state: kvset(s, m), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
     }
     return KvResult{ state: s, effect: kvget(s, m) }

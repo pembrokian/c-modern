@@ -29,9 +29,6 @@ func log_append(s: LogServiceState, obs: syscall.ReceiveObservation) LogServiceS
         return s
     }
     if s.len >= LOG_BUFFER_CAPACITY {
-        // Intentional silent drop: buffer is fixed-capacity for bootstrap.
-        // A full buffer returns the state unchanged. The caller receives an
-        // Ok reply from handle() regardless — overflow is not signalled.
         return s
     }
     next_retained: [4]u8 = s.retained
@@ -50,6 +47,10 @@ func log_tail(s: LogServiceState) service_effect.Effect {
 func handle(s: LogServiceState, m: service_effect.Message) LogResult {
     if m.payload_len == 0 {
         return LogResult{ state: s, effect: log_tail(s) }
+    }
+    // Backpressure: full buffer is visible to the caller as Exhausted.
+    if s.len >= LOG_BUFFER_CAPACITY {
+        return LogResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()) }
     }
     new_state: LogServiceState = log_append(s, syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: m.endpoint_id, source_pid: m.source_pid, payload_len: m.payload_len, received_handle_slot: 0, received_handle_count: 0, payload: m.payload })
     return LogResult{ state: new_state, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
