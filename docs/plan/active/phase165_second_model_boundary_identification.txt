@@ -1,0 +1,241 @@
+Phase 165 -- Second Model Boundary Identification
+==================================================
+
+Status
+------
+COMPLETE
+
+Purpose
+-------
+Continue the evidence-driven boundary-identification method established in
+Phase 160 by finding the next repeated problem that the current service and
+kernel model cannot solve cleanly without new rules.
+
+Phase 160 identified the per-send delivery witness gap and Phase 161 fixed it.
+The system has grown meaningfully since then: Phase 162 cleaned orchestration
+impurities, Phase 163 closed constant linkage and aggregate const usability,
+and Phase 164 resolved the struct embedding language question.
+
+Enough real evidence has now accumulated across those phases to name the
+second repeated model failure honestly.
+
+This phase must name the boundary before any expansion.
+It does not implement anything.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase160_first_model_boundary_identification.txt`
+- `docs/plan/active/phase161_per_send_delivery_witness.txt`
+- `docs/plan/active/phase162_orchestration_cleanup.txt`
+- `docs/plan/active/phase163_bootstrap_constant_linkage_and_aggregate_const_follow_through.txt`
+- `docs/plan/active/phase164_struct_embedding_pressure_audit_and_conditional_admission.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 160 applied the boundary-identification method once and produced one
+  named missing concept (per-send delivery witness) that Phase 161 then
+  implemented narrowly.
+- The same method must now be applied again from a larger evidence base.
+- The risk on one side is declaring the boundary in advance before measuring
+  the actual evidence — which would skip the method and jump to a conclusion.
+- The risk on the other side is indefinitely deferring the naming and letting
+  structural friction grow without acknowledgment.
+- A credible candidate that has appeared across multiple recent phases is
+  service-to-service communication structure: the current dispatch model uses
+  explicit named dispatch functions per service, which Phase 162 established
+  as the right shape, but the topology of which services may call which is
+  still implicit and encoded in control flow rather than named as a concept.
+- Other candidates include: payload size pressure (4-byte wire limit visible
+  since Phase 141), the static vs. growable service directory question
+  (appearing in Phase 170's horizon), and init-owned orchestration legibility
+  as the service set grows.
+- This phase must weigh those candidates against real evidence rather than
+  asserting one by taste.
+
+Problem being solved
+--------------------
+- The repository now has enough post-Phase-160 accumulated evidence to name a
+  second repeated model failure.
+- Without one explicit naming phase, later expansions could be grounded in
+  speculation or taste rather than observed repeated strain.
+- The second boundary might be the same category as the first (a runtime
+  dispatcher policy limitation expressible inside the current model) or it
+  might require a narrower language or kernel-model rule change.
+- Without naming it first, the repository cannot choose the correct repair.
+
+Core rule
+---------
+- Measure from real evidence observed in Phases 161 through 164.
+- Name the boundary as a repeated problem, not as a desired feature.
+- Classify the narrowest plausible next expansion axis without implementing it.
+- If no second genuine boundary exists yet, say so explicitly and treat the
+  current model as sufficient until more evidence accumulates.
+- Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces
+  closed unless the evidence has already proved a narrow owning-layer gap.
+
+Chosen slice for this phase
+---------------------------
+1. one canonical Phase 165 execution note defining the second boundary-
+   identification synthesis
+2. one audit over the post-Phase-160 evidence: orchestration cleanup, constant
+   linkage, embedding decision, and any accumulated dispatch friction
+3. one explicit statement of the second repeated model problem, or one
+   explicit "no second boundary yet" conclusion
+4. one classification of the narrowest plausible next expansion axis,
+   recorded but not yet admitted
+
+Why this is the right next step
+-------------------------------
+- It applies the Phase 160 method a second time with more evidence available.
+- It prevents Phase 166 and later expansions from being grounded in taste or
+  speculation.
+- It converts accumulated friction into a named concept before any fix is
+  attempted.
+
+Planning rule for this phase
+------------------------------
+Use this sanity check on every Phase 165 change:
+
+- measuring repeated friction from Phases 161–164 and naming the next
+  boundary: admissible
+- implementing the fix in the same phase: wrong phase
+- declaring the boundary category before measuring evidence: wrong phase
+
+Required implementation surfaces
+---------------------------------
+1. `docs/plan/active/phase165_second_model_boundary_identification.txt`
+   - publish the canonical Phase 165 execution note and synthesis
+
+2. `docs/plan/decision_log.txt`
+   - record which candidate boundary was named and why
+
+What this phase should prove
+-----------------------------
+- that the Phase 160 boundary-identification method is repeatable and useful
+  rather than a one-time exercise
+- that the repository names structural problems before attempting to fix them
+  even when the problems are well-understood intuitively
+- that the named boundary is grounded in repeated evidence, not in roadmap
+  ambition
+
+Execution note and synthesis
+----------------------------
+
+Phase 165 was executed by measuring the four post-Phase-160 phases against
+the three candidate boundaries named in the repository status note.
+
+Evidence summary
+~~~~~~~~~~~~~~~~
+
+Phase 161 (per-send delivery witness):
+  One field added to Effect.  No topology changes.  No payload changes.
+  The send_dropped gap was orthogonal to topology or payload structure.
+
+Phase 162 (orchestration cleanup):
+  Renamed dispatch arms (kernel_dispatch_kv, kernel_dispatch_leaf,
+  kernel_dispatch_serial).  This was structural cleanup: the dispatch topology
+  existed and was implicitly readable, but the arm names were absent.
+  After Phase 162, the topology is named at the dispatch level but still not
+  named as a single data concept.  The routing decision (serial → shell →
+  log|kv) is expressed through function names and endpoint_id comparisons, not
+  through any structure that could be inspected or passed.
+
+Phase 163 (constant linkage):
+  Three files — shell_service.mc, scenarios.mc, kernel_dispatch.mc — were
+  duplicating endpoint ID constants because there was no shared owning module
+  that all three could import without a circular dependency.  boot.mc owned
+  the constants but shell_service.mc could not import boot.mc (boot imports
+  shell).  The fix was to surface imported constant reuse through the compiler
+  path; but the structural condition causing the duplication — that topology
+  facts (endpoint IDs) have no neutral home independent of the services that
+  use them — was not resolved.  boot.mc still owns the IDs.  shell_service.mc
+  still carries them in its state struct as constructor parameters.
+
+Phase 164 (struct embedding):
+  Branch B — explicitly deferred.  The identified pressure sites (KernelBootState
+  updates, SerialShellPathState updates) were all addressable through with-helpers.
+  No new structural problem was introduced or resolved at the service topology level.
+
+Candidate evaluation
+~~~~~~~~~~~~~~~~~~~~
+
+Candidate A — service communication topology:
+  REAL and RECURRING.  The same structural condition appeared in both Phase 162
+  and Phase 163:
+  - Phase 162: topology encoded only in named function arms and endpoint_id
+    comparisons, with no named data structure describing reachability.
+  - Phase 163: the endpoint ID constants that define the topology had no
+    neutral owning module and had to live in boot.mc, which then created a
+    circular dependency forcing shell_service to carry them in mutable state.
+  ShellServiceState carries log_endpoint_id and kv_endpoint_id as fields.
+  These fields are topology facts, not service state.  They never change after
+  init.  Adding any new shell-reachable service requires coordinated changes to
+  three sites: ShellServiceState, shell_init, and kernel_dispatch_leaf.  No
+  single named module owns the topology.
+
+Candidate B — 4-byte payload pressure:
+  NOT YET REAL from Phases 161-164.  The 4-byte limit was present in all four
+  phases and caused zero structural friction.  No phase needed to exceed four
+  bytes.  The limit was explicitly deferred in Phase 141 decision log and has
+  not been revisited since.  Declaring it as the second boundary from
+  post-Phase-160 evidence would be speculative rather than evidence-driven.
+
+Candidate C — static service directory:
+  NOT YET REAL.  The service directory (four fixed boot-wired endpoints) has not
+  been strained by any phase from 161 to 164.  This is a longer-horizon item.
+
+Named second boundary
+~~~~~~~~~~~~~~~~~~~~~
+
+The second repeated model failure is:
+
+  The service-to-service reachability topology has no structural home.
+
+Concretely: which services shell_service may send to is encoded in
+ShellServiceState as constructor-injected fields (log_endpoint_id,
+kv_endpoint_id).  The same facts appear as constants in boot.mc, which
+shell_service cannot import.  The dispatch routing (which endpoint_id maps to
+which handler) is encoded separately in kernel_dispatch.mc.  The three sites
+share no named data structure representing topology; they share only values
+that must be kept consistent by convention.
+
+This is a repeated problem, not a taste objection:
+- Phase 162 cleaned up one symptom (unnamed dispatch arms) but left the
+  underlying condition in place.
+- Phase 163 cleaned up another symptom (constant duplication) but the root
+  cause — topology facts distributed across state structs, constructor
+  signatures, and dispatch arms without a neutral owner — remains.
+
+Narrowest plausible next expansion axis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A thin service_topology.mc module that owns the endpoint ID constants and has
+no service imports.  Both boot.mc and shell_service.mc import it.
+
+Consequences of this one change:
+- ShellServiceState drops log_endpoint_id and kv_endpoint_id (topology facts,
+  not retained state)
+- shell_init loses two parameters
+- kernel_dispatch.mc imports service_topology for endpoint ID routing constants
+- boot.mc imports service_topology instead of owning the constants itself
+- scenarios.mc imports service_topology for the serial endpoint ID reference
+
+No new language features, no compiler changes, no Effect changes, no new
+behavioral protocol.  The topology becomes readable as data (one module, four
+constants) rather than implied by three files that must agree by convention.
+
+Phase 166 implements this repair.
+
+Conclusion
+~~~~~~~~~~
+
+The Phase 160 boundary-identification method is repeatable.  The second boundary
+is real, grounded in two separate phase observations (162, 163), and narrow enough
+that the repair (Phase 166) stays inside the current language and kernel model
+with no compiler surface changes.

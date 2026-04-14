@@ -4,9 +4,9 @@ import kernel_dispatch
 import serial_service
 import serial_shell_event_log
 import service_effect
+import service_topology
 import syscall
 
-const SERIAL_ENDPOINT_ID: u32 = 10
 
 func build_receive_observation(source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8) syscall.ReceiveObservation {
     return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: endpoint_id, source_pid: source_pid, payload_len: payload_len, received_handle_slot: 0, received_handle_count: 0, payload: payload }
@@ -22,7 +22,7 @@ func smoke_valid_step_emits_flat_events() bool {
     payload[1] = 67
     payload[2] = 72
     payload[3] = 73
-    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, service_topology.SERIAL_ENDPOINT_ID, 4, payload))
     event_log = serial_shell_event_log.append_effect_events(event_log, effect)
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
@@ -52,7 +52,7 @@ func smoke_invalid_byte_emits_reject_event() bool {
     effect: service_effect.Effect
 
     payload[0] = 255
-    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 1, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, service_topology.SERIAL_ENDPOINT_ID, 1, payload))
     event_log = serial_shell_event_log.append_effect_events(event_log, effect)
     if serial_service.serial_forwarded(state.path_state.serial_state) != 0 {
         return false
@@ -73,7 +73,7 @@ func smoke_ring_keeps_latest_events() bool {
     effect: service_effect.Effect
 
     payload[0] = 255
-    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 1, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, service_topology.SERIAL_ENDPOINT_ID, 1, payload))
     event_log = serial_shell_event_log.append_effect_events(event_log, effect)
 
     payload = ipc.zero_payload()
@@ -81,7 +81,7 @@ func smoke_ring_keeps_latest_events() bool {
     payload[1] = 67
     payload[2] = 65
     payload[3] = 33
-    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, SERIAL_ENDPOINT_ID, 4, payload))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, build_receive_observation(9, service_topology.SERIAL_ENDPOINT_ID, 4, payload))
     event_log = serial_shell_event_log.append_effect_events(event_log, effect)
 
     if serial_shell_event_log.event_log_len(event_log) != 4 {

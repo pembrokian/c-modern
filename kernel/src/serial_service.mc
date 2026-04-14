@@ -57,25 +57,14 @@ func serial_on_receive(s: SerialServiceState, obs: syscall.ReceiveObservation) S
     if obs.payload[0] == SERIAL_INVALID_BYTE {
         return next
     }
-    // Bytes beyond SERIAL_BUFFER_CAPACITY are intentionally dropped: the
-    // fixed-size buffer only accommodates one 4-byte command at a time.
+    // Bytes beyond SERIAL_BUFFER_CAPACITY are intentionally dropped.
     next_buffer: [4]u8 = next.buffer
     next_len: usize = next.len
-    if next_len < SERIAL_BUFFER_CAPACITY {
-        next_buffer[next_len] = obs.payload[0]
-        next_len = next_len + 1
-    }
-    if obs.payload_len > 1 && next_len < SERIAL_BUFFER_CAPACITY {
-        next_buffer[next_len] = obs.payload[1]
-        next_len = next_len + 1
-    }
-    if obs.payload_len > 2 && next_len < SERIAL_BUFFER_CAPACITY {
-        next_buffer[next_len] = obs.payload[2]
-        next_len = next_len + 1
-    }
-    if obs.payload_len > 3 && next_len < SERIAL_BUFFER_CAPACITY {
-        next_buffer[next_len] = obs.payload[3]
-        next_len = next_len + 1
+    for i in 0..obs.payload_len {
+        if next_len < SERIAL_BUFFER_CAPACITY {
+            next_buffer[next_len] = obs.payload[i]
+            next_len = next_len + 1
+        }
     }
     return serialwith(next, next_buffer, next_len, syscall.SyscallStatus.None, 0, primitives.zero_payload())
 }

@@ -1,0 +1,98 @@
+Phase 174 -- Second Target Platform Boundary Identification
+============================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Classify which compiler and runtime assumptions are Darwin arm64 specific and
+which are plausibly portable, without implementing any second-target support.
+
+The current repository is explicitly Darwin arm64 hosted.  That is an honest
+constraint, not an oversight.  But as the kernel and compiler mature, the
+portability question becomes more answerable: some assumptions will be
+genuinely platform-dependent while others will be incidental.
+
+This phase names those assumptions from current code to give future portability
+work a concrete starting point rather than leaving portability as a vague
+future goal.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase84_freestanding_support_statement_and_tooling_audit.txt`
+- `docs/plan/archive/phase95_freestanding_v0_3_slice_audit.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/arch/veya/veya_kernel_endstate_arch.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The bootstrap backend configuration is frozen Darwin arm64.
+- The freestanding proof harness was archived after Phase 163 because the
+  active kernel path no longer relied on it.
+- The hosted runtime is POSIX-shaped but not formally abstracted.
+- Portability barriers likely include: LLVM target triple initialization,
+  stdlib hosted runtime syscall layer, `hal` barrier model, and freestanding
+  build toolchain assumptions.
+- A second target that has been discussed implicitly is Linux arm64, which
+  shares the ISA but differs in ABI conventions, syscall numbers, and toolchain
+  defaults.
+
+Problem being solved
+--------------------
+- Without naming the portability barriers, future work cannot estimate what
+  second-target support would actually require.
+- With named barriers, the repository can make informed choices: accept a
+  permanently narrow target matrix, or invest in specific bounded portability
+  work when the right second-target pressure appears.
+- This phase does not claim second-target support; it only makes the distance
+  measurable.
+
+Core rule
+---------
+- Classify assumptions from current source, not from aspirational target lists.
+- Do not add target abstraction layers.
+- Do not implement any Linux or other second-target code.
+- If the current code already has clean portability seams (e.g., through
+  `hal`, explicit ABI encoding, or separate driver shims), note that
+  explicitly.
+- This is a classification and documentation phase only.
+
+Chosen slice for this phase
+---------------------------
+1. one survey of the compiler, runtime, and `hal` sources for Darwin-specific
+   or host-specific assumptions
+2. one classification of those assumptions into: target-inherent (cannot be
+   abstracted cheaply), portability-seam (already abstract or easily made so),
+   and incidental (historical, easily changed)
+3. one explicit statement of what a hypothetical Linux arm64 hosted second
+   target would require from the current codebase
+4. one trigger condition for opening second-target work (e.g., "reopen when
+   a real admitted kernel or stdlib consumer requires Linux arm64 behavior that
+   Darwin arm64 cannot supply")
+
+Why this is the right placement
+--------------------------------
+- After Phase 173: SMP constraints are named, and SMP often interacts with
+  target-specific memory model and barrier assumptions.
+- Before any future portability investment: the classification makes that
+  investment cost-visible.
+
+Planning rule for this phase
+------------------------------
+- Work from current source.  Do not audit theoretical targets.
+- Name only real current assumptions, not hypothetical future ones.
+
+What this phase should prove
+-----------------------------
+- that the repository's target-narrowness is explicit and understood, not
+  accidental
+- that the portability barriers and seams are named clearly enough to inform
+  future target decisions
+- that the Darwin arm64 assumption does not silently grow harder to remove
+  as the codebase matures

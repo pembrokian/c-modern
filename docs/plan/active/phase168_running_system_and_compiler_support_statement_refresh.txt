@@ -1,0 +1,124 @@
+Phase 168 -- Running System And Compiler Support Statement Refresh
+==================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Publish one updated and honest support statement for both the running Veya
+kernel system and the Modern C compiler after the Phase 161 through Phase 166
+wave.
+
+This is the Phase 109 and Phase 120 equivalent for the current plateau:
+a single canonical note that names what the repository now claims, names what
+it still defers, and keeps public documentation aligned with the actual landed
+slice.
+
+Without this phase, the public support statements (README, hosted release
+note, freestanding support note, Veya readiness position) will misrepresent
+the current admitted slice by the time this wave lands.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/plan/admin/veya_running_system_support_statement.txt`
+- `docs/plan/active/phase165_second_model_boundary_identification.txt`
+- `docs/plan/active/phase166_bounded_model_expansion_from_second_boundary.txt`
+- `docs/plan/archive/phase109_first_running_veya_kernel_slice_audit.txt`
+- `docs/plan/archive/phase120_running_system_support_statement.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The last full support statement refresh happened in the Phase 120 wave and
+  the Phase 31 hosted support audit.
+- Since Phase 120, the repository has landed: Phase 121–126 authority and
+  image hardening, Phase 127 multi-file modules, Phase 128–163 service system
+  and orchestration waves, and post-163 language and model work through
+  Phase 166.
+- The public documentation is now meaningfully behind the actual admitted
+  slice.
+- This phase must be done after Phase 166 concludes so the statement
+  accurately reflects the post-boundary-repair system shape.
+- The statement must be honest: name only what is actually proved, name the
+  most important deferred fronts explicitly.
+
+Problem being solved
+--------------------
+- Support statements that lag the implementation cause readers to underestimate
+  the current admitted slice or to assume things that are still deferred.
+- A single canonical refresh anchors later phases against a known current
+  truth rather than against a stale document.
+- The refresh also identifies whether public README and release notes require
+  coordinated updates.
+
+Core rule
+---------
+- Only claim what is genuinely proved on the current admitted slice.
+- Name the deferred fronts as explicitly as the claimed ones.
+- Do not use the support-statement phase as an excuse to claim aspirational
+  behavior.
+- Keep the statement reviewable: one human reading it should be able to
+  reproduce the claimed behavior.
+
+Chosen slice for this phase
+---------------------------
+1. one updated Veya running-system support statement
+   - what IPC, authority, service, and orchestration shapes are admitted
+   - what scheduler, multicore, loader, packaging, and device fronts remain
+     deferred
+2. one updated Modern C compiler support statement
+   - what language, sema, MIR, backend, stdlib, and workflow surfaces are
+     admitted on the hosted Darwin arm64 slice
+   - what generic, const-eval, ABI portability, and freestanding fronts remain
+     deferred
+3. README and hosted support note alignment check
+   - ensure public-facing documents match the canonical statements
+4. one focused aggregate CTest smoke over the admitted public-cut set
+   - the same role `mc_first_use_smoke` and `mc_public_cut_smoke` served in
+     Phase 75–77, but refreshed against the current admitted slice
+
+Why this is the right next step
+-------------------------------
+- Phase 166 closes the second boundary repair; Phase 168 captures the
+  resulting honest combined state.
+- It prevents the mid-term phases (169–175) from being planned against a
+  stale truth claim.
+- It creates a natural checkpoint between the post-163 consolidation wave and
+  the longer-horizon work.
+
+Planning rule for this phase
+------------------------------
+Use this sanity check on every Phase 168 change:
+
+- aligning published documentation with the actual current admitted slice:
+  admissible
+- claiming behavior that is not yet proved: wrong phase
+- expanding the admitted slice inside the documentation phase: wrong phase
+
+Required implementation surfaces
+---------------------------------
+1. `docs/plan/admin/modern_c_veya_readiness_position.txt`
+   - refresh the Veya position and Modern C position sections
+
+2. `docs/plan/admin/veya_running_system_support_statement.txt`
+   - refresh against the post-Phase-166 landing
+
+3. `README.md`
+   - align with the refreshed support statements
+
+4. one aggregate CTest and `make` smoke target
+   - cover the admitted public-cut set at the current landing
+
+What this phase should prove
+-----------------------------
+- that the repository's public documentation accurately represents the current
+  admitted slice
+- that the deferred fronts are named and visible rather than implied or hidden
+- that the resulting support state is reviewable without requiring deep reading
+  of the phase doc archive

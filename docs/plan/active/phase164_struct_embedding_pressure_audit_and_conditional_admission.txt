@@ -3,7 +3,7 @@ Phase NNN -- Struct Embedding Pressure Audit And Conditional Admission
 
 Status
 ------
-PLANNED
+COMPLETE — Branch B (Explicit Deferral)
 
 Purpose
 -------
@@ -161,10 +161,25 @@ Branch B outcome
 
 Chosen outcome
 --------------
-Chosen outcome: not predetermined.
+Branch B — explicit deferral.
 
-The repository should schedule this phase now, but the phase itself must earn
-either a narrow admission or an explicit deferral from real code pressure.
+Audit result (2026-04-14):
+- Both identified pressure sites (KernelBootState updates in kernel_dispatch.mc;
+  SerialShellPathState updates in serial_shell_path.mc) were the "update one
+  field, carry the rest" pattern — already solved by the kvwith/logwith
+  with-helper idiom in the existing codebase.
+- Added bootwith_log() and bootwith_kv() to boot.mc; added pathwith() to
+  serial_shell_path.mc.  Removed all repeated KernelBootState and
+  SerialShellPathState struct literals from kernel_dispatch.mc and
+  serial_shell_path.mc respectively.
+- The four delegating accessor functions in serial_shell_path.mc
+  (path_serial_reply_status, path_serial_reply_len, path_serial_reply_payload,
+  path_serial_buffer_len) are intentional encapsulation, not boilerplate.
+- No compiler, sema, MIR, backend, ABI, target, runtime, or hal changes.
+- All tests pass (mc_tool_workflow_unit, mc_tool_build_state_unit,
+  mc_tool_real_project_unit).
+- Decision recorded in docs/arch/c-lang/key_decisions.txt (entry 6) and
+  docs/plan/decision_log.txt.
 
 What this phase should try to prove
 -----------------------------------

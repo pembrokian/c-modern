@@ -1,0 +1,93 @@
+Phase 173 -- Multi-Core Model Boundary Identification
+======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Name the first repeated constraint that the current kernel model violates
+under multi-core assumptions, without implementing any SMP change.
+
+This is a Phase-160-style identification phase for the SMP boundary.
+The repository does not claim multicore support.  What this phase does is
+make that deferral concrete: instead of "SMP is future work", the repository
+should be able to say "these specific model assumptions break under SMP, and
+here is why the current model does not need to address them yet."
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase160_first_model_boundary_identification.txt`
+- `docs/plan/active/phase165_second_model_boundary_identification.txt`
+- `docs/arch/veya/veya_kernel_endstate_arch.txt`
+- `docs/arch/veya/veya_kernel_blueprint_v0.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The current kernel is single-core, table-driven, and fixed-size.
+- All critical sections are currently expressed as single-core critical
+  sections (interrupt masking or cooperative model).
+- The end-state kernel architecture doc anticipates eventual SMP support but
+  treats it as out of scope for the current slice.
+- Common SMP failure modes for microkernel models include: endpoint-table
+  mutation races, capability-handle-table ownership under concurrent send and
+  receive, scheduler ready-queue races under concurrent wake, and process-slot
+  lifecycle races under concurrent spawn.
+- This phase surveys those candidates against the current code and names the
+  one or two that would be hardest to retrofit.
+
+Problem being solved
+--------------------
+- Without naming the SMP constraints explicitly, later kernel growth can
+  inadvertently make SMP harder (e.g., by widening single-core assumptions into
+  more places) or easier (e.g., by separating ownership in ways that compose
+  cleanly with per-core data structures).
+- Naming the constraints now preserves optionality without committing to an
+  SMP implementation timeline.
+- It also gives the supervisor and topology phases (172, 170) a boundary to
+  reason against.
+
+Core rule
+---------
+- Name the SMP constraints from current code, not from architecture theory.
+- Do not implement any SMP change.
+- Do not add locks, barriers, or per-core data structures.
+- If the current model already has clean SMP-compatible ownership (e.g.,
+  through per-process table ownership), note that explicitly.
+- This is a documentation and classification phase, not an implementation phase.
+
+Chosen slice for this phase
+---------------------------
+1. one survey of the current kernel source for single-core assumptions
+2. one classification of the two or three model constraints that would be
+   hardest to retrofit for SMP
+3. one explicit statement of why those constraints do not currently block
+   single-core work
+4. one trigger condition for each constraint (e.g., "reopen this constraint
+   when the scheduler ready queue needs concurrent wake from two cores")
+
+Why this is the right placement
+--------------------------------
+- After Phase 172: supervisor and restart shape are understood, so the SMP
+  survey can reason about process slot and lifecycle ownership concretely.
+- Before any broader platform portability work (Phase 174): platform targets
+  often interact with SMP assumptions, so naming SMP constraints first creates
+  a clearer portability audit.
+
+Planning rule for this phase
+------------------------------
+- Work from current source, not from architecture diagrams.
+- Name only constraints that are real today, not hypothetical future ones.
+
+What this phase should prove
+-----------------------------
+- that the repository's SMP deferral is explicit and reasoned, not silent
+- that the current kernel structure is understood well enough to name the
+  points of SMP fragility
+- that future kernel growth is aware of those constraints even while
+  single-core work continues

@@ -1,0 +1,114 @@
+Phase 170 -- Static Service Topology First Acknowledgment
+===========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Answer one grounded question about the current kernel service model: is the
+topology of which services may communicate with which currently nameable, or
+is it fully implicit in control flow?
+
+This is not a dynamic service registration phase.
+This is not a routing table phase.
+This is not a service bus phase.
+
+It is a Phase-160-style boundary identification for the composition topology
+specifically: measure where it is encoded today, decide whether it needs to
+become nameable, and take the smallest honest step if it does.
+
+The repository's existing dispatch shape (explicit named functions per
+service, established in Phase 162) is the right dispatch form.  The open
+question is narrower: as the service set grows beyond the current four
+services, does the *topology* — which service connects to which endpoint —
+need to be expressible outside of annotated protocol logic, or is the current
+implicit form still sufficient?
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase165_second_model_boundary_identification.txt`
+- `docs/plan/active/phase166_bounded_model_expansion_from_second_boundary.txt`
+- `docs/plan/archive/phase146_service_shape_consolidation.txt`
+- `docs/plan/archive/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/archive/phase153_service_composition_shape_audit.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The current kernel has four services with an explicit but implicit topology:
+  `boot.mc` routes to `log_service`, `kv_service`, `shell_service`, and
+  `serial_service` through named dispatch functions established in Phase 162.
+- The topology is readable by inspection but not recorded as a named concept.
+- Phase 165 may or may not have named topology as the second boundary.  If it
+  did, this phase implements the repair.  If Phase 165 named a different
+  boundary, this phase is a separate later audit rather than a follow-on to
+  Phase 166.
+- Dynamic registration, broker patterns, namespace rewiring, service
+  directories, and ambient discovery remain out of scope.
+
+Problem being solved
+--------------------
+- As the service set grows, the implicit topology will become harder to
+  understand and maintain without a named concept.
+- But naming the topology prematurely (before growth pressure materializes)
+  adds indirection without benefit.
+- This phase audits the current state of that pressure and makes one bounded
+  decision: is the topology still sufficiently described by inspection, or
+  does it need to become a named record?
+
+Core rule
+---------
+- Do not introduce a data-driven routing table as a default.
+- Do not generalize the dispatch shape established in Phase 162.
+- If the topology is still sufficiently implicit at the current service count,
+  record that conclusion and defer.
+- If naming is justified, the named form must remain readable and flat —
+  explicit topology records, not a routing framework.
+- Dynamic registration, indirection layers, and service bus abstractions are
+  out of scope regardless of the audit outcome.
+
+Chosen slice for this phase
+---------------------------
+Branch A -- topology naming admitted
+- one explicit topology record or binding site naming which endpoints are
+  connected by init
+- one bounded proof that the named form is at least as readable as the current
+  implicit form
+- no routing logic, indirection, or dynamic growth mechanism
+
+Branch B -- explicit deferral
+- one audit establishing that the current implicit topology is still honest
+  and legible at the current service count
+- one explicit statement of the trigger condition for reopening: e.g. "reopen
+  when the service count grows past N or when a new service composition is
+  added that cannot be described by inspection"
+
+Why this is the right placement
+--------------------------------
+- After Phase 166, the second boundary is repaired and the system is in a
+  more stable state.
+- After Phase 168, the support statement is refreshed and the topology
+  question can be measured honestly against the stated admitted slice.
+- Before Phase 172 (supervisor shape), because topology clarity is a
+  prerequisite for reasoning about supervision.
+
+Planning rule for this phase
+------------------------------
+- Measure topology legibility from real current code.
+- Do not invent pressure.
+- If Branch B wins, write the trigger condition explicitly so this phase
+  does not need to be repeated without new evidence.
+
+What this phase should prove
+-----------------------------
+- that the repository's composition topology is either honestly implicit or
+  honestly named, but not ambiguous
+- that dynamic registration and routing frameworks are still cleanly deferred
+  without pretending the topology question does not exist

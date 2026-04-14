@@ -13,6 +13,10 @@ func path_init(serial_state: serial_service.SerialServiceState, shell_state: she
     return SerialShellPathState{ serial_state: serial_state, shell_state: shell_state, shell_endpoint_id: shell_endpoint_id }
 }
 
+func pathwith(p: SerialShellPathState, serial: serial_service.SerialServiceState, shell: shell_service.ShellServiceState) SerialShellPathState {
+    return SerialShellPathState{ serial_state: serial, shell_state: shell, shell_endpoint_id: p.shell_endpoint_id }
+}
+
 func build_reply_observation(shell_state: shell_service.ShellServiceState, shell_endpoint_id: u32, effect: service_effect.Effect) syscall.ReceiveObservation {
     return syscall.ReceiveObservation{ status: service_effect.effect_reply_status(effect), block_reason: syscall.BlockReason.None, endpoint_id: shell_endpoint_id, source_pid: shell_state.pid, payload_len: service_effect.effect_reply_payload_len(effect), received_handle_slot: 0, received_handle_count: 0, payload: service_effect.effect_reply_payload(effect) }
 }
@@ -39,7 +43,7 @@ func path_step(path: *SerialShellPathState, obs: syscall.ReceiveObservation) ser
     serial_state: serial_service.SerialServiceState = current.serial_state
     shell_state: shell_service.ShellServiceState = current.shell_state
     effect: service_effect.Effect = serial_shell_step(&serial_state, &shell_state, current.shell_endpoint_id, obs)
-    *path = SerialShellPathState{ serial_state: serial_state, shell_state: shell_state, shell_endpoint_id: current.shell_endpoint_id }
+    *path = pathwith(current, serial_state, shell_state)
     return effect
 }
 
@@ -62,7 +66,7 @@ func path_serial_buffer_len(path: SerialShellPathState) usize {
 func path_receive_reply(path: SerialShellPathState, effect: service_effect.Effect) SerialShellPathState {
     obs: syscall.ReceiveObservation = syscall.ReceiveObservation{ status: service_effect.effect_reply_status(effect), block_reason: syscall.BlockReason.None, endpoint_id: path.shell_endpoint_id, source_pid: path.shell_state.pid, payload_len: service_effect.effect_reply_payload_len(effect), received_handle_slot: 0, received_handle_count: 0, payload: service_effect.effect_reply_payload(effect) }
     new_serial: serial_service.SerialServiceState = serial_service.serial_on_reply(path.serial_state, obs)
-    return SerialShellPathState{ serial_state: new_serial, shell_state: path.shell_state, shell_endpoint_id: path.shell_endpoint_id }
+    return pathwith(path, new_serial, path.shell_state)
 }
 
 // Commit an inner resolved effect into the path's serial reply slot.

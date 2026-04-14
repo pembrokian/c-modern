@@ -1,0 +1,98 @@
+Phase 169 -- Const-Eval First Expansion
+========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Admit one bounded step of compile-time evaluation beyond the current admitted
+slice, if and only if real repository pressure justifies it by this phase.
+
+The current admitted const slice (Phase 163) proves: scalar constants, direct
+exported constant reuse across modules, and aggregate const declarations built
+from admitted constant ingredients.  It deliberately stops before const
+functions, arbitrary compile-time execution, and broader constant-linkage
+policy.
+
+This phase is the first honest checkpoint for that deferral.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase163_bootstrap_constant_linkage_and_aggregate_const_follow_through.txt`
+- `docs/arch/c-lang/language/semantics/constants_spec.txt`
+- `docs/plan/archive/phase60_compile_time_truth_closure.txt`
+- `docs/plan/archive/phase25_compile_time_and_static_storage_semantic_closure.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 163 landed direct exported scalar constant reuse and one aggregate
+  const declaration built from imported ingredients.
+- The backlog explicitly records: "reopen only when a real admitted consumer
+  needs compile-time function execution or a broader constant artifact model
+  than direct exported constants plus aggregate literals."
+- This phase should begin with a consumer-matrix audit: does the kernel, any
+  stdlib module, or any admitted real project need const behavior beyond the
+  current slice before Phase 168's support statement is published?
+- If no authentic pressure exists, this phase concludes as an explicit
+  no-op gate and records the deferral cleanly.
+- If pressure exists, the narrowest honest expansion is admitted.
+
+Problem being solved
+--------------------
+- Without one explicit re-audit phase, the const deferral from Phase 163 can
+  silently accumulate into real friction without acknowledgment.
+- With a re-audit phase, the repository either confirms the deferral is still
+  right or finds the one narrowest step that removes the real bottleneck.
+
+Core rule
+---------
+- Do not admit const functions or arbitrary compile-time execution without a
+  real admitted consumer that cannot be served by the current slice.
+- If a consumer is found, implement only the narrowest step that satisfies it.
+- Keep the implementation in the right layer: const evaluation is a sema
+  concern, not a MIR or driver concern.
+- Prefer a second scalar-constant form or a small const-arithmetic expression
+  before considering full const-function evaluation.
+
+Chosen slice for this phase
+---------------------------
+Conditional on evidence:
+
+Branch A -- narrow expansion
+- one audit proving that one admitted consumer (kernel-side or stdlib-side)
+  needs const evaluation beyond the Phase 163 slice
+- one minimal sema-owned const-eval extension
+- one corresponding MIR and backend path through the admitted expression form
+- focused fixture coverage
+
+Branch B -- explicit deferral
+- one audit confirming no current admitted consumer needs more than the
+  Phase 163 slice
+- one decision-log entry recording the measured conclusion
+- no implementation
+
+Why this is the right placement
+--------------------------------
+- Placing this after Phase 168 means it is evaluated against the refreshed
+  support statement, not against stale documentation.
+- Placing it before the longer-horizon compiler phases ensures the const
+  question is answered before later phases assume a particular const-eval model.
+
+Planning rule for this phase
+------------------------------
+- Start with the consumer matrix.  If no consumer pressure exists, conclude
+  Branch B.
+- Do not implement Branch A by ambition alone.
+
+What this phase should prove
+-----------------------------
+- that the Phase 163 const deferral boundary is re-examined on evidence rather
+  than forgotten
+- that const expansion (if admitted) remains in the right compiler layer
+- that the repository's const model is stated honestly and consistently

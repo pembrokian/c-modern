@@ -118,3 +118,43 @@ Consequence:
 	to validate `internal.mc` imports
 - later implementation phases should reject stale export-block assumptions
 	rather than carrying compatibility shims
+
+6. Struct Embedding Deferred — Explicit Composition Is The Default
+
+Decision:
+- struct embedding (anonymous embedded fields with promoted field lookup) is not
+  admitted in the current language.
+- explicit composition through named fields is the only struct nesting model.
+- with-helpers (e.g. `kvwith`, `logwith`, `bootwith_log`, `pathwith`) are the
+  standard relief for the "update one field, carry the rest" pattern.
+
+Why:
+- Phase 164 audit measured real wrapper pressure in the reset-lane kernel and
+  found that every identified pressure site was the "update one field, carry
+  the rest" struct-update antipattern — already solved by the `kvwith`/`logwith`
+  pattern in the existing codebase.
+- Adding with-helpers to `boot.mc` and `serial_shell_path.mc` removed all
+  repeated struct literals in `kernel_dispatch.mc` without any compiler change.
+- The delegating accessor functions in `serial_shell_path.mc` are intentional
+  encapsulation, not boilerplate: callers must not need to know which inner
+  struct owns a reply field.
+- Plan 9 clarity means simplicity of structure and flat readable code, not
+  mandatory adoption of Plan 9 language conveniences like embedding.
+- Promoted-field lookup with ambiguity rules, layout implications, and
+  disambiguation costs adds language complexity that the audit did not justify.
+
+Consequence:
+- wrapper struct pressure should be resolved by: (a) with-helpers for
+  single-field updates; (b) smaller records or better owner factoring if the
+  record has too many unchanging fields; (c) explicit delegation functions if
+  callers need to forward through a contained sub-struct's accessors.
+- struct embedding proposals must prove repeated pressure that neither
+  with-helpers nor owner refactoring can address before reopening this question.
+- if reopened: any admitted form must be strictly structural, shallow, explicit
+  in docs, and ambiguity-rejecting; no method promotion, subtyping, or implicit
+  conversion may arise.
+
+Revisit trigger:
+- a wrapper record where with-helpers and owner refactoring would themselves
+  require more boilerplate than the embedding they replace, and the lookup
+  semantics can be proved unambiguous in that use case.

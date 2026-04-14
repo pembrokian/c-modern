@@ -22,9 +22,9 @@ import ipc
 import kv_service
 import log_service
 import service_effect
+import service_topology
 import syscall
 
-const SERIAL_ENDPOINT_ID: u32 = 10
 
 func make_obs(b0: u8, b1: u8, b2: u8, b3: u8) syscall.ReceiveObservation {
     payload: [4]u8 = ipc.zero_payload()
@@ -32,7 +32,7 @@ func make_obs(b0: u8, b1: u8, b2: u8, b3: u8) syscall.ReceiveObservation {
     payload[1] = b1
     payload[2] = b2
     payload[3] = b3
-    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: SERIAL_ENDPOINT_ID, source_pid: 99, payload_len: 4, received_handle_slot: 0, received_handle_count: 0, payload: payload }
+    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: service_topology.SERIAL_ENDPOINT_ID, source_pid: 99, payload_len: 4, received_handle_slot: 0, received_handle_count: 0, payload: payload }
 }
 
 // Ordering: replies arrive in submission order.

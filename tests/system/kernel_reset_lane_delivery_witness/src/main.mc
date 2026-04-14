@@ -22,12 +22,12 @@ import boot
 import kernel_dispatch
 import serial_protocol
 import service_effect
+import service_topology
 import syscall
 
-const SERIAL_ENDPOINT_ID: u32 = 10
 
 func cmd(payload: [4]u8) syscall.ReceiveObservation {
-    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: SERIAL_ENDPOINT_ID, source_pid: 1, payload_len: 4, received_handle_slot: 0, received_handle_count: 0, payload: payload }
+    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: service_topology.SERIAL_ENDPOINT_ID, source_pid: 1, payload_len: 4, received_handle_slot: 0, received_handle_count: 0, payload: payload }
 }
 
 // Case A: fresh state, log is empty.

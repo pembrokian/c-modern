@@ -1,0 +1,103 @@
+Phase 175 -- Error Model Widening First Gate
+=============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Re-examine the `errors.Error` kind/code encoding deferral from the current
+admitted slice and determine whether any real admitted consumer has reached
+the point where kind/code classification is insufficient.
+
+The current `errors.Error` model (Phase 47 closeout) is scalar at the ABI
+boundary, encodes a kind/code value with stdlib constructors and inspectors,
+and deliberately stops before message ownership, wrapped causes, heap-backed
+objects, and source context.
+
+The backlog records: "reopen only when another admitted real program still
+feels too opaque after kind or code classification, then design the narrowest
+explicit follow-up without reopening hidden propagation."
+
+This phase applies that reopen condition.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase47_full_error_treatment.txt`
+- `docs/plan/archive/phase67_filesystem_and_error_contract_follow_through.txt`
+- `docs/arch/c-lang/language/semantics/` (error semantics if documented)
+- `docs/plan/backlog.txt` (error model widening entry)
+- `docs/arch/key_decisions.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The `errors.Error` kind/code model has been in production across the
+  admitted slice since Phase 47.
+- It is used by: filesystem operations (`fs.read_all_err`, `fs.list_dir_err`),
+  subprocess operations, networking, and various stdlib helpers.
+- Real consumers that are still opaque after kind/code: the backlog has not
+  yet recorded a specific one.  This phase starts with that audit.
+- Common widening requests would include: associating a human-readable message
+  with an error, wrapping one error as the cause of another, or propagating
+  error origin context for diagnostics.
+- The risk is premature message-heap ownership or cause-chain semantics that
+  force unresolved lifetime policy before a real consumer justifies it.
+
+Problem being solved
+--------------------
+- Without a checkpoint, the kind/code model can become the permanent ceiling
+  even if real program expressiveness has grown past what it can describe.
+- With a checkpoint, the repository either confirms the current model is
+  sufficient or finds the narrowest honest extension that removes the real
+  bottleneck.
+
+Core rule
+---------
+- Do not admit message strings, cause chains, or heap-backed error objects
+  without a real admitted consumer that is genuinely blocked by the current
+  kind/code encoding.
+- If a consumer is found, design the narrowest extension that serves it:
+  prefer a bounded optional message slice over an owned heap string; prefer
+  an explicit `cause: Error` field over a dynamic cause chain.
+- Error propagation semantics must remain explicit at use sites.
+- No hidden error propagation, no implicit try-operator, no exceptions.
+
+Chosen slice for this phase
+---------------------------
+Conditional on consumer audit:
+
+Branch A -- narrow widening admitted
+- one audit proving specific admitted programs are opaque after kind/code
+- one minimal `Error` widening that removes the identified opacity
+- stdlib, runtime, and proof program updates for the new form
+- kind/code inspection remains valid for all existing consumers
+
+Branch B -- explicit deferral
+- one audit confirming that no current admitted consumer is blocked by
+  kind/code limitations
+- one decision-log entry refreshing the deferral condition with a sharper
+  trigger
+
+Why this is the right placement
+--------------------------------
+- After Phase 174: the target portability picture is known, and error ABI
+  interacts with target-specific error code representation.
+- Before any substantial new stdlib or kernel user-space consumer growth:
+  if the error model needs widening, earlier is less disruptive.
+
+Planning rule for this phase
+------------------------------
+- Start with a concrete audit of current program opacity after kind/code.
+- Do not widen on ergonomics alone.
+
+What this phase should prove
+-----------------------------
+- that the kind/code error model is re-examined on evidence at this plateau
+- that any admitted widening keeps error propagation explicit and lifetime
+  policy honest
+- that the repository's error model is stated consistently with the admitted
+  language surface

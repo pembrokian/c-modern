@@ -1,0 +1,227 @@
+Phase 166 -- Bounded Model Expansion From Second Boundary
+==========================================================
+
+Status
+------
+COMPLETE
+
+Purpose
+-------
+Implement the narrowest repair for whatever second boundary Phase 165
+identifies, following the same pattern Phase 161 used after Phase 160.
+
+This phase is intentionally left partially open because its content depends
+on the Phase 165 outcome.  It is recorded now to make the planning chain
+explicit and to prevent the Phase 165 conclusion from being deferred
+indefinitely because no execution slot exists for the follow-on work.
+
+The three most credible candidate expansions based on current evidence are:
+
+A. Service communication topology formalization — if Phase 165 names the
+   implicit topology (which services may call which) as the repeated boundary,
+   this phase gives that topology a name as data rather than encoding it only
+   in control flow.  This does not mean a routing table or service bus; it
+   means the topology becomes something the repository can describe, not just
+   infer.
+
+B. Payload model bounded expansion — if Phase 165 names the 4-byte fixed wire
+   format as the repeated boundary, this phase defines the smallest honest
+   growth: a variable small payload or typed payload struct, without reopening
+   the full IPC protocol.
+
+C. Service directory first step toward growability — if Phase 165 names the
+   fixed three-entry init-owned directory as the repeated boundary, this phase
+   defines the smallest honest answer that does not require dynamic registration
+   or a namespace framework.
+
+Only one candidate will be implemented, and only after Phase 165 establishes
+which one is genuine.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase165_second_model_boundary_identification.txt`
+- `docs/plan/active/phase160_first_model_boundary_identification.txt`
+- `docs/plan/active/phase161_per_send_delivery_witness.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The pattern from Phase 160–161 is: name first, fix second, in separate
+  phases.
+- This phase must not be started before Phase 165 reaches a conclusion.
+- If Phase 165 concludes "no second boundary yet", this phase is deferred and
+  recorded as dormant until more evidence accumulates.
+- If Phase 165 names a boundary, this phase implements only the narrowest
+  possible repair for that one named boundary, not a general expansion.
+
+Problem being solved
+--------------------
+- A named boundary without an execution slot for repair creates pressure to
+  keep the boundary unnamed.
+- Pre-allocating a phase for the repair removes that pressure while keeping
+  the repair scoped by the Phase 165 conclusion rather than pre-decided.
+
+Core rule
+---------
+- Do not start this phase before Phase 165 concludes.
+- Implement only the repair the Phase 165 boundary specifically requires.
+- Keep the implementation as narrow as Phase 161 was relative to Phase 160.
+- If the fix requires compiler, sema, MIR, or backend changes, those must be
+  explicitly justified by the Phase 165 boundary evidence.
+- Do not use the Phase 165 conclusion as permission to expand broadly.
+
+Chosen slice for this phase
+---------------------------
+- Conditional on Phase 165 outcome.
+- One boundary repair.
+- One proof that the repair removes the named friction without widening scope.
+- One focused regression over the affected surface.
+
+Why this is the right next step
+-------------------------------
+- It completes the two-phase method (name + fix) that produced a clean result
+  in Phase 160–161.
+- It keeps the fix grounded in the Phase 165 measurement rather than in prior
+  roadmap assumptions.
+
+Planning rule for this phase
+------------------------------
+Use this sanity check on every Phase 166 change:
+
+- implementing exactly the repair Phase 165 named: admissible
+- expanding to a second problem in the same phase: wrong phase
+- implementing a repair from a different boundary than the one Phase 165
+  named: wrong phase
+
+What this phase should prove
+-----------------------------
+- that the two-phase boundary-identification and repair method is stable and
+  repeatable
+- that the named boundary is genuinely reduced by the chosen repair
+- that no new structural impurity was introduced by the fix
+
+Execution note
+--------------
+
+Phase 165 named: service-to-service reachability topology has no structural
+home.  Candidate A won.
+
+The repair is Branch A: service topology formalization as a thin data module.
+
+Implementation
+~~~~~~~~~~~~~~
+
+One new module, `kernel/src/service_topology.mc`, owns the four endpoint ID
+constants and has no service imports:
+
+  SERIAL_ENDPOINT_ID, SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, KV_ENDPOINT_ID
+
+Before this phase:
+- boot.mc owned the four endpoint ID constants
+- ShellServiceState carried log_endpoint_id and kv_endpoint_id as fields
+  (topology facts, injected at construction time via shell_init parameters)
+- kernel_dispatch.mc referenced boot.LOG_ENDPOINT_ID, boot.KV_ENDPOINT_ID,
+  boot.SERIAL_ENDPOINT_ID — possible only because kernel_dispatch imports boot,
+  but the IDs conceptually belonged to the topology, not to boot's init logic
+- Nine system test fixture files each declared:
+    const SERIAL_ENDPOINT_ID: u32 = 10
+  as a local duplicate because they could not import boot.mc cleanly for
+  just this one constant (boot imports shell, creating a dependency weight
+  out of proportion to the need)
+
+After this phase:
+- service_topology.mc owns all four endpoint ID constants
+- boot.mc imports service_topology; drops the four endpoint ID constants;
+  passes service_topology.SHELL_ENDPOINT_ID to path_init; passes no endpoint
+  IDs to shell_init
+- shell_service.mc imports service_topology; ShellServiceState has pid and
+  slot only; shell_init takes pid and slot only; handle() references
+  service_topology.LOG_ENDPOINT_ID and service_topology.KV_ENDPOINT_ID
+  directly
+- kernel_dispatch.mc imports service_topology; all three endpoint_id routing
+  checks reference service_topology.*
+- scenarios.mc imports service_topology; DEFAULT_SERIAL_ROUTE uses
+  service_topology.SERIAL_ENDPOINT_ID
+- nine system test fixtures drop their local constant and import
+  service_topology directly
+
+No compiler changes.  No Effect changes.  No protocol changes.  No new
+behavioral rules.  The topology is now visible as one named module with four
+constants rather than implied by three modules that must agree by convention.
+
+Boundary reduction proof:
+  Before: adding a new shell-reachable service required three coordinated
+    changes — ShellServiceState field, shell_init parameter, kernel_dispatch arm.
+  After: adding a new shell-reachable service requires one constant addition
+    to service_topology.mc and one new arm in kernel_dispatch_leaf.
+    ShellServiceState and shell_init are topology-neutral.
+
+Tests: all mc_tool_workflow_unit, mc_tool_build_state_unit, and
+mc_tool_real_project_unit tests pass without modification.
+
+Second boundary repair (applied in same phase)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+After service_topology.mc landed and the boundary-identification method was
+re-applied from the post-topology codebase, a second same-category boundary
+was immediately visible:
+
+Observable event codes have no structural home.  The six serial-shell dispatch
+event codes (EVENT_SERIAL_BUFFERED through EVENT_SERIAL_CLEARED) were defined
+independently in both kernel_dispatch.mc (producer) and serial_shell_event_log.mc
+(consumer), with no import relationship between them.  Any new observable event
+type required two coordinated constant additions, one in each file, that had to
+agree by value by convention — the exact same structural gap that service_topology
+repaired for endpoint IDs.
+
+Additionally, serial_shell_event_log.mc stored its ring buffer slots as
+slot0/slot1/slot2/slot3 separate struct fields with if-chain access in
+slot_value() and with_slot(), rather than a slots: [4]u32 array — a style guide
+violation visible as the same repeated-if-chain pattern the guide targets.
+
+And serial_service.mc's serial_on_receive used four separate if-blocks
+guarded by obs.payload_len comparisons where a single for loop was correct.
+
+The repair:
+
+  One new module, `kernel/src/event_codes.mc`, owns all six event code
+  constants with no other imports.
+
+  kernel_dispatch.mc imports event_codes; drops its six local constants;
+  references event_codes.EVENT_* for all emit calls.
+
+  serial_shell_event_log.mc imports event_codes; drops its six local
+  constant definitions; re-exports the constants as module-level aliases
+  (const EVENT_SERIAL_BUFFERED: u32 = event_codes.EVENT_SERIAL_BUFFERED)
+  so existing callers that import serial_shell_event_log for the ring-buffer
+  API continue to work without a separate import; replaces slot0/slot1/
+  slot2/slot3 fields with slots: [4]u32; simplifies slot_value() to a direct
+  array read (eliminating the if-chain entirely); simplifies with_slot() to
+  one array copy and one indexed assignment; eliminates the slot_value()
+  function entirely from the public API.
+
+  serial_service.mc: serial_on_receive replaces four guarded if-blocks with
+  a single for i in 0..obs.payload_len loop plus one capacity guard inside.
+
+No compiler changes.  No Effect changes.  No protocol changes.  No new
+behavioral rules.  The event codes are now visible as one named module with
+six constants rather than implied by two modules that must agree by convention.
+
+Boundary reduction proof:
+  Before: adding a new observable event type required adding a constant in
+    kernel_dispatch.mc AND the same constant with the same value in
+    serial_shell_event_log.mc, then one arm in serial_attach_events().
+    Missing either constant was a silent inconsistency — the number agreed
+    but the names were unrelated.
+  After: adding a new observable event type requires one constant addition in
+    event_codes.mc and one arm in serial_attach_events().  Both kernel_dispatch
+    and serial_shell_event_log reference event_codes directly; the value can
+    only diverge if event_codes.mc is edited incorrectly.
+
+Tests: all mc_tool_workflow_unit, mc_tool_build_state_unit, and
+mc_tool_real_project_unit tests pass without modification.

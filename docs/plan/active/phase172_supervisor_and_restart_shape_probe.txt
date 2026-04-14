@@ -1,0 +1,101 @@
+Phase 172 -- Supervisor And Restart Shape Probe
+================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Answer one grounded question about service lifecycle in the current kernel:
+does the init-owned restart model from Phase 149 remain sufficient as the
+service count and restart frequency grow, or does the repository need a
+named supervisor concept that is distinct from init?
+
+Phase 149 established restart semantics as a first-class pattern using
+explicit init-owned re-run of a service through a retained program capability.
+That model is intentionally simple and deliberately not a supervision
+framework.
+
+This phase probes whether that model is still sufficient under real usage
+pressure, or whether a named supervisor concept is the next minimal honest
+addition.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/archive/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/archive/phase130_explicit_restart_or_replacement_probe.txt`
+- `docs/plan/active/phase170_static_service_topology_first_acknowledgment.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+- `docs/arch/veya/veya_kernel_endstate_arch.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The current model: init owns restart by re-running a service through a
+  retained program capability, with no framework-level supervision contract.
+- The end-state kernel architecture doc anticipates a supervisor concept in the
+  longer term, but does not require it at the current service count.
+- The Phase 170 topology acknowledgment is a prerequisite: if the topology
+  is clarified first, the supervision question becomes easier to frame.
+- Supervision growth risks are: turning init into a hidden service framework,
+  introducing restart policies that generalize before pressure justifies them,
+  and conflating kernel-owned process lifecycle with user-space policy.
+
+Problem being solved
+--------------------
+- If the init-owned restart model is still sufficient, this phase establishes
+  that clearly and provides a trigger condition for reopening.
+- If it is not sufficient, this phase names the specific deficit and classifies
+  the narrowest honest next concept without implementing it.
+- Without this probe, supervision policy can grow silently through convenience
+  additions to init rather than through one explicit ownership decision.
+
+Core rule
+---------
+- Do not admit a supervision framework by default.
+- If a named supervisor concept is justified, it must be clearly distinct from
+  init (owns what init does not) and from the kernel (keeps policy in user
+  space).
+- No automatic retry policies, health-check callbacks, or watchdog timers in
+  this phase.
+- Measure from real restart and failure pressure in the current service set.
+
+Chosen slice for this phase
+---------------------------
+Branch A -- supervisor concept identified
+- one audit proving that init-owned restart is insufficient for a specific
+  real scenario in the current or near-term service set
+- one named supervisor concept with explicit ownership boundaries
+- no implementation in this phase — classification only
+
+Branch B -- explicit deferral
+- one audit confirming init-owned restart remains sufficient at the current
+  service count and usage pattern
+- one explicit trigger condition for reopening (e.g., "reopen when service
+  count exceeds N, or when restart-frequency pressure requires per-service
+  policies")
+
+Why this is the right placement
+--------------------------------
+- After Phase 170: topology is understood, so supervision can be framed
+  against a stable service graph.
+- Before Phase 173 (multicore boundary): supervisors interact with scheduler
+  wake and process slot ownership, so the supervision question should be
+  answered before SMP pressure is added to the same model.
+
+Planning rule for this phase
+------------------------------
+- Measure from actual restart and failure behavior in the current kernel.
+- Do not admit a supervision concept on architectural taste alone.
+
+What this phase should prove
+-----------------------------
+- that the init-owned restart model is either still sufficient or has a
+  clearly named successor concept
+- that supervision policy remains in user space and does not drift into init
+  or the kernel layer

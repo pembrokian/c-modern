@@ -16,6 +16,7 @@ import kernel_dispatch
 import log_service
 import serial_protocol
 import service_effect
+import service_topology
 import syscall
 
 const STEP_COUNT: usize = 22
@@ -51,7 +52,7 @@ struct SerialRoute {
     pid: u32
 }
 
-const DEFAULT_SERIAL_ROUTE: SerialRoute = SerialRoute{ endpoint: boot.SERIAL_ENDPOINT_ID, pid: 1 }
+const DEFAULT_SERIAL_ROUTE: SerialRoute = SerialRoute{ endpoint: service_topology.SERIAL_ENDPOINT_ID, pid: 1 }
 
 // serial_obs wraps a protocol payload into a ReceiveObservation.
 // endpoint and pid are explicit: swap the endpoint to route to a different
@@ -78,7 +79,7 @@ func cmd_kv_get(key: u8) syscall.ReceiveObservation {
 }
 
 func kv_count_obs(pid: u32) syscall.ReceiveObservation {
-    return serial_obs(boot.SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
+    return serial_obs(service_topology.SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
 }
 
 func step(obs: syscall.ReceiveObservation, failure_code: i32, check: StepCheck) StepSpec {
@@ -120,7 +121,7 @@ func step_table() [22]StepSpec {
     specs[1] = routed_step(cmd_kv_set(5, 42), 1)
     specs[2] = payload1_step(cmd_kv_get(5), 1, syscall.SyscallStatus.Ok, 42)
     specs[3] = log_tail_state_step(cmd_log_tail(), 1, syscall.SyscallStatus.Ok, 77, 75)
-    specs[4] = payload1_step(serial_obs(boot.SERIAL_ENDPOINT_ID, 99, serial_protocol.encode_kv_get(5)), 1, syscall.SyscallStatus.Ok, 42)
+    specs[4] = payload1_step(serial_obs(service_topology.SERIAL_ENDPOINT_ID, 99, serial_protocol.encode_kv_get(5)), 1, syscall.SyscallStatus.Ok, 42)
     specs[5] = routed_step(cmd_kv_set(5, 77), 1)
     specs[6] = routed_step(cmd_kv_set(5, 99), 1)
     specs[7] = payload1_step(cmd_kv_get(5), 1, syscall.SyscallStatus.Ok, 99)

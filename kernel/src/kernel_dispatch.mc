@@ -7,11 +7,13 @@
 // This module owns how an incoming observation is turned into an Effect.
 
 import boot
+import event_codes
 import kv_service
 import log_service
 import primitives
 import serial_shell_path
 import service_effect
+import service_topology
 import syscall
 
 // MAX_EFFECT_CHAIN_DEPTH guards against send loops between services.
@@ -19,12 +21,6 @@ import syscall
 // Value 8 is well above the current topology (serial → shell → kv/log, depth ≤ 3).
 const MAX_EFFECT_CHAIN_DEPTH: u32 = 8
 const KV_WRITE_LOG_MARKER: u8 = 75
-const EVENT_SERIAL_BUFFERED: u32 = 1
-const EVENT_SERIAL_REJECTED: u32 = 2
-const EVENT_SHELL_FORWARDED: u32 = 3
-const EVENT_SHELL_REPLY_OK: u32 = 4
-const EVENT_SHELL_REPLY_INVALID: u32 = 5
-const EVENT_SERIAL_CLEARED: u32 = 6
 
 // kv dispatch with advisory log marker.
 // The kv write always returns its own status; the advisory log append is
@@ -37,14 +33,14 @@ func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Messag
     if msg.payload_len >= 2 {
         log_payload: [4]u8 = primitives.zero_payload()
         log_payload[0] = KV_WRITE_LOG_MARKER
-        log_msg: service_effect.Message = service_effect.message(msg.source_pid, boot.LOG_ENDPOINT_ID, 1, log_payload)
+        log_msg: service_effect.Message = service_effect.message(msg.source_pid, service_topology.LOG_ENDPOINT_ID, 1, log_payload)
         kv_log_result: log_service.LogResult = log_service.handle(current.log_state, log_msg)
         new_log_state = kv_log_result.state
         if service_effect.effect_reply_status(kv_log_result.effect) == syscall.SyscallStatus.Exhausted {
             advisory_dropped = 1
         }
     }
-    *state = boot.KernelBootState{ path_state: current.path_state, log_state: new_log_state, kv_state: kv_result.state }
+    *state = boot.bootwith_kv(boot.bootwith_log(current, new_log_state), kv_result.state)
     if advisory_dropped == 1 {
         return service_effect.effect_mark_send_dropped(kv_result.effect)
     }
@@ -56,12 +52,12 @@ func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Messag
 // a further Send that needs chasing through a non-leaf path.
 func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    if msg.endpoint_id == boot.LOG_ENDPOINT_ID {
+    if msg.endpoint_id == service_topology.LOG_ENDPOINT_ID {
         log_result: log_service.LogResult = log_service.handle(current.log_state, msg)
-        *state = boot.KernelBootState{ path_state: current.path_state, log_state: log_result.state, kv_state: current.kv_state }
+        *state = boot.bootwith_log(current, log_result.state)
         return log_result.effect
     }
-    if msg.endpoint_id == boot.KV_ENDPOINT_ID {
+    if msg.endpoint_id == service_topology.KV_ENDPOINT_ID {
         return kernel_dispatch_kv(state, msg)
     }
     return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
@@ -89,21 +85,21 @@ func serial_attach_events(serial_effect: service_effect.Effect, obs: syscall.Rec
     result: service_effect.Effect = serial_effect
     if obs.payload_len != 0 {
         if obs.payload[0] == 255 {
-            result = service_effect.effect_with_event(result, EVENT_SERIAL_REJECTED)
+            result = service_effect.effect_with_event(result, event_codes.EVENT_SERIAL_REJECTED)
         } else {
-            result = service_effect.effect_with_event(result, EVENT_SERIAL_BUFFERED)
+            result = service_effect.effect_with_event(result, event_codes.EVENT_SERIAL_BUFFERED)
         }
     }
     if serial_shell_path.path_serial_reply_status(next_path) != syscall.SyscallStatus.None {
-        result = service_effect.effect_with_event(result, EVENT_SHELL_FORWARDED)
+        result = service_effect.effect_with_event(result, event_codes.EVENT_SHELL_FORWARDED)
         if serial_shell_path.path_serial_reply_status(next_path) == syscall.SyscallStatus.Ok {
-            result = service_effect.effect_with_event(result, EVENT_SHELL_REPLY_OK)
+            result = service_effect.effect_with_event(result, event_codes.EVENT_SHELL_REPLY_OK)
         }
         if serial_shell_path.path_serial_reply_status(next_path) == syscall.SyscallStatus.InvalidArgument {
-            result = service_effect.effect_with_event(result, EVENT_SHELL_REPLY_INVALID)
+            result = service_effect.effect_with_event(result, event_codes.EVENT_SHELL_REPLY_INVALID)
         }
         if serial_shell_path.path_serial_buffer_len(next_path) == 0 {
-            result = service_effect.effect_with_event(result, EVENT_SERIAL_CLEARED)
+            result = service_effect.effect_with_event(result, event_codes.EVENT_SERIAL_CLEARED)
         }
     }
     if service_effect.effect_send_dropped(resolved) != 0 {
@@ -128,7 +124,7 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
 // Top-level dispatch step: route to the serial path or directly to leaf
 // services.  No endpoint-specific post-processing needed at this level.
 func kernel_dispatch_step(state: *boot.KernelBootState, observation: syscall.ReceiveObservation) service_effect.Effect {
-    if observation.endpoint_id == boot.SERIAL_ENDPOINT_ID {
+    if observation.endpoint_id == service_topology.SERIAL_ENDPOINT_ID {
         return kernel_dispatch_serial(state, observation)
     }
     return kernel_dispatch_leaf(state, service_effect.message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload))
