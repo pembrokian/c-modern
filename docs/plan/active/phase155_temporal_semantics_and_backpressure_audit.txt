@@ -22,7 +22,6 @@ Relationship to companion notes
 This phase plan should stay aligned with:
 
 - `docs/plan/admin/speculative_roadmap_post_phase145.txt`
-- `docs/plan/active/phase132_backpressure_and_blocking_audit.txt`
 - `docs/plan/active/phase147_ipc_shape_audit_under_real_usage.txt`
 - `docs/plan/active/phase154_service_identity_and_addressing_semantics.txt`
 - `docs/plan/active/phase156_multi_client_interaction_audit.txt`
@@ -91,21 +90,17 @@ The owning implementation surfaces for this phase are:
    - publish the canonical Phase 155 execution note
 
 2. `kernel/src/serial_service.mc`, `kernel/src/shell_service.mc`,
-   `kernel/src/log_service.mc`, `kernel/src/kv_service.mc`, and any admitted
-   Phase 152 variation owner
+   `kernel/src/log_service.mc`, `kernel/src/kv_service.mc`
    - expose the user-visible timing, reply, and queue-pressure boundaries that
      the phase must classify
 
-3. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
-   - preserve explicit orchestration and restart policy while time-related
-     truth is audited
+3. `kernel/src/main.mc`, `kernel/src/boot.mc`
+   - keep integration behavior showing temporal ordering and reply timing;
+     audit invariants go in the test fixture, not in main
 
-4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
-   - add one audit path over a bounded delayed or backpressured scenario
-
-5. `tests/tool/freestanding/kernel/`
-   - add one focused Phase 155 regression plus one projected MIR golden over
-     the temporal-semantics boundary
+4. `tests/system/kernel_reset_lane_temporal_backpressure/`
+   - add one behavior-first system test fixture following the
+     InstallKernelResetLaneFixtureProject pattern; no MIR projections
 
 Deliverables
 ------------
@@ -114,7 +109,8 @@ Deliverables
   backpressure truth
 - one audit-owned Phase 155 proof over at least one slow-path or queued-path
   scenario
-- one focused freestanding regression plus projected MIR golden for the Phase
+- one behavior-first system test fixture in
+  tests/system/kernel_reset_lane_temporal_backpressure/ validating the Phase
   155 boundary
 
 Suggested execution order
@@ -136,8 +132,8 @@ Preferred proof points
    explicit non-guarantee.
 2. Visible queue pressure or delay is described in caller-visible terms.
 3. No scheduler rewrite, fairness policy, or async framework appears.
-4. One projected MIR proof shows the same bounded temporal contract in the
-   real artifact.
+4. One behavior-first system test validates the same bounded temporal contract
+   in the real artifact.
 
 Exit criteria
 -------------
@@ -147,8 +143,8 @@ Exit criteria
 - at least one delayed or backpressured scenario is audited concretely
 - the phase distinguishes guaranteed ordering from accidental current
   behavior
-- the focused regression proves build, run, docs, and MIR all expose the same
-  Phase 155 boundary
+- the behavior-first system test fixture builds and runs, proving the Phase
+  155 temporal and backpressure contract
 - compiler and low-level toolchain surfaces remain unchanged in this phase
 
 Non-goals

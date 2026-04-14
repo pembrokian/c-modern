@@ -14,18 +14,14 @@ const CMD_G: u8 = 71   // 'G'
 const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
 
 struct ShellServiceState {
-    owner_pid: u32
-    endpoint_handle_slot: u32
+    pid: u32
+    slot: u32
     log_endpoint_id: u32
     kv_endpoint_id: u32
 }
 
-func shell_init(owner_pid: u32, endpoint_handle_slot: u32, log_endpoint_id: u32, kv_endpoint_id: u32) ShellServiceState {
-    return ShellServiceState{ owner_pid: owner_pid, endpoint_handle_slot: endpoint_handle_slot, log_endpoint_id: log_endpoint_id, kv_endpoint_id: kv_endpoint_id }
-}
-
-func service_state(owner_pid: u32, endpoint_handle_slot: u32, log_endpoint_id: u32, kv_endpoint_id: u32) ShellServiceState {
-    return shell_init(owner_pid, endpoint_handle_slot, log_endpoint_id, kv_endpoint_id)
+func shell_init(pid: u32, slot: u32, log_endpoint_id: u32, kv_endpoint_id: u32) ShellServiceState {
+    return ShellServiceState{ pid: pid, slot: slot, log_endpoint_id: log_endpoint_id, kv_endpoint_id: kv_endpoint_id }
 }
 
 func invalid_effect() service_effect.Effect {
@@ -34,44 +30,44 @@ func invalid_effect() service_effect.Effect {
     return service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 1, payload)
 }
 
-func handle(state: ShellServiceState, msg: service_effect.Message) service_effect.Effect {
+func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     payload: [4]u8 = primitives.zero_payload()
 
-    if state.owner_pid == 0 || msg.payload_len != 4 {
+    if s.pid == 0 || m.payload_len != 4 {
         return invalid_effect()
     }
 
-    if msg.payload[0] == CMD_E && msg.payload[1] == CMD_C {
-        payload[0] = msg.payload[2]
-        payload[1] = msg.payload[3]
+    if m.payload[0] == CMD_E && m.payload[1] == CMD_C {
+        payload[0] = m.payload[2]
+        payload[1] = m.payload[3]
         return service_effect.effect_reply(syscall.SyscallStatus.Ok, 2, payload)
     }
 
-    if msg.payload[0] == CMD_L && msg.payload[1] == CMD_A && msg.payload[3] == CMD_BANG {
-        payload[0] = msg.payload[2]
-        return service_effect.effect_send(state.owner_pid, state.log_endpoint_id, 1, payload)
+    if m.payload[0] == CMD_L && m.payload[1] == CMD_A && m.payload[3] == CMD_BANG {
+        payload[0] = m.payload[2]
+        return service_effect.effect_send(s.pid, s.log_endpoint_id, 1, payload)
     }
 
-    if msg.payload[0] == CMD_L && msg.payload[1] == CMD_T && msg.payload[2] == CMD_BANG && msg.payload[3] == CMD_BANG {
-        return service_effect.effect_send(state.owner_pid, state.log_endpoint_id, 0, payload)
+    if m.payload[0] == CMD_L && m.payload[1] == CMD_T && m.payload[2] == CMD_BANG && m.payload[3] == CMD_BANG {
+        return service_effect.effect_send(s.pid, s.log_endpoint_id, 0, payload)
     }
 
-    if msg.payload[0] == CMD_K && msg.payload[1] == CMD_S {
-        payload[0] = msg.payload[2]
-        payload[1] = msg.payload[3]
-        return service_effect.effect_send(state.owner_pid, state.kv_endpoint_id, 2, payload)
+    if m.payload[0] == CMD_K && m.payload[1] == CMD_S {
+        payload[0] = m.payload[2]
+        payload[1] = m.payload[3]
+        return service_effect.effect_send(s.pid, s.kv_endpoint_id, 2, payload)
     }
 
-    if msg.payload[0] == CMD_K && msg.payload[1] == CMD_G && msg.payload[3] == CMD_BANG {
-        payload[0] = msg.payload[2]
-        return service_effect.effect_send(state.owner_pid, state.kv_endpoint_id, 1, payload)
+    if m.payload[0] == CMD_K && m.payload[1] == CMD_G && m.payload[3] == CMD_BANG {
+        payload[0] = m.payload[2]
+        return service_effect.effect_send(s.pid, s.kv_endpoint_id, 1, payload)
     }
 
     return invalid_effect()
 }
 
-func debug_request(state: ShellServiceState, payload_len: usize) u32 {
-    if state.owner_pid == 0 || payload_len == 0 {
+func debug_request(s: ShellServiceState, len: usize) u32 {
+    if s.pid == 0 || len == 0 {
         return 0
     }
     return 1

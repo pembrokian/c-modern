@@ -1,0 +1,420 @@
+Veya Kernel Style Guide
+=======================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Define the code style, naming conventions, module shape, and structural rules
+for kernel service code in the reset-lane kernel tree (kernel/src/).
+
+This guide applies to anyone — human or agent — writing or reviewing kernel
+service modules.  It is a prompt-compatible reference: an agent can read this
+file and produce code that is consistent with the existing kernel tree without
+needing to study each module individually.
+
+This guide does not apply to:
+
+- stdlib, codegen, sema, MIR, or compiler-internal code
+- test fixture code in tests/system/ or tests/smoke/ (though those should
+  follow the spirit of these rules)
+- the legacy kernel_old/ tree
+
+Relationship to companion notes
+--------------------------------
+Read these first if you are working on a new phase:
+
+- `kernel/README.md` — module admission policy and four-section standard
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt` — canonical service shape
+- `docs/arch/veya/veya_kernel_endstate_arch.txt` — long-term ownership target
+- `docs/plan/decision_log.txt` — deliberate limited solutions and why
+- `docs/plan/backlog.txt` — deferred work items
+
+---
+
+1. Aesthetic stance
+-------------------
+
+The reset-lane kernel targets Plan 9-inspired clarity: small, direct, flat,
+and readable.  The following values govern every decision below.
+
+Do:
+  - write short, direct, lowercase names
+  - write flat control flow with early returns
+  - remove boilerplate; factor it into a small helper if it appears twice
+  - keep modules small and focused on one concern
+  - prefer explicit state transformation over mutation
+  - no dynamic allocation in the hot path; fixed-size arrays everywhere
+
+Do not:
+  - introduce deep nesting or long if-chains when a loop or early return works
+  - use long identifiers when a short one is unambiguous in context
+  - add layers of abstraction that hide what is actually happening
+  - copy per-service definitions of concepts that belong in a shared module
+  - add "framework-y" wrappers that solve a problem that does not exist yet
+
+The standard to aim for: if a reader has to scroll past repeated boilerplate
+to understand what a function does, the code is not yet Plan-9-ish enough.
+
+
+2. Module structure
+-------------------
+
+Every service module follows the four-section standard:
+
+    1. Imports
+    2. Constants
+    3. Structs
+    4. Functions
+       a. init
+       b. helpers (small pure helpers — state constructors, field accessors)
+       c. handlers (the named behavior of the service — on_receive, kvset, ...)
+       d. public entry (handle / dispatch)
+       e. debug / introspection (last, lean, no production side effects)
+
+Sections that are empty may be omitted.  Do not invent additional sections
+(no audit blocks, no observation hooks, no routing tables).
+
+Section order is strict: imports → constants → structs → functions.
+Within functions, the four sub-groups above order them.
+
+Example skeleton:
+
+    import primitives
+    import service_effect
+    import syscall
+
+    const CAPACITY: usize = 4
+
+    struct State {
+        pid: u32
+        slot: u32
+        ...
+    }
+
+    struct Result {
+        state: State
+        effect: service_effect.Effect
+    }
+
+    func init(pid: u32, slot: u32) State { ... }
+    func with_fields(s: State, ...) State { ... }   // struct helper
+    func on_set(s: State, m: service_effect.Message) State { ... }
+    func on_get(s: State, m: service_effect.Message) service_effect.Effect { ... }
+    func handle(s: State, m: service_effect.Message) Result { ... }
+    func item_count(s: State) usize { ... }         // debug accessor
+
+
+3. Naming conventions
+---------------------
+
+Module names
+  Short, lowercase, one word or two joined without underscore where readable.
+  Examples: kv_service, log_service, serial_service, shell_service, boot, ipc.
+  Avoid: kv_service_module, kv_service_impl.
+
+Struct names
+  PascalCase.  One or two words.
+  The state struct for module foo_service is named FooServiceState.
+  The result pair for module foo_service is named FooResult (not
+  FooHandleResult, not FooDispatchResult).
+  Examples: KvServiceState, KvResult, LogServiceState, LogHandleResult→LogResult.
+
+State struct fields
+  Short, lowercase.  Use pid not owner_pid.  Use slot not endpoint_handle_slot.
+  Use len not buffer_len.  Use count not item_count.
+  Full table:
+
+    owner_pid              → pid
+    endpoint_handle_slot   → slot
+    payload_len            → len  (in context; keep payload_len when the
+                                   full Message struct owns it)
+    reply_payload_len      → replylen (or keep reply_payload_len if in Effect)
+    buffer_len             → len
+    retained_len           → len
+
+  Note: shared protocol structs (Message, Effect, ReceiveObservation) keep
+  their published field names unchanged.  Short-name rules apply only to
+  per-service state structs.
+
+Function names
+  Short, lowercase, verb or verb+noun.
+  Public init:     foo_init(pid, slot)
+  Struct helper:   foowith(s, ...)   or foo_with(s, ...)
+  Handlers:        fooset, fooget, foo_append, foo_tail, foo_on_receive
+  Entry point:     handle(s, m)   (always named handle for service modules)
+  Debug:           foo_count, foo_len, foo_forwarded
+  Receive entry:   foorecv(s, obs)
+
+  Avoid:
+    kv_on_set          → kvset
+    kv_on_get          → kvget
+    kv_on_receive      → kvrecv
+    debug_kv_count     → kv_count
+    service_state      → (remove; kv_init is the real constructor)
+
+  The service_state() alias is not part of the four-section standard.
+  Remove it when you touch a module.
+
+Function parameter names
+  Short: s for the service state, m for a message, obs for an observation,
+  key/val for kv pairs, i for a loop index.
+  Avoid: state, msg, observation, new_state.
+
+
+4. State transformation
+-----------------------
+
+Services are pure state machines.  The handler takes a value, returns a new
+value.  Do not mutate state in place unless the language requires it for a
+local temporary that never escapes the function.
+
+Rule: a handler function must have no global side effects.  All effects are
+returned as an Effect value and executed by the dispatcher.
+
+Struct constructor helper
+  When a struct literal must repeat unchanged fields, factor that into a
+  with-helper:
+
+    // DO:
+    func kvwith(s: KvServiceState, keys: [4]u8, vals: [4]u8, count: usize) KvServiceState {
+        return KvServiceState{ pid: s.pid, slot: s.slot, keys: keys, values: vals, count: count }
+    }
+
+    // AVOID:
+    return KvServiceState{ pid: state.pid, slot: state.slot, keys: next_keys, values: next_values, count: state.count }
+    return KvServiceState{ pid: state.pid, slot: state.slot, keys: next_keys, values: next_values, count: state.count }
+    return KvServiceState{ pid: state.pid, slot: state.slot, keys: next_keys, values: next_values, count: state.count }
+
+  If the same struct literal appears more than once, factor it.
+  A one-time literal at the end of a function is acceptable as-is.
+
+Incremental state from a copy
+  Copy the state, then mutate fields you need to change, then call the
+  with-helper (or return a struct literal) once.  Never write:
+
+    s.field = x
+    s.other = y
+    return s
+
+  because the language uses value semantics.  Create a local copy and
+  modify that explicitly, or use the with-helper pattern.
+
+
+5. Control flow
+---------------
+
+Early return
+  Return as early as possible.  Guard conditions come first; the happy path
+  is last (or implicitly the fallthrough).
+
+    // DO:
+    func kvset(s: State, m: Message) State {
+        if m.payload_len < 2 {
+            return s
+        }
+        key: u8 = m.payload[0]
+        ...
+    }
+
+    // AVOID:
+    func kvset(s: State, m: Message) State {
+        if m.payload_len >= 2 {
+            key: u8 = m.payload[0]
+            ...
+        }
+        return s
+    }
+
+Loops over fixed-size arrays
+  Use a for-in range loop instead of a repeated if-chain:
+
+    // DO:
+    for i in 0..s.count {
+        if s.keys[i] == key { ... }
+    }
+
+    // AVOID:
+    if 0 < s.count && s.keys[0] == key { ... }
+    if 1 < s.count && s.keys[1] == key { ... }
+    if 2 < s.count && s.keys[2] == key { ... }
+    if 3 < s.count && s.keys[3] == key { ... }
+
+  The upper bound of the range can be any expression: s.count, s.len, etc.
+  The range is exclusive on the right: 0..4 iterates i = 0, 1, 2, 3.
+
+Flat nesting
+  No more than two levels of nesting in a handler unless the algorithm
+  genuinely requires it.  If you are nesting three levels deep, split the
+  inner block into a helper function.
+
+Intermediate variables
+  Name locals for clarity at the point where the name is first assigned.
+  Do not introduce an intermediate variable whose only purpose is to hold
+  the result of one expression that is used once.
+
+    // DO:
+    return KvResult{ state: kvset(s, m), effect: effect_reply(Ok, 0, zero_payload()) }
+
+    // AVOID:
+    new_state: KvServiceState = kvset(s, m)
+    result: KvResult = KvResult{ state: new_state, effect: ... }
+    return result
+
+
+6. The shared protocol contract
+--------------------------------
+
+The following types are owned by shared modules and must not be redefined
+per service:
+
+  service_effect.Message   — the input to every service handler
+  service_effect.Effect    — the output of every service handler
+  syscall.SyscallStatus    — status codes
+  syscall.ReceiveObservation — raw kernel receive event
+
+Each service's handle() function has exactly this signature:
+
+    func handle(s: FooServiceState, m: service_effect.Message) FooResult
+
+where FooResult carries one .state and one .effect field.
+
+If a service does not produce state changes (e.g. shell_service is stateless
+modulo wired endpoint IDs), it may return Effect directly instead of a
+Result pair.  That is an intentional exception for state-free routing
+services.
+
+Do not create service-local variants of Message or Effect.
+Do not add routing logic or control-flow metadata to a Result pair.
+
+
+7. Effect semantics
+-------------------
+
+An Effect is one of three variants:
+
+    None    — no visible consequence (used for error/ignore paths)
+    Reply   — one synchronous reply to the message source
+    Send    — one asynchronous send to another endpoint
+
+A handler must return exactly one Effect per message.  Sequences of effects
+(reply-then-log, send-then-reply) are handled by the dispatcher chaining
+calls, not by adding compound Effect variants.  Do not introduce
+ReplyAndEmit, ReplyAndSend, or any hybrid.
+
+The dispatcher (boot.kernel_dispatch_step) is the only place where multiple
+Effects are sequenced.  Services see one message in, one effect out.
+
+
+8. Audit and debug functions
+-----------------------------
+
+Audit logic belongs in test fixtures, not in service modules or main.mc.
+
+  DO put invariant checks in tests/system/kernel_reset_lane_*/src/main.mc.
+  DO NOT put invariant checks in kernel/src/main.mc.
+  DO NOT add `if !invariant { panic() }` code to service modules.
+
+Debug accessor functions are allowed in a service module only if they return
+a plain observable value (a count, a length, a flag) without any side effect.
+Name them after the datum: kv_count, log_len, serial_forwarded.
+Prefix with the service name to avoid collision across modules.
+
+Remove debug accessors when the datum they expose is either:
+  a) directly available as a struct field via the state value, or
+  b) no longer covered by any test
+
+
+9. Module admission
+-------------------
+
+Do not add a module to kernel/src/ unless the current phase boundary forces
+it.  Each admission must satisfy:
+
+  a) the phase plan explicitly names the module or the audit proves it is
+     required
+  b) the module follows the four-section standard
+  c) the module does not copy concepts already owned by primitives, ipc,
+     service_effect, or syscall
+  d) the module is lean: no observation-count fields, no last_* fields, no
+     phase-indexed audit structs, no proof-routing helpers
+
+See kernel/README.md for the per-phase deferred module table.
+
+
+10. What main.mc contains
+---------------------------
+
+main.mc is the kernel image entry point.  It contains:
+
+  - integration behavior: calls to boot.kernel_init(), the dispatch loop,
+    and state transitions via cmd_log_append, cmd_kv_set, cmd_kv_get, etc.
+  - smoke return codes that test observable integration behavior
+
+main.mc does not contain:
+
+  - invariant assertions (those belong in test fixtures)
+  - service-level audit blocks
+  - imports of service_identity or any service module that is not needed
+    for the integration path
+
+This rule exists because main.mc must demonstrate behavior, not duplicate
+what the test suite can check more precisely.
+
+
+11. Example: canonical service shape
+--------------------------------------
+
+The kv_service.mc after the Phase 154 Plan-9 refactor is the reference
+implementation for a stateful key-value service.  Study it first.
+
+Key patterns it demonstrates:
+
+  a) Short struct fields: pid, slot, keys, values, count
+  b) kvwith() removes struct-literal repetition
+  c) for i in 0..s.count replaces 4× repeated if-chain
+  d) kvset and kvget are flat, ≤ 15 lines each
+  e) handle() is ≤ 8 lines
+  f) KvResult (not KvHandleResult) as the return pair
+  g) kv_count (not debug_kv_count) as the debug accessor
+  h) No service_state() alias
+
+The log_service.mc is the next module that should receive the same treatment
+when it is next touched.  Current pre-refactor patterns to clean up:
+
+  - owner_pid → pid, endpoint_handle_slot → slot
+  - LogHandleResult → LogResult
+  - log_on_tail's repeated if-chain → for i in 0..s.len loop
+  - service_state() alias → remove
+  - debug_retained_len → log_len
+
+The serial_service.mc is intentionally more complex (it carries reply staging
+state and has a forwarding buffer path).  Its long functions are justified by
+the protocol; however the same naming rules still apply when it is next
+touched.
+  owner_pid → pid, endpoint_handle_slot → slot, service_state() → remove.
+
+
+12. Prompt note for agents
+---------------------------
+
+When implementing a new kernel service or modifying an existing one:
+
+  1. Read this document.
+  2. Read kernel/README.md for the module admission gate.
+  3. Read the named phase plan in docs/plan/active/.
+  4. Read kv_service.mc as the style reference.
+  5. Follow sections 2–10 exactly.
+  6. Write one behavior-first test fixture in
+     tests/system/kernel_reset_lane_<name>/src/main.mc that exercises the
+     phase contract.  Register it via InstallKernelResetLaneFixtureProject
+     in tests/tool/tool_workflow_suite.cpp.
+  7. Do not add audit blocks to kernel/src/main.mc.
+  8. Do not add MIR golden projections; system test fixtures are sufficient.
+  9. Run:
+       cmake --build build/debug -j4
+       ctest --test-dir build/debug -j4 --output-on-failure
+
+     and confirm all 31+ tests pass before declaring a phase done.

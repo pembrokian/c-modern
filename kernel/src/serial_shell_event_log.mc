@@ -85,34 +85,8 @@ func event_log_entry(log: SerialShellEventLog, logical_index: usize) u32 {
 
 func append_effect_events(log: SerialShellEventLog, effect: service_effect.Effect) SerialShellEventLog {
     next_log: SerialShellEventLog = log
-    index: usize = 0
-    while index < service_effect.effect_event_count(effect) {
-        next_log = event_log_push(next_log, service_effect.effect_event(effect, index))
-        index = index + 1
+    for i in 0..effect.event_count {
+        next_log = event_log_push(next_log, service_effect.effect_event(effect, i))
     }
     return next_log
-}
-
-func event_serial_buffered() u32 {
-    return EVENT_SERIAL_BUFFERED
-}
-
-func event_serial_rejected() u32 {
-    return EVENT_SERIAL_REJECTED
-}
-
-func event_shell_forwarded() u32 {
-    return EVENT_SHELL_FORWARDED
-}
-
-func event_shell_reply_ok() u32 {
-    return EVENT_SHELL_REPLY_OK
-}
-
-func event_shell_reply_invalid() u32 {
-    return EVENT_SHELL_REPLY_INVALID
-}
-
-func event_serial_cleared() u32 {
-    return EVENT_SERIAL_CLEARED
 }

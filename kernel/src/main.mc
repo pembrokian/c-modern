@@ -64,7 +64,7 @@ func main() i32 {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return 1
     }
-    if service_effect.effect_reply_payload_len(effect) != log_service.debug_retained_len(state.log_state) {
+    if service_effect.effect_reply_payload_len(effect) != log_service.log_len(state.log_state) {
         return 1
     }
     if service_effect.effect_reply_payload(effect)[0] != 77 {

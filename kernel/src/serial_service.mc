@@ -5,8 +5,8 @@ const SERIAL_BUFFER_CAPACITY: usize = 4
 const SERIAL_INVALID_BYTE: u8 = 255
 
 struct SerialServiceState {
-    owner_pid: u32
-    endpoint_handle_slot: u32
+    pid: u32
+    slot: u32
     buffer: [4]u8
     len: usize
     reply_status: syscall.SyscallStatus
@@ -14,84 +14,88 @@ struct SerialServiceState {
     reply_payload: [4]u8
 }
 
-func serial_init(owner_pid: u32, endpoint_handle_slot: u32) SerialServiceState {
-    return SerialServiceState{ owner_pid: owner_pid, endpoint_handle_slot: endpoint_handle_slot, buffer: primitives.zero_payload(), len: 0, reply_status: syscall.SyscallStatus.None, reply_len: 0, reply_payload: primitives.zero_payload() }
+func serial_init(pid: u32, slot: u32) SerialServiceState {
+    return SerialServiceState{ pid: pid, slot: slot, buffer: primitives.zero_payload(), len: 0, reply_status: syscall.SyscallStatus.None, reply_len: 0, reply_payload: primitives.zero_payload() }
 }
 
-func service_state(owner_pid: u32, endpoint_handle_slot: u32) SerialServiceState {
-    return serial_init(owner_pid, endpoint_handle_slot)
+func serialwith(s: SerialServiceState, buf: [4]u8, blen: usize, rs: syscall.SyscallStatus, rlen: usize, rp: [4]u8) SerialServiceState {
+    return SerialServiceState{ pid: s.pid, slot: s.slot, buffer: buf, len: blen, reply_status: rs, reply_len: rlen, reply_payload: rp }
 }
 
-func serial_clear_reply(state: SerialServiceState) SerialServiceState {
-    return SerialServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, buffer: state.buffer, len: state.len, reply_status: syscall.SyscallStatus.None, reply_len: 0, reply_payload: primitives.zero_payload() }
+func serial_clear_reply(s: SerialServiceState) SerialServiceState {
+    return serialwith(s, s.buffer, s.len, syscall.SyscallStatus.None, 0, primitives.zero_payload())
 }
 
-func serial_reply_status(state: SerialServiceState) syscall.SyscallStatus {
-    return state.reply_status
+func serial_reply_status(s: SerialServiceState) syscall.SyscallStatus {
+    return s.reply_status
 }
 
-func serial_reply_len(state: SerialServiceState) usize {
-    return state.reply_len
+func serial_reply_len(s: SerialServiceState) usize {
+    return s.reply_len
 }
 
-func serial_reply_payload(state: SerialServiceState) [4]u8 {
-    return state.reply_payload
+func serial_reply_payload(s: SerialServiceState) [4]u8 {
+    return s.reply_payload
 }
 
-func serial_has_pending_reply(state: SerialServiceState) u32 {
-    if state.reply_status == syscall.SyscallStatus.None {
+func serial_has_pending_reply(s: SerialServiceState) u32 {
+    if s.reply_status == syscall.SyscallStatus.None {
         return 0
     }
     return 1
 }
 
-func serial_on_receive(state: SerialServiceState, observation: syscall.ReceiveObservation) SerialServiceState {
-    next_state: SerialServiceState = serial_clear_reply(state)
-    if observation.payload_len == 0 {
-        return next_state
+func serial_forwarded(s: SerialServiceState) u32 {
+    return serial_has_pending_reply(s)
+}
+
+func serial_on_receive(s: SerialServiceState, obs: syscall.ReceiveObservation) SerialServiceState {
+    next: SerialServiceState = serial_clear_reply(s)
+    if obs.payload_len == 0 {
+        return next
     }
-    if observation.payload[0] == SERIAL_INVALID_BYTE {
-        return next_state
+    if obs.payload[0] == SERIAL_INVALID_BYTE {
+        return next
     }
     // Bytes beyond SERIAL_BUFFER_CAPACITY are intentionally dropped: the
     // fixed-size buffer only accommodates one 4-byte command at a time.
-    next_buffer: [4]u8 = next_state.buffer
-    next_len: usize = next_state.len
+    next_buffer: [4]u8 = next.buffer
+    next_len: usize = next.len
     if next_len < SERIAL_BUFFER_CAPACITY {
-        next_buffer[next_len] = observation.payload[0]
+        next_buffer[next_len] = obs.payload[0]
         next_len = next_len + 1
     }
-    if observation.payload_len > 1 && next_len < SERIAL_BUFFER_CAPACITY {
-        next_buffer[next_len] = observation.payload[1]
+    if obs.payload_len > 1 && next_len < SERIAL_BUFFER_CAPACITY {
+        next_buffer[next_len] = obs.payload[1]
         next_len = next_len + 1
     }
-    if observation.payload_len > 2 && next_len < SERIAL_BUFFER_CAPACITY {
-        next_buffer[next_len] = observation.payload[2]
+    if obs.payload_len > 2 && next_len < SERIAL_BUFFER_CAPACITY {
+        next_buffer[next_len] = obs.payload[2]
         next_len = next_len + 1
     }
-    if observation.payload_len > 3 && next_len < SERIAL_BUFFER_CAPACITY {
-        next_buffer[next_len] = observation.payload[3]
+    if obs.payload_len > 3 && next_len < SERIAL_BUFFER_CAPACITY {
+        next_buffer[next_len] = obs.payload[3]
         next_len = next_len + 1
     }
-    return SerialServiceState{ owner_pid: next_state.owner_pid, endpoint_handle_slot: next_state.endpoint_handle_slot, buffer: next_buffer, len: next_len, reply_status: syscall.SyscallStatus.None, reply_len: 0, reply_payload: primitives.zero_payload() }
+    return serialwith(next, next_buffer, next_len, syscall.SyscallStatus.None, 0, primitives.zero_payload())
 }
 
-func serial_forward_request_len(state: SerialServiceState) usize {
-    return state.len
+func serial_forward_request_len(s: SerialServiceState) usize {
+    return s.len
 }
 
-func serial_forward_request_payload(state: SerialServiceState) [4]u8 {
-    return state.buffer
+func serial_forward_request_payload(s: SerialServiceState) [4]u8 {
+    return s.buffer
 }
 
-func serial_clear(state: SerialServiceState) SerialServiceState {
-    return SerialServiceState{ owner_pid: state.owner_pid, endpoint_handle_slot: state.endpoint_handle_slot, buffer: primitives.zero_payload(), len: 0, reply_status: state.reply_status, reply_len: state.reply_len, reply_payload: state.reply_payload }
+func serial_clear(s: SerialServiceState) SerialServiceState {
+    return serialwith(s, primitives.zero_payload(), 0, s.reply_status, s.reply_len, s.reply_payload)
 }
 
-func serial_on_reply(state: SerialServiceState, observation: syscall.ReceiveObservation) SerialServiceState {
-    if observation.status == syscall.SyscallStatus.None {
-        return state
+func serial_on_reply(s: SerialServiceState, obs: syscall.ReceiveObservation) SerialServiceState {
+    if obs.status == syscall.SyscallStatus.None {
+        return s
     }
-    cleared: SerialServiceState = serial_clear(state)
-    return SerialServiceState{ owner_pid: cleared.owner_pid, endpoint_handle_slot: cleared.endpoint_handle_slot, buffer: cleared.buffer, len: cleared.len, reply_status: observation.status, reply_len: observation.payload_len, reply_payload: observation.payload }
+    cleared: SerialServiceState = serial_clear(s)
+    return serialwith(cleared, cleared.buffer, cleared.len, obs.status, obs.payload_len, obs.payload)
 }

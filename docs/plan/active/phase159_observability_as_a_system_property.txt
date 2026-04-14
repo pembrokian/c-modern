@@ -90,19 +90,17 @@ The owning implementation surfaces for this phase are:
    - remain the primary retained observation owner and the first place to
      distinguish system-visible truth from instrumentation sprawl
 
-3. `kernel/src/shell_service.mc`, `kernel/src/kv_service.mc`, and any admitted
-   Phase 152 variation owner
+3. `kernel/src/shell_service.mc`, `kernel/src/kv_service.mc`
    - expose the observation needs that remain user-meaningful across the
      admitted service system
 
-4. `kernel/src/debug/`, `kernel/src/bootstrap_audit/`, and owner-local debug
-   helpers
-   - add one audit path over a bounded debugging or inspection workflow while
-     rejecting cross-cutting framework drift
+4. `kernel/src/main.mc`, `kernel/src/boot.mc`
+   - keep integration behavior showing the minimal observation surface; audit
+     invariants go in the test fixture, not in main
 
-5. `tests/tool/freestanding/kernel/`
-   - add one focused Phase 159 regression plus one projected MIR golden over
-     the observability boundary
+5. `tests/system/kernel_reset_lane_observability/`
+   - add one behavior-first system test fixture following the
+     InstallKernelResetLaneFixtureProject pattern; no MIR projections
 
 Deliverables
 ------------
@@ -111,8 +109,9 @@ Deliverables
 - one classification of system-visible truth versus implementation detail
 - one audit-owned Phase 159 proof over at least one debugging or inspection
   workflow
-- one focused freestanding regression plus projected MIR golden for the Phase
-  159 boundary
+- one behavior-first system test fixture in
+  tests/system/kernel_reset_lane_observability/ validating the Phase 159
+  boundary
 
 Suggested execution order
 -------------------------
@@ -131,8 +130,8 @@ Preferred proof points
    internal folklore.
 2. The minimum observation surface remains explicit and bounded.
 3. No telemetry platform, logging framework, or debug-print sprawl appears.
-4. One projected MIR proof shows the same bounded observation contract in the
-   real artifact.
+4. One behavior-first system test validates the same bounded observation
+   contract in the real artifact.
 
 Exit criteria
 -------------
@@ -141,8 +140,8 @@ Exit criteria
 - the real kernel artifact builds and runs to a Phase 159 marker
 - at least one debugging or inspection workflow is audited concretely
 - the phase distinguishes system-visible truth from implementation detail
-- the focused regression proves build, run, docs, and MIR all expose the same
-  Phase 159 boundary
+- the behavior-first system test fixture builds and runs, proving the Phase
+  159 observability contract
 - compiler and low-level toolchain surfaces remain unchanged in this phase
 
 Non-goals

@@ -93,38 +93,42 @@ func effect_event_count(effect: Effect) usize {
     return effect.event_count
 }
 
-func effect_event(effect: Effect, index: usize) u32 {
-    if index >= effect.event_count {
+func effect_event(effect: Effect, i: usize) u32 {
+    if i >= effect.event_count {
         return 0
     }
-    if index == 0 {
+    if i == 0 {
         return effect.event0
     }
-    if index == 1 {
+    if i == 1 {
         return effect.event1
     }
-    if index == 2 {
+    if i == 2 {
         return effect.event2
     }
     return effect.event3
 }
 
+func effectwith_events(e: Effect, count: usize, e0: u32, e1: u32, e2: u32, e3: u32) Effect {
+    return Effect{ kind: e.kind, reply_status: e.reply_status, reply_payload_len: e.reply_payload_len, reply_payload: e.reply_payload, send_source_pid: e.send_source_pid, send_endpoint_id: e.send_endpoint_id, send_payload_len: e.send_payload_len, send_payload: e.send_payload, event_count: count, event0: e0, event1: e1, event2: e2, event3: e3 }
+}
+
 func effect_with_event(effect: Effect, event_code: u32) Effect {
     if effect.event_count == 0 {
-        return Effect{ kind: effect.kind, reply_status: effect.reply_status, reply_payload_len: effect.reply_payload_len, reply_payload: effect.reply_payload, send_source_pid: effect.send_source_pid, send_endpoint_id: effect.send_endpoint_id, send_payload_len: effect.send_payload_len, send_payload: effect.send_payload, event_count: 1, event0: event_code, event1: 0, event2: 0, event3: 0 }
+        return effectwith_events(effect, 1, event_code, 0, 0, 0)
     }
     if effect.event_count == 1 {
-        return Effect{ kind: effect.kind, reply_status: effect.reply_status, reply_payload_len: effect.reply_payload_len, reply_payload: effect.reply_payload, send_source_pid: effect.send_source_pid, send_endpoint_id: effect.send_endpoint_id, send_payload_len: effect.send_payload_len, send_payload: effect.send_payload, event_count: 2, event0: effect.event0, event1: event_code, event2: 0, event3: 0 }
+        return effectwith_events(effect, 2, effect.event0, event_code, 0, 0)
     }
     if effect.event_count == 2 {
-        return Effect{ kind: effect.kind, reply_status: effect.reply_status, reply_payload_len: effect.reply_payload_len, reply_payload: effect.reply_payload, send_source_pid: effect.send_source_pid, send_endpoint_id: effect.send_endpoint_id, send_payload_len: effect.send_payload_len, send_payload: effect.send_payload, event_count: 3, event0: effect.event0, event1: effect.event1, event2: event_code, event3: 0 }
+        return effectwith_events(effect, 3, effect.event0, effect.event1, event_code, 0)
     }
     if effect.event_count == 3 {
-        return Effect{ kind: effect.kind, reply_status: effect.reply_status, reply_payload_len: effect.reply_payload_len, reply_payload: effect.reply_payload, send_source_pid: effect.send_source_pid, send_endpoint_id: effect.send_endpoint_id, send_payload_len: effect.send_payload_len, send_payload: effect.send_payload, event_count: 4, event0: effect.event0, event1: effect.event1, event2: effect.event2, event3: event_code }
+        return effectwith_events(effect, 4, effect.event0, effect.event1, effect.event2, event_code)
     }
     return effect
 }
 
-func from_receive_observation(observation: syscall.ReceiveObservation) Message {
-    return message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload)
+func from_receive_observation(obs: syscall.ReceiveObservation) Message {
+    return message(obs.source_pid, obs.endpoint_id, obs.payload_len, obs.payload)
 }

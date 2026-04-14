@@ -90,20 +90,17 @@ The owning implementation surfaces for this phase are:
    - publish the canonical Phase 158 execution note
 
 2. `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`,
-   `kernel/src/kv_service.mc`, and any admitted Phase 152 variation owner
+   `kernel/src/kv_service.mc`
    - expose the failure, retry, and reset consequences that the phase must
      compare
 
-3. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
-   - keep restart and orchestration policy explicit while cross-service
-     failure meaning is audited
+3. `kernel/src/main.mc`, `kernel/src/boot.mc`
+   - keep integration behavior showing restart and failure wiring; audit
+     invariants go in the test fixture, not in main
 
-4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
-   - add one audit path over at least one cross-service failure comparison
-
-5. `tests/tool/freestanding/kernel/`
-   - add one focused Phase 158 regression plus one projected MIR golden over
-     the cross-service failure boundary
+4. `tests/system/kernel_reset_lane_cross_service_failure/`
+   - add one behavior-first system test fixture following the
+     InstallKernelResetLaneFixtureProject pattern; no MIR projections
 
 Deliverables
 ------------
@@ -114,7 +111,8 @@ Deliverables
   differences
 - one audit-owned Phase 158 proof over at least one cross-service failure
   case
-- one focused freestanding regression plus projected MIR golden for the Phase
+- one behavior-first system test fixture in
+  tests/system/kernel_reset_lane_cross_service_failure/ validating the Phase
   158 boundary
 
 Suggested execution order
@@ -135,8 +133,8 @@ Preferred proof points
    guessing.
 2. At least one cross-service failure difference is classified concretely.
 3. No hidden retry framework or kernel-owned recovery policy appears.
-4. One projected MIR proof shows the same bounded failure comparison in the
-   real artifact.
+4. One behavior-first system test validates the same bounded failure
+   comparison in the real artifact.
 
 Exit criteria
 -------------
@@ -145,8 +143,8 @@ Exit criteria
 - the real kernel artifact builds and runs to a Phase 158 marker
 - visible failure semantics are compared across the admitted service set
 - at least one intentional or accidental difference is classified explicitly
-- the focused regression proves build, run, docs, and MIR all expose the same
-  Phase 158 boundary
+- the behavior-first system test fixture builds and runs, proving the Phase
+  158 cross-service failure contract
 - compiler and low-level toolchain surfaces remain unchanged in this phase
 
 Non-goals

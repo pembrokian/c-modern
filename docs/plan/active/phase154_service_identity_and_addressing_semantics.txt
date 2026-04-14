@@ -3,7 +3,43 @@ Phase 154 -- Service Identity And Addressing Semantics
 
 Status
 ------
-PLANNED
+DONE
+
+Closeout note
+-------------
+Phase 154 was executed against the reset-lane kernel (`kernel/src/`) rather
+than the old `bootstrap_services/` / `init.mc` tree referenced in the
+original plan, which was written before the Phase 152c kernel reset.
+
+What was implemented:
+- `kernel/src/service_identity.mc`: `ServiceRef` struct (wraps `endpoint_id:
+  u32`), `service_ref()`, `ref_endpoint()`, `refs_equal()`, `ref_is_valid()`;
+  embedded stability rules state that endpoint_id survives restart but
+  retained state does not, and there is no discovery.
+- `kernel/src/ipc.mc`: `zero_payload()` and `payload_byte()` IPC payload
+  utilities, fixing the pre-existing broken `import ipc` across all
+  reset-lane test fixtures.
+- `kernel/src/boot.mc`: four named ref accessors — `boot_serial_ref()`,
+  `boot_shell_ref()`, `boot_log_ref()`, `boot_kv_ref()` — expose the
+  fixed-wired endpoint identities by name.
+- `kernel/src/serial_service.mc`: `serial_forwarded()` alias for test
+  compatibility.
+- `tests/system/kernel_reset_lane_service_identity/`: new behavior-first
+  test fixture with four smoke passes checking that refs are valid, distinct,
+  idempotent, and route correctly — consistent with the Phase 152c testing
+  conventions.
+
+Key design decision:
+- `ServiceRef` is a plain struct, not a compiler-known type. No sema, MIR,
+  backend, or language surfaces were opened. The identity contract is library
+  code.
+- The identity audit was intentionally kept out of `kernel/src/main.mc`.
+  main.mc shows integration behavior; structural invariant checks belong in
+  the test fixture layer. This separation is now the established rule.
+- The plan artifacts referencing `tests/tool/freestanding/kernel/` MIR
+  projections and freestanding regressions were not appropriate for the
+  reset-lane approach; the behavior-first system test replaces them per the
+  Phase 152c testing convention.
 
 Purpose
 -------

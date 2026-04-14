@@ -4,6 +4,7 @@ import log_service
 import serial_service
 import serial_shell_path
 import service_effect
+import service_identity
 import shell_service
 import syscall
 
@@ -35,7 +36,7 @@ struct KernelBootState {
 }
 
 func kernel_init() KernelBootState {
-    return KernelBootState{ path_state: serial_shell_path.service_state(serial_service.serial_init(BOOT_SERIAL_OWNER_PID, 1), shell_service.shell_init(BOOT_SHELL_OWNER_PID, 1, LOG_ENDPOINT_ID, KV_ENDPOINT_ID), SHELL_ENDPOINT_ID), log_state: log_service.log_init(BOOT_LOG_OWNER_PID, 1), kv_state: kv_service.kv_init(BOOT_KV_OWNER_PID, 1) }
+    return KernelBootState{ path_state: serial_shell_path.path_init(serial_service.serial_init(BOOT_SERIAL_OWNER_PID, 1), shell_service.shell_init(BOOT_SHELL_OWNER_PID, 1, LOG_ENDPOINT_ID, KV_ENDPOINT_ID), SHELL_ENDPOINT_ID), log_state: log_service.log_init(BOOT_LOG_OWNER_PID, 1), kv_state: kv_service.kv_init(BOOT_KV_OWNER_PID, 1) }
 }
 
 func message_to_observation(msg: service_effect.Message) syscall.ReceiveObservation {
@@ -52,18 +53,18 @@ func kernel_dispatch_message(state: *KernelBootState, msg: service_effect.Messag
         return shell_effect
     }
     if msg.endpoint_id == LOG_ENDPOINT_ID {
-        log_result: log_service.LogHandleResult = log_service.handle(current.log_state, msg)
+        log_result: log_service.LogResult = log_service.handle(current.log_state, msg)
         *state = KernelBootState{ path_state: current.path_state, log_state: log_result.state, kv_state: current.kv_state }
         return log_result.effect
     }
     if msg.endpoint_id == KV_ENDPOINT_ID {
-        kv_result: kv_service.KvHandleResult = kv_service.handle(current.kv_state, msg)
+        kv_result: kv_service.KvResult = kv_service.handle(current.kv_state, msg)
         new_log_state: log_service.LogServiceState = current.log_state
         if msg.payload_len >= 2 {
             log_payload: [4]u8 = primitives.zero_payload()
             log_payload[0] = KV_WRITE_LOG_MARKER
             log_msg: service_effect.Message = service_effect.message(msg.source_pid, LOG_ENDPOINT_ID, 1, log_payload)
-            kv_log_result: log_service.LogHandleResult = log_service.handle(current.log_state, log_msg)
+            kv_log_result: log_service.LogResult = log_service.handle(current.log_state, log_msg)
             new_log_state = kv_log_result.state
         }
         *state = KernelBootState{ path_state: current.path_state, log_state: new_log_state, kv_state: kv_result.state }
@@ -129,4 +130,25 @@ func debug_boot_routed(effect: service_effect.Effect) u32 {
         return 0
     }
     return 1
+}
+
+// Named ServiceRef accessors for the four boot-wired services.
+// These refs are stable across restart — the endpoint_id never changes after
+// kernel_init() assigns it.  Callers that hold one of these refs may resume
+// sending after a service restart without reacquiring the ref.
+
+func boot_serial_ref() service_identity.ServiceRef {
+    return service_identity.service_ref(SERIAL_ENDPOINT_ID)
+}
+
+func boot_shell_ref() service_identity.ServiceRef {
+    return service_identity.service_ref(SHELL_ENDPOINT_ID)
+}
+
+func boot_log_ref() service_identity.ServiceRef {
+    return service_identity.service_ref(LOG_ENDPOINT_ID)
+}
+
+func boot_kv_ref() service_identity.ServiceRef {
+    return service_identity.service_ref(KV_ENDPOINT_ID)
 }

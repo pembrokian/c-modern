@@ -223,10 +223,10 @@ add_test(NAME mc_tool_real_project_unit COMMAND mc_tool_real_project_tests ${CMA
 add_test(NAME mc_tool_freestanding_bootstrap_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} bootstrap)
 
 # Primary freestanding kernel surfaces.
-add_test(NAME mc_tool_freestanding_kernel_runtime_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-runtime)
+# Note: kernel-runtime and kernel-artifacts removed; they probed kernel_old/ (frozen legacy tree)
+# via kernel/build.toml which does not exist in the reset-lane kernel.
 add_test(NAME mc_tool_freestanding_kernel_synthetic_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-synthetic)
 add_test(NAME mc_tool_freestanding_kernel_docs_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-docs)
-add_test(NAME mc_tool_freestanding_kernel_artifacts_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-artifacts)
 
 add_test(NAME mc_tool_freestanding_system_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} system)
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
@@ -313,3 +313,15 @@ add_test(NAME mc_release_snapshot_prep
          -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
          -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_release_snapshot_prep.cmake)
+
+# These tests internally invoke the same smoke scripts which write to shared
+# output directories (${BINARY_DIR}/audit/first_use_smoke/ and
+# ${BINARY_DIR}/audit/public_cut_smoke/).  Serialise them so that parallel
+# ctest runs (-j4) do not race on those directories.
+set_tests_properties(
+    mc_first_use_smoke
+    mc_public_cut_smoke
+    mc_release_readiness_audit
+    mc_release_snapshot_prep
+    mc_v0_2_gate
+    PROPERTIES RESOURCE_LOCK audit_smoke_dirs)

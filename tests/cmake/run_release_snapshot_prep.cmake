@@ -6,7 +6,8 @@ function(resolve_plan_doc out_var file_name)
   foreach(candidate
       "${SOURCE_ROOT}/docs/plan/${file_name}"
       "${SOURCE_ROOT}/docs/plan/active/${file_name}"
-      "${SOURCE_ROOT}/docs/plan/archive/${file_name}")
+      "${SOURCE_ROOT}/docs/plan/archive/${file_name}"
+      "${SOURCE_ROOT}/docs/plan/admin/${file_name}")
     if(EXISTS "${candidate}")
       set(${out_var} "${candidate}" PARENT_SCOPE)
       return()
@@ -44,7 +45,7 @@ endif()
 
 file(READ "${REPORT_PATH}" REPORT_CONTENT)
 file(READ "${SOURCE_ROOT}/README.md" README_CONTENT)
-file(READ "${SOURCE_ROOT}/docs/plan/release_hardening_hosted_slice.txt" RELEASE_NOTE_CONTENT)
+file(READ "${SOURCE_ROOT}/docs/plan/admin/release_hardening_hosted_slice.txt" RELEASE_NOTE_CONTENT)
 resolve_plan_doc(PHASE80_PATH "phase80_release_snapshot_preparation.txt")
 file(READ "${PHASE80_PATH}" PHASE80_CONTENT)
 

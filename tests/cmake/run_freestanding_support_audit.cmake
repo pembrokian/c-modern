@@ -3,8 +3,8 @@ if(NOT DEFINED SOURCE_ROOT)
 endif()
 
 set(README_PATH "${SOURCE_ROOT}/README.md")
-set(HOSTED_NOTE_PATH "${SOURCE_ROOT}/docs/plan/release_hardening_hosted_slice.txt")
-set(FREESTANDING_NOTE_PATH "${SOURCE_ROOT}/docs/plan/freestanding_support_statement.txt")
+set(HOSTED_NOTE_PATH "${SOURCE_ROOT}/docs/plan/admin/release_hardening_hosted_slice.txt")
+set(FREESTANDING_NOTE_PATH "${SOURCE_ROOT}/docs/plan/admin/freestanding_support_statement.txt")
 
 file(READ "${README_PATH}" README_CONTENT)
 file(READ "${HOSTED_NOTE_PATH}" HOSTED_NOTE_CONTENT)

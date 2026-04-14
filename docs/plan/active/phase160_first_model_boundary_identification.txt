@@ -105,13 +105,13 @@ The owning implementation surfaces for this phase are:
    through `docs/plan/active/phase159_observability_as_a_system_property.txt`
    - provide the evidence base used to justify the identified boundary
 
-4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
-   - add one synthesis-oriented audit path that proves the named boundary is
-     visible in the real artifact and not only in prose
+4. `kernel/src/main.mc`, `kernel/src/boot.mc`
+   - keep integration behavior grounding the named boundary in real artifact
+     behavior; audit invariants go in the test fixture, not in main
 
-5. `tests/tool/freestanding/kernel/`
-   - add one focused Phase 160 regression or aggregation proof plus one
-     projected MIR golden over the named model boundary
+5. `tests/system/kernel_reset_lane_model_boundary/`
+   - add one behavior-first system test fixture following the
+     InstallKernelResetLaneFixtureProject pattern; no MIR projections
 
 Deliverables
 ------------
@@ -121,8 +121,9 @@ Deliverables
 - one named first model boundary grounded in repeated evidence
 - one classification of the narrowest plausible next expansion axis without
   admitting it
-- one audit-owned Phase 160 proof plus one focused freestanding regression or
-  aggregation proof over the named boundary
+- one behavior-first system test fixture in
+  tests/system/kernel_reset_lane_model_boundary/ validating the Phase 160
+  named boundary
 
 Suggested execution order
 -------------------------
@@ -144,7 +145,7 @@ Preferred proof points
 1. The repository can point to repeated evidence rather than one anecdote.
 2. The named model boundary is stated before any fix is admitted.
 3. The next expansion axis is narrow, explicit, and still deferred.
-4. One projected MIR or aggregation proof shows the named boundary is rooted
+4. One behavior-first system test validates that the named boundary is rooted
    in the real artifact.
 
 Exit criteria
@@ -156,8 +157,8 @@ Exit criteria
 - the phase identifies one repeated problem the current model does not solve
   cleanly
 - the phase classifies one narrow next expansion axis without implementing it
-- the focused regression or aggregation proof shows build, run, docs, and MIR
-  all expose the same Phase 160 boundary conclusion
+- the behavior-first system test fixture builds and runs, proving the Phase
+  160 named boundary contract
 - compiler and low-level toolchain surfaces remain unchanged in this phase
 
 Non-goals

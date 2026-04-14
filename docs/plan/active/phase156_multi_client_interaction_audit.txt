@@ -87,19 +87,17 @@ The owning implementation surfaces for this phase are:
    - publish the canonical Phase 156 execution note
 
 2. `kernel/src/shell_service.mc`, `kernel/src/log_service.mc`,
-   `kernel/src/kv_service.mc`, and any admitted Phase 152 variation owner
+   `kernel/src/kv_service.mc`
    - expose the shared service paths that multi-client interleaving must
      classify
 
-3. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
-   - keep the multi-client proof wiring explicit and owner-local
+3. `kernel/src/main.mc`, `kernel/src/boot.mc`
+   - keep integration behavior showing the multi-client wiring; audit
+     invariants go in the test fixture, not in main
 
-4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
-   - add one audit path over the chosen interleaving scenario
-
-5. `tests/tool/freestanding/kernel/`
-   - add one focused Phase 156 regression plus one projected MIR golden over
-     the multi-client interaction boundary
+4. `tests/system/kernel_reset_lane_multi_client/`
+   - add one behavior-first system test fixture following the
+     InstallKernelResetLaneFixtureProject pattern; no MIR projections
 
 Deliverables
 ------------
@@ -108,8 +106,9 @@ Deliverables
   path
 - one explicit classification of the first interleaving assumptions exposed
 - one audit-owned Phase 156 proof over the chosen multi-client scenario
-- one focused freestanding regression plus projected MIR golden for the Phase
-  156 boundary
+- one behavior-first system test fixture in
+  tests/system/kernel_reset_lane_multi_client/ validating the Phase 156
+  boundary
 
 Suggested execution order
 -------------------------
@@ -129,8 +128,8 @@ Preferred proof points
 2. The repository can name the first assumption that fails under
    interleaving.
 3. No scheduler expansion, thread model, or fairness framework appears.
-4. One projected MIR proof shows the bounded multi-client scenario remains
-   explicit in the real artifact.
+4. One behavior-first system test validates the bounded multi-client scenario
+   in the real artifact.
 
 Exit criteria
 -------------
@@ -140,8 +139,8 @@ Exit criteria
 - at least one shared service path is exercised by two independent clients
 - one audit classifies the first interleaving assumption exposed by the real
   artifact
-- the focused regression proves build, run, docs, and MIR all expose the same
-  Phase 156 boundary
+- the behavior-first system test fixture builds and runs, proving the Phase
+  156 multi-client contract
 - compiler and low-level toolchain surfaces remain unchanged in this phase
 
 Non-goals

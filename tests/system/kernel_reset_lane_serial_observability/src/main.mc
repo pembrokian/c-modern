@@ -29,16 +29,16 @@ func smoke_valid_step_emits_flat_events() bool {
     if serial_shell_event_log.event_log_len(event_log) != 4 {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.event_serial_buffered() {
+    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.EVENT_SERIAL_BUFFERED {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 1) != serial_shell_event_log.event_shell_forwarded() {
+    if serial_shell_event_log.event_log_entry(event_log, 1) != serial_shell_event_log.EVENT_SHELL_FORWARDED {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 2) != serial_shell_event_log.event_shell_reply_ok() {
+    if serial_shell_event_log.event_log_entry(event_log, 2) != serial_shell_event_log.EVENT_SHELL_REPLY_OK {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 3) != serial_shell_event_log.event_serial_cleared() {
+    if serial_shell_event_log.event_log_entry(event_log, 3) != serial_shell_event_log.EVENT_SERIAL_CLEARED {
         return false
     }
     return true
@@ -59,7 +59,7 @@ func smoke_invalid_byte_emits_reject_event() bool {
     if serial_shell_event_log.event_log_len(event_log) != 1 {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.event_serial_rejected() {
+    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.EVENT_SERIAL_REJECTED {
         return false
     }
     return true
@@ -86,16 +86,16 @@ func smoke_ring_keeps_latest_events() bool {
     if serial_shell_event_log.event_log_len(event_log) != 4 {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.event_serial_buffered() {
+    if serial_shell_event_log.event_log_entry(event_log, 0) != serial_shell_event_log.EVENT_SERIAL_BUFFERED {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 1) != serial_shell_event_log.event_shell_forwarded() {
+    if serial_shell_event_log.event_log_entry(event_log, 1) != serial_shell_event_log.EVENT_SHELL_FORWARDED {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 2) != serial_shell_event_log.event_shell_reply_ok() {
+    if serial_shell_event_log.event_log_entry(event_log, 2) != serial_shell_event_log.EVENT_SHELL_REPLY_OK {
         return false
     }
-    if serial_shell_event_log.event_log_entry(event_log, 3) != serial_shell_event_log.event_serial_cleared() {
+    if serial_shell_event_log.event_log_entry(event_log, 3) != serial_shell_event_log.EVENT_SERIAL_CLEARED {
         return false
     }
     return true

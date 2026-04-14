@@ -91,19 +91,17 @@ The owning implementation surfaces for this phase are:
    - publish the canonical Phase 157 execution note
 
 2. `kernel/src/log_service.mc`, `kernel/src/kv_service.mc`,
-   `kernel/src/shell_service.mc`, and any admitted Phase 152 variation owner
+   `kernel/src/shell_service.mc`
    - expose the retained-state and observation boundaries that the phase must
      audit over longer-running use
 
-3. `kernel/src/init.mc`, `kernel/src/main.mc`, and `kernel/src/bootstrap_services/`
-   - keep orchestration, restart, and long-lived scenario wiring explicit
+3. `kernel/src/main.mc`, `kernel/src/boot.mc`
+   - keep integration behavior showing restart and long-lived wiring; audit
+     invariants go in the test fixture, not in main
 
-4. `kernel/src/debug/` and `kernel/src/bootstrap_audit/`
-   - add one audit path over the chosen long-lived interaction slice
-
-5. `tests/tool/freestanding/kernel/`
-   - add one focused Phase 157 regression plus one projected MIR golden over
-     the long-lived coherence boundary
+4. `tests/system/kernel_reset_lane_long_lived_coherence/`
+   - add one behavior-first system test fixture following the
+     InstallKernelResetLaneFixtureProject pattern; no MIR projections
 
 Deliverables
 ------------
@@ -113,7 +111,8 @@ Deliverables
 - one explicit classification of whether system meaning remains coherent over
   time
 - one audit-owned Phase 157 proof over the chosen long-lived scenario
-- one focused freestanding regression plus projected MIR golden for the Phase
+- one behavior-first system test fixture in
+  tests/system/kernel_reset_lane_long_lived_coherence/ validating the Phase
   157 boundary
 
 Suggested execution order
@@ -134,8 +133,8 @@ Preferred proof points
 2. System meaning over time is described in user-visible terms.
 3. Any semantic drift is recorded directly rather than hidden behind more
    machinery.
-4. One projected MIR proof shows the same bounded long-lived scenario in the
-   real artifact.
+4. One behavior-first system test validates the same bounded long-lived
+   scenario in the real artifact.
 
 Exit criteria
 -------------
@@ -146,8 +145,8 @@ Exit criteria
   and observation
 - the phase publishes one explicit conclusion about whether system meaning
   remains coherent over time
-- the focused regression proves build, run, docs, and MIR all expose the same
-  Phase 157 boundary
+- the behavior-first system test fixture builds and runs, proving the Phase
+  157 long-lived coherence contract
 - compiler and low-level toolchain surfaces remain unchanged in this phase
 
 Non-goals

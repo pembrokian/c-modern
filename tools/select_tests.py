@@ -48,17 +48,13 @@ SMOKE_AND_AUDIT_TESTS = [
 
 DEFAULT_BASE_CANDIDATES = ["origin/main", "main", "origin/master", "master"]
 CACHE_VERSION = 1
-KERNEL_ARTIFACT_TEST = "mc_tool_freestanding_kernel_artifacts_unit"
 KERNEL_DOCS_TEST = "mc_tool_freestanding_kernel_docs_unit"
-KERNEL_RUNTIME_TEST = "mc_tool_freestanding_kernel_runtime_unit"
 KERNEL_SYNTHETIC_TEST = "mc_tool_freestanding_kernel_synthetic_unit"
 
 
 ALL_KERNEL_SURFACE_TESTS = [
-    KERNEL_RUNTIME_TEST,
     KERNEL_SYNTHETIC_TEST,
     KERNEL_DOCS_TEST,
-    KERNEL_ARTIFACT_TEST,
 ]
 
 ALL_KERNEL_TESTS = list(ALL_KERNEL_SURFACE_TESTS)
@@ -183,23 +179,14 @@ def classify_kernel_path(path: str) -> tuple[list[str], str] | None:
     if path in KERNEL_DOC_PATHS:
         return ([KERNEL_DOCS_TEST], "kernel documentation ownership")
 
-    if path.startswith("tests/tool/freestanding/kernel/runtime/"):
-        return ([KERNEL_RUNTIME_TEST], "kernel runtime surface ownership")
-
-    if re.match(r"tests/tool/freestanding/kernel/phase\d+_[^/]+\.cpp$", path):
-        return ([KERNEL_RUNTIME_TEST], "kernel standalone runtime proof ownership")
-
     if path.startswith("tests/tool/freestanding/kernel/synthetic/"):
         return ([KERNEL_SYNTHETIC_TEST], "kernel synthetic surface ownership")
 
     if path.startswith("tests/tool/freestanding/kernel/docs/"):
         return ([KERNEL_DOCS_TEST], "kernel docs descriptor ownership")
 
-    if path.startswith("tests/tool/freestanding/kernel/artifact_specs/"):
-        return ([KERNEL_ARTIFACT_TEST], "kernel artifact descriptor ownership")
-
     if path.startswith("kernel/"):
-        return ([KERNEL_RUNTIME_TEST, KERNEL_ARTIFACT_TEST, "mc_tool_freestanding_system_unit"], "kernel ownership")
+        return (["mc_tool_freestanding_system_unit", "mc_tool_workflow_unit"], "kernel ownership")
 
     if path.startswith("stdlib/"):
         return ([*ALL_KERNEL_SURFACE_TESTS,
@@ -305,17 +292,8 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "mc_tool_build_state_unit": ["tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
         "mc_tool_real_project_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/", "tests/support/"],
         "mc_tool_freestanding_bootstrap_unit": ["tests/tool/freestanding/bootstrap/", *common_tool_inputs, "runtime/freestanding/", "stdlib/"],
-        KERNEL_RUNTIME_TEST: [
-            "tests/tool/freestanding/kernel/suite.cpp",
-            "tests/tool/freestanding/kernel/runtime/",
-            *common_tool_inputs,
-            "runtime/freestanding/",
-            "kernel/",
-            "stdlib/",
-        ],
         KERNEL_SYNTHETIC_TEST: ["tests/tool/freestanding/kernel/synthetic/", "tests/tool/freestanding/kernel/suite.cpp", *common_tool_inputs, "runtime/freestanding/", "stdlib/"],
         KERNEL_DOCS_TEST: ["AGENTS.md", "docs/agent/prompts/repo_map.md", "tests/tool/README.md", "tests/tool/freestanding/README.md", "kernel/README.md", "tests/tool/freestanding/kernel/suite.cpp", "tests/tool/freestanding/kernel/docs/"],
-        KERNEL_ARTIFACT_TEST: ["tests/tool/freestanding/kernel/artifacts.cpp", "tests/tool/freestanding/kernel/artifact_specs/", *common_tool_inputs, "runtime/freestanding/", "kernel/", "stdlib/"],
         "mc_tool_freestanding_system_unit": ["tests/tool/freestanding/system/", *common_tool_inputs, "runtime/freestanding/", "kernel/", "stdlib/"],
         "mc_help_smoke": ["compiler/driver/", "compiler/support/", "README.md"],
         "mc_check_smoke": ["tests/cases/", "compiler/driver/", "compiler/support/", "compiler/parse/", "compiler/sema/", "compiler/mir/"],
