@@ -3,7 +3,7 @@ Phase 171 -- Generic Monomorphization First Slice
 
 Status
 ------
-PLANNED
+COMPLETE (Branch B — explicit deferral with one structural backend fix)
 
 Purpose
 -------

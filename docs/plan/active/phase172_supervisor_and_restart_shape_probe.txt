@@ -3,7 +3,7 @@ Phase 172 -- Supervisor And Restart Shape Probe
 
 Status
 ------
-PLANNED
+COMPLETE (Branch B — explicit supervisor deferral; init.mc gap closed)
 
 Purpose
 -------

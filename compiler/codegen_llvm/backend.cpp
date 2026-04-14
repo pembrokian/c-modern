@@ -67,6 +67,9 @@ bool ValidateBootstrapTargetImpl(const TargetConfig& target,
     return false;
 }
 
+// Forward declaration — defined below once TypeSupportsErasedGenericEmission is available.
+bool FunctionSupportsErasedGenericEmission(const mir::Module& module, const mir::Function& function);
+
 bool ValidateExecutableBackendCapabilitiesImpl(const mir::Module& module,
                                               const TargetConfig& target,
                                               const std::filesystem::path& source_path,
@@ -76,6 +79,20 @@ bool ValidateExecutableBackendCapabilitiesImpl(const mir::Module& module,
     }
 
     for (const auto& function : module.functions) {
+        // Non-extern generic functions whose type parameters appear in ABI-significant
+        // positions cannot be emitted by the bootstrap backend (monomorphization is not
+        // yet supported).  Catch this early so the caller gets a compiler diagnostic
+        // instead of a silent definition omission followed by a linker error.
+        if (!function.is_extern && !function.type_params.empty() &&
+            !FunctionSupportsErasedGenericEmission(module, function)) {
+            ReportBackendError(source_path,
+                               "generic function '" + function.name +
+                                   "' uses type parameters in ABI-incompatible positions; "
+                                   "monomorphized generic functions are not yet supported by the bootstrap backend",
+                               diagnostics);
+            return false;
+        }
+
         for (const auto& block : function.blocks) {
             for (const auto& instruction : block.instructions) {
                 if (instruction.kind != mir::Instruction::Kind::kAtomicCompareExchange) {

@@ -12,6 +12,7 @@
 // protocol encoding in serial_protocol.mc.
 
 import boot
+import init
 import kernel_dispatch
 import log_service
 import serial_protocol
@@ -199,7 +200,7 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
     return 0
 }
 
-func run(state: *boot.KernelBootState) i32 {
+func run_main(state: *boot.KernelBootState) i32 {
     specs: [22]StepSpec = step_table()
 
     for step in 0..STEP_COUNT {
@@ -210,4 +211,33 @@ func run(state: *boot.KernelBootState) i32 {
         }
     }
     return 0
+}
+
+// run_restart_probe verifies service restart: the log is exhausted after
+// run_main, init.restart_log replaces its state, and the log must then
+// accept a new append and report one retained entry.
+func run_restart_probe(state: *boot.KernelBootState) i32 {
+    *state = init.restart_log(*state)
+
+    // After restart the log must accept a new append.
+    append_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_append(55))
+    if service_effect.effect_reply_status(append_effect) != syscall.SyscallStatus.Ok {
+        return 8
+    }
+
+    // Tail must report exactly one retained entry.
+    tail_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_tail())
+    if service_effect.effect_reply_payload_len(tail_effect) != 1 {
+        return 9
+    }
+
+    return 0
+}
+
+func run(state: *boot.KernelBootState) i32 {
+    result: i32 = run_main(state)
+    if result != 0 {
+        return result
+    }
+    return run_restart_probe(state)
 }
