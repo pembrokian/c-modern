@@ -1477,6 +1477,36 @@ void TestKernelResetLanePhase170StaticTopologyProjectRuns(const std::filesystem:
     }
 }
 
+void TestKernelResetLanePhase173SmpBoundaryProjectRuns(const std::filesystem::path& source_root,
+                                                       const std::filesystem::path& binary_root,
+                                                       const std::filesystem::path& mc_path) {
+    const std::filesystem::path fixture_root = source_root / "tests" / "system" / "kernel_reset_lane_smp_boundary";
+    const std::filesystem::path project_root = binary_root / "kernel_reset_lane_phase173_smp_boundary_project";
+    const std::filesystem::path project_path =
+        InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
+
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_phase173_smp_boundary_build";
+    std::filesystem::remove_all(build_dir);
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "app",
+                                       "kernel_reset_lane_phase173_smp_boundary_build_output.txt",
+                                       "kernel reset lane phase 173 smp boundary build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_phase173_smp_boundary_run_output.txt",
+                                                             "kernel reset lane phase 173 smp boundary run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane phase 173 smp boundary project should return 0, got:\n" + run_output);
+    }
+}
+
 
 }  // namespace
 
@@ -1524,6 +1554,7 @@ void RunWorkflowToolSuite(const std::filesystem::path& source_root,
     TestKernelResetLanePhase160ModelBoundaryProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLanePhase161DeliveryWitnessProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLanePhase170StaticTopologyProjectRuns(source_root, suite_root, mc_path);
+    TestKernelResetLanePhase173SmpBoundaryProjectRuns(source_root, suite_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

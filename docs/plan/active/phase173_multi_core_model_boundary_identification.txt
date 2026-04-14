@@ -3,7 +3,7 @@ Phase 173 -- Multi-Core Model Boundary Identification
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -91,3 +91,99 @@ What this phase should prove
   points of SMP fragility
 - that future kernel growth is aware of those constraints even while
   single-core work continues
+
+Survey results
+--------------
+Source read: kernel/src/kernel_dispatch.mc, boot.mc, init.mc, service_topology.mc,
+kv_service.mc, log_service.mc, syscall.mc, scenarios.mc.
+
+Single-core assumptions found in current source:
+
+  1. kernel_dispatch_step(state: *boot.KernelBootState, ...)
+     Takes a single mutable pointer to the entire kernel state.  Every
+     dispatch — leaf, kv, effect-chain — reads *state, calls a service,
+     and writes a new state back through the same pointer.  The
+     read-modify-write is not atomic.  Under SMP, two cores calling
+     kernel_dispatch_step with the same state pointer concurrently race
+     on the write-back.
+
+  2. kernel_dispatch_kv compound mutation
+     kernel_dispatch_kv reads current.log_state, dispatches kv, dispatches
+     the advisory log append, then commits both updates to *state as a
+     single compound assignment.  The two dispatches are not fused into one
+     atomic operation.  Under SMP, another core can observe the intermediate
+     state between the kv commit and the advisory log commit.
+
+  3. execute_effect depth guard
+     MAX_EFFECT_CHAIN_DEPTH is passed as a stack-local value parameter.
+     This is already SMP-safe: each call chain carries its own depth
+     counter independently.  No constraint here.
+
+  4. ServiceSlot constants and endpoint IDs
+     All slots and endpoint IDs in service_topology.mc are compile-time
+     constants (u32 values 10–13).  Immutable.  SMP-safe by construction.
+
+  5. Service handler functions (kv_service.handle, log_service.handle)
+     Each service takes its state by value and returns a new state value.
+     Pure functions with no global side effects.  These already compose
+     correctly with per-core state shards.  No SMP constraint here.
+
+Named constraints
+-----------------
+Two constraints would be hardest to retrofit for SMP.
+
+  Constraint A: Unified dispatch state pointer
+  Location: kernel_dispatch.mc — kernel_dispatch_step, kernel_dispatch_leaf,
+            kernel_dispatch_kv, execute_effect
+  Shape: KernelBootState is a single struct containing all per-service
+         retained states.  The dispatcher takes *KernelBootState and all
+         paths write back through that same pointer.  There is no per-service
+         lock, no per-service shard, and no version guard.
+  Difficulty to retrofit: high.  Fixing this requires either a global
+         serialization lock (reducing SMP to a single dispatch lane) or
+         partitioning KernelBootState into per-service pointers with
+         per-service ownership (structural redesign of the dispatch call site).
+  Why it does not block single-core: single-core sequential dispatch is
+         exactly the assumption the current model encodes.  All 22 steps in
+         the scenario verify sequential composition over a shared *state
+         without races.
+  Trigger: reopen when a phase requires concurrent interrupt-driven dispatch
+         from multiple hardware cores, or when the scheduler ready queue
+         needs concurrent wake from two cores over different service shards.
+
+  Constraint B: Advisory-first compound dispatch atomicity
+  Location: kernel_dispatch.mc — kernel_dispatch_kv
+  Shape: kernel_dispatch_kv executes two dependent dispatches (kv write
+         then advisory log append) and commits both outcomes to *state in
+         one compound assignment.  The compound is not atomic.  Under SMP
+         a second core observing *state between the two sub-dispatches
+         would see kv state updated without the corresponding log update.
+  Difficulty to retrofit: medium.  Could be closed by a per-kv-dispatch
+         lock or by making the advisory append the kv caller's explicit
+         responsibility (eliminating the compound).
+  Why it does not block single-core: advisory log silencing is already a
+         named model gap (Phase 160); the compound is consistent from the
+         single-core caller's perspective because no other dispatch can
+         interleave between the two sub-dispatches on one core.
+  Trigger: reopen when a phase introduces concurrent log writes from two
+         sources that share the same advisory commit window, or when the
+         advisory gap is closed and a stronger cross-service atomicity
+         guarantee is required.
+
+Clean pattern (SMP-compatible)
+-------------------------------
+The per-service handler functions (kv_service.handle, log_service.handle,
+etc.) take state by value and return a new state value.  They have no
+global side effects.  If the state pointer is ever partitioned into per-
+service pointers, the handler functions require no change.  This is the
+future clean path if SMP adoption ever becomes a real phase.
+
+Deliverables
+------------
+- this phase plan updated to COMPLETE with named constraints
+- tests/system/kernel_reset_lane_smp_boundary/: behavior-first fixture
+  that demonstrates the sequential dispatch assumption concretely;
+  verifies that two dispatches over the shared state pointer accumulate
+  state correctly under the current single-core contract
+- docs/plan/decision_log.txt: SMP deferral decision entry
+- docs/plan/backlog.txt: two deferred SMP constraint tracking items

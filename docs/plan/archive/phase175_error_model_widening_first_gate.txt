@@ -1,0 +1,90 @@
+Phase 175 -- Error Model Widening First Gate
+=============================================
+
+Status
+------
+IMPLEMENTED (Branch B -- explicit deferral)
+
+Purpose
+-------
+Re-examine the `errors.Error` kind/code encoding deferral from the current
+admitted slice and determine whether any real admitted consumer has reached
+the point where kind/code classification is insufficient.
+
+Outcome
+-------
+Branch B -- explicit deferral.
+
+The consumer audit found no admitted program that is blocked by the current
+kind/code encoding.  The deferral from Phase 47 stands, with a sharper trigger
+condition recorded in the decision log.
+
+Consumer audit findings
+-----------------------
+Programs surveyed:
+  - file_walker: uses is_err(); returns fixed exit code (94, 92) on any error
+  - evented_echo: uses is_err()/is_ok(); returns fixed codes (10..14) per step
+  - evented_partial_write: same binary pattern
+  - grep_lite: no errors.Error use in production paths
+  - line_filter_relay: uses is_err(); never inspects kind or code
+  - pipe_handoff: binary is_ok() checks only
+  - pipe_ready: binary is_ok() checks only
+
+Tests surveyed:
+  - evented_echo parse_invalid_port_test.mc: uses testing.expect_err(err,
+    kind, code) -- the only site that inspects kind/code, and it is a test
+    assertion, not production branching
+
+Conclusion: kind/code is never read in production code.  is_err()/is_ok() is
+universally sufficient.  No consumer needs to render a human-readable error
+message.  No consumer branches differently based on error kind at a specific
+call site.  The kind/code model is not a current ceiling on any real program.
+
+What was verified
+-----------------
+- errors.mc is complete: ok(), fail(), is_err(), is_ok(), kind(), code(),
+  fail_errno(), fail_io(), fail_utf8(), fail_mem(), fail_net(), fail_sync(),
+  fail_user(), fail_code(), kind_none() through kind_user()
+- All admitted real consumers use the surface correctly
+- The ABI encoding (kind * 65536 + code as uintptr) is stable
+- No admitted consumer needs message strings, cause chains, or heap objects
+
+What this phase does not change
+---------------------------------
+- No code was added or removed
+- errors.mc is unchanged
+- The kind/code scalar ABI is unchanged
+
+Why no Branch A widening was admitted
+--------------------------------------
+Admitted programs treat all errors as fatal and return fixed integer codes to
+the OS.  The opacity question ("is kind/code enough to act on the error?")
+does not arise at runtime because every call site already knows which operation
+failed by virtue of where in the control flow the failure was detected.
+
+The only actionable widening would be human-readable messages for user-facing
+diagnostics.  No admitted program currently does that.  Admitting message
+ownership before a real program needs it would force a heap-ownership policy
+decision across the runtime and stdlib ahead of evidence.
+
+Revisit condition (sharpened from Phase 47)
+-------------------------------------------
+Reopen Phase 175 only when both of these hold:
+  1. An admitted program is rendered genuinely opaque after kind/code -- i.e.
+     the caller has the Error but cannot determine what to tell the user or
+     which recovery path to take even with the kind and code values.
+  2. The narrowest resolution is a bounded optional message slice or an
+     explicit cause field -- not a heap-backed error object, cause chain,
+     implicit try-operator, or hidden propagation.
+
+Binary is_err() flow control alone is NOT the trigger.  Kind/code inspection
+in test assertions alone is NOT the trigger.
+
+Relationship to companion notes
+-------------------------------
+- docs/plan/archive/phase47_full_error_treatment.txt: Phase 47 closeout
+- docs/plan/archive/phase67_filesystem_and_error_contract_follow_through.txt:
+  Phase 67 additive fs.read_all_err / fs.list_dir_err companions
+- docs/arch/key_decisions.txt: scalar Error ABI settled decision
+- docs/plan/decision_log.txt: Phase 175 deferral entry (2026-04-14)
+- docs/plan/backlog.txt: error model widening item (updated trigger)
