@@ -19,6 +19,9 @@ func main() i32 {
     if scenarios.run_observability_inspection(&state) != 0 {
         return 1
     }
+    if scenarios.run_model_boundary(&state) != 0 {
+        return 1
+    }
 
     return 0
 }

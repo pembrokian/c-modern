@@ -193,6 +193,7 @@ func run_cross_service_failure(state: *boot.KernelBootState) i32 {
 //
 // Called after run_cross_service_failure.
 // State: kv has count=2 (keys 5 and 20), log is at capacity (4 retained entries).
+// run_model_boundary (Phase 160) is called after this and expects that same state.
 //
 // Proves the user can inspect system state truthfully via the public protocol
 // without requiring internal knowledge:
@@ -233,6 +234,78 @@ func run_observability_inspection(state: *boot.KernelBootState) i32 {
     }
     if service_effect.effect_reply_payload_len(effect) != 4 {
         return 5
+    }
+
+    return 0
+}
+
+// Model boundary identification (Phase 160).
+//
+// Called after run_observability_inspection.
+// State: kv count=2 (keys 5 and 20), log at capacity (4 entries).
+//
+// Named boundary: advisory audit silencing is invisible to the kv caller.
+//
+// When the log is at capacity, a kv write returns Ok but its advisory audit
+// marker is silently discarded by the dispatcher.  The kv caller has no
+// protocol-level signal that the audit trail is incomplete.  The effect
+// model has no witness for advisory send outcomes.
+//
+// Pressure observed across Phase 152-159:
+//   Phase 152: log restart while kv live -- audit gap during selective restart
+//   Phase 156: shared namespace -- no per-client audit isolation
+//   Phase 157: long-lived coherence -- state stays consistent but audit trail diverges
+//   Phase 158: explicitly named advisory silencing as the one cross-service inconsistency
+//   Phase 159: kv count visible, but correlation between kv writes and log
+//              entries breaks once the log is full
+//
+// This scenario proves the boundary is real in the running artifact:
+//   1. kv count and log length both at their Phase 159 post-state (2 and 4).
+//   2. Two new kv writes both return Ok.
+//   3. Log length is unchanged at 4: both advisory markers were dropped.
+//   4. kv count is 4: both entries were stored correctly.
+//   5. The gap (2 kv writes, 0 new log entries) is the named boundary.
+//
+// Narrowest plausible next expansion axis (named but not admitted):
+//   Per-send delivery witnesses.  A witness would let the dispatcher report
+//   Dropped to the kv caller when the advisory send could not be delivered.
+//   This closes the gap without a recovery framework or platform.
+//   No witness implementation is admitted in this phase.
+func run_model_boundary(state: *boot.KernelBootState) i32 {
+    effect: service_effect.Effect
+
+    // Confirm starting state: kv has 2 entries, log is full.
+    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_count()))
+    if service_effect.effect_reply_payload_len(effect) != 2 {
+        return 1
+    }
+    s: boot.KernelBootState = *state
+    if log_service.log_len(s.log_state) != 4 {
+        return 2
+    }
+
+    // Write two new kv entries.  Both return Ok even though the log is full.
+    // The advisory markers are silently dropped; the caller sees no difference.
+    effect = boot.kernel_dispatch_step(state, cmd_kv_set(30, 11))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 3
+    }
+    effect = boot.kernel_dispatch_step(state, cmd_kv_set(31, 22))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 4
+    }
+
+    // Log is still at capacity: both advisory markers were silently dropped.
+    // This is the named boundary: kv success does not imply audit success.
+    s = *state
+    if log_service.log_len(s.log_state) != 4 {
+        return 5
+    }
+
+    // kv count grew by 2: entries were stored correctly.
+    effect = boot.kernel_dispatch_step(state, serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_count()))
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return 6
     }
 
     return 0

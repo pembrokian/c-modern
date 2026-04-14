@@ -483,6 +483,66 @@ Phase 158 -- Cross-Service Failure Semantics Consistency (LANDED)
   files were changed
 - Validated by `tests/system/kernel_reset_lane_cross_service_failure/`
 
+Phase 159 -- Observability As A System Property (LANDED)
+- Phase 159 defined the minimum user-meaningful observation surface required
+  by the admitted system:
+  - kv_count (KC!!) is system-visible truth: the user can determine how many
+    kv entries exist without knowing the stored keys; reply is Ok with
+    count in reply_payload_len; this closed the one gap Phase 155-158 left
+    open (log was already fully observable via LT!!, but kv occupancy was
+    opaque without prior key knowledge)
+  - kv_get (KG <key> !) and log_tail (LT!!) are confirmed as the only other
+    system-visible observation queries
+  - KV_WRITE_LOG_MARKER byte value and internal endpoint IDs are classified
+    as implementation detail, not user contracts
+  - observation is non-mutating: count and tail queries return the same
+    values on repeated calls with no state change
+- No telemetry stack, logging framework, tracing platform, or
+  cross-cutting debug substrate was opened
+- `kv_service.handle` already returned count from the zero-length payload
+  path; the `serial_protocol.encode_kv_count()` function and
+  `shell_service` route were added for the public-protocol surface
+- `kernel/src/scenarios.mc` gained `run_observability_inspection`; no
+  service module files were changed
+- Validated by `tests/system/kernel_reset_lane_observability/`
+- Phase 159 also confirmed the advisory-silencing gap visible since
+  Phase 158: kv count is observable, but correlation between kv write
+  count and log entry count breaks once the log is full; that gap is
+  the named model boundary addressed in Phase 160
+
+Phase 160 -- First Model Boundary Identification (LANDED)
+- Phase 160 named the first repeated model failure from the Phase 152-159
+  evidence and deferred its fix:
+  - Named boundary: advisory audit silencing is invisible to the kv caller.
+    When the log is at capacity, a kv write returns Ok but its advisory
+    audit marker is silently discarded by the boot dispatcher.  The kv
+    caller has no protocol-level signal that the audit trail was lost.
+    The effect model has no witness for advisory send outcomes.
+  - Repeated evidence: this gap was first visible in the Phase 152 restart
+    variation (audit trail interrupted during selective restart), confirmed
+    in Phase 156 (no per-client audit isolation), surfaced as an explicit
+    inconsistency in Phase 158 (advisory log drop named as the one
+    cross-service failure difference), and revealed as unobservable in
+    Phase 159 (count diverges from log length but the caller cannot tell
+    which writes were audited)
+  - Narrowest next expansion axis named but not admitted: per-send delivery
+    witnesses; a witness would let the dispatcher report Dropped to the kv
+    caller when the advisory send was not delivered; this closes the gap
+    without a recovery framework or platform; no implementation admitted
+    in this phase
+  - Compiler, sema, MIR, backend, ABI, target, runtime, and hal surfaces
+    were kept closed
+- `kernel/src/scenarios.mc` gained `run_model_boundary`; no service module
+  files, dispatcher logic, or protocol layers were changed
+- Boundary is grounded in the real running artifact:
+  - `kernel/src/main.mc` calls `run_model_boundary` after
+    `run_observability_inspection`; the running kernel proves the gap
+    exists by confirming two kv writes succeed and log length stays at 4
+  - `tests/system/kernel_reset_lane_model_boundary/` provides a standalone
+    behavior-first fixture proving the same boundary without chaining on
+    phase history
+- Validated by `tests/system/kernel_reset_lane_model_boundary/`
+
 What should naturally emerge from this wave
 -------------------------------------------
 If the repository follows this roadmap honestly, the next useful results
