@@ -13,6 +13,7 @@ This file is a fast orientation map for agents working in this repository.
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
 - `docs/plan/decision_log.txt`: record of intentional limited solutions and deferred fuller fixes
 - `docs/plan/phase3_bootstrap_finish.txt`: repository-specific bootstrap Phase 3 milestone note
+- `docs/arch/veya/kernel_style_guide.txt`: current kernel service style, naming, module-shape, and main.mc constraints
 - `build/`: disposable build output
 
 ## Compiler Tree
@@ -29,6 +30,7 @@ This file is a fast orientation map for agents working in this repository.
 
 - `kernel`
   - repository-owned Veya kernel sources rather than disposable proof-only fixtures
+  - `docs/arch/veya/kernel_style_guide.txt`: required style guide for kernel/src/ service modules and kernel main.mc orchestration
   - `build.toml`: freestanding kernel manifest for the active bring-up slice
   - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed first-user-entry, endpoint core, syscall IPC, interrupt classification, timer-owned tick delivery, MMU-owned translation-root construction, bounded init-owned multi-service orchestration, one bounded delegated request-reply follow-through, one bounded fixed service-directory publication step, one bounded image-contract hardening step, one bounded target-surface audit, one bounded next-plateau audit, one bounded delegation-chain stress step, one bounded invalidation and rejection audit step, one bounded authority lifetime classification step, one bounded service-death observation step, one bounded partial-failure propagation step, one bounded UART receive-frame ownership-boundary audit step, one bounded device-failure-containment audit step, one bounded optional completion-backed follow-through step, one bounded serial-ingress composed service graph step, one bounded serial shell command-routing step, one bounded long-lived log-service follow-through step, one bounded service-shape consolidation step, one bounded IPC-shape audit under real usage step, one bounded authority-ergonomics-under-reuse step, one bounded restart-contract step, one bounded rebuilt-system clean-second-pass step, and thin root orchestration across the owned scheduler, lifecycle, bootstrap helper, and debug audit modules
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through

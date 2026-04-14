@@ -15,6 +15,7 @@ See these files first:
 - `docs/plan/admin/bootstrap_plan.txt`
 - `docs/plan/archive/phase3_bootstrap_finish.txt`
 - `docs/agent/prompts/repo_map.md`
+- `docs/arch/veya/kernel_style_guide.txt` for kernel/src/ service shape, naming, and main.mc limits
 
 Documentation routing:
 
