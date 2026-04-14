@@ -310,3 +310,33 @@ func run_model_boundary(state: *boot.KernelBootState) i32 {
 
     return 0
 }
+
+// Delivery witness (Phase 161).
+//
+// Called after run_model_boundary.
+// State: kv count=4, log at capacity (full from prior phases).
+//
+// Phase 160 named the boundary: advisory audit silencing is invisible
+// to the kv caller.  Phase 161 closes it with one per-send witness field
+// on Effect.  The caller now reads effect_send_dropped() to determine
+// whether the advisory log record landed.
+//
+// With the log full, overwriting an existing key returns Ok as before,
+// but send_dropped=1 is set in the returned effect.  The caller can
+// distinguish the two cases for the first time.
+func run_delivery_witness(state: *boot.KernelBootState) i32 {
+    effect: service_effect.Effect
+
+    // Log is full from prior phases.  Overwrite key 5 (existing).
+    // kv returns Ok; advisory log append is Exhausted.
+    // Phase 161: send_dropped must be 1 -- the caller sees the drop.
+    effect = boot.kernel_dispatch_step(state, cmd_kv_set(5, 123))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 1
+    }
+    if service_effect.effect_send_dropped(effect) != 1 {
+        return 2
+    }
+
+    return 0
+}

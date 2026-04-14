@@ -543,6 +543,31 @@ Phase 160 -- First Model Boundary Identification (LANDED)
     phase history
 - Validated by `tests/system/kernel_reset_lane_model_boundary/`
 
+Phase 161 -- Per-Send Delivery Witness (LANDED)
+- Phase 161 implemented the narrowest expansion axis identified in Phase 160:
+  per-send delivery witnesses.
+  - Added `send_dropped: u32` to the Effect struct in service_effect.mc as
+    the last field; all four Effect constructors carry send_dropped: 0.
+  - Added `effect_mark_send_dropped()` and `effect_send_dropped()` to
+    service_effect.mc.
+  - In boot.mc kv dispatch: when the advisory log append returns Exhausted,
+    the kv reply effect is marked with send_dropped = 1 before returning.
+  - In kernel_dispatch_step: send_dropped propagates from the inner kv
+    effect to the outer serial reply so callers routing through the serial
+    path can observe advisory drop status.
+  - The change is purely additive: existing callers that do not check
+    effect_send_dropped() observe no behavior change.
+  - No recovery, retry, two-phase commit, or callback mechanism admitted.
+  - No new modules admitted.  Compiler, sema, MIR, backend, ABI, target,
+    runtime, and hal surfaces remain closed.
+- `kernel/src/scenarios.mc` gained `run_delivery_witness`; called after
+  `run_model_boundary`; proves send_dropped = 1 when the log is full.
+- `kernel/src/main.mc` calls `run_delivery_witness` and returns 0.
+- `tests/system/kernel_reset_lane_delivery_witness/` proves both cases:
+  case A (log has space) → send_dropped = 0;
+  case B (log full)      → send_dropped = 1.
+- Validated by `tests/system/kernel_reset_lane_delivery_witness/`
+
 What should naturally emerge from this wave
 -------------------------------------------
 If the repository follows this roadmap honestly, the next useful results

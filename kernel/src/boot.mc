@@ -60,17 +60,25 @@ func kernel_dispatch_message(state: *KernelBootState, msg: service_effect.Messag
     if msg.endpoint_id == KV_ENDPOINT_ID {
         kv_result: kv_service.KvResult = kv_service.handle(current.kv_state, msg)
         new_log_state: log_service.LogServiceState = current.log_state
+        advisory_dropped: u32 = 0
         if msg.payload_len >= 2 {
             log_payload: [4]u8 = primitives.zero_payload()
             log_payload[0] = KV_WRITE_LOG_MARKER
             log_msg: service_effect.Message = service_effect.message(msg.source_pid, LOG_ENDPOINT_ID, 1, log_payload)
             // The kv-write log marker is advisory: if the log is full the
-            // Exhausted reply is intentionally discarded here.  The kv reply
-            // is what the caller receives; the marker is for observability only.
+            // Exhausted reply is discarded.  The kv reply is what the caller
+            // receives.  Phase 161: send_dropped is set so the caller can
+            // observe whether the advisory record landed.
             kv_log_result: log_service.LogResult = log_service.handle(current.log_state, log_msg)
             new_log_state = kv_log_result.state
+            if service_effect.effect_reply_status(kv_log_result.effect) == syscall.SyscallStatus.Exhausted {
+                advisory_dropped = 1
+            }
         }
         *state = KernelBootState{ path_state: current.path_state, log_state: new_log_state, kv_state: kv_result.state }
+        if advisory_dropped == 1 {
+            return service_effect.effect_mark_send_dropped(kv_result.effect)
+        }
         return kv_result.effect
     }
     return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, empty_payload)
@@ -123,7 +131,13 @@ func kernel_dispatch_step(state: *KernelBootState, observation: syscall.ReceiveO
     start_msg: service_effect.Message = service_effect.message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload)
     effect: service_effect.Effect = execute_effect(state, kernel_dispatch_message(state, start_msg), 0)
     if observation.endpoint_id == SERIAL_ENDPOINT_ID {
-        return serial_path_post_dispatch(state, observation, effect)
+        serial_effect: service_effect.Effect = serial_path_post_dispatch(state, observation, effect)
+        // Phase 161: propagate send_dropped from the inner kv effect to the
+        // outer serial reply so the caller can observe advisory drop status.
+        if service_effect.effect_send_dropped(effect) != 0 {
+            return service_effect.effect_mark_send_dropped(serial_effect)
+        }
+        return serial_effect
     }
     return effect
 }

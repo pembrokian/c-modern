@@ -1,0 +1,129 @@
+Phase 161 -- Per-Send Delivery Witness
+=======================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Implement the narrowest expansion axis identified in Phase 160: per-send
+delivery witnesses.
+
+Phase 160 named one repeated model failure: when a kv write triggers an
+advisory log append and the log is full, the advisory send is silently
+discarded by the dispatcher.  The kv caller receives Ok but has no
+protocol-level signal that the audit trail was lost.  The kv Ok reply is
+identical whether the advisory send was delivered or dropped.
+
+This phase closes that gap by adding one `send_dropped` field to the Effect
+struct.  The dispatcher sets this field to 1 when an advisory send could not
+be delivered.  The caller inspects `effect_send_dropped()` to know whether
+the advisory send landed.
+
+The compiler, sema, MIR, backend, ABI, target, runtime, and hal surfaces
+remain closed.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase160_first_model_boundary_identification.txt`
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/decision_log.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+
+Repository status note
+----------------------
+- Phase 160 proved the boundary in a standalone system test and in the
+  chained scenarios.mc scenario.
+- Phase 161 admits the narrowest possible fix: one new field on Effect, one
+  dispatcher change, one new accessor, and one new accessor call at the
+  chained scenario and standalone system test level.
+
+Problem being solved
+--------------------
+- The kv caller cannot distinguish "advisory send delivered" from "advisory
+  send dropped" using the current Effect model.
+- Extending Effect with `send_dropped: u32` gives the caller a first-class
+  signal without changing the kv reply status or introducing recovery.
+- The fix is purely additive: existing callers that do not check send_dropped
+  observe no behavior change.
+
+Core rule
+---------
+- One field.  One dispatcher check.  One accessor pair.
+- No recovery, retry, two-phase commit, or callback mechanism.
+- No new modules.
+
+Chosen slice for this phase
+---------------------------
+Targeted change surface:
+
+1. `kernel/src/service_effect.mc`
+   - add `send_dropped: u32` to Effect struct (last field)
+   - update the four Effect constructors (effect_none, effect_reply,
+     effect_send, effectwith_events) to carry send_dropped: 0
+   - add `effect_mark_send_dropped(e: Effect) Effect`
+   - add `effect_send_dropped(e: Effect) u32`
+
+2. `kernel/src/boot.mc`
+   - in the KV dispatch path: after the advisory log append, if the log
+     result is Exhausted, return the kv effect marked with send_dropped = 1
+   - in kernel_dispatch_step: propagate send_dropped from the inner effect
+     to the outer serial reply when routing through the serial path
+
+3. `kernel/src/scenarios.mc`
+   - add `run_delivery_witness(state: *boot.KernelBootState) i32`
+   - called after run_model_boundary; the log is still full at that point;
+     overwriting an existing kv key returns Ok with send_dropped = 1
+
+4. `kernel/src/main.mc`
+   - add one call to `scenarios.run_delivery_witness(&state)`
+
+5. `tests/system/kernel_reset_lane_delivery_witness/`
+   - standalone behavior-first test: proves both cases
+   - case A: log has space, kv write → send_dropped = 0
+   - case B: log full, kv write → send_dropped = 1
+   - same build.toml and InstallKernelResetLaneFixtureProject shape as
+     prior phase fixtures
+
+6. `tests/tool/tool_workflow_suite.cpp`
+   - add TestKernelResetLanePhase161DeliveryWitnessProjectRuns following
+     the same shape as the Phase 160 test
+
+Why this is the right next step
+-------------------------------
+- It directly resolves the named Phase 160 boundary.
+- It is the smallest truthful change: one field closes the observability gap.
+- It does not require a new module, a recovery framework, or compiler work.
+- The Effect model already distinguishes Reply / Send / None; adding
+  send_dropped orthogonally is consistent with the existing struct shape.
+
+Preferred proof points
+----------------------
+1. `effect_send_dropped(e)` returns 0 for a kv write when the log has space.
+2. `effect_send_dropped(e)` returns 1 for a kv write when the log is full.
+3. Both writes still return `Ok` as the primary reply status.
+4. The standalone system test exercises both cases from a fresh state.
+5. The chained scenario validates the witness in the running integration state.
+
+Exit criteria
+-------------
+- service_effect.mc extended with `send_dropped` field and accessors
+- boot.mc marks advisory drops and propagates the witness through the
+  serial-path layer
+- scenarios.mc run_delivery_witness validates the witness in the chained state
+- main.mc calls run_delivery_witness and returns 0
+- standalone system test builds and the executable returns 0
+- C++ workflow test builds the fixture and expects exit code 0
+- compiler, sema, MIR, backend, ABI, target, runtime, and hal surfaces
+  unchanged
+
+Non-goals
+---------
+- recovery of dropped advisory sends
+- retry policy or callback on drop
+- transactional write-ahead log guarantee
+- new module or new Effect variant
+- compiler enforcement of send_dropped inspection

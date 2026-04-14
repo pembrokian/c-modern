@@ -28,6 +28,7 @@ struct Effect {
     event1: u32
     event2: u32
     event3: u32
+    send_dropped: u32
 }
 
 func message(source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8) Message {
@@ -36,15 +37,15 @@ func message(source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]
 
 func effect_none() Effect {
     payload: [4]u8 = primitives.zero_payload()
-    return Effect{ kind: EffectKind.None, reply_status: syscall.SyscallStatus.None, reply_payload_len: 0, reply_payload: payload, send_source_pid: 0, send_endpoint_id: 0, send_payload_len: 0, send_payload: payload, event_count: 0, event0: 0, event1: 0, event2: 0, event3: 0 }
+    return Effect{ kind: EffectKind.None, reply_status: syscall.SyscallStatus.None, reply_payload_len: 0, reply_payload: payload, send_source_pid: 0, send_endpoint_id: 0, send_payload_len: 0, send_payload: payload, event_count: 0, event0: 0, event1: 0, event2: 0, event3: 0, send_dropped: 0 }
 }
 
 func effect_reply(status: syscall.SyscallStatus, payload_len: usize, payload: [4]u8) Effect {
-    return Effect{ kind: EffectKind.Reply, reply_status: status, reply_payload_len: payload_len, reply_payload: payload, send_source_pid: 0, send_endpoint_id: 0, send_payload_len: 0, send_payload: primitives.zero_payload(), event_count: 0, event0: 0, event1: 0, event2: 0, event3: 0 }
+    return Effect{ kind: EffectKind.Reply, reply_status: status, reply_payload_len: payload_len, reply_payload: payload, send_source_pid: 0, send_endpoint_id: 0, send_payload_len: 0, send_payload: primitives.zero_payload(), event_count: 0, event0: 0, event1: 0, event2: 0, event3: 0, send_dropped: 0 }
 }
 
 func effect_send(source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8) Effect {
-    return Effect{ kind: EffectKind.Send, reply_status: syscall.SyscallStatus.None, reply_payload_len: 0, reply_payload: primitives.zero_payload(), send_source_pid: source_pid, send_endpoint_id: endpoint_id, send_payload_len: payload_len, send_payload: payload, event_count: 0, event0: 0, event1: 0, event2: 0, event3: 0 }
+    return Effect{ kind: EffectKind.Send, reply_status: syscall.SyscallStatus.None, reply_payload_len: 0, reply_payload: primitives.zero_payload(), send_source_pid: source_pid, send_endpoint_id: endpoint_id, send_payload_len: payload_len, send_payload: payload, event_count: 0, event0: 0, event1: 0, event2: 0, event3: 0, send_dropped: 0 }
 }
 
 func effect_has_reply(effect: Effect) u32 {
@@ -110,7 +111,7 @@ func effect_event(effect: Effect, i: usize) u32 {
 }
 
 func effectwith_events(e: Effect, count: usize, e0: u32, e1: u32, e2: u32, e3: u32) Effect {
-    return Effect{ kind: e.kind, reply_status: e.reply_status, reply_payload_len: e.reply_payload_len, reply_payload: e.reply_payload, send_source_pid: e.send_source_pid, send_endpoint_id: e.send_endpoint_id, send_payload_len: e.send_payload_len, send_payload: e.send_payload, event_count: count, event0: e0, event1: e1, event2: e2, event3: e3 }
+    return Effect{ kind: e.kind, reply_status: e.reply_status, reply_payload_len: e.reply_payload_len, reply_payload: e.reply_payload, send_source_pid: e.send_source_pid, send_endpoint_id: e.send_endpoint_id, send_payload_len: e.send_payload_len, send_payload: e.send_payload, event_count: count, event0: e0, event1: e1, event2: e2, event3: e3, send_dropped: e.send_dropped }
 }
 
 func effect_with_event(effect: Effect, event_code: u32) Effect {
@@ -127,6 +128,14 @@ func effect_with_event(effect: Effect, event_code: u32) Effect {
         return effectwith_events(effect, 4, effect.event0, effect.event1, effect.event2, event_code)
     }
     return effect
+}
+
+func effect_mark_send_dropped(e: Effect) Effect {
+    return Effect{ kind: e.kind, reply_status: e.reply_status, reply_payload_len: e.reply_payload_len, reply_payload: e.reply_payload, send_source_pid: e.send_source_pid, send_endpoint_id: e.send_endpoint_id, send_payload_len: e.send_payload_len, send_payload: e.send_payload, event_count: e.event_count, event0: e.event0, event1: e.event1, event2: e.event2, event3: e.event3, send_dropped: 1 }
+}
+
+func effect_send_dropped(e: Effect) u32 {
+    return e.send_dropped
 }
 
 func from_receive_observation(obs: syscall.ReceiveObservation) Message {

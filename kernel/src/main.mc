@@ -20,9 +20,11 @@ func main() i32 {
         return 1
     }
     if scenarios.run_model_boundary(&state) != 0 {
-        return 1
+        return 6
     }
-
+    if scenarios.run_delivery_witness(&state) != 0 {
+        return 7
+    }
     return 0
 }
 
