@@ -126,3 +126,65 @@ func run_long_lived_coherence(state: *boot.KernelBootState) i32 {
 
     return 0
 }
+
+// Cross-service failure semantics (Phase 158).
+//
+// Called after run_long_lived_coherence; the log is at capacity (4 entries)
+// at this point due to the kv-write advisory markers written by prior scenarios.
+//
+// This scenario classifies three cross-service failure findings:
+//
+//   Advisory log drop (intentional difference):
+//     When the log is full, a kv write still returns Ok.  The advisory log
+//     marker is silently discarded by the dispatcher.  The kv caller has no
+//     visible signal that the audit trail was lost.  This is the one
+//     cross-service failure inconsistency: kv success does not imply that
+//     the associated log record was written.
+//
+//   Aligned InvalidArgument (consistent):
+//     kv get for a missing key and a shell invalid command both return
+//     InvalidArgument.  The same status code signals "request cannot be
+//     fulfilled as stated" across service boundaries.
+//
+//   Exhausted state is sticky (consistent):
+//     Log full returns Exhausted on every further append.  A kv write does
+//     not free log capacity.  The exhausted state persists until restart.
+func run_cross_service_failure(state: *boot.KernelBootState) i32 {
+    effect: service_effect.Effect
+
+    // Log is full from prior scenarios.  Any further append must return Exhausted.
+    effect = boot.kernel_dispatch_step(state, cmd_log_append(42))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
+        return 1
+    }
+
+    // kv write with a new key: the kv operation succeeds (Ok) even though the
+    // advisory log marker is silently dropped.  The caller sees Ok and has no
+    // signal that the log record was lost.
+    effect = boot.kernel_dispatch_step(state, cmd_kv_set(20, 55))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 2
+    }
+
+    // Log is still full; the kv write did not free any log capacity.
+    effect = boot.kernel_dispatch_step(state, cmd_log_append(1))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
+        return 3
+    }
+
+    // kv get for a key that was never set returns InvalidArgument.
+    // This is the consistent cross-service signal for an unfulfillable request.
+    effect = boot.kernel_dispatch_step(state, cmd_kv_get(99))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.InvalidArgument {
+        return 4
+    }
+
+    // kv overwrite also succeeds when the log is full: advisory marker is
+    // dropped for overwrites as well, with the same silent loss semantics.
+    effect = boot.kernel_dispatch_step(state, cmd_kv_set(20, 77))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 5
+    }
+
+    return 0
+}

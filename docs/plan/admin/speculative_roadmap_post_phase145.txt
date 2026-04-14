@@ -444,6 +444,45 @@ Phase 156 -- Multi-Client Interaction Audit (LANDED)
   wiring step; no other kernel service files were changed
 - Validated by `tests/system/kernel_reset_lane_multi_client/`
 
+Phase 157 -- Long-Lived System Coherence Audit (LANDED)
+- Phase 157 proved that service meaning remains coherent over repeated
+  interactions, not just across one short proof path:
+  - kv state is stable across repeated reads: no silent expiry or drift
+  - log overwrite-on-full is permanent policy: tail still returns the
+    original 4 entries; no silent loss or silent growth occurs
+  - restart resets all service state to the empty baseline with no hidden
+    residue from prior interactions
+  - the kv-write advisory log marker is coherent: log saturation does not
+    affect kv state or kv reply status
+  - repeated overwrites of the same kv key never overflow the store
+- No scheduler, persistence layer, service supervisor, or compiler surface
+  was opened
+- Validated by `tests/system/kernel_reset_lane_long_lived_coherence/`
+
+Phase 158 -- Cross-Service Failure Semantics Consistency (LANDED)
+- Phase 158 classified cross-service failure semantics across the admitted
+  service set and named one intentional inconsistency:
+  - Advisory log drop (intentional difference): when the log buffer is
+    full, a kv write still returns Ok; the dispatcher silently discards
+    the advisory log marker; the kv caller has no signal that the audit
+    record was lost; this is documented as the one named cross-service
+    failure inconsistency — kv success does not imply log record written
+  - Exhausted is consistent: both log full and kv full return Exhausted
+    with no state change; capacity overflow uses the same status code
+    across service boundaries
+  - InvalidArgument is consistent: kv get for a missing key and a shell
+    invalid command both return InvalidArgument; the same status signals
+    "request cannot be fulfilled as stated" across service boundaries
+  - Exhausted is sticky: a full log stays full regardless of kv activity;
+    services own their capacity independently
+- No recovery framework, retry policy, two-phase commit, log-full callback,
+  or compiler surface was opened
+- Advisory log drop is explicitly intentional and classified in
+  `docs/plan/decision_log.txt`
+- `kernel/src/scenarios.mc` gained `run_cross_service_failure`; no service
+  files were changed
+- Validated by `tests/system/kernel_reset_lane_cross_service_failure/`
+
 What should naturally emerge from this wave
 -------------------------------------------
 If the repository follows this roadmap honestly, the next useful results

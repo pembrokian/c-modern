@@ -13,6 +13,9 @@ func main() i32 {
     if scenarios.run_long_lived_coherence(&state) != 0 {
         return 1
     }
+    if scenarios.run_cross_service_failure(&state) != 0 {
+        return 1
+    }
 
     return 0
 }
