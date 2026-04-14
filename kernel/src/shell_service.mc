@@ -1,17 +1,22 @@
 import primitives
+import serial_protocol
 import service_effect
 import syscall
 
 const SHELL_INVALID_REPLY: u8 = 63  // '?'
 const CMD_E: u8 = 69   // 'E'
 const CMD_C: u8 = 67   // 'C'
-const CMD_L: u8 = 76   // 'L'
-const CMD_A: u8 = 65   // 'A'
-const CMD_T: u8 = 84   // 'T'
-const CMD_K: u8 = 75   // 'K'
-const CMD_S: u8 = 83   // 'S'
-const CMD_G: u8 = 71   // 'G'
-const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
+// Bootstrap limitation: cross-module constant references do not yet survive
+// link, so the wire-format constants from serial_protocol are re-declared here.
+// Both sets must match; serial_protocol.mc is the single source of truth for
+// comment and documentation purposes.
+const CMD_L: u8 = 76
+const CMD_A: u8 = 65
+const CMD_T: u8 = 84
+const CMD_K: u8 = 75
+const CMD_S: u8 = 83
+const CMD_G: u8 = 71
+const CMD_BANG: u8 = 33
 
 struct ShellServiceState {
     pid: u32
