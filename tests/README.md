@@ -22,10 +22,10 @@ Compiler-validation owners:
 - `cmake/` for repository-owned CTest audit helpers
 - `support/` for local reusable test harness utilities
 
-Legacy rule during Phase 152c:
+Legacy archive rule:
 
-- do not expand phase-driven runtime-proof suites such as `tests/tool/freestanding/kernel/runtime/phase*` unless a narrow legacy maintenance fix forces it
-- treat those proof-heavy runtime suites as read-only legacy surfaces while new cleanup checks move toward `smoke/` and `system/`
+- the retired freestanding proof harness now lives under `archive/legacy_freestanding/`
+- do not add new active coverage there; new behavior work belongs in `smoke/`, `system/`, or the grouped `tests/tool/` workflow suites
 
 The shared support layer currently covers fixture helpers plus the common
 process, socket, timeout, and temporary-file helpers used by grouped
@@ -81,7 +81,6 @@ The large integration areas are now split by behavior family instead of one exec
 - tool workflow and CLI/project validation
 - tool build-state, imported-artifact, and incremental rebuild validation
 - tool real-project workflow validation
-- tool freestanding proof validation
 - codegen core executable behavior
 - codegen stdlib and canonical executable behavior
 - codegen project and imported-module executable behavior
@@ -91,25 +90,11 @@ The active grouped tool CTest targets use semantic names:
 - `mc_tool_workflow_unit`
 - `mc_tool_build_state_unit`
 - `mc_tool_real_project_unit`
-- `mc_tool_freestanding_bootstrap_unit`
-- `mc_tool_freestanding_kernel_runtime_unit`
-- `mc_tool_freestanding_kernel_docs_unit`
-- `mc_tool_freestanding_kernel_artifacts_unit`
-- `mc_tool_freestanding_system_unit`
-
-The freestanding kernel workflow now routes through the top-level runtime,
-docs, and artifacts surfaces. Any retained shard CTests are legacy
-implementation details rather than normal ownership targets.
-
-During the Phase 152c reset, those retained runtime proof targets are not the
-destination for new behavior-first cleanup work. Use the simplest possible
-workflow runner for new smokes and system checks until those surfaces can own
-their own direct runners.
 
 When those grouped tool suites generate disposable outputs, they now root them
 under semantic suite directories such as `build/debug/tool/workflow/...`,
-`build/debug/tool/build_state/...`, `build/debug/tool/real_projects/...`, and
-`build/debug/tool/freestanding/...` instead of creating fresh top-level
+`build/debug/tool/build_state/...`, and `build/debug/tool/real_projects/...`
+instead of creating fresh top-level
 `phase*` trees. The leaf project, build, and output names under those suite
 roots are also semantic now, so routine runs no longer create new disposable
 `phase*` artifacts anywhere under the active build root.

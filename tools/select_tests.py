@@ -39,7 +39,6 @@ SMOKE_AND_AUDIT_TESTS = [
     "mc_dump_paths_smoke",
     "mc_first_use_smoke",
     "mc_supported_slice_doc_audit",
-    "mc_freestanding_support_audit",
     "mc_public_cut_smoke",
     "mc_release_readiness_audit",
     "mc_v0_2_gate",
@@ -48,28 +47,11 @@ SMOKE_AND_AUDIT_TESTS = [
 
 DEFAULT_BASE_CANDIDATES = ["origin/main", "main", "origin/master", "master"]
 CACHE_VERSION = 1
-KERNEL_DOCS_TEST = "mc_tool_freestanding_kernel_docs_unit"
-KERNEL_SYNTHETIC_TEST = "mc_tool_freestanding_kernel_synthetic_unit"
-
-
-ALL_KERNEL_SURFACE_TESTS = [
-    KERNEL_SYNTHETIC_TEST,
-    KERNEL_DOCS_TEST,
-]
-
-ALL_KERNEL_TESTS = list(ALL_KERNEL_SURFACE_TESTS)
-
-ALL_FREESTANDING_TESTS = [
-    "mc_tool_freestanding_bootstrap_unit",
-    *ALL_KERNEL_TESTS,
-    "mc_tool_freestanding_system_unit",
-]
 
 ALL_TOOL_TESTS = [
     "mc_tool_workflow_unit",
     "mc_tool_build_state_unit",
     "mc_tool_real_project_unit",
-    *ALL_FREESTANDING_TESTS,
 ]
 
 FULL_LOCAL_UNIT_SET = [
@@ -96,29 +78,15 @@ RULES = [
     Rule(("tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_suite.cpp"), ("mc_tool_workflow_unit",), "workflow suite ownership"),
     Rule(("tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp"), ("mc_tool_build_state_unit",), "build-state suite ownership"),
     Rule(("tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp"), ("mc_tool_real_project_unit",), "real-project suite ownership"),
-    Rule(("tests/tool/freestanding/bootstrap/",), ("mc_tool_freestanding_bootstrap_unit",), "freestanding bootstrap ownership"),
-    Rule(("tests/tool/freestanding/system/",), ("mc_tool_freestanding_system_unit",), "freestanding system ownership"),
-    Rule(("tests/tool/freestanding/kernel/artifacts.cpp",), ("mc_tool_freestanding_kernel_artifacts_unit",), "kernel artifact suite ownership"),
-    Rule(("tests/tool/freestanding/kernel/suite.cpp",), tuple(ALL_KERNEL_SURFACE_TESTS), "kernel surface ownership"),
-    Rule(("tests/tool/tool_freestanding_tests.cpp",), tuple(ALL_FREESTANDING_TESTS), "freestanding suite driver ownership"),
     Rule(("tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h"), tuple(ALL_TOOL_TESTS), "shared tool helper ownership"),
     Rule(("compiler/lex/", "compiler/parse/", "compiler/ast/"), tuple(CORE_COMPILER_TESTS), "frontend syntax-layer ownership"),
     Rule(("compiler/resolve/", "compiler/sema/"), ("mc_sema_fixture_unit", "mc_mir_fixture_unit", "mc_mir_unit", "mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "semantic-layer ownership"),
     Rule(("compiler/mir/",), ("mc_mir_fixture_unit", "mc_mir_unit", "mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "MIR-layer ownership"),
     Rule(("compiler/codegen_llvm/",), ("mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "LLVM codegen ownership"),
     Rule(("compiler/driver/", "compiler/support/", "compiler/mci/", "mci/"), tuple(ALL_TOOL_TESTS), "driver and tool-surface ownership"),
-    Rule(("runtime/freestanding/",), tuple(ALL_FREESTANDING_TESTS), "freestanding runtime ownership"),
     Rule(("tests/support/",), tuple(FULL_LOCAL_UNIT_SET), "shared test harness ownership"),
     Rule(("CMakeLists.txt",), tuple(FULL_LOCAL_UNIT_SET), "build graph ownership"),
 ]
-
-KERNEL_DOC_PATHS = {
-    "AGENTS.md",
-    "docs/agent/prompts/repo_map.md",
-    "tests/tool/README.md",
-    "tests/tool/freestanding/README.md",
-    "kernel/README.md",
-}
 
 
 def parse_args() -> argparse.Namespace:
@@ -176,21 +144,12 @@ def resolve_base_ref(source_root: Path, requested_base_ref: str) -> str:
     return "HEAD"
 
 def classify_kernel_path(path: str) -> tuple[list[str], str] | None:
-    if path in KERNEL_DOC_PATHS:
-        return ([KERNEL_DOCS_TEST], "kernel documentation ownership")
-
-    if path.startswith("tests/tool/freestanding/kernel/synthetic/"):
-        return ([KERNEL_SYNTHETIC_TEST], "kernel synthetic surface ownership")
-
-    if path.startswith("tests/tool/freestanding/kernel/docs/"):
-        return ([KERNEL_DOCS_TEST], "kernel docs descriptor ownership")
-
     if path.startswith("kernel/"):
-        return (["mc_tool_freestanding_system_unit", "mc_tool_workflow_unit"], "kernel ownership")
+        return (["mc_tool_workflow_unit"], "kernel workflow ownership")
 
     if path.startswith("stdlib/"):
-        return ([*ALL_KERNEL_SURFACE_TESTS,
-                 "mc_tool_freestanding_system_unit",
+        return (["mc_tool_workflow_unit",
+                 "mc_tool_real_project_unit",
                  "mc_codegen_executable_stdlib_unit",
                  "mc_check_stdlib_import_smoke"],
                 "stdlib ownership")
@@ -268,7 +227,6 @@ def iter_owned_files(source_root: Path, relative_paths: Iterable[str]) -> list[P
 
 def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
     common_tool_inputs = [
-        "tests/tool/tool_freestanding_tests.cpp",
         "tests/tool/tool_suite_common.cpp",
         "tests/tool/tool_suite_common.h",
         "compiler/driver/",
@@ -291,10 +249,6 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "mc_tool_workflow_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
         "mc_tool_build_state_unit": ["tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
         "mc_tool_real_project_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/", "tests/support/"],
-        "mc_tool_freestanding_bootstrap_unit": ["tests/tool/freestanding/bootstrap/", *common_tool_inputs, "runtime/freestanding/", "stdlib/"],
-        KERNEL_SYNTHETIC_TEST: ["tests/tool/freestanding/kernel/synthetic/", "tests/tool/freestanding/kernel/suite.cpp", *common_tool_inputs, "runtime/freestanding/", "stdlib/"],
-        KERNEL_DOCS_TEST: ["AGENTS.md", "docs/agent/prompts/repo_map.md", "tests/tool/README.md", "tests/tool/freestanding/README.md", "kernel/README.md", "tests/tool/freestanding/kernel/suite.cpp", "tests/tool/freestanding/kernel/docs/"],
-        "mc_tool_freestanding_system_unit": ["tests/tool/freestanding/system/", *common_tool_inputs, "runtime/freestanding/", "kernel/", "stdlib/"],
         "mc_help_smoke": ["compiler/driver/", "compiler/support/", "README.md"],
         "mc_check_smoke": ["tests/cases/", "compiler/driver/", "compiler/support/", "compiler/parse/", "compiler/sema/", "compiler/mir/"],
         "mc_check_stdlib_import_smoke": ["stdlib/", "compiler/driver/", "compiler/support/", "compiler/sema/", "compiler/mir/"],
@@ -304,7 +258,6 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "mc_dump_paths_smoke": ["tests/cases/", "compiler/support/", "compiler/driver/"],
         "mc_first_use_smoke": ["README.md", "examples/", "compiler/driver/", "compiler/support/"],
         "mc_supported_slice_doc_audit": ["tests/cmake/run_supported_slice_doc_audit.cmake", "README.md", "docs/"],
-        "mc_freestanding_support_audit": ["tests/cmake/run_freestanding_support_audit.cmake", "README.md", "kernel/README.md", "tests/tool/freestanding/README.md"],
         "mc_public_cut_smoke": ["tests/cmake/run_public_cut_smoke.cmake", "README.md", "tests/cases/"],
         "mc_release_readiness_audit": ["tests/cmake/run_release_readiness_audit.cmake", "docs/", "README.md"],
         "mc_v0_2_gate": ["tests/cmake/run_v0_2_gate.cmake", "docs/", "README.md", "tests/cases/"],

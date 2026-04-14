@@ -6,7 +6,7 @@ This directory is the repository-owned kernel reset lane established in Phase 15
 
 Rules
 
-- Treat `kernel_old/` as the frozen legacy proof-shaped tree.
+- Treat `archive/legacy_freestanding/kernel_old/` as the frozen legacy proof-shaped tree.
 - New runtime simplification work starts here instead of extending verifier-owned structures in the legacy tree.
 - Services in this lane stay small: state, init, handlers, optional debug only.
 - Do not copy `record_*`, `observe_*`, `*Observation`, phase-indexed audit structs, or proof-routing helpers into this tree.
@@ -21,7 +21,8 @@ Current scope (Phase 153)
 - Ring-buffer observability lives in [`kernel/src/serial_shell_event_log.mc`](src/serial_shell_event_log.mc).
 - The dispatch entry is [`kernel/src/boot.mc`](src/boot.mc): `kernel_init()` + `kernel_dispatch_step()`.
 - The integration loop owner is [`kernel/src/scenarios.mc`](src/scenarios.mc): one scripted observation loop over the serial path.
-- The kernel image entry is [`kernel/src/main.mc`](src/main.mc): thin init-plus-loop entry vs `kernel_old/src/main.mc` at 1,706 lines.
+- The kernel image entry is [`kernel/src/main.mc`](src/main.mc): thin init-plus-loop entry vs `archive/legacy_freestanding/kernel_old/src/main.mc` at 1,706 lines.
+- The repo-owned project manifest is [`kernel/build.toml`](build.toml): direct workflow builds can target the active reset-lane tree without copying a fixture-local manifest.
 - Seven tests cover all paths: three smoke tests and four system tests.
 - The lane is wired into the build via the workflow test suite.
 

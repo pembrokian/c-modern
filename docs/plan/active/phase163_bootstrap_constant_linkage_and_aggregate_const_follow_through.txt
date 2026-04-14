@@ -3,7 +3,7 @@ Phase 163 -- Bootstrap Constant Linkage And Aggregate Const Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
@@ -48,6 +48,24 @@ Repository status note
 - The next truthful step is therefore not a broad const-eval wave. It is one
   bounded follow-through on exported constant linkage and ordinary aggregate
   const usability in the active compiler path.
+
+Landed result
+-------------
+- The active compiler path already carried exported module-scoped constants and
+  admitted aggregate const declarations through sema, MIR, and executable
+  builds on ordinary project targets; Phase 163 spends that support honestly
+  on the newer project-mode logical-module path and the active kernel tree.
+- `kernel/src/shell_service.mc`, `kernel/src/scenarios.mc`, and
+  `kernel/src/kernel_dispatch.mc` now reference imported owner constants
+  directly instead of re-declaring them locally.
+- `kernel/src/scenarios.mc` now carries one aggregate const declaration
+  (`DEFAULT_SERIAL_ROUTE`) built from an imported owner constant
+  (`boot.SERIAL_ENDPOINT_ID`), proving the admitted aggregate-const slice on
+  the active kernel path without widening into const functions.
+- A focused real-project regression now proves imported scalar const reuse,
+  imported aggregate const reuse, and imported-scalar-inside-aggregate-const
+  construction through a multi-file `module_sets.helper` logical module and a
+  full build or run path.
 
 Problem being solved
 --------------------
@@ -228,6 +246,17 @@ Exit criteria
   Phase 163-motivating owner pair
 - compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces do
   not widen beyond this constant follow-through slice
+
+Exit status
+-----------
+- Satisfied: imported module-scoped constants are now referenced directly in
+  the active kernel tree via `boot.*` and `serial_protocol.*` owners.
+- Satisfied: `DEFAULT_SERIAL_ROUTE` proves one admitted aggregate const on the
+  active kernel path using an imported owner constant.
+- Satisfied: the new `module-set-imported-const` regression covers the newer
+  logical-module path through project check, build, and run.
+- Satisfied: no const-call execution, macro system, generic metaprogramming,
+  ABI widening, or backend policy expansion was introduced.
 
 Non-goals
 ---------

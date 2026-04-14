@@ -6,17 +6,6 @@ import syscall
 const SHELL_INVALID_REPLY: u8 = 63  // '?'
 const CMD_E: u8 = 69   // 'E'
 const CMD_C: u8 = 67   // 'C'
-// Bootstrap limitation: cross-module constant references do not yet survive
-// link, so the wire-format constants from serial_protocol are re-declared here.
-// Both sets must match; serial_protocol.mc is the single source of truth for
-// comment and documentation purposes.
-const CMD_L: u8 = 76
-const CMD_A: u8 = 65
-const CMD_T: u8 = 84
-const CMD_K: u8 = 75
-const CMD_S: u8 = 83
-const CMD_G: u8 = 71
-const CMD_BANG: u8 = 33
 
 struct ShellServiceState {
     pid: u32
@@ -48,27 +37,27 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
         return service_effect.effect_reply(syscall.SyscallStatus.Ok, 2, payload)
     }
 
-    if m.payload[0] == CMD_L && m.payload[1] == CMD_A && m.payload[3] == CMD_BANG {
+    if m.payload[0] == serial_protocol.CMD_L && m.payload[1] == serial_protocol.CMD_A && m.payload[3] == serial_protocol.CMD_BANG {
         payload[0] = m.payload[2]
         return service_effect.effect_send(s.pid, s.log_endpoint_id, 1, payload)
     }
 
-    if m.payload[0] == CMD_L && m.payload[1] == CMD_T && m.payload[2] == CMD_BANG && m.payload[3] == CMD_BANG {
+    if m.payload[0] == serial_protocol.CMD_L && m.payload[1] == serial_protocol.CMD_T && m.payload[2] == serial_protocol.CMD_BANG && m.payload[3] == serial_protocol.CMD_BANG {
         return service_effect.effect_send(s.pid, s.log_endpoint_id, 0, payload)
     }
 
-    if m.payload[0] == CMD_K && m.payload[1] == CMD_S {
+    if m.payload[0] == serial_protocol.CMD_K && m.payload[1] == serial_protocol.CMD_S {
         payload[0] = m.payload[2]
         payload[1] = m.payload[3]
         return service_effect.effect_send(s.pid, s.kv_endpoint_id, 2, payload)
     }
 
-    if m.payload[0] == CMD_K && m.payload[1] == CMD_G && m.payload[3] == CMD_BANG {
+    if m.payload[0] == serial_protocol.CMD_K && m.payload[1] == serial_protocol.CMD_G && m.payload[3] == serial_protocol.CMD_BANG {
         payload[0] = m.payload[2]
         return service_effect.effect_send(s.pid, s.kv_endpoint_id, 1, payload)
     }
 
-    if m.payload[0] == CMD_K && m.payload[1] == CMD_C && m.payload[2] == CMD_BANG && m.payload[3] == CMD_BANG {
+    if m.payload[0] == serial_protocol.CMD_K && m.payload[1] == CMD_C && m.payload[2] == serial_protocol.CMD_BANG && m.payload[3] == serial_protocol.CMD_BANG {
         return service_effect.effect_send(s.pid, s.kv_endpoint_id, 0, payload)
     }
 

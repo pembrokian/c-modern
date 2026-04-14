@@ -18,9 +18,6 @@ import serial_protocol
 import service_effect
 import syscall
 
-// Bootstrap limitation: cross-module constant references are not yet supported
-// at link time, so this const is declared locally rather than via boot.SERIAL_ENDPOINT_ID.
-const SERIAL_ENDPOINT_ID: u32 = 10
 const STEP_COUNT: usize = 22
 
 enum StepCheckKind {
@@ -49,6 +46,13 @@ struct StepSpec {
     check: StepCheck
 }
 
+struct SerialRoute {
+    endpoint: u32
+    pid: u32
+}
+
+const DEFAULT_SERIAL_ROUTE: SerialRoute = SerialRoute{ endpoint: boot.SERIAL_ENDPOINT_ID, pid: 1 }
+
 // serial_obs wraps a protocol payload into a ReceiveObservation.
 // endpoint and pid are explicit: swap the endpoint to route to a different
 // service; swap pid to simulate a different client.
@@ -58,23 +62,23 @@ func serial_obs(endpoint: u32, pid: u32, payload: [4]u8) syscall.ReceiveObservat
 
 // cmd_* are single-client convenience wrappers: serial endpoint, pid=1.
 func cmd_log_append(value: u8) syscall.ReceiveObservation {
-    return serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_log_append(value))
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_log_append(value))
 }
 
 func cmd_log_tail() syscall.ReceiveObservation {
-    return serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_log_tail())
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_log_tail())
 }
 
 func cmd_kv_set(key: u8, value: u8) syscall.ReceiveObservation {
-    return serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_set(key, value))
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_kv_set(key, value))
 }
 
 func cmd_kv_get(key: u8) syscall.ReceiveObservation {
-    return serial_obs(SERIAL_ENDPOINT_ID, 1, serial_protocol.encode_kv_get(key))
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_kv_get(key))
 }
 
 func kv_count_obs(pid: u32) syscall.ReceiveObservation {
-    return serial_obs(SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
+    return serial_obs(boot.SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
 }
 
 func step(obs: syscall.ReceiveObservation, failure_code: i32, check: StepCheck) StepSpec {
@@ -116,7 +120,7 @@ func step_table() [22]StepSpec {
     specs[1] = routed_step(cmd_kv_set(5, 42), 1)
     specs[2] = payload1_step(cmd_kv_get(5), 1, syscall.SyscallStatus.Ok, 42)
     specs[3] = log_tail_state_step(cmd_log_tail(), 1, syscall.SyscallStatus.Ok, 77, 75)
-    specs[4] = payload1_step(serial_obs(SERIAL_ENDPOINT_ID, 99, serial_protocol.encode_kv_get(5)), 1, syscall.SyscallStatus.Ok, 42)
+    specs[4] = payload1_step(serial_obs(boot.SERIAL_ENDPOINT_ID, 99, serial_protocol.encode_kv_get(5)), 1, syscall.SyscallStatus.Ok, 42)
     specs[5] = routed_step(cmd_kv_set(5, 77), 1)
     specs[6] = routed_step(cmd_kv_set(5, 99), 1)
     specs[7] = payload1_step(cmd_kv_get(5), 1, syscall.SyscallStatus.Ok, 99)

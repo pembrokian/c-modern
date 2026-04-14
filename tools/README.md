@@ -11,9 +11,9 @@ Convenience entrypoint
 - `make select-tests`: wrapper around `tools/select_tests.py`.
   - default behavior uses `SELECT_TESTS_ARGS=--build --run --cache`
   - override arguments when needed, for example:
-    `make select-tests SELECT_TESTS_ARGS='--changed tests/tool/freestanding/kernel/runtime/phase109_first_running_kernel_slice_audit/phase.toml --changed docs/agent/prompts/repo_map.md --run --cache'`
+    `make select-tests SELECT_TESTS_ARGS='--changed kernel/src/kernel_dispatch.mc --changed compiler/driver/builder.cpp --run --cache'`
 
-Freestanding kernel maintenance note
+Legacy archive note
 
-- adding a new runtime kernel phase normally means updating its descriptor directory under `tests/tool/freestanding/kernel/runtime/phase.../`, adding its goldens, and touching `tests/tool/freestanding/kernel/synthetic/` only for the separate synthetic phases85-88 surface
-- update `tools/select_tests.py` only when top-level kernel surface ownership changes or a new surface is introduced
+- the retired freestanding proof suite, `kernel_old/`, and related maintenance scripts now live under `archive/legacy_freestanding/`
+- active `kernel/` work should route through `kernel/build.toml`, `tests/tool/tool_workflow_suite.cpp`, and the ordinary grouped tool suites

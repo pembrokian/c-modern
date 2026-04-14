@@ -145,20 +145,6 @@ add_executable(mc_tool_real_project_tests
 target_include_directories(mc_tool_real_project_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_tool_real_project_tests PRIVATE mc_support mc_test_support)
 
-add_executable(mc_tool_freestanding_tests
-    tests/tool/tool_freestanding_tests.cpp
-    tests/tool/tool_suite_common.cpp
-    tests/tool/freestanding/bootstrap/suite.cpp
-    tests/tool/freestanding/kernel/artifacts.cpp
-    tests/tool/freestanding/kernel/synthetic/suite.cpp
-    tests/tool/freestanding/kernel/suite.cpp
-    tests/tool/freestanding/system/suite.cpp
-    tests/tool/freestanding/suite.cpp
-)
-
-target_include_directories(mc_tool_freestanding_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(mc_tool_freestanding_tests PRIVATE mc_support mc_test_support)
-
 add_executable(mc_codegen_fixture_tests
     tests/compiler/codegen/codegen_fixture_tests.cpp
 )
@@ -220,15 +206,6 @@ add_test(NAME mc_codegen_llvm_unit COMMAND mc_codegen_llvm_tests)
 add_test(NAME mc_tool_workflow_unit COMMAND mc_tool_workflow_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_tool_build_state_unit COMMAND mc_tool_build_state_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_tool_real_project_unit COMMAND mc_tool_real_project_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-add_test(NAME mc_tool_freestanding_bootstrap_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} bootstrap)
-
-# Primary freestanding kernel surfaces.
-# Note: kernel-runtime and kernel-artifacts removed; they probed kernel_old/ (frozen legacy tree)
-# via kernel/build.toml which does not exist in the reset-lane kernel.
-add_test(NAME mc_tool_freestanding_kernel_synthetic_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-synthetic)
-add_test(NAME mc_tool_freestanding_kernel_docs_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} kernel-docs)
-
-add_test(NAME mc_tool_freestanding_system_unit COMMAND mc_tool_freestanding_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} system)
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_codegen_executable_core_unit COMMAND mc_codegen_executable_core_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_codegen_executable_stdlib_unit COMMAND mc_codegen_executable_stdlib_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -286,10 +263,6 @@ add_test(NAME mc_supported_slice_doc_audit
      COMMAND ${CMAKE_COMMAND}
          -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_supported_slice_doc_audit.cmake)
-add_test(NAME mc_freestanding_support_audit
-     COMMAND ${CMAKE_COMMAND}
-         -DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
-         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_freestanding_support_audit.cmake)
 add_test(NAME mc_public_cut_smoke
      COMMAND ${CMAKE_COMMAND}
          -DMC=$<TARGET_FILE:mc>

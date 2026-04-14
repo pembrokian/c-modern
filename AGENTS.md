@@ -61,7 +61,6 @@ ctest --test-dir build/debug -R mc_mir_fixture_unit --output-on-failure
 ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure
 ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure
 ctest --test-dir build/debug -R mc_tool_real_project_unit --output-on-failure
-ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_(docs|shard[1-9])|system)_unit' -j8 --output-on-failure
 make select-tests
 ```
 
@@ -81,15 +80,9 @@ Active grouped regression layout:
 - `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
 - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
 - `tests/tool/tool_real_project_suite.cpp`: real-project grouped implementation
-- `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
-- `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
-- `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
-- `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding grouped orchestrator for the descriptor-driven runtime surface plus the separate synthetic phases85-88 surface
-- `tests/tool/freestanding/kernel/synthetic/suite.cpp`: standalone synthetic kernel proofs for phases 85-88
-- late freestanding kernel audits keep descriptor-owned runtime checks under `tests/tool/freestanding/kernel/runtime/phase.../`, preserved early runtime MIR goldens under `tests/tool/freestanding/kernel/runtime/legacy_goldens/`, and artifact expectations under `tests/tool/freestanding/kernel/artifact_specs/...`; synthetic, publication, and artifact checks live on their separate top-level surfaces
 - local changed-path selection now lives in `tools/select_tests.py` and the `make select-tests` wrapper; use that for narrow local iteration before wider gates
-- when adding a new freestanding kernel phase, update the owned runtime descriptor directory plus its goldens first, update `tests/tool/freestanding/kernel/synthetic/` only for the separate synthetic phases85-88 surface, and update `tools/select_tests.py` only if the new phase changes top-level surface ownership or adds a new surface such as synthetic, docs, or artifacts
-- `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
+- `kernel/build.toml`: repository-owned hosted reset-lane project manifest used by the active workflow suite
+- `archive/legacy_freestanding/`: retired freestanding proof harness, `kernel_old/`, and related maintenance helpers preserved for historical reference only
 - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`: compatibility runners only, not the active implementation owners
 - `tests/compiler/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation
 - primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`
@@ -122,5 +115,6 @@ If you add a feature that changes compiler-visible behavior, update the narrowes
 - Import handling currently lives in bootstrap sema and is intentionally simpler than a future interface-artifact system.
 - Layout support exists, but it is still first-cut bootstrap behavior and not full ABI completion.
 - The build tree under `build/` is disposable.
+- Do not reactivate or extend the archived freestanding proof harness under `archive/legacy_freestanding/`; new validation belongs on the active hosted kernel or grouped workflow surfaces.
 - Do not reintroduce fresh top-level `build/debug/phase*` regression output trees for repository-owned tests; prefer the semantic `audit`, `probes`, `tmp`, `tool`, or grouped suite work roots already in use.
 - If you need to tidy an existing build tree in place, prefer `make clean-legacy-build-debris` over ad hoc manual deletion.

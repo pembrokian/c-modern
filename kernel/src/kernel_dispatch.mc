@@ -14,12 +14,6 @@ import serial_shell_path
 import service_effect
 import syscall
 
-// Bootstrap limitation: cross-module constant references are not yet supported
-// at link time, so these consts are declared locally rather than via boot.*.
-const LOG_ENDPOINT_ID: u32 = 12
-const KV_ENDPOINT_ID: u32 = 13
-const SERIAL_ENDPOINT_ID: u32 = 10
-
 // MAX_EFFECT_CHAIN_DEPTH guards against send loops between services.
 // If the chain exceeds this depth the original caller receives Exhausted.
 // Value 8 is well above the current topology (serial → shell → kv/log, depth ≤ 3).
@@ -43,7 +37,7 @@ func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Messag
     if msg.payload_len >= 2 {
         log_payload: [4]u8 = primitives.zero_payload()
         log_payload[0] = KV_WRITE_LOG_MARKER
-        log_msg: service_effect.Message = service_effect.message(msg.source_pid, LOG_ENDPOINT_ID, 1, log_payload)
+        log_msg: service_effect.Message = service_effect.message(msg.source_pid, boot.LOG_ENDPOINT_ID, 1, log_payload)
         kv_log_result: log_service.LogResult = log_service.handle(current.log_state, log_msg)
         new_log_state = kv_log_result.state
         if service_effect.effect_reply_status(kv_log_result.effect) == syscall.SyscallStatus.Exhausted {
@@ -62,12 +56,12 @@ func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Messag
 // a further Send that needs chasing through a non-leaf path.
 func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    if msg.endpoint_id == LOG_ENDPOINT_ID {
+    if msg.endpoint_id == boot.LOG_ENDPOINT_ID {
         log_result: log_service.LogResult = log_service.handle(current.log_state, msg)
         *state = boot.KernelBootState{ path_state: current.path_state, log_state: log_result.state, kv_state: current.kv_state }
         return log_result.effect
     }
-    if msg.endpoint_id == KV_ENDPOINT_ID {
+    if msg.endpoint_id == boot.KV_ENDPOINT_ID {
         return kernel_dispatch_kv(state, msg)
     }
     return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
@@ -134,7 +128,7 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
 // Top-level dispatch step: route to the serial path or directly to leaf
 // services.  No endpoint-specific post-processing needed at this level.
 func kernel_dispatch_step(state: *boot.KernelBootState, observation: syscall.ReceiveObservation) service_effect.Effect {
-    if observation.endpoint_id == SERIAL_ENDPOINT_ID {
+    if observation.endpoint_id == boot.SERIAL_ENDPOINT_ID {
         return kernel_dispatch_serial(state, observation)
     }
     return kernel_dispatch_leaf(state, service_effect.message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload))

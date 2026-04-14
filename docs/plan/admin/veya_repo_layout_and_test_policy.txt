@@ -79,8 +79,8 @@ Test layout rule
 Validation policy
 -----------------
 - During Veya-focused iteration, run the narrowest owning Veya-facing
-  checks first, especially the owning freestanding slice (`mc_tool_freestanding_bootstrap_unit`,
-  the owning `mc_tool_freestanding_kernel_case_<name>_unit`, or `mc_tool_freestanding_system_unit`).
+  checks first, especially `mc_tool_workflow_unit` for the active reset-lane
+  kernel and the narrowest compiler suite that owns the touched layer.
 - If a change touches compiler ownership directly, also run the narrowest
   relevant compiler suites for that layer, such as parser, sema, MIR, or other
   tool tests.

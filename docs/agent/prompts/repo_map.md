@@ -31,7 +31,7 @@ This file is a fast orientation map for agents working in this repository.
 - `kernel`
   - repository-owned Veya kernel sources rather than disposable proof-only fixtures
   - `docs/arch/veya/kernel_style_guide.txt`: required style guide for kernel/src/ service modules and kernel main.mc orchestration
-  - `build.toml`: freestanding kernel manifest for the active bring-up slice
+  - `build.toml`: hosted reset-lane manifest used by the active workflow suite
   - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed first-user-entry, endpoint core, syscall IPC, interrupt classification, timer-owned tick delivery, MMU-owned translation-root construction, bounded init-owned multi-service orchestration, one bounded delegated request-reply follow-through, one bounded fixed service-directory publication step, one bounded image-contract hardening step, one bounded target-surface audit, one bounded next-plateau audit, one bounded delegation-chain stress step, one bounded invalidation and rejection audit step, one bounded authority lifetime classification step, one bounded service-death observation step, one bounded partial-failure propagation step, one bounded UART receive-frame ownership-boundary audit step, one bounded device-failure-containment audit step, one bounded optional completion-backed follow-through step, one bounded serial-ingress composed service graph step, one bounded serial shell command-routing step, one bounded long-lived log-service follow-through step, one bounded service-shape consolidation step, one bounded IPC-shape audit under real usage step, one bounded authority-ergonomics-under-reuse step, one bounded restart-contract step, one bounded rebuilt-system clean-second-pass step, and thin root orchestration across the owned scheduler, lifecycle, bootstrap helper, and debug audit modules
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
   - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for spawn, timer block, wake-to-ready, exit, and waited-child release follow-through
@@ -122,19 +122,8 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
     - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
     - `tests/tool/tool_real_project_suite.cpp`: real-project grouped implementation
-    - `tests/tool/tool_freestanding_tests.cpp`: freestanding proof driver
-    - `tests/tool/freestanding/suite.cpp`: freestanding top-level orchestrator
-    - `tests/tool/freestanding/bootstrap/suite.cpp`: freestanding bootstrap and narrow `hal` grouped implementation
-    - `tests/tool/freestanding/kernel/suite.cpp`: kernel freestanding orchestrator for the descriptor-driven runtime surface plus the separate synthetic phases85-88 surface
-    - `tests/tool/freestanding/kernel/runtime/`: descriptor-owned kernel runtime proofs, one phase directory per runtime case
-    - `tests/tool/freestanding/kernel/docs/`: descriptor-owned kernel documentation audits
-    - `tests/tool/freestanding/kernel/artifact_specs/`: descriptor-owned kernel artifact audits
-    - `tests/tool/freestanding/kernel/synthetic/suite.cpp`: standalone synthetic kernel proofs for phases 85-88
-    - `tests/tool/freestanding/kernel/runtime/legacy_goldens/`: preserved early narrow MIR proof slices kept as regression references alongside the active descriptor-owned runtime surface
-    - late ownership-hardening kernel audits now keep checked-in expectations adjacent to their owning surfaces under `tests/tool/freestanding/kernel/runtime/`, `tests/tool/freestanding/kernel/synthetic/`, and `tests/tool/freestanding/kernel/artifact_specs/`; runtime, synthetic, docs, and artifact validation all run through top-level surfaces rather than shard targets
-    - `tests/tool/tool_suite_common.cpp`: `ExpectMirFirstMatchProjectionFile` is the shared helper for those projected MIR goldens
-    - `tests/tool/freestanding/system/suite.cpp`: init, user-space policy, and integrated-system grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
+    - `archive/legacy_freestanding/`: retired freestanding proof harness and `kernel_old/`, preserved outside the live build and selector contract
   - if freestanding or Veya coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split
   - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` are thin compatibility runners only
 
@@ -195,4 +184,4 @@ Focused grouped-suite checks that are often enough for tool or workflow work:
 - `ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure`
 - `ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure`
 - `ctest --test-dir build/debug -R mc_tool_real_project_unit --output-on-failure`
-- `ctest --test-dir build/debug -R 'mc_tool_freestanding_(bootstrap|kernel_(docs|shard[1-9])|system)_unit' -j8 --output-on-failure`
+- `ctest --test-dir build/debug -R 'mc_tool_(workflow|build_state|real_project)_unit' --output-on-failure`

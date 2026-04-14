@@ -966,6 +966,35 @@ void TestDuplicateTopLevelAcrossModulePartsFails(const std::filesystem::path& bi
                          "duplicate top-level declarations across module parts should fail deterministically");
 }
 
+void TestKernelResetLaneRepoProjectRuns(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_path = source_root / "kernel" / "build.toml";
+    const std::filesystem::path build_dir = binary_root / "kernel_reset_lane_repo_build";
+    std::filesystem::remove_all(build_dir);
+
+    BuildProjectTargetAndExpectSuccess(mc_path,
+                                       project_path,
+                                       build_dir,
+                                       "kernel",
+                                       "kernel_reset_lane_repo_build_output.txt",
+                                       "kernel reset lane repo project build");
+
+    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                              "run",
+                                                              "--project",
+                                                              project_path.generic_string(),
+                                                              "--target",
+                                                              "kernel",
+                                                              "--build-dir",
+                                                              build_dir.generic_string()},
+                                                             build_dir / "kernel_reset_lane_repo_run_output.txt",
+                                                             "kernel reset lane repo project run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane repo project should return 0, got:\n" + run_output);
+    }
+}
+
 void TestKernelResetLaneSmokeProjectRuns(const std::filesystem::path& source_root,
                                          const std::filesystem::path& binary_root,
                                          const std::filesystem::path& mc_path) {
@@ -1447,6 +1476,7 @@ void RunWorkflowToolSuite(const std::filesystem::path& source_root,
     TestProjectModeMultiFileModulesBuildAndRun(suite_root, mc_path);
     TestDuplicateModuleSetFileOwnershipFails(suite_root, mc_path);
     TestDuplicateTopLevelAcrossModulePartsFails(suite_root, mc_path);
+    TestKernelResetLaneRepoProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLaneSmokeProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLaneRetainedStateProjectRuns(source_root, suite_root, mc_path);
     TestKernelResetLaneObservabilityProjectRuns(source_root, suite_root, mc_path);

@@ -897,6 +897,9 @@ void NamespaceImportedBuildUnit(mc::mir::Module& module,
     for (auto& global : module.globals) {
         global.type = RewriteImportedTypeNames(std::move(global.type), renamed_types);
         for (auto& name : global.names) {
+            if (name.find('.') != std::string::npos) {
+                continue;
+            }
             const std::string qualified_name = QualifyImportedSymbol(module_name, name);
             renamed_globals.emplace(name, qualified_name);
             name = qualified_name;

@@ -1,0 +1,16 @@
+schema = 1
+project = "kernel-reset-lane"
+default = "kernel"
+
+[targets.kernel]
+kind = "exe"
+package = "kernel"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.kernel.search_paths]
+modules = ["src", "../stdlib"]
+
+[targets.kernel.runtime]
+startup = "default"

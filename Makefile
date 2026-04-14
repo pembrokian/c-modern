@@ -5,7 +5,7 @@ CTEST_JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN
 SELECT_TESTS_PY ?= $(shell if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' python3; fi)
 SELECT_TESTS_ARGS ?= --build --run --cache
 
-.PHONY: build test select-tests first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate freestanding-support-audit release-snapshot-prep clean-legacy-build-debris format dump-paths clean
+.PHONY: build test select-tests first-use-smoke public-cut-smoke release-readiness-audit v0_2_gate release-snapshot-prep clean-legacy-build-debris format dump-paths clean
 
 build:
 	cmake -S . -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE="$(CONFIG)"
@@ -28,9 +28,6 @@ release-readiness-audit: build
 
 v0_2_gate: build
 	ctest --test-dir "$(BUILD_DIR)" -R '^mc_v0_2_gate$$' --output-on-failure
-
-freestanding-support-audit: build
-	ctest --test-dir "$(BUILD_DIR)" -R '^mc_freestanding_support_audit$$' --output-on-failure
 
 release-snapshot-prep: build
 	./tools/release/prepare_v0_2_snapshot.sh --source-root . --build-dir "$(BUILD_DIR)"
