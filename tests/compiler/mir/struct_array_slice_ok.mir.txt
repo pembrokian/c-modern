@@ -1,0 +1,48 @@
+Module
+  TypeDecl kind=struct name=Endpoint
+    Field name=pid type=u32
+    Field name=active type=bool
+  Function name=active_count returns=[usize]
+    Local name=endpoints type=[2]Endpoint param readonly
+    Local name=view type=Slice<Endpoint>
+    Block label=entry0
+      load_local %v0:[2]Endpoint target=endpoints
+      array_to_slice %v1:Slice<Endpoint> target=Slice<Endpoint> operands=[%v0]
+      store_local target=view operands=[%v1]
+      load_local %v2:Slice<Endpoint> target=view
+      const %v3:int_literal op=0
+      field %v4:usize target=len target_kind=field target_name=len target_base=Slice<Endpoint> operands=[%v2]
+      bounds_check op=index operands=[%v3, %v4]
+      index %v5:Endpoint target_kind=index target_display=view[0] target_base=Slice<Endpoint> operands=[%v2, %v3] target_types=[int_literal]
+      field %v6:bool target=active target_kind=field target_name=active target_display=view[0].active target_base=Endpoint operands=[%v5]
+      terminator cond value=%v6 true=if_then1 false=if_merge2
+    Block label=if_then1
+      load_local %v7:Slice<Endpoint> target=view
+      field %v8:usize target=len target_kind=field target_name=len target_display=view.len target_base=Slice<Endpoint> operands=[%v7]
+      terminator return values=[%v8]
+    Block label=if_merge2
+      const %v9:int_literal op=0
+      terminator return values=[%v9]
+  Function name=main returns=[usize]
+    Local name=endpoints type=[2]Endpoint
+    Block label=entry0
+      const %v0:int_literal op=7
+      const %v1:bool op=true
+      aggregate_init %v2:Endpoint target=Endpoint operands=[%v0, %v1] fields=[pid, active]
+      load_local %v3:[2]Endpoint target=endpoints
+      const %v4:int_literal op=0
+      const %v5:usize op=2
+      bounds_check op=index operands=[%v4, %v5]
+      store_target target=endpoints[0] target_kind=index target_base=[2]Endpoint operands=[%v2, %v3, %v4] target_types=[int_literal]
+      const %v6:int_literal op=9
+      const %v7:bool op=false
+      aggregate_init %v8:Endpoint target=Endpoint operands=[%v6, %v7] fields=[pid, active]
+      load_local %v9:[2]Endpoint target=endpoints
+      const %v10:int_literal op=1
+      const %v11:usize op=2
+      bounds_check op=index operands=[%v10, %v11]
+      store_target target=endpoints[1] target_kind=index target_base=[2]Endpoint operands=[%v8, %v9, %v10] target_types=[int_literal]
+      load_local %v12:[2]Endpoint target=endpoints
+      symbol_ref %v13:proc([2]Endpoint)->usize target=active_count target_kind=function target_name=active_count
+      call %v14:usize target=active_count target_kind=function target_name=active_count operands=[%v13, %v12]
+      terminator return values=[%v14]

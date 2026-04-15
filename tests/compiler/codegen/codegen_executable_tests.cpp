@@ -1434,6 +1434,12 @@ void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
                     {});
 
     RunBuiltFixture(mc_path,
+                    source_root / "tests/compiler/codegen/struct_index_address_local.mc",
+                    work_root / "struct_index_address_local_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
                     source_root / "tests/compiler/codegen/bool_struct_fields.mc",
                     work_root / "bool_struct_fields_build",
                     0,
