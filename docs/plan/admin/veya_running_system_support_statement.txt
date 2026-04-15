@@ -9,10 +9,11 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 166 does and does not support.
+through Phase 177 does and does not support.
 
-This is the refreshed Phase 168 statement.  It supersedes the earlier Phase
-120 through Phase 121 statement and reflects the post-Phase-166 landing.
+This is the current refreshed running-system statement.  It supersedes the
+earlier Phase 120 through Phase 121 statement and reflects the post-Phase-177
+landing.
 
 This note is intentionally narrower than the current-position assessment.
 It does not claim a general Veya platform, dynamic loading, dynamic
@@ -79,20 +80,23 @@ Repository status note
 - Phase 176 adds a fifth boot-wired echo service with bounded exhaustion and
   explicit init-owned restart follow-through, while keeping topology and
   restart policy flat.
+- Phase 177 hardens the shell as a hostile-user boundary by classifying
+  shell-owned invalid commands as unknown command versus malformed admitted
+  shape without widening payload width, compiler surfaces, or the shell
+  vocabulary.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 109 through Phase 166 running-system slice,
+- State only the admitted Phase 109 through Phase 177 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
   them honestly.
 
-Admitted support posture: refreshed Phase 168 running-system support
-statement; not a general Veya platform or broader freestanding workflow
-guarantee.
+Admitted support posture: current running-system support statement; not a
+general Veya platform or broader freestanding workflow guarantee.
 
 Frozen support matrix
 ---------------------
@@ -110,8 +114,9 @@ Frozen support matrix
   overwrite-on-full; kv_service with bounded in-memory key-value state and
   kv-count query; echo_service with bounded request-derived replies and
   explicit exhaustion after four uses; shell_service as a stateless
-  command-routing owner; serial_service as serial ingress and reply staging
-  owner
+  command-routing owner with compact hostile-user invalid classification
+  (`?C` unknown command, `?S` malformed admitted shape); serial_service as
+  serial ingress and reply staging owner
 - admitted topology boundary: service_topology.mc owns SERIAL_ENDPOINT_ID,
   SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, KV_ENDPOINT_ID, and ECHO_ENDPOINT_ID
   as the neutral topology module with no service imports; shell_service.mc
@@ -151,8 +156,8 @@ Frozen support matrix
   162 orchestration cleanup, Phase 163 constant linkage follow-through, Phase
   164 struct embedding deferral, Phase 165 second model boundary
   identification, Phase 166 service topology and event codes formalization,
-  Phase 168 this support statement refresh, and Phase 176 fifth-service
-  growth under explicit restart
+  Phase 168 this support statement refresh, Phase 176 fifth-service growth
+  under explicit restart, and Phase 177 hostile-user shell boundary
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,
@@ -224,11 +229,12 @@ statement over the repository-owned Veya kernel artifact: one interactive
 serial-shell system with log, kv, echo, shell, and serial services; one named
 neutral service topology module; one named event codes module; per-send
 delivery witness on the Effect type; named dispatch arms in the boot
-orchestrator; a scripted observation loop in scenarios.mc; and a thin
-main.mc that is init plus one call.
+orchestrator; a scripted observation loop in scenarios.mc; a shell that
+classifies shell-owned hostile-user invalid commands as unknown command or
+malformed admitted shape; and a thin main.mc that is init plus one call.
 
 The repository also provides the complete Phase 109–121 mechanism boundary
-and the Phase 122–166 authority, service, orchestration, and model-repair
+and the Phase 122–177 authority, service, orchestration, and model-repair
 wave over that same artifact.
 
 The repository still does not claim a general Veya platform, broader

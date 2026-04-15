@@ -43,16 +43,16 @@ Supported hosted slice:
 
 Supported Veya running-system slice:
 
-This summary mirrors the refreshed Phase 168 statement in `docs/plan/admin/veya_running_system_support_statement.txt`.
+This summary mirrors the current statement in `docs/plan/admin/veya_running_system_support_statement.txt`.
 
 - supported compiler host and produced proof-artifact target family: Darwin arm64 bootstrap target family only
 - admitted runtime environment: repository-owned freestanding kernel target built through `mc build --project kernel/build.toml --target kernel --build-dir <dir>`
 - admitted kernel mechanism boundary: explicit boot entry, first user entry, endpoint and handle state, syscall-owned byte IPC, attached-handle transfer, program-cap spawn and wait, timer-backed wake, bootstrap-capability handoff, named dispatch arms, per-send delivery witness
-- admitted service-layer boundary: shared service_effect Message and Effect contract; log_service, kv_service, shell_service, serial_service, echo_service, transfer_service
+- admitted service-layer boundary: shared service_effect Message and Effect contract; log_service, kv_service, shell_service with compact hostile-user invalid classification (`?C`, `?S`), serial_service, echo_service, transfer_service
 - admitted topology boundary: service_topology.mc owns SERIAL, SHELL, LOG, KV endpoint ID constants; shell_service.mc is topology-neutral
 - admitted event codes boundary: event_codes.mc owns the six observable event code constants; serial_shell_event_log.mc is a ring-buffer sink
 - admitted orchestration boundary: scenarios.mc owns the scripted observation loop; main.mc is init plus one call
-- admitted proof set: Phases 109–166 (see `docs/plan/admin/veya_running_system_support_statement.txt` for the full list)
+- admitted proof set: Phases 109–177 (see `docs/plan/admin/veya_running_system_support_statement.txt` for the full list)
 - unsupported today: dynamic discovery, dynamic loading, a service manager, broader init policy, freestanding `mc run` or `mc test`, broader target-family admission, multicore, general packaging, struct embedding, and const functions
 
 Supported freestanding v0.3 slice:

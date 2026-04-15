@@ -3,7 +3,36 @@ Phase 177 -- Shell As Hostile User Boundary
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+The shell remains a real bounded user boundary under hostile use without
+reopening payload width, compiler surfaces, or a broader error-object model.
+
+The landed Phase 177 slice adds one bounded shell-owned truth improvement and
+one executable hostile-user matrix over the real reset-lane path.
+
+- `kernel/src/shell_service.mc` now distinguishes two shell-owned invalid
+  consequences inside the existing four-byte protocol:
+  - `?C` for unknown command family or verb
+  - `?S` for malformed command shape or sentinel usage
+- service-owned failures remain service-owned:
+  - valid `KGk!` against a missing key still returns
+    `SyscallStatus.InvalidArgument` from `kv_service`
+  - valid `ECxy` after echo saturation still returns
+    `SyscallStatus.Exhausted` from `echo_service`
+- no payload-width widening, text-shell redesign, general parser framework,
+  event-code expansion, compiler expansion, or broader error-model widening
+  was admitted
+- one new system fixture and workflow registration now drive malformed,
+  repeated-invalid, mixed-valid-invalid, and restart-sensitive interaction
+  patterns through the real kernel path
+
+Phase result
+------------
+Phase 177 is complete as one hostile-user shell boundary follow-through over
+the admitted compact serial-shell path.
 
 Purpose
 -------
@@ -76,6 +105,56 @@ Chosen slice for this phase
 4. one bounded follow-through only if a concrete shell-owned defect is found
    by that matrix
 
+Concrete defect found
+---------------------
+- Before Phase 177, every shell-owned invalid command collapsed to the same
+  one-byte `?` reply payload.
+- That was sufficient to reject misuse, but not sufficient to classify why the
+  shell rejected a command without reading code.
+- The narrowest honest repair was to keep the existing `InvalidArgument`
+  status and fixed four-byte reply width, and add one extra classifier byte.
+
+Implementation surfaces
+-----------------------
+The landed implementation changes are:
+
+1. `kernel/src/shell_service.mc`
+   - keep shell syntax ownership in `shell_service`
+   - classify shell-owned invalid consequences as `?C` and `?S`
+   - preserve valid routing and all peer-service semantics unchanged
+
+2. `tests/system/kernel_reset_lane_phase177_hostile_shell/`
+   - drive the real kernel through hostile-user interaction patterns:
+     malformed commands, repeated invalid commands, mixed valid and invalid
+     traffic, service-owned failure consequences, and restart-sensitive echo
+     pressure
+
+3. `tests/tool/tool_workflow_suite.cpp`
+   - register the new hostile-shell fixture in the workflow suite so the real
+     build-run path remains repo-owned
+
+Why this landed shape is enough
+-------------------------------
+- The shell now exposes enough user-visible truth to distinguish shell syntax
+  failure from service semantics without widening payloads or inventing a text
+  protocol.
+- The service owners still own their own stateful truth: missing key,
+  exhaustion, and restart-sensitive behavior are unchanged and remain visible
+  through existing statuses.
+- The shell remains a bounded command router rather than becoming a policy
+  broker or message-rendering framework.
+
+Validation
+----------
+- `mc_tool_workflow_unit`
+
+Non-goals preserved
+-------------------
+- wider serial or IPC payloads
+- a line-oriented shell, REPL, or parser framework
+- human-readable shell error strings or broader error objects
+- new compiler, sema, MIR, backend, ABI, target, runtime, or hal work
+
 Why this is the right placement
 --------------------------------
 - After Phase 176: one more service-owned behavior gives the shell a more
@@ -99,3 +178,14 @@ What this phase should prove
   broader error-model or payload-width work by default
 - that the repository's next interface pressure comes from real hostile use,
   not from more internal audit-only refinement
+
+Exit criteria
+-------------
+- the shell classifies shell-owned invalid commands without widening the
+  compact protocol
+- repeated invalid commands do not mutate peer-service state
+- mixed valid and invalid traffic preserves valid service-owned follow-through
+- restart-sensitive service behavior remains service-owned and visible after
+  hostile traffic
+- the workflow suite runs the hostile-user matrix over the real kernel path
+- compiler and framework surfaces remain closed
