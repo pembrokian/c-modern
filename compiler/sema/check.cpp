@@ -12,6 +12,7 @@
 #include <fstream>
 #include <limits>
 #include <optional>
+#include <span>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
@@ -432,6 +433,99 @@ class Checker {
         return UnknownType();
     }
 
+    Type NormalizeAggregateExpectedType(Type expected) const {
+        expected = CanonicalizeBuiltinType(std::move(expected));
+        while (expected.kind == Type::Kind::kConst && !expected.subtypes.empty()) {
+            expected = CanonicalizeBuiltinType(expected.subtypes.front());
+        }
+        return expected;
+    }
+
+    Type ResolveAggregateInitType(const Expr& expr) {
+        if (expr.type_target != nullptr) {
+            ValidateTypeExpr(expr.type_target.get(), CurrentTypeParams(), expr.type_target->span);
+            return SemanticTypeFromAst(expr.type_target.get(), CurrentTypeParams());
+        }
+        if (expr.left != nullptr) {
+            Type aggregate_type = NamedOrBuiltinType(CombineQualifiedName(*expr.left));
+            for (const auto& type_arg : expr.left->type_args) {
+                ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
+                aggregate_type.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
+            }
+            return aggregate_type;
+        }
+        return UnknownType();
+    }
+
+    void ApplyNestedAggregateTypeHints(Expr& expr, const Type& aggregate_type) {
+        const Type normalized = NormalizeAggregateExpectedType(aggregate_type);
+        const Type resolved_aggregate = StripType(normalized, *module_, TypeStripMode::kAliasesOnly);
+        if (resolved_aggregate.kind == Type::Kind::kArray) {
+            if (resolved_aggregate.subtypes.empty()) {
+                return;
+            }
+            for (auto& field_init : expr.field_inits) {
+                if (field_init.value != nullptr) {
+                    ApplyExpectedAggregateType(*field_init.value, resolved_aggregate.subtypes.front());
+                }
+            }
+            return;
+        }
+
+        const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
+        const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
+        const auto instantiated_fields =
+            type_decl != nullptr ? InstantiateTypeDeclFields(*type_decl, resolved_aggregate)
+                                 : std::vector<std::pair<std::string, Type>> {};
+        const auto& field_source = type_decl != nullptr ? instantiated_fields : builtin_fields;
+        if (field_source.empty()) {
+            return;
+        }
+
+        for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
+            auto& field_init = expr.field_inits[index];
+            if (field_init.value == nullptr) {
+                continue;
+            }
+
+            Type field_type = UnknownType();
+            if (field_init.has_name) {
+                const auto found = std::find_if(field_source.begin(), field_source.end(), [&](const auto& field) {
+                    return field.first == field_init.name;
+                });
+                if (found != field_source.end()) {
+                    field_type = found->second;
+                }
+            } else if (index < field_source.size()) {
+                field_type = field_source[index].second;
+            }
+
+            if (!IsUnknown(field_type)) {
+                ApplyExpectedAggregateType(*field_init.value, field_type);
+            }
+        }
+    }
+
+    void ApplyExpectedAggregateType(Expr& expr, const Type& expected_type) {
+        if (expr.kind != Expr::Kind::kAggregateInit) {
+            return;
+        }
+
+        const Type normalized = NormalizeAggregateExpectedType(expected_type);
+        if (IsUnknown(normalized)) {
+            return;
+        }
+
+        if (expr.type_target == nullptr && expr.left == nullptr) {
+            expr.type_target = TypeToAst(normalized);
+        }
+
+        const Type aggregate_type = ResolveAggregateInitType(expr);
+        if (!IsUnknown(aggregate_type)) {
+            ApplyNestedAggregateTypeHints(expr, aggregate_type);
+        }
+    }
+
     std::optional<ConstValue> EvaluateTopLevelConst(std::string_view name, bool report_errors,
                                                     std::unordered_set<std::string>& active_names) {
         const std::string key(name);
@@ -717,16 +811,40 @@ class Checker {
             case Expr::Kind::kField:
                 return EvaluateEnumConst(expr, nullptr, report_errors, active_names);
             case Expr::Kind::kAggregateInit: {
-                Type aggregate_type = UnknownType();
-                if (expr.left != nullptr && (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {
-                    aggregate_type = NamedOrBuiltinType(CombineQualifiedName(*expr.left));
-                    for (const auto& type_arg : expr.left->type_args) {
-                        ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
-                        aggregate_type.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
-                    }
+                Type aggregate_type = ResolveAggregateInitType(expr);
+                if (IsUnknown(aggregate_type)) {
+                    return std::nullopt;
                 }
 
+                ApplyNestedAggregateTypeHints(const_cast<Expr&>(expr), aggregate_type);
+
                 const Type resolved_aggregate = StripType(aggregate_type, *module_, TypeStripMode::kAliasesOnly);
+                if (resolved_aggregate.kind == Type::Kind::kArray) {
+                    if (resolved_aggregate.subtypes.empty()) {
+                        return std::nullopt;
+                    }
+                    const auto length = mc::support::ParseArrayLength(resolved_aggregate.metadata);
+                    if (!length.has_value() || *length != expr.field_inits.size()) {
+                        return std::nullopt;
+                    }
+
+                    ConstValue result;
+                    result.kind = ConstValue::Kind::kAggregate;
+                    result.elements.reserve(expr.field_inits.size());
+                    for (const auto& field_init : expr.field_inits) {
+                        if (field_init.has_name || field_init.value == nullptr) {
+                            return std::nullopt;
+                        }
+                        const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
+                        if (!field_value.has_value()) {
+                            return std::nullopt;
+                        }
+                        result.elements.push_back(*field_value);
+                    }
+                    result.text = RenderConstValue(result);
+                    return result;
+                }
+
                 const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
                 const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
                 const auto instantiated_fields =
@@ -1319,6 +1437,9 @@ class Checker {
                 continue;
             }
             for (std::size_t index = 0; index < decl.values.size(); ++index) {
+                if (!IsUnknown(declared_type)) {
+                    ApplyExpectedAggregateType(*decl.values[index], declared_type);
+                }
                 // Global validation runs without any pushed local scopes. AnalyzeExpr
                 // therefore resolves names through global_symbols_, which was seeded
                 // during CollectTopLevelDecls before ValidateGlobals runs.
@@ -1941,17 +2062,24 @@ class Checker {
             conversion_target = SemanticTypeFromAst(expr.type_target.get(), CurrentTypeParams());
         }
 
-        std::vector<Type> arg_types;
-        arg_types.reserve(expr.args.size());
-        for (const auto& arg : expr.args) {
-            arg_types.push_back(AnalyzeExpr(*arg));
-        }
-
         if (IsPanicBuiltinCall(expr)) {
+            std::vector<Type> arg_types;
+            arg_types.reserve(expr.args.size());
+            for (const auto& arg : expr.args) {
+                arg_types.push_back(AnalyzeExpr(*arg));
+            }
             return AnalyzePanicBuiltinCall(expr, arg_types);
         }
 
         if (!IsUnknown(conversion_target)) {
+            if (expr.args.size() == 1) {
+                ApplyExpectedAggregateType(*expr.args.front(), conversion_target);
+            }
+            std::vector<Type> arg_types;
+            arg_types.reserve(expr.args.size());
+            for (const auto& arg : expr.args) {
+                arg_types.push_back(AnalyzeExpr(*arg));
+            }
             if (expr.args.size() != 1) {
                 Report(expr.span, "explicit conversion to " + FormatType(conversion_target) + " expects 1 argument but got " +
                                       std::to_string(expr.args.size()));
@@ -1982,12 +2110,36 @@ class Checker {
             return UnknownType();
         }
 
+        if (expr.left != nullptr && expr.left->kind == Expr::Kind::kQualifiedName && callee_type.kind == Type::Kind::kNamed) {
+            if (const auto variant = LookupVariant(callee_type, expr.left->secondary_text);
+                variant.has_value() && variant->payload_fields.size() == expr.args.size()) {
+                for (std::size_t index = 0; index < expr.args.size(); ++index) {
+                    ApplyExpectedAggregateType(*expr.args[index], variant->payload_fields[index].second);
+                }
+            }
+        }
+
+        const Type stripped_callee = ResolveCallableShell(callee_type, *module_);
+        if (stripped_callee.kind == Type::Kind::kProcedure) {
+            const std::size_t param_count = ProcedureParamCount(stripped_callee);
+            if (param_count == expr.args.size()) {
+                for (std::size_t index = 0; index < expr.args.size(); ++index) {
+                    ApplyExpectedAggregateType(*expr.args[index], stripped_callee.subtypes[index]);
+                }
+            }
+        }
+
+        std::vector<Type> arg_types;
+        arg_types.reserve(expr.args.size());
+        for (const auto& arg : expr.args) {
+            arg_types.push_back(AnalyzeExpr(*arg));
+        }
+
         const Type variant_ctor_type = AnalyzeVariantConstructorCall(expr, callee_type, arg_types);
         if (!IsUnknown(variant_ctor_type)) {
             return variant_ctor_type;
         }
 
-        const Type stripped_callee = ResolveCallableShell(callee_type, *module_);
         if (stripped_callee.kind != Type::Kind::kProcedure) {
             Report(expr.left->span, "call target must have procedure type");
             return UnknownType();
@@ -2247,15 +2399,58 @@ class Checker {
                 return record(UnknownType());
             }
             case Expr::Kind::kAggregateInit: {
-                Type aggregate_type = UnknownType();
-                if (expr.left != nullptr && (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {
-                    aggregate_type = NamedOrBuiltinType(CombineQualifiedName(*expr.left));
-                    for (const auto& type_arg : expr.left->type_args) {
-                        ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
-                        aggregate_type.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
+                Type aggregate_type = ResolveAggregateInitType(expr);
+                if (IsUnknown(aggregate_type)) {
+                    for (const auto& field_init : expr.field_inits) {
+                        if (field_init.value != nullptr) {
+                            (void)AnalyzeExpr(*field_init.value);
+                        }
                     }
+                    Report(expr.span, "aggregate initializer requires an explicit type or an expected aggregate context");
+                    return record(UnknownType());
                 }
+
+                ApplyNestedAggregateTypeHints(const_cast<Expr&>(expr), aggregate_type);
+
                 const Type resolved_aggregate = StripType(aggregate_type, *module_, TypeStripMode::kAliasesOnly);
+                if (resolved_aggregate.kind == Type::Kind::kArray) {
+                    if (resolved_aggregate.subtypes.empty()) {
+                        for (const auto& field_init : expr.field_inits) {
+                            if (field_init.value != nullptr) {
+                                (void)AnalyzeExpr(*field_init.value);
+                            }
+                        }
+                        return record(resolved_aggregate);
+                    }
+
+                    const Type& element_type = resolved_aggregate.subtypes.front();
+                    const auto length = mc::support::ParseArrayLength(resolved_aggregate.metadata);
+                    if (length.has_value() && expr.field_inits.size() != *length) {
+                        Report(expr.span,
+                               "array aggregate initializer for type " + FormatType(resolved_aggregate) + " expects " +
+                                   std::to_string(*length) + " elements but got " + std::to_string(expr.field_inits.size()));
+                    }
+
+                    for (const auto& field_init : expr.field_inits) {
+                        if (field_init.value == nullptr) {
+                            continue;
+                        }
+                        const Type value_type = AnalyzeExpr(*field_init.value);
+                        if (field_init.has_name) {
+                            Report(field_init.span,
+                                   "array aggregate initializers do not support named elements for type " +
+                                       FormatType(resolved_aggregate));
+                            continue;
+                        }
+                        if (!IsAssignable(element_type, value_type, *module_)) {
+                            Report(field_init.span,
+                                   "array aggregate element type mismatch: expected " + FormatType(element_type) + ", got " +
+                                       FormatType(value_type));
+                        }
+                    }
+                    return record(resolved_aggregate);
+                }
+
                 const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
                 const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
                 if (type_decl != nullptr || !builtin_fields.empty()) {
@@ -2273,7 +2468,7 @@ class Checker {
                             const auto found = fields.find(field_init.name);
                             if (found == fields.end()) {
                                 Report(field_init.span,
-                                       "type " + FormatType(aggregate_type) + " has no field named " + field_init.name);
+                                       "type " + FormatType(resolved_aggregate) + " has no field named " + field_init.name);
                                 continue;
                             }
                             if (!IsAssignable(found->second, value_type, *module_)) {
@@ -2284,7 +2479,8 @@ class Checker {
                             continue;
                         }
                         if (index >= field_source.size()) {
-                            Report(field_init.span, "too many aggregate initializer values for type " + FormatType(aggregate_type));
+                            Report(field_init.span,
+                                   "too many aggregate initializer values for type " + FormatType(resolved_aggregate));
                             continue;
                         }
                         if (!IsAssignable(field_source[index].second, value_type, *module_)) {
@@ -2298,7 +2494,7 @@ class Checker {
                         (void)AnalyzeExpr(*field_init.value);
                     }
                 }
-                return record(aggregate_type);
+                return record(resolved_aggregate);
             }
             case Expr::Kind::kParen:
                 return record(AnalyzeExpr(*expr.left));
@@ -2473,6 +2669,12 @@ class Checker {
                                    current_function_ != nullptr ? current_function_->type_params
                                                 : std::vector<std::string> {});
 
+        if (stmt.has_initializer && stmt.exprs.size() == stmt.pattern.names.size() && !IsUnknown(declared_type)) {
+            for (const auto& expr : stmt.exprs) {
+                ApplyExpectedAggregateType(*expr, declared_type);
+            }
+        }
+
         std::vector<Type> value_types;
         value_types.reserve(stmt.pattern.names.size());
         if (stmt.has_initializer) {
@@ -2504,18 +2706,30 @@ class Checker {
     }
 
     void CheckBindingOrAssign(const Stmt& stmt) {
+        std::vector<BindingOrAssignResolution> resolutions;
+        resolutions.reserve(stmt.pattern.names.size());
+        for (const auto& name : stmt.pattern.names) {
+            resolutions.push_back(LookupValue(name).has_value() ? BindingOrAssignResolution::kAssign : BindingOrAssignResolution::kBind);
+        }
+
+        if (stmt.exprs.size() == stmt.pattern.names.size()) {
+            for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+                if (resolutions[index] != BindingOrAssignResolution::kAssign) {
+                    continue;
+                }
+                const auto binding = LookupValue(stmt.pattern.names[index]);
+                if (binding.has_value()) {
+                    ApplyExpectedAggregateType(*stmt.exprs[index], binding->type);
+                }
+            }
+        }
+
         const auto values = AnalyzeExprValuesForArity(stmt.exprs,
                                                       stmt.pattern.names.size(),
                                                       stmt.span,
                                                       "binding-or-assignment requires one value per name");
         if (!values.has_value()) {
             return;
-        }
-
-        std::vector<BindingOrAssignResolution> resolutions;
-        resolutions.reserve(stmt.pattern.names.size());
-        for (const auto& name : stmt.pattern.names) {
-            resolutions.push_back(LookupValue(name).has_value() ? BindingOrAssignResolution::kAssign : BindingOrAssignResolution::kBind);
         }
 
         if (HasDuplicateBindingOrAssignBindNames(stmt, resolutions)) {
@@ -2534,6 +2748,12 @@ class Checker {
     }
 
     void CheckAssign(const Stmt& stmt) {
+        if (stmt.assign_values.size() == stmt.assign_targets.size()) {
+            for (std::size_t index = 0; index < stmt.assign_targets.size(); ++index) {
+                ApplyExpectedAggregateType(*stmt.assign_values[index], AnalyzeExpr(*stmt.assign_targets[index]));
+            }
+        }
+
         const auto values = AnalyzeExprValuesForArity(stmt.assign_values,
                                                       stmt.assign_targets.size(),
                                                       stmt.span,
@@ -2675,6 +2895,11 @@ class Checker {
     void CheckReturn(const Stmt& stmt) {
         if (current_function_ == nullptr) {
             return;
+        }
+        if (stmt.exprs.size() == current_function_->return_types.size()) {
+            for (std::size_t index = 0; index < stmt.exprs.size(); ++index) {
+                ApplyExpectedAggregateType(*stmt.exprs[index], current_function_->return_types[index]);
+            }
         }
         const auto values = AnalyzeExprValuesForArity(stmt.exprs,
                                                       current_function_->return_types.size(),

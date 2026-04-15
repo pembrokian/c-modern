@@ -1,0 +1,8 @@
+SemanticModule
+  TypeDecl name=ServiceSlot kind=struct
+    Field name=endpoint type=u32
+    Field name=pid type=u32
+    Layout size=8 align=4 offsets=[0, 4]
+  Const names=[SERVICE_SLOTS] type=[2]ServiceSlot values=[{{endpoint: 10, pid: 1}, {endpoint: 11, pid: 2}}]
+  Function name=first_pid params=[] returns=[u32]
+  Function name=main params=[] returns=[i32]

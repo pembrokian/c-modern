@@ -354,7 +354,7 @@ void TestParserReportsMalformedInput() {
            "parser should report a direct syntax diagnostic");
 }
 
-void TestParserRejectsArrayLiteralCallArgumentWithoutHanging() {
+void TestParserAcceptsArrayLiteralCallArgument() {
     mc::support::DiagnosticSink diagnostics;
     const auto parsed = ParseText(
         "func view(values: [4]i32) i32 {\n"
@@ -366,10 +366,43 @@ void TestParserRejectsArrayLiteralCallArgumentWithoutHanging() {
         "}\n",
         diagnostics);
 
-    Expect(!parsed.ok, "parser should reject unsupported array literal call arguments rather than hanging");
-    Expect(diagnostics.HasErrors(), "parser should report diagnostics for unsupported array literal call arguments");
-    Expect(diagnostics.Render().find("expected expression") != std::string::npos,
-           "parser should report the unexpected array literal token directly");
+        Expect(parsed.ok, "parser should accept explicit array literal call arguments");
+        Expect(!diagnostics.HasErrors(), "parser should not report diagnostics for explicit array literals");
+
+        const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
+        Expect(dump.find("AggregateInitExpr") != std::string::npos,
+            "array literal call arguments should parse as aggregate initializers");
+        Expect(dump.find("typeTarget:") != std::string::npos,
+            "array literal call arguments should preserve the explicit type target");
+        Expect(dump.find("ArrayType") != std::string::npos,
+            "array literal call arguments should preserve the array type in the AST");
+}
+
+void TestParserAcceptsInferredBraceAggregateArgument() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "struct Pair {\n"
+        "    left: i32\n"
+        "    right: i32\n"
+        "}\n"
+        "\n"
+        "func view(pair: Pair) i32 {\n"
+        "    return pair.left\n"
+        "}\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return view({ left: 1, right: 2 })\n"
+        "}\n",
+        diagnostics);
+
+    Expect(parsed.ok, "parser should accept inferred brace aggregate call arguments");
+    Expect(!diagnostics.HasErrors(), "parser should not report diagnostics for inferred brace aggregates");
+
+    const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
+    Expect(dump.find("AggregateInitExpr") != std::string::npos,
+           "inferred brace aggregate call arguments should parse as aggregate initializers");
+    Expect(dump.find("typeTarget:") == std::string::npos,
+           "inferred brace aggregate call arguments should not synthesize an explicit type target in the parser");
 }
 
 void TestParserHandlesMultiTargetAssignment() {
@@ -455,7 +488,8 @@ int main() {
     TestParserBuildsDeterministicAstDump();
     TestParserHandlesTypesAndLoopForms();
     TestParserReportsMalformedInput();
-    TestParserRejectsArrayLiteralCallArgumentWithoutHanging();
+    TestParserAcceptsArrayLiteralCallArgument();
+    TestParserAcceptsInferredBraceAggregateArgument();
     TestParserHandlesMultiTargetAssignment();
     TestParserPreservesBindingAssignmentAmbiguity();
     TestAstDumpDepthLimitAppliesThroughHelperBoundaries();

@@ -1,0 +1,74 @@
+Phase 192 -- Inferred Brace Aggregate Follow-Through
+====================================================
+
+Status
+------
+COMPLETE
+
+Outcome
+-------
+The compiler now admits brace-only aggregate literals in expected-type contexts
+and reuses the existing aggregate-init machinery to type-check, constant-
+evaluate, and lower them through real owner code.
+
+- parser now accepts bare `{ ... }` aggregate initializer expressions without
+  requiring an explicit named or typed base
+- sema now infers aggregate targets from expected-type owners including typed
+  globals, typed local bindings, assignments, call arguments, return values,
+  and nested aggregate fields or array elements under an already-known owner
+- real kernel owner code in `kernel/src/service_topology.mc` now uses inferred
+  brace aggregates directly for service-slot records, fallback return values,
+  and topology tables
+- standalone brace aggregates without an expected type remain intentionally
+  unsupported
+- trailing commas in aggregate literals remain intentionally unsupported
+
+Purpose
+-------
+Finish the explicit follow-through that Phase 191 intentionally deferred:
+remove the remaining owner-local boilerplate where the destination aggregate
+type is already obvious from surrounding source.
+
+Chosen slice
+------------
+1. admit bare brace aggregate syntax in expression positions that already allow
+   aggregate init
+2. infer the aggregate target only from existing expected-type owners
+3. recurse that expected shape into nested array elements and aggregate fields
+4. spend the feature in active kernel owner code immediately
+5. keep standalone untyped brace values and broader compile-time execution out
+
+What this phase did not do
+--------------------------
+- no free-floating `{ ... }` values without an expected aggregate context
+- no implicit numeric coercions
+- no const-function or arbitrary compile-time execution widening
+- no trailing-comma admission in aggregate literals
+
+Implementation files changed
+----------------------------
+- `compiler/ast/ast.h`
+- `compiler/parse/parser_internal.h`
+- `compiler/parse/parser_expr.cpp`
+- `compiler/sema/check.cpp`
+- `compiler/sema/type.h`
+- `compiler/sema/type.cpp`
+- `kernel/src/service_topology.mc`
+- `tests/tool/bootstrap_tests.cpp`
+- `tests/compiler/sema/inferred_brace_aggregate_ok.mc`
+- `tests/compiler/sema/inferred_brace_aggregate_ok.sema.txt`
+- `docs/plan/decision_log.txt`
+- `docs/plan/backlog.txt`
+
+Validation
+----------
+- `mc_bootstrap_unit`
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
+- `mc_tool_workflow_unit`
+
+Deferred edge kept explicit
+---------------------------
+- bare brace aggregates still require an owner that already states the target
+  aggregate type; the language still does not admit a standalone untyped brace
+  value as a first-class expression

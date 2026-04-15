@@ -130,7 +130,8 @@ std::string RenderExprInline(const ast::Expr& expr) {
             return stream.str();
         }
         case ast::Expr::Kind::kAggregateInit:
-            return expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>");
+            return expr.type_target != nullptr ? RenderTypeInline(*expr.type_target)
+                                               : (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>"));
         case ast::Expr::Kind::kParen:
             return "(" + (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) + ")";
     }
@@ -289,6 +290,66 @@ std::vector<std::pair<std::string, Type>> BuiltinAggregateFields(const Type& raw
         return fields;
     }
     return fields;
+}
+
+std::unique_ptr<ast::TypeExpr> TypeToAst(const Type& raw_type) {
+    const Type type = CanonicalizeBuiltinType(raw_type);
+    auto expr = std::make_unique<ast::TypeExpr>();
+    switch (type.kind) {
+        case Type::Kind::kBool:
+            expr->kind = ast::TypeExpr::Kind::kNamed;
+            expr->name = "bool";
+            return expr;
+        case Type::Kind::kString:
+            expr->kind = ast::TypeExpr::Kind::kNamed;
+            expr->name = "string";
+            return expr;
+        case Type::Kind::kNamed:
+            expr->kind = ast::TypeExpr::Kind::kNamed;
+            expr->name = type.name;
+            expr->type_args.reserve(type.subtypes.size());
+            for (const auto& subtype : type.subtypes) {
+                auto type_arg = TypeToAst(subtype);
+                if (type_arg == nullptr) {
+                    return nullptr;
+                }
+                expr->type_args.push_back(std::move(type_arg));
+            }
+            return expr;
+        case Type::Kind::kPointer:
+            if (type.subtypes.empty()) {
+                return nullptr;
+            }
+            expr->kind = ast::TypeExpr::Kind::kPointer;
+            expr->inner = TypeToAst(type.subtypes.front());
+            return expr->inner != nullptr ? std::move(expr) : nullptr;
+        case Type::Kind::kConst:
+            if (type.subtypes.empty()) {
+                return nullptr;
+            }
+            expr->kind = ast::TypeExpr::Kind::kConst;
+            expr->inner = TypeToAst(type.subtypes.front());
+            return expr->inner != nullptr ? std::move(expr) : nullptr;
+        case Type::Kind::kArray:
+            if (type.subtypes.empty()) {
+                return nullptr;
+            }
+            expr->kind = ast::TypeExpr::Kind::kArray;
+            expr->inner = TypeToAst(type.subtypes.front());
+            if (expr->inner == nullptr) {
+                return nullptr;
+            }
+            expr->length_expr = std::make_unique<ast::Expr>();
+            expr->length_expr->kind = ast::Expr::Kind::kLiteral;
+            expr->length_expr->text = type.metadata;
+            expr->length_expr->secondary_text = "int_lit";
+            if (const auto length = mc::support::ParseArrayLength(type.metadata); length.has_value()) {
+                expr->length_expr->integer_literal_value = static_cast<std::int64_t>(*length);
+            }
+            return expr;
+        default:
+            return nullptr;
+    }
 }
 
 Type TypeFromAst(const ast::TypeExpr* type_expr) {

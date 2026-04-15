@@ -51,14 +51,36 @@ enum ServiceRestartMode {
     Reload,
 }
 
-const SERIAL_SLOT: ServiceSlot = ServiceSlot{ endpoint: SERIAL_ENDPOINT_ID, pid: 1 }
-const SHELL_SLOT: ServiceSlot = ServiceSlot{ endpoint: SHELL_ENDPOINT_ID, pid: 2 }
-const LOG_SLOT: ServiceSlot = ServiceSlot{ endpoint: LOG_ENDPOINT_ID, pid: 3 }
-const KV_SLOT: ServiceSlot = ServiceSlot{ endpoint: KV_ENDPOINT_ID, pid: 4 }
-const ECHO_SLOT: ServiceSlot = ServiceSlot{ endpoint: ECHO_ENDPOINT_ID, pid: 5 }
-const TRANSFER_SLOT: ServiceSlot = ServiceSlot{ endpoint: TRANSFER_ENDPOINT_ID, pid: 6 }
-const QUEUE_SLOT: ServiceSlot = ServiceSlot{ endpoint: QUEUE_ENDPOINT_ID, pid: 7 }
-const TICKET_SLOT: ServiceSlot = ServiceSlot{ endpoint: TICKET_ENDPOINT_ID, pid: 8 }
+const SERIAL_SLOT: ServiceSlot = { endpoint: SERIAL_ENDPOINT_ID, pid: 1 }
+const SHELL_SLOT: ServiceSlot = { endpoint: SHELL_ENDPOINT_ID, pid: 2 }
+const LOG_SLOT: ServiceSlot = { endpoint: LOG_ENDPOINT_ID, pid: 3 }
+const KV_SLOT: ServiceSlot = { endpoint: KV_ENDPOINT_ID, pid: 4 }
+const ECHO_SLOT: ServiceSlot = { endpoint: ECHO_ENDPOINT_ID, pid: 5 }
+const TRANSFER_SLOT: ServiceSlot = { endpoint: TRANSFER_ENDPOINT_ID, pid: 6 }
+const QUEUE_SLOT: ServiceSlot = { endpoint: QUEUE_ENDPOINT_ID, pid: 7 }
+const TICKET_SLOT: ServiceSlot = { endpoint: TICKET_ENDPOINT_ID, pid: 8 }
+
+const SERVICE_SLOTS: [8]ServiceSlot = {
+    SERIAL_SLOT,
+    SHELL_SLOT,
+    LOG_SLOT,
+    KV_SLOT,
+    ECHO_SLOT,
+    TRANSFER_SLOT,
+    QUEUE_SLOT,
+    TICKET_SLOT
+}
+
+const SERVICE_RESTART_MODES: [8]ServiceRestartMode = {
+    ServiceRestartMode.None,
+    ServiceRestartMode.None,
+    ServiceRestartMode.Reload,
+    ServiceRestartMode.Reload,
+    ServiceRestartMode.Reset,
+    ServiceRestartMode.Reset,
+    ServiceRestartMode.Reload,
+    ServiceRestartMode.Reset
+}
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
@@ -69,59 +91,20 @@ func service_count() usize {
 }
 
 func service_slot_at(index: usize) ServiceSlot {
-    if index == 0 {
-        return SERIAL_SLOT
+    if index >= service_count() {
+        return { endpoint: 0, pid: 0 }
     }
-    if index == 1 {
-        return SHELL_SLOT
-    }
-    if index == 2 {
-        return LOG_SLOT
-    }
-    if index == 3 {
-        return KV_SLOT
-    }
-    if index == 4 {
-        return ECHO_SLOT
-    }
-    if index == 5 {
-        return TRANSFER_SLOT
-    }
-    if index == 6 {
-        return QUEUE_SLOT
-    }
-    if index == 7 {
-        return TICKET_SLOT
-    }
-    return ServiceSlot{ endpoint: 0, pid: 0 }
+    return SERVICE_SLOTS[index]
 }
 
 func service_slot_for_endpoint(endpoint: u32) ServiceSlot {
-    if endpoint == SERIAL_ENDPOINT_ID {
-        return SERIAL_SLOT
+    for i in 0..service_count() {
+        slot: ServiceSlot = SERVICE_SLOTS[i]
+        if slot.endpoint == endpoint {
+            return slot
+        }
     }
-    if endpoint == SHELL_ENDPOINT_ID {
-        return SHELL_SLOT
-    }
-    if endpoint == LOG_ENDPOINT_ID {
-        return LOG_SLOT
-    }
-    if endpoint == KV_ENDPOINT_ID {
-        return KV_SLOT
-    }
-    if endpoint == ECHO_ENDPOINT_ID {
-        return ECHO_SLOT
-    }
-    if endpoint == TRANSFER_ENDPOINT_ID {
-        return TRANSFER_SLOT
-    }
-    if endpoint == QUEUE_ENDPOINT_ID {
-        return QUEUE_SLOT
-    }
-    if endpoint == TICKET_ENDPOINT_ID {
-        return TICKET_SLOT
-    }
-    return ServiceSlot{ endpoint: 0, pid: 0 }
+    return { endpoint: 0, pid: 0 }
 }
 
 func service_slot_is_valid(slot: ServiceSlot) bool {
@@ -135,23 +118,11 @@ func service_slot_is_valid(slot: ServiceSlot) bool {
 // init.mc enacts restart, but the topology module names which public services
 // restart at all and which ones reload retained state.
 func service_restart_mode(endpoint: u32) ServiceRestartMode {
-    if endpoint == LOG_ENDPOINT_ID {
-        return ServiceRestartMode.Reload
-    }
-    if endpoint == KV_ENDPOINT_ID {
-        return ServiceRestartMode.Reload
-    }
-    if endpoint == ECHO_ENDPOINT_ID {
-        return ServiceRestartMode.Reset
-    }
-    if endpoint == TRANSFER_ENDPOINT_ID {
-        return ServiceRestartMode.Reset
-    }
-    if endpoint == QUEUE_ENDPOINT_ID {
-        return ServiceRestartMode.Reload
-    }
-    if endpoint == TICKET_ENDPOINT_ID {
-        return ServiceRestartMode.Reset
+    for i in 0..service_count() {
+        slot: ServiceSlot = SERVICE_SLOTS[i]
+        if slot.endpoint == endpoint {
+            return SERVICE_RESTART_MODES[i]
+        }
     }
     return ServiceRestartMode.None
 }
@@ -176,29 +147,5 @@ func service_restart_reloads_state(endpoint: u32) bool {
 // ids before any service-specific routing.  All boot-wired endpoints are
 // publicly addressable.
 func endpoint_is_boot_wired(endpoint: u32) bool {
-    if endpoint == SERIAL_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == SHELL_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == LOG_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == KV_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == ECHO_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == TRANSFER_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == QUEUE_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == TICKET_ENDPOINT_ID {
-        return true
-    }
-    return false
+    return service_slot_is_valid(service_slot_for_endpoint(endpoint))
 }

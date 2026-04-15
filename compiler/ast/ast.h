@@ -120,7 +120,7 @@ struct DefaultCase : Node {
 //   kDerefField      : left = base
 //   kIndex           : left = base, right = index
 //   kSlice           : left = base, right = begin, extra = end
-//   kAggregateInit   : text = type name (may be empty for inferred), field_inits = fields
+//   kAggregateInit   : left = named base or type_target = explicit/inferred type, field_inits = fields
 //   kParen           : left = inner expression
 //
 // Optional pointer fields: nullptr means the field is absent for that Kind.

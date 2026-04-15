@@ -55,6 +55,7 @@ Type NamedOrBuiltinType(std::string_view name);
 Type CanonicalizeBuiltinType(Type type);
 std::vector<std::pair<std::string, Type>> BuiltinAggregateFields(const Type& type);
 
+std::unique_ptr<ast::TypeExpr> TypeToAst(const Type& type);
 Type TypeFromAst(const ast::TypeExpr* type_expr);
 std::string FormatType(const Type& type);
 bool IsUnknown(const Type& type);

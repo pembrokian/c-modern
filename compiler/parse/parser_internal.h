@@ -129,8 +129,11 @@ class Parser {
                                                      bool allow_bare_identifier,
                                                      std::size_t depth) const;
     bool LooksLikeTypeCallExpr() const;
+    bool LooksLikeTypeAggregateInitExpr() const;
     bool LooksLikePostfixTypeArgs() const;
     std::unique_ptr<Expr> ParseTypeCallExpr();
+    std::unique_ptr<Expr> ParseTypeAggregateInitExpr();
+    std::unique_ptr<Expr> ParseBraceAggregateInitExpr();
     std::unique_ptr<Expr> ParseUnaryExpr();
     std::unique_ptr<Expr> ParsePostfixExpr();
     FieldInit ParseFieldInit();

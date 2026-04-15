@@ -1,0 +1,137 @@
+Phase 191 -- Constant Aggregate Tables For Flat Owner Data
+==========================================================
+
+Status
+------
+COMPLETE
+
+Outcome
+-------
+The compiler now admits explicit typed aggregate literals for array-shaped
+constants and ordinary expressions, and the active kernel topology owner uses
+that feature directly through real constant tables rather than fallback
+condition ladders.
+
+- the parser now accepts explicit typed aggregate initializers whose type is a
+  full type expression rather than only a named nominal base, including forms
+  such as `[4]i32{ 1, 2, 3, 4 }` and `[8]ServiceSlot{ ... }`
+- sema now type-checks and constant-evaluates those typed aggregate literals
+  through the existing aggregate-const path
+- the active reset-lane kernel now stores boot-wired topology and restart-mode
+  facts in constant arrays and uses indexed lookup or flat iteration over those
+  tables in `service_topology.mc`
+- no const-function work, inferred brace-literal work, data-driven framework
+  work, or broader compiler redesign was admitted
+
+What changed in real code:
+
+- `kernel/src/service_topology.mc` now owns `SERVICE_SLOTS` and
+  `SERVICE_RESTART_MODES` as first-class constant tables
+- `service_slot_at(...)`, `service_slot_for_endpoint(...)`,
+  `service_restart_mode(...)`, and `endpoint_is_boot_wired(...)` now consume
+  those tables directly instead of open-coded endpoint ladders
+- the bootstrap parser regression that previously required array literal call
+  arguments to fail is flipped to the new supported behavior
+- one sema fixture proves array-shaped constant aggregate tables serialize as
+  semantic const facts deterministically
+
+Purpose
+-------
+Close the parked Phase 178 language follow-through for flat owner data: admit
+first-class constant aggregate tables narrowly enough that real owner modules
+can replace repetitive conditional lookup code with direct indexed or iterated
+constant-table use.
+
+This phase improves real language and kernel code.
+It is not a proof-only detour.
+
+Relationship to companion notes
+-------------------------------
+This phase plan stays aligned with:
+
+- `docs/plan/archive/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+
+Repository status note
+----------------------
+- Phase 178 explicitly kept topology helpers flat and explicit because the
+  language did not yet carry one honest constant-table form for `[N]ServiceSlot`
+  owner data.
+- Structural aggregate constants already existed across sema, `.mci`, and the
+  executable backend for admitted slices, but the parser still rejected direct
+  typed array aggregate literals like `[4]i32{ ... }`.
+- The active kernel therefore carried explicit linear `if` ladders where a
+  constant table was the simpler honest representation.
+
+Problem being solved
+--------------------
+- Flat owner data such as static service topology was representable only as a
+  family of individual constants plus repeated condition ladders.
+- The repository already had the downstream const machinery needed for array-
+  shaped aggregate data, but the front-end syntax hole blocked real use.
+- Without this follow-through, owner-local code would keep growing repetitive
+  lookup helpers even when the honest data shape was a small fixed table.
+
+Core rule
+---------
+- Admit only explicit typed aggregate literals.
+- Keep the design transparent and deterministic.
+- Improve real owner code immediately after the feature lands.
+- Do not widen into inferred `{ ... }` literals, const functions, broader
+  compile-time execution, or generic data-driven frameworks.
+
+Chosen slice for this phase
+---------------------------
+1. parser support for explicit typed aggregate init when the base is a full
+   type expression instead of only a nominal name
+2. sema support for typing and constant-evaluating those expressions through
+   the existing aggregate-const machinery
+3. one active owner follow-through in `kernel/src/service_topology.mc`
+   replacing open-coded lookup ladders with constant tables
+4. one focused compiler regression and one real-kernel validation surface
+5. one explicit record of what remains deferred
+
+Why this is the right placement
+-------------------------------
+- The backlog item was already evidence-backed by a live owner (`service_topology`).
+- The downstream constant machinery already existed, so the narrow missing
+  layer was the front-end admission path plus owner adoption.
+- This is the smallest honest compiler change that removes real code noise
+  without introducing framework behavior.
+
+What this phase did not do
+--------------------------
+- no inferred aggregate literals
+- no const functions
+- no arbitrary compile-time execution
+- no routing-table or supervisor framework
+- no broader package or module redesign
+- no new runtime, ABI, target, or `hal` surface
+
+Implementation files changed
+----------------------------
+- `compiler/ast/ast.h`
+- `compiler/parse/parser_internal.h`
+- `compiler/parse/parser_expr.cpp`
+- `compiler/sema/check.cpp`
+- `compiler/sema/type.cpp`
+- `kernel/src/service_topology.mc`
+- `tests/tool/bootstrap_tests.cpp`
+- `tests/compiler/sema/const_array_table_ok.mc`
+- `tests/compiler/sema/const_array_table_ok.sema.txt`
+- `docs/plan/decision_log.txt`
+- `docs/plan/backlog.txt`
+
+Validation
+----------
+- `mc_bootstrap_unit`
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
+- `mc_tool_workflow_unit`
+
+Deferred edge kept explicit
+---------------------------
+- inferred brace literals remain deferred; this phase requires an explicit
+  type target such as `[8]ServiceSlot{ ... }`

@@ -729,7 +729,13 @@ bool RenderLLVMEnumConstValue(const mir::Module& module,
         return false;
     }
 
-    if (value.enum_type != enum_type) {
+    sema::Type rendered_enum_type = value.enum_type;
+    if (rendered_enum_type != enum_type && rendered_enum_type.kind == sema::Type::Kind::kNamed &&
+        rendered_enum_type.subtypes == enum_type.subtypes && VariantLeafName(rendered_enum_type.name) == VariantLeafName(enum_type.name)) {
+        rendered_enum_type.name = enum_type.name;
+    }
+
+    if (rendered_enum_type != enum_type) {
         ReportBackendError(source_path,
                            "LLVM bootstrap backend received mismatched enum constant type " +
                                sema::FormatType(value.enum_type) + " for " + sema::FormatType(enum_type),

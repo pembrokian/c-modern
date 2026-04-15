@@ -369,6 +369,14 @@ bool Parser::LooksLikeTypeCallExpr() const {
     return inner_type_end.has_value() && Peek(*inner_type_end).kind == TokenKind::kRParen && Peek(*inner_type_end + 1).kind == TokenKind::kLParen;
 }
 
+bool Parser::LooksLikeTypeAggregateInitExpr() const {
+    if (!IsTypeExprStart(Current().kind)) {
+        return false;
+    }
+    const auto type_end = SkipTypeExprLookahead(0, true);
+    return type_end.has_value() && Peek(*type_end).kind == TokenKind::kLBrace;
+}
+
 bool Parser::LooksLikePostfixTypeArgs() const {
     if (!Check(TokenKind::kLt)) {
         return false;
@@ -398,9 +406,47 @@ std::unique_ptr<Expr> Parser::ParseTypeCallExpr() {
     return expr;
 }
 
+std::unique_ptr<Expr> Parser::ParseTypeAggregateInitExpr() {
+    auto expr = std::make_unique<Expr>();
+    expr->kind = Expr::Kind::kAggregateInit;
+    expr->span.begin = Current().span.begin;
+    expr->type_target = ParseTypeExpr();
+    Consume(TokenKind::kLBrace, "expected '{' after aggregate initializer type");
+    SkipNewlines();
+    if (!Check(TokenKind::kRBrace)) {
+        do {
+            expr->field_inits.push_back(ParseFieldInit());
+            SkipNewlines();
+        } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+    }
+    Consume(TokenKind::kRBrace, "expected '}' after aggregate initializer");
+    expr->span.end = Previous().span.end;
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::ParseBraceAggregateInitExpr() {
+    auto expr = std::make_unique<Expr>();
+    expr->kind = Expr::Kind::kAggregateInit;
+    expr->span.begin = Current().span.begin;
+    Consume(TokenKind::kLBrace, "expected '{' to start aggregate initializer");
+    SkipNewlines();
+    if (!Check(TokenKind::kRBrace)) {
+        do {
+            expr->field_inits.push_back(ParseFieldInit());
+            SkipNewlines();
+        } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+    }
+    Consume(TokenKind::kRBrace, "expected '}' after aggregate initializer");
+    expr->span.end = Previous().span.end;
+    return expr;
+}
+
 std::unique_ptr<Expr> Parser::ParseUnaryExpr() {
     if (LooksLikeTypeCallExpr()) {
         return ParseTypeCallExpr();
+    }
+    if (allow_aggregate_init_ && LooksLikeTypeAggregateInitExpr()) {
+        return ParseTypeAggregateInitExpr();
     }
     std::vector<Token> operators;
     while (IsPrefixUnaryOperator(Current().kind)) {
@@ -526,10 +572,12 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
             node->kind = Expr::Kind::kAggregateInit;
             node->span.begin = expr->span.begin;
             node->left = std::move(expr);
+            SkipNewlines();
             if (!Check(TokenKind::kRBrace)) {
                 do {
                     node->field_inits.push_back(ParseFieldInit());
-                } while (Match(TokenKind::kComma));
+                    SkipNewlines();
+                } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
             }
             Consume(TokenKind::kRBrace, "expected '}' after aggregate initializer");
             node->span.end = Previous().span.end;
@@ -572,6 +620,10 @@ std::unique_ptr<Expr> Parser::ParseAssignmentTarget() {
 }
 
 std::unique_ptr<Expr> Parser::ParsePrimaryExpr() {
+    if (allow_aggregate_init_ && Check(TokenKind::kLBrace)) {
+        return ParseBraceAggregateInitExpr();
+    }
+
     if (IsLiteral(Current().kind)) {
         auto expr = std::make_unique<Expr>();
         expr->kind = Expr::Kind::kLiteral;
