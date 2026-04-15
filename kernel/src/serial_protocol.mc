@@ -9,6 +9,10 @@
 //   K S <key> <val> — kv set
 //   K G <key> !     — kv get
 //   K C ! !         — kv count (returns count as reply_payload_len)
+//   Q A <value> !   — queue enqueue
+//   Q D ! !         — queue dequeue
+//   Q C ! !         — queue count (returns count as reply_payload_len)
+//   Q P ! !         — queue peek
 //   X Q <target> !  — lifecycle query
 //   X R <target> !  — explicit restart
 //
@@ -30,6 +34,7 @@ const CMD_G: u8 = 71   // 'G'
 const CMD_C: u8 = 67   // 'C' — count
 const CMD_D: u8 = 68   // 'D' — dequeue
 const CMD_I: u8 = 73   // 'I' — issue
+const CMD_P: u8 = 80   // 'P' — peek
 const CMD_U: u8 = 85   // 'U' — use
 const CMD_X: u8 = 88   // 'X' — lifecycle control family
 const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
@@ -89,6 +94,14 @@ func encode_queue_enqueue(value: u8) [4]u8 {
 
 func encode_queue_dequeue() [4]u8 {
     return ipc.payload_byte(CMD_Q, CMD_D, CMD_BANG, CMD_BANG)
+}
+
+func encode_queue_count() [4]u8 {
+    return ipc.payload_byte(CMD_Q, CMD_C, CMD_BANG, CMD_BANG)
+}
+
+func encode_queue_peek() [4]u8 {
+    return ipc.payload_byte(CMD_Q, CMD_P, CMD_BANG, CMD_BANG)
 }
 
 func encode_ticket_issue() [4]u8 {

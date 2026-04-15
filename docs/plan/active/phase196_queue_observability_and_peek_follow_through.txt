@@ -3,7 +3,7 @@ Phase 196 -- Queue Observability And Peek Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETED
 
 Purpose
 -------

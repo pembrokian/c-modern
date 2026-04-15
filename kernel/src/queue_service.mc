@@ -1,4 +1,5 @@
 import primitives
+import serial_protocol
 import service_effect
 import syscall
 
@@ -59,9 +60,34 @@ func queue_pop(s: QueueServiceState) QueueResult {
     return QueueResult{ state: queuewith(s, next_items, s.len - 1), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 1, reply) }
 }
 
+func queue_count(s: QueueServiceState) QueueResult {
+    return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, s.len, primitives.zero_payload()) }
+}
+
+func queue_peek(s: QueueServiceState) QueueResult {
+    if s.len == 0 {
+        return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
+    }
+    reply: [4]u8 = primitives.zero_payload()
+    reply[0] = s.items[0]
+    return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 1, reply) }
+}
+
 func handle(s: QueueServiceState, m: service_effect.Message) QueueResult {
     if m.payload_len == 0 {
         return queue_pop(s)
+    }
+    if m.payload_len == 2 {
+        if m.payload[1] != serial_protocol.CMD_BANG {
+            return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
+        }
+        if m.payload[0] == serial_protocol.CMD_C {
+            return queue_count(s)
+        }
+        if m.payload[0] == serial_protocol.CMD_P {
+            return queue_peek(s)
+        }
+        return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     if m.payload_len != 1 {
         return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }

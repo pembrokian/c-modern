@@ -176,6 +176,14 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             }
             return service_effect.effect_send(s.pid, service_topology.QUEUE_ENDPOINT_ID, 0, payload)
         }
+        if m.payload[1] == serial_protocol.CMD_C || m.payload[1] == serial_protocol.CMD_P {
+            if m.payload[2] != serial_protocol.CMD_BANG || m.payload[3] != serial_protocol.CMD_BANG {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = m.payload[1]
+            payload[1] = serial_protocol.CMD_BANG
+            return service_effect.effect_send(s.pid, service_topology.QUEUE_ENDPOINT_ID, 2, payload)
+        }
         return invalid_effect(SHELL_INVALID_COMMAND)
     }
 
