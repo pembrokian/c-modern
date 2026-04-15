@@ -20,7 +20,7 @@ import service_effect
 import service_topology
 import syscall
 
-const STEP_COUNT: usize = 22
+const STEP_COUNT: usize = 27
 
 enum StepCheckKind {
     Routed,
@@ -71,6 +71,10 @@ func cmd_log_tail() syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_log_tail())
 }
 
+func cmd_echo(left: u8, right: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_echo(left, right))
+}
+
 func cmd_kv_set(key: u8, value: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_kv_set(key, value))
 }
@@ -115,8 +119,8 @@ func witness_step(obs: syscall.ReceiveObservation, failure_code: i32, status: sy
     return step(obs, failure_code, StepCheck{ kind: StepCheckKind.Witness, status: status, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: send_dropped })
 }
 
-func step_table() [22]StepSpec {
-    specs: [22]StepSpec
+func step_table() [27]StepSpec {
+    specs: [27]StepSpec
 
     specs[0] = routed_step(cmd_log_append(77), 1)
     specs[1] = routed_step(cmd_kv_set(5, 42), 1)
@@ -140,6 +144,11 @@ func step_table() [22]StepSpec {
     specs[19] = reply_len_log_len_step(cmd_kv_set(31, 22), 6, syscall.SyscallStatus.Ok, 0, 4)
     specs[20] = reply_len_step(kv_count_obs(1), 6, syscall.SyscallStatus.Ok, 4)
     specs[21] = witness_step(cmd_kv_set(5, 123), 7, syscall.SyscallStatus.Ok, 1)
+    specs[22] = payload1_step(cmd_echo(7, 8), 10, syscall.SyscallStatus.Ok, 8)
+    specs[23] = reply_len_step(cmd_echo(1, 2), 10, syscall.SyscallStatus.Ok, 2)
+    specs[24] = reply_len_step(cmd_echo(3, 4), 10, syscall.SyscallStatus.Ok, 2)
+    specs[25] = reply_len_step(cmd_echo(5, 6), 10, syscall.SyscallStatus.Ok, 2)
+    specs[26] = status_step(cmd_echo(9, 10), 11, syscall.SyscallStatus.Exhausted)
 
     return specs
 }
@@ -201,7 +210,7 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
 }
 
 func run_main(state: *boot.KernelBootState) i32 {
-    specs: [22]StepSpec = step_table()
+    specs: [27]StepSpec = step_table()
 
     for step in 0..STEP_COUNT {
         spec: StepSpec = specs[step]
@@ -229,6 +238,22 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     tail_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_tail())
     if service_effect.effect_reply_payload_len(tail_effect) != 1 {
         return 9
+    }
+
+    *state = init.restart_echo(*state)
+
+    echo_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(33, 44))
+    if service_effect.effect_reply_status(echo_effect) != syscall.SyscallStatus.Ok {
+        return 12
+    }
+    if service_effect.effect_reply_payload_len(echo_effect) != 2 {
+        return 13
+    }
+    if service_effect.effect_reply_payload(echo_effect)[0] != 33 {
+        return 14
+    }
+    if service_effect.effect_reply_payload(echo_effect)[1] != 44 {
+        return 15
     }
 
     return 0

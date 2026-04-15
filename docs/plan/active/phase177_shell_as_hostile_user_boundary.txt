@@ -1,0 +1,101 @@
+Phase 177 -- Shell As Hostile User Boundary
+===========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Re-evaluate the shell as a real user-facing boundary by driving it with
+malformed, repeated, mixed, and state-dependent interactions rather than only
+with repository-shaped happy-path commands.
+
+The current shell is honest as a bounded structured command owner.
+This phase asks the next question: does that shell remain honest when the user
+is inconvenient rather than cooperative?
+
+This phase is not a text shell redesign.
+This phase is not a wider payload-width phase.
+This phase is not a discovery or packaging phase.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase142_serial_shell_command_routing.txt`
+- `docs/plan/archive/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/archive/phase159_observability_as_a_system_property.txt`
+- `docs/plan/archive/phase175_error_model_widening_first_gate.txt`
+- `docs/plan/active/phase176_adversarial_service_growth_under_explicit_restart.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The current shell path is compact, structured, and intentionally narrow.
+- The admitted shell vocabulary was audited for repeated real usage in Phase
+  147, but that audit stayed within the current cooperative repository-owned
+  usage patterns.
+- Error model widening was deferred in Phase 175 because current admitted
+  programs do not yet need broader user-facing error descriptions.
+- The missing pressure is not another internal shell cleanup.  It is user
+  behavior that is repetitive, malformed, or state-dependent enough to stress
+  shell-owned command meaning and service-owned consequences.
+
+Problem being solved
+--------------------
+- The repository can currently say that the shell works for the admitted
+  command set.
+- It cannot yet say whether the shell remains a clean owner boundary when a
+  user repeats invalid commands, mixes valid and invalid operations, or relies
+  on stateful service behavior over time.
+- Without that pressure, later packaging or persistence work risks building on
+  a shell that is still effectively a debug surface.
+
+Core rule
+---------
+- Keep shell syntax ownership in `shell_service`.
+- Keep service semantics in the target service owner.
+- Do not widen payload width or add a general parser framework.
+- Prefer adversarial interaction patterns over broader shell vocabulary.
+- If the current reply surfaces are insufficient, name the narrowest blocked
+  path rather than widening errors or messaging wholesale.
+
+Chosen slice for this phase
+---------------------------
+1. one hostile-user interaction matrix over the admitted shell path: malformed
+   input, repeated invalid input, mixed valid and invalid sequences, and
+   state-dependent commands across restarts
+2. one classification of which failure consequences belong to shell syntax and
+   which belong to service semantics
+3. one check that the shell still exposes enough user-visible truth without
+   requiring broader payloads, discovery, or error-object widening
+4. one bounded follow-through only if a concrete shell-owned defect is found
+   by that matrix
+
+Why this is the right placement
+--------------------------------
+- After Phase 176: one more service-owned behavior gives the shell a more
+  meaningful system to talk to.
+- Before any persistence or packaging work: a hostile-user shell audit is a
+  cheaper way to expose interface weakness than opening broader service
+  lifecycle policy.
+
+Planning rule for this phase
+----------------------------
+- Stress the shell with interaction patterns, not with a larger command set by
+  default.
+- Prefer repeated misuse and mixed traffic over feature accretion.
+- Keep the shell a bounded user-facing owner, not a policy broker.
+
+What this phase should prove
+----------------------------
+- that the shell is either a real user boundary or still partly a structured
+  debug interface
+- that malformed and mixed usage can be classified cleanly without reopening
+  broader error-model or payload-width work by default
+- that the repository's next interface pressure comes from real hostile use,
+  not from more internal audit-only refinement

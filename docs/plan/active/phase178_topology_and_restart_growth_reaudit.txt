@@ -1,0 +1,92 @@
+Phase 178 -- Topology And Restart Growth Re-Audit
+=================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Re-audit the flat static topology and init-owned explicit restart policy after
+the first post-Phase-174 growth pressure, and decide whether the Phase 170 and
+Phase 172 deferrals still hold under that expanded service system.
+
+This phase does not assume that topology or supervisor work is now required.
+It asks whether the new pressure from Phases 176 and 177 is enough to justify
+either one.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase170_static_service_topology_first_acknowledgment.txt`
+- `docs/plan/active/phase172_supervisor_and_restart_shape_probe.txt`
+- `docs/plan/active/phase176_adversarial_service_growth_under_explicit_restart.txt`
+- `docs/plan/active/phase177_shell_as_hostile_user_boundary.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 170 kept topology as flat slot constants with no iteration API,
+  routing table, or supervisor-visible graph.
+- Phase 172 kept restart policy in `init.mc` through flat explicit functions.
+- The backlog trigger for both deferrals is now explicit: reopen only when the
+  service count exceeds eight, when runtime slot iteration is required, when
+  restart-frequency pressure requires per-service retry policy, or when
+  caller-driven explicit restart is no longer the narrowest honest path.
+- Phase 176 has now provided the first honest evidence beyond the earlier
+  four-service, cooperative-user system.
+- Phase 177 is expected to add hostile-user pressure on top of that growth.
+
+Problem being solved
+--------------------
+- Once real growth pressure exists, the repository needs to know whether the
+  current flat topology and flat restart policy are still stable or were only
+  accidentally comfortable at four services.
+- Without this re-audit, topology and restart convenience work could drift in
+  piecemeal through local helpers instead of one explicit decision.
+
+Core rule
+---------
+- Measure only from the pressure created in Phases 176 and 177.
+- Do not admit a routing framework or supervisor by default.
+- If the current flat forms are still sufficient, record that explicitly.
+- If one bounded structural addition is needed, it must remain flat, named,
+  and ownership-visible.
+
+Chosen slice for this phase
+---------------------------
+Branch A -- explicit reaffirmation of current deferrals
+- one audit confirming that flat ServiceSlot constants and flat init-owned
+  restart functions remain sufficient after the new pressure
+- one updated trigger statement if the evidence sharpens it
+
+Branch B -- one bounded structural follow-through
+- one small topology or restart-owner addition justified directly by the new
+  pressure, such as a flat iterable slot list or a slightly less repetitive
+  init-owned restart shape
+- no routing table, supervisor service, watchdog, or retry framework
+
+Why this is the right placement
+--------------------------------
+- After Phases 176 and 177: the repository finally has new evidence rather
+  than speculation.
+- Before any retained-state or packaging work: topology and restart ownership
+  should be re-judged on that evidence first.
+
+Planning rule for this phase
+----------------------------
+- Reuse the exact backlog triggers where possible.
+- Prefer Branch A unless the new pressure clearly defeats the current flat
+  forms.
+- Keep policy in `init.mc` unless a narrower owner is clearly blocked.
+
+What this phase should prove
+----------------------------
+- that the repository can distinguish real structural pressure from ordinary
+  growth discomfort
+- that Phase 170 and Phase 172 are either still correct deferrals or now have
+  one specific bounded follow-through
+- that topology and restart policy do not silently widen through convenience
+  code

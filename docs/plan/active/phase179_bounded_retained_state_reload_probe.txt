@@ -1,0 +1,94 @@
+Phase 179 -- Bounded Retained-State Reload Probe
+================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Introduce the first minimal "state survives a restart" pressure without
+opening a filesystem, database, or general persistence framework.
+
+The goal is not durable storage as a feature family.
+The goal is to discover whether the current service identity, restart truth,
+and init-owned lifecycle model can carry one explicit retained-state reload
+path honestly.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/archive/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/archive/phase157_long_lived_system_coherence_audit.txt`
+- `docs/plan/active/phase172_supervisor_and_restart_shape_probe.txt`
+- `docs/plan/active/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Current restart semantics are explicit and truthful precisely because all
+  service state resets to a known empty baseline.
+- Current identity semantics are compile-time and runtime-local: a ServiceRef
+  names a boot-wired endpoint, not a persisted object identity.
+- The repository still makes no persistence, packaging, loader, or filesystem
+  claim.
+- Nevertheless, the next honest external pressure after service growth is not
+  a full storage subsystem.  It is one bounded retained-state reload path.
+
+Problem being solved
+--------------------
+- Without one retained-state reload probe, the repository cannot tell whether
+  restart-with-state is merely deferred or whether it would immediately expose
+  a deeper identity or lifecycle mismatch.
+- Jumping straight to a filesystem would mix storage semantics, persistence
+  format, boot loading, and service policy into one too-large step.
+- This phase creates the pressure in the narrowest possible way: one explicit
+  saved-state artifact or snapshot under explicit owner control, then one
+  explicit reload on restart.
+
+Core rule
+---------
+- Do not admit a filesystem API family.
+- Do not admit general persistence or transaction semantics.
+- Keep saved-state format explicit and bounded.
+- Keep reload ownership visible: either service-owned or init-owned, but not
+  hidden behind a framework.
+- If retained-state reload exposes an identity mismatch, name that mismatch
+  precisely instead of solving it with packaging or service registries.
+
+Chosen slice for this phase
+---------------------------
+1. one retained-state candidate only, preferably the smallest current service
+   whose retained behavior is already meaningful under restart pressure
+2. one explicit save representation and one explicit reload path
+3. one proof that restart-with-reload either preserves the intended visible
+   state honestly or exposes the first real mismatch in service identity or
+   lifecycle ownership
+4. no broader storage namespace, file API, or general persistence abstraction
+
+Why this is the right placement
+--------------------------------
+- After Phase 178: topology and restart structure have been re-judged under
+  growth pressure first.
+- Before any packaging or second-target investment: retained-state reload is a
+  more immediate system pressure than broader artifact lifecycle policy.
+
+Planning rule for this phase
+----------------------------
+- Choose the narrowest service whose state reload is both meaningful and easy
+  to reason about.
+- Prefer one explicit snapshot over any background persistence story.
+- If the pressure still fits the current identity and restart model, say so.
+
+What this phase should prove
+----------------------------
+- that the repository can admit one minimal restart-with-state path without
+  lying about storage or packaging completion
+- that service identity, restart truth, and retained state either compose
+  honestly at this scale or expose one clearly named next boundary
+- that persistence pressure can be introduced incrementally rather than as a
+  subsystem leap

@@ -1,0 +1,171 @@
+Phase 176 -- Adversarial Service Growth Under Explicit Restart
+==============================================================
+
+Status
+------
+COMPLETE
+
+Outcome
+-------
+Fifth-service pressure admitted without framework growth.
+
+This phase adds one new boot-wired `echo_service` to the active reset-lane
+kernel and keeps the ownership model flat and explicit.
+
+- `service_topology.mc` now names five boot-wired services with a new
+  `ECHO_ENDPOINT_ID`, `ECHO_SLOT`, and `SERVICE_COUNT = 5`.
+- `boot.mc` now constructs `echo_service` state alongside the existing
+  serial-shell path, log, and kv state.
+- `shell_service.mc` routes the compact `ECxy` shell command to the new
+  echo endpoint instead of replying locally.
+- `kernel_dispatch.mc` handles echo as a leaf service with no new routing
+  framework or table.
+- `init.mc` now owns `restart_echo()` in the same flat caller-driven style
+  as `restart_log()` and `restart_kv()`.
+- `scenarios.mc` now exercises echo routing, echo exhaustion, and explicit
+  echo restart follow-through.
+
+Chosen service slice
+--------------------
+The admitted fifth service is `echo_service`: a bounded request-derived reply
+owner that is distinct from log retention and key-value storage.
+
+Its explicit user-visible pressure is simple and honest:
+
+- the first four echo requests succeed and return the request bytes
+- the fifth echo request returns `SyscallStatus.Exhausted`
+- `init.restart_echo()` resets that pressure and allows the next echo request
+  to succeed again
+
+This keeps the phase in the intended scope: one real service-owned behavior,
+one explicit restart follow-through, and one explicit failure consequence.
+
+Deferral result
+---------------
+Phase 170 and Phase 172 deferrals still hold at five services.
+
+- The flat `ServiceSlot` topology remains readable and sufficient.
+- The flat init-owned restart policy remains readable and sufficient.
+- No routing table, supervisor, watchdog, retry framework, persistence layer,
+  packaging layer, or compiler expansion was required.
+
+Implementation files changed
+----------------------------
+- `kernel/src/echo_service.mc`
+- `kernel/src/service_topology.mc`
+- `kernel/src/boot.mc`
+- `kernel/src/kernel_dispatch.mc`
+- `kernel/src/shell_service.mc`
+- `kernel/src/serial_protocol.mc`
+- `kernel/src/init.mc`
+- `kernel/src/scenarios.mc`
+- `tests/system/kernel_reset_lane_phase176_growth/`
+- `tests/system/kernel_reset_lane_static_topology/src/main.mc`
+- `tests/tool/tool_workflow_suite.cpp`
+
+Validation
+----------
+- `mc_tool_workflow_unit` passes with the new Phase 176 growth fixture and the
+  updated static-topology fixture.
+
+Purpose
+-------
+Introduce the first post-Phase-174 external pressure by growing the running
+service system one notch past its current four-service comfort point and
+proving that explicit restart, routing, and failure consequences remain
+honest under that growth.
+
+This phase is not a supervisor framework phase.
+This phase is not a persistence phase.
+This phase is not a dynamic service registration phase.
+
+It is the smallest honest move away from internal coherence work and toward
+system pressure from another real service-owned behavior.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase170_static_service_topology_first_acknowledgment.txt`
+- `docs/plan/active/phase172_supervisor_and_restart_shape_probe.txt`
+- `docs/plan/active/phase173_multi_core_model_boundary_identification.txt`
+- `docs/plan/active/phase174_second_target_platform_boundary_identification.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The current running-system slice is stable at four boot-wired services:
+  serial, shell, log, and kv.
+- Phase 170 named the static topology and kept it flat.
+- Phase 172 confirmed that init-owned explicit restart remains sufficient at
+  the four-service point.
+- Phase 173 named SMP constraints but left the current single-state-pointer
+  dispatch model intentionally unchanged.
+- Phase 174 named target portability barriers without opening second-target
+  implementation work.
+- The strongest unanswered question is no longer internal consistency of the
+  current four-service set.  It is whether the current ownership shape stays
+  honest when one more real service-owned behavior is admitted.
+
+Problem being solved
+--------------------
+- The current topology, restart policy, and shell-visible workflows were all
+  judged under a four-service system.
+- Without one more real service or one more nontrivial shell-visible service
+  workflow, the repository cannot tell whether the current flat ServiceSlot
+  model and init-owned restart model are genuinely stable or merely untested
+  at their first size.
+- This phase creates exactly that pressure without leaping to supervisors,
+  persistence, or packaging.
+
+Core rule
+---------
+- Add one real service-owned behavior only.
+- Keep the dispatch model explicit and named; do not generalize into a
+  routing table or bus.
+- Keep restart caller-driven through `init.mc`.
+- Do not widen into service packaging, dynamic discovery, or persistence.
+- If the new service exposes a real topology or restart weakness, name the
+  weakness precisely rather than masking it with a framework.
+
+Chosen slice for this phase
+---------------------------
+1. one new bounded service or one new bounded shell-visible workflow that is
+   not reducible to the current log or kv behavior
+2. one explicit integration into `service_topology.mc`, `kernel_dispatch.mc`,
+   and `init.mc` using the current flat model
+3. one restart follow-through showing whether explicit init-owned restart is
+   still sufficient when the service set is larger than four
+4. one user-visible failure consequence or backpressure path for that new
+   service, expressed through existing reply-status mechanisms where possible
+5. one explicit statement of whether this growth materially changes the Phase
+   170 or Phase 172 deferral triggers
+
+Why this is the right placement
+--------------------------------
+- After Phase 174: portability barriers are named, so the repository does not
+  need another classification phase before it admits more real system usage.
+- Before any persistence or packaging work: one more real service is a cheaper
+  and more honest way to create external pressure than opening storage or
+  service-instantiation policy prematurely.
+
+Planning rule for this phase
+----------------------------
+- Choose a service because it exposes a distinct owned behavior, not because
+  it sounds architecturally important.
+- Prefer a service that stresses routing, restart, or shell interaction using
+  existing mechanisms.
+- If the fifth-service pressure still fits cleanly in the current flat model,
+  say so explicitly.
+
+What this phase should prove
+----------------------------
+- that the current running-system slice can survive one notch of real growth
+  without hidden framework pressure
+- that the flat topology and explicit restart model are either still honest at
+  five services or now have a precisely named local weakness
+- that external pressure can be introduced without abandoning the repository's
+  one-owner-at-a-time planning discipline

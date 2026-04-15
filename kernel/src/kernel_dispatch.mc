@@ -7,6 +7,7 @@
 // This module owns how an incoming observation is turned into an Effect.
 
 import boot
+import echo_service
 import event_codes
 import kv_service
 import log_service
@@ -47,8 +48,8 @@ func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Messag
     return kv_result.effect
 }
 
-// Leaf service dispatch: log, kv, and the default for unknown endpoints.
-// Shell Send effects always target log or kv; no leaf service produces
+// Leaf service dispatch: log, kv, echo, and the default for unknown endpoints.
+// Shell Send effects always target log, kv, or echo; no leaf service produces
 // a further Send that needs chasing through a non-leaf path.
 func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
@@ -59,6 +60,11 @@ func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Mess
     }
     if msg.endpoint_id == service_topology.KV_ENDPOINT_ID {
         return kernel_dispatch_kv(state, msg)
+    }
+    if msg.endpoint_id == service_topology.ECHO_ENDPOINT_ID {
+        echo_result: echo_service.EchoResult = echo_service.handle(current.echo_state, msg)
+        *state = boot.bootwith_echo(current, echo_result.state)
+        return echo_result.effect
     }
     return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
 }
@@ -117,7 +123,7 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
     resolved: service_effect.Effect = execute_effect(state, inner, 0)
     next_path = serial_shell_path.path_commit_reply(next_path, resolved)
     current = *state
-    *state = boot.KernelBootState{ path_state: next_path, log_state: current.log_state, kv_state: current.kv_state }
+    *state = boot.KernelBootState{ path_state: next_path, log_state: current.log_state, kv_state: current.kv_state, echo_state: current.echo_state }
     return serial_attach_events(serial_build_reply(next_path), obs, next_path, resolved)
 }
 

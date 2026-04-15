@@ -4,6 +4,7 @@
 //
 // Dispatch and routing logic lives in kernel_dispatch.mc.
 
+import echo_service
 import kv_service
 import log_service
 import serial_service
@@ -18,6 +19,7 @@ struct KernelBootState {
     path_state: serial_shell_path.SerialShellPathState
     log_state: log_service.LogServiceState
     kv_state: kv_service.KvServiceState
+    echo_state: echo_service.EchoServiceState
 }
 
 func kernel_init() KernelBootState {
@@ -25,15 +27,20 @@ func kernel_init() KernelBootState {
     shell_slot: service_topology.ServiceSlot = service_topology.SHELL_SLOT
     log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
     kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
-    return KernelBootState{ path_state: serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint), log_state: log_service.log_init(log_slot.pid, 1), kv_state: kv_service.kv_init(kv_slot.pid, 1) }
+    echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
+    return KernelBootState{ path_state: serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint), log_state: log_service.log_init(log_slot.pid, 1), kv_state: kv_service.kv_init(kv_slot.pid, 1), echo_state: echo_service.echo_init(echo_slot.pid, 1) }
 }
 
 func bootwith_log(s: KernelBootState, log: log_service.LogServiceState) KernelBootState {
-    return KernelBootState{ path_state: s.path_state, log_state: log, kv_state: s.kv_state }
+    return KernelBootState{ path_state: s.path_state, log_state: log, kv_state: s.kv_state, echo_state: s.echo_state }
 }
 
 func bootwith_kv(s: KernelBootState, kv: kv_service.KvServiceState) KernelBootState {
-    return KernelBootState{ path_state: s.path_state, log_state: s.log_state, kv_state: kv }
+    return KernelBootState{ path_state: s.path_state, log_state: s.log_state, kv_state: kv, echo_state: s.echo_state }
+}
+
+func bootwith_echo(s: KernelBootState, echo: echo_service.EchoServiceState) KernelBootState {
+    return KernelBootState{ path_state: s.path_state, log_state: s.log_state, kv_state: s.kv_state, echo_state: echo }
 }
 
 func debug_boot_routed(effect: service_effect.Effect) u32 {
@@ -62,4 +69,8 @@ func boot_log_ref() service_identity.ServiceRef {
 
 func boot_kv_ref() service_identity.ServiceRef {
     return service_identity.service_ref(service_topology.KV_ENDPOINT_ID)
+}
+
+func boot_echo_ref() service_identity.ServiceRef {
+    return service_identity.service_ref(service_topology.ECHO_ENDPOINT_ID)
 }

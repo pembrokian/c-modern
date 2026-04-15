@@ -5,8 +5,6 @@ import service_topology
 import syscall
 
 const SHELL_INVALID_REPLY: u8 = 63  // '?'
-const CMD_E: u8 = 69   // 'E'
-const CMD_C: u8 = 67   // 'C'
 
 struct ShellServiceState {
     pid: u32
@@ -30,10 +28,10 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
         return invalid_effect()
     }
 
-    if m.payload[0] == CMD_E && m.payload[1] == CMD_C {
+    if m.payload[0] == serial_protocol.CMD_E && m.payload[1] == serial_protocol.CMD_C {
         payload[0] = m.payload[2]
         payload[1] = m.payload[3]
-        return service_effect.effect_reply(syscall.SyscallStatus.Ok, 2, payload)
+        return service_effect.effect_send(s.pid, service_topology.ECHO_ENDPOINT_ID, 2, payload)
     }
 
     if m.payload[0] == serial_protocol.CMD_L && m.payload[1] == serial_protocol.CMD_A && m.payload[3] == serial_protocol.CMD_BANG {
@@ -56,7 +54,7 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
         return service_effect.effect_send(s.pid, service_topology.KV_ENDPOINT_ID, 1, payload)
     }
 
-    if m.payload[0] == serial_protocol.CMD_K && m.payload[1] == CMD_C && m.payload[2] == serial_protocol.CMD_BANG && m.payload[3] == serial_protocol.CMD_BANG {
+    if m.payload[0] == serial_protocol.CMD_K && m.payload[1] == serial_protocol.CMD_C && m.payload[2] == serial_protocol.CMD_BANG && m.payload[3] == serial_protocol.CMD_BANG {
         return service_effect.effect_send(s.pid, service_topology.KV_ENDPOINT_ID, 0, payload)
     }
 

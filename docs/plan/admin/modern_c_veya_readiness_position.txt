@@ -37,6 +37,7 @@ Record one maintained repository position after Phase 163 closed exported consta
 Record one maintained repository position after Phase 164 explicitly deferred struct embedding after the pressure audit found no genuine repeated pressure.
 Record one maintained repository position after Phase 165 named the second repeated model boundary (service-to-service reachability topology had no structural home).
 Record one maintained repository position after Phase 166 repaired both second-boundary findings with service_topology.mc and event_codes.mc.
+Record one maintained repository position after Phase 176 admitted a fifth boot-wired echo service under explicit restart without widening the compiler or framework surfaces.
 
 This note answers four questions that now matter:
 
@@ -178,7 +179,7 @@ Current repository truth
 - The landed Phase 150 rebuilt-system clean second pass also belongs to that same admitted slice rather than to a reusable runtime framework, dynamic registration model, or reopened compiler wave.
 - The landed Phase 151 main simplification (main.mc reduced to init plus one scenarios call) also belongs to that same admitted slice rather than to a generic orchestration framework or compiler-facing service support.
 - The landed Phase 152–152c kernel behavioral reset establishes kernel/ as the live clean tree and kernel_old/ as the frozen legacy reference; the reset-lane service rule is state plus init plus handlers plus optional debug only.
-- The landed Phase 153 shared service_effect execution contract (Message and Effect types shared across shell, log, kv, and serial services) also belongs to that same admitted slice rather than to a service runtime, hidden broker, or reopened compiler wave.
+- The landed Phase 153 shared service_effect execution contract (Message and Effect types shared across shell, log, kv, serial, and now echo services) also belongs to that same admitted slice rather than to a service runtime, hidden broker, or reopened compiler wave.
 - The landed Phase 154 service identity and addressing formalization (plain ServiceRef wrapping endpoint_id as a compile-time constant) also belongs to that same admitted slice rather than to a compiler-known type or dynamic runtime registry.
 - The landed Phase 157 long-lived system coherence audit also belongs to that same admitted slice rather than to a broader consistency framework, persistent store, or reopened compiler wave.
 - The landed Phase 158 cross-service failure semantics consistency audit also belongs to that same admitted slice rather than to a recovery, retry, or audit-trail-integrity framework; the advisory log drop is explicitly named as one intentional cross-service inconsistency.
@@ -189,7 +190,8 @@ Current repository truth
 - The landed Phase 163 exported constant linkage and aggregate const follow-through admits direct cross-module constant reuse and ordinary aggregate const literals on the active kernel path; it does not admit const functions or arbitrary compile-time execution.
 - Phase 164 explicitly deferred struct embedding after the pressure audit proved that all identified pressure sites (KernelBootState, SerialShellPathState) resolve through with-helpers without the language feature; embedding remains deferred.
 - The landed Phase 165 second model boundary identification named "service-to-service reachability topology has no structural home" as the second repeated boundary; three sites (ShellServiceState fields, boot.mc constants, kernel_dispatch if-chains) had to agree by convention with no neutral owning module.
-- The landed Phase 166 repair introduced service_topology.mc (four endpoint ID constants, no imports) and event_codes.mc (six event code constants, no imports); shell_service.mc is now topology-neutral; nine system test fixtures dropped local constant duplicates; serial_shell_event_log.mc switched to a slots: [4]u32 array with a for loop; serial_on_receive was also rewritten as a for loop per the style guide.
+- The landed Phase 166 repair introduced service_topology.mc (initially four endpoint ID constants, later extended by Phase 176 to five, still with no service imports) and event_codes.mc (six event code constants, no imports); shell_service.mc is now topology-neutral; nine system test fixtures dropped local constant duplicates; serial_shell_event_log.mc switched to a slots: [4]u32 array with a for loop; serial_on_receive was also rewritten as a for loop per the style guide.
+- The landed Phase 176 fifth-service growth step adds one boot-wired echo_service with bounded request-derived replies, explicit `Exhausted` pressure after four requests, and flat init-owned `restart_echo()` follow-through; this belongs to the same admitted running-system slice rather than to a routing framework, supervisor, persistence layer, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -213,8 +215,9 @@ It means:
   a fixed-size, table-driven, single-core, inspectable form
 - explicit boot, user entry, IPC, authority transfer, spawn, wait, sleep or
   wake, bounded init-owned service orchestration, a bounded namespace
-  answer, named dispatch topology, per-send delivery witnessing, and
-  explicit event code ownership are now real inside that slice
+  answer, named dispatch topology, per-send delivery witnessing, explicit
+  event code ownership, and one fifth boot-wired echo-service pressure step
+  are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 

@@ -10,6 +10,7 @@
 // restart may resume sending without reacquiring the ref.
 
 import boot
+import echo_service
 import kv_service
 import log_service
 import service_topology
@@ -22,4 +23,9 @@ func restart_log(state: boot.KernelBootState) boot.KernelBootState {
 func restart_kv(state: boot.KernelBootState) boot.KernelBootState {
     kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
     return boot.bootwith_kv(state, kv_service.kv_init(kv_slot.pid, 1))
+}
+
+func restart_echo(state: boot.KernelBootState) boot.KernelBootState {
+    echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
+    return boot.bootwith_echo(state, echo_service.echo_init(echo_slot.pid, 1))
 }

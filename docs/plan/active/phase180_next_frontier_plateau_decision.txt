@@ -1,0 +1,93 @@
+Phase 180 -- Next Frontier Plateau Decision
+===========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Decide, after the first post-Phase-174 external-pressure wave, whether the
+next honest frontier is continued service-system growth or bounded second-
+target portability work.
+
+This phase is a decision phase, not an implementation family.
+It exists so the repository does not pursue both fronts at once without
+evidence.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase174_second_target_platform_boundary_identification.txt`
+- `docs/plan/active/phase176_adversarial_service_growth_under_explicit_restart.txt`
+- `docs/plan/active/phase177_shell_as_hostile_user_boundary.txt`
+- `docs/plan/active/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/active/phase179_bounded_retained_state_reload_probe.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 174 names the portability distance but does not yet justify second-
+  target implementation work.
+- Phases 176 through 179 are intended to answer a different question: whether
+  the stronger near-term pressure is still inside the service system once it
+  faces real growth, hostile use, and one bounded retained-state path.
+- The repository should not open both portability and richer service-system
+  work simultaneously unless one front clearly stops being the narrowest next
+  owner.
+
+Problem being solved
+--------------------
+- Without an explicit plateau decision, the repository risks mixing two
+  plausible but different next waves:
+  one about making the service system more real under constraint,
+  and one about making the whole toolchain and runtime less Darwin-specific.
+- Those waves stress different owners and should not be pursued together by
+  default.
+
+Core rule
+---------
+- Compare only real evidence from Phases 174 and 176 through 179.
+- Do not authorize both fronts at once by vague language.
+- If service growth still exposes the stronger real pressure, portability work
+  remains deferred.
+- If service growth stabilizes and Phase 174's portability seams are now the
+  clearest next blocker, then authorize one bounded portability follow-through.
+
+Chosen slice for this phase
+---------------------------
+Branch A -- service-system frontier remains stronger
+- one explicit statement that the next wave should stay on service growth,
+  identity, retained state, or user-facing interaction
+- one refreshed trigger condition for reopening bounded second-target work
+
+Branch B -- bounded portability follow-through now justified
+- one explicit statement that the next wave should move to one bounded
+  second-target seam or hosted portability probe
+- one explicit statement of what service-system questions are now sufficiently
+  stable to leave deferred for that work
+
+Why this is the right placement
+--------------------------------
+- After Phase 179: the repository has finally tested the current system under
+  real post-coherence pressure instead of more internal refinement.
+- After Phase 174: portability distance is already named and can be weighed
+  honestly against the new system pressure.
+
+Planning rule for this phase
+----------------------------
+- Decide based on the narrowest blocked path, not on architectural taste.
+- Prefer the front that currently has the clearest real consumer pressure.
+- Preserve explicit deferral for whichever front loses.
+
+What this phase should prove
+----------------------------
+- that the repository can choose one next frontier deliberately rather than by
+  drift
+- that portability and system-growth work stay evidence-driven and mutually
+  ordered
+- that the post-174 wave ends with a real plateau statement instead of five
+  disconnected follow-on ideas

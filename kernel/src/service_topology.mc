@@ -13,6 +13,7 @@ const SERIAL_ENDPOINT_ID: u32 = 10
 const SHELL_ENDPOINT_ID: u32 = 11
 const LOG_ENDPOINT_ID: u32 = 12
 const KV_ENDPOINT_ID: u32 = 13
+const ECHO_ENDPOINT_ID: u32 = 14
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -26,7 +27,8 @@ const SERIAL_SLOT: ServiceSlot = ServiceSlot{ endpoint: SERIAL_ENDPOINT_ID, pid:
 const SHELL_SLOT: ServiceSlot = ServiceSlot{ endpoint: SHELL_ENDPOINT_ID, pid: 2 }
 const LOG_SLOT: ServiceSlot = ServiceSlot{ endpoint: LOG_ENDPOINT_ID, pid: 3 }
 const KV_SLOT: ServiceSlot = ServiceSlot{ endpoint: KV_ENDPOINT_ID, pid: 4 }
+const ECHO_SLOT: ServiceSlot = ServiceSlot{ endpoint: ECHO_ENDPOINT_ID, pid: 5 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 4
+const SERVICE_COUNT: u32 = 5

@@ -1,6 +1,6 @@
 // Phase 170: Static service topology first acknowledgment.
 //
-// Proves that the static wiring of the four boot services is now named
+// Proves that the static wiring of the boot services is now named
 // in one place (service_topology.ServiceSlot) rather than split between
 // endpoint ID constants in service_topology.mc and PID constants in boot.mc.
 //
@@ -26,6 +26,7 @@ func smoke_slot_endpoints_match_constants() bool {
     shell_slot: service_topology.ServiceSlot = service_topology.SHELL_SLOT
     log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
     kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
+    echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
 
     if serial_slot.endpoint != service_topology.SERIAL_ENDPOINT_ID {
         return false
@@ -39,12 +40,15 @@ func smoke_slot_endpoints_match_constants() bool {
     if kv_slot.endpoint != service_topology.KV_ENDPOINT_ID {
         return false
     }
+    if echo_slot.endpoint != service_topology.ECHO_ENDPOINT_ID {
+        return false
+    }
     return true
 }
 
-// B: SERVICE_COUNT must equal 4 — the number of boot-wired slots.
-func smoke_service_count_is_four() bool {
-    if service_topology.SERVICE_COUNT != 4 {
+// B: SERVICE_COUNT must equal 5 — the number of boot-wired slots.
+func smoke_service_count_is_five() bool {
+    if service_topology.SERVICE_COUNT != 5 {
         return false
     }
     return true
@@ -66,7 +70,7 @@ func main() i32 {
     if smoke_slot_endpoints_match_constants() == false {
         return 1
     }
-    if smoke_service_count_is_four() == false {
+    if smoke_service_count_is_five() == false {
         return 2
     }
     if smoke_init_and_round_trip() == false {

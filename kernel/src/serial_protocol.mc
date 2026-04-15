@@ -20,10 +20,15 @@ const CMD_L: u8 = 76   // 'L'
 const CMD_A: u8 = 65   // 'A'
 const CMD_T: u8 = 84   // 'T'
 const CMD_K: u8 = 75   // 'K'
+const CMD_E: u8 = 69   // 'E'
 const CMD_S: u8 = 83   // 'S'
 const CMD_G: u8 = 71   // 'G'
 const CMD_C: u8 = 67   // 'C' — count
 const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
+
+func encode_echo(left: u8, right: u8) [4]u8 {
+    return ipc.payload_byte(CMD_E, CMD_C, left, right)
+}
 
 func encode_log_append(value: u8) [4]u8 {
     return ipc.payload_byte(CMD_L, CMD_A, value, CMD_BANG)
