@@ -6,8 +6,9 @@
 // here so init is the named owner of the restart contract.
 //
 // Stability rules from service_identity.mc apply: the endpoint_id survives
-// restart, retained state does not.  Callers that held a ServiceRef before
-// restart may resume sending without reacquiring the ref.
+// restart, and retained state survives only when init chooses an explicit
+// save-and-reload path.  Callers that held a ServiceRef before restart may
+// resume sending without reacquiring the ref.
 
 import boot
 import echo_service
@@ -43,7 +44,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
 
 func restart_log(state: boot.KernelBootState) boot.KernelBootState {
     log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
-    return boot.bootwith_log(state, log_service.log_init(log_slot.pid, 1))
+    snap: log_service.LogSnapshot = log_service.log_snapshot(state.log_state)
+    return boot.bootwith_log(state, log_service.log_reload(log_slot.pid, 1, snap))
 }
 
 func restart_kv(state: boot.KernelBootState) boot.KernelBootState {

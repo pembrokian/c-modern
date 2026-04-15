@@ -1,0 +1,102 @@
+Phase 186 -- Boot Decomposition And Lifecycle Audit
+==================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Re-audit the current division of responsibility between `boot.mc`, `init.mc`,
+the scenario owner, topology wiring, and restart policy after the restart,
+identity, authority, and IPC pressure wave.
+
+This phase is not a broad boot rewrite.
+It asks whether the current owner split is still honest now that the service
+system has accumulated more restart, retained-state, and authority semantics.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase151_complete_main_simplification.txt`
+- `docs/plan/archive/phase157_long_lived_system_coherence_audit.txt`
+- `docs/plan/active/phase172_supervisor_and_restart_shape_probe.txt`
+- `docs/plan/active/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase183_endpoint_ownership_and_authority_audit.txt`
+- `docs/plan/active/phase185_ipc_shape_reaudit_under_restart_and_retained_state.txt`
+- `docs/arch/veya/kernel_style_guide.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- `main.mc` is already constrained to init plus one call.
+- `scenarios.mc` owns the scripted observation loop.
+- `boot.mc` owns kernel initialization and dispatch.
+- `init.mc` owns explicit restart policy.
+- `service_topology.mc` owns flat static wiring.
+- The service system has now accumulated enough restart and retained-state
+  behavior that owner blur is more likely to show up as lifecycle confusion
+  rather than as a missing feature.
+
+Problem being solved
+--------------------
+- The current shape is intentionally flat, but additional restart and retained-
+  state semantics may slowly blur what belongs to boot, what belongs to init,
+  and what belongs to runtime dispatch or topology ownership.
+- Without one audit, boot and lifecycle structure can widen through repeated
+  convenience changes rather than one explicit decision.
+
+Core rule
+---------
+- Re-audit current owner responsibilities before widening into a supervisor,
+  service graph framework, or lifecycle subsystem.
+- Prefer one small owner-local structural repair over a broad rewrite.
+- Preserve the current style-guide bias toward explicit flat ownership.
+- Do not widen compiler, sema, MIR, backend, ABI, target, runtime, or `hal`
+  surfaces.
+
+Chosen slice for this phase
+---------------------------
+1. one explicit ownership classification for the current lifecycle surfaces:
+   boot initialization, dispatch, topology wiring, restart policy, and live
+   scripted operation
+2. one audit of where restart and retained-state semantics currently live and
+   whether any of that policy is sitting in the wrong owner
+3. one bounded structural follow-through only if a concrete owner blur is
+   found, such as moving one restart-adjacent or topology-adjacent helper to a
+   nearer owner
+4. one explicit statement of whether the current boot or init or runtime split
+   is still the narrowest honest shape at this scale
+
+What this phase should not do
+-----------------------------
+- no supervisor framework
+- no service graph framework
+- no dynamic discovery or namespace subsystem
+- no scheduler redesign
+- no compiler-facing lifecycle feature
+
+Why this is the right placement
+-------------------------------
+- After the identity, authority, and IPC re-audit wave, the repository should
+  know whether lifecycle structure is still clear or has started to blur.
+- This phase turns accumulated pressure into one explicit ownership judgment
+  before a larger subsystem is considered.
+
+Planning rule for this phase
+----------------------------
+- Prefer auditing and one bounded move over speculative decomposition.
+- Keep ownership visible in source, not hidden behind new abstractions.
+- If the current split is still honest, record that directly and stop.
+
+What this phase should prove
+----------------------------
+- that boot, init, topology, and live-operation ownership are either still
+  cleanly separated or now have one clearly named local blur
+- that later structural growth can happen from evidence rather than from
+  frustration with accumulated helpers
+- that the repository remains in model-clarification-under-growth mode rather
+  than premature subsystem expansion

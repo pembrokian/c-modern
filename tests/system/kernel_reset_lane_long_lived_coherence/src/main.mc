@@ -16,10 +16,12 @@
 //     every further append.  Tail still returns the original 4 entries on
 //     every subsequent read.  No silent loss or silent growth occurs.
 //
-//   restart resets all service state to the empty baseline:
+//   fresh kernel_init() resets all service state to the empty baseline:
 //     A new kernel_init() call produces a state that is identical in
 //     behavior to the very first init.  No hidden residue from prior
-//     interactions leaks across restarts.
+//     interactions leaks across full-kernel re-init.
+//     Phase 179 later adds one narrower exception: init-owned log restart
+//     may explicitly reload a saved retained snapshot.
 //
 //   kv-write advisory log marker is coherent across many writes:
 //     Each kv set appends one marker to the log.  When the log is full
@@ -180,8 +182,8 @@ func smoke_log_full_stable_tail() bool {
     return true
 }
 
-// Restart resets all state to the empty baseline.
-func smoke_restart_clears_state() bool {
+// A fresh kernel_init() resets all state to the empty baseline.
+func smoke_kernel_init_clears_state() bool {
     state: boot.KernelBootState = boot.kernel_init()
     effect: service_effect.Effect
 
@@ -189,7 +191,7 @@ func smoke_restart_clears_state() bool {
     effect = kernel_dispatch.kernel_dispatch_step(&state, obs(75, 83, 7, 55))
     effect = kernel_dispatch.kernel_dispatch_step(&state, obs(76, 65, 9, 33))
 
-    // Restart: fresh init.
+    // Fresh kernel init.
     state = boot.kernel_init()
 
     // kv key 7 is gone — get returns InvalidArgument.
@@ -283,7 +285,7 @@ func main() i32 {
     if !smoke_log_full_stable_tail() {
         return 3
     }
-    if !smoke_restart_clears_state() {
+    if !smoke_kernel_init_clears_state() {
         return 4
     }
     if !smoke_kv_log_marker_coherent_at_saturation() {

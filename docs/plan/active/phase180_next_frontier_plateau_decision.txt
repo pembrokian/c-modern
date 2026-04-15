@@ -3,7 +3,49 @@ Phase 180 -- Next Frontier Plateau Decision
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Branch A landed: the service-system frontier remains the stronger next owner,
+and bounded second-target portability work stays deferred.
+
+The comparison set from Phases 176 through 179 is now explicit:
+
+- Phase 176 found one more real service-owned pressure point and closed it
+  with one flat boot-wired `echo_service` plus explicit restart.
+- Phase 177 found one real hostile-user shell truth gap and closed it with
+  compact shell-owned invalid classification rather than wider payloads or a
+  broader error model.
+- Phase 178 found one real growth friction in topology and restart readability
+  and closed it with flat lookup and endpoint-driven restart helpers rather
+  than a routing table or supervisor.
+- Phase 179 found one real restart-with-state pressure point and closed it
+  with one explicit `log_service` snapshot and reload path rather than a
+  persistence or packaging framework.
+
+Phase 174, by contrast, named portability seams honestly but did not expose a
+real admitted consumer whose narrowest next blocker was second-target support.
+
+Phase result
+------------
+The next wave should stay on service growth, service identity, retained state,
+and user-facing interaction inside the current running-system slice.
+
+Bounded second-target work remains deferred until both of these are true:
+
+1. a real admitted consumer needs Linux arm64 or another second target for a
+   behavior Darwin arm64 cannot supply honestly
+2. the strongest next blocked path is no longer an owner-local service-system
+   question that can be answered inside `kernel/src/` without target work
+
+What did not change:
+
+- no second-target implementation work was admitted
+- no compiler, sema, MIR, backend, ABI, runtime, or `hal` expansion was
+  admitted for this phase
+- no service-system question was declared permanently settled; only the next
+  ordering decision is settled
 
 Purpose
 -------
@@ -32,9 +74,10 @@ Repository status note
 ----------------------
 - Phase 174 names the portability distance but does not yet justify second-
   target implementation work.
-- Phases 176 through 179 are intended to answer a different question: whether
-  the stronger near-term pressure is still inside the service system once it
-  faces real growth, hostile use, and one bounded retained-state path.
+- Phases 176 through 179 now provide the comparison set for a different
+  question: whether the stronger near-term pressure is still inside the
+  service system once it has faced real growth, hostile use, and one bounded
+  retained-state reload path.
 - The repository should not open both portability and richer service-system
   work simultaneously unless one front clearly stops being the narrowest next
   owner.

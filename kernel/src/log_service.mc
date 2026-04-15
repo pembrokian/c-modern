@@ -11,6 +11,11 @@ struct LogServiceState {
     len: usize
 }
 
+struct LogSnapshot {
+    retained: [LOG_BUFFER_CAPACITY]u8
+    len: usize
+}
+
 struct LogResult {
     state: LogServiceState
     effect: service_effect.Effect
@@ -22,6 +27,14 @@ func log_init(pid: u32, slot: u32) LogServiceState {
 
 func logwith(s: LogServiceState, retained: [LOG_BUFFER_CAPACITY]u8, len: usize) LogServiceState {
     return LogServiceState{ pid: s.pid, slot: s.slot, retained: retained, len: len }
+}
+
+func log_snapshot(s: LogServiceState) LogSnapshot {
+    return LogSnapshot{ retained: s.retained, len: s.len }
+}
+
+func log_reload(pid: u32, slot: u32, snap: LogSnapshot) LogServiceState {
+    return LogServiceState{ pid: pid, slot: slot, retained: snap.retained, len: snap.len }
 }
 
 func log_append(s: LogServiceState, obs: syscall.ReceiveObservation) LogServiceState {

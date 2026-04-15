@@ -1,0 +1,131 @@
+Phase 181 -- Key-Value Retained-State Reload Follow-Through
+===========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Extend the retained-state restart slice from one audit-oriented owner
+(`log_service`) to one user-facing state owner (`kv_service`) without opening
+filesystem, database, snapshot-framework, or compiler-facing work.
+
+Phase 179 proved that one explicit retained-state reload path can fit the
+current service identity and init-owned restart model honestly.
+Phase 180 then decided that the next frontier should remain inside service
+growth, service identity, retained state, or user-facing interaction rather
+than moving to second-target portability.
+
+This phase asks the next narrower question:
+can the same explicit restart-with-state shape carry one user-visible service
+state owner, or was the log-only result merely the easiest special case?
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/archive/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/archive/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/active/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/active/phase179_bounded_retained_state_reload_probe.txt`
+- `docs/plan/active/phase180_next_frontier_plateau_decision.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Phase 178 kept restart policy flat and init-owned, and exposed endpoint-
+  driven restart as the public restart owner shape.
+- Phase 179 proved one explicit retained-state reload path on `log_service`
+  using a fixed-size service-owned snapshot and an init-owned reload call.
+- `kv_service` is the smallest current retained-state owner whose state is
+  directly user-facing rather than observational: keys, values, overwrite
+  semantics, missing-key behavior, and fixed-capacity exhaustion are all part
+  of the active shell-visible service model.
+- The repository still has no filesystem, persistence namespace, database,
+  general snapshot registry, or cross-service restart transaction model.
+- Phase 180 decided that the next honest frontier stays inside the service
+  system until a real admitted consumer makes second-target work the narrower
+  blocker.
+
+Problem being solved
+--------------------
+- The current retained-state result is still asymmetric: log state can survive
+  explicit restart, but key-value state resets to empty.
+- That asymmetry is still acceptable today, but it leaves one important
+  unanswered question: whether the Phase 179 restart-with-state shape can
+  carry a user-facing service owner without immediately exposing a deeper
+  identity, lifecycle, or policy mismatch.
+- If the answer is yes, then retained-state follow-through remains a simple
+  owner-local service concern rather than the start of a persistence
+  framework.
+- If the answer is no, the repository should name the first blocked boundary
+  explicitly instead of widening into packaging, storage, or a snapshot bus.
+
+Core rule
+---------
+- Choose one retained-state owner only: `kv_service`.
+- Keep the saved-state format explicit, bounded, and service-owned.
+- Keep restart policy explicit and init-owned.
+- Preserve the current service identity contract: endpoint ids stay stable
+  across restart; retained state survives only when init chooses an explicit
+  save-and-reload path.
+- Do not admit a filesystem API, persistence namespace, transaction model,
+  snapshot framework, supervisor, or compiler-facing expansion.
+- If the second retained-state owner exposes a new mismatch, name it
+  precisely rather than solving it with a broader framework.
+
+Chosen slice for this phase
+---------------------------
+1. one explicit bounded `kv_service` snapshot representation covering the
+   admitted retained user-facing state only
+2. one explicit `kv_service` reload helper that reconstructs state from that
+   representation under the existing fixed-capacity model
+3. one init-owned restart follow-through that reloads `kv_service` state
+   rather than resetting it to the empty baseline
+4. one live integration path showing that key-value state survives restart,
+   remains queryable through the existing shell-visible workflow, and can
+   continue to evolve afterwards under the current overwrite and exhaustion
+   semantics
+5. one explicit statement of whether the current service identity and restart
+   truth still hold cleanly once retained reload is no longer log-only
+
+What this phase should not do
+-----------------------------
+- no filesystem or durable persistence claim
+- no cross-service snapshot bundle or coordinated restart transaction
+- no dynamic service discovery or packaging work
+- no broader shell vocabulary, text protocol, or user-interface redesign
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Why this is the right placement
+-------------------------------
+- After Phase 179: the repository has one explicit retained-state reload path,
+  but still cannot say whether that shape generalizes past the easiest owner.
+- After Phase 180: retained-state follow-through is explicitly preferred over
+  portability work until the service-system frontier stops being the narrower
+  next owner.
+- Before any broader persistence or packaging discussion: one more retained-
+  state owner is the cheapest honest discriminator.
+
+Planning rule for this phase
+----------------------------
+- Prefer the smallest user-facing retained-state owner already in the system.
+- Preserve the current fixed-capacity, overwrite, missing-key, and exhausted
+  semantics unless the reload path proves one of them inconsistent.
+- Keep the implementation Ken-Thompson-simple: one saved record, one reload
+  helper, one init-owned restart path, one live workflow follow-through.
+- If the current explicit shape still works, say so directly.
+- If it breaks, name the narrowest blocked boundary instead of generalizing.
+
+What this phase should prove
+----------------------------
+- that the repository can carry retained-state reload for one user-facing
+  service without immediately widening into a persistence framework
+- that service identity, explicit restart truth, and bounded user state
+  either still compose honestly or expose one clearly named next boundary
+- that the service-system frontier chosen in Phase 180 leads to another real
+  implementation step rather than only to more classification

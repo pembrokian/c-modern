@@ -1,7 +1,7 @@
 import boot
+import init
 import kernel_dispatch
 import ipc
-import log_service
 import service_effect
 import service_identity
 import service_topology
@@ -56,20 +56,31 @@ func smoke_boot_refs_are_valid_and_distinct() bool {
     return true
 }
 
-// After a simulated restart the service ref is still valid.
-// The endpoint_id does not change; only retained state is lost.
-func smoke_ref_survives_restart_state_is_gone() bool {
+// After an explicit restart the service ref is still valid.
+// The endpoint_id does not change, and init may reload retained state.
+func smoke_ref_survives_restart_and_log_reload() bool {
+    state: boot.KernelBootState = boot.kernel_init()
     log_ref: service_identity.ServiceRef = boot.boot_log_ref()
+    append_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, build_serial_cmd(76, 65, 55, 33))
+    if service_effect.effect_reply_status(append_effect) != syscall.SyscallStatus.Ok {
+        return false
+    }
 
-    // Simulate restart: re-init the log service (state reset to empty).
-    restarted_state: log_service.LogServiceState = log_service.log_init(3, 1)
+    state = init.restart(state, service_identity.ref_endpoint(log_ref))
 
     // Ref is still valid after restart: endpoint_id unchanged.
     if !service_identity.ref_is_valid(log_ref) {
         return false
     }
-    // Restarted state has no retained entries.
-    if log_service.log_len(restarted_state) != 0 {
+
+    tail_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, build_serial_cmd(76, 84, 33, 33))
+    if service_effect.effect_reply_status(tail_effect) != syscall.SyscallStatus.Ok {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(tail_effect) != 1 {
+        return false
+    }
+    if service_effect.effect_reply_payload(tail_effect)[0] != 55 {
         return false
     }
     return true
@@ -105,7 +116,7 @@ func main() i32 {
     if !smoke_boot_refs_are_valid_and_distinct() {
         return 1
     }
-    if !smoke_ref_survives_restart_state_is_gone() {
+    if !smoke_ref_survives_restart_and_log_reload() {
         return 1
     }
     if !smoke_ref_is_idempotent() {

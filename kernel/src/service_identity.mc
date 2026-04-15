@@ -12,12 +12,13 @@
 //
 // What survives restart:
 //   - The endpoint_id in ServiceRef remains valid.
-//   - Any in-flight state (retained log entries, kv pairs) is lost.
+//   - Any retained state that init explicitly saves and reloads survives.
+//   - The current explicit reload path preserves log retained entries only.
 //   - Callers that retained their ServiceRef before restart may resume
 //     sending without reacquiring the ref.
 //
 // What does not survive restart:
-//   - Retained state (LogServiceState.retained, KvServiceState.keys/values).
+//   - Retained state with no explicit reload path (KvServiceState.keys/values).
 //   - Pending effects or in-flight message chains.
 //
 // Discovery and dynamic binding are explicitly ruled out in Phase 154.

@@ -3,7 +3,98 @@ Phase 179 -- Bounded Retained-State Reload Probe
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 179 landed as one explicit retained-state reload path without opening a
+filesystem, database, supervisor, or compiler-facing expansion.
+
+The landed slice chooses the narrowest real retained-state owner already in
+the system: `log_service`.
+
+- `kernel/src/log_service.mc` now owns one explicit bounded save
+  representation, `LogSnapshot`, plus two explicit helpers:
+  - `log_snapshot(state)` saves the retained log bytes and length
+  - `log_reload(pid, slot, snapshot)` reconstructs the service state from that
+    saved representation
+- `kernel/src/init.mc` remains the restart-policy owner and now uses the
+  explicit snapshot path in `restart_log()` rather than reinitializing the
+  log to an empty baseline
+- the live integration path in `kernel/src/scenarios.mc` now exercises the
+  retained reload result directly: the full retained log survives restart and
+  remains full afterwards
+- one new system fixture and workflow registration prove the more useful case
+  that a partially filled retained log survives restart and can continue to
+  grow after reload
+
+What did not change:
+
+- there is still no filesystem API, persistence namespace, or transaction
+  model
+- retained-state reload is still explicit and owner-local, not a framework
+- only `log_service` has a reload path; `kv_service` still resets on restart
+- no compiler, sema, MIR, backend, ABI, target, runtime, or hal expansion was
+  required
+
+Phase result
+------------
+The current service identity and init-owned restart model can carry one honest
+restart-with-state path at this scale.
+
+The key composition result is narrow and explicit:
+
+- endpoint identity still stays stable across restart
+- retained state survives only when init chooses an explicit save-and-reload
+  path
+- the first admitted retained-state reload path is log-only and bounded to
+  the existing four-byte retained buffer
+
+Implementation surfaces
+-----------------------
+The landed implementation changes are:
+
+1. `kernel/src/log_service.mc`
+   - add the explicit `LogSnapshot` representation
+   - add `log_snapshot(...)` and `log_reload(...)`
+
+2. `kernel/src/init.mc`
+   - keep restart policy init-owned
+   - change `restart_log()` from empty re-init to explicit snapshot reload
+
+3. `kernel/src/service_identity.mc`
+   - update the published restart contract so retained state is no longer
+     described as universally lost
+
+4. `kernel/src/scenarios.mc`
+   - make the live restart probe check retained reload directly
+
+5. `tests/system/kernel_reset_lane_phase179_retained_reload/`
+   - prove the partial-log restart-with-reload path on the real reset-lane
+     kernel path
+
+6. `tests/system/kernel_reset_lane_service_identity/`
+   - verify ServiceRef stability against the real restart-and-reload path
+
+7. `tests/system/kernel_reset_lane_long_lived_coherence/`
+   - narrow the older empty-baseline wording to fresh `kernel_init()` instead
+     of every restart path
+
+8. `tests/tool/tool_workflow_suite.cpp`
+   - register the new Phase 179 fixture in the workflow suite
+
+Why this landed shape is enough
+-------------------------------
+- It introduces real restart-with-state behavior, not just a proof-only note.
+- The saved-state format is explicit and fixed-size.
+- The reload owner is visible in source: `log_service` owns representation,
+  `init` owns restart policy.
+- The system stays Ken-Thompson-simple: one saved struct, one reload helper,
+  one restart owner, no framework.
+
+Validation
+----------
+- `mc_tool_workflow_unit`
 
 Purpose
 -------
@@ -30,8 +121,10 @@ This phase plan should stay aligned with:
 
 Repository status note
 ----------------------
-- Current restart semantics are explicit and truthful precisely because all
-  service state resets to a known empty baseline.
+- Current restart semantics are explicit and truthful precisely because restart
+  behavior is caller-visible and owner-local.
+- Before this phase, every admitted restart path reset service state to a
+  known empty baseline.
 - Current identity semantics are compile-time and runtime-local: a ServiceRef
   names a boot-wired endpoint, not a persisted object identity.
 - The repository still makes no persistence, packaging, loader, or filesystem

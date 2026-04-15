@@ -1,0 +1,103 @@
+Phase 185 -- IPC Shape Re-Audit Under Restart And Retained State
+================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Re-audit the current IPC and reply shape after restart identity, endpoint
+authority, and capability-lifetime pressure have been pushed harder, and
+decide what the first real IPC-owned mismatch actually is if one exists.
+
+This phase is intentionally not a payload-widening phase by default.
+It exists to stop the repository from widening IPC for the wrong reason.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase147_ipc_shape_audit_under_real_usage.txt`
+- `docs/plan/archive/phase158_cross_service_failure_semantics_consistency.txt`
+- `docs/plan/archive/phase159_observability_as_a_system_property.txt`
+- `docs/plan/archive/phase160_first_model_boundary_identification.txt`
+- `docs/plan/archive/phase161_per_send_delivery_witness.txt`
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase183_endpoint_ownership_and_authority_audit.txt`
+- `docs/plan/active/phase184_capability_propagation_and_leakage_probe.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The current IPC shape is still compact and explicit: receive, handle, one
+  effect, optional send, optional reply.
+- The shell-visible system already carries restart-sensitive and retained-
+  state-sensitive interactions.
+- Earlier IPC work named one model boundary around advisory-send visibility and
+  repaired it with the additive `send_dropped` witness.
+- The repository still has not justified wider payloads, typed message
+  algebra, reply correlation ids, or a transport rewrite.
+
+Problem being solved
+--------------------
+- New pressure may make the next IPC mismatch look superficially like payload
+  size when the real issue is identity continuity, restart visibility, reply
+  interpretation, or authority context.
+- Without a dedicated re-audit, the next broader IPC change could solve the
+  wrong problem.
+
+Core rule
+---------
+- Re-audit the current compact IPC shape against real admitted restart and
+  retained-state scenarios.
+- Do not widen payload width, add correlation ids, or add typed message
+  variants unless a concrete IPC-owned defect makes one of them the narrowest
+  honest repair.
+- Prefer naming the first real mismatch over pre-solving several possible
+  ones.
+
+Chosen slice for this phase
+---------------------------
+1. one interaction matrix over restart-sensitive and retained-state-sensitive
+   workflows asking whether the first visible mismatch is payload width,
+   message typing, reply interpretation, routing identity, authority context,
+   or restart visibility
+2. one explicit classification of what the current IPC shape still does well
+   and where it first becomes misleading under the newer pressure
+3. one bounded follow-through only if a concrete IPC-owned defect is found,
+   and only if that repair is narrower than broader identity or authority work
+4. one explicit statement of whether payload widening is still deferred for
+   the right reason
+
+What this phase should not do
+-----------------------------
+- no payload widening by default
+- no message bus or typed transport framework
+- no async or deferred-work subsystem
+- no broader shell redesign
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Why this is the right placement
+-------------------------------
+- After the identity and authority pressure wave, IPC can be judged against
+  sharper evidence instead of guessed future needs.
+- This keeps IPC growth evidence-driven and prevents premature subsystem
+  widening.
+
+Planning rule for this phase
+----------------------------
+- Ask what the first real mismatch is, not what the most ambitious IPC model
+  could be.
+- If the compact shape still holds, say so explicitly.
+- If a defect exists, keep the repair smaller than a transport redesign.
+
+What this phase should prove
+----------------------------
+- that the repository still knows why IPC is narrow and whether that reason is
+  still honest after restart and retained-state growth
+- that any future IPC widening will be tied to one named blocked path instead
+  of architectural drift
+- that service-system growth continues to sharpen the model rather than merely
+  enlarge it

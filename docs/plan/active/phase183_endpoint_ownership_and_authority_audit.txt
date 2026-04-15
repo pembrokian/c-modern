@@ -1,0 +1,106 @@
+Phase 183 -- Endpoint Ownership And Authority Audit
+==================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Clarify what endpoint ids mean in the current running system and what kind of
+authority, if any, they carry.
+
+The repository now has static boot-wired endpoint ids, ServiceRef wrappers,
+handle-based authority transfer, explicit restart, and growing retained-state
+pressure.  That is enough to ask a sharper question:
+
+are endpoint ids names, routing keys, authorities, or some split combination
+of those roles?
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/archive/phase148_authority_ergonomics_under_reuse.txt`
+- `docs/plan/active/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- `service_topology.mc` owns fixed endpoint ids and flat lookup helpers.
+- ServiceRef names boot-wired services through endpoint ids.
+- Capability and handle transfer already exist as explicit authority-bearing
+  surfaces.
+- Restart keeps endpoint ids stable today.
+- The repository still has no dynamic endpoint allocation, discovery, or
+  service registry.
+
+Problem being solved
+--------------------
+- Endpoint ids currently serve multiple practical roles at once:
+  topology constants, routing selectors, and public service names.
+- At the same time, handles and capabilities remain the intended explicit
+  authority surfaces.
+- Without one explicit audit, later work on restart, stale authority, service
+  graph growth, or dynamic topology pressure could blur naming and authority
+  into one accidental model.
+
+Core rule
+---------
+- Keep naming, routing, and authority distinct unless current code proves they
+  are intentionally the same.
+- Work from the admitted boot-wired system, not from hypothetical dynamic
+  endpoint allocation.
+- Do not introduce a new capability model, endpoint allocator, naming service,
+  or compiler-known endpoint type.
+- Do not widen compiler, sema, MIR, backend, ABI, target, runtime, or `hal`
+  surfaces.
+
+Chosen slice for this phase
+---------------------------
+1. one explicit ownership classification of endpoint ids across the current
+   system: who defines them, who routes on them, who may speak about them, and
+   whether knowing one conveys authority
+2. one comparison between ServiceRef, endpoint id, and handle-carried
+   authority under the current restart and topology rules
+3. one bounded follow-through only if the current source exposes a real owner
+   blur, such as moving one authority check or tightening one endpoint-facing
+   helper boundary
+4. one explicit statement of whether endpoint ids are currently best read as
+   stable public names, stable routing keys, authority-bearing values, or a
+   split contract with named authority elsewhere
+
+What this phase should not do
+-----------------------------
+- no dynamic topology work
+- no endpoint rebinding mechanism
+- no service registry or namespace framework
+- no new capability algebra
+- no compiler-facing endpoint feature
+
+Why this is the right placement
+-------------------------------
+- After Phase 182: restart identity continuity should already be named.
+- Before capability leakage and IPC restart-pressure audits: endpoint meaning
+  needs to be explicit.
+- This keeps the work inside the current service-system pressure rather than
+  widening into subsystem growth.
+
+Planning rule for this phase
+----------------------------
+- Prefer one clear classification over a new mechanism.
+- If a repair is needed, keep it owner-local and flat.
+- Preserve the current Ken-Thompson-simple shape: explicit constants,
+  explicit checks, explicit routing.
+
+What this phase should prove
+----------------------------
+- that the current endpoint model is either honest enough to carry more growth
+  or exposes one specifically named blur between naming and authority
+- that later retained-state, restart, and IPC phases can rely on a sharper
+  endpoint contract
+- that no larger topology or capability subsystem is needed by default

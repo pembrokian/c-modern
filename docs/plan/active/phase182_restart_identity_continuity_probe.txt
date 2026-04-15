@@ -1,0 +1,117 @@
+Phase 182 -- Restart Identity Continuity Probe
+==============================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Decide, after the planned key-value retained-state follow-through, what the
+current system honestly means by "the same service" across an explicit
+restart.
+
+The repository now has several ingredients that make this question real
+rather than speculative:
+
+- fixed boot-wired endpoint ids
+- stable ServiceRef wrappers over those endpoint ids
+- init-owned explicit restart
+- one retained-state reload path already landed for `log_service`
+- one planned second retained-state reload path for `kv_service`
+
+This phase asks whether those ingredients still describe one continuing
+service identity, or whether restart should be treated as replacement under a
+stable routing surface.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/archive/phase154_service_identity_and_addressing_semantics.txt`
+- `docs/plan/active/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/active/phase179_bounded_retained_state_reload_probe.txt`
+- `docs/plan/active/phase180_next_frontier_plateau_decision.txt`
+- `docs/plan/active/phase181_key_value_retained_state_reload_follow_through.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Restart is explicit and init-owned rather than hidden behind a supervisor.
+- ServiceRef currently wraps a stable endpoint id, not a persisted object
+  identity.
+- `log_service` already has one explicit restart-with-state path.
+- Phase 181 is expected to test whether that shape also carries one
+  user-facing retained-state owner.
+- The current topology is still static, boot-wired, and endpoint-stable.
+
+Problem being solved
+--------------------
+- The repository still lacks one explicit answer to whether restart means
+  continuity or replacement.
+- Stable endpoint ids and possible retained state survival can make restart
+  look like continuity to callers even if the service instance was rebuilt.
+- Without a named answer, later work on endpoint authority, stale handles,
+  IPC reply interpretation, or richer restart policy will drift.
+
+Core rule
+---------
+- Decide identity continuity from current owned behavior, not from abstract
+  process-model taste.
+- Keep routing identity, authority identity, and retained-state continuity
+  conceptually separate unless the source proves they are the same.
+- Do not admit dynamic discovery, rebinding, a supervisor, or a broader
+  service registry.
+- Do not widen compiler, sema, MIR, backend, ABI, target, runtime, or `hal`
+  surfaces.
+
+Chosen slice for this phase
+---------------------------
+1. one explicit classification of restart continuity over the admitted
+   restartable services: endpoint continuity, pid continuity, retained-state
+   continuity, and caller-visible availability
+2. one live restart probe showing whether a caller can distinguish restart
+   from uninterrupted availability under the current ServiceRef and shell-
+   visible paths
+3. one bounded follow-through only if the current contract is internally
+   ambiguous, such as tightening `service_identity.mc` wording or adding one
+   narrow caller-visible marker at the existing owner boundary
+4. one explicit statement of whether restart under stable endpoint ids should
+   currently be read as replacement, continuity, or a split contract where
+   routing continuity and service-instance continuity differ
+
+What this phase should not do
+-----------------------------
+- no dynamic endpoint rebinding
+- no service registry or naming service
+- no supervisor or restart queue
+- no filesystem or persistence expansion
+- no compiler-facing service identity feature
+
+Why this is the right placement
+-------------------------------
+- After Phase 181: the repository should know whether retained-state reload is
+  still log-only or now spans both observational and user-facing state.
+- Before endpoint authority or stale-handle work: the meaning of restart
+  continuity needs to be explicit first.
+- This stays inside the Phase 180 service-system frontier and does not widen
+  into target or portability work.
+
+Planning rule for this phase
+----------------------------
+- Prefer naming the current contract clearly over introducing a new mechanism.
+- If one bounded marker or wording repair is needed, keep it at the current
+  owner boundary.
+- If the current contract is already coherent, record that directly and stop.
+
+What this phase should prove
+----------------------------
+- that the repository can describe restart identity honestly under stable
+  routing and possible retained-state survival
+- that later authority and IPC phases will inherit one explicit continuity
+  contract instead of an accidental one
+- that the next service-system pressure can still be answered without a larger
+  framework

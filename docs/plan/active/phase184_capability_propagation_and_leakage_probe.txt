@@ -1,0 +1,105 @@
+Phase 184 -- Capability Propagation And Leakage Probe
+====================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Stress the current authority model under restart, retained-state continuity,
+and repeated interaction to find out whether stale or unintended authority can
+survive longer than the current model claims.
+
+This is not a new capability framework phase.
+It is the smallest honest follow-through after identity continuity and
+endpoint-authority clarification.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase118_request_reply_and_delegation_follow_through.txt`
+- `docs/plan/archive/phase124_delegation_chain_stress.txt`
+- `docs/plan/archive/phase125_invalidation_and_rejection_audit.txt`
+- `docs/plan/archive/phase126_authority_lifetime_classification.txt`
+- `docs/plan/active/phase177_shell_as_hostile_user_boundary.txt`
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase183_endpoint_ownership_and_authority_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has explicit handles, explicit invalidation, and one
+  delegated request-reply lineage.
+- Hostile shell pressure has already been tested at the syntax boundary.
+- Restart and retained-state work are making longer-lived service state more
+  realistic.
+- The current model still assumes that explicit authority stays explicit and
+  does not leak across restart or reuse by accident.
+
+Problem being solved
+--------------------
+- Once restart and retained state are more realistic, stale authority becomes
+  a more valuable thing to probe than another isolated happy-path feature.
+- The repository needs one explicit answer to whether restarted services,
+  stale handles, or repeated shell-visible interactions can accidentally carry
+  authority farther than intended.
+- Without this probe, later service growth may rest on an authority model that
+  is only partially audited under reuse.
+
+Core rule
+---------
+- Stress the current explicit authority model; do not replace it.
+- Keep authority in handles, capabilities, and named owners rather than in
+  ambient shortcuts.
+- Prefer stale-authority and cross-restart leakage patterns over broader new
+  capability features.
+- Do not add a new authority framework, borrow model, session model, or
+  compiler-facing capability feature.
+
+Chosen slice for this phase
+---------------------------
+1. one leakage matrix over the current admitted surfaces: stale handle after
+   restart, pre-restart versus post-restart authority visibility, repeated
+   delegated use, and hostile shell-visible interaction attempting to cross an
+   authority boundary it should not cross
+2. one explicit classification of which authority survives restart, which is
+   intentionally reconstructed, and which must be invalidated or become
+   unusable
+3. one bounded follow-through only if a concrete leakage or stale-authority
+   ambiguity is found, such as tightening one invalidation path or one restart
+   owner boundary
+4. one explicit statement of whether the current system's authority-lifetime
+   story still holds under retained-state growth
+
+What this phase should not do
+-----------------------------
+- no new capability types
+- no authority registry or ambient authority helper layer
+- no dynamic topology or discovery work
+- no supervisor, retry queue, or session framework
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Why this is the right placement
+-------------------------------
+- After endpoint meaning is named, leakage is the next honest pressure.
+- After hostile shell and retained-state work, stale authority is more likely
+  to reveal a real model edge than another isolated feature slice.
+- This stays squarely in the "what breaks first under growth" direction chosen
+  after Phase 180.
+
+Planning rule for this phase
+----------------------------
+- Prefer concrete stale-authority cases over abstract security language.
+- If no leakage exists, say so explicitly and stop.
+- If a leak exists, repair only the narrowest owner boundary that caused it.
+
+What this phase should prove
+----------------------------
+- that explicit authority still means explicit authority under restart and
+  reuse pressure
+- that hostile-user and retained-state follow-through have not created an
+  accidental authority channel
+- that later growth can continue without a larger capability subsystem

@@ -39,6 +39,8 @@ Record one maintained repository position after Phase 165 named the second repea
 Record one maintained repository position after Phase 166 repaired both second-boundary findings with service_topology.mc and event_codes.mc.
 Record one maintained repository position after Phase 176 admitted a fifth boot-wired echo service under explicit restart without widening the compiler or framework surfaces.
 Record one maintained repository position after Phase 177 hardened the shell as a hostile-user boundary with compact invalid classification and no payload-width or compiler expansion.
+Record one maintained repository position after Phase 178 kept topology and restart flat with one bounded structural follow-through.
+Record one maintained repository position after Phase 179 admitted one explicit retained-state reload path without opening persistence or compiler surfaces.
 
 This note answers four questions that now matter:
 
@@ -195,6 +197,7 @@ Current repository truth
 - The landed Phase 176 fifth-service growth step adds one boot-wired echo_service with bounded request-derived replies, explicit `Exhausted` pressure after four requests, and flat init-owned `restart_echo()` follow-through; this belongs to the same admitted running-system slice rather than to a routing framework, supervisor, persistence layer, or reopened compiler wave.
 - The landed Phase 177 hostile-user shell boundary step keeps the compact four-byte shell protocol but upgrades shell-owned invalid replies from a bare `?` to a two-byte classifier (`?C` unknown command, `?S` malformed admitted shape); valid peer-service failures remain peer-service owned; this belongs to the same admitted running-system slice rather than to wider payloads, a text shell, richer error objects, or a reopened compiler wave.
 - The landed Phase 178 topology and restart growth re-audit keeps the five-service system flat but adds one bounded structural follow-through: service_topology.mc now owns flat lookup helpers over the existing slot constants, and init.mc now owns endpoint-driven restart helpers over the admitted restartable services; this belongs to the same admitted running-system slice rather than to a routing table, supervisor, retry framework, or reopened compiler wave.
+- The landed Phase 179 bounded retained-state reload probe adds one explicit save-and-reload path for `log_service`: `log_service` owns the fixed-size `LogSnapshot` representation and `init.restart_log()` reloads that snapshot on restart; this belongs to the same admitted running-system slice rather than to a filesystem, persistence framework, packaging layer, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -311,9 +314,9 @@ What it still does not prove:
 
 Working engineering stance
 --------------------------
-The right stance after Phase 130 is still conservative.
-The current plateau carried forward by Phase 128 is still intentionally
-narrow.
+The right stance after Phase 180 is still conservative.
+The current plateau is intentionally narrow even after the post-Phase-174
+external-pressure wave.
 
 - treat the current core language as sufficient until a real next kernel step
   proves otherwise
@@ -325,6 +328,8 @@ narrow.
   better-defended running system
 - refuse claims that outrun the proof surface, especially on portability,
   packaging, loader scope, or service-management generality
+- keep second-target work deferred until a real admitted consumer makes it
+  the narrowest honest blocker rather than a classified future seam
 
 Assessment of the end-state architecture note
 ---------------------------------------------
@@ -355,28 +360,29 @@ What still needs discipline as implementation grows:
 
 Next milestone themes and work areas
 ------------------------------------
-The Phase 160–166 boundary-identification and repair wave established a
-repeatable two-phase method (name first, fix in the next phase).  The next
-milestones should apply that discipline to whatever the next real kernel step
-exposes.
+Phase 180 closes the first post-Phase-174 plateau decision explicitly:
+service-system growth remains the stronger next frontier, and bounded
+second-target portability work stays deferred.
 
-Recommended work themes after Phase 168:
+Recommended work themes after Phase 180:
 
-- const-eval first expansion: Phase 163 admitted scalar and aggregate const
-  linkage; Phase 169 should determine whether const function evaluation has
-  genuine current owner pressure or whether the current boundary is still
-  sufficient
-- static service topology elaboration: Phase 166 made topology a data
-  concept; Phase 170 should decide whether the topology warrants explicit
-  edges (growability) or stays as constants
-- generic monomorphization first slice: the repository defers generics, but
-  Phase 171 should measure whether one narrow monomorphization path is now
-  justified by the kernel or hosted slice
-- keep the two-phase boundary method: name before fixing; keep repairs scoped
-  by the named evidence, not by aspirational roadmap items
-- compiler boundary discipline: reopen sema, MIR, backend, ABI, or hal
-  surfaces only when the next real kernel or hosted proof exposes a concrete
-  owner gap
+- continue inside the service system: prefer the next phase to land on one
+  bounded service-growth, service-identity, retained-state, or user-facing
+  interaction pressure point rather than on second-target support
+- preserve flat explicit ownership: keep routing, restart, retained-state, and
+  shell behavior inside named owners instead of widening into a framework,
+  supervisor, persistence layer, or compiler-facing mechanism by default
+- keep the two-phase boundary method: when a new running-system distortion is
+  discovered, name it first and repair it in the next phase rather than
+  widening opportunistically
+- keep compiler boundary discipline: reopen sema, MIR, backend, ABI, target,
+  runtime, or `hal` surfaces only when the next real kernel or hosted proof
+  exposes a concrete owner gap that cannot be closed inside `kernel/src/`
+- keep second-target work on an explicit trigger only: reopen bounded
+  portability follow-through only when a real admitted consumer needs Linux
+  arm64 or another second target for behavior Darwin arm64 cannot supply
+  honestly, and when that pressure is stronger than any remaining owner-local
+  service-system question
 
 Deferred by default
 -------------------
@@ -429,5 +435,6 @@ Both statements are meaningful, but both remain intentionally narrow.
 The repository is beyond readiness and beyond pure proof sketches, yet still
 well short of a general kernel platform or a finished systems-language story.
 
-This position note was last refreshed at Phase 168 to reflect the post-Phase-166
-landing; the next refresh should follow the next evidence-driven plateau.
+This position note was refreshed at Phase 180 to reflect the post-Phase-179
+plateau decision; the next refresh should follow the next evidence-driven
+frontier choice or a later support-boundary change.

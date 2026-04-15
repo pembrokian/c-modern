@@ -222,38 +222,54 @@ func run_main(state: *boot.KernelBootState) i32 {
     return 0
 }
 
-// run_restart_probe verifies service restart: the log is exhausted after
-// run_main, init.restart_log replaces its state, and the log must then
-// accept a new append and report one retained entry.
+// run_restart_probe verifies two restart contracts on the live path:
+// log restart reloads the retained state snapshot exactly as saved, and echo
+// restart still resets its bounded request counter.
 func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.LOG_ENDPOINT_ID)
 
-    // After restart the log must accept a new append.
-    append_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_append(55))
-    if service_effect.effect_reply_status(append_effect) != syscall.SyscallStatus.Ok {
+    // The reloaded log stays full after restart because the retained entries
+    // were explicitly reloaded rather than discarded.
+    tail_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_tail())
+    if service_effect.effect_reply_status(tail_effect) != syscall.SyscallStatus.Ok {
         return 8
     }
-
-    // Tail must report exactly one retained entry.
-    tail_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_tail())
-    if service_effect.effect_reply_payload_len(tail_effect) != 1 {
+    if service_effect.effect_reply_payload_len(tail_effect) != 4 {
         return 9
+    }
+    tail_payload: [4]u8 = service_effect.effect_reply_payload(tail_effect)
+    if tail_payload[0] != 77 {
+        return 10
+    }
+    if tail_payload[1] != 75 {
+        return 11
+    }
+    if tail_payload[2] != 75 {
+        return 12
+    }
+    if tail_payload[3] != 75 {
+        return 13
+    }
+
+    append_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_append(55))
+    if service_effect.effect_reply_status(append_effect) != syscall.SyscallStatus.Exhausted {
+        return 14
     }
 
     *state = init.restart(*state, service_topology.ECHO_ENDPOINT_ID)
 
     echo_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(33, 44))
     if service_effect.effect_reply_status(echo_effect) != syscall.SyscallStatus.Ok {
-        return 12
+        return 15
     }
     if service_effect.effect_reply_payload_len(echo_effect) != 2 {
-        return 13
+        return 16
     }
     if service_effect.effect_reply_payload(echo_effect)[0] != 33 {
-        return 14
+        return 17
     }
     if service_effect.effect_reply_payload(echo_effect)[1] != 44 {
-        return 15
+        return 18
     }
 
     return 0
