@@ -226,7 +226,7 @@ func run_main(state: *boot.KernelBootState) i32 {
 // run_main, init.restart_log replaces its state, and the log must then
 // accept a new append and report one retained entry.
 func run_restart_probe(state: *boot.KernelBootState) i32 {
-    *state = init.restart_log(*state)
+    *state = init.restart(*state, service_topology.LOG_ENDPOINT_ID)
 
     // After restart the log must accept a new append.
     append_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_append(55))
@@ -240,7 +240,7 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
         return 9
     }
 
-    *state = init.restart_echo(*state)
+    *state = init.restart(*state, service_topology.ECHO_ENDPOINT_ID)
 
     echo_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(33, 44))
     if service_effect.effect_reply_status(echo_effect) != syscall.SyscallStatus.Ok {

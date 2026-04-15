@@ -3,7 +3,67 @@ Phase 178 -- Topology And Restart Growth Re-Audit
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Branch B (one bounded structural follow-through) landed without reopening a
+routing table, supervisor, retry framework, or any compiler-facing surface.
+
+The re-audit result is: the flat topology and flat init-owned restart model
+still hold at five services, but the first real post-Phase-176 growth pressure
+does justify one small owner-local structural addition in each surface.
+
+- `service_topology.mc` now owns three flat lookup helpers over the existing
+  five slot constants:
+  - `service_count()` returns the slot count as `usize`
+  - `service_slot_at(index)` enumerates the static slots in named order
+  - `service_slot_for_endpoint(endpoint)` maps a stable endpoint id back to
+    its slot record
+  - `service_slot_is_valid(slot)` makes the out-of-range sentinel explicit
+- `init.mc` keeps `restart_log()`, `restart_kv()`, and `restart_echo()` as the
+  explicit per-service policy surface, and now also owns:
+  - `can_restart(endpoint)` for a flat yes/no policy check
+  - `restart(state, endpoint)` for endpoint-driven caller-visible restart
+- `scenarios.mc` now uses the endpoint-driven restart entry in the live kernel
+  integration path, so the new shape is not test-only scaffolding
+- one new system fixture and workflow registration prove the new boundary on
+  the real reset-lane path: flat topology is enumerable, restartability stays
+  explicit and selective, and echo pressure is recoverable through the new
+  endpoint-driven restart entry
+
+What did not change:
+
+- topology is still fixed static wiring, not a routing table or service graph
+- restart policy is still init-owned and caller-driven, not a supervisor
+- serial and shell remain non-restartable in the current explicit policy model
+- no compiler, sema, MIR, backend, ABI, target, runtime, or hal expansion was
+  required
+
+Why this is enough
+------------------
+- At five services, readers now have one flat way to enumerate or look up the
+  static topology without inventing a data-driven router.
+- Restart policy can now be driven from an observed endpoint id without
+  widening into retry frameworks, service classes, or autonomous policy.
+- The admitted shape stays Ken-Thompson-simple: explicit slots, explicit
+  restartable endpoints, and explicit owner-local functions.
+
+Implementation files changed
+----------------------------
+- `kernel/src/service_topology.mc`
+- `kernel/src/init.mc`
+- `kernel/src/scenarios.mc`
+- `tests/system/kernel_reset_lane_phase178_topology_restart/`
+- `tests/tool/tool_workflow_suite.cpp`
+- `docs/plan/decision_log.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/admin/veya_running_system_support_statement.txt`
+- `docs/plan/admin/modern_c_veya_readiness_position.txt`
+
+Validation
+----------
+- `mc_tool_workflow_unit`
 
 Purpose
 -------

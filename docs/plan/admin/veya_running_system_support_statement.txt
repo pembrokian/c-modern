@@ -157,7 +157,8 @@ Frozen support matrix
   164 struct embedding deferral, Phase 165 second model boundary
   identification, Phase 166 service topology and event codes formalization,
   Phase 168 this support statement refresh, Phase 176 fifth-service growth
-  under explicit restart, and Phase 177 hostile-user shell boundary
+  under explicit restart, Phase 177 hostile-user shell boundary, and Phase
+  178 topology and restart growth re-audit
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,
@@ -231,7 +232,9 @@ neutral service topology module; one named event codes module; per-send
 delivery witness on the Effect type; named dispatch arms in the boot
 orchestrator; a scripted observation loop in scenarios.mc; a shell that
 classifies shell-owned hostile-user invalid commands as unknown command or
-malformed admitted shape; and a thin main.mc that is init plus one call.
+malformed admitted shape; flat topology lookup helpers over the five boot
+slots; an endpoint-driven init-owned restart entry for the admitted
+restartable services; and a thin main.mc that is init plus one call.
 
 The repository also provides the complete Phase 109–121 mechanism boundary
 and the Phase 122–177 authority, service, orchestration, and model-repair

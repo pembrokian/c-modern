@@ -15,6 +15,32 @@ import kv_service
 import log_service
 import service_topology
 
+func can_restart(endpoint: u32) bool {
+    if endpoint == service_topology.LOG_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == service_topology.KV_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == service_topology.ECHO_ENDPOINT_ID {
+        return true
+    }
+    return false
+}
+
+func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
+    if endpoint == service_topology.LOG_ENDPOINT_ID {
+        return restart_log(state)
+    }
+    if endpoint == service_topology.KV_ENDPOINT_ID {
+        return restart_kv(state)
+    }
+    if endpoint == service_topology.ECHO_ENDPOINT_ID {
+        return restart_echo(state)
+    }
+    return state
+}
+
 func restart_log(state: boot.KernelBootState) boot.KernelBootState {
     log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
     return boot.bootwith_log(state, log_service.log_init(log_slot.pid, 1))

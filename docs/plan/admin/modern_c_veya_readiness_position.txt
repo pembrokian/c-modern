@@ -194,6 +194,7 @@ Current repository truth
 - The landed Phase 166 repair introduced service_topology.mc (initially four endpoint ID constants, later extended by Phase 176 to five, still with no service imports) and event_codes.mc (six event code constants, no imports); shell_service.mc is now topology-neutral; nine system test fixtures dropped local constant duplicates; serial_shell_event_log.mc switched to a slots: [4]u32 array with a for loop; serial_on_receive was also rewritten as a for loop per the style guide.
 - The landed Phase 176 fifth-service growth step adds one boot-wired echo_service with bounded request-derived replies, explicit `Exhausted` pressure after four requests, and flat init-owned `restart_echo()` follow-through; this belongs to the same admitted running-system slice rather than to a routing framework, supervisor, persistence layer, or reopened compiler wave.
 - The landed Phase 177 hostile-user shell boundary step keeps the compact four-byte shell protocol but upgrades shell-owned invalid replies from a bare `?` to a two-byte classifier (`?C` unknown command, `?S` malformed admitted shape); valid peer-service failures remain peer-service owned; this belongs to the same admitted running-system slice rather than to wider payloads, a text shell, richer error objects, or a reopened compiler wave.
+- The landed Phase 178 topology and restart growth re-audit keeps the five-service system flat but adds one bounded structural follow-through: service_topology.mc now owns flat lookup helpers over the existing slot constants, and init.mc now owns endpoint-driven restart helpers over the admitted restartable services; this belongs to the same admitted running-system slice rather than to a routing table, supervisor, retry framework, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -218,9 +219,10 @@ It means:
 - explicit boot, user entry, IPC, authority transfer, spawn, wait, sleep or
   wake, bounded init-owned service orchestration, a bounded namespace
   answer, named dispatch topology, per-send delivery witnessing, explicit
-  event code ownership, one fifth boot-wired echo-service pressure step, and
-  compact shell-owned hostile-user invalid classification are now real inside
-  that slice
+  event code ownership, one fifth boot-wired echo-service pressure step,
+  compact shell-owned hostile-user invalid classification, flat topology
+  lookup over the five boot-wired slots, and endpoint-driven explicit restart
+  over the admitted restartable services are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
