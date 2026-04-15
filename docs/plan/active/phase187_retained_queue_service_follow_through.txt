@@ -3,7 +3,55 @@ Phase 187 -- Retained Queue Service Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 187 landed as one new retained-state owner-local service expansion.
+
+`queue_service` now joins `log_service` and `kv_service` as an explicit
+restart-with-reload owner, but the implementation stays flat and local:
+
+- `kernel/src/queue_service.mc` owns one bounded FIFO with explicit enqueue,
+  dequeue, full, empty, snapshot, and reload behavior
+- `service_topology.mc` classifies the queue endpoint as a reload-class boot-
+  wired service under the existing Phase 186 lifecycle split
+- `boot.mc`, `kernel_dispatch.mc`, `shell_service.mc`, and
+  `serial_protocol.mc` admit the new queue path without widening the effect
+  model, shell transport, or dispatch shape
+- `init.restart(state, endpoint)` now reloads queue state explicitly through
+  `restart_queue(...)`
+- `scenarios.mc` proves both live queue traffic and post-restart preserved
+  ordering on the repository-owned kernel path
+- `tests/system/kernel_reset_lane_phase187_retained_queue_reload/` adds the
+  focused user-facing follow-through: full-before-restart, preserved FIFO
+  order after restart, and explicit empty truth after consumption
+
+What did not change:
+
+- no mailbox subsystem, async receive, scheduler work queue, or persistence
+  framework
+- no shell protocol redesign beyond one compact queue command family
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Phase result
+------------
+The current retained-state reload model is not limited to append-only or
+key-addressed owners.
+
+One bounded FIFO owner fits the same explicit pattern cleanly:
+
+- queue ordering remains owner-local to `queue_service`
+- dequeue remains destructive and explicit
+- full and empty remain ordinary reply consequences rather than a broader
+  queue framework
+- restart classification stays static in `service_topology`
+- restart enactment stays explicit in `init`
+
+Validation
+----------
+- `Build debug`
+- `mc_tool_workflow_unit`
 
 Purpose
 -------
@@ -35,6 +83,8 @@ Repository status note
 ----------------------
 - The repository already has two explicit retained-state reload owners:
   `log_service` and `kv_service`.
+- Phase 186 already fixed the lifecycle-owner split: static restart class is
+  topology-owned, while restart enactment remains init-owned.
 - Both of those owners retain state across restart, but neither yet answers a
   different user-facing pressure: ordered retained elements with destructive
   read semantics.

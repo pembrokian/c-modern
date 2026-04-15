@@ -206,6 +206,8 @@ Current repository truth
 - The landed Phase 183 endpoint ownership and authority audit makes the endpoint-name contract explicit in code: boot-wired endpoint ids are stable public names and routing keys, not capability authority tokens; this belongs to the same admitted running-system slice rather than to a naming service, dynamic topology framework, or reopened compiler wave.
 - The landed Phase 184 capability propagation and leakage probe tightens the current authority boundary without widening it: non-zero `ReceiveObservation` handle metadata is now rejected with `InvalidCapability` at the dispatch gateway before endpoint-name routing, so stale or injected handle-bearing traffic cannot cross restart or reuse pressure as ambient authority; this belongs to the same admitted running-system slice rather than to a capability subsystem, authority registry, or reopened compiler wave.
 - The landed Phase 185 IPC shape re-audit keeps that authority gate as the default ordinary-message rule but admits one explicit transferred-handle exception: one transfer-only endpoint, one boot-owned monotonic grant table, and one bounded transfer_service follow-through path. This still belongs to the same admitted running-system slice rather than to a broader capability framework, typed transport redesign, payload widening wave, or reopened compiler wave.
+- The landed Phase 186 boot decomposition and lifecycle audit keeps the current flat split but repairs one owner blur: static restart classification now lives in `service_topology.mc`, while explicit restart enactment stays in `init.mc`; this belongs to the same admitted running-system slice rather than to a supervisor, lifecycle subsystem, or reopened compiler wave.
+- The landed Phase 187 retained queue service follow-through adds one bounded FIFO owner with explicit full, empty, dequeue, snapshot, and reload truth under that same lifecycle split; this belongs to the same admitted running-system slice rather than to a mailbox subsystem, persistence framework, queue framework, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -232,9 +234,10 @@ It means:
   answer, named dispatch topology, per-send delivery witnessing, explicit
   event code ownership, one fifth boot-wired echo-service pressure step,
   compact shell-owned hostile-user invalid classification, flat topology
-  lookup over the five boot-wired slots, endpoint-driven explicit restart
-  over the admitted restartable services, and explicit retained-state reload
-  for both `log_service` and `kv_service` are now real inside that slice
+  lookup plus static restart classification over the boot-wired slots,
+  endpoint-driven explicit restart over the admitted restartable services,
+  and explicit retained-state reload for `log_service`, `kv_service`, and
+  `queue_service` are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
@@ -433,9 +436,10 @@ chase speculative language machinery.
 Bottom line
 -----------
 Veya should currently be described as a bounded small running system over a
-real microkernel artifact with an interactive serial-shell service set, named
-service topology, named event codes, a per-send delivery witness, and a
-scripted observation loop that keeps main.mc to four lines.
+real microkernel artifact with an interactive serial-shell service set,
+named service topology and restart classification, named event codes, a
+per-send delivery witness, and a scripted observation loop that keeps
+main.mc to four lines.
 
 Modern C should currently be described as capable of carrying that kernel and
 running-system slice through the current admitted language surface.
@@ -444,6 +448,7 @@ Both statements are meaningful, but both remain intentionally narrow.
 The repository is beyond readiness and beyond pure proof sketches, yet still
 well short of a general kernel platform or a finished systems-language story.
 
-This position note was refreshed at Phase 180 to reflect the post-Phase-179
-plateau decision; the next refresh should follow the next evidence-driven
-frontier choice or a later support-boundary change.
+This position note was refreshed at Phase 187 to reflect the landed queue
+service follow-through and the Phase 186 lifecycle-owner repair; the next
+refresh should follow the next evidence-driven frontier choice or a later
+support-boundary change.

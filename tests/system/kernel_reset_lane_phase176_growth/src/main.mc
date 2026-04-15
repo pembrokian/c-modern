@@ -10,9 +10,9 @@ func cmd(payload: [4]u8) syscall.ReceiveObservation {
     return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: service_topology.SERIAL_ENDPOINT_ID, source_pid: 1, payload_len: 4, received_handle_slot: 0, received_handle_count: 0, payload: payload }
 }
 
-func smoke_fifth_service_is_named() bool {
+func smoke_echo_service_is_named() bool {
     echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
-    if service_topology.SERVICE_COUNT != 6 {
+    if service_topology.SERVICE_COUNT != 7 {
         return false
     }
     if echo_slot.endpoint != service_topology.ECHO_ENDPOINT_ID {
@@ -84,7 +84,7 @@ func smoke_echo_pressure_and_restart() bool {
 }
 
 func main() i32 {
-    if smoke_fifth_service_is_named() == false {
+    if smoke_echo_service_is_named() == false {
         return 1
     }
     if smoke_echo_route_round_trip() == false {

@@ -20,10 +20,12 @@ const CMD_L: u8 = 76   // 'L'
 const CMD_A: u8 = 65   // 'A'
 const CMD_T: u8 = 84   // 'T'
 const CMD_K: u8 = 75   // 'K'
+const CMD_Q: u8 = 81   // 'Q'
 const CMD_E: u8 = 69   // 'E'
 const CMD_S: u8 = 83   // 'S'
 const CMD_G: u8 = 71   // 'G'
 const CMD_C: u8 = 67   // 'C' — count
+const CMD_D: u8 = 68   // 'D' — dequeue
 const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
 
 func encode_echo(left: u8, right: u8) [4]u8 {
@@ -48,4 +50,12 @@ func encode_kv_get(key: u8) [4]u8 {
 
 func encode_kv_count() [4]u8 {
     return ipc.payload_byte(CMD_K, CMD_C, CMD_BANG, CMD_BANG)
+}
+
+func encode_queue_enqueue(value: u8) [4]u8 {
+    return ipc.payload_byte(CMD_Q, CMD_A, value, CMD_BANG)
+}
+
+func encode_queue_dequeue() [4]u8 {
+    return ipc.payload_byte(CMD_Q, CMD_D, CMD_BANG, CMD_BANG)
 }

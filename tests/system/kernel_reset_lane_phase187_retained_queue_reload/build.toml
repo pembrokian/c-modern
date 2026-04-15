@@ -1,0 +1,16 @@
+schema = 1
+project = "kernel-reset-lane-phase187-retained-queue-reload"
+default = "app"
+
+[targets.app]
+kind = "exe"
+package = "app"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.app.search_paths]
+modules = ["src", "__KERNEL_NEW_SRC__"]
+
+[targets.app.runtime]
+startup = "default"

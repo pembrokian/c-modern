@@ -101,7 +101,7 @@ void RunKernelResetLaneScenario(const std::filesystem::path& source_root,
     ExpectKernelResetLaneRunSuccess(scenario, run_outcome, run_output);
 }
 
-constexpr std::array<ResetLaneScenario, 26> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 27> kResetLaneScenarios = {{
     {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run"},
     {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run"},
     {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run"},
@@ -128,6 +128,7 @@ constexpr std::array<ResetLaneScenario, 26> kResetLaneScenarios = {{
     {"phase 183 endpoint authority", "tests/system/kernel_reset_lane_phase183_endpoint_authority", "kernel_reset_lane_phase183_endpoint_authority_project", "kernel_reset_lane_phase183_endpoint_authority_build", "app", "kernel_reset_lane_phase183_endpoint_authority_build_output.txt", "kernel_reset_lane_phase183_endpoint_authority_run_output.txt", "kernel reset lane phase 183 endpoint authority build", "kernel reset lane phase 183 endpoint authority run"},
     {"phase 184 capability leakage", "tests/system/kernel_reset_lane_phase184_capability_leakage", "kernel_reset_lane_phase184_capability_leakage_project", "kernel_reset_lane_phase184_capability_leakage_build", "app", "kernel_reset_lane_phase184_capability_leakage_build_output.txt", "kernel_reset_lane_phase184_capability_leakage_run_output.txt", "kernel reset lane phase 184 capability leakage build", "kernel reset lane phase 184 capability leakage run"},
     {"phase 185 transferred handle", "tests/system/kernel_reset_lane_phase185_transferred_handle", "kernel_reset_lane_phase185_transferred_handle_project", "kernel_reset_lane_phase185_transferred_handle_build", "app", "kernel_reset_lane_phase185_transferred_handle_build_output.txt", "kernel_reset_lane_phase185_transferred_handle_run_output.txt", "kernel reset lane phase 185 transferred handle build", "kernel reset lane phase 185 transferred handle run"},
+    {"phase 187 retained queue reload", "tests/system/kernel_reset_lane_phase187_retained_queue_reload", "kernel_reset_lane_phase187_retained_queue_reload_project", "kernel_reset_lane_phase187_retained_queue_reload_build", "app", "kernel_reset_lane_phase187_retained_queue_reload_build_output.txt", "kernel_reset_lane_phase187_retained_queue_reload_run_output.txt", "kernel reset lane phase 187 retained queue reload build", "kernel reset lane phase 187 retained queue reload run"},
 }};
 
 }  // namespace

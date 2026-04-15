@@ -21,11 +21,12 @@ import service_identity
 import service_topology
 import syscall
 
-const STEP_COUNT: usize = 27
+const STEP_COUNT: usize = 31
 
 enum StepCheckKind {
     Routed,
     Status,
+    Payload0,
     Payload1,
     LogTailState,
     ReplyLen,
@@ -84,6 +85,14 @@ func cmd_kv_get(key: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_kv_get(key))
 }
 
+func cmd_queue_enqueue(value: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_queue_enqueue(value))
+}
+
+func cmd_queue_dequeue() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_queue_dequeue())
+}
+
 func kv_count_obs(pid: u32) syscall.ReceiveObservation {
     return serial_obs(service_topology.SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
 }
@@ -104,6 +113,10 @@ func payload1_step(obs: syscall.ReceiveObservation, failure_code: i32, status: s
     return step(obs, failure_code, StepCheck{ kind: StepCheckKind.Payload1, status: status, reply_len: 0, payload0: 0, payload1: payload1, log_len: 0, send_dropped: 0 })
 }
 
+func payload0_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, payload0: u8) StepSpec {
+    return step(obs, failure_code, StepCheck{ kind: StepCheckKind.Payload0, status: status, reply_len: 0, payload0: payload0, payload1: 0, log_len: 0, send_dropped: 0 })
+}
+
 func log_tail_state_step(obs: syscall.ReceiveObservation, failure_code: i32, status: syscall.SyscallStatus, payload0: u8, payload1: u8) StepSpec {
     return step(obs, failure_code, StepCheck{ kind: StepCheckKind.LogTailState, status: status, reply_len: 0, payload0: payload0, payload1: payload1, log_len: 0, send_dropped: 0 })
 }
@@ -120,8 +133,8 @@ func witness_step(obs: syscall.ReceiveObservation, failure_code: i32, status: sy
     return step(obs, failure_code, StepCheck{ kind: StepCheckKind.Witness, status: status, reply_len: 0, payload0: 0, payload1: 0, log_len: 0, send_dropped: send_dropped })
 }
 
-func step_table() [27]StepSpec {
-    specs: [27]StepSpec
+func step_table() [31]StepSpec {
+    specs: [31]StepSpec
 
     specs[0] = routed_step(cmd_log_append(77), 1)
     specs[1] = routed_step(cmd_kv_set(5, 42), 1)
@@ -150,6 +163,10 @@ func step_table() [27]StepSpec {
     specs[24] = reply_len_step(cmd_echo(3, 4), 10, syscall.SyscallStatus.Ok, 2)
     specs[25] = reply_len_step(cmd_echo(5, 6), 10, syscall.SyscallStatus.Ok, 2)
     specs[26] = status_step(cmd_echo(9, 10), 11, syscall.SyscallStatus.Exhausted)
+    specs[27] = status_step(cmd_queue_enqueue(41), 40, syscall.SyscallStatus.Ok)
+    specs[28] = status_step(cmd_queue_enqueue(42), 40, syscall.SyscallStatus.Ok)
+    specs[29] = payload0_step(cmd_queue_dequeue(), 40, syscall.SyscallStatus.Ok, 41)
+    specs[30] = payload0_step(cmd_queue_dequeue(), 40, syscall.SyscallStatus.Ok, 42)
 
     return specs
 }
@@ -165,6 +182,12 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
         return 0
     }
     if check.kind == StepCheckKind.Status {
+        return 1
+    }
+    if check.kind == StepCheckKind.Payload0 {
+        if service_effect.effect_reply_payload(effect)[0] != check.payload0 {
+            return 0
+        }
         return 1
     }
     if check.kind == StepCheckKind.Payload1 {
@@ -211,7 +234,7 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
 }
 
 func run_main(state: *boot.KernelBootState) i32 {
-    specs: [27]StepSpec = step_table()
+    specs: [31]StepSpec = step_table()
 
     for step in 0..STEP_COUNT {
         spec: StepSpec = specs[step]
@@ -325,6 +348,78 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
         return 31
     }
 
+    queue_before: service_identity.ServiceMark = boot.boot_queue_mark(*state)
+    queue_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_enqueue(61))
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.Ok {
+        return 40
+    }
+    queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_enqueue(62))
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.Ok {
+        return 41
+    }
+    queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_enqueue(63))
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.Ok {
+        return 42
+    }
+
+    *state = init.restart(*state, service_topology.QUEUE_ENDPOINT_ID)
+    queue_after: service_identity.ServiceMark = boot.boot_queue_mark(*state)
+
+    if !service_identity.marks_same_endpoint(queue_before, queue_after) {
+        return 43
+    }
+    if !service_identity.marks_same_pid(queue_before, queue_after) {
+        return 44
+    }
+    if service_identity.marks_same_instance(queue_before, queue_after) {
+        return 45
+    }
+    if service_identity.mark_generation(queue_after) != service_identity.mark_generation(queue_before) + 1 {
+        return 46
+    }
+
+    queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.Ok {
+        return 47
+    }
+    if service_effect.effect_reply_payload(queue_effect)[0] != 61 {
+        return 48
+    }
+
+    queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.Ok {
+        return 49
+    }
+    if service_effect.effect_reply_payload(queue_effect)[0] != 62 {
+        return 50
+    }
+
+    queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_enqueue(64))
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.Ok {
+        return 51
+    }
+
+    queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.Ok {
+        return 52
+    }
+    if service_effect.effect_reply_payload(queue_effect)[0] != 63 {
+        return 53
+    }
+
+    queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.Ok {
+        return 54
+    }
+    if service_effect.effect_reply_payload(queue_effect)[0] != 64 {
+        return 55
+    }
+
+    queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
+    if service_effect.effect_reply_status(queue_effect) != syscall.SyscallStatus.InvalidArgument {
+        return 56
+    }
+
     echo_before: service_identity.ServiceMark = boot.boot_echo_mark(*state)
     *state = init.restart(*state, service_topology.ECHO_ENDPOINT_ID)
     echo_after: service_identity.ServiceMark = boot.boot_echo_mark(*state)
@@ -344,16 +439,16 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
 
     echo_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(33, 44))
     if service_effect.effect_reply_status(echo_effect) != syscall.SyscallStatus.Ok {
-        return 36
+        return 57
     }
     if service_effect.effect_reply_payload_len(echo_effect) != 2 {
-        return 37
+        return 58
     }
     if service_effect.effect_reply_payload(echo_effect)[0] != 33 {
-        return 38
+        return 59
     }
     if service_effect.effect_reply_payload(echo_effect)[1] != 44 {
-        return 39
+        return 60
     }
 
     return 0

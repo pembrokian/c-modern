@@ -9,7 +9,7 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 185 does and does not support.
+through Phase 187 does and does not support.
 
 This is the current refreshed running-system statement.  It supersedes the
 earlier Phase 120 through Phase 121 statement and reflects the post-Phase-185
@@ -101,12 +101,17 @@ Repository status note
   admitting one explicit transferred-handle path through a transfer-only
   endpoint, one boot-owned monotonic grant table, and one bounded transfer
   service.
+- Phase 186 moves static restart classification to service_topology.mc while
+  keeping restart enactment explicit and init-owned.
+- Phase 187 adds one bounded retained `queue_service` with explicit FIFO,
+  full, empty, snapshot, and reload behavior under that same flat lifecycle
+  split.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 109 through Phase 185 running-system slice,
+- State only the admitted Phase 109 through Phase 187 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
@@ -131,8 +136,10 @@ Frozen support matrix
   overwrite-on-full plus one explicit retained-state snapshot/reload path via
   init-owned restart; kv_service with bounded in-memory key-value state,
   kv-count query, and one explicit retained-state snapshot/reload path via
-  init-owned restart; echo_service with bounded request-derived replies and
-  explicit exhaustion after four uses; transfer_service as one bounded
+  init-owned restart; queue_service with bounded FIFO state, explicit full or
+  empty consequences, and one explicit retained-state snapshot/reload path
+  via init-owned restart; echo_service with bounded request-derived replies
+  and explicit exhaustion after four uses; transfer_service as one bounded
   transferred-handle consumer that performs one follow-through send;
   shell_service as a stateless
   command-routing owner with compact hostile-user invalid classification
@@ -141,10 +148,11 @@ Frozen support matrix
   outside ordinary named messaging and are rejected at the dispatch gateway
   with `InvalidCapability` unless they target the explicit transfer endpoint
 - admitted topology boundary: service_topology.mc owns SERIAL_ENDPOINT_ID,
-  SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, KV_ENDPOINT_ID, ECHO_ENDPOINT_ID, and
-  TRANSFER_ENDPOINT_ID as the neutral topology module with no service
-  imports; shell_service.mc is topology-neutral; kernel_dispatch routes
-  through named arms referencing service_topology
+  SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, KV_ENDPOINT_ID, ECHO_ENDPOINT_ID,
+  TRANSFER_ENDPOINT_ID, and QUEUE_ENDPOINT_ID as the neutral topology module
+  with no service imports; shell_service.mc is topology-neutral;
+  service_topology also owns static restart classification; kernel_dispatch
+  routes through named arms referencing service_topology
 - admitted event codes boundary: event_codes.mc owns EVENT_SERIAL_BUFFERED
   through EVENT_SERIAL_CLEARED; serial_shell_event_log.mc is a ring-buffer
   sink consuming those codes from real effects
@@ -184,8 +192,10 @@ Frozen support matrix
   topology and restart growth re-audit, Phase 179 bounded retained-state
   reload probe, Phase 181 key-value retained-state reload follow-through,
   Phase 182 restart identity continuity, Phase 183 endpoint ownership and
-  authority audit, Phase 184 capability propagation and leakage probe, and
-  Phase 185 IPC shape re-audit under restart and retained state
+  authority audit, Phase 184 capability propagation and leakage probe, Phase
+  185 IPC shape re-audit under restart and retained state, Phase 186 boot
+  decomposition and lifecycle audit, and Phase 187 retained queue service
+  follow-through
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,
@@ -254,7 +264,7 @@ Practical support statement
 ---------------------------
 The current repository can honestly claim one bounded running-system support
 statement over the repository-owned Veya kernel artifact: one interactive
-serial-shell system with log, kv, echo, transfer, shell, and serial
+serial-shell system with log, kv, queue, echo, transfer, shell, and serial
 services; one named neutral service topology module; one named event codes
 module; per-send
 delivery witness on the Effect type; named dispatch arms in the boot

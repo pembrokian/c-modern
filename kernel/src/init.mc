@@ -17,6 +17,7 @@ import boot
 import echo_service
 import kv_service
 import log_service
+import queue_service
 import service_topology
 import transfer_service
 
@@ -29,6 +30,9 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
     }
     if endpoint == service_topology.KV_ENDPOINT_ID {
         return restart_kv(state)
+    }
+    if endpoint == service_topology.QUEUE_ENDPOINT_ID {
+        return restart_queue(state)
     }
     if endpoint == service_topology.ECHO_ENDPOINT_ID {
         return restart_echo(state)
@@ -49,6 +53,12 @@ func restart_kv(state: boot.KernelBootState) boot.KernelBootState {
     kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
     snap: kv_service.KvSnapshot = kv_service.kv_snapshot(state.kv.state)
     return boot.bootrestart_kv(state, kv_service.kv_reload(kv_slot.pid, 1, snap))
+}
+
+func restart_queue(state: boot.KernelBootState) boot.KernelBootState {
+    queue_slot: service_topology.ServiceSlot = service_topology.QUEUE_SLOT
+    snap: queue_service.QueueSnapshot = queue_service.queue_snapshot(state.queue.state)
+    return boot.bootrestart_queue(state, queue_service.queue_reload(queue_slot.pid, 1, snap))
 }
 
 func restart_echo(state: boot.KernelBootState) boot.KernelBootState {

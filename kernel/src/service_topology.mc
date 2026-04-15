@@ -1,6 +1,6 @@
 // Service topology: stable endpoint addressing and service-slot records for
-// the kernel boot image.  This module owns the four endpoint IDs and the
-// four ServiceSlot constants that name the static wiring (endpoint, owner
+// the kernel boot image.  This module owns the boot-wired endpoint IDs and
+// the ServiceSlot constants that name the static wiring (endpoint, owner
 // pid) for each boot service.  It has no service imports, so both boot.mc
 // (which constructs services) and shell_service.mc (which sends to services)
 // can import it without a circular dependency.
@@ -34,6 +34,7 @@ const LOG_ENDPOINT_ID: u32 = 12
 const KV_ENDPOINT_ID: u32 = 13
 const ECHO_ENDPOINT_ID: u32 = 14
 const TRANSFER_ENDPOINT_ID: u32 = 15
+const QUEUE_ENDPOINT_ID: u32 = 16
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -55,13 +56,14 @@ const LOG_SLOT: ServiceSlot = ServiceSlot{ endpoint: LOG_ENDPOINT_ID, pid: 3 }
 const KV_SLOT: ServiceSlot = ServiceSlot{ endpoint: KV_ENDPOINT_ID, pid: 4 }
 const ECHO_SLOT: ServiceSlot = ServiceSlot{ endpoint: ECHO_ENDPOINT_ID, pid: 5 }
 const TRANSFER_SLOT: ServiceSlot = ServiceSlot{ endpoint: TRANSFER_ENDPOINT_ID, pid: 6 }
+const QUEUE_SLOT: ServiceSlot = ServiceSlot{ endpoint: QUEUE_ENDPOINT_ID, pid: 7 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 6
+const SERVICE_COUNT: u32 = 7
 
 func service_count() usize {
-    return 6
+    return 7
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -82,6 +84,9 @@ func service_slot_at(index: usize) ServiceSlot {
     }
     if index == 5 {
         return TRANSFER_SLOT
+    }
+    if index == 6 {
+        return QUEUE_SLOT
     }
     return ServiceSlot{ endpoint: 0, pid: 0 }
 }
@@ -104,6 +109,9 @@ func service_slot_for_endpoint(endpoint: u32) ServiceSlot {
     }
     if endpoint == TRANSFER_ENDPOINT_ID {
         return TRANSFER_SLOT
+    }
+    if endpoint == QUEUE_ENDPOINT_ID {
+        return QUEUE_SLOT
     }
     return ServiceSlot{ endpoint: 0, pid: 0 }
 }
@@ -131,6 +139,9 @@ func service_restart_mode(endpoint: u32) ServiceRestartMode {
     if endpoint == TRANSFER_ENDPOINT_ID {
         return ServiceRestartMode.Reset
     }
+    if endpoint == QUEUE_ENDPOINT_ID {
+        return ServiceRestartMode.Reload
+    }
     return ServiceRestartMode.None
 }
 
@@ -149,7 +160,7 @@ func service_restart_reloads_state(endpoint: u32) bool {
 }
 
 // endpoint_is_boot_wired returns true when the endpoint id names one of the
-// five statically wired boot services.  This is the explicit addressing
+// boot-wired public services.  This is the explicit addressing
 // gate: the dispatcher uses this to separate known public names from unknown
 // ids before any service-specific routing.  All boot-wired endpoints are
 // publicly addressable.
@@ -170,6 +181,9 @@ func endpoint_is_boot_wired(endpoint: u32) bool {
         return true
     }
     if endpoint == TRANSFER_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == QUEUE_ENDPOINT_ID {
         return true
     }
     return false

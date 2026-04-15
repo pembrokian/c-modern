@@ -12,6 +12,7 @@ import event_codes
 import kv_service
 import log_service
 import primitives
+import queue_service
 import serial_shell_path
 import service_effect
 import service_topology
@@ -62,6 +63,11 @@ func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Mess
     }
     if msg.endpoint_id == service_topology.KV_ENDPOINT_ID {
         return kernel_dispatch_kv(state, msg)
+    }
+    if msg.endpoint_id == service_topology.QUEUE_ENDPOINT_ID {
+        queue_result: queue_service.QueueResult = queue_service.handle(current.queue.state, msg)
+        *state = boot.bootwith_queue(current, queue_result.state)
+        return queue_result.effect
     }
     if msg.endpoint_id == service_topology.ECHO_ENDPOINT_ID {
         echo_result: echo_service.EchoResult = echo_service.handle(current.echo.state, msg)
