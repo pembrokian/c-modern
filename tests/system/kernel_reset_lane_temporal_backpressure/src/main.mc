@@ -104,7 +104,7 @@ func smoke_log_full_returns_exhausted() bool {
     }
 
     // State must not have grown: tail still returns 4 entries, not 5.
-    if log_service.log_len(state.log_state) != 4 {
+    if log_service.log_len(state.log.state) != 4 {
         return false
     }
     return true
@@ -139,7 +139,7 @@ func smoke_kv_full_new_key_returns_exhausted() bool {
         return false
     }
 
-    if kv_service.kv_count(state.kv_state) != 4 {
+    if kv_service.kv_count(state.kv.state) != 4 {
         return false
     }
     return true

@@ -88,6 +88,8 @@ Repository status note
   endpoint-driven restart helpers.
 - Phase 179 adds one explicit retained-state reload path for `log_service`
   through an init-owned restart policy and a service-owned fixed-size snapshot.
+- Phase 181 extends that same explicit retained-state reload shape to
+  `kv_service` without widening into persistence or compiler work.
 
 Core rule
 ---------
@@ -116,8 +118,9 @@ Frozen support matrix
 - admitted service-layer boundary: shared service_effect Message and Effect
   execution contract; log_service with bounded in-memory retention and
   overwrite-on-full plus one explicit retained-state snapshot/reload path via
-  init-owned restart; kv_service with bounded in-memory key-value state and
-  kv-count query; echo_service with bounded request-derived replies and
+  init-owned restart; kv_service with bounded in-memory key-value state,
+  kv-count query, and one explicit retained-state snapshot/reload path via
+  init-owned restart; echo_service with bounded request-derived replies and
   explicit exhaustion after four uses; shell_service as a stateless
   command-routing owner with compact hostile-user invalid classification
   (`?C` unknown command, `?S` malformed admitted shape); serial_service as

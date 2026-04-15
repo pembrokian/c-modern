@@ -17,10 +17,10 @@ func build_observation(endpoint_id: u32, payload_len: usize, payload: [4]u8) sys
 
 func smoke_init_has_empty_services() bool {
     state: boot.KernelBootState = boot.kernel_init()
-    if log_service.log_len(state.log_state) != 0 {
+    if log_service.log_len(state.log.state) != 0 {
         return false
     }
-    if kv_service.kv_count(state.kv_state) != 0 {
+    if kv_service.kv_count(state.kv.state) != 0 {
         return false
     }
     return true
@@ -85,7 +85,7 @@ func smoke_serial_composes_services() bool {
     if service_effect.effect_reply_payload(effect)[0] != 77 || service_effect.effect_reply_payload(effect)[1] != 75 {
         return false
     }
-    if log_service.log_len(state.log_state) != 2 {
+    if log_service.log_len(state.log.state) != 2 {
         return false
     }
     return true
@@ -101,7 +101,7 @@ func smoke_log_dispatch_routes() bool {
     if boot.debug_boot_routed(effect) == 0 {
         return false
     }
-    if log_service.log_len(state.log_state) != 1 {
+    if log_service.log_len(state.log.state) != 1 {
         return false
     }
     return true
@@ -118,7 +118,7 @@ func smoke_kv_dispatch_routes() bool {
     if boot.debug_boot_routed(effect) == 0 {
         return false
     }
-    if kv_service.kv_count(state.kv_state) != 1 {
+    if kv_service.kv_count(state.kv.state) != 1 {
         return false
     }
     return true

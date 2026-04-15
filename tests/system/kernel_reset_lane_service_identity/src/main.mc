@@ -57,19 +57,37 @@ func smoke_boot_refs_are_valid_and_distinct() bool {
 }
 
 // After an explicit restart the service ref is still valid.
-// The endpoint_id does not change, and init may reload retained state.
-func smoke_ref_survives_restart_and_log_reload() bool {
+// The endpoint_id and pid do not change, but the instance generation does.
+// Retained state may still survive when init reloads it explicitly.
+func smoke_restart_keeps_route_and_replaces_instance() bool {
     state: boot.KernelBootState = boot.kernel_init()
     log_ref: service_identity.ServiceRef = boot.boot_log_ref()
+    before: service_identity.ServiceMark = boot.boot_log_mark(state)
     append_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, build_serial_cmd(76, 65, 55, 33))
     if service_effect.effect_reply_status(append_effect) != syscall.SyscallStatus.Ok {
         return false
     }
 
     state = init.restart(state, service_identity.ref_endpoint(log_ref))
+    after: service_identity.ServiceMark = boot.boot_log_mark(state)
 
     // Ref is still valid after restart: endpoint_id unchanged.
     if !service_identity.ref_is_valid(log_ref) {
+        return false
+    }
+    if !service_identity.ref_matches_mark(log_ref, after) {
+        return false
+    }
+    if !service_identity.marks_same_endpoint(before, after) {
+        return false
+    }
+    if !service_identity.marks_same_pid(before, after) {
+        return false
+    }
+    if service_identity.marks_same_instance(before, after) {
+        return false
+    }
+    if service_identity.mark_generation(after) != service_identity.mark_generation(before) + 1 {
         return false
     }
 
@@ -116,7 +134,7 @@ func main() i32 {
     if !smoke_boot_refs_are_valid_and_distinct() {
         return 1
     }
-    if !smoke_ref_survives_restart_and_log_reload() {
+    if !smoke_restart_keeps_route_and_replaces_instance() {
         return 1
     }
     if !smoke_ref_is_idempotent() {

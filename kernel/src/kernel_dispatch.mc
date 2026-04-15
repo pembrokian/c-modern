@@ -28,14 +28,14 @@ const KV_WRITE_LOG_MARKER: u8 = 75
 // best-effort.  send_dropped is set to 1 when the advisory was not delivered.
 func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    kv_result: kv_service.KvResult = kv_service.handle(current.kv_state, msg)
-    new_log_state: log_service.LogServiceState = current.log_state
+    kv_result: kv_service.KvResult = kv_service.handle(current.kv.state, msg)
+    new_log_state: log_service.LogServiceState = current.log.state
     advisory_dropped: u32 = 0
     if msg.payload_len >= 2 {
         log_payload: [4]u8 = primitives.zero_payload()
         log_payload[0] = KV_WRITE_LOG_MARKER
         log_msg: service_effect.Message = service_effect.message(msg.source_pid, service_topology.LOG_ENDPOINT_ID, 1, log_payload)
-        kv_log_result: log_service.LogResult = log_service.handle(current.log_state, log_msg)
+        kv_log_result: log_service.LogResult = log_service.handle(current.log.state, log_msg)
         new_log_state = kv_log_result.state
         if service_effect.effect_reply_status(kv_log_result.effect) == syscall.SyscallStatus.Exhausted {
             advisory_dropped = 1
@@ -54,7 +54,7 @@ func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Messag
 func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     if msg.endpoint_id == service_topology.LOG_ENDPOINT_ID {
-        log_result: log_service.LogResult = log_service.handle(current.log_state, msg)
+        log_result: log_service.LogResult = log_service.handle(current.log.state, msg)
         *state = boot.bootwith_log(current, log_result.state)
         return log_result.effect
     }
@@ -62,7 +62,7 @@ func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Mess
         return kernel_dispatch_kv(state, msg)
     }
     if msg.endpoint_id == service_topology.ECHO_ENDPOINT_ID {
-        echo_result: echo_service.EchoResult = echo_service.handle(current.echo_state, msg)
+        echo_result: echo_service.EchoResult = echo_service.handle(current.echo.state, msg)
         *state = boot.bootwith_echo(current, echo_result.state)
         return echo_result.effect
     }
@@ -123,7 +123,7 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
     resolved: service_effect.Effect = execute_effect(state, inner, 0)
     next_path = serial_shell_path.path_commit_reply(next_path, resolved)
     current = *state
-    *state = boot.KernelBootState{ path_state: next_path, log_state: current.log_state, kv_state: current.kv_state, echo_state: current.echo_state }
+    *state = boot.bootwith_path(current, next_path)
     return serial_attach_events(serial_build_reply(next_path), obs, next_path, resolved)
 }
 

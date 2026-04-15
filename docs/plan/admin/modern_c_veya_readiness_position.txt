@@ -41,6 +41,7 @@ Record one maintained repository position after Phase 176 admitted a fifth boot-
 Record one maintained repository position after Phase 177 hardened the shell as a hostile-user boundary with compact invalid classification and no payload-width or compiler expansion.
 Record one maintained repository position after Phase 178 kept topology and restart flat with one bounded structural follow-through.
 Record one maintained repository position after Phase 179 admitted one explicit retained-state reload path without opening persistence or compiler surfaces.
+Record one maintained repository position after Phase 182 made restart identity explicit as stable routing plus replaced instance generation under the same endpoint and pid.
 
 This note answers four questions that now matter:
 
@@ -198,6 +199,8 @@ Current repository truth
 - The landed Phase 177 hostile-user shell boundary step keeps the compact four-byte shell protocol but upgrades shell-owned invalid replies from a bare `?` to a two-byte classifier (`?C` unknown command, `?S` malformed admitted shape); valid peer-service failures remain peer-service owned; this belongs to the same admitted running-system slice rather than to wider payloads, a text shell, richer error objects, or a reopened compiler wave.
 - The landed Phase 178 topology and restart growth re-audit keeps the five-service system flat but adds one bounded structural follow-through: service_topology.mc now owns flat lookup helpers over the existing slot constants, and init.mc now owns endpoint-driven restart helpers over the admitted restartable services; this belongs to the same admitted running-system slice rather than to a routing table, supervisor, retry framework, or reopened compiler wave.
 - The landed Phase 179 bounded retained-state reload probe adds one explicit save-and-reload path for `log_service`: `log_service` owns the fixed-size `LogSnapshot` representation and `init.restart_log()` reloads that snapshot on restart; this belongs to the same admitted running-system slice rather than to a filesystem, persistence framework, packaging layer, or reopened compiler wave.
+- The landed Phase 181 key-value retained-state reload follow-through extends that same explicit save-and-reload shape to one user-facing owner: `kv_service` now owns `KvSnapshot`, `kv_snapshot(...)`, and `kv_reload(...)`, while `init.restart_kv()` reloads the saved state on restart; this remains a bounded service-local restart truth rather than a filesystem, persistence framework, packaging layer, or reopened compiler wave.
+- The landed Phase 182 restart identity continuity probe makes the split contract explicit in runtime state: `ServiceRef` keeps stable routing, the boot-wired pid also stays stable, but each explicit restart replaces the service instance and bumps a generation marker in `boot.KernelBootState`; retained-state continuity remains explicit and owner-local (`log_service`, `kv_service`) rather than universal; this belongs to the same admitted running-system slice rather than to a registry, supervisor, persistence framework, compiler-known identity type, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -224,8 +227,9 @@ It means:
   answer, named dispatch topology, per-send delivery witnessing, explicit
   event code ownership, one fifth boot-wired echo-service pressure step,
   compact shell-owned hostile-user invalid classification, flat topology
-  lookup over the five boot-wired slots, and endpoint-driven explicit restart
-  over the admitted restartable services are now real inside that slice
+  lookup over the five boot-wired slots, endpoint-driven explicit restart
+  over the admitted restartable services, and explicit retained-state reload
+  for both `log_service` and `kv_service` are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 

@@ -17,6 +17,7 @@ import kernel_dispatch
 import log_service
 import serial_protocol
 import service_effect
+import service_identity
 import service_topology
 import syscall
 
@@ -174,7 +175,7 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
     }
     if check.kind == StepCheckKind.LogTailState {
         payload: [4]u8 = service_effect.effect_reply_payload(effect)
-        if service_effect.effect_reply_payload_len(effect) != log_service.log_len(s.log_state) {
+        if service_effect.effect_reply_payload_len(effect) != log_service.log_len(s.log.state) {
             return 0
         }
         if payload[0] != check.payload0 {
@@ -195,7 +196,7 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
         if service_effect.effect_reply_payload_len(effect) != check.reply_len {
             return 0
         }
-        if log_service.log_len(s.log_state) != check.log_len {
+        if log_service.log_len(s.log.state) != check.log_len {
             return 0
         }
         return 1
@@ -226,50 +227,133 @@ func run_main(state: *boot.KernelBootState) i32 {
 // log restart reloads the retained state snapshot exactly as saved, and echo
 // restart still resets its bounded request counter.
 func run_restart_probe(state: *boot.KernelBootState) i32 {
+    log_before: service_identity.ServiceMark = boot.boot_log_mark(*state)
     *state = init.restart(*state, service_topology.LOG_ENDPOINT_ID)
+    log_after: service_identity.ServiceMark = boot.boot_log_mark(*state)
+
+    if !service_identity.marks_same_endpoint(log_before, log_after) {
+        return 8
+    }
+    if !service_identity.marks_same_pid(log_before, log_after) {
+        return 9
+    }
+    if service_identity.marks_same_instance(log_before, log_after) {
+        return 10
+    }
+    if service_identity.mark_generation(log_after) != service_identity.mark_generation(log_before) + 1 {
+        return 11
+    }
 
     // The reloaded log stays full after restart because the retained entries
     // were explicitly reloaded rather than discarded.
     tail_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_tail())
     if service_effect.effect_reply_status(tail_effect) != syscall.SyscallStatus.Ok {
-        return 8
+        return 12
     }
     if service_effect.effect_reply_payload_len(tail_effect) != 4 {
-        return 9
+        return 13
     }
     tail_payload: [4]u8 = service_effect.effect_reply_payload(tail_effect)
     if tail_payload[0] != 77 {
-        return 10
+        return 14
     }
     if tail_payload[1] != 75 {
-        return 11
+        return 15
     }
     if tail_payload[2] != 75 {
-        return 12
+        return 16
     }
     if tail_payload[3] != 75 {
-        return 13
+        return 17
     }
 
     append_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_log_append(55))
     if service_effect.effect_reply_status(append_effect) != syscall.SyscallStatus.Exhausted {
-        return 14
+        return 18
     }
 
+    kv_before: service_identity.ServiceMark = boot.boot_kv_mark(*state)
+    *state = init.restart(*state, service_topology.KV_ENDPOINT_ID)
+    kv_after: service_identity.ServiceMark = boot.boot_kv_mark(*state)
+
+    if !service_identity.marks_same_endpoint(kv_before, kv_after) {
+        return 19
+    }
+    if !service_identity.marks_same_pid(kv_before, kv_after) {
+        return 20
+    }
+    if service_identity.marks_same_instance(kv_before, kv_after) {
+        return 21
+    }
+    if service_identity.mark_generation(kv_after) != service_identity.mark_generation(kv_before) + 1 {
+        return 22
+    }
+
+    kv_count_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, kv_count_obs(1))
+    if service_effect.effect_reply_status(kv_count_effect) != syscall.SyscallStatus.Ok {
+        return 23
+    }
+    if service_effect.effect_reply_payload_len(kv_count_effect) != 4 {
+        return 24
+    }
+
+    kv_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_kv_get(20))
+    if service_effect.effect_reply_status(kv_effect) != syscall.SyscallStatus.Ok {
+        return 25
+    }
+    if service_effect.effect_reply_payload_len(kv_effect) != 2 {
+        return 26
+    }
+    kv_payload: [4]u8 = service_effect.effect_reply_payload(kv_effect)
+    if kv_payload[0] != 20 {
+        return 27
+    }
+    if kv_payload[1] != 77 {
+        return 28
+    }
+
+    kv_overwrite_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_kv_set(20, 88))
+    if service_effect.effect_reply_status(kv_overwrite_effect) != syscall.SyscallStatus.Ok {
+        return 29
+    }
+
+    kv_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_kv_get(20))
+    if service_effect.effect_reply_status(kv_effect) != syscall.SyscallStatus.Ok {
+        return 30
+    }
+    if service_effect.effect_reply_payload(kv_effect)[1] != 88 {
+        return 31
+    }
+
+    echo_before: service_identity.ServiceMark = boot.boot_echo_mark(*state)
     *state = init.restart(*state, service_topology.ECHO_ENDPOINT_ID)
+    echo_after: service_identity.ServiceMark = boot.boot_echo_mark(*state)
+
+    if !service_identity.marks_same_endpoint(echo_before, echo_after) {
+        return 32
+    }
+    if !service_identity.marks_same_pid(echo_before, echo_after) {
+        return 33
+    }
+    if service_identity.marks_same_instance(echo_before, echo_after) {
+        return 34
+    }
+    if service_identity.mark_generation(echo_after) != service_identity.mark_generation(echo_before) + 1 {
+        return 35
+    }
 
     echo_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(33, 44))
     if service_effect.effect_reply_status(echo_effect) != syscall.SyscallStatus.Ok {
-        return 15
+        return 36
     }
     if service_effect.effect_reply_payload_len(echo_effect) != 2 {
-        return 16
+        return 37
     }
     if service_effect.effect_reply_payload(echo_effect)[0] != 33 {
-        return 17
+        return 38
     }
     if service_effect.effect_reply_payload(echo_effect)[1] != 44 {
-        return 18
+        return 39
     }
 
     return 0

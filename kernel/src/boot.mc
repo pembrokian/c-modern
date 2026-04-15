@@ -15,11 +15,16 @@ import service_topology
 import shell_service
 import syscall
 
+struct ServiceCell<T> {
+    state: T
+    generation: u32
+}
+
 struct KernelBootState {
     path_state: serial_shell_path.SerialShellPathState
-    log_state: log_service.LogServiceState
-    kv_state: kv_service.KvServiceState
-    echo_state: echo_service.EchoServiceState
+    log: ServiceCell<log_service.LogServiceState>
+    kv: ServiceCell<kv_service.KvServiceState>
+    echo: ServiceCell<echo_service.EchoServiceState>
 }
 
 func kernel_init() KernelBootState {
@@ -28,19 +33,41 @@ func kernel_init() KernelBootState {
     log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
     kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
     echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
-    return KernelBootState{ path_state: serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint), log_state: log_service.log_init(log_slot.pid, 1), kv_state: kv_service.kv_init(kv_slot.pid, 1), echo_state: echo_service.echo_init(echo_slot.pid, 1) }
+
+    path_state: serial_shell_path.SerialShellPathState = serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
+    log_cell: ServiceCell<log_service.LogServiceState> = ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
+    kv_cell: ServiceCell<kv_service.KvServiceState> = ServiceCell<kv_service.KvServiceState>{ state: kv_service.kv_init(kv_slot.pid, 1), generation: 1 }
+    echo_cell: ServiceCell<echo_service.EchoServiceState> = ServiceCell<echo_service.EchoServiceState>{ state: echo_service.echo_init(echo_slot.pid, 1), generation: 1 }
+
+    return KernelBootState{ path_state: path_state, log: log_cell, kv: kv_cell, echo: echo_cell }
 }
 
 func bootwith_log(s: KernelBootState, log: log_service.LogServiceState) KernelBootState {
-    return KernelBootState{ path_state: s.path_state, log_state: log, kv_state: s.kv_state, echo_state: s.echo_state }
+    return KernelBootState{ path_state: s.path_state, log: ServiceCell<log_service.LogServiceState>{ state: log, generation: s.log.generation }, kv: s.kv, echo: s.echo }
+}
+
+func bootwith_path(s: KernelBootState, path: serial_shell_path.SerialShellPathState) KernelBootState {
+    return KernelBootState{ path_state: path, log: s.log, kv: s.kv, echo: s.echo }
 }
 
 func bootwith_kv(s: KernelBootState, kv: kv_service.KvServiceState) KernelBootState {
-    return KernelBootState{ path_state: s.path_state, log_state: s.log_state, kv_state: kv, echo_state: s.echo_state }
+    return KernelBootState{ path_state: s.path_state, log: s.log, kv: ServiceCell<kv_service.KvServiceState>{ state: kv, generation: s.kv.generation }, echo: s.echo }
 }
 
 func bootwith_echo(s: KernelBootState, echo: echo_service.EchoServiceState) KernelBootState {
-    return KernelBootState{ path_state: s.path_state, log_state: s.log_state, kv_state: s.kv_state, echo_state: echo }
+    return KernelBootState{ path_state: s.path_state, log: s.log, kv: s.kv, echo: ServiceCell<echo_service.EchoServiceState>{ state: echo, generation: s.echo.generation } }
+}
+
+func bootrestart_log(s: KernelBootState, log: log_service.LogServiceState) KernelBootState {
+    return KernelBootState{ path_state: s.path_state, log: ServiceCell<log_service.LogServiceState>{ state: log, generation: s.log.generation + 1 }, kv: s.kv, echo: s.echo }
+}
+
+func bootrestart_kv(s: KernelBootState, kv: kv_service.KvServiceState) KernelBootState {
+    return KernelBootState{ path_state: s.path_state, log: s.log, kv: ServiceCell<kv_service.KvServiceState>{ state: kv, generation: s.kv.generation + 1 }, echo: s.echo }
+}
+
+func bootrestart_echo(s: KernelBootState, echo: echo_service.EchoServiceState) KernelBootState {
+    return KernelBootState{ path_state: s.path_state, log: s.log, kv: s.kv, echo: ServiceCell<echo_service.EchoServiceState>{ state: echo, generation: s.echo.generation + 1 } }
 }
 
 func debug_boot_routed(effect: service_effect.Effect) u32 {
@@ -73,4 +100,16 @@ func boot_kv_ref() service_identity.ServiceRef {
 
 func boot_echo_ref() service_identity.ServiceRef {
     return service_identity.service_ref(service_topology.ECHO_ENDPOINT_ID)
+}
+
+func boot_log_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.LOG_ENDPOINT_ID, s.log.state.pid, s.log.generation)
+}
+
+func boot_kv_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.KV_ENDPOINT_ID, s.kv.state.pid, s.kv.generation)
+}
+
+func boot_echo_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.ECHO_ENDPOINT_ID, s.echo.state.pid, s.echo.generation)
 }

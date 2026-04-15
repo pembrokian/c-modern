@@ -3,7 +3,58 @@ Phase 181 -- Key-Value Retained-State Reload Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 181 landed as one narrow extension of the retained-state restart path:
+`kv_service` now joins `log_service` as an explicit restart-with-state owner,
+without opening any filesystem, snapshot framework, supervisor, or compiler
+surface.
+
+The landed implementation stays fully owner-local and explicit:
+
+- `kernel/src/kv_service.mc` now owns one bounded save representation,
+  `KvSnapshot`, plus `kv_snapshot(...)` and `kv_reload(...)`
+- `kernel/src/init.mc` remains the restart-policy owner and now reloads a
+  saved `KvSnapshot` in `restart_kv()` instead of resetting the store to the
+  empty baseline
+- the live integration path in `kernel/src/scenarios.mc` now proves that
+  retained key-value state survives restart, remains queryable, and can still
+  evolve afterwards through an overwrite on an existing key
+- `tests/system/kernel_reset_lane_phase181_kv_retained_reload/` adds the
+  simpler user-facing follow-through: reload two retained entries, then
+  overwrite one key, append one new key, and confirm the store keeps moving
+  under the existing bounded semantics
+
+What did not change:
+
+- there is still no filesystem, durable persistence claim, snapshot bus, or
+  coordinated cross-service restart transaction
+- reload remains explicit and per-service rather than generic
+- endpoint identity is still stable across restart, but only services with an
+  explicit save-and-reload path retain user-visible state
+- no compiler, sema, MIR, backend, ABI, target, runtime, or hal work was
+  required
+
+Phase result
+------------
+The current service identity and init-owned restart model still compose
+honestly once retained-state reload is no longer log-only.
+
+The narrow result is now:
+
+- endpoint identity stays stable across restart
+- retained state survives only when init chooses an explicit save-and-reload
+  path
+- that explicit shape now carries both one observational owner
+  (`log_service`) and one user-facing owner (`kv_service`)
+- this is still not a persistence framework; it is two explicit bounded
+  restart-with-state paths
+
+Validation
+----------
+- `mc_tool_workflow_unit`
 
 Purpose
 -------

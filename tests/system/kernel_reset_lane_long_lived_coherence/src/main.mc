@@ -110,7 +110,7 @@ func smoke_repeated_overwrite_stable_count() bool {
     }
 
     // Only one slot consumed: count == 1.
-    if kv_service.kv_count(state.kv_state) != 1 {
+    if kv_service.kv_count(state.kv.state) != 1 {
         return false
     }
 
@@ -214,7 +214,7 @@ func smoke_kernel_init_clears_state() bool {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    if log_service.log_len(state.log_state) != 1 {
+    if log_service.log_len(state.log.state) != 1 {
         return false
     }
 
@@ -247,7 +247,7 @@ func smoke_kv_log_marker_coherent_at_saturation() bool {
     }
 
     // Log is full now (4 markers).
-    if log_service.log_len(state.log_state) != 4 {
+    if log_service.log_len(state.log.state) != 4 {
         return false
     }
 
@@ -268,7 +268,7 @@ func smoke_kv_log_marker_coherent_at_saturation() bool {
     }
 
     // Log count is still 4 — no phantom entries were added.
-    if log_service.log_len(state.log_state) != 4 {
+    if log_service.log_len(state.log.state) != 4 {
         return false
     }
 

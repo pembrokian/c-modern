@@ -128,7 +128,7 @@ func smoke_backpressure_is_per_service() bool {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
         return false
     }
-    if log_service.log_len(state.log_state) != 4 {
+    if log_service.log_len(state.log.state) != 4 {
         return false
     }
     return true

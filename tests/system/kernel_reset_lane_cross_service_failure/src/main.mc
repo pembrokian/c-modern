@@ -85,7 +85,7 @@ func smoke_kv_write_ok_masks_advisory_log_drop() bool {
     }
 
     // Log is still full; the kv write freed no log capacity.
-    if log_service.log_len(state.log_state) != 4 {
+    if log_service.log_len(state.log.state) != 4 {
         return false
     }
 
@@ -156,7 +156,7 @@ func smoke_exhausted_is_consistent_across_services() bool {
     }
 
     // kv count is still 4; state is unchanged on Exhausted.
-    if kv_service.kv_count(state.kv_state) != 4 {
+    if kv_service.kv_count(state.kv.state) != 4 {
         return false
     }
 
@@ -216,7 +216,7 @@ func smoke_kv_overwrite_ok_masks_advisory_log_drop() bool {
     }
 
     // Log now has: [kv_marker=75, 1, 2, 3] = 4 entries (full).
-    if log_service.log_len(state.log_state) != 4 {
+    if log_service.log_len(state.log.state) != 4 {
         return false
     }
 

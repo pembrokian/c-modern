@@ -12,6 +12,12 @@ struct KvServiceState {
     count: usize
 }
 
+struct KvSnapshot {
+    keys: [KV_CAPACITY]u8
+    values: [KV_CAPACITY]u8
+    count: usize
+}
+
 struct KvResult {
     state: KvServiceState
     effect: service_effect.Effect
@@ -23,6 +29,14 @@ func kv_init(pid: u32, slot: u32) KvServiceState {
 
 func kvwith(s: KvServiceState, keys: [KV_CAPACITY]u8, vals: [KV_CAPACITY]u8, count: usize) KvServiceState {
     return KvServiceState{ pid: s.pid, slot: s.slot, keys: keys, values: vals, count: count }
+}
+
+func kv_snapshot(s: KvServiceState) KvSnapshot {
+    return KvSnapshot{ keys: s.keys, values: s.values, count: s.count }
+}
+
+func kv_reload(pid: u32, slot: u32, snap: KvSnapshot) KvServiceState {
+    return KvServiceState{ pid: pid, slot: slot, keys: snap.keys, values: snap.values, count: snap.count }
 }
 
 func kvset(s: KvServiceState, m: service_effect.Message) KvServiceState {

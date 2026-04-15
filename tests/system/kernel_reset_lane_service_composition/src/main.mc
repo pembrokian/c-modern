@@ -45,7 +45,7 @@ func smoke_mixed_shell_workflow_stays_explicit() bool {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return false
     }
-    if service_effect.effect_reply_payload_len(effect) != log_service.log_len(state.log_state) {
+    if service_effect.effect_reply_payload_len(effect) != log_service.log_len(state.log.state) {
         return false
     }
     if service_effect.effect_reply_payload(effect)[0] != 65 {

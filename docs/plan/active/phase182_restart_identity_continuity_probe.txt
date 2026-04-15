@@ -3,7 +3,59 @@ Phase 182 -- Restart Identity Continuity Probe
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 182 landed as one narrow runtime-owned clarification of restart
+identity rather than as a framework expansion.
+
+The landed implementation makes the current contract explicit in code:
+
+- `ServiceRef` still names stable routing only: the endpoint id survives
+  restart and callers can keep using the same ref without rediscovery
+- owner pid continuity is also stable across restart because the current
+  restart path reuses the fixed boot-wired slot pid
+- service-instance continuity is now explicitly separate from routing and pid
+  continuity: `boot.KernelBootState` carries one generation counter per
+  restartable service, and `init.restart_*()` bumps that generation on each
+  replacement
+- retained-state continuity remains owner-local and explicit: `log_service`
+  and `kv_service` preserve retained state because init reloads snapshots,
+  while `echo_service` still restarts from its empty baseline
+- caller-visible availability remains uninterrupted at the current admitted
+  boundary: callers keep the same `ServiceRef`, and the restarted services
+  continue answering on the same shell-visible routes after replacement
+
+The resulting contract is therefore a split one, and it is now real rather
+than implicit:
+
+- routing continuity: yes
+- pid continuity: yes
+- retained-state continuity: only for services with explicit reload
+- service-instance continuity: no; restart is replacement, not the same
+  instance continuing
+
+What did not change:
+
+- no dynamic rebinding, discovery, registry, or supervisor
+- no new service framework, restart queue, or persistence layer
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Phase result
+------------
+The repository now answers the restart identity question honestly:
+under the current reset-lane model, restart is replacement under stable
+routing rather than uninterrupted same-instance continuity.
+
+`ServiceRef` still gives callers a stable address surface, but callers that
+care about instance identity can now observe the replacement boundary through
+the generation marker rather than inferring continuity from the stable
+endpoint id alone.
+
+Validation
+----------
+- `tests/system/kernel_reset_lane_service_identity`
 
 Purpose
 -------
@@ -18,7 +70,7 @@ rather than speculative:
 - stable ServiceRef wrappers over those endpoint ids
 - init-owned explicit restart
 - one retained-state reload path already landed for `log_service`
-- one planned second retained-state reload path for `kv_service`
+- one landed second retained-state reload path for `kv_service`
 
 This phase asks whether those ingredients still describe one continuing
 service identity, or whether restart should be treated as replacement under a
@@ -44,7 +96,7 @@ Repository status note
 - ServiceRef currently wraps a stable endpoint id, not a persisted object
   identity.
 - `log_service` already has one explicit restart-with-state path.
-- Phase 181 is expected to test whether that shape also carries one
+- Phase 181 has now shown that the same explicit shape also carries one
   user-facing retained-state owner.
 - The current topology is still static, boot-wired, and endpoint-stable.
 
@@ -93,8 +145,9 @@ What this phase should not do
 
 Why this is the right placement
 -------------------------------
-- After Phase 181: the repository should know whether retained-state reload is
-  still log-only or now spans both observational and user-facing state.
+- After Phase 181: the repository now knows retained-state reload spans both
+  observational and user-facing state, so the remaining question is what that
+  means for service identity continuity.
 - Before endpoint authority or stale-handle work: the meaning of restart
   continuity needs to be explicit first.
 - This stays inside the Phase 180 service-system frontier and does not widen
