@@ -167,6 +167,11 @@ struct CheckOptions {
     const std::unordered_map<std::string, Module>* imported_modules = nullptr;
     std::optional<std::string> current_package_identity;
     std::function<std::optional<std::string>(const std::filesystem::path&)> package_identity_for_source;
+    // When non-empty, maps merged-module part index to source file path.
+    // Part i owns synthetic lines [i * module_part_line_stride, (i+1) * module_part_line_stride).
+    // Used by the checker to recover exact file ownership for diagnostics.
+    std::vector<std::filesystem::path> module_part_paths;
+    std::size_t module_part_line_stride = 0;
 };
 
 CheckResult CheckProgram(const ast::SourceFile& source_file,

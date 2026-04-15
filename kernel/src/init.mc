@@ -19,6 +19,7 @@ import kv_service
 import log_service
 import queue_service
 import service_topology
+import ticket_service
 import transfer_service
 
 func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
@@ -39,6 +40,9 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
     }
     if endpoint == service_topology.TRANSFER_ENDPOINT_ID {
         return restart_transfer(state)
+    }
+    if endpoint == service_topology.TICKET_ENDPOINT_ID {
+        return restart_ticket(state)
     }
     return state
 }
@@ -69,4 +73,9 @@ func restart_echo(state: boot.KernelBootState) boot.KernelBootState {
 func restart_transfer(state: boot.KernelBootState) boot.KernelBootState {
     transfer_slot: service_topology.ServiceSlot = service_topology.TRANSFER_SLOT
     return boot.bootrestart_transfer(state, transfer_service.transfer_init(transfer_slot.pid, 1))
+}
+
+func restart_ticket(state: boot.KernelBootState) boot.KernelBootState {
+    ticket_slot: service_topology.ServiceSlot = service_topology.TICKET_SLOT
+    return boot.bootrestart_ticket(state, ticket_service.ticket_init(ticket_slot.pid, 1, state.ticket.state.epoch + 1))
 }

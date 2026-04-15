@@ -35,6 +35,7 @@ const KV_ENDPOINT_ID: u32 = 13
 const ECHO_ENDPOINT_ID: u32 = 14
 const TRANSFER_ENDPOINT_ID: u32 = 15
 const QUEUE_ENDPOINT_ID: u32 = 16
+const TICKET_ENDPOINT_ID: u32 = 17
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -57,13 +58,14 @@ const KV_SLOT: ServiceSlot = ServiceSlot{ endpoint: KV_ENDPOINT_ID, pid: 4 }
 const ECHO_SLOT: ServiceSlot = ServiceSlot{ endpoint: ECHO_ENDPOINT_ID, pid: 5 }
 const TRANSFER_SLOT: ServiceSlot = ServiceSlot{ endpoint: TRANSFER_ENDPOINT_ID, pid: 6 }
 const QUEUE_SLOT: ServiceSlot = ServiceSlot{ endpoint: QUEUE_ENDPOINT_ID, pid: 7 }
+const TICKET_SLOT: ServiceSlot = ServiceSlot{ endpoint: TICKET_ENDPOINT_ID, pid: 8 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 7
+const SERVICE_COUNT: u32 = 8
 
 func service_count() usize {
-    return 7
+    return 8
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -87,6 +89,9 @@ func service_slot_at(index: usize) ServiceSlot {
     }
     if index == 6 {
         return QUEUE_SLOT
+    }
+    if index == 7 {
+        return TICKET_SLOT
     }
     return ServiceSlot{ endpoint: 0, pid: 0 }
 }
@@ -112,6 +117,9 @@ func service_slot_for_endpoint(endpoint: u32) ServiceSlot {
     }
     if endpoint == QUEUE_ENDPOINT_ID {
         return QUEUE_SLOT
+    }
+    if endpoint == TICKET_ENDPOINT_ID {
+        return TICKET_SLOT
     }
     return ServiceSlot{ endpoint: 0, pid: 0 }
 }
@@ -141,6 +149,9 @@ func service_restart_mode(endpoint: u32) ServiceRestartMode {
     }
     if endpoint == QUEUE_ENDPOINT_ID {
         return ServiceRestartMode.Reload
+    }
+    if endpoint == TICKET_ENDPOINT_ID {
+        return ServiceRestartMode.Reset
     }
     return ServiceRestartMode.None
 }
@@ -184,6 +195,9 @@ func endpoint_is_boot_wired(endpoint: u32) bool {
         return true
     }
     if endpoint == QUEUE_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == TICKET_ENDPOINT_ID {
         return true
     }
     return false

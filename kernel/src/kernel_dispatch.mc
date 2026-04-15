@@ -8,15 +8,19 @@
 
 import boot
 import echo_service
+import init
 import event_codes
 import kv_service
 import log_service
 import primitives
 import queue_service
+import serial_protocol
 import serial_shell_path
 import service_effect
 import service_topology
+import shell_service
 import syscall
+import ticket_service
 import transfer_grant
 import transfer_service
 
@@ -52,10 +56,38 @@ func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Messag
 }
 
 // Leaf service dispatch: log, kv, echo, and the default for unknown endpoints.
-// Shell Send effects always target log, kv, or echo; no leaf service produces
-// a further Send that needs chasing through a non-leaf path.
+// Shell Send effects target either a leaf service or one bounded shell-owned
+// lifecycle control step on the shell endpoint; no leaf service produces a
+// further Send that needs chasing through a non-leaf path.
+func kernel_dispatch_shell_control(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    if msg.payload_len != 4 {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_SHAPE)
+    }
+    if msg.payload[0] != serial_protocol.CMD_X {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
+    if msg.payload[1] != serial_protocol.CMD_R {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
+    if msg.payload[3] != serial_protocol.CMD_BANG {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_SHAPE)
+    }
+    endpoint: u32 = shell_service.lifecycle_target_endpoint(msg.payload[2])
+    if endpoint == 0 {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
+    if !service_topology.service_can_restart(endpoint) {
+        return shell_service.lifecycle_effect(syscall.SyscallStatus.InvalidArgument, msg.payload[2], endpoint)
+    }
+    *state = init.restart(*state, endpoint)
+    return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], endpoint)
+}
+
 func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
+    if msg.endpoint_id == service_topology.SHELL_ENDPOINT_ID {
+        return kernel_dispatch_shell_control(state, msg)
+    }
     if msg.endpoint_id == service_topology.LOG_ENDPOINT_ID {
         log_result: log_service.LogResult = log_service.handle(current.log.state, msg)
         *state = boot.bootwith_log(current, log_result.state)
@@ -78,6 +110,11 @@ func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Mess
         transfer_result: transfer_service.TransferResult = transfer_service.handle(current.transfer.state, msg)
         *state = boot.bootwith_transfer(current, transfer_result.state)
         return transfer_result.effect
+    }
+    if msg.endpoint_id == service_topology.TICKET_ENDPOINT_ID {
+        ticket_result: ticket_service.TicketResult = ticket_service.handle(current.ticket.state, msg)
+        *state = boot.bootwith_ticket(current, ticket_result.state)
+        return ticket_result.effect
     }
     return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
 }

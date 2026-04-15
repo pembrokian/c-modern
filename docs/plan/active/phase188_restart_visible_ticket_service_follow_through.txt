@@ -3,18 +3,32 @@ Phase 188 -- Restart-Visible Ticket Service Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETE
 
 Purpose
 -------
 Add one new user-facing service whose whole point is to make reset-style
 restart truth visible to callers rather than only to internal audits.
 
-This phase should add one bounded `ticket_service` that issues small tokens
+This phase adds one bounded `ticket_service` that issues small tokens
 and later validates or consumes them.
 Unlike the retained-state services, this owner should deliberately reset on
 restart so that pre-restart tickets become invalid in an explicit,
 user-visible way.
+
+Landed implementation summary
+----------------------------
+- `ticket_service` is a new reset-style owner in `kernel/src/ticket_service.mc`.
+- The compact shell protocol is `TI!!` to issue one ticket and `TU<epoch><id>`
+  to consume one previously issued ticket.
+- Issuance returns two reply bytes: `[epoch, id]`.
+- Consuming a stale ticket returns `InvalidArgument` with one-byte payload
+  `S`; consuming an unknown or already-consumed ticket returns
+  `InvalidArgument` with one-byte payload `I`.
+- The implementation reuses the current restart split honestly: stable public
+  endpoint id, stable service pid, and replaced service-instance generation.
+- No capability framework, session registry, supervisor layer, compiler,
+  sema, MIR, backend, ABI, target, runtime, or `hal` expansion was admitted.
 
 Relationship to companion notes
 -------------------------------
@@ -87,9 +101,9 @@ Why this is the right next step
   consequence, one explicit reset contract.
 - It does not require a wider IPC, authority, or lifecycle framework.
 
-Required implementation surfaces
---------------------------------
-The likely owning implementation surfaces for this phase are:
+Landed implementation surfaces
+-----------------------------
+The owning implementation surfaces for this phase are:
 
 1. `kernel/src/ticket_service.mc`
    - introduce the new bounded ticket owner, issuance rules, instance marker,
@@ -112,11 +126,11 @@ The likely owning implementation surfaces for this phase are:
      the existing compact shell path
 
 6. `kernel/src/service_identity.mc`
-   - touch only if the smallest honest protocol reuses the current generation
-     truth rather than inventing a second restart marker family
+   - no new identity subsystem was added; the implementation reuses the
+     existing stable-ref plus generation-marker split through `boot.mc`
 
-7. `kernel/src/kernel_dispatch.mc` and `kernel/src/service_effect.mc`
-   - route the new service path without widening the generic transport model
+7. `kernel/src/kernel_dispatch.mc`
+  - route the new service path without widening the generic transport model
 
 8. `kernel/src/scenarios.mc`
    - add one live restart workflow showing ticket issuance, explicit restart,

@@ -12,7 +12,7 @@ func cmd(payload: [4]u8) syscall.ReceiveObservation {
 
 func smoke_echo_service_is_named() bool {
     echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
-    if service_topology.SERVICE_COUNT != 7 {
+    if service_topology.SERVICE_COUNT != 8 {
         return false
     }
     if echo_slot.endpoint != service_topology.ECHO_ENDPOINT_ID {

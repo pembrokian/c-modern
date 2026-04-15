@@ -12,6 +12,7 @@
 // protocol encoding in serial_protocol.mc.
 
 import boot
+import ipc
 import init
 import kernel_dispatch
 import log_service
@@ -19,7 +20,9 @@ import serial_protocol
 import service_effect
 import service_identity
 import service_topology
+import shell_service
 import syscall
+import ticket_service
 
 const STEP_COUNT: usize = 31
 
@@ -85,12 +88,28 @@ func cmd_kv_get(key: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_kv_get(key))
 }
 
+func cmd_lifecycle_query(target: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_query(target))
+}
+
+func cmd_lifecycle_restart(target: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_restart(target))
+}
+
 func cmd_queue_enqueue(value: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_queue_enqueue(value))
 }
 
 func cmd_queue_dequeue() syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_queue_dequeue())
+}
+
+func cmd_ticket_issue() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_ticket_issue())
+}
+
+func cmd_ticket_use(epoch: u8, id: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_ticket_use(epoch, id))
 }
 
 func kv_count_obs(pid: u32) syscall.ReceiveObservation {
@@ -246,6 +265,39 @@ func run_main(state: *boot.KernelBootState) i32 {
     return 0
 }
 
+func expect_restart_identity(before: service_identity.ServiceMark, after: service_identity.ServiceMark, base: i32) i32 {
+    if !service_identity.marks_same_endpoint(before, after) {
+        return base
+    }
+    if !service_identity.marks_same_pid(before, after) {
+        return base + 1
+    }
+    if service_identity.marks_same_instance(before, after) {
+        return base + 2
+    }
+    if service_identity.mark_generation(after) != service_identity.mark_generation(before) + 1 {
+        return base + 3
+    }
+    return 0
+}
+
+func expect_lifecycle(effect: service_effect.Effect, status: syscall.SyscallStatus, target: u8, mode: u8) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 2 {
+        return false
+    }
+    payload: [4]u8 = service_effect.effect_reply_payload(effect)
+    if payload[0] != target {
+        return false
+    }
+    if payload[1] != mode {
+        return false
+    }
+    return true
+}
+
 // run_restart_probe verifies two restart contracts on the live path:
 // log restart reloads the retained state snapshot exactly as saved, and echo
 // restart still resets its bounded request counter.
@@ -254,17 +306,9 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.LOG_ENDPOINT_ID)
     log_after: service_identity.ServiceMark = boot.boot_log_mark(*state)
 
-    if !service_identity.marks_same_endpoint(log_before, log_after) {
-        return 8
-    }
-    if !service_identity.marks_same_pid(log_before, log_after) {
-        return 9
-    }
-    if service_identity.marks_same_instance(log_before, log_after) {
-        return 10
-    }
-    if service_identity.mark_generation(log_after) != service_identity.mark_generation(log_before) + 1 {
-        return 11
+    log_id: i32 = expect_restart_identity(log_before, log_after, 8)
+    if log_id != 0 {
+        return log_id
     }
 
     // The reloaded log stays full after restart because the retained entries
@@ -299,17 +343,9 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.KV_ENDPOINT_ID)
     kv_after: service_identity.ServiceMark = boot.boot_kv_mark(*state)
 
-    if !service_identity.marks_same_endpoint(kv_before, kv_after) {
-        return 19
-    }
-    if !service_identity.marks_same_pid(kv_before, kv_after) {
-        return 20
-    }
-    if service_identity.marks_same_instance(kv_before, kv_after) {
-        return 21
-    }
-    if service_identity.mark_generation(kv_after) != service_identity.mark_generation(kv_before) + 1 {
-        return 22
+    kv_id: i32 = expect_restart_identity(kv_before, kv_after, 19)
+    if kv_id != 0 {
+        return kv_id
     }
 
     kv_count_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, kv_count_obs(1))
@@ -365,17 +401,9 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.QUEUE_ENDPOINT_ID)
     queue_after: service_identity.ServiceMark = boot.boot_queue_mark(*state)
 
-    if !service_identity.marks_same_endpoint(queue_before, queue_after) {
-        return 43
-    }
-    if !service_identity.marks_same_pid(queue_before, queue_after) {
-        return 44
-    }
-    if service_identity.marks_same_instance(queue_before, queue_after) {
-        return 45
-    }
-    if service_identity.mark_generation(queue_after) != service_identity.mark_generation(queue_before) + 1 {
-        return 46
+    queue_id: i32 = expect_restart_identity(queue_before, queue_after, 43)
+    if queue_id != 0 {
+        return queue_id
     }
 
     queue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
@@ -424,17 +452,9 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.ECHO_ENDPOINT_ID)
     echo_after: service_identity.ServiceMark = boot.boot_echo_mark(*state)
 
-    if !service_identity.marks_same_endpoint(echo_before, echo_after) {
-        return 32
-    }
-    if !service_identity.marks_same_pid(echo_before, echo_after) {
-        return 33
-    }
-    if service_identity.marks_same_instance(echo_before, echo_after) {
-        return 34
-    }
-    if service_identity.mark_generation(echo_after) != service_identity.mark_generation(echo_before) + 1 {
-        return 35
+    echo_id: i32 = expect_restart_identity(echo_before, echo_after, 32)
+    if echo_id != 0 {
+        return echo_id
     }
 
     echo_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(33, 44))
@@ -451,6 +471,184 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
         return 60
     }
 
+    ticket_before: service_identity.ServiceMark = boot.boot_ticket_mark(*state)
+    ticket_issue_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_ticket_issue())
+    if service_effect.effect_reply_status(ticket_issue_effect) != syscall.SyscallStatus.Ok {
+        return 61
+    }
+    if service_effect.effect_reply_payload_len(ticket_issue_effect) != 2 {
+        return 62
+    }
+    stale_ticket: [4]u8 = service_effect.effect_reply_payload(ticket_issue_effect)
+
+    *state = init.restart(*state, service_topology.TICKET_ENDPOINT_ID)
+    ticket_after: service_identity.ServiceMark = boot.boot_ticket_mark(*state)
+
+    ticket_id: i32 = expect_restart_identity(ticket_before, ticket_after, 63)
+    if ticket_id != 0 {
+        return ticket_id
+    }
+
+    ticket_use_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_ticket_use(stale_ticket[0], stale_ticket[1]))
+    if service_effect.effect_reply_status(ticket_use_effect) != syscall.SyscallStatus.InvalidArgument {
+        return 67
+    }
+    if service_effect.effect_reply_payload_len(ticket_use_effect) != 1 {
+        return 68
+    }
+    if service_effect.effect_reply_payload(ticket_use_effect)[0] != ticket_service.TICKET_STALE {
+        return 69
+    }
+
+    ticket_issue_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_ticket_issue())
+    if service_effect.effect_reply_status(ticket_issue_effect) != syscall.SyscallStatus.Ok {
+        return 70
+    }
+    if service_effect.effect_reply_payload_len(ticket_issue_effect) != 2 {
+        return 71
+    }
+    fresh_ticket: [4]u8 = service_effect.effect_reply_payload(ticket_issue_effect)
+    if fresh_ticket[0] == stale_ticket[0] {
+        return 72
+    }
+
+    ticket_use_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_ticket_use(fresh_ticket[0], fresh_ticket[1]))
+    if service_effect.effect_reply_status(ticket_use_effect) != syscall.SyscallStatus.Ok {
+        return 73
+    }
+    if service_effect.effect_reply_payload_len(ticket_use_effect) != 1 {
+        return 74
+    }
+    if service_effect.effect_reply_payload(ticket_use_effect)[0] != fresh_ticket[1] {
+        return 75
+    }
+
+    ticket_use_effect = kernel_dispatch.kernel_dispatch_step(state, cmd_ticket_use(fresh_ticket[0], fresh_ticket[1]))
+    if service_effect.effect_reply_status(ticket_use_effect) != syscall.SyscallStatus.InvalidArgument {
+        return 76
+    }
+    if service_effect.effect_reply_payload_len(ticket_use_effect) != 1 {
+        return 77
+    }
+    if service_effect.effect_reply_payload(ticket_use_effect)[0] != ticket_service.TICKET_INVALID {
+        return 78
+    }
+
+    return 0
+}
+
+func run_shell_lifecycle_probe(state: *boot.KernelBootState) i32 {
+    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_QUEUE))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_QUEUE, serial_protocol.LIFECYCLE_RELOAD) {
+        return 79
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_ECHO))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_ECHO, serial_protocol.LIFECYCLE_RESET) {
+        return 80
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_SERIAL))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_SERIAL, serial_protocol.LIFECYCLE_NONE) {
+        return 81
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_restart(serial_protocol.TARGET_SERIAL))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.InvalidArgument, serial_protocol.TARGET_SERIAL, serial_protocol.LIFECYCLE_NONE) {
+        return 82
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_enqueue(71))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 83
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_enqueue(72))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 84
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_restart(serial_protocol.TARGET_QUEUE))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_QUEUE, serial_protocol.LIFECYCLE_RELOAD) {
+        return 85
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 86
+    }
+    if service_effect.effect_reply_payload(effect)[0] != 71 {
+        return 87
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 88
+    }
+    if service_effect.effect_reply_payload(effect)[0] != 72 {
+        return 89
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_restart(serial_protocol.TARGET_ECHO))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_ECHO, serial_protocol.LIFECYCLE_RESET) {
+        return 90
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(41, 42))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 91
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(43, 44))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 92
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(45, 46))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 93
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(47, 48))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 94
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(49, 50))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
+        return 95
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_restart(serial_protocol.TARGET_ECHO))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_ECHO, serial_protocol.LIFECYCLE_RESET) {
+        return 96
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(51, 52))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 97
+    }
+    if service_effect.effect_reply_payload(effect)[0] != 51 {
+        return 98
+    }
+    if service_effect.effect_reply_payload(effect)[1] != 52 {
+        return 99
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_LOG))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_LOG, serial_protocol.LIFECYCLE_RELOAD) {
+        return 100
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, ipc.payload_byte(serial_protocol.CMD_X, serial_protocol.CMD_G, serial_protocol.TARGET_LOG, serial_protocol.CMD_BANG)))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.InvalidArgument {
+        return 101
+    }
+    if service_effect.effect_reply_payload_len(effect) != 2 {
+        return 102
+    }
+    if service_effect.effect_reply_payload(effect)[0] != shell_service.SHELL_INVALID_REPLY {
+        return 103
+    }
+    if service_effect.effect_reply_payload(effect)[1] != shell_service.SHELL_INVALID_COMMAND {
+        return 104
+    }
+
     return 0
 }
 
@@ -459,5 +657,9 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
-    return run_restart_probe(state)
+    result = run_restart_probe(state)
+    if result != 0 {
+        return result
+    }
+    return run_shell_lifecycle_probe(state)
 }

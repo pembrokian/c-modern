@@ -1919,6 +1919,10 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         if (!node.package_identity.empty()) {
             sema_options.current_package_identity = node.package_identity;
         }
+        if (node.source_paths.size() > 1) {
+            sema_options.module_part_paths = CanonicalizeModuleSourcePaths(node.source_paths);
+            sema_options.module_part_line_stride = kMergedModulePartLineStride;
+        }
 
         const auto source_text = ReadLogicalModuleSourceText(node.source_paths, diagnostics);
         if (!source_text.has_value()) {

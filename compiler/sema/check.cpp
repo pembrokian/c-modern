@@ -274,12 +274,16 @@ class Checker {
             const std::filesystem::path& file_path,
                         std::optional<std::string> current_package_identity,
             const ImportedModules* imported_modules,
-            support::DiagnosticSink& diagnostics)
+            support::DiagnosticSink& diagnostics,
+            std::vector<std::filesystem::path> module_part_paths = {},
+            std::size_t module_part_line_stride = 0)
                 : source_file_(source_file),
                     file_path_(file_path),
                     current_package_identity_(std::move(current_package_identity)),
                     imported_modules_(imported_modules),
-                    diagnostics_(diagnostics) {}
+                    diagnostics_(diagnostics),
+                    module_part_paths_(std::move(module_part_paths)),
+                    module_part_line_stride_(module_part_line_stride) {}
 
     CheckResult Run() {
         auto module = std::make_unique<Module>();
@@ -326,9 +330,19 @@ class Checker {
 
   private:
     void Report(const mc::support::SourceSpan& span, const std::string& message) {
+        std::filesystem::path path = file_path_;
+        support::SourceSpan resolved = span;
+        if (module_part_line_stride_ > 0 && !module_part_paths_.empty()) {
+            const std::size_t part = span.begin.line / module_part_line_stride_;
+            if (part < module_part_paths_.size()) {
+                path = module_part_paths_[part];
+                resolved.begin.line = span.begin.line - part * module_part_line_stride_;
+                resolved.end.line = span.end.line - part * module_part_line_stride_;
+            }
+        }
         diagnostics_.Report({
-            .file_path = file_path_,
-            .span = span,
+            .file_path = path,
+            .span = resolved,
             .severity = DiagnosticSeverity::kError,
             .message = message,
         });
@@ -2684,6 +2698,8 @@ class Checker {
     std::optional<std::string> current_package_identity_;
     const ImportedModules* imported_modules_;
     support::DiagnosticSink& diagnostics_;
+    std::vector<std::filesystem::path> module_part_paths_;
+    std::size_t module_part_line_stride_ = 0;
     Module* module_ = nullptr;
     std::unordered_map<std::string, Decl::Kind> value_symbols_;
     std::unordered_map<std::string, Decl::Kind> type_symbols_;
@@ -2828,7 +2844,8 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
     }
 
     const ImportedModules* imported_modules_ptr = imported_modules.empty() ? nullptr : &imported_modules;
-    auto checked = Checker(source_file, normalized_path, options.current_package_identity, imported_modules_ptr, diagnostics).Run();
+    auto checked = Checker(source_file, normalized_path, options.current_package_identity, imported_modules_ptr, diagnostics,
+                           options.module_part_paths, options.module_part_line_stride).Run();
     Module visible_module = checked.module != nullptr ? BuildImportVisibleModuleSurface(*checked.module, source_file) : Module {};
     visible_cache[normalized_path] = visible_module;
     visit_state[normalized_path] = VisitState::kDone;

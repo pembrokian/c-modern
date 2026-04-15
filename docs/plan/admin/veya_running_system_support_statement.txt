@@ -9,10 +9,10 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 187 does and does not support.
+through Phase 188 does and does not support.
 
 This is the current refreshed running-system statement.  It supersedes the
-earlier Phase 120 through Phase 121 statement and reflects the post-Phase-185
+earlier Phase 120 through Phase 121 statement and reflects the post-Phase-188
 landing.
 
 This note is intentionally narrower than the current-position assessment.
@@ -106,12 +106,15 @@ Repository status note
 - Phase 187 adds one bounded retained `queue_service` with explicit FIFO,
   full, empty, snapshot, and reload behavior under that same flat lifecycle
   split.
+- Phase 188 adds one bounded reset-style `ticket_service` whose shell-visible
+  issued tickets carry an epoch byte and become explicitly stale across
+  restart while the public endpoint id remains stable.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 109 through Phase 187 running-system slice,
+- State only the admitted Phase 109 through Phase 188 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
@@ -141,6 +144,9 @@ Frozen support matrix
   via init-owned restart; echo_service with bounded request-derived replies
   and explicit exhaustion after four uses; transfer_service as one bounded
   transferred-handle consumer that performs one follow-through send;
+  ticket_service as one bounded reset-style owner that issues two-byte
+  `[epoch, id]` tickets and rejects stale or already-consumed tickets
+  explicitly;
   shell_service as a stateless
   command-routing owner with compact hostile-user invalid classification
   (`?C` unknown command, `?S` malformed admitted shape); serial_service as
@@ -149,8 +155,9 @@ Frozen support matrix
   with `InvalidCapability` unless they target the explicit transfer endpoint
 - admitted topology boundary: service_topology.mc owns SERIAL_ENDPOINT_ID,
   SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, KV_ENDPOINT_ID, ECHO_ENDPOINT_ID,
-  TRANSFER_ENDPOINT_ID, and QUEUE_ENDPOINT_ID as the neutral topology module
-  with no service imports; shell_service.mc is topology-neutral;
+  TRANSFER_ENDPOINT_ID, QUEUE_ENDPOINT_ID, and TICKET_ENDPOINT_ID as the
+  neutral topology module with no service imports; shell_service.mc is
+  topology-neutral;
   service_topology also owns static restart classification; kernel_dispatch
   routes through named arms referencing service_topology
 - admitted event codes boundary: event_codes.mc owns EVENT_SERIAL_BUFFERED
@@ -194,8 +201,8 @@ Frozen support matrix
   Phase 182 restart identity continuity, Phase 183 endpoint ownership and
   authority audit, Phase 184 capability propagation and leakage probe, Phase
   185 IPC shape re-audit under restart and retained state, Phase 186 boot
-  decomposition and lifecycle audit, and Phase 187 retained queue service
-  follow-through
+  decomposition and lifecycle audit, Phase 187 retained queue service
+  follow-through, and Phase 188 restart-visible ticket service follow-through
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,

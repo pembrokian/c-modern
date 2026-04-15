@@ -196,6 +196,9 @@ void TestDuplicateTopLevelAcrossModulePartsFails(const std::filesystem::path& bi
     ExpectOutputContains(output,
                          "duplicate top-level value symbol: answer",
                          "duplicate top-level declarations across module parts should fail deterministically");
+    ExpectOutputContains(output,
+                         "helper_b.mc",
+                         "duplicate-symbol diagnostic should name the contributing part file, not the primary part file");
 }
 
 }  // namespace
