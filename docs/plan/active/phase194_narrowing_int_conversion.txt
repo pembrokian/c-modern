@@ -1,0 +1,180 @@
+Phase 194 -- Narrow Explicit Integer Conversion For Compact Protocol Packing
+==========================================================================
+
+Status
+------
+PARKED
+
+Purpose
+-------
+Consider one narrow explicit integer-conversion surface so admitted low-level
+owners can state intentional byte or word truncation directly in source
+without reopening implicit numeric coercions, broader arithmetic widening, or
+a general cast framework.
+
+This phase should answer one recurring compiler pressure point that has now
+appeared in more than one real kernel follow-through.
+Compact shell and service protocols naturally carry byte-sized payloads, but
+the underlying state they need to expose or compare often lives in wider
+integer fields.
+The language currently requires compatible operand widths and has no explicit
+conversion form that says "truncate this wider integer to the target width on
+purpose".
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase188_restart_visible_ticket_service_follow_through.txt`
+- `docs/plan/active/phase193_bounded_shell_service_identity_query_follow_through.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has multiple honest compact protocol owners whose
+  payloads are byte-sized by design.
+- Phase 188 used a bounded ticket protocol where stale-state truth and
+  compact payload shape had to stay explicit without reopening transport or
+  compiler surfaces.
+- Phase 193 hit the same underlying limit again when the shell-visible
+  generation query needed four fixed bytes but service-instance generation
+  naturally lived as a wider numeric counter.
+- The landed Phase 193 implementation therefore kept an owner-local tracked
+  four-byte generation payload beside the numeric generation counter in
+  `kernel/src/service_identity.mc` and `kernel/src/boot.mc` instead of
+  widening compiler behavior.
+
+Problem being solved
+--------------------
+- The current language has no narrow explicit conversion form for intentional
+  width changes such as `u32` to `u8` when packing compact payload bytes.
+- Mixed-width integer comparison and byte extraction therefore pressure owner
+  code into one of two unsatisfying shapes:
+  1. keep parallel same-width shadow state solely so compact payloads can be
+     answered without explicit packing
+  2. restructure protocols to avoid the conversion instead of stating the
+     intended truncation directly
+- That pressure is still bounded today, but it has now recurred across two
+  real admitted consumers rather than one isolated local neatness request.
+
+Core rule
+---------
+- Keep any admitted conversion explicit at the source site.
+- Require the destination width or destination integer type to be named by
+  the programmer.
+- Preserve the current rule that the language does not perform implicit
+  numeric narrowing across mixed-width operations.
+- Prefer one conversion expression form over a larger arithmetic redesign.
+- Do not let this phase become a general cast framework, pointer-cast system,
+  or hidden coercion policy.
+
+Chosen conversion shape
+-----------------------
+If this parked phase is reopened, the narrowest honest shape is:
+
+1. admit one explicit integer-conversion expression that names the target
+   integer type directly at the conversion site
+2. support only integer-to-integer width changes in the first slice
+3. allow explicit narrowing and widening between the existing scalar integer
+   types only
+4. keep overflow or truncation semantics explicit and deterministic rather
+   than implicit in ordinary arithmetic or comparison
+5. spend the feature immediately on one real compact-packing owner instead of
+   landing it as unused language surface
+
+Likely syntax direction
+-----------------------
+The likely direction for a future active implementation is one explicit
+target-typed conversion form such as:
+
+1. `u8(expr)` for integer-to-integer conversion where the target type is
+   named directly
+2. or another equally explicit target-typed form if parser pressure proves
+   the parenthesized call-like spelling ambiguous in practice
+
+The important constraint is not the exact token spelling.
+The important constraint is that the source must state the target integer
+type explicitly and that ordinary mixed-width arithmetic must continue to
+reject implicit narrowing.
+
+Why this is the right next step
+-------------------------------
+- It addresses a real recurring pressure point already seen in active kernel
+  work rather than a speculative language neatness request.
+- It would let compact protocol owners state intentional byte packing or
+  width alignment directly in source instead of carrying parallel tracked
+  payload state solely to satisfy current typing limits.
+- It stays much smaller and more honest than a broader cast model because the
+  feature can be limited to scalar integer conversions only.
+
+Required implementation surfaces
+--------------------------------
+If this phase is reopened for implementation, the likely owning surfaces are:
+
+1. `compiler/parse/parser_expr.cpp`
+   - parse one explicit target-typed integer-conversion expression without
+     widening the rest of expression grammar unnecessarily
+
+2. `compiler/ast/ast.h`
+   - add the narrowest expression representation needed to distinguish an
+     explicit integer conversion from an ordinary call or type expression
+
+3. `compiler/sema/check.cpp`
+   - validate that the source expression and target type are both integer
+     types and reject non-integer uses in the first slice
+
+4. `compiler/mir/`
+   - lower the admitted conversions deterministically with explicit width
+     change semantics rather than hidden coercion
+
+5. `compiler/codegen_llvm/`
+   - map the narrowed MIR conversion operation onto the existing integer
+     conversion primitives in the backend
+
+6. `kernel/src/ticket_service.mc` or `kernel/src/service_identity.mc`
+   - spend the feature immediately on one real compact-packing or byte-
+     comparison path that currently carries owner-local workaround state
+
+7. `tests/compiler/sema/` and `tests/compiler/mir/`
+   - add focused positive and negative coverage for explicit integer
+     conversion legality, determinism, and rejection of implicit narrowing
+
+Chosen slice for this phase
+---------------------------
+1. one explicit integer-to-integer conversion form
+2. explicit narrowing and widening only for scalar integer types
+3. no implicit mixed-width coercions in arithmetic, comparison, or aggregate
+   construction
+4. one immediate kernel spend on compact protocol packing or byte comparison
+5. one bounded negative test surface proving non-integer casts remain out of
+   scope
+
+What this phase should not do
+-----------------------------
+- no implicit numeric coercion rules
+- no pointer casts, address reinterpretation, or ABI escape hatch
+- no float conversion model
+- no general cast framework shared across all type families
+- no hidden truncation in comparison or assignment
+- no backend-only legalization that sema does not model explicitly
+
+Planning rule for this phase
+----------------------------
+- Reopen only when a real admitted owner is more distorted by same-width
+  shadow state or protocol reshaping than by the language staying explicit.
+- Start from the smallest real kernel consumer rather than from an abstract
+  numeric-type completeness goal.
+- Keep the semantics target-typed, explicit, and deterministic.
+- If the design starts pressuring broader coercion rules, stop and keep this
+  phase parked rather than widening it opportunistically.
+
+What this phase should prove
+----------------------------
+- that the language can admit one honest low-level integer-conversion step
+  without reopening implicit coercion policy
+- that compact protocol packing can be expressed directly in source when the
+  programmer intentionally names the destination width
+- that the real owner-local workaround pressure from Phases 188 and 193 can
+  be relieved by one narrow compiler slice rather than by broader numeric or
+  framework growth

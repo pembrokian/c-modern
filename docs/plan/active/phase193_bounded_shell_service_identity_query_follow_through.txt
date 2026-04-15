@@ -1,0 +1,179 @@
+Phase 193 -- Bounded Shell Service Identity Query Follow-Through
+================================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Spend the restart-identity split from Phase 182 on one compact shell-visible
+query so callers can observe service-instance replacement directly without
+widening into discovery, a supervisor, or a broader lifecycle framework.
+
+This phase should add one bounded identity query over the existing shell
+control path.
+The query should expose the current service generation for one fixed
+boot-wired target while preserving the existing split contract:
+endpoint id and pid stay stable, but the service instance generation changes
+ on explicit restart.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase186_boot_decomposition_and_lifecycle_audit.txt`
+- `docs/plan/active/phase189_bounded_shell_lifecycle_control_follow_through.txt`
+- `docs/plan/active/phase188_restart_visible_ticket_service_follow_through.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already names the split contract explicitly in
+  `kernel/src/service_identity.mc` and threads generation markers through
+  `boot.mc`.
+- The current user-facing shell path can query lifecycle class and request an
+  explicit restart, but it cannot ask which concrete service instance is live.
+- Ticket service already makes restart-visible discontinuity matter for one
+  owner-local protocol, but the shell still lacks a direct identity query over
+  the general boot-wired service set.
+- The shell payload remains intentionally compact and fixed-width.
+
+Implementation result
+---------------------
+- `kernel/src/serial_protocol.mc` now admits `XI<target>!` on the existing `X`
+  control family.
+- `kernel/src/shell_service.mc` remains the command parser and reply-shaping
+  owner; identity queries reuse the existing shell-endpoint control hop and
+  return one fixed four-byte generation payload.
+- `kernel/src/kernel_dispatch.mc` performs the bounded shell-control follow-
+  through for `XI` alongside the existing `XR` path.
+- `kernel/src/boot.mc` and `kernel/src/service_identity.mc` remain the source
+  of generation truth; the landed implementation carries both numeric
+  generation and the shell-visible four-byte generation payload so the kernel
+  can answer compact identity queries without widening compiler surfaces.
+- `kernel/src/scenarios.mc` now proves the shell-visible identity change for
+  one reload owner (`queue`) and one reset owner (`echo`) while the existing
+  restart-identity checks continue to prove stable endpoint and pid continuity.
+- `tests/system/kernel_reset_lane_phase193_shell_identity/` adds the focused
+  reset-lane fixture for the bounded shell-visible identity contract.
+- No compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+  was admitted in this phase.
+
+Problem being solved
+--------------------
+- Restart identity is true in the kernel model and observable in internal
+  tests, but it is still weakly exposed at the direct user-facing control
+  surface.
+- A caller can restart a service through the shell today, but cannot query the
+  current generation before and after that restart without relying on an
+  indirect service-local protocol such as ticket invalidation.
+- Without one bounded shell-visible identity query, the split between stable
+  routing continuity and replaced service-instance continuity remains more
+  documented than exercised.
+
+Core rule
+---------
+- Keep `shell_service.mc` as the command parser and reply-shaping owner.
+- Keep `service_identity.mc` and `boot.mc` as the source of service-instance
+  truth.
+- Keep `init.mc` as the explicit restart enactment owner.
+- Reuse the existing shell endpoint control path rather than inventing a new
+  transport or discovery surface.
+- Keep the reply compact and deterministic.
+- Do not widen into dynamic discovery, broader lifecycle payloads, or a
+  supervisor-facing control plane.
+
+Chosen interaction shape
+------------------------
+Chosen shape for this phase:
+
+1. add one shell-visible identity query verb inside the existing `X` control
+   family, for example `XI<target>!`
+2. map the target byte through the existing boot-wired public-name table in
+   `shell_service.mc`
+3. return one four-byte reply payload containing the current service
+   generation in a fixed byte order, with the target implied by the request
+4. keep lifecycle-class queries on the existing `XQ<target>!` path rather than
+   merging lifecycle and identity into one wider reply
+5. prove one before-restart versus after-restart identity change for both one
+   reset owner and one reload owner while endpoint identity remains stable
+
+Why this is the right next step
+-------------------------------
+- It spends existing restart-identity truth directly at the user-facing shell
+  boundary instead of only through service-local side effects.
+- It reuses the already admitted boot-wired fixed-target model and does not
+  need dynamic naming or discovery.
+- It keeps the question narrow: expose one current generation marker and stop
+  there.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `kernel/src/shell_service.mc`
+   - add one new identity-query verb and compact reply shaping
+
+2. `kernel/src/serial_protocol.mc`
+   - add the smallest command-byte vocabulary needed for the identity query
+
+3. `kernel/src/boot.mc`
+   - expose the current service marks through the existing `boot_*_mark(...)`
+     helpers or the smallest adjacent helper if a target-lookup bridge is
+     needed
+
+4. `kernel/src/service_identity.mc`
+   - remain the owner of generation meaning and accessors; touch only if a
+     fixed-byte encoding helper is the narrowest honest owner
+
+5. `kernel/src/kernel_dispatch.mc`
+   - route the shell-triggered query without widening the effect model
+
+6. `kernel/src/scenarios.mc`
+   - add one live workflow that queries a service mark, restarts the target,
+     then queries again and verifies generation change with stable endpoint
+     continuity
+
+7. `tests/system/` and `tests/tool/tool_kernel_reset_lane_suite.cpp`
+   - add one focused reset-lane fixture and workflow registration proving the
+     shell-visible identity contract directly
+
+Chosen slice for this phase
+---------------------------
+1. one shell-visible identity query verb
+2. one fixed four-byte generation reply
+3. one reset-service proof showing generation changes after restart
+4. one reload-service proof showing retained state may survive while
+   generation still changes
+5. one hostile-input proof keeping malformed identity queries shell-owned
+
+What this phase should not do
+-----------------------------
+- no dynamic discovery or service registry
+- no widened shell payload model beyond the fixed four-byte reply
+- no richer lifecycle payload bundle combining class, pid, and generation in
+  one multi-purpose message
+- no supervisor, health-check, or retry policy
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Planning rule for this phase
+----------------------------
+- Keep the query target fixed by the existing shell target byte table.
+- Expose only generation truth; reuse the existing lifecycle query for restart
+  class.
+- Preserve the current endpoint-stable contract explicitly in the scenario and
+  fixture wording.
+- If the reply shape starts pressuring richer packing, name that as a separate
+  follow-on rather than widening this phase.
+
+What this phase should prove
+----------------------------
+- that the Phase 182 split contract is not only documented but directly
+  user-visible through the admitted shell path
+- that stable routing continuity and replaced service-instance continuity
+  remain separately observable after later lifecycle follow-through
+- that the shell control family can grow by one more bounded identity query
+  without becoming a broader control framework

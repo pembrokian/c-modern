@@ -1,5 +1,5 @@
 schema = 1
-project = "kernel-reset-lane-phase177-hostile-shell"
+project = "kernel-reset-lane-phase193-shell-identity"
 default = "app"
 
 [targets.app]

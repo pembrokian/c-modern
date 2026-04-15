@@ -101,7 +101,7 @@ void RunKernelResetLaneScenario(const std::filesystem::path& source_root,
     ExpectKernelResetLaneRunSuccess(scenario, run_outcome, run_output);
 }
 
-constexpr std::array<ResetLaneScenario, 29> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 30> kResetLaneScenarios = {{
     {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run"},
     {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run"},
     {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run"},
@@ -131,6 +131,7 @@ constexpr std::array<ResetLaneScenario, 29> kResetLaneScenarios = {{
     {"phase 187 retained queue reload", "tests/system/kernel_reset_lane_phase187_retained_queue_reload", "kernel_reset_lane_phase187_retained_queue_reload_project", "kernel_reset_lane_phase187_retained_queue_reload_build", "app", "kernel_reset_lane_phase187_retained_queue_reload_build_output.txt", "kernel_reset_lane_phase187_retained_queue_reload_run_output.txt", "kernel reset lane phase 187 retained queue reload build", "kernel reset lane phase 187 retained queue reload run"},
     {"phase 188 ticket restart", "tests/system/kernel_reset_lane_phase188_ticket_restart", "kernel_reset_lane_phase188_ticket_restart_project", "kernel_reset_lane_phase188_ticket_restart_build", "app", "kernel_reset_lane_phase188_ticket_restart_build_output.txt", "kernel_reset_lane_phase188_ticket_restart_run_output.txt", "kernel reset lane phase 188 ticket restart build", "kernel reset lane phase 188 ticket restart run"},
     {"phase 189 shell lifecycle", "tests/system/kernel_reset_lane_phase189_shell_lifecycle", "kernel_reset_lane_phase189_shell_lifecycle_project", "kernel_reset_lane_phase189_shell_lifecycle_build", "app", "kernel_reset_lane_phase189_shell_lifecycle_build_output.txt", "kernel_reset_lane_phase189_shell_lifecycle_run_output.txt", "kernel reset lane phase 189 shell lifecycle build", "kernel reset lane phase 189 shell lifecycle run"},
+    {"phase 193 shell identity", "tests/system/kernel_reset_lane_phase193_shell_identity", "kernel_reset_lane_phase193_shell_identity_project", "kernel_reset_lane_phase193_shell_identity_build", "app", "kernel_reset_lane_phase193_shell_identity_build_output.txt", "kernel_reset_lane_phase193_shell_identity_run_output.txt", "kernel reset lane phase 193 shell identity build", "kernel reset lane phase 193 shell identity run"},
 }};
 
 }  // namespace

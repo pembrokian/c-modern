@@ -75,6 +75,10 @@ func encode_lifecycle_query(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_Q, target, CMD_BANG)
 }
 
+func encode_lifecycle_identity(target: u8) [4]u8 {
+    return ipc.payload_byte(CMD_X, CMD_I, target, CMD_BANG)
+}
+
 func encode_lifecycle_restart(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_R, target, CMD_BANG)
 }

@@ -92,6 +92,10 @@ func cmd_lifecycle_query(target: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_query(target))
 }
 
+func cmd_lifecycle_identity(target: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_identity(target))
+}
+
 func cmd_lifecycle_restart(target: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_restart(target))
 }
@@ -293,6 +297,30 @@ func expect_lifecycle(effect: service_effect.Effect, status: syscall.SyscallStat
         return false
     }
     if payload[1] != mode {
+        return false
+    }
+    return true
+}
+
+func expect_identity(effect: service_effect.Effect, status: syscall.SyscallStatus, mark: service_identity.ServiceMark) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return false
+    }
+    payload: [4]u8 = service_effect.effect_reply_payload(effect)
+    expected: [4]u8 = service_identity.mark_generation_payload(mark)
+    if payload[0] != expected[0] {
+        return false
+    }
+    if payload[1] != expected[1] {
+        return false
+    }
+    if payload[2] != expected[2] {
+        return false
+    }
+    if payload[3] != expected[3] {
         return false
     }
     return true
@@ -538,115 +566,149 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
 }
 
 func run_shell_lifecycle_probe(state: *boot.KernelBootState) i32 {
-    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_QUEUE))
-    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_QUEUE, serial_protocol.LIFECYCLE_RELOAD) {
+    queue_before: service_identity.ServiceMark = boot.boot_queue_mark(*state)
+    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_identity(serial_protocol.TARGET_QUEUE))
+    if !expect_identity(effect, syscall.SyscallStatus.Ok, queue_before) {
         return 79
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_QUEUE))
+    if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_QUEUE, serial_protocol.LIFECYCLE_RELOAD) {
+        return 80
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_ECHO))
     if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_ECHO, serial_protocol.LIFECYCLE_RESET) {
-        return 80
+        return 81
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_SERIAL))
     if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_SERIAL, serial_protocol.LIFECYCLE_NONE) {
-        return 81
+        return 82
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_restart(serial_protocol.TARGET_SERIAL))
     if !expect_lifecycle(effect, syscall.SyscallStatus.InvalidArgument, serial_protocol.TARGET_SERIAL, serial_protocol.LIFECYCLE_NONE) {
-        return 82
+        return 83
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_enqueue(71))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 83
+        return 84
     }
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_enqueue(72))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 84
+        return 85
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_restart(serial_protocol.TARGET_QUEUE))
     if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_QUEUE, serial_protocol.LIFECYCLE_RELOAD) {
-        return 85
-    }
-
-    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return 86
     }
-    if service_effect.effect_reply_payload(effect)[0] != 71 {
-        return 87
+
+    queue_after: service_identity.ServiceMark = boot.boot_queue_mark(*state)
+    queue_id: i32 = expect_restart_identity(queue_before, queue_after, 87)
+    if queue_id != 0 {
+        return queue_id
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_identity(serial_protocol.TARGET_QUEUE))
+    if !expect_identity(effect, syscall.SyscallStatus.Ok, queue_after) {
+        return 91
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 88
+        return 92
+    }
+    if service_effect.effect_reply_payload(effect)[0] != 71 {
+        return 93
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_queue_dequeue())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return 94
     }
     if service_effect.effect_reply_payload(effect)[0] != 72 {
-        return 89
+        return 95
+    }
+
+    echo_before: service_identity.ServiceMark = boot.boot_echo_mark(*state)
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_identity(serial_protocol.TARGET_ECHO))
+    if !expect_identity(effect, syscall.SyscallStatus.Ok, echo_before) {
+        return 96
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_restart(serial_protocol.TARGET_ECHO))
     if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_ECHO, serial_protocol.LIFECYCLE_RESET) {
-        return 90
+        return 97
+    }
+
+    echo_after: service_identity.ServiceMark = boot.boot_echo_mark(*state)
+    echo_id: i32 = expect_restart_identity(echo_before, echo_after, 98)
+    if echo_id != 0 {
+        return echo_id
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_identity(serial_protocol.TARGET_ECHO))
+    if !expect_identity(effect, syscall.SyscallStatus.Ok, echo_after) {
+        return 102
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(41, 42))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 91
+        return 103
     }
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(43, 44))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 92
+        return 104
     }
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(45, 46))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 93
+        return 105
     }
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(47, 48))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 94
+        return 106
     }
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(49, 50))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
-        return 95
+        return 107
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_restart(serial_protocol.TARGET_ECHO))
     if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_ECHO, serial_protocol.LIFECYCLE_RESET) {
-        return 96
+        return 108
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_echo(51, 52))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return 97
+        return 109
     }
     if service_effect.effect_reply_payload(effect)[0] != 51 {
-        return 98
+        return 110
     }
     if service_effect.effect_reply_payload(effect)[1] != 52 {
-        return 99
+        return 111
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, cmd_lifecycle_query(serial_protocol.TARGET_LOG))
     if !expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_LOG, serial_protocol.LIFECYCLE_RELOAD) {
-        return 100
+        return 112
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(state, serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, ipc.payload_byte(serial_protocol.CMD_X, serial_protocol.CMD_G, serial_protocol.TARGET_LOG, serial_protocol.CMD_BANG)))
+    effect = kernel_dispatch.kernel_dispatch_step(state, serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, ipc.payload_byte(serial_protocol.CMD_X, serial_protocol.CMD_I, serial_protocol.CMD_BANG, serial_protocol.CMD_BANG)))
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.InvalidArgument {
-        return 101
+        return 113
     }
     if service_effect.effect_reply_payload_len(effect) != 2 {
-        return 102
+        return 114
     }
     if service_effect.effect_reply_payload(effect)[0] != shell_service.SHELL_INVALID_REPLY {
-        return 103
+        return 115
     }
     if service_effect.effect_reply_payload(effect)[1] != shell_service.SHELL_INVALID_COMMAND {
-        return 104
+        return 116
     }
 
     return 0

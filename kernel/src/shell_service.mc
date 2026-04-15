@@ -1,6 +1,7 @@
 import primitives
 import serial_protocol
 import service_effect
+import service_identity
 import service_topology
 import syscall
 
@@ -74,6 +75,14 @@ func lifecycle_effect(status: syscall.SyscallStatus, target: u8, endpoint: u32) 
     return service_effect.effect_reply(status, 2, payload)
 }
 
+func lifecycle_identity_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
+}
+
+func lifecycle_identity_effect(status: syscall.SyscallStatus, generation_payload: [4]u8) service_effect.Effect {
+    return service_effect.effect_reply(status, 4, generation_payload)
+}
+
 func lifecycle_restart_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
 }
@@ -143,6 +152,9 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
         }
         if m.payload[1] == serial_protocol.CMD_Q {
             return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], endpoint)
+        }
+        if m.payload[1] == serial_protocol.CMD_I {
+            return lifecycle_identity_request(s, m)
         }
         if m.payload[1] == serial_protocol.CMD_R {
             return lifecycle_restart_request(s, m)

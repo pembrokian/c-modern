@@ -12,5 +12,12 @@ env = "hosted"
 [targets.kernel.search_paths]
 modules = ["src", "../stdlib"]
 
+[targets.kernel.module_sets.boot]
+files = [
+	"src/boot.mc",
+	"src/boot_update.mc",
+	"src/boot_identity.mc"
+]
+
 [targets.kernel.runtime]
 startup = "default"

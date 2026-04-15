@@ -12,5 +12,12 @@ env = "hosted"
 [targets.app.search_paths]
 modules = ["__KERNEL_NEW_SRC__"]
 
+[targets.app.module_sets.boot]
+files = [
+	"__KERNEL_NEW_SRC__/boot.mc",
+	"__KERNEL_NEW_SRC__/boot_update.mc",
+	"__KERNEL_NEW_SRC__/boot_identity.mc"
+]
+
 [targets.app.runtime]
 startup = "default"

@@ -1,0 +1,152 @@
+Phase 195 -- Narrow Record-Update Syntax For Owner-Local State Mutation
+=======================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Admit one explicit immutable record-update expression form so owner-local code
+can replace repeated whole-record reconstruction with a direct copy-with
+syntax, without widening into hidden mutation, object methods, or a broader
+state-management framework.
+
+This phase should close a real source-level ergonomics gap that remains after
+the aggregate-literal work from Phases 191 and 192.
+The target is not a new data model.
+The target is one clearer source form for the already-admitted "copy this
+record and replace these fields" pattern.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase164_struct_embedding_pressure_audit_and_conditional_admission.txt`
+- `docs/plan/active/phase191_constant_aggregate_tables_for_flat_owner_data.txt`
+- `docs/plan/active/phase192_inferred_brace_aggregate_follow_through.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already resolved one earlier state-update pressure point by
+  extracting owner-local `with_*` helpers instead of admitting struct
+  embedding.
+- Later kernel work introduced `ServiceCell<T>` in `kernel/src/boot.mc`, which
+  reduced generation bookkeeping but still left many explicit
+  `KernelBootState{ ... old.other ... }` reconstruction sites.
+- The recent aggregate-literal phases removed obvious type boilerplate, but
+  they did not change the cost of "copy the old record, update one field".
+- The backlog and decision log now name record-update syntax as the strongest
+  language ergonomics follow-through if that pattern becomes the dominant
+  owner-local noise source.
+
+Problem being solved
+--------------------
+- Owner-local state code still has to restate every untouched field when
+  constructing an updated record value.
+- That is honest but increasingly noisy in `kernel/src/boot.mc` and adjacent
+  state-owner modules where the real operation is "preserve the existing
+  record and replace one or two fields".
+- Without one narrow record-update form, later owner-local cleanup will keep
+  multiplying small `with_*` wrappers or full aggregate reconstructions even
+  when the intended state transition is already explicit.
+
+Core rule
+---------
+- Keep record update explicit and immutable.
+- Require an existing record-typed base value.
+- Allow updating only named fields that already belong to the base record.
+- Preserve the current field-order, layout, and type rules.
+- Do not widen into hidden mutation, nested path updates, collection updates,
+  structural typing, or object-style methods.
+
+Chosen syntax and scope
+-----------------------
+Chosen shape for this phase:
+
+1. admit one explicit record-update expression form: `base with { field:
+   value, ... }`
+2. require `base` to have a concrete struct or record type already known at
+   the expression site
+3. infer the result type directly from `base`
+4. copy all omitted fields from `base` unchanged
+5. reject unknown fields, duplicate fields, and updates whose replacement type
+   does not match the declared field type
+
+Why this is the right next step
+-------------------------------
+- It directly addresses owner-local pressure already visible in active kernel
+  code rather than inventing a speculative data abstraction.
+- It builds on the recent aggregate-literal work without reopening broader
+  compile-time execution or standalone aggregate semantics.
+- It is smaller and more honest than struct embedding or a generic state
+  framework because the operation remains "copy, then replace named fields".
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `compiler/ast/ast.h`
+   - add one explicit record-update expression node or the narrowest
+     equivalent representation over the existing aggregate-expression family
+
+2. `compiler/parse/parser_expr.cpp`
+   - parse the chosen `with { ... }` expression form with the smallest
+     precedence and recovery impact
+
+3. `compiler/sema/check.cpp`
+   - validate that the base expression is record-typed, every updated field
+     exists, replacements type-check, and omitted fields are carried from the
+     base
+
+4. `compiler/mir/`
+   - lower record update deterministically, likely as one explicit copy of the
+     base aggregate plus field replacements rather than a new runtime feature
+
+5. `kernel/src/boot.mc`
+   - spend the feature immediately on the `bootwith_*` and `bootrestart_*`
+     family where it removes real whole-record reconstruction noise
+
+6. `kernel/src/serial_shell_path.mc` or the narrowest adjacent owner
+   - spend the feature on one smaller non-boot record update site if that
+     proves the form is useful beyond one file
+
+7. `tests/compiler/sema/` and `tests/compiler/mir/`
+   - add focused positive and negative coverage for typing, field ownership,
+     and lowering determinism
+
+Chosen slice for this phase
+---------------------------
+1. one explicit `base with { ... }` syntax
+2. record-only updates with known field names
+3. same-type replacement checking
+4. immediate owner-local spend in active kernel state code
+5. no nested or generalized update semantics
+
+What this phase should not do
+-----------------------------
+- no hidden mutation or in-place update semantics
+- no nested path update such as `base with { child.field: value }`
+- no array, slice, map, or buffer update syntax
+- no object methods, property promotion, or struct embedding
+- no broader compile-time execution, reflection, or pattern-matching work
+
+Planning rule for this phase
+----------------------------
+- Start from one concrete owner-local record-rebuild family in `boot.mc`.
+- Lower through existing aggregate and field mechanisms rather than inventing
+  a new runtime concept.
+- Preserve deterministic dumps and fixture output.
+- If the syntax pressures nested updates or collection updates, stop and name
+  that as a separate follow-on rather than widening this phase.
+
+What this phase should prove
+----------------------------
+- that the repository can remove a real owner-local state-update boilerplate
+  source without reopening broader data-model work
+- that recent aggregate-literal ergonomics can be extended one step further in
+  an explicit, non-magical way
+- that active kernel code can become clearer at the exact sites where the
+  current language still forces full-record restatement

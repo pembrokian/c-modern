@@ -1,0 +1,144 @@
+Phase 196 -- Queue Observability And Peek Follow-Through
+=======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Add one bounded non-destructive observation surface to the retained queue
+owner so callers can inspect queued state directly without widening into a
+mailbox framework, subscriptions, or richer queue policy.
+
+This phase should make the queue owner's retained state more honestly usable
+under repeated interaction.
+The queue should remain a fixed-capacity, service-local FIFO with explicit
+enqueue, dequeue, reload-on-restart, and no blocking receive semantics.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase159_observability_as_a_system_property.txt`
+- `docs/plan/active/phase177_shell_as_hostile_user_boundary.txt`
+- `docs/plan/active/phase187_retained_queue_service_follow_through.txt`
+- `docs/plan/active/phase189_bounded_shell_lifecycle_control_follow_through.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has one retained FIFO owner in
+  `kernel/src/queue_service.mc` with explicit enqueue and destructive dequeue.
+- Queue reload after restart is already proved, but the current public
+  interaction surface can observe queued state only by consuming it.
+- The queue service already tracks its length internally through `len`, and
+  the shell path already owns one bounded `Q` command family.
+- The repository still has no mailbox subsystem, blocking receive path, or
+  subscription model.
+
+Problem being solved
+--------------------
+- A caller can store values in the queue and consume them, but cannot ask how
+  much retained queue state currently exists or inspect the next value without
+  mutating the queue.
+- That makes the retained queue honest as a consumptive owner but still
+  awkward as a visible user-facing stateful service.
+- Without one bounded non-destructive observation step, the queue owner risks
+  remaining less inspectable than the log or key-value owners despite already
+  participating in retained restart semantics.
+
+Core rule
+---------
+- Keep `queue_service.mc` as the owner of FIFO state and observation truth.
+- Keep `shell_service.mc` as the parser and route owner for compact queue
+  commands.
+- Prefer one non-destructive `count` path and one non-destructive `peek` path
+  over broader iteration or mailbox semantics.
+- Reuse the current fixed four-byte shell frame and one-byte queue element
+  model.
+- Do not widen into subscriptions, blocking dequeue, queue iteration, or a
+  general observability framework.
+
+Chosen interaction shape
+------------------------
+Chosen shape for this phase:
+
+1. add one shell-visible queue-count query, for example `QC!!`
+2. add one shell-visible queue-peek query, for example `QP!!`
+3. make count return `Ok` with `reply_payload_len = s.len` and zero reply
+   payload bytes, reusing the existing compact observability pattern instead
+   of introducing numeric packing work
+4. make peek return `Ok` with one reply byte equal to the next queued value
+   without mutating queue state
+5. keep empty-queue peek as an explicit service-owned `InvalidArgument`
+   consequence rather than inventing an option type or sentinel payload
+
+Why this is the right next step
+-------------------------------
+- It spends the already-admitted retained queue owner on a real user-facing
+  observability question instead of adding a new service prematurely.
+- It follows the same discipline as Phase 159: close one observation gap
+  through the nearest owner with no framework growth.
+- It preserves the queue as a simple FIFO while making retained state more
+  honestly inspectable.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `kernel/src/queue_service.mc`
+   - add one non-destructive `queue_peek(...)` helper and the narrowest
+     reply-shaping support for `count` and `peek`
+
+2. `kernel/src/shell_service.mc`
+   - extend the existing `Q` family with compact `count` and `peek` verbs
+
+3. `kernel/src/serial_protocol.mc`
+   - add the smallest command-byte vocabulary needed for queue observation
+
+4. `kernel/src/scenarios.mc`
+   - add one live workflow proving that `count` and `peek` are non-mutating,
+     that dequeue still consumes, and that retained queue state survives one
+     explicit reload-style restart unchanged
+
+5. `tests/system/` and `tests/tool/tool_kernel_reset_lane_suite.cpp`
+   - add one focused reset-lane fixture and one workflow registration over the
+     queue observation contract
+
+Chosen slice for this phase
+---------------------------
+1. one queue-count query
+2. one queue-peek query
+3. one empty-queue rejection path for peek
+4. one proof that count and peek do not mutate queue state
+5. one retained-restart proof that count and peek report the same queued state
+   before and after reload
+
+What this phase should not do
+-----------------------------
+- no blocking receive or mailbox semantics
+- no queue iteration or multi-element dump surface
+- no subscription, notification, or event-stream model
+- no capacity growth, fairness policy, or broader scheduler work
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Planning rule for this phase
+----------------------------
+- Keep the queue payload one byte per element and the shell frame fixed-width.
+- Use `reply_payload_len` for count so the phase does not widen numeric
+  conversion or payload packing work.
+- Keep emptiness classification inside `queue_service.mc`, not in the shell.
+- If repeated queue consumers start needing more than count and next-value
+  observation, name that as a separate mailbox or queue-policy phase instead
+  of widening this one.
+
+What this phase should prove
+----------------------------
+- that the retained queue owner can support one honest non-destructive
+  observation surface without becoming a mailbox subsystem
+- that retained queue state remains directly inspectable across reload-style
+  restart
+- that the shell command family can grow a small queue-observation slice while
+  preserving service-owned semantics and compact hostile-input handling
