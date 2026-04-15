@@ -1,0 +1,165 @@
+Phase 187 -- Retained Queue Service Follow-Through
+==================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue the service-system frontier by adding one new user-facing retained
+service whose state is ordered and partially consumptive rather than append-
+only or key-addressed.
+
+This phase should add one bounded in-memory `queue_service` to the running
+kernel slice.
+It should prove that the current explicit restart and retained-state model can
+carry one FIFO-style owner with enqueue and dequeue behavior without widening
+into mailboxes, async receive, scheduler work, or a persistence framework.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase143_long_lived_log_service_follow_through.txt`
+- `docs/plan/archive/phase144_stateful_key_value_service_follow_through.txt`
+- `docs/plan/archive/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/active/phase179_bounded_retained_state_reload_probe.txt`
+- `docs/plan/active/phase181_key_value_retained_state_reload_follow_through.txt`
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase186_boot_decomposition_and_lifecycle_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has two explicit retained-state reload owners:
+  `log_service` and `kv_service`.
+- Both of those owners retain state across restart, but neither yet answers a
+  different user-facing pressure: ordered retained elements with destructive
+  read semantics.
+- The current system still has no mailbox subsystem, blocking receive owner,
+  event queue framework, or asynchronous delivery model.
+- The next honest retained-state question is therefore not durability or
+  storage hierarchy; it is whether one bounded FIFO owner still fits the
+  current flat boot, init, shell, and dispatch split.
+
+Problem being solved
+--------------------
+- The current retained-state slice may still be too specialized. Append-only
+  log history and key-addressed overwrite semantics do not yet prove that the
+  current restart-with-reload shape can carry ordered state with destructive
+  consumption.
+- Without one queue-shaped owner, the repository cannot tell whether retained
+  reload remains an owner-local pattern or only happened to work for two
+  friendlier state shapes.
+- The repository therefore needs one bounded FIFO service that is directly
+  user-visible, restartable with explicit retained reload, and small enough to
+  avoid opening a scheduler, IPC, or persistence redesign.
+
+Core rule
+---------
+- Keep ordering, full, empty, and dequeue semantics inside `queue_service`.
+- Keep the queue bounded, in-memory, and deterministic.
+- Keep restart policy explicit and init-owned.
+- Preserve the current lifecycle split from Phase 186: topology classifies the
+  service as restartable with reload, and `init.mc` performs the actual
+  replacement.
+- Keep the shell route compact and fixed-size; do not use this phase to widen
+  the transport model.
+- Do not admit blocking wait, subscriptions, background consumers, or a
+  general message-queue framework.
+
+Chosen queue shape
+------------------
+Chosen shape for this phase:
+
+1. one new `queue_service` owner with a bounded FIFO of small fixed payload
+   elements
+2. one shell-routed enqueue path
+3. one shell-routed dequeue path with an explicit empty consequence
+4. one optional bounded query such as count or peek only if it is needed to
+   keep the audit legible; do not widen beyond the smallest useful shape
+5. one explicit retained-state reload path proving that queue order and live
+   occupancy survive restart exactly as saved
+
+Why this is the right next step
+-------------------------------
+- It adds a second family of user-facing retained state without widening the
+  system into infrastructure.
+- It pressures the current reload model in a way that log and key-value do
+  not: order matters, removal matters, and head or tail position must remain
+  honest across restart.
+- It is still small enough to stay owner-local and deterministic.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `kernel/src/queue_service.mc`
+   - introduce the new bounded queue owner, retained state shape, explicit
+     full or empty consequences, and reload helpers
+
+2. `kernel/src/service_topology.mc`
+   - add one new endpoint id, one new slot constant, increment
+     `SERVICE_COUNT`, and classify `queue_service` as
+     `ServiceRestartMode.Reload`
+
+3. `kernel/src/boot.mc`
+   - add one boot-owned service cell for the queue owner
+
+4. `kernel/src/init.mc`
+   - add one explicit `restart_queue(...)` path using a queue-owned snapshot
+     and reload helper
+
+5. `kernel/src/shell_service.mc` and `kernel/src/serial_protocol.mc`
+   - add only the smallest command vocabulary needed to drive enqueue and
+     dequeue from the existing compact shell path
+
+6. `kernel/src/kernel_dispatch.mc` and `kernel/src/service_effect.mc`
+   - route the new service path without widening into a broader dispatch or
+     effect framework
+
+7. `kernel/src/scenarios.mc`
+   - extend the live scripted path with one queue workflow plus one restart
+     follow-through
+
+8. `tests/system/` and `tests/tool/tool_kernel_reset_lane_suite.cpp`
+   - add one focused reset-lane fixture and one workflow-suite registration
+     proving pre-restart order, post-restart preserved order, and explicit
+     empty or full truth
+
+Chosen slice for this phase
+---------------------------
+1. one new bounded queue owner
+2. one enqueue path and one dequeue path over the existing shell route
+3. one explicit empty consequence and one explicit full policy
+4. one retained-state snapshot and reload path
+5. one live restart proof that queue contents and order survive replacement
+
+What this phase should not do
+-----------------------------
+- no mailbox or actor framework
+- no blocking receive or wakeup API
+- no scheduler, interrupt, or timer expansion
+- no durable persistence claim
+- no shell scripting, batching, or text protocol redesign
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Planning rule for this phase
+----------------------------
+- Keep the queue element shape tiny and explicit.
+- Prefer one service-owned fixed-capacity queue over any generic collection or
+  framework abstraction.
+- If retained reload works cleanly, say so directly.
+- If queue order or destructive read semantics expose a blur, name the
+  narrowest blocked owner rather than widening into a larger subsystem.
+
+What this phase should prove
+----------------------------
+- that the current retained-state reload model is not limited to append-only
+  or key-addressed services
+- that one ordered consumptive service can fit the present flat lifecycle and
+  dispatch structure honestly
+- that the next service-system step is still concrete implementation work,
+  not only more classification

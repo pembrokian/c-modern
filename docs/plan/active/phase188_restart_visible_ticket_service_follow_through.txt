@@ -1,0 +1,163 @@
+Phase 188 -- Restart-Visible Ticket Service Follow-Through
+==========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Add one new user-facing service whose whole point is to make reset-style
+restart truth visible to callers rather than only to internal audits.
+
+This phase should add one bounded `ticket_service` that issues small tokens
+and later validates or consumes them.
+Unlike the retained-state services, this owner should deliberately reset on
+restart so that pre-restart tickets become invalid in an explicit,
+user-visible way.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/archive/phase149_restart_semantics_as_a_first_class_pattern.txt`
+- `docs/plan/active/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase183_endpoint_ownership_and_authority_audit.txt`
+- `docs/plan/active/phase185_ipc_shape_reaudit_under_restart_and_retained_state.txt`
+- `docs/plan/active/phase186_boot_decomposition_and_lifecycle_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has reset-style restart owners in `echo_service` and
+  `transfer_service`, but their reset truth is mostly internal: bounded
+  request count or transfer-local state is replaced without creating a richer
+  user-facing stale-state question.
+- Phase 182 made service-instance replacement explicit through generation
+  markers, but most callers still do not depend directly on that boundary.
+- The system still has no capability framework, session registry, or ambient
+  identity layer.
+- The next honest restart-focused service question is therefore whether one
+  compact user-facing owner can make instance discontinuity matter without
+  widening into authority or supervisor work.
+
+Problem being solved
+--------------------
+- The current reset semantics are architecturally honest but still weakly
+  user-felt. A caller can observe that a service was restarted, but the model
+  has not yet proved one bounded workflow where pre-restart service-issued
+  state becomes invalid in a way a user-visible protocol must handle.
+- Without that pressure, restart identity can remain true in docs while still
+  being too easy to ignore at the interaction boundary.
+- The repository therefore needs one compact ticket-like owner whose issued
+  state is valid only for one service instance and becomes explicitly invalid
+  after reset-style restart.
+
+Core rule
+---------
+- Keep ticket issuance, validation, consumption, and stale-ticket rejection
+  inside `ticket_service`.
+- Keep the service reset-style rather than retained-reload.
+- Make the restart-visible distinction explicit in the service protocol,
+  likely through a small instance marker or epoch carried by the ticket itself.
+- Keep the shell route compact and deterministic.
+- Do not turn this phase into a capability system, authentication layer, or
+  general session framework.
+
+Chosen ticket shape
+-------------------
+Chosen shape for this phase:
+
+1. one new `ticket_service` owner that issues bounded compact tickets
+2. one shell-routed `issue` path that returns one ticket for later use
+3. one shell-routed `use` or `consume` path that validates the presented
+   ticket against the current service instance
+4. one explicit stale or invalid ticket consequence
+5. one restart follow-through proving that endpoint identity stays stable
+   while previously issued tickets become invalid after reset-style restart
+
+Why this is the right next step
+-------------------------------
+- It spends the restart-identity work from Phases 182 and 186 on a service
+  a caller can actually misuse after restart.
+- It keeps the pressure narrow: one small protocol, one user-visible stale
+  consequence, one explicit reset contract.
+- It does not require a wider IPC, authority, or lifecycle framework.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `kernel/src/ticket_service.mc`
+   - introduce the new bounded ticket owner, issuance rules, instance marker,
+     and stale-ticket rejection semantics
+
+2. `kernel/src/service_topology.mc`
+   - add one new endpoint id, one new slot constant, increment
+     `SERVICE_COUNT`, and classify `ticket_service` as
+     `ServiceRestartMode.Reset`
+
+3. `kernel/src/boot.mc`
+   - add one boot-owned service cell for the ticket owner
+
+4. `kernel/src/init.mc`
+   - add one explicit `restart_ticket(...)` path that resets service state and
+     advances the caller-visible restart-visible marker
+
+5. `kernel/src/shell_service.mc` and `kernel/src/serial_protocol.mc`
+   - add the smallest command vocabulary needed to issue and use tickets over
+     the existing compact shell path
+
+6. `kernel/src/service_identity.mc`
+   - touch only if the smallest honest protocol reuses the current generation
+     truth rather than inventing a second restart marker family
+
+7. `kernel/src/kernel_dispatch.mc` and `kernel/src/service_effect.mc`
+   - route the new service path without widening the generic transport model
+
+8. `kernel/src/scenarios.mc`
+   - add one live restart workflow showing ticket issuance, explicit restart,
+     old-ticket rejection, and post-restart new-ticket success
+
+9. `tests/system/` and `tests/tool/tool_kernel_reset_lane_suite.cpp`
+   - add one focused fixture and workflow registration proving the reset
+     contract directly
+
+Chosen slice for this phase
+---------------------------
+1. one new reset-style ticket owner
+2. one ticket-issue path
+3. one ticket-use path
+4. one explicit stale-ticket consequence after restart
+5. one live proof that restart-visible instance change matters to callers
+
+What this phase should not do
+-----------------------------
+- no capability framework or rights algebra
+- no authentication or user identity model
+- no broader handle-transfer expansion
+- no supervisor or policy engine
+- no dynamic discovery or namespace growth
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Planning rule for this phase
+----------------------------
+- Prefer one small restart-visible protocol over a richer service feature set.
+- Keep ticket representation tiny enough to fit the current compact shell
+  route.
+- Reuse existing service-identity truth where it is already honest; do not
+  invent a second identity subsystem just for this phase.
+- If the service forces a new blur, name that blur precisely instead of
+  widening into framework work.
+
+What this phase should prove
+----------------------------
+- that reset-style restart semantics can be made user-visible without opening
+  a capability or session framework
+- that stable endpoint identity and replaced service-instance identity remain
+  distinguishable under real use
+- that the service frontier still yields bounded concrete work after the
+  lifecycle-owner repair in Phase 186

@@ -20,23 +20,10 @@ import log_service
 import service_topology
 import transfer_service
 
-func can_restart(endpoint: u32) bool {
-    if endpoint == service_topology.LOG_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == service_topology.KV_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == service_topology.ECHO_ENDPOINT_ID {
-        return true
-    }
-    if endpoint == service_topology.TRANSFER_ENDPOINT_ID {
-        return true
-    }
-    return false
-}
-
 func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
+    if !service_topology.service_can_restart(endpoint) {
+        return state
+    }
     if endpoint == service_topology.LOG_ENDPOINT_ID {
         return restart_log(state)
     }

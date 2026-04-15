@@ -1,0 +1,141 @@
+Phase 190 -- Multi-File Diagnostic Ownership Follow-Through
+===========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Take the active multi-file module backlog item and turn it into one bounded
+compiler or tooling follow-through: semantic diagnostics for project-mode
+multi-file modules should point at the exact contributing file part rather
+than only at the logical module's canonical primary source path.
+
+This phase should improve diagnostic ownership only.
+It should preserve the current explicit `module_sets.<module>.files = [...]`
+model and avoid reopening the broader module-system design.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase127_project_mode_multi_file_modules.txt`
+- `docs/plan/active/phase184b_tool_workflow_suite_domain_split.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- Project-mode multi-file ordinary modules are already supported through
+  explicit `module_sets.<module>.files = [...]` tables.
+- The first cut intentionally merged logical module parts for semantic
+  checking while preserving one canonical source identity for some diagnostics
+  and artifacts.
+- A later repair already solved sema and MIR span-collision pressure by
+  offsetting later parts into unique synthetic line ranges before semantic
+  checking.
+- The remaining user-facing gap is narrower: some semantic diagnostics for
+  non-primary module parts can still anchor to the logical module's canonical
+  path rather than the exact contributing file.
+
+Problem being solved
+--------------------
+- Current behavior is semantically correct but ergonomically distorted for
+  larger logical modules: the user can get the right error message on the
+  wrong file path.
+- Without one bounded follow-through, the repository risks either living with
+  misleading diagnostics or overreacting by reopening AST identity, module
+  semantics, or a larger package design.
+- The repository therefore needs one source-ownership repair that maps the
+  merged logical-module spans back to exact part files for diagnostics while
+  leaving logical-module identity, import semantics, and artifact naming
+  unchanged.
+
+Core rule
+---------
+- Preserve the current explicit project-mode `module_sets` design.
+- Preserve logical-module artifact identity and deterministic merged checking.
+- Improve only diagnostic file ownership and original line or column mapping.
+- Prefer one additive source-part ownership map over a broad AST or module
+  rewrite.
+- Do not widen into direct-source multi-file mode, multi-file `internal`
+  modules, source-language module-part declarations, or package redesign.
+
+Chosen slice for this phase
+---------------------------
+1. one failing multi-file project fixture whose semantic error originates in a
+   non-primary module part and currently demonstrates the path-ownership gap
+2. one driver or source-manager mapping from merged synthetic spans back to
+   exact part file plus original line range
+3. one semantic diagnostic emission path that uses that mapping for user-
+   facing diagnostics
+4. one explicit statement that `.mci`, build-state, and logical-module
+   identity remain keyed by logical module rather than by part file
+5. one focused regression in the active workflow or tool suite proving the
+   corrected file ownership deterministically
+
+Why this is the right placement
+-------------------------------
+- The backlog already names this as the strongest compiler-focused detour that
+  improves real usability without reopening the language model.
+- The current multi-file module slice is mature enough that the remaining
+  pain is no longer correctness but ownership precision.
+- This is the smallest honest compiler-facing step if the repository wants a
+  detour from more kernel growth.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `compiler/driver/builder.cpp`
+   - preserve merged logical-module assembly while exposing enough part
+     ownership metadata for later diagnostics
+
+2. `compiler/support/source_manager.h` and `compiler/support/source_manager.cpp`
+   - own the source-part mapping from synthetic merged locations back to exact
+     file path and original line or column information if this is the
+     narrowest owner
+
+3. `compiler/support/diagnostics.h` and `compiler/support/diagnostics.cpp`
+   - render the corrected file ownership in emitted diagnostics
+
+4. `compiler/sema/check.cpp`
+   - touch only where semantic diagnostics need to preserve or forward the
+     corrected source identity
+
+5. `tests/tool/tool_multifile_module_suite.cpp`
+   - add one focused regression over a semantic failure in a later module part
+
+6. `tests/compiler/sema/` or the narrowest adjacent fixture layer
+   - add a compiler-facing fixture only if the tool suite alone is too coarse
+     to prove the exact ownership repair
+
+What this phase should not do
+-----------------------------
+- no module-system redesign
+- no direct-source multi-file workflow
+- no multi-file `internal` modules
+- no package or namespace redesign
+- no artifact naming change for `.mci`, MIR, or build-state outputs
+- no parser, sema, MIR, backend, ABI, target, runtime, or `hal` widening
+  beyond the narrow diagnostic-ownership repair
+
+Planning rule for this phase
+----------------------------
+- Start from one concrete misattributed semantic diagnostic.
+- Repair file ownership first; only widen line or column plumbing if the
+  concrete failing case requires it.
+- Keep the fix inside current logical-module truth rather than changing what a
+  module is.
+- If a broader AST identity gap is truly required, record that explicitly in
+  the decision log rather than smuggling it in as a diagnostic fix.
+
+What this phase should prove
+----------------------------
+- that the repository can improve multi-file developer ergonomics without
+  reopening the module-system design
+- that semantic diagnostics for merged logical modules can name the exact
+  contributing file deterministically
+- that a compiler-facing detour remains available when the team wants one,
+  but it can stay bounded and evidence-driven

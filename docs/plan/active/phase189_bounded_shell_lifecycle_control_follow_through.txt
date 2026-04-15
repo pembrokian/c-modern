@@ -1,0 +1,156 @@
+Phase 189 -- Bounded Shell Lifecycle Control Follow-Through
+===========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Add one bounded user-facing shell interaction that exercises the current
+topology, lifecycle classification, and explicit restart split directly
+without widening into a supervisor or admin framework.
+
+This phase should expose one compact shell-owned lifecycle control surface
+over the existing service system.
+The shell should remain a parser and route owner; topology should remain the
+owner of static lifecycle classification; `init.mc` should remain the owner of
+restart enactment.
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/archive/phase142_serial_shell_command_routing.txt`
+- `docs/plan/archive/phase145_service_restart_failure_and_usage_pressure_audit.txt`
+- `docs/plan/active/phase177_shell_as_hostile_user_boundary.txt`
+- `docs/plan/active/phase178_topology_and_restart_growth_reaudit.txt`
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase183_endpoint_ownership_and_authority_audit.txt`
+- `docs/plan/active/phase186_boot_decomposition_and_lifecycle_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The shell path is already real, hostile-input classification is explicit,
+  and the current service set is now large enough that lifecycle facts are not
+  purely internal anymore.
+- Phase 186 clarified the split: `service_topology.mc` names static restart
+  class, and `init.mc` enacts restart.
+- The system still has no supervisor, health checker, dynamic registry, or
+  general shell runtime.
+- The next honest interaction pressure is therefore one compact shell-visible
+  lifecycle command that proves the new owner split is usable, not just well
+  documented.
+
+Problem being solved
+--------------------
+- The current lifecycle split is clear in code and docs, but still largely
+  exercised by scripted scenarios rather than by a bounded user-facing path.
+- Without one shell-visible lifecycle interaction, the repository risks
+  keeping restart classification and explicit restart policy correct yet too
+  detached from the actual human-usable control surface.
+- The repository therefore needs one compact shell verb family that can ask
+  what lifecycle class a public service has and perform one explicit restart
+  on a restartable target without widening into supervision.
+
+Core rule
+---------
+- `serial_service` remains transport-only.
+- `shell_service` owns command parsing, target classification, and compact
+  user-visible consequences.
+- `service_topology.mc` remains the owner of static lifecycle facts.
+- `init.mc` remains the only owner that actually replaces service state.
+- Keep the lifecycle surface fixed, tiny, and explicit.
+- Do not widen into dynamic service discovery, health monitoring, policy
+  loops, or a full admin console.
+
+Chosen interaction shape
+------------------------
+Chosen shape for this phase:
+
+1. one shell-visible command that queries bounded lifecycle facts for a named
+   public service, likely at least restartability and reload-versus-reset
+2. one shell-visible command that requests explicit restart for a restartable
+   service by fixed compact identifier
+3. one explicit rejection path for non-restartable targets such as serial or
+   shell
+4. one explicit post-restart truth check using at least one reload-style
+   service and one reset-style service
+5. one hostile-input path keeping invalid lifecycle commands shell-owned and
+   compact
+
+Why this is the right next step
+-------------------------------
+- It spends the Phase 186 owner repair on a direct user-facing workflow.
+- It pressures the exact boundaries that were recently clarified without
+  inventing a broader subsystem.
+- It can reuse the newer retained and reset services as concrete lifecycle
+  discriminators rather than relying only on internal probes.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `kernel/src/shell_service.mc` and `kernel/src/serial_protocol.mc`
+   - add one compact lifecycle query verb and one compact restart verb with
+     fixed command classification and bounded replies
+
+2. `kernel/src/service_topology.mc`
+   - provide the lifecycle facts the shell is allowed to surface, without
+     absorbing reply-shaping or command parsing
+
+3. `kernel/src/init.mc`
+   - remain the enactment owner for restart requests and reject no-op or
+     unsupported targets only where enactment truth requires it
+
+4. `kernel/src/kernel_dispatch.mc` or the smallest adjacent live owner
+   - route the new shell-triggered control path without turning lifecycle
+     control into a general endpoint family
+
+5. `kernel/src/service_identity.mc`
+   - expose the smallest restart-visible truth needed for bounded post-action
+     confirmation if the chosen reply shape needs it
+
+6. `kernel/src/scenarios.mc`
+   - add one live workflow that queries a target, restarts it, and verifies
+     the expected retained-versus-reset consequence
+
+7. `tests/system/` and `tests/tool/tool_kernel_reset_lane_suite.cpp`
+   - add one focused workflow fixture and one workflow-suite registration over
+     the shell-visible lifecycle surface
+
+Chosen slice for this phase
+---------------------------
+1. one lifecycle-query command
+2. one explicit restart command
+3. one rejection path for non-restartable public services
+4. one post-restart proof over one reload owner and one reset owner
+5. one hostile-input proof keeping malformed lifecycle traffic shell-owned
+
+What this phase should not do
+-----------------------------
+- no supervisor or health-monitor framework
+- no autonomous restart policy
+- no dynamic service registry or discovery shell
+- no text shell, scripting, or wider payload model
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Planning rule for this phase
+----------------------------
+- Expose only the lifecycle facts the current topology already knows.
+- Keep restart an explicit user action, not a kernel policy loop.
+- Prefer fixed compact target identifiers over any dynamic naming surface.
+- If the current owner split still works cleanly under a shell-visible path,
+  say so directly.
+- If not, name the narrowest owner blur instead of widening into framework
+  work.
+
+What this phase should prove
+----------------------------
+- that the Phase 186 lifecycle-owner split is usable as well as correct
+- that one user-facing lifecycle control path can remain compact and honest
+  without creating a supervisor
+- that shell interaction can keep growing in bounded steps rather than only
+  through broader protocol redesign

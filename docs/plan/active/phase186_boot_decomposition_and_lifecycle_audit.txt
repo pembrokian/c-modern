@@ -3,7 +3,74 @@ Phase 186 -- Boot Decomposition And Lifecycle Audit
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 186 landed as one bounded lifecycle-owner repair rather than as a boot
+rewrite, supervisor, or compiler-facing expansion.
+
+The re-audit result is: the current split is still the narrowest honest shape,
+but one lifecycle classification had drifted into the wrong owner.
+
+- `boot.mc` remains the state-construction owner for the boot-wired kernel
+  image; it still owns `KernelBootState`, `kernel_init()`, and the explicit
+  state-update helpers
+- `kernel_dispatch.mc` remains the runtime dispatch owner; no restart policy,
+  topology growth, or lifecycle framework was added there
+- `scenarios.mc` remains the scripted live-operation owner; Phase 186 makes no
+  new loop or supervisor layer
+- `init.mc` remains the explicit restart-policy owner, but is now limited to
+  restart enactment rather than also owning static lifecycle classification
+- `service_topology.mc` now owns the static lifecycle classification that was
+  already implicit in the fixed boot-wired topology:
+  - `service_restart_mode(endpoint)` names whether a public service is
+    non-restartable, restartable with empty-state reset, or restartable with
+    explicit retained-state reload
+  - `service_can_restart(endpoint)` names the flat restartability fact
+  - `service_restart_reloads_state(endpoint)` names whether retained state is
+    part of that restart contract
+- the old `init.can_restart(...)` helper is removed; the topology owner now
+  answers classification, and init answers execution through
+  `restart(state, endpoint)`
+
+What did not change:
+
+- no supervisor, retry framework, registry, or lifecycle subsystem
+- no change to the current flat restart contract: serial and shell still do
+  not restart; log and kv still reload retained state; echo and transfer still
+  restart from an empty baseline
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Phase result
+------------
+The current boot or init or runtime split is still the right one at this
+scale.
+
+The only concrete blur was that a static topology fact had been exposed as an
+init-owned helper.  Phase 186 repairs that by moving lifecycle classification
+next to the static slot owner while keeping restart enactment explicit and
+flat in `init.mc`.
+
+That leaves the system in a Ken-Thompson-simple shape:
+
+- topology names static services and their lifecycle class
+- init performs explicit replacement when a caller chooses restart
+- boot holds the state being replaced
+- the live path stays a direct scripted loop with no lifecycle framework
+
+Implementation files changed
+----------------------------
+- `kernel/src/service_topology.mc`
+- `kernel/src/init.mc`
+- `tests/system/kernel_reset_lane_phase178_topology_restart/src/main.mc`
+- `docs/plan/active/phase186_boot_decomposition_and_lifecycle_audit.txt`
+- `docs/plan/decision_log.txt`
+- `docs/plan/backlog.txt`
+
+Validation
+----------
+- `kernel_reset_lane_phase178_topology_restart`
 
 Purpose
 -------

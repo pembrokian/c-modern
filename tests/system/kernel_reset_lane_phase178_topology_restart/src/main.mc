@@ -47,23 +47,35 @@ func smoke_topology_is_enumerable() bool {
     return true
 }
 
-func smoke_restart_owner_stays_flat() bool {
-    if init.can_restart(service_topology.SERIAL_ENDPOINT_ID) {
+func smoke_lifecycle_classification_stays_flat() bool {
+    if service_topology.service_can_restart(service_topology.SERIAL_ENDPOINT_ID) {
         return false
     }
-    if init.can_restart(service_topology.SHELL_ENDPOINT_ID) {
+    if service_topology.service_can_restart(service_topology.SHELL_ENDPOINT_ID) {
         return false
     }
-    if !init.can_restart(service_topology.LOG_ENDPOINT_ID) {
+    if !service_topology.service_can_restart(service_topology.LOG_ENDPOINT_ID) {
         return false
     }
-    if !init.can_restart(service_topology.KV_ENDPOINT_ID) {
+    if !service_topology.service_restart_reloads_state(service_topology.LOG_ENDPOINT_ID) {
         return false
     }
-    if !init.can_restart(service_topology.ECHO_ENDPOINT_ID) {
+    if !service_topology.service_can_restart(service_topology.KV_ENDPOINT_ID) {
         return false
     }
-    if !init.can_restart(service_topology.TRANSFER_ENDPOINT_ID) {
+    if !service_topology.service_restart_reloads_state(service_topology.KV_ENDPOINT_ID) {
+        return false
+    }
+    if !service_topology.service_can_restart(service_topology.ECHO_ENDPOINT_ID) {
+        return false
+    }
+    if service_topology.service_restart_reloads_state(service_topology.ECHO_ENDPOINT_ID) {
+        return false
+    }
+    if !service_topology.service_can_restart(service_topology.TRANSFER_ENDPOINT_ID) {
+        return false
+    }
+    if service_topology.service_restart_reloads_state(service_topology.TRANSFER_ENDPOINT_ID) {
         return false
     }
     return true
@@ -113,7 +125,7 @@ func main() i32 {
     if !smoke_topology_is_enumerable() {
         return 1
     }
-    if !smoke_restart_owner_stays_flat() {
+    if !smoke_lifecycle_classification_stays_flat() {
         return 2
     }
     if !smoke_endpoint_restart_recovers_echo() {

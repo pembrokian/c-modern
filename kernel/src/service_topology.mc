@@ -43,6 +43,12 @@ struct ServiceSlot {
     pid: u32
 }
 
+enum ServiceRestartMode {
+    None,
+    Reset,
+    Reload,
+}
+
 const SERIAL_SLOT: ServiceSlot = ServiceSlot{ endpoint: SERIAL_ENDPOINT_ID, pid: 1 }
 const SHELL_SLOT: ServiceSlot = ServiceSlot{ endpoint: SHELL_ENDPOINT_ID, pid: 2 }
 const LOG_SLOT: ServiceSlot = ServiceSlot{ endpoint: LOG_ENDPOINT_ID, pid: 3 }
@@ -107,6 +113,39 @@ func service_slot_is_valid(slot: ServiceSlot) bool {
         return false
     }
     return true
+}
+
+// Lifecycle classification stays with the static slot owner.
+// init.mc enacts restart, but the topology module names which public services
+// restart at all and which ones reload retained state.
+func service_restart_mode(endpoint: u32) ServiceRestartMode {
+    if endpoint == LOG_ENDPOINT_ID {
+        return ServiceRestartMode.Reload
+    }
+    if endpoint == KV_ENDPOINT_ID {
+        return ServiceRestartMode.Reload
+    }
+    if endpoint == ECHO_ENDPOINT_ID {
+        return ServiceRestartMode.Reset
+    }
+    if endpoint == TRANSFER_ENDPOINT_ID {
+        return ServiceRestartMode.Reset
+    }
+    return ServiceRestartMode.None
+}
+
+func service_can_restart(endpoint: u32) bool {
+    if service_restart_mode(endpoint) == ServiceRestartMode.None {
+        return false
+    }
+    return true
+}
+
+func service_restart_reloads_state(endpoint: u32) bool {
+    if service_restart_mode(endpoint) == ServiceRestartMode.Reload {
+        return true
+    }
+    return false
 }
 
 // endpoint_is_boot_wired returns true when the endpoint id names one of the
